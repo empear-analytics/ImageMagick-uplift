@@ -4318,6 +4318,7 @@ holds them there:
   Directory and the tile menu time out or never settle; Print, Launch and Browse Documentation
   start external programs.
 - **xwindow.c**: XMakeImageMSBFirst needs an MSB-first server (Xvfb is LSB-first), and XDitherImage
-  and XRenderImage are not reached from any screen type tried (eight Xvfb visuals).
+  an HP Color Recovery visual. XRenderImage is reachable (annotate.c draws text in an X11 font,
+  a font name starting with "-"): a case for it is next, after the sweep.
 
 Overnight `x11cl13`: a confirmation sweep of all six W01 files on fresh baselines (cap 1500).
