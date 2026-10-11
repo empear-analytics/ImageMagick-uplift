@@ -5434,3 +5434,9 @@ indexes failed
 13:46 resweep annotate:   killed 442, survived 71 (4 capped), no coverage 92, errors 0
 14:45 resweep draw:   killed 1923, survived 529 (317 capped), no coverage 92, errors 0
 == confirm-loop Sun Oct 11 14:45:15 UTC 2026: cases since 342bd757f, at 029569055 X11 cases: display's color and matte edit through their own 
+14:46 pushed
+14:49 16 new cases since 342bd757f
+14:49 selfcheck: 16 cases, 6 runs each, 0 nondeterministic
+14:50 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+14:50 confirm image:   killed 0, survived 0 (0 capped), no coverage 93, errors 0
+14:50 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0

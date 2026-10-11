@@ -37,4 +37,4 @@ mutate: 93 mutants, 0s
   SyncImage                              1      0        0      1
   SyncImagesSettings                     1      0        0      1
 
-  full results: build-oracle/work/mutation-confirm-342bd757f-image.json
+  full results: build-oracle/work/mutation-confirm-029569055-image.json
