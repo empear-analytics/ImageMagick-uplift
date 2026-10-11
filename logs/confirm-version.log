@@ -1,5 +1,5 @@
 mutate: 6 mutants in MagickCore/version\.c$, 4 functions
-mutate: baseline over 17 cases in 0s
+mutate: baseline over 16 cases in 0s
   mutants: 6/6 (2s)
 
 mutate: 6 mutants, 2s
@@ -16,4 +16,4 @@ mutate: 6 mutants, 2s
     x  version.c:625:15 cxx_ne_to_eq               if (version != (size_t *) NULL)
   (x: the oracle executes this line; c: capped, not every reaching case ran)
 
-  full results: build-oracle/work/mutation-confirm-342bd757f-version.json
+  full results: build-oracle/work/mutation-confirm-029569055-version.json
