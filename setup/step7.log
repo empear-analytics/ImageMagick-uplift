@@ -5531,3 +5531,7 @@ indexes failed
 16:10 confirm memory:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 16:11 confirm configure:   killed 0, survived 0 (0 capped), no coverage 46, errors 0
 16:11 confirm delegate:   killed 0, survived 0 (0 capped), no coverage 50, errors 0
+16:11 pushed
+16:11 confirm mime:   killed 0, survived 0 (0 capped), no coverage 23, errors 0
+16:11 confirm log:   killed 0, survived 0 (0 capped), no coverage 64, errors 0
+16:11 confirm type:   killed 0, survived 0 (0 capped), no coverage 58, errors 0
