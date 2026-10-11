@@ -4275,3 +4275,49 @@ not display's 20.2; Color and Matte's Method menu lists Undefined first.
 display.c 16% -> 23% adjusted (x11cl12 and every W01 rerun merged), xwindow.c 34% -> 35%. Left
 out, measured: a point element (freehand: it draws only while the pointer moves), Annotate's
 Font Name > 6x10 (no such font under Xvfb; a notice waits).
+
+### W01: the X11 files' plateau (Windows, 2026-10-11, evening)
+
+More rounds the same way (each: new cases, then every open display, xwindow and widget mutant
+against them, uncapped):
+
+| round | cases | kills |
+|---|---|---|
+| `annot1011` | Annotate: typed text, Apply, a second line, BackSpace, ctrl+u, colors, angles (`6d6cec7ae`) | 82 |
+| `menu1011` | menu items at 22 px, rotate, chop's direction, crop's button (`0142f2326`) | 50 |
+| `pan1011` | an image larger than the screen: the pan icon dragged, clicked; arrow keys (`913664ccd`) | 54 |
+| `crop1011` | the crop rectangle adjusted: arrows, Home, Page Up/Down, corners dragged (`ba9aa6da9`) | 24 |
+| `paste1011` | paste's Operator menu (`6fbc4c4e8`) | 5 |
+| `roi1011` | Region of Interest with Apply's commands (`62730b34a`) | 40 |
+| `comp1011` | Composite: image from the browser, operator, dissolve (`45bba5020`) | 37 |
+| `mag1011` | the second button held on the image (XMagnifyImage) (`7f2d1c336`) | 19 |
+| `keys1011` | v, ctrl+r, Alt with arrows (trim an edge), Alt dialogs; xevents learns alt+ (`f81b27ccb`) | 23 |
+| `info1011b` | the image info text grabbed (`07ad48eb5`) | 39 |
+
+**Display's menus are 22 pixels apart, not 20.2** (a grab of Transform): from the seventh item
+on, the earlier menu cases pressed the item before the one named, and several "left out,
+measured" items (Threshold, Edge Detect, Spread, Shade, Raise, Normalize, Region of Interest)
+had been measured on the wrong item. Those cases keep their labels and ids (their kills are
+real); the items are now placed right. A dialog mapped in the menu's own window keeps the pointer
+where the item was, outside the dialog below y=120: the keys move it in first.
+
+**Adjusted, merged (x11cl12, its reruns, every round since): display.c 16% -> 34%, xwindow.c 34%
+-> 39%, widget.c 45%, animate.c 17%** (accelerate.c trusted and opencl.c 72% as on 10-10). Rounds
+now add one or two points each: this is the plateau, and **owner's decision (2026-10-11): these
+four interactive files take it as their level**, documented here, instead of the 80% gate. What
+holds them there:
+
+- **animate.c**: animate plays at once and steps frames after XDelay sleeps of real time, so under
+  xevents it is never idle and no key reaches it in step; its cases are the non-interactive x11
+  ones (root window, windowed, resources).
+- **widget.c**: XNoticeWidget busy-waits on a timer that the fixed epoch stops (never idle);
+  the file browser's grabs show the case directory's path, which names the run (dropped
+  10-06), so its drawing (XFileBrowserWidget 6%) is unobserved.
+- **display.c**: the modes' rubber-band drawing (XOR rectangles and lines) is never in a grab, which
+  comes after the mode ends; Trim Edges, Shear, Add Frame, Slide Show, Preferences, Visual
+  Directory and the tile menu time out or never settle; Print, Launch and Browse Documentation
+  start external programs.
+- **xwindow.c**: XMakeImageMSBFirst needs an MSB-first server (Xvfb is LSB-first), and XDitherImage
+  and XRenderImage are not reached from any screen type tried (eight Xvfb visuals).
+
+Overnight `x11cl13`: a confirmation sweep of all six W01 files on fresh baselines (cap 1500).
