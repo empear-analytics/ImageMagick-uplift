@@ -5934,3 +5934,7 @@ indexes failed
 20:17 confirm vision:   killed 0, survived 0 (0 capped), no coverage 115, errors 0
 20:17 confirm threshold:   killed 0, survived 0 (0 capped), no coverage 106, errors 0
 20:17 confirm shear:   killed 0, survived 0 (0 capped), no coverage 126, errors 0
+20:17 pushed
+20:17 confirm segment:   killed 0, survived 0 (0 capped), no coverage 137, errors 0
+20:18 confirm decorate:   killed 0, survived 0 (0 capped), no coverage 16, errors 0
+20:18 confirm identify:   killed 0, survived 0 (0 capped), no coverage 24, errors 0
