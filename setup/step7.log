@@ -5583,3 +5583,12 @@ indexes failed
 16:27 resweep enhance:   killed 902, survived 155 (0 capped), no coverage 0, errors 0
 16:35 resweep resize:   killed 960, survived 136 (36 capped), no coverage 40, errors 0
 16:41 resweep statistic:   killed 766, survived 146 (34 capped), no coverage 3, errors 0
+16:42 pushed
+16:48 resweep visual-effects:   killed 703, survived 174 (0 capped), no coverage 0, errors 0
+16:55 resweep effect:   killed 1007, survived 186 (1 capped), no coverage 0, errors 0
+== confirm-loop Sun Oct 11 16:55:12 UTC 2026: cases since ea210ae21, at 0142f2326 X11 cases: display's menus are 22 px apart; the items 20.2 m
+16:59 20 new cases since ea210ae21
+16:59 selfcheck: 20 cases, 6 runs each, 0 nondeterministic
+16:59 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+16:59 confirm image:   killed 0, survived 0 (0 capped), no coverage 93, errors 0
+16:59 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0
