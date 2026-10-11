@@ -5246,11 +5246,24 @@ _XEV_DRAW_MENUS = {
 _XEV_DRAW_BUTTONS = ["Element", "Color", "Stipple", "Width", "Undo", "Help", "Dismiss"]
 
 
-def _xev_draw_pick(button, item):
+def _xev_draw_pick(button, item, buttons=_XEV_DRAW_BUTTONS, menus=_XEV_DRAW_MENUS):
     """The button clicked, then the item: these menus' items are 22 pixels apart from y=15
     (measured on a grab of the Element menu; display's own menus are closer)."""
-    return " use:2 click:65,%d map click:40,%d" % (101 + 32 * _XEV_DRAW_BUTTONS.index(button),
-                                                  15 + 22 * _XEV_DRAW_MENUS[button].index(item))
+    return " use:2 click:65,%d map click:40,%d" % (101 + 32 * buttons.index(button),
+                                                  15 + 22 * menus[button].index(item))
+
+
+# Color and Matte Edit's widgets (display.c XColorEditImage, XMatteEditImage), placed like Draw's.
+# Method lists option.c's paint methods, Undefined too; the pens are Draw's but transparent.
+_XEV_PENS = ["black", "blue", "cyan", "green", "gray", "red", "magenta", "yellow", "white", "Browser..."]
+_XEV_METHODS = ["Undefined", "FillToBorder", "Floodfill", "Point", "Replace", "Reset"]
+_XEV_FUZZ = ["0%", "2%", "5%", "10%", "15%", "Dialog..."]
+_XEV_COLOR_BUTTONS = ["Method", "Pixel Color", "Border Color", "Fuzz", "Undo", "Help", "Dismiss"]
+_XEV_COLOR_MENUS = {"Method": _XEV_METHODS, "Pixel Color": _XEV_PENS, "Border Color": _XEV_PENS,
+                    "Fuzz": _XEV_FUZZ}
+_XEV_MATTE_BUTTONS = ["Method", "Border Color", "Fuzz", "Matte Value", "Undo", "Help", "Dismiss"]
+_XEV_MATTE_MENUS = {"Method": _XEV_METHODS, "Border Color": _XEV_PENS, "Fuzz": _XEV_FUZZ,
+                    "Matte Value": ["Opaque", "Transparent", "Dialog..."]}
 
 
 GAP_XEVENTS_CASES += [
@@ -5292,6 +5305,23 @@ GAP_XEVENTS_CASES += [
      " use:1 click:30,38 key:Escape grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
     ("xevents display matte edit, a click", _xev_menu_pick("Image Edit", "Matte...", _XEV_EDIT) +
      " use:1 click:30,38 key:Escape grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
+] + [
+    # Color and Matte Edit through their own menus (2026-10-11): each paint method, a fuzz, a
+    # border color and an undo. One click, at 10,38: below the Info window, and left of x=20, as
+    # measured (line coverage): there a press after a menu pick never reached display.
+    ("xevents display %s edit %s" % (mode, label), _xev_menu_pick("Image Edit", mode.capitalize() + "...", _XEV_EDIT) +
+     "".join(_xev_draw_pick(b, it, buttons, menus) for b, it in picks) + " use:1 " + gesture +
+     " key:Escape grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")])
+    for mode, buttons, menus, first, undo in (
+        ("color", _XEV_COLOR_BUTTONS, _XEV_COLOR_MENUS, ("Pixel Color", "red"), 229),
+        ("matte", _XEV_MATTE_BUTTONS, _XEV_MATTE_MENUS, ("Matte Value", "Transparent"), 229))
+    for label, picks, gesture in (
+        [("%s, a click" % m.lower(), [("Method", m), first], "click:10,38") for m in _XEV_METHODS[1:]] +
+        [("floodfill, fuzz 10%", [("Method", "Floodfill"), first, ("Fuzz", "10%")], "click:10,38"),
+         ("filltoborder, black border", [("Method", "FillToBorder"), first, ("Border Color", "black")],
+          "click:10,38"),
+         ("point, then undone", [("Method", "Point"), first], "click:10,38 use:2 click:65,%d use:1" % undo)])
+] + [
     ("xevents display rotate by drag", _xev_menu_pick("Transform", "Rotate...", _XEV_TRANSFORM) +
      " use:1 drag:10,38,60,38 grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
     ("xevents display chop, horizontal", _xev_menu_pick("Transform", "Chop", _XEV_TRANSFORM) +
