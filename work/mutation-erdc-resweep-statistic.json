@@ -19,8 +19,8 @@
   "col": 15,
   "function": "statistic.c:DestroyPixelTLS",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/1903205287",
+  "cases": 1,
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -32,7 +32,7 @@
   "function": "statistic.c:DestroyPixelTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/312ef8872a",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -56,7 +56,7 @@
   "function": "statistic.c:AcquirePixelTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/312ef8872a",
+  "killer": "multi/1dd02fa978",
   "why": "stderr differs; out.miff differs"
  },
  {
@@ -79,8 +79,8 @@
   "col": 26,
   "function": "statistic.c:AcquirePixelTLS",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/1903205287",
+  "cases": 1,
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -92,7 +92,7 @@
   "function": "statistic.c:AcquirePixelTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/312ef8872a",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -116,7 +116,7 @@
   "function": "statistic.c:AcquirePixelTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/312ef8872a",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -128,7 +128,7 @@
   "function": "statistic.c:AcquirePixelTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/312ef8872a",
+  "killer": "multi/1dd02fa978",
   "why": "stderr differs; out.miff differs"
  },
  {
@@ -152,7 +152,7 @@
   "function": "statistic.c:AcquirePixelTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/312ef8872a",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -164,7 +164,7 @@
   "function": "statistic.c:AcquirePixelTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/312ef8872a",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -200,7 +200,7 @@
   "function": "statistic.c:AcquirePixelTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/312ef8872a",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -224,7 +224,7 @@
   "function": "statistic.c:EvaluateMax",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/a7b38820cd",
+  "killer": "evaluate/be3a37ece9",
   "why": "out.miff differs"
  },
  {
@@ -331,8 +331,8 @@
   "col": 42,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 36,
-  "killer": "evaluate/329f7924d0",
+  "cases": 1,
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -343,8 +343,8 @@
   "col": 28,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 29,
-  "killer": "evaluate/371ce410df",
+  "cases": 62,
+  "killer": "evaluate/99d4f5702a",
   "why": "out.miff differs"
  },
  {
@@ -355,8 +355,8 @@
   "col": 28,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 35,
-  "killer": "evaluate/24928e43c3",
+  "cases": 19,
+  "killer": "evaluate/1af167af9b",
   "why": "out.miff differs"
  },
  {
@@ -367,8 +367,8 @@
   "col": 55,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 35,
-  "killer": "evaluate/24928e43c3",
+  "cases": 19,
+  "killer": "evaluate/1af167af9b",
   "why": "out.miff differs"
  },
  {
@@ -379,8 +379,8 @@
   "col": 58,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 19,
-  "killer": "evaluate/09ddba2d0a",
+  "cases": 23,
+  "killer": "evaluate/01c51dc436",
   "why": "out.miff differs"
  },
  {
@@ -391,8 +391,8 @@
   "col": 35,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 31,
-  "killer": "evaluate/a4da0dbcdf",
+  "cases": 6,
+  "killer": "evaluate/d7ed24d507",
   "why": "out.miff differs"
  },
  {
@@ -403,8 +403,8 @@
   "col": 21,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 31,
-  "killer": "evaluate/a4da0dbcdf",
+  "cases": 6,
+  "killer": "evaluate/d7ed24d507",
   "why": "out.miff differs"
  },
  {
@@ -415,8 +415,8 @@
   "col": 36,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 31,
-  "killer": "evaluate/a4da0dbcdf",
+  "cases": 6,
+  "killer": "evaluate/d7ed24d507",
   "why": "out.miff differs"
  },
  {
@@ -427,8 +427,8 @@
   "col": 28,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 90,
-  "killer": "evaluate/e968caf302",
+  "cases": 32,
+  "killer": "evaluate/c64b6e7e96",
   "why": "out.miff differs"
  },
  {
@@ -439,8 +439,8 @@
   "col": 36,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 90,
-  "killer": "evaluate/e968caf302",
+  "cases": 32,
+  "killer": "evaluate/c64b6e7e96",
   "why": "out.miff differs"
  },
  {
@@ -451,7 +451,7 @@
   "col": 35,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 12,
+  "cases": 3,
   "killer": "evaluate/866f311139",
   "why": "out.miff differs"
  },
@@ -463,7 +463,7 @@
   "col": 45,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 12,
+  "cases": 3,
   "killer": "evaluate/866f311139",
   "why": "out.miff differs"
  },
@@ -475,7 +475,7 @@
   "col": 58,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 12,
+  "cases": 3,
   "killer": "evaluate/866f311139",
   "why": "out.miff differs"
  },
@@ -487,7 +487,7 @@
   "col": 35,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 9,
+  "cases": 12,
   "killer": "evaluate/0519af54f6",
   "why": "out.miff differs"
  },
@@ -499,7 +499,7 @@
   "col": 46,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 9,
+  "cases": 12,
   "killer": "evaluate/0519af54f6",
   "why": "out.miff differs"
  },
@@ -511,7 +511,7 @@
   "col": 19,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 9,
+  "cases": 12,
   "killer": "evaluate/0519af54f6",
   "why": "out.miff differs"
  },
@@ -523,7 +523,7 @@
   "col": 19,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 45,
+  "cases": 46,
   "killer": "evaluate/9f53a9a5fb",
   "why": "out.miff differs"
  },
@@ -535,7 +535,7 @@
   "col": 19,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 45,
+  "cases": 46,
   "killer": "evaluate/9f53a9a5fb",
   "why": "out.miff differs"
  },
@@ -547,7 +547,7 @@
   "col": 39,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 45,
+  "cases": 46,
   "killer": "evaluate/9f53a9a5fb",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
@@ -559,7 +559,7 @@
   "col": 24,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 184,
+  "cases": 202,
   "killer": "mogrify/7c066f0bc2",
   "why": "work.miff differs"
  },
@@ -583,8 +583,8 @@
   "col": 41,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/bbb849fee2",
+  "cases": 16,
+  "killer": "evaluate/1b48696b07",
   "why": "out.miff differs"
  },
  {
@@ -595,8 +595,8 @@
   "col": 37,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/bbb849fee2",
+  "cases": 16,
+  "killer": "evaluate/1b48696b07",
   "why": "out.miff differs"
  },
  {
@@ -607,8 +607,8 @@
   "col": 54,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/bbb849fee2",
+  "cases": 16,
+  "killer": "evaluate/1b48696b07",
   "why": "out.miff differs"
  },
  {
@@ -619,8 +619,8 @@
   "col": 30,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/bbb849fee2",
+  "cases": 16,
+  "killer": "evaluate/1b48696b07",
   "why": "out.miff differs"
  },
  {
@@ -631,8 +631,8 @@
   "col": 50,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/bbb849fee2",
+  "cases": 16,
+  "killer": "evaluate/1b48696b07",
   "why": "out.miff differs"
  },
  {
@@ -643,7 +643,7 @@
   "col": 28,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 68,
+  "cases": 10,
   "killer": "evaluate/01c1f9fcc2",
   "why": "out.miff differs"
  },
@@ -655,8 +655,8 @@
   "col": 28,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 23,
-  "killer": "evaluate/64246e43d6",
+  "cases": 43,
+  "killer": "evaluate/cccbe1e157",
   "why": "out.miff differs"
  },
  {
@@ -667,8 +667,8 @@
   "col": 28,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 3,
-  "killer": "evaluate/4cd8b190d8",
+  "cases": 25,
+  "killer": "evaluate/3e3b98a620",
   "why": "out.miff differs"
  },
  {
@@ -679,8 +679,8 @@
   "col": 58,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "cases": 13,
+  "killer": "evaluate/2669e28d4a",
   "why": "out.miff differs"
  },
  {
@@ -691,8 +691,8 @@
   "col": 23,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 6,
-  "killer": "unary/691de94716",
+  "cases": 2,
+  "killer": "unary/ba2d45bcf5",
   "why": "out.miff differs"
  },
  {
@@ -715,8 +715,8 @@
   "col": 27,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 6,
-  "killer": "unary/691de94716",
+  "cases": 2,
+  "killer": "unary/ba2d45bcf5",
   "why": "out.miff differs"
  },
  {
@@ -739,7 +739,7 @@
   "col": 44,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 179,
+  "cases": 192,
   "killer": "gaps/bddb9a100d",
   "why": "out.miff differs"
  },
@@ -763,7 +763,7 @@
   "col": 59,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 49,
+  "cases": 112,
   "killer": "unary/cc0b83c96d",
   "why": "out.miff differs"
  },
@@ -775,7 +775,7 @@
   "col": 25,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 49,
+  "cases": 112,
   "killer": "unary/cc0b83c96d",
   "why": "out.miff differs"
  },
@@ -787,7 +787,7 @@
   "col": 48,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 49,
+  "cases": 112,
   "killer": "unary/cc0b83c96d",
   "why": "out.miff differs"
  },
@@ -799,7 +799,7 @@
   "col": 53,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 49,
+  "cases": 112,
   "killer": "unary/cc0b83c96d",
   "why": "out.miff differs"
  },
@@ -811,7 +811,7 @@
   "col": 67,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 49,
+  "cases": 112,
   "killer": "unary/cc0b83c96d",
   "why": "out.miff differs"
  },
@@ -823,8 +823,8 @@
   "col": 37,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 6,
-  "killer": "unary/691de94716",
+  "cases": 2,
+  "killer": "unary/ba2d45bcf5",
   "why": "out.miff differs"
  },
  {
@@ -835,8 +835,8 @@
   "col": 54,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 6,
-  "killer": "unary/691de94716",
+  "cases": 2,
+  "killer": "unary/ba2d45bcf5",
   "why": "out.miff differs"
  },
  {
@@ -847,7 +847,7 @@
   "col": 19,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 63,
+  "cases": 68,
   "killer": "evaluate/9df9ea7096",
   "why": "out.miff differs"
  },
@@ -859,7 +859,7 @@
   "col": 19,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 63,
+  "cases": 68,
   "killer": "evaluate/9df9ea7096",
   "why": "out.miff differs"
  },
@@ -871,7 +871,7 @@
   "col": 39,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 63,
+  "cases": 68,
   "killer": "evaluate/9df9ea7096",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
@@ -883,8 +883,8 @@
   "col": 35,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 4,
-  "killer": "evaluate/4961dd6cca",
+  "cases": 31,
+  "killer": "evaluate/8bcb8505f4",
   "why": "out.miff differs"
  },
  {
@@ -895,8 +895,8 @@
   "col": 21,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 4,
-  "killer": "evaluate/4961dd6cca",
+  "cases": 31,
+  "killer": "evaluate/8bcb8505f4",
   "why": "out.miff differs"
  },
  {
@@ -907,8 +907,8 @@
   "col": 36,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 4,
-  "killer": "evaluate/4961dd6cca",
+  "cases": 31,
+  "killer": "evaluate/8bcb8505f4",
   "why": "out.miff differs"
  },
  {
@@ -919,8 +919,8 @@
   "col": 28,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 13,
-  "killer": "evaluate/a46d655bfe",
+  "cases": 80,
+  "killer": "evaluate/422776ce47",
   "why": "out.miff differs"
  },
  {
@@ -931,8 +931,8 @@
   "col": 28,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 96,
-  "killer": "evaluate/5d15d89815",
+  "cases": 59,
+  "killer": "evaluate/cd0791e8c6",
   "why": "out.miff differs"
  },
  {
@@ -943,8 +943,8 @@
   "col": 40,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 7,
-  "killer": "unary/f5df5da718",
+  "cases": 11,
+  "killer": "evaluate/021e214e0d",
   "why": "out.miff differs"
  },
  {
@@ -955,7 +955,7 @@
   "col": 40,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 219,
+  "cases": 225,
   "killer": "evaluate-sequence/b564a1e12c",
   "why": "out.miff differs"
  },
@@ -967,8 +967,8 @@
   "col": 40,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 39,
-  "killer": "evaluate/7765125fe9",
+  "cases": 29,
+  "killer": "evaluate/296ec0deb7",
   "why": "out.miff differs"
  },
  {
@@ -979,7 +979,7 @@
   "col": 40,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 202,
+  "cases": 238,
   "killer": "evaluate-sequence/006bf292dc",
   "why": "out.miff differs"
  },
@@ -991,7 +991,7 @@
   "col": 40,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 230,
+  "cases": 229,
   "killer": "evaluate-sequence/465440c0ef",
   "why": "out.miff differs"
  },
@@ -1003,8 +1003,8 @@
   "col": 40,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 15,
-  "killer": "evaluate/88d019a3e0",
+  "cases": 44,
+  "killer": "evaluate/0be12d676a",
   "why": "out.miff differs"
  },
  {
@@ -1015,7 +1015,7 @@
   "col": 58,
   "function": "statistic.c:ApplyEvaluateOperator",
   "status": "killed",
-  "cases": 21,
+  "cases": 52,
   "killer": "evaluate/0d2ced6f78",
   "why": "out.miff differs"
  },
@@ -1027,7 +1027,7 @@
   "col": 20,
   "function": "statistic.c:AcquireImageCanvas",
   "status": "killed",
-  "cases": 3,
+  "cases": 4,
   "killer": "gaps/61eb1cc936",
   "why": "out.miff differs"
  },
@@ -1040,7 +1040,7 @@
   "function": "statistic.c:AcquireImageCanvas",
   "status": "killed",
   "cases": 7,
-  "killer": "sequence/94f1b1b322",
+  "killer": "sequence/fd3a6b3b96",
   "why": "out.miff differs"
  },
  {
@@ -1051,7 +1051,7 @@
   "col": 28,
   "function": "statistic.c:AcquireImageCanvas",
   "status": "killed",
-  "cases": 3,
+  "cases": 4,
   "killer": "gaps/61eb1cc936",
   "why": "out.miff differs"
  },
@@ -1075,7 +1075,7 @@
   "col": 20,
   "function": "statistic.c:AcquireImageCanvas",
   "status": "killed",
-  "cases": 3,
+  "cases": 4,
   "killer": "gaps/61eb1cc936",
   "why": "out.miff differs"
  },
@@ -1099,7 +1099,7 @@
   "col": 17,
   "function": "statistic.c:AcquireImageCanvas",
   "status": "killed",
-  "cases": 3,
+  "cases": 4,
   "killer": "gaps/61eb1cc936",
   "why": "out.miff differs"
  },
@@ -1375,7 +1375,7 @@
   "col": 21,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 5,
+  "cases": 8,
   "killer": "sequence/94f1b1b322",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
@@ -1435,7 +1435,7 @@
   "col": 25,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 5,
+  "cases": 8,
   "killer": "sequence/94f1b1b322",
   "why": "out.miff differs"
  },
@@ -1531,7 +1531,7 @@
   "col": 11,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 5,
+  "cases": 8,
   "killer": "sequence/94f1b1b322",
   "why": "out.miff differs"
  },
@@ -1999,8 +1999,8 @@
   "col": 70,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 6,
-  "killer": "evaluate-sequence/3e3e4bdef9",
+  "cases": 5,
+  "killer": "sequence/fd3a6b3b96",
   "why": "out.miff differs"
  },
  {
@@ -2083,7 +2083,7 @@
   "col": 27,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 41,
+  "cases": 12,
   "killer": "evaluate-sequence/79dcdeeb5d",
   "why": "out.miff differs"
  },
@@ -2107,7 +2107,7 @@
   "col": 65,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 41,
+  "cases": 12,
   "killer": "evaluate-sequence/79dcdeeb5d",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -2119,7 +2119,7 @@
   "col": 29,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 41,
+  "cases": 12,
   "killer": "evaluate-sequence/79dcdeeb5d",
   "why": "out.miff differs"
  },
@@ -2131,7 +2131,7 @@
   "col": 29,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 41,
+  "cases": 12,
   "killer": "evaluate-sequence/79dcdeeb5d",
   "why": "out.miff differs"
  },
@@ -2143,7 +2143,7 @@
   "col": 55,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 41,
+  "cases": 12,
   "killer": "evaluate-sequence/79dcdeeb5d",
   "why": "out.miff differs"
  },
@@ -2155,7 +2155,7 @@
   "col": 61,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 41,
+  "cases": 12,
   "killer": "evaluate-sequence/79dcdeeb5d",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
@@ -2167,8 +2167,8 @@
   "col": 27,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 43,
-  "killer": "evaluate-sequence/181e6ca1c0",
+  "cases": 7,
+  "killer": "evaluate-sequence/2291a4fb44",
   "why": "out.miff differs"
  },
  {
@@ -2191,8 +2191,8 @@
   "col": 65,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 43,
-  "killer": "evaluate-sequence/181e6ca1c0",
+  "cases": 7,
+  "killer": "evaluate-sequence/2291a4fb44",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -2203,8 +2203,8 @@
   "col": 79,
   "function": "EvaluateImages",
   "status": "killed",
-  "cases": 43,
-  "killer": "evaluate-sequence/181e6ca1c0",
+  "cases": 7,
+  "killer": "evaluate-sequence/2291a4fb44",
   "why": "out.miff differs"
  },
  {
@@ -2408,7 +2408,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2419,7 +2419,7 @@
   "col": 16,
   "function": "EvaluateImage",
   "status": "killed",
-  "cases": 172,
+  "cases": 199,
   "killer": "gaps/69576684ec",
   "why": "out.miff differs"
  },
@@ -2432,7 +2432,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2444,7 +2444,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -2456,7 +2456,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
  {
@@ -2468,7 +2468,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2480,7 +2480,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2492,7 +2492,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2504,8 +2504,8 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "killer": "evaluate/b52a628d3f",
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:895:46:895:48",
@@ -2516,7 +2516,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -2528,7 +2528,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2539,8 +2539,8 @@
   "col": 19,
   "function": "EvaluateImage",
   "status": "killed",
-  "cases": 6,
-  "killer": "evaluate/4cd8b190d8",
+  "cases": 1,
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2552,8 +2552,8 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
-  "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
+  "killer": "evaluate/b52a628d3f",
+  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:907:41:907:43",
@@ -2564,7 +2564,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2576,7 +2576,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2588,7 +2588,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2600,7 +2600,7 @@
   "function": "EvaluateImage",
   "status": "killed",
   "cases": 1,
-  "killer": "evaluate/0d8fc98bb7",
+  "killer": "evaluate/b52a628d3f",
   "why": "out.miff differs"
  },
  {
@@ -2647,7 +2647,7 @@
   "col": 19,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 3,
+  "cases": 1,
   "killer": "opencl/c3069acc2b",
   "why": "out.miff differs"
  },
@@ -2659,7 +2659,7 @@
   "col": 19,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 3,
+  "cases": 1,
   "killer": "opencl/c3069acc2b",
   "why": "out.miff differs"
  },
@@ -2671,7 +2671,7 @@
   "col": 51,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 3,
+  "cases": 1,
   "killer": "opencl/c3069acc2b",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -2683,7 +2683,7 @@
   "col": 22,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 3,
+  "cases": 1,
   "killer": "opencl/c3069acc2b",
   "why": "out.miff differs"
  },
@@ -2695,7 +2695,7 @@
   "col": 36,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 9,
+  "cases": 16,
   "killer": "gaps/a9861721a0",
   "why": "out.miff differs"
  },
@@ -2707,8 +2707,8 @@
   "col": 36,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 2,
-  "killer": "opencl/e7c88573d1",
+  "cases": 5,
+  "killer": "opencl/710c9fa55f",
   "why": "out.miff differs"
  },
  {
@@ -2719,8 +2719,8 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 2,
-  "killer": "opencl/e7c88573d1",
+  "cases": 5,
+  "killer": "opencl/710c9fa55f",
   "why": "out.miff differs"
  },
  {
@@ -2731,8 +2731,8 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 2,
-  "killer": "opencl/e7c88573d1",
+  "cases": 5,
+  "killer": "opencl/710c9fa55f",
   "why": "out.miff differs"
  },
  {
@@ -2743,7 +2743,7 @@
   "col": 36,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 40,
+  "cases": 89,
   "killer": "gaps/53bda95d21",
   "why": "out.miff differs"
  },
@@ -2755,8 +2755,8 @@
   "col": 36,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 2,
-  "killer": "opencl/e7c88573d1",
+  "cases": 5,
+  "killer": "opencl/710c9fa55f",
   "why": "out.miff differs"
  },
  {
@@ -2767,7 +2767,7 @@
   "col": 31,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 75,
+  "cases": 64,
   "killer": "gaps/d2033f0624",
   "why": "out.miff differs"
  },
@@ -2779,8 +2779,8 @@
   "col": 31,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 2,
-  "killer": "opencl/e7c88573d1",
+  "cases": 5,
+  "killer": "opencl/710c9fa55f",
   "why": "out.miff differs"
  },
  {
@@ -2791,8 +2791,8 @@
   "col": 35,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 2,
-  "killer": "opencl/e7c88573d1",
+  "cases": 5,
+  "killer": "opencl/710c9fa55f",
   "why": "out.miff differs"
  },
  {
@@ -2803,8 +2803,8 @@
   "col": 17,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 2,
-  "killer": "opencl/e7c88573d1",
+  "cases": 5,
+  "killer": "opencl/710c9fa55f",
   "why": "out.miff differs"
  },
  {
@@ -2815,8 +2815,8 @@
   "col": 28,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 2,
-  "killer": "opencl/e7c88573d1",
+  "cases": 5,
+  "killer": "opencl/710c9fa55f",
   "why": "out.miff differs"
  },
  {
@@ -2827,8 +2827,8 @@
   "col": 62,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 2,
-  "killer": "opencl/e7c88573d1",
+  "cases": 5,
+  "killer": "opencl/710c9fa55f",
   "why": "out.miff differs"
  },
  {
@@ -2839,7 +2839,7 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 13,
+  "cases": 99,
   "killer": "gaps/2eecde9b93",
   "why": "out.miff differs"
  },
@@ -2851,8 +2851,8 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 13,
-  "killer": "gaps/2eecde9b93",
+  "cases": 63,
+  "killer": "gaps/206c7509ce",
   "why": "out.miff differs"
  },
  {
@@ -2863,7 +2863,7 @@
   "col": 33,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 66,
+  "cases": 63,
   "killer": "gaps/206c7509ce",
   "why": "out.miff differs"
  },
@@ -2875,8 +2875,8 @@
   "col": 33,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 7,
-  "killer": "opencl/30d3462479",
+  "cases": 10,
+  "killer": "opencl/6e94667ed7",
   "why": "out.miff differs"
  },
  {
@@ -2887,7 +2887,7 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 36,
+  "cases": 79,
   "killer": "gaps/3a2beb839b",
   "why": "out.miff differs"
  },
@@ -2899,8 +2899,8 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 7,
-  "killer": "opencl/30d3462479",
+  "cases": 10,
+  "killer": "opencl/6e94667ed7",
   "why": "out.miff differs"
  },
  {
@@ -2911,7 +2911,7 @@
   "col": 31,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 82,
+  "cases": 71,
   "killer": "gaps/02ac8761e3",
   "why": "out.miff differs"
  },
@@ -2923,8 +2923,8 @@
   "col": 31,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 7,
-  "killer": "opencl/30d3462479",
+  "cases": 10,
+  "killer": "opencl/6e94667ed7",
   "why": "out.miff differs"
  },
  {
@@ -2935,8 +2935,8 @@
   "col": 17,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 13,
-  "killer": "gaps/2eecde9b93",
+  "cases": 63,
+  "killer": "gaps/206c7509ce",
   "why": "out.miff differs"
  },
  {
@@ -2947,8 +2947,8 @@
   "col": 45,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 7,
-  "killer": "opencl/30d3462479",
+  "cases": 10,
+  "killer": "opencl/6e94667ed7",
   "why": "out.miff differs"
  },
  {
@@ -2959,8 +2959,8 @@
   "col": 18,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 7,
-  "killer": "opencl/30d3462479",
+  "cases": 10,
+  "killer": "opencl/6e94667ed7",
   "why": "out.miff differs"
  },
  {
@@ -2983,8 +2983,8 @@
   "col": 20,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 14,
-  "killer": "opencl/595bb5b829",
+  "cases": 24,
+  "killer": "opencl/872d665bf0",
   "why": "out.miff differs"
  },
  {
@@ -2995,8 +2995,8 @@
   "col": 26,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 14,
-  "killer": "opencl/595bb5b829",
+  "cases": 24,
+  "killer": "opencl/872d665bf0",
   "why": "out.miff differs"
  },
  {
@@ -3019,8 +3019,8 @@
   "col": 20,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 7,
-  "killer": "opencl/30d3462479",
+  "cases": 10,
+  "killer": "opencl/6e94667ed7",
   "why": "out.miff differs"
  },
  {
@@ -3031,8 +3031,8 @@
   "col": 22,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 8,
-  "killer": "unary/3809f2a9c3",
+  "cases": 10,
+  "killer": "opencl/6e94667ed7",
   "why": "out.miff differs"
  },
  {
@@ -3043,8 +3043,8 @@
   "col": 28,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 8,
-  "killer": "unary/3809f2a9c3",
+  "cases": 10,
+  "killer": "opencl/6e94667ed7",
   "why": "out.miff differs"
  },
  {
@@ -3055,8 +3055,8 @@
   "col": 33,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 7,
-  "killer": "opencl/30d3462479",
+  "cases": 10,
+  "killer": "opencl/6e94667ed7",
   "why": "out.miff differs"
  },
  {
@@ -3067,7 +3067,7 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 18,
+  "cases": 77,
   "killer": "gaps/bd483f1d07",
   "why": "out.miff differs"
  },
@@ -3079,8 +3079,8 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 17,
-  "killer": "unary/17ec6218c3",
+  "cases": 6,
+  "killer": "unary/ab3722383c",
   "why": "out.miff differs"
  },
  {
@@ -3091,7 +3091,7 @@
   "col": 33,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3103,7 +3103,7 @@
   "col": 33,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3115,7 +3115,7 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 32,
+  "cases": 76,
   "killer": "gaps/3d189ed076",
   "why": "out.miff differs"
  },
@@ -3127,7 +3127,7 @@
   "col": 32,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3139,7 +3139,7 @@
   "col": 31,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 52,
+  "cases": 108,
   "killer": "gaps/850a18e132",
   "why": "out.miff differs"
  },
@@ -3151,7 +3151,7 @@
   "col": 31,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3163,8 +3163,8 @@
   "col": 22,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 17,
-  "killer": "unary/17ec6218c3",
+  "cases": 6,
+  "killer": "unary/ab3722383c",
   "why": "out.miff differs"
  },
  {
@@ -3175,7 +3175,7 @@
   "col": 28,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3187,7 +3187,7 @@
   "col": 35,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3199,7 +3199,7 @@
   "col": 42,
   "function": "statistic.c:ApplyFunction",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3223,7 +3223,7 @@
   "col": 57,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3235,7 +3235,7 @@
   "col": 15,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3248,7 +3248,7 @@
   "function": "FunctionImage",
   "status": "killed",
   "cases": 1,
-  "killer": "opencl/a81c36ed33",
+  "killer": "opencl/c3069acc2b",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -3260,7 +3260,7 @@
   "function": "FunctionImage",
   "status": "killed",
   "cases": 1,
-  "killer": "opencl/a81c36ed33",
+  "killer": "opencl/c3069acc2b",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
  {
@@ -3271,7 +3271,7 @@
   "col": 16,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3283,7 +3283,7 @@
   "col": 11,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3295,7 +3295,7 @@
   "col": 17,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3307,7 +3307,7 @@
   "col": 17,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff differs"
  },
@@ -3320,7 +3320,7 @@
   "function": "FunctionImage",
   "status": "killed",
   "cases": 1,
-  "killer": "opencl/a81c36ed33",
+  "killer": "opencl/c3069acc2b",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -3331,7 +3331,7 @@
   "col": 19,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3343,7 +3343,7 @@
   "col": 19,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff differs"
  },
@@ -3356,8 +3356,8 @@
   "function": "FunctionImage",
   "status": "killed",
   "cases": 1,
-  "killer": "opencl/a81c36ed33",
-  "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
+  "killer": "opencl/c3069acc2b",
+  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:1132:41:1132:43",
@@ -3367,7 +3367,7 @@
   "col": 41,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3379,7 +3379,7 @@
   "col": 60,
   "function": "FunctionImage",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "opencl/a81c36ed33",
   "why": "out.miff differs"
  },
@@ -3440,7 +3440,7 @@
   "function": "GetImageEntropy",
   "status": "killed",
   "cases": 1,
-  "killer": "format/7d1199dd5a",
+  "killer": "format/9e758ae9ee",
   "why": "stdout differs"
  },
  {
@@ -3494,7 +3494,7 @@
   "function": "GetImageKurtosis",
   "status": "killed",
   "cases": 1,
-  "killer": "format/7d1199dd5a",
+  "killer": "format/9e758ae9ee",
   "why": "stdout differs"
  },
  {
@@ -3518,8 +3518,8 @@
   "function": "GetImageMean",
   "status": "killed",
   "cases": 1,
-  "killer": "format/7d1199dd5a",
-  "why": "stdout differs"
+  "killer": "unary/275dcf3c54",
+  "why": "out.miff differs"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:1401:24:1401:26",
@@ -3542,7 +3542,7 @@
   "function": "GetImageMedian",
   "status": "killed",
   "cases": 1,
-  "killer": "format/7d1199dd5a",
+  "killer": "format/9e758ae9ee",
   "why": "stdout differs"
  },
  {
@@ -3566,7 +3566,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3578,7 +3578,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3590,7 +3590,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3602,7 +3602,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -3614,7 +3614,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3626,7 +3626,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3638,7 +3638,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3650,7 +3650,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -3662,7 +3662,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3674,7 +3674,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3686,7 +3686,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -3698,7 +3698,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3710,7 +3710,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3722,7 +3722,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3733,8 +3733,8 @@
   "col": 15,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -3746,7 +3746,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -3758,7 +3758,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3770,7 +3770,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3782,7 +3782,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3794,7 +3794,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3806,7 +3806,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -3818,7 +3818,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3830,7 +3830,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3842,7 +3842,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3854,7 +3854,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -3866,7 +3866,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3878,7 +3878,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3890,7 +3890,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -3902,7 +3902,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3913,8 +3913,8 @@
   "col": 25,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "cases": 1,
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3926,7 +3926,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3937,8 +3937,8 @@
   "col": 49,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "cases": 1,
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3950,7 +3950,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -3962,7 +3962,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -3973,8 +3973,8 @@
   "col": 60,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -3986,7 +3986,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -3997,8 +3997,8 @@
   "col": 31,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4009,8 +4009,8 @@
   "col": 25,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "cases": 1,
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4022,7 +4022,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4033,8 +4033,8 @@
   "col": 49,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "cases": 1,
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4046,7 +4046,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4058,7 +4058,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4069,8 +4069,8 @@
   "col": 60,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4082,7 +4082,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4093,8 +4093,8 @@
   "col": 31,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4105,8 +4105,8 @@
   "col": 25,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "cases": 1,
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4118,7 +4118,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4129,8 +4129,8 @@
   "col": 49,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "cases": 1,
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4142,7 +4142,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4154,7 +4154,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4165,8 +4165,8 @@
   "col": 60,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4178,7 +4178,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 2,
-  "killer": "gaps/0fe7b2a8c7",
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4189,8 +4189,8 @@
   "col": 31,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4202,7 +4202,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4214,7 +4214,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4226,7 +4226,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4238,7 +4238,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4250,7 +4250,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4262,7 +4262,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4273,8 +4273,8 @@
   "col": 39,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4285,8 +4285,8 @@
   "col": 60,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4297,8 +4297,8 @@
   "col": 63,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4309,8 +4309,8 @@
   "col": 31,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4321,8 +4321,8 @@
   "col": 34,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4333,8 +4333,8 @@
   "col": 55,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4346,7 +4346,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4358,7 +4358,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4370,7 +4370,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4382,7 +4382,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4394,7 +4394,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4406,7 +4406,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4417,8 +4417,8 @@
   "col": 39,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4429,8 +4429,8 @@
   "col": 60,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4441,8 +4441,8 @@
   "col": 63,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4453,8 +4453,8 @@
   "col": 31,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4465,8 +4465,8 @@
   "col": 34,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4477,8 +4477,8 @@
   "col": 55,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4682,7 +4682,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4694,7 +4694,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4706,7 +4706,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4718,7 +4718,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4730,7 +4730,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4742,7 +4742,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4753,8 +4753,8 @@
   "col": 39,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4765,8 +4765,8 @@
   "col": 60,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4777,8 +4777,8 @@
   "col": 63,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4789,8 +4789,8 @@
   "col": 31,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4801,8 +4801,8 @@
   "col": 34,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4813,8 +4813,8 @@
   "col": 55,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4826,7 +4826,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4838,7 +4838,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4850,7 +4850,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4862,7 +4862,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4874,7 +4874,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4886,7 +4886,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4897,8 +4897,8 @@
   "col": 39,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4909,8 +4909,8 @@
   "col": 60,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4921,8 +4921,8 @@
   "col": 63,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4933,8 +4933,8 @@
   "col": 31,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4945,8 +4945,8 @@
   "col": 34,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4957,8 +4957,8 @@
   "col": 55,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4970,7 +4970,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -4981,8 +4981,8 @@
   "col": 15,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -4994,7 +4994,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -5006,7 +5006,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5018,7 +5018,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5030,7 +5030,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5042,7 +5042,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5054,7 +5054,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5066,7 +5066,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5078,7 +5078,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5090,7 +5090,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5102,7 +5102,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5114,7 +5114,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5126,7 +5126,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5138,7 +5138,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5150,7 +5150,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5162,7 +5162,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5174,7 +5174,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5186,7 +5186,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5198,7 +5198,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5210,7 +5210,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5222,7 +5222,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5233,8 +5233,8 @@
   "col": 41,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -5246,7 +5246,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5342,7 +5342,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5353,7 +5353,7 @@
   "col": 18,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 26,
+  "cases": 27,
   "killer": "gaps/a976cf937e",
   "why": "stdout differs"
  },
@@ -5390,7 +5390,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5401,8 +5401,8 @@
   "col": 26,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 29,
-  "killer": "identify/e61eae2cdf",
+  "cases": 28,
+  "killer": "identify/eec89c52d9",
   "why": "stdout differs"
  },
  {
@@ -5414,7 +5414,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5461,8 +5461,8 @@
   "col": 34,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 29,
-  "killer": "identify/e61eae2cdf",
+  "cases": 28,
+  "killer": "identify/eec89c52d9",
   "why": "stdout differs"
  },
  {
@@ -5473,8 +5473,8 @@
   "col": 53,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 29,
-  "killer": "identify/e61eae2cdf",
+  "cases": 28,
+  "killer": "identify/eec89c52d9",
   "why": "stdout differs"
  },
  {
@@ -5486,7 +5486,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 8,
-  "killer": "identify/c04c180521",
+  "killer": "gaps/fc0926ad35",
   "why": "stdout differs"
  },
  {
@@ -5497,7 +5497,7 @@
   "col": 62,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 26,
+  "cases": 27,
   "killer": "gaps/a976cf937e",
   "why": "stdout differs"
  },
@@ -5510,7 +5510,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5522,7 +5522,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5534,7 +5534,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5546,7 +5546,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5558,7 +5558,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5569,8 +5569,8 @@
   "col": 15,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -5582,7 +5582,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -5594,7 +5594,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5605,8 +5605,8 @@
   "col": 15,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -5618,7 +5618,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -5630,7 +5630,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5642,7 +5642,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5654,7 +5654,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5666,7 +5666,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5678,7 +5678,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5690,7 +5690,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5702,7 +5702,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5714,7 +5714,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5726,7 +5726,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5738,7 +5738,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5750,7 +5750,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5762,7 +5762,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5774,7 +5774,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5786,7 +5786,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5798,7 +5798,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5810,7 +5810,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5822,7 +5822,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5834,7 +5834,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5846,7 +5846,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5858,7 +5858,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5870,7 +5870,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5882,7 +5882,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5894,7 +5894,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5906,7 +5906,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5918,7 +5918,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5930,7 +5930,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5942,7 +5942,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5954,7 +5954,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5966,7 +5966,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5978,7 +5978,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -5990,7 +5990,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6002,7 +6002,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6014,7 +6014,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6026,7 +6026,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6038,7 +6038,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6050,7 +6050,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6061,8 +6061,8 @@
   "col": 66,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -6074,7 +6074,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6085,8 +6085,8 @@
   "col": 14,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -6098,7 +6098,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6110,7 +6110,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6122,7 +6122,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6134,7 +6134,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6146,7 +6146,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6158,7 +6158,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6170,7 +6170,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6182,7 +6182,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6194,7 +6194,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6206,7 +6206,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6218,7 +6218,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6230,7 +6230,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6242,7 +6242,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6254,7 +6254,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6266,7 +6266,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6278,7 +6278,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6290,7 +6290,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6301,8 +6301,8 @@
   "col": 52,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -6313,8 +6313,8 @@
   "col": 68,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -6325,8 +6325,8 @@
   "col": 14,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -6338,7 +6338,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6349,8 +6349,8 @@
   "col": 30,
   "function": "GetImageMoments",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "cases": 2,
+  "killer": "identify/ade0f8e6de",
   "why": "stdout differs"
  },
  {
@@ -6362,7 +6362,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6374,7 +6374,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6386,7 +6386,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6398,7 +6398,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6410,7 +6410,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6422,7 +6422,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6434,7 +6434,7 @@
   "function": "GetImageMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6446,7 +6446,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6458,7 +6458,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6470,7 +6470,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6482,7 +6482,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -6493,7 +6493,7 @@
   "col": 11,
   "function": "GetImagePerceptualHash",
   "status": "killed",
-  "cases": 11,
+  "cases": 30,
   "killer": "gaps/ed5e93fe36",
   "why": "stdout differs"
  },
@@ -6506,7 +6506,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6518,7 +6518,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6529,7 +6529,7 @@
   "col": 20,
   "function": "GetImagePerceptualHash",
   "status": "killed",
-  "cases": 2,
+  "cases": 17,
   "killer": "gaps/0fe7b2a8c7",
   "why": "stdout differs"
  },
@@ -6542,7 +6542,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6554,7 +6554,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6566,7 +6566,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6578,7 +6578,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6590,7 +6590,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6614,7 +6614,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -6626,7 +6626,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6650,7 +6650,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6662,7 +6662,7 @@
   "function": "GetImagePerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/0b6cfd72ec",
+  "killer": "identify/bd1b5e2904",
   "why": "stdout differs"
  },
  {
@@ -6686,7 +6686,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6710,8 +6710,8 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
-  "why": "exit status [0] -> ['timeout']; stderr differs; out.miff missing in candidate"
+  "killer": "unary/232a092a6a",
+  "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:1884:16:1884:18",
@@ -6722,7 +6722,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6734,7 +6734,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6746,7 +6746,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6758,7 +6758,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6770,7 +6770,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -6782,7 +6782,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6794,7 +6794,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6806,7 +6806,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -6818,7 +6818,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6842,7 +6842,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6854,7 +6854,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6890,7 +6890,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6902,7 +6902,7 @@
   "function": "GetImageRange",
   "status": "killed",
   "cases": 1,
-  "killer": "convert/f8562594dc",
+  "killer": "unary/232a092a6a",
   "why": "out.miff differs"
  },
  {
@@ -6987,7 +6987,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "identify/15d9590616",
-  "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
+  "why": "exit status [0] -> [-6]; stderr differs"
  },
  {
   "id": "cxx_le_to_gt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:1981:14:1981:16",
@@ -7033,7 +7033,7 @@
   "col": 21,
   "function": "statistic.c:GetMedianPixel",
   "status": "killed",
-  "cases": 52,
+  "cases": 50,
   "killer": "decode/77dda4847a",
   "why": "stdout differs"
  },
@@ -7057,7 +7057,7 @@
   "col": 25,
   "function": "statistic.c:GetMedianPixel",
   "status": "killed",
-  "cases": 52,
+  "cases": 50,
   "killer": "decode/77dda4847a",
   "why": "stdout differs"
  },
@@ -7191,7 +7191,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "identify/15d9590616",
-  "why": "exit status [0] -> [-6]; stdout differs"
+  "why": "stdout differs"
  },
  {
   "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:2000:13:2000:14",
@@ -8679,7 +8679,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "identify/15d9590616",
-  "why": "exit status [0] -> [-6]; stdout differs"
+  "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:2280:19:2280:21",
@@ -9002,7 +9002,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9014,7 +9014,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9026,7 +9026,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "stderr differs; out.miff differs"
  },
  {
@@ -9038,7 +9038,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9050,7 +9050,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -9062,7 +9062,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
  {
@@ -9074,7 +9074,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9086,7 +9086,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9098,7 +9098,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9110,7 +9110,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -9122,7 +9122,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9134,7 +9134,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9158,7 +9158,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9170,7 +9170,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9194,7 +9194,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -9218,7 +9218,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9230,7 +9230,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9242,7 +9242,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9254,7 +9254,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -9266,7 +9266,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9278,7 +9278,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9302,7 +9302,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9314,7 +9314,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9326,7 +9326,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9338,7 +9338,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9350,7 +9350,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9362,7 +9362,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9374,7 +9374,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9386,7 +9386,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -9398,7 +9398,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9410,7 +9410,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9434,8 +9434,8 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "killer": "multi/1dd02fa978",
+  "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:2560:41:2560:43",
@@ -9446,7 +9446,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9458,7 +9458,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9470,7 +9470,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9518,7 +9518,7 @@
   "function": "PolynomialImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/1903205287",
+  "killer": "multi/1dd02fa978",
   "why": "out.miff differs"
  },
  {
@@ -9565,8 +9565,8 @@
   "col": 15,
   "function": "statistic.c:DestroyPixelListTLS",
   "status": "killed",
-  "cases": 22,
-  "killer": "unary/dbe3fd1a17",
+  "cases": 11,
+  "killer": "unary/55791a723b",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -9578,7 +9578,7 @@
   "function": "statistic.c:DestroyPixelListTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9602,7 +9602,7 @@
   "function": "statistic.c:AcquirePixelList",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9613,8 +9613,8 @@
   "col": 27,
   "function": "statistic.c:AcquirePixelList",
   "status": "killed",
-  "cases": 5,
-  "killer": "statistic/007dce6bfd",
+  "cases": 13,
+  "killer": "convert/ff90d969eb",
   "why": "out.miff differs"
  },
  {
@@ -9626,7 +9626,7 @@
   "function": "statistic.c:AcquirePixelList",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "stderr differs; out.miff differs"
  },
  {
@@ -9638,7 +9638,7 @@
   "function": "statistic.c:AcquirePixelListTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "stderr differs; out.miff differs"
  },
  {
@@ -9662,7 +9662,7 @@
   "function": "statistic.c:AcquirePixelListTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9686,8 +9686,8 @@
   "function": "statistic.c:AcquirePixelListTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
-  "why": "exit status [0] -> [-9]; out.miff missing in candidate"
+  "killer": "statistic/16f2277133",
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:2719:23:2719:25",
@@ -9698,7 +9698,7 @@
   "function": "statistic.c:AcquirePixelListTLS",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "stderr differs; out.miff differs"
  },
  {
@@ -9841,8 +9841,8 @@
   "col": 13,
   "function": "statistic.c:AddNodePixelList",
   "status": "killed",
-  "cases": 2,
-  "killer": "statistic/007dce6bfd",
+  "cases": 4,
+  "killer": "convert/ff90d969eb",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -9949,8 +9949,8 @@
   "col": 18,
   "function": "statistic.c:GetMedianPixelList",
   "status": "killed",
-  "cases": 5,
-  "killer": "unary/7af169e3fa",
+  "cases": 3,
+  "killer": "convert/ff90d969eb",
   "why": "out.miff differs"
  },
  {
@@ -9962,7 +9962,7 @@
   "function": "statistic.c:GetModePixelList",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/1c335e91ff",
+  "killer": "statistic/51bb6053bf",
   "why": "out.miff differs"
  },
  {
@@ -9974,7 +9974,7 @@
   "function": "statistic.c:GetModePixelList",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/1c335e91ff",
+  "killer": "statistic/51bb6053bf",
   "why": "out.miff differs"
  },
  {
@@ -9986,8 +9986,8 @@
   "function": "statistic.c:GetModePixelList",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/1c335e91ff",
-  "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
+  "killer": "statistic/51bb6053bf",
+  "why": "out.miff differs"
  },
  {
   "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:2840:18:2840:19",
@@ -10010,8 +10010,8 @@
   "function": "statistic.c:GetNonpeakPixelList",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/007dce6bfd",
-  "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
+  "killer": "unary/55791a723b",
+  "why": "exit status [0] -> ['timeout']; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_le_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:2870:18:2870:20",
@@ -10033,8 +10033,8 @@
   "col": 17,
   "function": "statistic.c:GetNonpeakPixelList",
   "status": "killed",
-  "cases": 1,
-  "killer": "statistic/007dce6bfd",
+  "cases": 2,
+  "killer": "unary/91f30852a4",
   "why": "out.miff differs"
  },
  {
@@ -10046,7 +10046,7 @@
   "function": "statistic.c:GetNonpeakPixelList",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/007dce6bfd",
+  "killer": "unary/55791a723b",
   "why": "out.miff differs"
  },
  {
@@ -10058,7 +10058,7 @@
   "function": "statistic.c:GetNonpeakPixelList",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/007dce6bfd",
+  "killer": "unary/55791a723b",
   "why": "out.miff differs"
  },
  {
@@ -10069,8 +10069,8 @@
   "col": 40,
   "function": "statistic.c:GetNonpeakPixelList",
   "status": "killed",
-  "cases": 1,
-  "killer": "statistic/007dce6bfd",
+  "cases": 2,
+  "killer": "unary/91f30852a4",
   "why": "out.miff differs"
  },
  {
@@ -10093,9 +10093,9 @@
   "col": 47,
   "function": "statistic.c:InsertPixelList",
   "status": "killed",
-  "cases": 2,
-  "killer": "statistic/007dce6bfd",
-  "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
+  "cases": 3,
+  "killer": "unary/55791a723b",
+  "why": "exit status [0] -> ['timeout']; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:2894:3:2894:37",
@@ -10117,7 +10117,7 @@
   "col": 23,
   "function": "statistic.c:ResetPixelList",
   "status": "killed",
-  "cases": 2,
+  "cases": 3,
   "killer": "unary/b1d27aea57",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
@@ -10129,8 +10129,8 @@
   "col": 23,
   "function": "statistic.c:ResetPixelList",
   "status": "killed",
-  "cases": 6,
-  "killer": "statistic/1c335e91ff",
+  "cases": 29,
+  "killer": "statistic/51bb6053bf",
   "why": "out.miff differs"
  },
  {
@@ -10142,7 +10142,7 @@
   "function": "statistic.c:ResetPixelList",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -10178,7 +10178,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10190,7 +10190,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10202,7 +10202,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "stderr differs; out.miff differs"
  },
  {
@@ -10213,8 +10213,8 @@
   "col": 43,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/94409217df",
+  "cases": 27,
+  "killer": "gaps/a58390051c",
   "why": "out.miff differs"
  },
  {
@@ -10225,8 +10225,8 @@
   "col": 69,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/94409217df",
+  "cases": 27,
+  "killer": "gaps/a58390051c",
   "why": "out.miff differs"
  },
  {
@@ -10249,8 +10249,8 @@
   "col": 66,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/94409217df",
+  "cases": 27,
+  "killer": "gaps/a58390051c",
   "why": "out.miff differs"
  },
  {
@@ -10261,8 +10261,8 @@
   "col": 70,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/94409217df",
+  "cases": 27,
+  "killer": "gaps/a58390051c",
   "why": "out.miff differs"
  },
  {
@@ -10285,8 +10285,8 @@
   "col": 59,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/94409217df",
+  "cases": 27,
+  "killer": "gaps/a58390051c",
   "why": "out.miff differs"
  },
  {
@@ -10298,7 +10298,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10310,7 +10310,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -10322,7 +10322,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
  {
@@ -10334,7 +10334,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10345,8 +10345,8 @@
   "col": 44,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "cases": 6,
+  "killer": "statistic/04b7c7ff31",
   "why": "out.miff differs"
  },
  {
@@ -10357,8 +10357,8 @@
   "col": 74,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "cases": 3,
+  "killer": "unary/b1d27aea57",
   "why": "out.miff differs"
  },
  {
@@ -10370,7 +10370,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10382,7 +10382,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10394,7 +10394,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10406,7 +10406,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10418,7 +10418,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10430,7 +10430,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10441,9 +10441,9 @@
   "col": 17,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "statistic/4bbcabfb88",
-  "why": "exit status [0] -> [-6]; stderr differs; out.miff differs"
+  "cases": 3,
+  "killer": "unary/b1d27aea57",
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:3008:56:3008:58",
@@ -10454,7 +10454,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -10466,7 +10466,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10477,8 +10477,8 @@
   "col": 19,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "cases": 3,
+  "killer": "unary/b1d27aea57",
   "why": "out.miff differs"
  },
  {
@@ -10490,7 +10490,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -10502,7 +10502,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10514,7 +10514,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10526,7 +10526,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10538,7 +10538,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10549,7 +10549,7 @@
   "col": 41,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 29,
   "killer": "gaps/94409217df",
   "why": "out.miff differs"
  },
@@ -10561,8 +10561,8 @@
   "col": 13,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/94409217df",
+  "cases": 27,
+  "killer": "gaps/a58390051c",
   "why": "out.miff differs"
  },
  {
@@ -10573,8 +10573,8 @@
   "col": 61,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/94409217df",
+  "cases": 27,
+  "killer": "gaps/a58390051c",
   "why": "out.miff differs"
  },
  {
@@ -10598,7 +10598,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10610,7 +10610,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10622,7 +10622,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -10634,7 +10634,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10646,7 +10646,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10658,7 +10658,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -10670,7 +10670,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10682,7 +10682,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10694,7 +10694,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10717,8 +10717,8 @@
   "col": 17,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "statistic/481292e440",
+  "cases": 6,
+  "killer": "statistic/04b7c7ff31",
   "why": "out.miff differs"
  },
  {
@@ -10729,7 +10729,7 @@
   "col": 36,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 8,
+  "cases": 1,
   "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
@@ -10766,7 +10766,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10778,7 +10778,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10789,8 +10789,8 @@
   "col": 37,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 49,
-  "killer": "statistic/e8bf6fa81a",
+  "cases": 8,
+  "killer": "statistic/8a029a58e1",
   "why": "out.miff differs"
  },
  {
@@ -10813,8 +10813,8 @@
   "col": 13,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 7,
-  "killer": "statistic/1c335e91ff",
+  "cases": 30,
+  "killer": "statistic/51bb6053bf",
   "why": "out.miff differs"
  },
  {
@@ -10825,8 +10825,8 @@
   "col": 13,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 5,
-  "killer": "statistic/007dce6bfd",
+  "cases": 11,
+  "killer": "unary/55791a723b",
   "why": "out.miff differs"
  },
  {
@@ -10837,8 +10837,8 @@
   "col": 50,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "statistic/481292e440",
+  "cases": 6,
+  "killer": "statistic/04b7c7ff31",
   "why": "out.miff differs"
  },
  {
@@ -10849,8 +10849,8 @@
   "col": 50,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "statistic/287f288be0",
+  "cases": 19,
+  "killer": "statistic/a1ab034a1f",
   "why": "out.miff differs"
  },
  {
@@ -10861,8 +10861,8 @@
   "col": 55,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "statistic/287f288be0",
+  "cases": 19,
+  "killer": "statistic/a1ab034a1f",
   "why": "out.miff differs"
  },
  {
@@ -10873,8 +10873,8 @@
   "col": 60,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "statistic/287f288be0",
+  "cases": 19,
+  "killer": "statistic/a1ab034a1f",
   "why": "out.miff differs"
  },
  {
@@ -10885,8 +10885,8 @@
   "col": 65,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "statistic/287f288be0",
+  "cases": 19,
+  "killer": "statistic/a1ab034a1f",
   "why": "out.miff differs"
  },
  {
@@ -10897,8 +10897,8 @@
   "col": 69,
   "function": "StatisticImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "statistic/287f288be0",
+  "cases": 19,
+  "killer": "statistic/a1ab034a1f",
   "why": "out.miff differs"
  },
  {
@@ -10910,7 +10910,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10922,7 +10922,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  },
  {
@@ -10970,7 +10970,7 @@
   "function": "StatisticImage",
   "status": "killed",
   "cases": 1,
-  "killer": "statistic/4bbcabfb88",
+  "killer": "statistic/16f2277133",
   "why": "out.miff differs"
  }
 ]
