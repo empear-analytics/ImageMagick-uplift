@@ -8,8 +8,8 @@
   "function": "CreateMagickThreadKey",
   "status": "killed",
   "cases": 1,
-  "killer": "infra/ea3780429a",
-  "why": "exit status [0] -> ['timeout']; stdout differs"
+  "killer": "decode/1a44e29495",
+  "why": "exit status [0] -> ['timeout']; dec.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/thread.c:142:34:142:36",
@@ -20,8 +20,8 @@
   "function": "DeleteMagickThreadKey",
   "status": "killed",
   "cases": 1,
-  "killer": "infra/ea3780429a",
-  "why": "exit status [0] -> ['timeout']; stdout differs"
+  "killer": "decode/1a44e29495",
+  "why": "exit status [0] -> ['timeout']"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/thread.c:237:41:237:43",

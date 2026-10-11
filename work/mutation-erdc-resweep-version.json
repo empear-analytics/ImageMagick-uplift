@@ -7,8 +7,8 @@
   "col": 18,
   "function": "GetMagickDelegates",
   "status": "killed",
-  "cases": 1,
-  "killer": "info/d333f9b818",
+  "cases": 3,
+  "killer": "gaps/2857e5295a",
   "why": "stdout differs"
  },
  {
