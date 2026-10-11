@@ -1,29 +1,29 @@
 mutate: 532 mutants in MagickCore/attribute\.c$, 24 functions
-mutate: baseline over 14393 cases in 0s
+mutate: baseline over 14396 cases in 0s
   mutants: 25/532 (0s)
   mutants: 50/532 (1s)
-  mutants: 75/532 (3s)
+  mutants: 75/532 (2s)
   mutants: 100/532 (9s)
-  mutants: 125/532 (10s)
+  mutants: 125/532 (9s)
   mutants: 150/532 (10s)
-  mutants: 175/532 (11s)
-  mutants: 200/532 (15s)
-  mutants: 225/532 (19s)
+  mutants: 175/532 (10s)
+  mutants: 200/532 (13s)
+  mutants: 225/532 (18s)
   mutants: 250/532 (21s)
   mutants: 275/532 (23s)
-  mutants: 300/532 (26s)
-  mutants: 325/532 (29s)
-  mutants: 350/532 (32s)
-  mutants: 375/532 (48s)
-  mutants: 400/532 (53s)
+  mutants: 300/532 (25s)
+  mutants: 325/532 (28s)
+  mutants: 350/532 (31s)
+  mutants: 375/532 (47s)
+  mutants: 400/532 (52s)
   mutants: 425/532 (53s)
   mutants: 450/532 (54s)
-  mutants: 475/532 (97s)
-  mutants: 500/532 (119s)
-  mutants: 525/532 (145s)
-  mutants: 532/532 (217s)
+  mutants: 475/532 (93s)
+  mutants: 500/532 (112s)
+  mutants: 525/532 (143s)
+  mutants: 532/532 (213s)
 
-mutate: 532 mutants, 217s
+mutate: 532 mutants, 213s
   killed 436, survived 88 (28 capped), no coverage 8, errors 0
   mutation score on reached code: 83.2%   overall: 82.0%
 

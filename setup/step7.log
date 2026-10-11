@@ -6029,3 +6029,7 @@ indexes failed
 21:10 pushed
 == confirm-loop round done Sun Oct 11 21:10:30 UTC 2026
 21:16 resweep type:   killed 188, survived 50 (4 capped), no coverage 12, errors 0
+21:16 pushed
+21:18 resweep layer:   killed 339, survived 84 (0 capped), no coverage 0, errors 0
+21:22 resweep transform:   killed 469, survived 123 (18 capped), no coverage 47, errors 0
+21:26 resweep attribute:   killed 436, survived 88 (28 capped), no coverage 8, errors 0
