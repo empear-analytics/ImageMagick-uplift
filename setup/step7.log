@@ -5649,3 +5649,6 @@ indexes failed
 17:07 confirm version:   killed 0, survived 1 (0 capped), no coverage 5, errors 0
 17:08 confirm module:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 17:08 pushed
+17:08 pushed
+== confirm-loop round done Sun Oct 11 17:08:25 UTC 2026
+17:12 resweep compare:   killed 572, survived 99 (0 capped), no coverage 23, errors 0
