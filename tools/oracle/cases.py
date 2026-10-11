@@ -5300,6 +5300,14 @@ GAP_XEVENTS_CASES += [
     # Copy a region, then paste it (ctrl+v reuses the mode widget's window; a click places it).
     ("xevents display copy and paste", "map key:ctrl+c map use:1 drag:10,10,50,40 key:Return key:ctrl+v "
      "use:1 click:20,20 key:Return grab:out.ppm key:q", ["display", img("rose")]),
+] + [
+    # Paste's Operator menu (2026-10-11): option.c's compose operators, the hidden ones too, 22
+    # pixels apart in the mode widget (the copy's, reused); the copy placed at 10,34.
+    ("xevents display paste, operator %s" % op, "map key:ctrl+c map use:1 drag:10,10,50,40 key:Return key:ctrl+v "
+     "use:2 click:65,101 map click:40,%d use:1 click:10,34 key:Return grab:out.ppm key:q" % (15 + 22 * i),
+     ["display", img("rose")])
+    for i, op in ((2, "Atop"), (7, "Clear"))  # Blend, ColorBurn, Colorize grabbed as Atop on rose
+] + [
     # Modes that keep the Commands widget open over the (small) image window: the image is placed
     # at +300+50, clear of it, else the drag lands on the widget and opens a menu. These modes
     # also map an Info window (70x26, the pointer position) over the image's top left, so a press
