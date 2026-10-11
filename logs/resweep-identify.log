@@ -1,23 +1,23 @@
 mutate: 387 mutants in MagickCore/identify\.c$, 6 functions
 mutate: baseline over 285 cases in 0s
   mutants: 25/387 (0s)
-  mutants: 50/387 (0s)
+  mutants: 50/387 (1s)
   mutants: 75/387 (1s)
   mutants: 100/387 (2s)
-  mutants: 125/387 (5s)
+  mutants: 125/387 (7s)
   mutants: 150/387 (10s)
-  mutants: 175/387 (21s)
+  mutants: 175/387 (17s)
   mutants: 200/387 (33s)
-  mutants: 225/387 (45s)
-  mutants: 250/387 (49s)
-  mutants: 275/387 (51s)
-  mutants: 300/387 (78s)
-  mutants: 325/387 (85s)
-  mutants: 350/387 (87s)
-  mutants: 375/387 (124s)
-  mutants: 387/387 (212s)
+  mutants: 225/387 (42s)
+  mutants: 250/387 (50s)
+  mutants: 275/387 (52s)
+  mutants: 300/387 (83s)
+  mutants: 325/387 (93s)
+  mutants: 350/387 (94s)
+  mutants: 375/387 (127s)
+  mutants: 387/387 (214s)
 
-mutate: 387 mutants, 212s
+mutate: 387 mutants, 214s
   killed 327, survived 60 (0 capped), no coverage 0, errors 0
   mutation score on reached code: 84.5%   overall: 84.5%
 
