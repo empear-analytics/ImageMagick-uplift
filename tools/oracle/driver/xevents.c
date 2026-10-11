@@ -6,7 +6,7 @@
     map           wait for a new top-level window to be mapped, then give it the focus
     idle          wait until the client is connected and idle, for a client that maps no window
                   (import waiting for a click); click:X,Y with no window waited for is on the root
-    key:NAME      press a key (an X keysym name: q, slash, F7, Return; ctrl+s, shift+Tab);
+    key:NAME      press a key (an X keysym name: q, slash, F7, Return; ctrl+s, shift+Tab, alt+Left);
                   key:NAME*N presses it N times
     type:TEXT     type TEXT, one key per character ('_' stands for a space)
     point:X,Y     move the pointer to X,Y in the focused window (widgets read the pointer)
@@ -222,25 +222,28 @@ static void Map(void)
   }
 }
 
-static void Press(KeySym sym, int shift, int ctrl)
+static void Press(KeySym sym, int shift, int ctrl, int alt)
 {
   KeyCode code = XKeysymToKeycode(dpy, sym);
   KeyCode sh = XKeysymToKeycode(dpy, XK_Shift_L), ct = XKeysymToKeycode(dpy, XK_Control_L);
+  KeyCode al = XKeysymToKeycode(dpy, XK_Alt_L);  /* Mod1 in Xvfb's default map */
   if (code == 0) Fail("no keycode for a key");
   Refocus();
   if (XkbKeycodeToKeysym(dpy, code, 0, 1) == sym && XkbKeycodeToKeysym(dpy, code, 0, 0) != sym) shift = 1;
   if (ctrl) XTestFakeKeyEvent(dpy, ct, True, CurrentTime);
+  if (alt) XTestFakeKeyEvent(dpy, al, True, CurrentTime);
   if (shift) XTestFakeKeyEvent(dpy, sh, True, CurrentTime);
   XTestFakeKeyEvent(dpy, code, True, CurrentTime);
   XTestFakeKeyEvent(dpy, code, False, CurrentTime);
   if (shift) XTestFakeKeyEvent(dpy, sh, False, CurrentTime);
+  if (alt) XTestFakeKeyEvent(dpy, al, False, CurrentTime);
   if (ctrl) XTestFakeKeyEvent(dpy, ct, False, CurrentTime);
   WaitIdle();
 }
 
 static void Key(const char *arg)
 {
-  int shift = 0, ctrl = 0, times = 1;
+  int shift = 0, ctrl = 0, alt = 0, times = 1;
   char spec[64], *star;
   snprintf(spec, sizeof(spec), "%s", arg);
   if ((star = strchr(spec, '*')) != NULL) { times = atoi(star + 1); *star = 0; }
@@ -249,12 +252,13 @@ static void Key(const char *arg)
   {
     if (strncmp(name, "ctrl+", 5) == 0) { ctrl = 1; name += 5; }
     else if (strncmp(name, "shift+", 6) == 0) { shift = 1; name += 6; }
+    else if (strncmp(name, "alt+", 4) == 0) { alt = 1; name += 4; }
     else break;
   }
   KeySym sym = XStringToKeysym(name);
   if (sym == NoSymbol) Fail("unknown key name");
   while (times-- > 0)
-    Press(sym, shift, ctrl);
+    Press(sym, shift, ctrl, alt);
 }
 
 static void Type(const char *text)
@@ -264,7 +268,7 @@ static void Type(const char *text)
     char name[2] = { *text == '_' ? ' ' : *text, 0 };
     KeySym sym = (name[0] == ' ') ? XK_space : XStringToKeysym(name);
     if (sym == NoSymbol) sym = (KeySym) (unsigned char) name[0];
-    Press(sym, 0, 0);
+    Press(sym, 0, 0, 0);
   }
 }
 

@@ -5129,6 +5129,18 @@ GAP_XEVENTS_CASES += [
     ("xevents display several commands", "map key:slash key:h key:equal key:asciitilde key:period grab:out.ppm key:q",
      ["display", img("rose_alpha")]),
 ]
+# More of XImageWindowCommand's keys (2026-10-11): v flips, ctrl+r redoes, Alt with an arrow
+# trims one pixel off that edge (xevents' alt+ is Mod1), and Alt with s, p, c, i, w asks for
+# Swirl, Oil Paint, Charcoal, Implode and Wave.
+GAP_XEVENTS_CASES += [("xevents display key %s" % k, "map key:%s grab:out.ppm key:q" % k, ["display", img("rose")])
+                      for k in ("v", "alt+Left", "alt+Right", "alt+Up", "alt+Down", "alt+Left*3")]
+GAP_XEVENTS_CASES += [("xevents display key %s, reply %s" % (k, reply),
+                       "map key:%s map key:ctrl+u type:%s key:Return grab:out.ppm key:q" % (k, reply),
+                       ["display", img("rose")])
+                      for k, reply in (("alt+s", "60"), ("alt+p", "3"), ("alt+c", "1"), ("alt+i", "0.5"),
+                                       ("alt+w", "5x30"), ("r", "+10+10"))]
+GAP_XEVENTS_CASES += [("xevents display redo after undo", "map key:asciitilde key:ctrl+z key:ctrl+r grab:out.ppm key:q",
+                       ["display", img("rose")])]
 # The file browser (ctrl+s, ctrl+o) starts in the image's directory, so these cases first copy
 # their input into the case directory: a save then cannot land in the corpus. Keys reach the
 # browser's text field only with the pointer over it (point:170,355); Right and BackSpace clear
