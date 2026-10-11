@@ -5428,3 +5428,9 @@ indexes failed
 13:35 confirm version:   killed 0, survived 1 (0 capped), no coverage 5, errors 0
 13:35 confirm module:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 13:36 pushed
+13:36 pushed
+== confirm-loop round done Sun Oct 11 13:36:20 UTC 2026
+13:38 resweep memory:   killed 23, survived 42 (42 capped), no coverage 7, errors 0
+13:46 resweep annotate:   killed 442, survived 71 (4 capped), no coverage 92, errors 0
+14:45 resweep draw:   killed 1923, survived 529 (317 capped), no coverage 92, errors 0
+== confirm-loop Sun Oct 11 14:45:15 UTC 2026: cases since 342bd757f, at 029569055 X11 cases: display's color and matte edit through their own 
