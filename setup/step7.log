@@ -5510,3 +5510,12 @@ indexes failed
 15:42 resweep layer:   killed 339, survived 84 (0 capped), no coverage 0, errors 0
 15:46 resweep transform:   killed 469, survived 123 (18 capped), no coverage 47, errors 0
 15:50 resweep attribute:   killed 436, survived 88 (28 capped), no coverage 8, errors 0
+15:50 pushed
+15:52 resweep paint:   killed 244, survived 36 (0 capped), no coverage 31, errors 0
+16:02 resweep geometry:   killed 239, survived 95 (92 capped), no coverage 4, errors 0
+== confirm-loop Sun Oct 11 16:02:46 UTC 2026: cases since 029569055, at ea210ae21 MUTATION.md: display's edit modes, the Info window and the x
+16:07 10 new cases since 029569055
+16:07 selfcheck: 10 cases, 6 runs each, 0 nondeterministic
+16:08 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+16:08 confirm image:   killed 0, survived 0 (0 capped), no coverage 93, errors 0
+16:09 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0

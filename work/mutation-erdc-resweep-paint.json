@@ -31,7 +31,7 @@
   "col": 17,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 41,
+  "cases": 30,
   "killer": "gaps/f49d8d71a2",
   "why": "out.miff differs"
  },
@@ -79,7 +79,7 @@
   "col": 17,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 41,
+  "cases": 30,
   "killer": "gaps/f49d8d71a2",
   "why": "out.miff differs"
  },
@@ -127,8 +127,8 @@
   "col": 43,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "unary/76f33c8137",
+  "cases": 5,
+  "killer": "unary/d3dcf5e396",
   "why": "out.miff differs"
  },
  {
@@ -139,7 +139,7 @@
   "col": 47,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 17,
+  "cases": 10,
   "killer": "convert/2c5236ad57",
   "why": "out.miff differs"
  },
@@ -151,8 +151,8 @@
   "col": 36,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "unary/76f33c8137",
+  "cases": 5,
+  "killer": "unary/d3dcf5e396",
   "why": "out.miff differs"
  },
  {
@@ -499,7 +499,7 @@
   "col": 17,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 25,
+  "cases": 4,
   "killer": "gaps/8a871dcb1f",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -571,7 +571,7 @@
   "col": 25,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 25,
+  "cases": 4,
   "killer": "gaps/8a871dcb1f",
   "why": "out.miff differs"
  },
@@ -823,7 +823,7 @@
   "col": 29,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 11,
+  "cases": 13,
   "killer": "unary/6099376a59",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -883,7 +883,7 @@
   "col": 16,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 18,
+  "cases": 14,
   "killer": "gaps/c32916a1b0",
   "why": "out.miff differs"
  },
@@ -1027,8 +1027,8 @@
   "col": 50,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "draw/4416770880",
+  "cases": 6,
+  "killer": "unary/111c667d96",
   "why": "out.miff differs"
  },
  {
@@ -1039,8 +1039,8 @@
   "col": 13,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 11,
-  "killer": "unary/6099376a59",
+  "cases": 6,
+  "killer": "unary/111c667d96",
   "why": "out.miff differs"
  },
  {
@@ -1099,7 +1099,7 @@
   "col": 52,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 36,
+  "cases": 6,
   "killer": "unary/111c667d96",
   "why": "out.miff differs"
  },
@@ -1111,7 +1111,7 @@
   "col": 13,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 36,
+  "cases": 6,
   "killer": "unary/111c667d96",
   "why": "out.miff differs"
  },
@@ -1123,8 +1123,8 @@
   "col": 53,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "draw/4416770880",
+  "cases": 6,
+  "killer": "unary/111c667d96",
   "why": "out.miff differs"
  },
  {
@@ -1135,8 +1135,8 @@
   "col": 55,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "draw/4416770880",
+  "cases": 6,
+  "killer": "unary/111c667d96",
   "why": "out.miff differs"
  },
  {
@@ -1147,8 +1147,8 @@
   "col": 13,
   "function": "FloodfillPaintImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "draw/4416770880",
+  "cases": 6,
+  "killer": "unary/111c667d96",
   "why": "out.miff differs"
  },
  {
@@ -1183,7 +1183,7 @@
   "col": 16,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 7,
+  "cases": 22,
   "killer": "gaps/a59c6b4cff",
   "why": "out.miff differs"
  },
@@ -1195,8 +1195,8 @@
   "col": 55,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "signature/53ec353577",
+  "cases": 1,
+  "killer": "gaps/f850dbe79a",
   "why": "stdout differs"
  },
  {
@@ -1208,7 +1208,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 1,
-  "killer": "signature/956ebe3ce9",
+  "killer": "gaps/f850dbe79a",
   "why": "stdout differs"
  },
  {
@@ -1219,8 +1219,8 @@
   "col": 16,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 23,
-  "killer": "gaps/2ee76e7c41",
+  "cases": 3,
+  "killer": "gaps/8e7c7711e8",
   "why": "out.miff differs"
  },
  {
@@ -1231,7 +1231,7 @@
   "col": 63,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 51,
+  "cases": 8,
   "killer": "gaps/501f28eeb3",
   "why": "out.miff differs"
  },
@@ -1243,7 +1243,7 @@
   "col": 60,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 51,
+  "cases": 8,
   "killer": "gaps/501f28eeb3",
   "why": "out.miff differs"
  },
@@ -1255,7 +1255,7 @@
   "col": 60,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 54,
+  "cases": 37,
   "killer": "gaps/39bda9c4f7",
   "why": "out.miff differs"
  },
@@ -1267,7 +1267,7 @@
   "col": 60,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 3,
   "killer": "gaps/8e7c7711e8",
   "why": "out.miff differs"
  },
@@ -1279,7 +1279,7 @@
   "col": 63,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 3,
   "killer": "gaps/8e7c7711e8",
   "why": "out.miff differs"
  },
@@ -1291,7 +1291,7 @@
   "col": 63,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 23,
+  "cases": 5,
   "killer": "gaps/2ee76e7c41",
   "why": "out.miff differs"
  },
@@ -1303,7 +1303,7 @@
   "col": 63,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 28,
+  "cases": 25,
   "killer": "gen/70a52e5778",
   "why": "out.miff differs"
  },
@@ -1315,7 +1315,7 @@
   "col": 63,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 52,
+  "cases": 44,
   "killer": "gaps/92a4645218",
   "why": "out.miff differs"
  },
@@ -1327,7 +1327,7 @@
   "col": 60,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 52,
+  "cases": 44,
   "killer": "gaps/92a4645218",
   "why": "out.miff differs"
  },
@@ -1339,7 +1339,7 @@
   "col": 60,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 60,
+  "cases": 59,
   "killer": "gaps/f55baee616",
   "why": "out.miff differs"
  },
@@ -1351,7 +1351,7 @@
   "col": 63,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 24,
+  "cases": 41,
   "killer": "gaps/a0b823f216",
   "why": "out.miff differs"
  },
@@ -1363,7 +1363,7 @@
   "col": 60,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 24,
+  "cases": 41,
   "killer": "gaps/a0b823f216",
   "why": "out.miff differs"
  },
@@ -1376,7 +1376,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 1,
-  "killer": "signature/956ebe3ce9",
+  "killer": "gaps/f850dbe79a",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -1388,7 +1388,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 1,
-  "killer": "signature/956ebe3ce9",
+  "killer": "gaps/f850dbe79a",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -1399,9 +1399,9 @@
   "col": 49,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "signature/956ebe3ce9",
-  "why": "stdout differs"
+  "cases": 2,
+  "killer": "gaps/cb08ba262f",
+  "why": "out.miff differs"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:547:53:547:55",
@@ -1411,9 +1411,9 @@
   "col": 53,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "signature/956ebe3ce9",
-  "why": "stdout differs"
+  "cases": 2,
+  "killer": "gaps/cb08ba262f",
+  "why": "out.miff differs"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:548:50:548:52",
@@ -1423,9 +1423,9 @@
   "col": 50,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "signature/956ebe3ce9",
-  "why": "stdout differs"
+  "cases": 2,
+  "killer": "gaps/cb08ba262f",
+  "why": "out.miff differs"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:549:50:549:52",
@@ -1435,9 +1435,9 @@
   "col": 50,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "signature/956ebe3ce9",
-  "why": "stdout differs"
+  "cases": 2,
+  "killer": "gaps/cb08ba262f",
+  "why": "out.miff differs"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:550:15:550:17",
@@ -1447,9 +1447,9 @@
   "col": 15,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "signature/956ebe3ce9",
-  "why": "stdout differs"
+  "cases": 2,
+  "killer": "gaps/cb08ba262f",
+  "why": "out.miff differs"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:550:67:550:69",
@@ -1460,7 +1460,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 1,
-  "killer": "signature/956ebe3ce9",
+  "killer": "gaps/f850dbe79a",
   "why": "stdout differs"
  },
  {
@@ -1472,7 +1472,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 6,
-  "killer": "gaps/5124736ae1",
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1484,7 +1484,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 6,
-  "killer": "gaps/5124736ae1",
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1496,7 +1496,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 1,
-  "killer": "signature/956ebe3ce9",
+  "killer": "gaps/f850dbe79a",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -1507,7 +1507,7 @@
   "col": 13,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1520,7 +1520,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 1,
-  "killer": "signature/956ebe3ce9",
+  "killer": "gaps/f850dbe79a",
   "why": "stdout differs"
  },
  {
@@ -1531,7 +1531,7 @@
   "col": 57,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1543,7 +1543,7 @@
   "col": 59,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1555,7 +1555,7 @@
   "col": 45,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1567,7 +1567,7 @@
   "col": 50,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1579,7 +1579,7 @@
   "col": 58,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1591,7 +1591,7 @@
   "col": 35,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1603,7 +1603,7 @@
   "col": 40,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1615,7 +1615,7 @@
   "col": 39,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1627,7 +1627,7 @@
   "col": 56,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1639,7 +1639,7 @@
   "col": 39,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1651,7 +1651,7 @@
   "col": 53,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1663,7 +1663,7 @@
   "col": 39,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1675,7 +1675,7 @@
   "col": 56,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1687,7 +1687,7 @@
   "col": 39,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1699,7 +1699,7 @@
   "col": 53,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 31,
   "killer": "gaps/65134f391d",
   "why": "out.miff differs"
  },
@@ -1711,8 +1711,8 @@
   "col": 79,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "gen/5e9ee1de8f",
+  "cases": 23,
+  "killer": "gen/b1869dbf07",
   "why": "out.miff differs"
  },
  {
@@ -1724,7 +1724,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 6,
-  "killer": "gaps/5124736ae1",
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1747,7 +1747,7 @@
   "col": 31,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 31,
+  "cases": 29,
   "killer": "gaps/0d25dab829",
   "why": "out.miff differs"
  },
@@ -1759,8 +1759,8 @@
   "col": 46,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "gaps/de3fd00003",
+  "cases": 6,
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1771,8 +1771,8 @@
   "col": 68,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "gaps/de3fd00003",
+  "cases": 6,
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1783,8 +1783,8 @@
   "col": 28,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "gaps/de3fd00003",
+  "cases": 6,
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1795,8 +1795,8 @@
   "col": 46,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "gaps/de3fd00003",
+  "cases": 6,
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1807,8 +1807,8 @@
   "col": 51,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "gaps/de3fd00003",
+  "cases": 6,
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1819,8 +1819,8 @@
   "col": 64,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "gaps/de3fd00003",
+  "cases": 6,
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1831,8 +1831,8 @@
   "col": 71,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "gaps/de3fd00003",
+  "cases": 6,
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1844,7 +1844,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 6,
-  "killer": "gaps/5124736ae1",
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1855,7 +1855,7 @@
   "col": 53,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 6,
+  "cases": 16,
   "killer": "gaps/5124736ae1",
   "why": "out.miff differs"
  },
@@ -1867,7 +1867,7 @@
   "col": 58,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 6,
+  "cases": 16,
   "killer": "gaps/5124736ae1",
   "why": "out.miff differs"
  },
@@ -1879,7 +1879,7 @@
   "col": 50,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 6,
+  "cases": 16,
   "killer": "gaps/5124736ae1",
   "why": "out.miff differs"
  },
@@ -1891,7 +1891,7 @@
   "col": 55,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 6,
+  "cases": 16,
   "killer": "gaps/5124736ae1",
   "why": "out.miff differs"
  },
@@ -1904,7 +1904,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 6,
-  "killer": "gaps/5124736ae1",
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1915,8 +1915,8 @@
   "col": 31,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 18,
-  "killer": "gaps/6f7fa55af8",
+  "cases": 7,
+  "killer": "gaps/ad44a7f7aa",
   "why": "out.miff differs"
  },
  {
@@ -1928,7 +1928,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 6,
-  "killer": "gaps/5124736ae1",
+  "killer": "gaps/007abd7eba",
   "why": "out.miff differs"
  },
  {
@@ -1939,7 +1939,7 @@
   "col": 32,
   "function": "GradientImage",
   "status": "killed",
-  "cases": 39,
+  "cases": 51,
   "killer": "gaps/2249e88b49",
   "why": "out.miff differs"
  },
@@ -1952,7 +1952,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 1,
-  "killer": "signature/956ebe3ce9",
+  "killer": "gaps/f850dbe79a",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -1964,8 +1964,8 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 1,
-  "killer": "signature/956ebe3ce9",
-  "why": "exit status [0] -> [1]; stdout differs; stderr differs"
+  "killer": "gaps/f850dbe79a",
+  "why": "stdout differs; stderr differs"
  },
  {
   "id": "cxx_mul_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:629:60:629:61",
@@ -1976,7 +1976,7 @@
   "function": "GradientImage",
   "status": "killed",
   "cases": 1,
-  "killer": "signature/956ebe3ce9",
+  "killer": "gaps/f850dbe79a",
   "why": "stdout differs"
  },
  {
@@ -1999,7 +1999,7 @@
   "col": 15,
   "function": "paint.c:DestroyHistogramTLS",
   "status": "killed",
-  "cases": 14,
+  "cases": 13,
   "killer": "mogrify/b7eb1a4581",
   "why": "exit status [0, 0] -> [0, -6]; stderr differs; work.miff differs"
  },
@@ -2191,8 +2191,8 @@
   "col": 51,
   "function": "OilPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "gaps/92f03ae4e6",
+  "cases": 2,
+  "killer": "gaps/5c9771af8b",
   "why": "out.miff differs"
  },
  {
@@ -2203,8 +2203,8 @@
   "col": 74,
   "function": "OilPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "gaps/92f03ae4e6",
+  "cases": 2,
+  "killer": "gaps/5c9771af8b",
   "why": "out.miff differs"
  },
  {
@@ -2215,8 +2215,8 @@
   "col": 11,
   "function": "OilPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "gaps/92f03ae4e6",
+  "cases": 2,
+  "killer": "gaps/5c9771af8b",
   "why": "out.miff differs"
  },
  {
@@ -2227,8 +2227,8 @@
   "col": 18,
   "function": "OilPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "gaps/92f03ae4e6",
+  "cases": 2,
+  "killer": "gaps/5c9771af8b",
   "why": "out.miff differs"
  },
  {
@@ -2239,8 +2239,8 @@
   "col": 22,
   "function": "OilPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "gaps/92f03ae4e6",
+  "cases": 2,
+  "killer": "gaps/5c9771af8b",
   "why": "out.miff differs"
  },
  {
@@ -2251,8 +2251,8 @@
   "col": 53,
   "function": "OilPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "gaps/92f03ae4e6",
+  "cases": 2,
+  "killer": "gaps/5c9771af8b",
   "why": "out.miff differs"
  },
  {
@@ -2263,8 +2263,8 @@
   "col": 60,
   "function": "OilPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "gaps/92f03ae4e6",
+  "cases": 2,
+  "killer": "gaps/5c9771af8b",
   "why": "out.miff differs"
  },
  {
@@ -2683,8 +2683,8 @@
   "col": 57,
   "function": "OilPaintImage",
   "status": "killed",
-  "cases": 9,
-  "killer": "gaps/92f03ae4e6",
+  "cases": 2,
+  "killer": "gaps/5c9771af8b",
   "why": "out.miff differs"
  },
  {
@@ -2803,8 +2803,8 @@
   "col": 57,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -2815,8 +2815,8 @@
   "col": 3,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -2827,7 +2827,7 @@
   "col": 3,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 4,
+  "cases": 5,
   "killer": "unary/fc14e7087a",
   "why": "out.miff differs"
  },
@@ -2851,8 +2851,8 @@
   "col": 15,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -2864,7 +2864,7 @@
   "function": "OpaquePaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/3da0ac8991",
+  "killer": "unary/ead0b4d139",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
  {
@@ -2876,7 +2876,7 @@
   "function": "OpaquePaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/3da0ac8991",
+  "killer": "unary/ead0b4d139",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
  {
@@ -2887,8 +2887,8 @@
   "col": 16,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -2899,8 +2899,8 @@
   "col": 11,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -2911,8 +2911,8 @@
   "col": 17,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -2923,9 +2923,9 @@
   "col": 17,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
-  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
+  "why": "exit status [0] -> [-6]; stderr differs"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:991:46:991:48",
@@ -2936,7 +2936,7 @@
   "function": "OpaquePaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/3da0ac8991",
+  "killer": "unary/ead0b4d139",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -2947,7 +2947,7 @@
   "col": 7,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 4,
+  "cases": 5,
   "killer": "unary/fc14e7087a",
   "why": "out.miff differs"
  },
@@ -2960,7 +2960,7 @@
   "function": "OpaquePaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/3da0ac8991",
+  "killer": "unary/ead0b4d139",
   "why": "out.miff differs"
  },
  {
@@ -2971,8 +2971,8 @@
   "col": 43,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -2983,8 +2983,8 @@
   "col": 13,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -2995,8 +2995,8 @@
   "col": 43,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -3007,8 +3007,8 @@
   "col": 13,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -3019,8 +3019,8 @@
   "col": 43,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -3031,8 +3031,8 @@
   "col": 13,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -3043,7 +3043,7 @@
   "col": 43,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 4,
+  "cases": 5,
   "killer": "unary/fc14e7087a",
   "why": "out.miff differs"
  },
@@ -3055,7 +3055,7 @@
   "col": 13,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 4,
+  "cases": 5,
   "killer": "unary/fc14e7087a",
   "why": "out.miff differs"
  },
@@ -3091,8 +3091,8 @@
   "col": 60,
   "function": "OpaquePaintImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/fc56a317c9",
+  "cases": 3,
+  "killer": "convert/fd4010c57c",
   "why": "out.miff differs"
  },
  {
@@ -3152,7 +3152,7 @@
   "function": "TransparentPaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/4415eb40f1",
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
@@ -3164,7 +3164,7 @@
   "function": "TransparentPaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/4415eb40f1",
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
@@ -3187,8 +3187,8 @@
   "col": 15,
   "function": "TransparentPaintImage",
   "status": "killed",
-  "cases": 3,
-  "killer": "unary/e5f41be62f",
+  "cases": 1,
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
@@ -3200,8 +3200,8 @@
   "function": "TransparentPaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/4415eb40f1",
-  "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
+  "killer": "convert/5e6f5d2380",
+  "why": "exit status [0] -> [1]; stderr differs"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:1118:41:1118:43",
@@ -3212,8 +3212,8 @@
   "function": "TransparentPaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/4415eb40f1",
-  "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
+  "killer": "convert/5e6f5d2380",
+  "why": "exit status [0] -> ['timeout']; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:1129:16:1129:18",
@@ -3223,8 +3223,8 @@
   "col": 16,
   "function": "TransparentPaintImage",
   "status": "killed",
-  "cases": 3,
-  "killer": "unary/e5f41be62f",
+  "cases": 1,
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
@@ -3235,8 +3235,8 @@
   "col": 11,
   "function": "TransparentPaintImage",
   "status": "killed",
-  "cases": 3,
-  "killer": "unary/e5f41be62f",
+  "cases": 1,
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
@@ -3247,8 +3247,8 @@
   "col": 17,
   "function": "TransparentPaintImage",
   "status": "killed",
-  "cases": 3,
-  "killer": "unary/e5f41be62f",
+  "cases": 1,
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
@@ -3258,10 +3258,10 @@
   "line": 1138,
   "col": 17,
   "function": "TransparentPaintImage",
-  "status": "survived",
-  "cases": 14,
-  "capped": false,
-  "line_executed": true
+  "status": "killed",
+  "cases": 4,
+  "killer": "unary/6a89cc07b6",
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:1138:46:1138:48",
@@ -3272,7 +3272,7 @@
   "function": "TransparentPaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/4415eb40f1",
+  "killer": "convert/5e6f5d2380",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
@@ -3283,8 +3283,8 @@
   "col": 7,
   "function": "TransparentPaintImage",
   "status": "killed",
-  "cases": 3,
-  "killer": "unary/e5f41be62f",
+  "cases": 1,
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
@@ -3296,7 +3296,7 @@
   "function": "TransparentPaintImage",
   "status": "killed",
   "cases": 1,
-  "killer": "unary/4415eb40f1",
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
@@ -3307,8 +3307,8 @@
   "col": 9,
   "function": "TransparentPaintImage",
   "status": "killed",
-  "cases": 3,
-  "killer": "unary/e5f41be62f",
+  "cases": 1,
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
@@ -3319,8 +3319,8 @@
   "col": 60,
   "function": "TransparentPaintImage",
   "status": "killed",
-  "cases": 3,
-  "killer": "unary/e5f41be62f",
+  "cases": 1,
+  "killer": "convert/5e6f5d2380",
   "why": "out.miff differs"
  },
  {
