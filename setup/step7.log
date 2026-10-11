@@ -5845,3 +5845,7 @@ indexes failed
 19:16 confirm mime:   killed 0, survived 0 (0 capped), no coverage 23, errors 0
 19:16 confirm log:   killed 0, survived 0 (0 capped), no coverage 64, errors 0
 19:16 confirm type:   killed 0, survived 0 (0 capped), no coverage 58, errors 0
+19:16 pushed
+19:16 confirm layer:   killed 0, survived 0 (0 capped), no coverage 84, errors 0
+19:16 confirm transform:   killed 0, survived 0 (0 capped), no coverage 170, errors 0
+19:17 confirm attribute:   killed 0, survived 0 (0 capped), no coverage 81, errors 0
