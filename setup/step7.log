@@ -5539,3 +5539,7 @@ indexes failed
 16:12 confirm layer:   killed 0, survived 0 (0 capped), no coverage 84, errors 0
 16:12 confirm transform:   killed 0, survived 0 (0 capped), no coverage 170, errors 0
 16:12 confirm attribute:   killed 0, survived 0 (0 capped), no coverage 81, errors 0
+16:12 pushed
+16:12 confirm paint:   killed 0, survived 0 (0 capped), no coverage 68, errors 0
+16:12 confirm geometry:   killed 0, survived 0 (0 capped), no coverage 8, errors 0
+16:13 confirm channel:   killed 0, survived 0 (0 capped), no coverage 26, errors 0
