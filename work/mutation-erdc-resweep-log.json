@@ -320,7 +320,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -332,7 +332,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
  },
  {
@@ -344,7 +344,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -356,7 +356,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [1]; stderr differs"
  },
  {
@@ -368,7 +368,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -380,7 +380,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -392,7 +392,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -404,7 +404,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [-11]; stdout differs"
  },
  {
@@ -416,7 +416,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -428,7 +428,7 @@
   "function": "GetLogInfoList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -704,7 +704,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -716,7 +716,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -728,7 +728,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -740,7 +740,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [-11]; stdout differs"
  },
  {
@@ -752,7 +752,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [-11]; stdout differs"
  },
  {
@@ -764,7 +764,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -776,7 +776,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 3,
-  "killer": "gaps/c5651ffad8",
+  "killer": "gaps/a1518a7ae4",
   "why": "stdout differs"
  },
  {
@@ -788,7 +788,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -800,7 +800,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -812,7 +812,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -836,7 +836,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -848,7 +848,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -860,7 +860,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -872,7 +872,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -884,7 +884,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -896,7 +896,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -908,7 +908,7 @@
   "function": "ListLogInfo",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -1759,7 +1759,7 @@
   "col": 35,
   "function": "log.c:FormatLogFilename",
   "status": "killed",
-  "cases": 4,
+  "cases": 3,
   "killer": "gaps/8ca8beb691",
   "why": "stdout differs; log-0.xml differs; log-1.xml missing in candidate"
  },
@@ -1771,7 +1771,7 @@
   "col": 23,
   "function": "log.c:FormatLogFilename",
   "status": "killed",
-  "cases": 4,
+  "cases": 3,
   "killer": "gaps/8ca8beb691",
   "why": "stdout differs; log-0.xml differs; log-1.xml missing in candidate"
  },
@@ -1784,7 +1784,7 @@
   "function": "log.c:TranslateEvent",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -1796,7 +1796,7 @@
   "function": "log.c:TranslateEvent",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -1807,7 +1807,7 @@
   "col": 23,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 1,
+  "cases": 4,
   "killer": "gaps/c8fc06c3b0",
   "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
  },
@@ -1820,7 +1820,7 @@
   "function": "log.c:TranslateEvent",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -1856,7 +1856,7 @@
   "function": "log.c:TranslateEvent",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -1867,7 +1867,7 @@
   "col": 20,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 4,
+  "cases": 21,
   "killer": "gaps/ea7b2cd250",
   "why": "stdout differs"
  },
@@ -1879,7 +1879,7 @@
   "col": 25,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 4,
+  "cases": 21,
   "killer": "gaps/ea7b2cd250",
   "why": "stdout differs"
  },
@@ -1903,7 +1903,7 @@
   "col": 44,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 4,
+  "cases": 21,
   "killer": "gaps/ea7b2cd250",
   "why": "stdout differs"
  },
@@ -1915,7 +1915,7 @@
   "col": 18,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 1,
+  "cases": 4,
   "killer": "gaps/c8fc06c3b0",
   "why": "stdout differs"
  },
@@ -1927,8 +1927,8 @@
   "col": 13,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/ef77c58e30",
+  "cases": 3,
+  "killer": "gaps/a1518a7ae4",
   "why": "stdout differs"
  },
  {
@@ -1939,7 +1939,7 @@
   "col": 33,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 12,
+  "cases": 7,
   "killer": "gaps/ef77c58e30",
   "why": "stdout differs"
  },
@@ -1951,7 +1951,7 @@
   "col": 13,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 12,
+  "cases": 7,
   "killer": "gaps/ef77c58e30",
   "why": "stdout differs"
  },
@@ -1963,7 +1963,7 @@
   "col": 33,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 12,
+  "cases": 7,
   "killer": "gaps/ef77c58e30",
   "why": "stdout differs"
  },
@@ -1976,7 +1976,7 @@
   "function": "log.c:TranslateEvent",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -1988,7 +1988,7 @@
   "function": "log.c:TranslateEvent",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -2143,7 +2143,7 @@
   "col": 43,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 3,
+  "cases": 5,
   "killer": "gaps/b563c3f17c",
   "why": "stdout differs"
  },
@@ -2155,7 +2155,7 @@
   "col": 43,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 3,
+  "cases": 5,
   "killer": "gaps/b563c3f17c",
   "why": "stdout differs"
  },
@@ -2167,7 +2167,7 @@
   "col": 18,
   "function": "log.c:TranslateEvent",
   "status": "killed",
-  "cases": 3,
+  "cases": 5,
   "killer": "gaps/b563c3f17c",
   "why": "stdout differs"
  },
@@ -2372,7 +2372,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -2384,7 +2384,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
  },
  {
@@ -2396,7 +2396,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
  },
  {
@@ -2408,7 +2408,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [1]; stderr differs"
  },
  {
@@ -2420,7 +2420,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -2432,7 +2432,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -2468,7 +2468,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -2492,7 +2492,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stderr differs"
  },
  {
@@ -2528,7 +2528,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [-11]; stdout differs"
  },
  {
@@ -2539,7 +2539,7 @@
   "col": 26,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 7,
+  "cases": 2,
   "killer": "gaps/d488577db5",
   "why": "exit status [0] -> [-11]; stdout differs; log-0.xml missing in candidate"
  },
@@ -2551,9 +2551,9 @@
   "col": 29,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/6cd1a382de",
-  "why": "exit status [0] -> [-11]"
+  "cases": 11,
+  "killer": "gaps/8ca8beb691",
+  "why": "stdout differs; log-0.xml differs; log-1.xml differs"
  },
  {
   "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/log.c:1657:29:1657:30",
@@ -2563,7 +2563,7 @@
   "col": 29,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 7,
+  "cases": 2,
   "killer": "gaps/d488577db5",
   "why": "exit status [0] -> [-11]; stdout differs; log-0.xml missing in candidate"
  },
@@ -2575,7 +2575,7 @@
   "col": 49,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 14,
+  "cases": 11,
   "killer": "gaps/8ca8beb691",
   "why": "stdout differs; log-1.xml missing in candidate; log-2.xml only in candidate"
  },
@@ -2587,7 +2587,7 @@
   "col": 55,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 21,
+  "cases": 15,
   "killer": "gaps/1c494c004c",
   "why": "stdout differs; log-0.xml differs; log-1.xml missing in candidate"
  },
@@ -2599,7 +2599,7 @@
   "col": 55,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 7,
+  "cases": 2,
   "killer": "gaps/d488577db5",
   "why": "exit status [0] -> ['timeout']; stdout differs; log-0.xml differs"
  },
@@ -2611,7 +2611,7 @@
   "col": 13,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 14,
+  "cases": 11,
   "killer": "gaps/8ca8beb691",
   "why": "stdout differs; log-0.xml differs; log-1.xml missing in candidate"
  },
@@ -2635,7 +2635,7 @@
   "col": 13,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 14,
+  "cases": 11,
   "killer": "gaps/8ca8beb691",
   "why": "stdout differs; log-0.xml differs; log-1.xml missing in candidate"
  },
@@ -2647,7 +2647,7 @@
   "col": 26,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 7,
+  "cases": 2,
   "killer": "gaps/d488577db5",
   "why": "exit status [0] -> [-11]; stdout differs; log-0.xml missing in candidate"
  },
@@ -2659,7 +2659,7 @@
   "col": 11,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 7,
+  "cases": 2,
   "killer": "gaps/d488577db5",
   "why": "stdout differs; log-0.xml missing in candidate"
  },
@@ -2671,7 +2671,7 @@
   "col": 30,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 7,
+  "cases": 2,
   "killer": "gaps/d488577db5",
   "why": "stdout differs; log-0.xml differs"
  },
@@ -2683,7 +2683,7 @@
   "col": 15,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 12,
+  "cases": 13,
   "killer": "gaps/6cd1a382de",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
@@ -2695,7 +2695,7 @@
   "col": 32,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 7,
+  "cases": 2,
   "killer": "gaps/d488577db5",
   "why": "stdout differs; log-0.xml differs"
  },
@@ -2707,7 +2707,7 @@
   "col": 48,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 6,
+  "cases": 1,
   "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
@@ -2719,7 +2719,7 @@
   "col": 28,
   "function": "LogMagickEventList",
   "status": "killed",
-  "cases": 6,
+  "cases": 1,
   "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
@@ -2732,7 +2732,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -2744,7 +2744,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stderr differs"
  },
  {
@@ -2756,7 +2756,7 @@
   "function": "LogMagickEventList",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -2864,7 +2864,7 @@
   "function": "SetLogEventMask",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -2876,7 +2876,7 @@
   "function": "SetLogEventMask",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> [1]; stderr differs"
  },
  {
@@ -2888,7 +2888,7 @@
   "function": "SetLogEventMask",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -2900,7 +2900,7 @@
   "function": "SetLogEventMask",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "stdout differs"
  },
  {
@@ -2912,7 +2912,7 @@
   "function": "SetLogEventMask",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/c8fc06c3b0",
+  "killer": "gaps/bf5369d18e",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
