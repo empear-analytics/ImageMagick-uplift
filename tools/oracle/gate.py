@@ -67,12 +67,21 @@ with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "unstable-kil
     UNSTABLE_KILLERS = {k for k in _keys if "@" not in k}
     UNSTABLE_IN = [tuple(k.split("@", 1)) for k in _keys if "@" in k]
 
+# An x11 case's `x:` on a build without X writes a MIFF file named "x:", and before HARNESS_VERSION
+# 14 X11 cases ran without the fixed epoch, so its date:timestamp was the clock: that file
+# differed between any baseline and any later run (2026-10-11). A kill that is nothing but that
+# file differing says nothing; on a build with X, `x:` writes no file, so the rule loses no kill there.
+CLOCK_ONLY = ("x: differs",)
+
 
 def honest(result, report=""):
     """The result, a kill by an unstable case read as a survivor."""
     if result["status"] == "killed":
         killer, name = result.get("killer"), os.path.basename(report)
-        if killer in UNSTABLE_KILLERS or any(killer == c and name.startswith(p) for c, p in UNSTABLE_IN):
+        why = result.get("why")
+        why = "; ".join(why) if isinstance(why, list) else why
+        if (killer in UNSTABLE_KILLERS or any(killer == c and name.startswith(p) for c, p in UNSTABLE_IN)
+                or (str(killer).startswith("x11/") and why in CLOCK_ONLY)):
             return dict(result, status="survived", killer=None)
     return result
 

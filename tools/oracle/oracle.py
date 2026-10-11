@@ -49,7 +49,7 @@ FIXED_MTIME = 1000000000       # 2001-09-09; file dates end up in properties
 # Prepended to every magick invocation by run_case, e.g. a sandbox (mutate.py).
 WRAPPER = []
 TIMEOUT = 30                   # the slowest legitimate case takes under 3s
-HARNESS_VERSION = "13"        # bump when normalisation or execution changes (13: OpenCL profile at this boot's clock)
+HARNESS_VERSION = "14"        # bump when normalisation or execution changes (13: OpenCL profile at this boot's clock; 14: X11 cases keep the fixed epoch on a build without X)
 # WIDE=1, as for build.sh: the builds with X11 and OpenCL (base-wide, cov-wide, ...), with a
 # case map and line coverage of their own (casemap-wide.json, oracle-wide.profdata, ...).
 WIDE = "-wide" if os.environ.get("WIDE") else ""
@@ -497,6 +497,18 @@ def read_capped(path):
     return data
 
 
+_HAS_X = {}
+
+
+def has_x(binary):
+    """Whether the binary was built with X11: `x` among -version's built-in delegates."""
+    if binary not in _HAS_X:
+        r = magick(binary, ["-version"], WORK)
+        line = next((l for l in r.stdout.decode().splitlines() if l.startswith("Delegates")), "")
+        _HAS_X[binary] = " x " in line + " "
+    return _HAS_X[binary]
+
+
 def run_case(binary, side, case, manifest, extra_env=None, timeout=None):
     d = case_dir(side, case)
     shutil.rmtree(d, ignore_errors=True)
@@ -519,8 +531,9 @@ def run_case(binary, side, case, manifest, extra_env=None, timeout=None):
         # drop it, unless the case sets it itself: display also handles ConfigureNotify only once
         # GetMagickTime() has moved on from the event (its "stasis"), so under a running clock a
         # resized window is repainted or not depending on a second boundary. The interactive
-        # cases (xevents, no delays) keep the fixed epoch for that reason.
-        if "SOURCE_DATE_EPOCH" not in case.get("env", {}):
+        # cases (xevents, no delays) keep the fixed epoch for that reason. A build without X keeps
+        # it too: there `x:` writes a MIFF file named "x:", whose date:timestamp would be the clock.
+        if "SOURCE_DATE_EPOCH" not in case.get("env", {}) and has_x(binary):
             env["SOURCE_DATE_EPOCH"] = None
     try:
         for step in case["steps"]:
