@@ -5266,7 +5266,7 @@ _XEV_COLOR_MENUS = {"Method": _XEV_METHODS, "Pixel Color": _XEV_PENS, "Border Co
 _XEV_MATTE_BUTTONS = ["Method", "Border Color", "Fuzz", "Matte Value", "Undo", "Help", "Dismiss"]
 _XEV_MATTE_MENUS = {"Method": _XEV_METHODS, "Border Color": _XEV_PENS, "Fuzz": _XEV_FUZZ,
                     "Matte Value": ["Opaque", "Transparent", "Dialog..."]}
-_XEV_ROTATE_BUTTONS = ["Pixel Color", "Direction", "Help", "Dismiss"]
+_XEV_ROTATE_BUTTONS =["Pixel Color", "Direction", "Help", "Dismiss"]
 _XEV_ROTATE_MENUS = {"Pixel Color": _XEV_PENS, "Direction": ["horizontal", "vertical"]}
 _XEV_CHOP_BUTTONS = ["Direction", "Help", "Dismiss"]
 _XEV_CHOP_MENUS = {"Direction": ["horizontal", "vertical"]}
@@ -5379,6 +5379,9 @@ GAP_XEVENTS_CASES += [
          [("Direction", "vertical")], "drag:15,32,15,44"),
         ("crop, the Crop button", "Crop", ["Crop", "Help", "Dismiss"], {}, [],
          "drag:10,32,50,44 use:2 click:65,101 use:1"))
+] + [
+    # animate is left out (2026-10-11, measured): it plays at once, stepping frames after XDelay
+    # sleeps of real time, so under xevents it is never idle and no key reaches it in step.
 ] + [
     # An image larger than the screen (1024x768): display shows part of it and maps the Pan Icon
     # window, whose rectangle a drag moves (XPanImage); the arrow keys pan too (2026-10-11).
