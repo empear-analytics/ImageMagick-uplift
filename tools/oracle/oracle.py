@@ -778,9 +778,12 @@ def program_fingerprint(binary):
 def driver_fingerprint(binary):
     """The imdriver beside the binary, by hash: a @driver case's baseline depends on it, so a
     rebuilt driver (a new or changed command) must start a fresh baseline, which the binary's own
-    hash does not capture (2026-10-04)."""
+    hash does not capture (2026-10-04). The xevents helper's source likewise: an @xevents case's
+    exit status is the helper's when it gives up (2026-10-11)."""
     driver = driver_path(binary)
-    return file_sha(driver)[:8] if os.path.exists(driver) else "none"
+    xev = os.path.join(ROOT, "tools", "oracle", "driver", "xevents.c")
+    return ((file_sha(driver)[:8] if os.path.exists(driver) else "none") +
+            (file_sha(xev)[:8] if os.path.exists(xev) else ""))
 
 
 def machine_fingerprint():

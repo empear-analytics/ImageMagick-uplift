@@ -25,7 +25,9 @@
   After every key the helper waits until the client is idle: blocked in poll or select with
   nothing unread on its X connection (pidfd_getfd + FIONREAD), so the case does not depend on
   how fast the machine is. At the end it waits for the client to exit; a client that is still
-  running after 20 s is killed, and the helper exits with 124.
+  running after 20 s is killed, and the helper exits with 124. A client that exits while map or
+  idle waits for it (a build without X: import and display stop at once) ends the script there,
+  and the helper exits with the client's status.
 */
 #define _GNU_SOURCE
 #include <dirent.h>
@@ -37,6 +39,7 @@
 #include <linux/sockios.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
 #include <sys/wait.h>
@@ -53,6 +56,7 @@ static pid_t child;
 static int pidfd = -1, xfd = -1;
 static Window focus = None, mapped[64];
 static int nmapped = 0, pinned = -1;
+static int exited = 0, cstatus = 0;
 
 static void Nap(long ms)
 {
@@ -65,6 +69,19 @@ static double Now(void)
   struct timespec t;
   clock_gettime(CLOCK_MONOTONIC, &t);
   return t.tv_sec + t.tv_nsec / 1e9;
+}
+
+/* The client has exited (reaped here; its status kept for Finish). */
+static int Exited(void)
+{
+  if (!exited && (waitpid(child, &cstatus, WNOHANG) == child)) exited = 1;
+  return exited;
+}
+
+/* Exit with the client's status, the rest of the script skipped. */
+static void Finish(void)
+{
+  exit(WIFEXITED(cstatus) ? WEXITSTATUS(cstatus) : 128 + WTERMSIG(cstatus));
 }
 
 static void Fail(const char *what)
@@ -80,10 +97,12 @@ static void FindXSocket(void)
   char path[64];
   DIR *d;
   struct dirent *e;
+  struct stat own, st;
   if (pidfd < 0) pidfd = (int) syscall(SYS_pidfd_open, child, 0);
   if (pidfd < 0) Fail("pidfd_open");
   snprintf(path, sizeof(path), "/proc/%d/fd", (int) child);
   if ((d = opendir(path)) == NULL) return;
+  if (fstat(ConnectionNumber(dpy), &own) != 0) own.st_ino = 0;
   while ((e = readdir(d)) != NULL)
   {
     int fd = atoi(e->d_name), dup;
@@ -92,6 +111,8 @@ static void FindXSocket(void)
     if (e->d_name[0] == '.') continue;
     dup = (int) syscall(SYS_pidfd_getfd, pidfd, fd, 0);
     if (dup < 0) continue;
+    /* this helper's own connection, which the client holds between fork and exec */
+    if ((fstat(dup, &st) == 0) && (st.st_ino == own.st_ino)) { close(dup); continue; }
     memset(&peer, 0, sizeof(peer));
     if ((getpeername(dup, (struct sockaddr *) &peer, &len) == 0) && (peer.sun_family == AF_UNIX) &&
         (memmem(peer.sun_path, len - sizeof(peer.sun_family), ".X11-unix/X", 11) != NULL))
@@ -194,6 +215,7 @@ static void Map(void)
         }
       }
     }
+    if (Exited()) Finish();  /* a client that never maps one: no X, or an early error */
     if (Now() > end) Fail("no new window");
     Nap(10);
     XSync(dpy, False);
@@ -272,6 +294,7 @@ static void IdleOnX(void)
   double end = Now() + 20;
   while (xfd < 0)
   {
+    if (Exited()) Finish();  /* exited before connecting (no X support, an early error) */
     if (Now() > end) Fail("client never connected to the X server");
     FindXSocket();
     Nap(10);
@@ -396,10 +419,11 @@ int main(int argc, char **argv)
     free(script);
   }
   end = Now() + 20;
-  while (waitpid(child, &status, WNOHANG) == 0)
+  while (!Exited())
   {
     if (Now() > end) { kill(child, SIGKILL); waitpid(child, &status, 0); return 124; }
     Nap(10);
   }
-  return WIFEXITED(status) ? WEXITSTATUS(status) : 128 + WTERMSIG(status);
+  Finish();
+  return 0;
 }
