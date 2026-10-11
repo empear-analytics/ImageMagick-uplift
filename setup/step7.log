@@ -5892,3 +5892,9 @@ indexes failed
 19:32 resweep annotate:   killed 442, survived 71 (4 capped), no coverage 92, errors 0
 20:06 resweep draw:   killed 1909, survived 543 (331 capped), no coverage 92, errors 0
 == confirm-loop Sun Oct 11 20:06:26 UTC 2026: cases since 62730b34a, at f81b27ccb xevents: alt+ (Mod1); X11 cases: more of display's keys (13 
+20:07 pushed
+20:10 17 new cases since 62730b34a
+20:10 selfcheck: 17 cases, 6 runs each, 0 nondeterministic
+20:11 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+20:11 confirm image:   killed 0, survived 5 (0 capped), no coverage 88, errors 0
+20:11 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0
