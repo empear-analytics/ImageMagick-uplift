@@ -5342,3 +5342,7 @@ indexes failed
 12:41 confirm compress:   killed 0, survived 0 (0 capped), no coverage 37, errors 0
 12:42 confirm cipher:   killed 0, survived 0 (0 capped), no coverage 54, errors 0
 12:42 confirm list:   killed 0, survived 7 (0 capped), no coverage 27, errors 0
+12:42 pushed
+12:42 confirm magic:   killed 0, survived 0 (0 capped), no coverage 12, errors 0
+12:43 confirm fourier:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
+12:43 confirm coder:   killed 0, survived 0 (0 capped), no coverage 13, errors 0
