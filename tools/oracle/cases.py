@@ -5234,6 +5234,25 @@ def _xev_menu_pick(menu, item, items):
     return "map click:20,20 map click:65,%d map click:40,%d" % (101 + 32 * _XEV_MENUS.index(menu), y)
 
 
+# Draw mode's widget (display.c XDrawEditImage): its buttons, and the items of each one's menu.
+_XEV_DRAW_MENUS = {
+    "Element": ["point", "line", "rectangle", "fill rectangle", "circle", "fill circle", "ellipse",
+                "fill ellipse", "polygon", "fill polygon"],
+    "Color": ["black", "blue", "cyan", "green", "gray", "red", "magenta", "yellow", "white",
+              "transparent", "Browser..."],
+    "Stipple": ["Brick", "Diagonal", "Scales", "Vertical", "Wavy", "Translucent", "Opaque", "Open..."],
+    "Width": ["1", "2", "4", "8", "16", "Dialog..."],
+}
+_XEV_DRAW_BUTTONS = ["Element", "Color", "Stipple", "Width", "Undo", "Help", "Dismiss"]
+
+
+def _xev_draw_pick(button, item):
+    """The button clicked, then the item: these menus' items are 22 pixels apart from y=15
+    (measured on a grab of the Element menu; display's own menus are closer)."""
+    return " use:2 click:65,%d map click:40,%d" % (101 + 32 * _XEV_DRAW_BUTTONS.index(button),
+                                                  15 + 22 * _XEV_DRAW_MENUS[button].index(item))
+
+
 GAP_XEVENTS_CASES += [
     ("xevents display crop by drag", "map key:c map use:1 drag:10,10,50,40 key:Return grab:out.ppm key:q",
      ["display", img("rose")]),
@@ -5253,6 +5272,22 @@ GAP_XEVENTS_CASES += [
     # draw mode never drew).
     ("xevents display draw by drag", _xev_menu_pick("Image Edit", "Draw...", _XEV_EDIT) +
      " use:1 drag:10,34,60,44 grab:out.ppm key:Escape key:q", ["display", "-geometry", "+300+50", img("rose")]),
+] + [
+    # Draw mode's own menus (2026-10-11): the Draw widget takes the Commands window's place, so
+    # use:2 reaches it; its buttons are where the Commands widget's are, each menu like display's.
+    ("xevents display draw %s" % label, _xev_menu_pick("Image Edit", "Draw...", _XEV_EDIT) +
+     "".join(_xev_draw_pick(*p) for p in picks) + " use:1 " + gesture + " grab:out.ppm key:Escape key:q",
+     ["display", "-geometry", "+300+50", img("rose")])
+    for label, picks, gesture in (
+        [(el + " by drag", [("Element", el)], "drag:10,34,60,44")
+         for el in ("line", "rectangle", "fill rectangle", "circle", "fill circle", "ellipse", "fill ellipse")] +
+        [(el + ", three corners", [("Element", el)], "drag:10,34,40,44 click:60,34 click:60,34")
+         for el in ("polygon", "fill polygon")] +
+        [("line, width 8", [("Element", "line"), ("Width", "8")], "drag:10,34,60,44"),
+         ("rectangle, red pen", [("Element", "rectangle"), ("Color", "red")], "drag:10,34,60,44"),
+         ("fill rectangle, brick stipple", [("Element", "fill rectangle"), ("Stipple", "Brick")], "drag:10,34,60,44"),
+         ("line, then undone", [("Element", "line")], "drag:10,34,60,44 use:2 click:65,229 use:1")])
+] + [
     ("xevents display color edit, a click", _xev_menu_pick("Image Edit", "Color...", _XEV_EDIT) +
      " use:1 click:30,38 key:Escape grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
     ("xevents display matte edit, a click", _xev_menu_pick("Image Edit", "Matte...", _XEV_EDIT) +
