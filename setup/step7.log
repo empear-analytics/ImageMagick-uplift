@@ -5652,3 +5652,7 @@ indexes failed
 17:08 pushed
 == confirm-loop round done Sun Oct 11 17:08:25 UTC 2026
 17:12 resweep compare:   killed 572, survived 99 (0 capped), no coverage 23, errors 0
+17:12 pushed
+17:17 resweep vision:   killed 633, survived 116 (0 capped), no coverage 0, errors 0
+17:19 resweep threshold:   killed 469, survived 106 (0 capped), no coverage 0, errors 0
+17:22 resweep shear:   killed 429, survived 81 (0 capped), no coverage 45, errors 0
