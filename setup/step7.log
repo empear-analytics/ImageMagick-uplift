@@ -5886,3 +5886,9 @@ indexes failed
 19:22 confirm version:   killed 0, survived 1 (0 capped), no coverage 5, errors 0
 19:22 confirm module:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 19:22 pushed
+19:22 pushed
+== confirm-loop round done Sun Oct 11 19:22:45 UTC 2026
+19:25 resweep memory:   killed 23, survived 42 (42 capped), no coverage 7, errors 0
+19:32 resweep annotate:   killed 442, survived 71 (4 capped), no coverage 92, errors 0
+20:06 resweep draw:   killed 1909, survived 543 (331 capped), no coverage 92, errors 0
+== confirm-loop Sun Oct 11 20:06:26 UTC 2026: cases since 62730b34a, at f81b27ccb xevents: alt+ (Mod1); X11 cases: more of display's keys (13 
