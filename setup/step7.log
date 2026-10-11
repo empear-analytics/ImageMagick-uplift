@@ -5818,3 +5818,8 @@ indexes failed
 18:51 resweep profile:   killed 455, survived 72 (7 capped), no coverage 22, errors 0
 18:55 resweep log:   killed 134, survived 97 (57 capped), no coverage 24, errors 0
 18:59 resweep delegate:   killed 230, survived 78 (23 capped), no coverage 15, errors 0
+19:00 pushed
+19:02 resweep configure:   killed 86, survived 28 (10 capped), no coverage 28, errors 0
+19:04 resweep mime:   killed 121, survived 24 (4 capped), no coverage 3, errors 0
+19:09 resweep policy:   killed 138, survived 99 (86 capped), no coverage 32, errors 0
+== confirm-loop Sun Oct 11 19:09:36 UTC 2026: cases since 6fbc4c4e8, at 62730b34a X11 cases: display's region of interest, with commands from 

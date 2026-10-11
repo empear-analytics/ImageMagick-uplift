@@ -407,7 +407,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "info/d333f9b818",
-  "why": "exit status [0] -> [-6]; stdout differs; stderr differs; magick-j2G4nYfKvAKGXh_aKC6h8XzQG0Zru9Ov only in candidate"
+  "why": "exit status [0] -> [-6]; stdout differs; stderr differs; magick-545K6wN0EBZgi_NXO7chDPHPuyPjD3HN only in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:465:15:465:17",
@@ -479,7 +479,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "info/d333f9b818",
-  "why": "exit status [0] -> [-6]; stdout differs; magick-Cqx06M4q32jSl4gyd-vszvyZVxvf0dfa only in candidate"
+  "why": "exit status [0] -> [-6]; stdout differs; magick-Dt36qw6Gh_hQPSZHWeCctFtO6m3o6N8n only in candidate"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:480:3:480:43",
@@ -961,7 +961,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "info/d333f9b818",
-  "why": "exit status [0] -> ['timeout']; stdout differs; magick-LTrRaB33G7wHJOOcQtR3LSI7B5yluc9J only in candidate"
+  "why": "exit status [0] -> ['timeout']; stdout differs; magick-VNrhwMjBFDxU47EfFauZj1FM0gDZMVtE only in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:1038:26:1038:28",
@@ -1105,7 +1105,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "info/d333f9b818",
-  "why": "exit status [0] -> ['timeout']; stdout differs; magick-aGdaJAwqysMvx7LS1ejwqnq-IVN8FrBU only in candidate"
+  "why": "exit status [0] -> ['timeout']; stdout differs; magick-3ZZs7d0LA9BN4HsL-sdZbxcb5klgo1O1 only in candidate"
  },
  {
   "id": "cxx_le_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:1111:38:1111:40",
@@ -1129,7 +1129,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "info/d333f9b818",
-  "why": "exit status [0] -> ['timeout']; stdout differs; magick-XUFaRYCJJQxi2i45MChJ7ROOyNxNEslF only in candidate"
+  "why": "exit status [0] -> ['timeout']; stdout differs; magick-SK36ShnLNydxHMBRCjAo7ps_QFNwXoOl only in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:1115:34:1115:36",
