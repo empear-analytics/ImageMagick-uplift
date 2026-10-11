@@ -1,20 +1,19 @@
 mutate: 255 mutants in MagickCore/log\.c$, 22 functions
-  baseline: 500/651 (3s)
-  baseline: 651/651 (7s)
-mutate: baseline over 15699 cases in 8s
+  baseline: 6/6 (0s)
+mutate: baseline over 15774 cases in 1s
   mutants: 25/255 (1s)
   mutants: 50/255 (3s)
-  mutants: 75/255 (47s)
-  mutants: 100/255 (58s)
-  mutants: 125/255 (94s)
-  mutants: 150/255 (98s)
-  mutants: 175/255 (103s)
-  mutants: 200/255 (106s)
-  mutants: 225/255 (107s)
-  mutants: 250/255 (233s)
-  mutants: 255/255 (237s)
+  mutants: 75/255 (46s)
+  mutants: 100/255 (57s)
+  mutants: 125/255 (91s)
+  mutants: 150/255 (95s)
+  mutants: 175/255 (100s)
+  mutants: 200/255 (102s)
+  mutants: 225/255 (103s)
+  mutants: 250/255 (230s)
+  mutants: 255/255 (233s)
 
-mutate: 255 mutants, 237s
+mutate: 255 mutants, 233s
   killed 134, survived 97 (57 capped), no coverage 24, errors 0
   mutation score on reached code: 58.0%   overall: 52.5%
 

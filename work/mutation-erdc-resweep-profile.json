@@ -273,7 +273,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/8c4f07a526",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/profile.c:511:15:511:16",
@@ -453,7 +453,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/8c4f07a526",
-  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
+  "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/profile.c:557:22:557:24",

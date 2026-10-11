@@ -5811,3 +5811,10 @@ indexes failed
 18:44 resweep client:   killed 3, survived 2 (2 capped), no coverage 0, errors 0
 18:44 resweep image-view:   killed 0, survived 0 (0 capped), no coverage 0, errors 0
 18:44 pushed
+18:45 pushed
+== resweep pass done Sun Oct 11 18:45:04 UTC 2026, at ad9242d3f
+18:45 resweep: cases changed since last pass, starting fresh
+== resweep Sun Oct 11 18:48:41 UTC 2026: all Mac files at 62730b34a, untrusted first
+18:51 resweep profile:   killed 455, survived 72 (7 capped), no coverage 22, errors 0
+18:55 resweep log:   killed 134, survived 97 (57 capped), no coverage 24, errors 0
+18:59 resweep delegate:   killed 230, survived 78 (23 capped), no coverage 15, errors 0
