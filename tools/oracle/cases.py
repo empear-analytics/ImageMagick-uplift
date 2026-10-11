@@ -5370,6 +5370,13 @@ GAP_XEVENTS_CASES += [
         ("crop, the Crop button", "Crop", ["Crop", "Help", "Dismiss"], {}, [],
          "drag:10,32,50,44 use:2 click:65,101 use:1"))
 ] + [
+    # An image larger than the screen (1024x768): display shows part of it and maps the Pan Icon
+    # window, whose rectangle a drag moves (XPanImage); the arrow keys pan too (2026-10-11).
+    ("xevents display pan, %s" % label, "map map " + steps + " use:1 grab:out.ppm key:q",
+     ["display", "-resize", "1600x1100!", img("rose")])
+    for label, steps in (("icon dragged", "use:2 drag:20,20,60,50"), ("icon clicked", "use:2 click:80,55"),
+                         ("arrow keys", "use:1 key:Right*3 key:Down*2"))
+] + [
     ("xevents display rotate by drag", _xev_menu_pick("Transform", "Rotate...", _XEV_TRANSFORM) +
      " use:1 drag:10,38,60,38 grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
     ("xevents display chop, horizontal", _xev_menu_pick("Transform", "Chop", _XEV_TRANSFORM) +
