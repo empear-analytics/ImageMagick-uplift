@@ -5287,6 +5287,16 @@ GAP_XEVENTS_CASES += [
      ["display", img("rose")]),
     ("xevents display cut by drag", "map key:ctrl+x map use:1 drag:10,10,50,40 key:Return grab:out.ppm key:q",
      ["display", img("rose")]),
+] + [
+    # The rectangle adjusted before Return (2026-10-11): the other arrow keys, Home, Page Up and
+    # Down, a corner dragged (a press within RoiDelta of it), and Escape before any drag.
+    ("xevents display crop, %s" % label, "map key:c map use:1 " + steps + " grab:out.ppm key:q", ["display", img("rose")])
+    for label, steps in (("corner moved left and up", "drag:10,10,50,40 key:Left*3 key:Up*2 key:Return"),
+                         ("Home, Page Down, Page Up", "drag:10,10,50,40 key:Home key:Next key:Prior key:Return"),
+                         ("bottom right corner dragged", "drag:10,10,50,40 drag:50,40,60,44 key:Return"),
+                         ("top left corner dragged", "drag:10,10,50,40 drag:10,10,18,16 key:Return"),
+                         ("escaped before a drag", "key:Escape"))
+] + [
     # Copy a region, then paste it (ctrl+v reuses the mode widget's window; a click places it).
     ("xevents display copy and paste", "map key:ctrl+c map use:1 drag:10,10,50,40 key:Return key:ctrl+v "
      "use:1 click:20,20 key:Return grab:out.ppm key:q", ["display", img("rose")]),
