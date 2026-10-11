@@ -5419,3 +5419,7 @@ indexes failed
 13:34 confirm magic:   killed 0, survived 0 (0 capped), no coverage 12, errors 0
 13:34 confirm fourier:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 13:34 confirm coder:   killed 0, survived 0 (0 capped), no coverage 13, errors 0
+13:34 pushed
+13:35 confirm colormap:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
+13:35 confirm random:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
+13:35 confirm artifact:   killed 0, survived 0 (0 capped), no coverage 9, errors 0
