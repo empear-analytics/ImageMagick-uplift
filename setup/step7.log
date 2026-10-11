@@ -5325,3 +5325,7 @@ indexes failed
 12:39 confirm enhance:   killed 0, survived 0 (0 capped), no coverage 155, errors 0
 12:39 confirm resize:   killed 0, survived 0 (0 capped), no coverage 181, errors 0
 12:39 confirm statistic:   killed 0, survived 0 (0 capped), no coverage 149, errors 0
+12:40 pushed
+12:40 confirm visual-effects:   killed 0, survived 0 (0 capped), no coverage 174, errors 0
+12:40 confirm effect:   killed 0, survived 0 (0 capped), no coverage 185, errors 0
+12:40 confirm compare:   killed 0, survived 0 (0 capped), no coverage 122, errors 0
