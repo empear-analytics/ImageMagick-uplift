@@ -5360,3 +5360,8 @@ indexes failed
 12:49 resweep profile:   killed 455, survived 72 (7 capped), no coverage 22, errors 0
 12:53 resweep log:   killed 134, survived 97 (57 capped), no coverage 24, errors 0
 12:57 resweep delegate:   killed 230, survived 78 (23 capped), no coverage 15, errors 0
+12:57 pushed
+12:59 resweep configure:   killed 86, survived 28 (10 capped), no coverage 28, errors 0
+13:02 resweep mime:   killed 121, survived 24 (4 capped), no coverage 3, errors 0
+13:21 resweep policy:   killed 138, survived 99 (86 capped), no coverage 32, errors 0
+== confirm-loop Sun Oct 11 13:21:18 UTC 2026: cases since ad9242d3f, at 342bd757f X11 cases: display's draw mode through its own menus (13 cas
