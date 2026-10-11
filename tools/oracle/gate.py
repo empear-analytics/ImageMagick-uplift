@@ -60,14 +60,20 @@ ROW = "  %-28s %7s %6s %12s %9s %9s %11s %6s %6s %8s  %s"
 
 
 # Cases found nondeterministic after they were credited with kills: those kills do not count.
+# A key CASE@PREFIX voids the case's kills only in reports whose file name starts with PREFIX
+# (a case unstable on one build, deterministic on another).
 with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "unstable-killers.json")) as _f:
-    UNSTABLE_KILLERS = {k for k in json.load(_f) if not k.startswith("_")}
+    _keys = [k for k in json.load(_f) if not k.startswith("_")]
+    UNSTABLE_KILLERS = {k for k in _keys if "@" not in k}
+    UNSTABLE_IN = [tuple(k.split("@", 1)) for k in _keys if "@" in k]
 
 
-def honest(result):
+def honest(result, report=""):
     """The result, a kill by an unstable case read as a survivor."""
-    if result["status"] == "killed" and result.get("killer") in UNSTABLE_KILLERS:
-        return dict(result, status="survived", killer=None)
+    if result["status"] == "killed":
+        killer, name = result.get("killer"), os.path.basename(report)
+        if killer in UNSTABLE_KILLERS or any(killer == c and name.startswith(p) for c, p in UNSTABLE_IN):
+            return dict(result, status="survived", killer=None)
     return result
 
 
@@ -115,7 +121,7 @@ def merged(reports):
     by_id = {}
     for path in reports:
         with open(path) as f:
-            for result in map(honest, json.load(f)):
+            for result in (honest(r, path) for r in json.load(f)):
                 if replaces(result, by_id.get(result["id"])):
                     by_id[result["id"]] = result
     kills = platform_kills()

@@ -10,5 +10,11 @@
  "gaps/ad8ecc4624": "fontconfig, as above",
  "gaps/d096c25525": "fontconfig, as above",
  "gaps/db7346cf08": "fontconfig, as above",
- "gaps/e645f1be37": "fontconfig, as above"
+ "gaps/e645f1be37": "fontconfig, as above",
+ "xevents/7c360a05a7@mutation-sweep1010-": "xevents import cases on a build without X (mull-sdl-win): import exits at once, and xevents' idle either saw that or waited out its 20 s and exited 125 (1 <-> 125 by timing). Deterministic on mull-x11cl, where their kills stand; xevents ends the script when the client exits, 2026-10-11",
+ "xevents/1e3f7439ec@mutation-sweep1010-": "as above",
+ "xevents/c377f7f8a5@mutation-sweep1010-": "as above",
+ "xevents/7c360a05a7@mutation-rep1011": "as above (the reruns that showed it)",
+ "xevents/1e3f7439ec@mutation-rep1011": "as above",
+ "xevents/c377f7f8a5@mutation-rep1011": "as above"
 }
