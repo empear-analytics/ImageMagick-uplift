@@ -4191,3 +4191,31 @@ RecordProfileData's `count == 0` -> `!=` has none (min then follows the last cal
 by timing alone). **opencl.c 74%, nine functions short**, the same nine as x11cl11. Upstream quirk:
 the log drops each kernel name's last character (`BlurRo`, `BlurColum`): CopyMagickString's length
 counts the terminator.
+
+## sweep1010: confirmation on fresh baselines, and the import cases without X (2026-10-10/11, night)
+
+All 36 regular files again, mull-sdl-win, capped at 1500 cases a mutant, catalogue at `2ae92bdc6`,
+on baselines recorded fresh under the machine-keyed cache (`cfec1e6db`), 19:50-06:50. Mutant by
+mutant against sweep1009 (17,636): **no kill lost**; 15,274 killed and 2,212 survived in both, 108
+not covered in both, 41 survivors killed. Two are magick.c's SetMagickPrecision, by the
+MAGICK_PRECISION case (`991aa9015`) as intended: magick.c 77% -> 78% alone. constitute.c and
+semaphore.c have no mutants in this build (ERDC's files), as in sweep1009.
+
+**The other 39 were false kills.** All by the three `xevents import` cases (`f4a3881ef`), all an
+exit status 1 <-> 125: exception.c 11, xml-tree.c 27 (FileToXML), splay-tree.c 1. Rerun twice
+against those cases only (`rep1011a/b`): 27, then 33 of the 39. Selfcheck on mull-sdl-win, 20
+runs: all three nondeterministic. This build has no X, so `import` exits at once; xevents' `idle`
+waited for the client's X connection, and could find its own, which the client holds between fork
+and exec: then it went on and returned the client's 1, otherwise it waited out its 20 s and exited
+125. On mull-x11cl the three are deterministic (selfcheck 10 runs), so their xwindow.c kills
+(x11cl12, import1010) stand. `04b6755e7`: `map` and `idle` end the script when the client has
+exited, with its status, and the socket search skips the helper's own connection; the baseline
+cache is keyed by xevents.c as well as the driver. Selfcheck of all 115 xevents cases, 6 runs: 0
+nondeterministic on either build; on mull-sdl-win a pass takes 2 s (was 147 s, every display case
+waiting out `map`); on mull-x11cl all 115 results are identical to the old helper's. `ac255ccbf`:
+unstable-killers.json takes CASE@REPORT-PREFIX, and the three cases' kills in sweep1010 and
+rep1011 do not count.
+
+**Gated** (sweep1010 alone, against sweep1009 alone): the same short functions in all 34 gated
+files; adjusted scores equal but for magick.c (77% -> 78%). The regular files' trust is
+confirmed on a second sweep on independent baselines.
