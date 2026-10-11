@@ -97,7 +97,7 @@
   "col": 24,
   "function": "DeleteImageArtifact",
   "status": "killed",
-  "cases": 20,
+  "cases": 17,
   "killer": "format/e37fad76a6",
   "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
  },
@@ -181,8 +181,8 @@
   "col": 26,
   "function": "GetImageArtifact",
   "status": "killed",
-  "cases": 17,
-  "killer": "gaps/c62de06d22",
+  "cases": 16,
+  "killer": "gaps/2f9555c8d7",
   "why": "stdout differs; out.miff differs"
  },
  {
@@ -218,8 +218,8 @@
   "function": "GetNextImageArtifact",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
-  "why": "stdout differs"
+  "killer": "gaps/6226b5ce7d",
+  "why": "exit status [0] -> [-6]; stdout differs; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/artifact.c:386:24:386:26",
@@ -262,8 +262,8 @@
   "function": "ResetImageArtifactIterator",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
-  "why": "stdout differs"
+  "killer": "gaps/6226b5ce7d",
+  "why": "exit status [0] -> [-6]; stdout differs; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/artifact.c:430:3:430:61",
@@ -273,8 +273,8 @@
   "col": 3,
   "function": "ResetImageArtifactIterator",
   "status": "killed",
-  "cases": 1,
-  "killer": "identify/46075343f4",
+  "cases": 2,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
