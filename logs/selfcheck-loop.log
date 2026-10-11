@@ -1,7 +1,7 @@
-  run 1: 1/1 (12s)
-  run 2: 1/1 (13s)
-  run 3: 1/1 (12s)
-  run 4: 1/1 (12s)
-  run 5: 1/1 (13s)
-  run 6: 1/1 (12s)
-selfcheck: 1 cases, 6 runs each, 0 nondeterministic
+  run 1: 17/17 (1s)
+  run 2: 17/17 (1s)
+  run 3: 17/17 (1s)
+  run 4: 17/17 (1s)
+  run 5: 17/17 (1s)
+  run 6: 17/17 (1s)
+selfcheck: 17 cases, 6 runs each, 0 nondeterministic

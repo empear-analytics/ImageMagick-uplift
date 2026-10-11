@@ -5365,3 +5365,9 @@ indexes failed
 13:02 resweep mime:   killed 121, survived 24 (4 capped), no coverage 3, errors 0
 13:21 resweep policy:   killed 138, survived 99 (86 capped), no coverage 32, errors 0
 == confirm-loop Sun Oct 11 13:21:18 UTC 2026: cases since ad9242d3f, at 342bd757f X11 cases: display's draw mode through its own menus (13 cas
+13:23 pushed
+13:25 17 new cases since ad9242d3f
+13:25 selfcheck: 17 cases, 6 runs each, 0 nondeterministic
+13:26 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+13:26 confirm image:   killed 0, survived 0 (0 capped), no coverage 93, errors 0
+13:26 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0
