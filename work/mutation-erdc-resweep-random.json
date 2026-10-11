@@ -199,7 +199,7 @@
   "col": 31,
   "function": "AcquireRandomInfo",
   "status": "killed",
-  "cases": 6,
+  "cases": 2,
   "killer": "gen/ebc3db8343",
   "why": "out.miff differs"
  },
@@ -211,7 +211,7 @@
   "col": 7,
   "function": "AcquireRandomInfo",
   "status": "killed",
-  "cases": 6,
+  "cases": 2,
   "killer": "gen/ebc3db8343",
   "why": "out.miff differs"
  },
@@ -223,7 +223,7 @@
   "col": 7,
   "function": "AcquireRandomInfo",
   "status": "killed",
-  "cases": 6,
+  "cases": 2,
   "killer": "gen/ebc3db8343",
   "why": "out.miff differs"
  },
@@ -235,7 +235,7 @@
   "col": 7,
   "function": "AcquireRandomInfo",
   "status": "killed",
-  "cases": 6,
+  "cases": 2,
   "killer": "gen/ebc3db8343",
   "why": "out.miff differs"
  },
@@ -1193,9 +1193,9 @@
   "col": 12,
   "function": "SetRandomKey",
   "status": "killed",
-  "cases": 134,
+  "cases": 127,
   "killer": "gaps/b0b255df3b",
-  "why": "exit status [0] -> ['timeout']; magick-N5eFoQ1Qla_xyw1oxvhvOQfdBNIZd0dX only in candidate; magick-dmUD4GhK54jrjyeE-BbNSyH4aTMBop3k only in candidate; magick-y7gJMiIgoNOcDVvCKRWqpWn_qjgLxBLv only in ca"
+  "why": "exit status [0] -> ['timeout']; magick-9hFdGw7yK97_7st2k1sIbv7gVRY50SGs only in candidate; magick-PRt_7u7hzFCSPEPN3RREZ0oWvqBHs65k only in candidate; magick-z4y3PNG7egIX3Yq1K7Fom-8NS6NeBCYl only in ca"
  },
  {
   "id": "cxx_ge_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/random.c:916:12:916:14",
