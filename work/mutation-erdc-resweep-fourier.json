@@ -127,8 +127,8 @@
   "col": 33,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 6,
-  "killer": "gaps/48d12fd149",
+  "cases": 4,
+  "killer": "gaps/b4def889ca",
   "why": "out.miff differs"
  },
  {
@@ -307,8 +307,8 @@
   "col": 19,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 6,
-  "killer": "gaps/48d12fd149",
+  "cases": 4,
+  "killer": "gaps/b4def889ca",
   "why": "out.miff differs"
  },
  {
@@ -356,7 +356,7 @@
   "function": "ComplexImages",
   "status": "killed",
   "cases": 3,
-  "killer": "complex/61ec981938",
+  "killer": "complex/1054b5fd68",
   "why": "out.miff differs"
  },
  {
@@ -368,7 +368,7 @@
   "function": "ComplexImages",
   "status": "killed",
   "cases": 3,
-  "killer": "complex/61ec981938",
+  "killer": "complex/1054b5fd68",
   "why": "out.miff differs"
  },
  {
@@ -379,8 +379,8 @@
   "col": 18,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 9,
-  "killer": "complex/10818ad74c",
+  "cases": 6,
+  "killer": "gaps/2914386e30",
   "why": "out.miff differs"
  },
  {
@@ -391,8 +391,8 @@
   "col": 18,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 9,
-  "killer": "complex/10818ad74c",
+  "cases": 6,
+  "killer": "gaps/2914386e30",
   "why": "out.miff differs"
  },
  {
@@ -403,7 +403,7 @@
   "col": 17,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 8,
+  "cases": 5,
   "killer": "complex/96652a27f6",
   "why": "out.miff differs"
  },
@@ -416,7 +416,7 @@
   "function": "ComplexImages",
   "status": "killed",
   "cases": 4,
-  "killer": "complex/c029afed31",
+  "killer": "gaps/b4def889ca",
   "why": "out.miff differs"
  },
  {
@@ -427,7 +427,7 @@
   "col": 48,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 6,
+  "cases": 10,
   "killer": "gaps/48d12fd149",
   "why": "out.miff differs"
  },
@@ -440,7 +440,7 @@
   "function": "ComplexImages",
   "status": "killed",
   "cases": 4,
-  "killer": "complex/c029afed31",
+  "killer": "gaps/b4def889ca",
   "why": "out.miff differs"
  },
  {
@@ -452,7 +452,7 @@
   "function": "ComplexImages",
   "status": "killed",
   "cases": 4,
-  "killer": "complex/c029afed31",
+  "killer": "gaps/b4def889ca",
   "why": "out.miff differs"
  },
  {
@@ -463,8 +463,8 @@
   "col": 45,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 6,
-  "killer": "gaps/48d12fd149",
+  "cases": 4,
+  "killer": "gaps/b4def889ca",
   "why": "out.miff differs"
  },
  {
@@ -475,7 +475,7 @@
   "col": 48,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 6,
+  "cases": 10,
   "killer": "gaps/48d12fd149",
   "why": "out.miff differs"
  },
@@ -488,7 +488,7 @@
   "function": "ComplexImages",
   "status": "killed",
   "cases": 4,
-  "killer": "complex/c029afed31",
+  "killer": "gaps/b4def889ca",
   "why": "out.miff differs"
  },
  {
@@ -500,7 +500,7 @@
   "function": "ComplexImages",
   "status": "killed",
   "cases": 4,
-  "killer": "complex/c029afed31",
+  "killer": "gaps/b4def889ca",
   "why": "out.miff differs"
  },
  {
@@ -547,7 +547,7 @@
   "col": 25,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 5,
+  "cases": 3,
   "killer": "complex/1054b5fd68",
   "why": "out.miff differs"
  },
@@ -559,7 +559,7 @@
   "col": 25,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 5,
+  "cases": 3,
   "killer": "complex/1054b5fd68",
   "why": "out.miff differs"
  },
@@ -643,7 +643,7 @@
   "col": 18,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 3,
+  "cases": 9,
   "killer": "complex/61ec981938",
   "why": "out.miff differs"
  },
@@ -655,7 +655,7 @@
   "col": 18,
   "function": "ComplexImages",
   "status": "killed",
-  "cases": 3,
+  "cases": 9,
   "killer": "complex/61ec981938",
   "why": "out.miff differs"
  },
