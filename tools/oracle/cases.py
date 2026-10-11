@@ -5143,6 +5143,15 @@ GAP_XEVENTS_FILE_CASES = [("xevents display save as %s" % ext,
 GAP_XEVENTS_FILE_CASES += [
     ("xevents display open palette.miff", "map key:ctrl+o " + _XEV_FIELD + "palette.miff key:Return grab:out.ppm key:q",
      ["display", "rose.miff"], ["rose", "palette"]),
+] + [
+    # Image Edit > Composite... (2026-10-11): the browser names the image to composite, then the
+    # Composite widget (Operators, Dissolve, Displace) holds the Commands window and a press on
+    # the image places it (at 10,34: below the Info window, left of x=20, as for Draw).
+    ("xevents display composite palette.miff%s" % label,
+     "map click:20,20 map click:65,325 map click:40,100 " + _XEV_FIELD + "palette.miff key:Return" + picks +
+     " use:1 click:10,34 grab:out.ppm key:q", ["display", "-geometry", "+300+50", "rose.miff"], ["rose", "palette"])
+    for label, picks in (("", ""), (", operator Atop", " use:2 click:65,101 map click:40,59"),
+                         (", dissolved 50", " use:2 click:65,133 map key:ctrl+u type:50 key:Return"))
 ]
 # display's menus: a click on the image opens the Commands widget, a click on its button opens a
 # menu, a click on an item runs the command (positions measured on the default font: buttons 32
