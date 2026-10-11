@@ -1,14 +1,14 @@
 mutate: 170 mutants in MagickCore/list\.c$, 27 functions
-mutate: baseline over 15084 cases in 0s
+mutate: baseline over 15147 cases in 0s
   mutants: 25/170 (1s)
-  mutants: 50/170 (2s)
-  mutants: 75/170 (4s)
-  mutants: 100/170 (6s)
-  mutants: 125/170 (8s)
-  mutants: 150/170 (38s)
-  mutants: 170/170 (138s)
+  mutants: 50/170 (1s)
+  mutants: 75/170 (3s)
+  mutants: 100/170 (8s)
+  mutants: 125/170 (14s)
+  mutants: 150/170 (68s)
+  mutants: 170/170 (142s)
 
-mutate: 170 mutants, 138s
+mutate: 170 mutants, 142s
   killed 127, survived 26 (13 capped), no coverage 17, errors 0
   mutation score on reached code: 83.0%   overall: 74.7%
 

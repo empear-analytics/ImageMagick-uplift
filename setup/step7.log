@@ -5725,3 +5725,7 @@ indexes failed
 17:54 pushed
 == confirm-loop round done Sun Oct 11 17:54:16 UTC 2026
 17:57 resweep identify:   killed 327, survived 60 (0 capped), no coverage 0, errors 0
+17:58 pushed
+18:01 resweep compress:   killed 190, survived 41 (0 capped), no coverage 0, errors 0
+18:02 resweep cipher:   killed 123, survived 50 (0 capped), no coverage 4, errors 0
+18:04 resweep list:   killed 127, survived 26 (13 capped), no coverage 17, errors 0
