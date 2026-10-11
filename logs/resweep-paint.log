@@ -1,22 +1,22 @@
 mutate: 311 mutants in MagickCore/paint\.c$, 8 functions
 mutate: baseline over 179 cases in 0s
-  mutants: 25/311 (1s)
+  mutants: 25/311 (0s)
   mutants: 50/311 (1s)
-  mutants: 75/311 (2s)
+  mutants: 75/311 (1s)
   mutants: 100/311 (3s)
-  mutants: 125/311 (6s)
-  mutants: 150/311 (7s)
-  mutants: 175/311 (7s)
-  mutants: 200/311 (8s)
-  mutants: 225/311 (8s)
-  mutants: 250/311 (10s)
-  mutants: 275/311 (10s)
-  mutants: 300/311 (13s)
-  mutants: 311/311 (140s)
+  mutants: 125/311 (4s)
+  mutants: 150/311 (5s)
+  mutants: 175/311 (5s)
+  mutants: 200/311 (6s)
+  mutants: 225/311 (6s)
+  mutants: 250/311 (9s)
+  mutants: 275/311 (9s)
+  mutants: 300/311 (11s)
+  mutants: 311/311 (139s)
 
-mutate: 311 mutants, 140s
-  killed 244, survived 36 (0 capped), no coverage 31, errors 0
-  mutation score on reached code: 87.1%   overall: 78.5%
+mutate: 311 mutants, 139s
+  killed 243, survived 37 (0 capped), no coverage 31, errors 0
+  mutation score on reached code: 86.8%   overall: 78.1%
 
   function                           total killed survived no-cov
   FloodfillPaintImage                   97     84       13      0
@@ -24,7 +24,7 @@ mutate: 311 mutants, 140s
   OilPaintImage                         57     50        7      0
   TransparentPaintImageChroma           31      0        0     31
   OpaquePaintImage                      29     24        5      0
-  TransparentPaintImage                 19     14        5      0
+  TransparentPaintImage                 19     13        6      0
   AcquireHistogramTLS                    6      4        2      0
   DestroyHistogramTLS                    4      2        2      0
 
@@ -62,6 +62,7 @@ mutate: 311 mutants, 140s
        paint.c:1030:21 cxx_eq_to_ne               if (proceed == MagickFalse)
     x  paint.c:1101:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
     x  paint.c:1112:3 cxx_remove_void_call       GetPixelInfo(image,&zero);
+    x  paint.c:1138:17 cxx_lt_to_le               for (x=0; x < (ssize_t) image->columns; x++)
     x  paint.c:1147:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
        paint.c:1155:17 cxx_post_inc_to_post_dec   progress++;
        paint.c:1158:21 cxx_eq_to_ne               if (proceed == MagickFalse)
