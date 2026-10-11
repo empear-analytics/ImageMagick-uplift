@@ -5391,6 +5391,23 @@ GAP_XEVENTS_CASES += [
     # animate is left out (2026-10-11, measured): it plays at once, stepping frames after XDelay
     # sleeps of real time, so under xevents it is never idle and no key reaches it in step.
 ] + [
+    # Region of Interest (2026-10-11; the earlier "never settles" was Launch..., pressed through the
+    # 20.2 spacing): a drag marks the region, then the Apply widget (in the Commands window: File,
+    # Edit, Transform, Enhance, Effects, F/X, Miscellany, Help, Dismiss) runs a command on it;
+    # Dismiss ends the mode.
+    ("xevents display region of interest, %s" % label,
+     _xev_menu_pick("Image Edit", "Region of Interest...", _XEV_EDIT, step=22) + " use:1 drag:10,32,50,44 " +
+     steps + " grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")])
+    for label, steps in (
+        ("flopped", "use:2 click:65,165 map click:40,15 use:2 click:65,357 use:1"),
+        ("negated", "use:2 click:65,197 map click:40,235 use:2 click:65,357 use:1"),
+        ("despeckled", "use:2 click:65,229 map click:40,15 use:2 click:65,357 use:1"),
+        ("solarized", "use:2 click:65,261 map click:40,15 map key:ctrl+u type:50% key:Return "
+                      "use:2 click:65,357 use:1"),
+        ("flopped, then undone", "use:2 click:65,165 map click:40,15 use:2 click:65,133 map click:40,15 "
+                                 "use:2 click:65,357 use:1"),
+        ("escaped", "key:Escape"))
+] + [
     # An image larger than the screen (1024x768): display shows part of it and maps the Pan Icon
     # window, whose rectangle a drag moves (XPanImage); the arrow keys pan too (2026-10-11).
     ("xevents display pan, %s" % label, "map map " + steps + " use:1 grab:out.ppm key:q",
