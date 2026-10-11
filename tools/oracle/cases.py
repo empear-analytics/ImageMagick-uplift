@@ -5264,6 +5264,12 @@ _XEV_COLOR_MENUS = {"Method": _XEV_METHODS, "Pixel Color": _XEV_PENS, "Border Co
 _XEV_MATTE_BUTTONS = ["Method", "Border Color", "Fuzz", "Matte Value", "Undo", "Help", "Dismiss"]
 _XEV_MATTE_MENUS = {"Method": _XEV_METHODS, "Border Color": _XEV_PENS, "Fuzz": _XEV_FUZZ,
                     "Matte Value": ["Opaque", "Transparent", "Dialog..."]}
+# Annotate's widget (XAnnotateEditImage): fonts are xwindow.c's font1..font0 defaults.
+_XEV_ANNOTATE_BUTTONS = ["Font Name", "Font Color", "Box Color", "Rotate Text", "Help", "Dismiss"]
+_XEV_ANNOTATE_MENUS = {"Font Name": ["fixed", "variable", "5x8", "6x10", "7x13bold", "8x13bold", "9x15bold",
+                                     "10x20", "12x24", "Browser..."],
+                       "Font Color": _XEV_DRAW_MENUS["Color"], "Box Color": _XEV_DRAW_MENUS["Color"],
+                       "Rotate Text": ["-90", "-45", "-30", "0", "30", "45", "90", "180", "Dialog..."]}
 
 
 GAP_XEVENTS_CASES += [
@@ -5321,6 +5327,25 @@ GAP_XEVENTS_CASES += [
          ("filltoborder, black border", [("Method", "FillToBorder"), first, ("Border Color", "black")],
           "click:10,38"),
          ("point, then undone", [("Method", "Point"), first], "click:10,38 use:2 click:65,%d use:1" % undo)])
+] + [
+    # Annotate (2026-10-11): a click places the text cursor (at 10,38, as above), the keys type
+    # the text, Escape or the Text widget's Apply (in the Commands window) puts it on the image
+    # (xwindow.c XAnnotateImage). The Annotate widget's menus pick font, colors and angle first.
+    ("xevents display annotate %s" % label, _xev_menu_pick("Image Edit", "Annotate...", _XEV_EDIT) +
+     "".join(_xev_draw_pick(b, it, _XEV_ANNOTATE_BUTTONS, _XEV_ANNOTATE_MENUS) for b, it in picks) +
+     " use:1 click:10,38 " + keys + " grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")])
+    for label, picks, keys in (
+        ("Hi, escaped", [], "type:Hi key:Escape"),
+        ("Hi, applied", [], "type:Hi use:2 click:65,133 use:1"),
+        ("two lines", [], "type:Hi key:Return type:Yo key:Escape"),
+        ("a letter erased", [], "type:Hix key:BackSpace key:Escape"),
+        ("a line erased, retyped", [], "type:Hix key:ctrl+u type:Yo key:Escape"),
+        ("in red", [("Font Color", "red")], "type:Hi key:Escape"),
+        ("on a yellow box", [("Box Color", "yellow")], "type:Hi key:Escape"),
+        ("in transparent", [("Font Color", "transparent")], "type:Hi key:Escape"),
+        ("rotated 90", [("Rotate Text", "90")], "type:Hi key:Escape"),
+        ("rotated -45", [("Rotate Text", "-45")], "type:Hi key:Escape"))
+    # left out, measured: Font Name > 6x10 never settles (no such font under Xvfb; a notice waits)
 ] + [
     ("xevents display rotate by drag", _xev_menu_pick("Transform", "Rotate...", _XEV_TRANSFORM) +
      " use:1 drag:10,38,60,38 grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
