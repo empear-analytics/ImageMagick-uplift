@@ -20,7 +20,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs; stderr differs"
  },
  {
@@ -31,7 +31,7 @@
   "col": 15,
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "gaps/438b93d61a",
   "why": "stdout differs"
  },
@@ -56,7 +56,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -68,7 +68,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -92,7 +92,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -104,7 +104,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -116,7 +116,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -128,7 +128,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -140,7 +140,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -152,7 +152,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -176,7 +176,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -187,8 +187,8 @@
   "col": 19,
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/c7b379278b",
+  "cases": 1,
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -200,7 +200,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -212,7 +212,7 @@
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -235,8 +235,8 @@
   "col": 31,
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/c7b379278b",
+  "cases": 1,
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -247,7 +247,7 @@
   "col": 31,
   "function": "identify.c:GetLocationStatistics",
   "status": "killed",
-  "cases": 1,
+  "cases": 2,
   "killer": "gaps/438b93d61a",
   "why": "stdout differs"
  },
@@ -272,7 +272,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -284,7 +284,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -295,8 +295,8 @@
   "col": 15,
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
-  "cases": 2,
-  "killer": "gaps/c7b379278b",
+  "cases": 3,
+  "killer": "gaps/3b8c375392",
   "why": "stdout differs"
  },
  {
@@ -308,7 +308,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -320,7 +320,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -332,7 +332,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -343,8 +343,8 @@
   "col": 17,
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
-  "cases": 4,
-  "killer": "gaps/caae20414d",
+  "cases": 3,
+  "killer": "gaps/3b8c375392",
   "why": "stdout differs"
  },
  {
@@ -356,8 +356,8 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
-  "why": "exit status [0] -> [-6]; stdout differs"
+  "killer": "gaps/007f96c778",
+  "why": "stdout differs"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/identify.c:334:18:334:20",
@@ -368,7 +368,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -380,7 +380,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -392,7 +392,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -416,7 +416,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -428,7 +428,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -439,7 +439,7 @@
   "col": 38,
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
-  "cases": 6,
+  "cases": 1,
   "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
@@ -451,7 +451,7 @@
   "col": 38,
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
-  "cases": 6,
+  "cases": 1,
   "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
@@ -463,7 +463,7 @@
   "col": 12,
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
-  "cases": 6,
+  "cases": 1,
   "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
@@ -476,7 +476,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -488,7 +488,7 @@
   "function": "identify.c:PrintChannelLocations",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -500,7 +500,7 @@
   "function": "identify.c:PrintChannelMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -512,7 +512,7 @@
   "function": "identify.c:PrintChannelMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -524,7 +524,7 @@
   "function": "identify.c:PrintChannelMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -536,7 +536,7 @@
   "function": "identify.c:PrintChannelMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -548,7 +548,7 @@
   "function": "identify.c:PrintChannelMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -560,7 +560,7 @@
   "function": "identify.c:PrintChannelMoments",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -572,7 +572,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -584,7 +584,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -596,7 +596,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -608,7 +608,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -620,7 +620,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -632,7 +632,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -644,7 +644,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -656,7 +656,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -668,7 +668,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -680,7 +680,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -692,7 +692,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -704,7 +704,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -716,7 +716,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -728,7 +728,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -740,7 +740,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -752,7 +752,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -764,7 +764,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -776,7 +776,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -788,7 +788,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -800,7 +800,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -812,7 +812,7 @@
   "function": "identify.c:PrintChannelPerceptualHash",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/bd1b5e2904",
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -824,7 +824,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -836,7 +836,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -848,7 +848,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -860,7 +860,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -872,7 +872,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -884,7 +884,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -896,7 +896,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -908,7 +908,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -920,7 +920,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -932,7 +932,7 @@
   "function": "identify.c:PrintChannelStatistics",
   "status": "killed",
   "cases": 1,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -955,8 +955,8 @@
   "col": 12,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 10,
-  "killer": "compare/e12f28b650",
+  "cases": 6,
+  "killer": "compare/99f4b2ea10",
   "why": "stdout differs; stderr differs"
  },
  {
@@ -968,7 +968,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
  {
@@ -979,7 +979,7 @@
   "col": 17,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 202,
+  "cases": 5,
   "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
@@ -991,8 +991,8 @@
   "col": 30,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "cases": 5,
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -1003,8 +1003,8 @@
   "col": 61,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "cases": 5,
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -1015,8 +1015,8 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "cases": 5,
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -1027,8 +1027,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "cases": 5,
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -1039,7 +1039,7 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 37,
+  "cases": 86,
   "killer": "gaps/caae20414d",
   "why": "stdout differs"
  },
@@ -1051,7 +1051,7 @@
   "col": 65,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 37,
+  "cases": 86,
   "killer": "gaps/caae20414d",
   "why": "stdout differs"
  },
@@ -1063,7 +1063,7 @@
   "col": 64,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 37,
+  "cases": 86,
   "killer": "gaps/caae20414d",
   "why": "stdout differs"
  },
@@ -1075,7 +1075,7 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 37,
+  "cases": 86,
   "killer": "gaps/caae20414d",
   "why": "stdout differs"
  },
@@ -1087,7 +1087,7 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 105,
+  "cases": 34,
   "killer": "gaps/3b8c375392",
   "why": "stdout differs"
  },
@@ -1099,7 +1099,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 34,
+  "cases": 48,
   "killer": "gaps/dd16ed9cb2",
   "why": "stdout differs"
  },
@@ -1111,7 +1111,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 34,
+  "cases": 48,
   "killer": "gaps/dd16ed9cb2",
   "why": "stdout differs"
  },
@@ -1123,7 +1123,7 @@
   "col": 61,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 34,
+  "cases": 48,
   "killer": "gaps/dd16ed9cb2",
   "why": "exit status [0] -> ['timeout']; stdout differs; out.miff missing in candidate"
  },
@@ -1135,7 +1135,7 @@
   "col": 45,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 34,
+  "cases": 48,
   "killer": "gaps/dd16ed9cb2",
   "why": "stdout differs"
  },
@@ -1147,8 +1147,8 @@
   "col": 30,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 1,
-  "killer": "gaps/438b93d61a",
+  "cases": 5,
+  "killer": "gaps/007f96c778",
   "why": "stdout differs"
  },
  {
@@ -1183,7 +1183,7 @@
   "col": 15,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1195,8 +1195,8 @@
   "col": 35,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 10,
-  "killer": "compare/e12f28b650",
+  "cases": 6,
+  "killer": "compare/99f4b2ea10",
   "why": "stdout differs"
  },
  {
@@ -1207,7 +1207,7 @@
   "col": 67,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1219,7 +1219,7 @@
   "col": 43,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1231,7 +1231,7 @@
   "col": 39,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1243,7 +1243,7 @@
   "col": 26,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1279,7 +1279,7 @@
   "col": 36,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1291,7 +1291,7 @@
   "col": 33,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1303,8 +1303,8 @@
   "col": 30,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 10,
-  "killer": "compare/e12f28b650",
+  "cases": 6,
+  "killer": "compare/99f4b2ea10",
   "why": "stdout differs"
  },
  {
@@ -1315,8 +1315,8 @@
   "col": 59,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 10,
-  "killer": "compare/e12f28b650",
+  "cases": 6,
+  "killer": "compare/99f4b2ea10",
   "why": "stdout differs"
  },
  {
@@ -1327,8 +1327,8 @@
   "col": 26,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 10,
-  "killer": "compare/e12f28b650",
+  "cases": 6,
+  "killer": "compare/99f4b2ea10",
   "why": "stdout differs"
  },
  {
@@ -1339,8 +1339,8 @@
   "col": 50,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 10,
-  "killer": "compare/e12f28b650",
+  "cases": 6,
+  "killer": "compare/99f4b2ea10",
   "why": "stdout differs"
  },
  {
@@ -1351,7 +1351,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1363,7 +1363,7 @@
   "col": 22,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1375,7 +1375,7 @@
   "col": 32,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1387,7 +1387,7 @@
   "col": 35,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 3,
+  "cases": 2,
   "killer": "identify/748434f895",
   "why": "stdout differs"
  },
@@ -1399,7 +1399,7 @@
   "col": 33,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1423,7 +1423,7 @@
   "col": 45,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1435,7 +1435,7 @@
   "col": 45,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 10,
+  "cases": 56,
   "killer": "compare/e12f28b650",
   "why": "stdout differs"
  },
@@ -1447,7 +1447,7 @@
   "col": 25,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 2,
+  "cases": 1,
   "killer": "identify/53d2bf322e",
   "why": "stdout differs"
  },
@@ -1508,7 +1508,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1520,7 +1520,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1532,7 +1532,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1544,7 +1544,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1555,8 +1555,8 @@
   "col": 31,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 26,
-  "killer": "decode/1d5a516a99",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "stdout differs"
  },
  {
@@ -1568,7 +1568,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1579,8 +1579,8 @@
   "col": 9,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 26,
-  "killer": "decode/1d5a516a99",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "stdout differs"
  },
  {
@@ -1592,7 +1592,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1604,7 +1604,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1616,7 +1616,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1628,7 +1628,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1664,7 +1664,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1676,7 +1676,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1687,8 +1687,8 @@
   "col": 28,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 32,
-  "killer": "decode/224679d221",
+  "cases": 45,
+  "killer": "decode/75ecb0d17f",
   "why": "stdout differs"
  },
  {
@@ -1699,8 +1699,8 @@
   "col": 60,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 32,
-  "killer": "decode/224679d221",
+  "cases": 45,
+  "killer": "decode/75ecb0d17f",
   "why": "stdout differs"
  },
  {
@@ -1711,7 +1711,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 61,
+  "cases": 45,
   "killer": "decode/75ecb0d17f",
   "why": "stdout differs"
  },
@@ -1723,7 +1723,7 @@
   "col": 64,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 61,
+  "cases": 45,
   "killer": "decode/75ecb0d17f",
   "why": "stdout differs"
  },
@@ -1736,7 +1736,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1748,7 +1748,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1760,7 +1760,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1772,7 +1772,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1784,7 +1784,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1796,7 +1796,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1808,7 +1808,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1819,8 +1819,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -1831,8 +1831,8 @@
   "col": 65,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -1843,8 +1843,8 @@
   "col": 64,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -1855,8 +1855,8 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -1867,8 +1867,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 25,
-  "killer": "identify/bd1b5e2904",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -1879,8 +1879,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 60,
-  "killer": "decode/51eef41a71",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "stdout differs"
  },
  {
@@ -1891,8 +1891,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 60,
-  "killer": "decode/51eef41a71",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "stdout differs"
  },
  {
@@ -1903,8 +1903,8 @@
   "col": 61,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 60,
-  "killer": "decode/51eef41a71",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -1915,8 +1915,8 @@
   "col": 45,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 60,
-  "killer": "decode/51eef41a71",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "stdout differs"
  },
  {
@@ -1928,7 +1928,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1940,7 +1940,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1952,7 +1952,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1964,7 +1964,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -1975,7 +1975,7 @@
   "col": 39,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 172,
   "killer": "gaps/c026d51d1e",
   "why": "stdout differs"
  },
@@ -1987,7 +1987,7 @@
   "col": 21,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 172,
   "killer": "gaps/c026d51d1e",
   "why": "stdout differs"
  },
@@ -1999,7 +1999,7 @@
   "col": 21,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 172,
   "killer": "gaps/c026d51d1e",
   "why": "stdout differs"
  },
@@ -2011,7 +2011,7 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 172,
   "killer": "gaps/c026d51d1e",
   "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
@@ -2036,7 +2036,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2060,7 +2060,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2072,7 +2072,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2084,7 +2084,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2096,7 +2096,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2108,7 +2108,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2120,7 +2120,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2132,7 +2132,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2144,7 +2144,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2156,7 +2156,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2167,8 +2167,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2179,8 +2179,8 @@
   "col": 75,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2191,8 +2191,8 @@
   "col": 65,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2203,8 +2203,8 @@
   "col": 18,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2215,8 +2215,8 @@
   "col": 64,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2227,8 +2227,8 @@
   "col": 79,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2239,8 +2239,8 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2251,8 +2251,8 @@
   "col": 77,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2263,8 +2263,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 25,
-  "killer": "identify/bd1b5e2904",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -2275,8 +2275,8 @@
   "col": 75,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 43,
-  "killer": "decode/7e4247b754",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -2287,8 +2287,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 60,
-  "killer": "decode/51eef41a71",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "stdout differs"
  },
  {
@@ -2299,8 +2299,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 60,
-  "killer": "decode/51eef41a71",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "stdout differs"
  },
  {
@@ -2311,8 +2311,8 @@
   "col": 61,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 60,
-  "killer": "decode/51eef41a71",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -2323,8 +2323,8 @@
   "col": 45,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 60,
-  "killer": "decode/51eef41a71",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "stdout differs"
  },
  {
@@ -2335,8 +2335,8 @@
   "col": 69,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 60,
-  "killer": "decode/51eef41a71",
+  "cases": 38,
+  "killer": "decode/a5f19831b1",
   "why": "stdout differs"
  },
  {
@@ -2348,7 +2348,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2359,8 +2359,8 @@
   "col": 22,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 33,
+  "killer": "quantizegap4/4cfd6b5b11",
   "why": "stdout differs"
  },
  {
@@ -2372,7 +2372,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2396,7 +2396,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2420,7 +2420,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2443,7 +2443,7 @@
   "col": 39,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 172,
   "killer": "gaps/c026d51d1e",
   "why": "stdout differs"
  },
@@ -2455,7 +2455,7 @@
   "col": 21,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 172,
   "killer": "gaps/c026d51d1e",
   "why": "stdout differs"
  },
@@ -2467,7 +2467,7 @@
   "col": 21,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 172,
   "killer": "gaps/c026d51d1e",
   "why": "stdout differs"
  },
@@ -2479,7 +2479,7 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 172,
   "killer": "gaps/c026d51d1e",
   "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
@@ -2503,7 +2503,7 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 27,
+  "cases": 172,
   "killer": "gaps/c026d51d1e",
   "why": "stdout differs"
  },
@@ -2516,7 +2516,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2528,7 +2528,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2540,7 +2540,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -2552,8 +2552,8 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
-  "why": "exit status [0] -> [-6]; stdout differs"
+  "killer": "gaps/6226b5ce7d",
+  "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/identify.c:992:44:992:45",
@@ -2563,8 +2563,8 @@
   "col": 44,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 25,
-  "killer": "identify/bd1b5e2904",
+  "cases": 35,
+  "killer": "gaps/0fe7b2a8c7",
   "why": "stdout differs"
  },
  {
@@ -2575,8 +2575,8 @@
   "col": 61,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 38,
-  "killer": "identify/ade0f8e6de",
+  "cases": 29,
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -2587,8 +2587,8 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 38,
-  "killer": "identify/ade0f8e6de",
+  "cases": 29,
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -2599,8 +2599,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 38,
-  "killer": "identify/ade0f8e6de",
+  "cases": 29,
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -2611,8 +2611,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 72,
-  "killer": "identify/0852d8efbf",
+  "cases": 96,
+  "killer": "identify/1ab2cd2f57",
   "why": "stdout differs"
  },
  {
@@ -2623,8 +2623,8 @@
   "col": 65,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 72,
-  "killer": "identify/0852d8efbf",
+  "cases": 96,
+  "killer": "identify/1ab2cd2f57",
   "why": "stdout differs"
  },
  {
@@ -2635,8 +2635,8 @@
   "col": 64,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 72,
-  "killer": "identify/0852d8efbf",
+  "cases": 96,
+  "killer": "identify/1ab2cd2f57",
   "why": "stdout differs"
  },
  {
@@ -2647,8 +2647,8 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 72,
-  "killer": "identify/0852d8efbf",
+  "cases": 96,
+  "killer": "identify/1ab2cd2f57",
   "why": "stdout differs"
  },
  {
@@ -2659,8 +2659,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 25,
-  "killer": "identify/bd1b5e2904",
+  "cases": 141,
+  "killer": "identify/562bad7e6d",
   "why": "stdout differs"
  },
  {
@@ -2671,7 +2671,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 171,
+  "cases": 180,
   "killer": "gaps/fc0926ad35",
   "why": "stdout differs"
  },
@@ -2683,7 +2683,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 171,
+  "cases": 180,
   "killer": "gaps/fc0926ad35",
   "why": "stdout differs"
  },
@@ -2695,7 +2695,7 @@
   "col": 61,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 171,
+  "cases": 180,
   "killer": "gaps/fc0926ad35",
   "why": "exit status [0] -> ['timeout']; stdout differs; out.miff missing in candidate"
  },
@@ -2707,7 +2707,7 @@
   "col": 45,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 171,
+  "cases": 180,
   "killer": "gaps/fc0926ad35",
   "why": "stdout differs"
  },
@@ -2719,8 +2719,8 @@
   "col": 30,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 25,
-  "killer": "identify/bd1b5e2904",
+  "cases": 29,
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -2731,8 +2731,8 @@
   "col": 22,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 25,
-  "killer": "identify/bd1b5e2904",
+  "cases": 29,
+  "killer": "identify/0b6cfd72ec",
   "why": "stdout differs"
  },
  {
@@ -2744,8 +2744,8 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
-  "why": "exit status [0] -> [-6]; stdout differs"
+  "killer": "gaps/6226b5ce7d",
+  "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/identify.c:1071:24:1071:26",
@@ -2756,8 +2756,8 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
-  "why": "exit status [0] -> [-6]; stdout differs"
+  "killer": "gaps/6226b5ce7d",
+  "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/identify.c:1080:61:1080:63",
@@ -2767,7 +2767,7 @@
   "col": 61,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 215,
+  "cases": 138,
   "killer": "feature/13a8f28d80",
   "why": "stdout differs"
  },
@@ -2779,7 +2779,7 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 215,
+  "cases": 138,
   "killer": "feature/13a8f28d80",
   "why": "stdout differs"
  },
@@ -2791,7 +2791,7 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 215,
+  "cases": 138,
   "killer": "feature/13a8f28d80",
   "why": "stdout differs"
  },
@@ -2803,8 +2803,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 200,
-  "killer": "feature/c3d674c33c",
+  "cases": 73,
+  "killer": "feature/559738366c",
   "why": "stdout differs"
  },
  {
@@ -2815,8 +2815,8 @@
   "col": 65,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 200,
-  "killer": "feature/c3d674c33c",
+  "cases": 73,
+  "killer": "feature/559738366c",
   "why": "stdout differs"
  },
  {
@@ -2827,8 +2827,8 @@
   "col": 64,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 200,
-  "killer": "feature/c3d674c33c",
+  "cases": 73,
+  "killer": "feature/559738366c",
   "why": "stdout differs"
  },
  {
@@ -2839,8 +2839,8 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 200,
-  "killer": "feature/c3d674c33c",
+  "cases": 73,
+  "killer": "feature/559738366c",
   "why": "stdout differs"
  },
  {
@@ -2851,8 +2851,8 @@
   "col": 62,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 55,
-  "killer": "identify/d13a889eb0",
+  "cases": 65,
+  "killer": "identify/db25d860e2",
   "why": "stdout differs"
  },
  {
@@ -2911,8 +2911,8 @@
   "col": 30,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 55,
-  "killer": "identify/d13a889eb0",
+  "cases": 65,
+  "killer": "identify/db25d860e2",
   "why": "stdout differs"
  },
  {
@@ -2923,8 +2923,8 @@
   "col": 12,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -2936,8 +2936,8 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
-  "why": "exit status [0] -> [1]; stdout differs; stderr differs"
+  "killer": "gaps/6226b5ce7d",
+  "why": "exit status [0] -> [1]; stdout differs; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_mul_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/identify.c:1144:37:1144:38",
@@ -2947,8 +2947,8 @@
   "col": 37,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2959,8 +2959,8 @@
   "col": 78,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 17,
-  "killer": "identify/5031d0644f",
+  "cases": 60,
+  "killer": "identify/3d993a41a5",
   "why": "stdout differs"
  },
  {
@@ -2971,8 +2971,8 @@
   "col": 30,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 53,
+  "killer": "identify/42919d044d",
   "why": "stdout differs"
  },
  {
@@ -2983,8 +2983,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 53,
+  "killer": "identify/42919d044d",
   "why": "stdout differs"
  },
  {
@@ -3007,8 +3007,8 @@
   "col": 49,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 33,
+  "killer": "quantizegap4/4cfd6b5b11",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -3019,8 +3019,8 @@
   "col": 19,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 53,
+  "killer": "identify/42919d044d",
   "why": "stdout differs"
  },
  {
@@ -3031,8 +3031,8 @@
   "col": 25,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 53,
+  "killer": "identify/42919d044d",
   "why": "stdout differs"
  },
  {
@@ -3043,8 +3043,8 @@
   "col": 25,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 30,
-  "killer": "decode/1f2792e6b0",
+  "cases": 50,
+  "killer": "quantizegap8/842180610d",
   "why": "stdout differs"
  },
  {
@@ -3055,8 +3055,8 @@
   "col": 54,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 30,
-  "killer": "decode/1f2792e6b0",
+  "cases": 33,
+  "killer": "quantizegap4/4cfd6b5b11",
   "why": "stdout differs"
  },
  {
@@ -3067,8 +3067,8 @@
   "col": 42,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 33,
+  "killer": "quantizegap4/4cfd6b5b11",
   "why": "stdout differs"
  },
  {
@@ -3079,8 +3079,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 53,
+  "killer": "identify/42919d044d",
   "why": "stdout differs"
  },
  {
@@ -3091,8 +3091,8 @@
   "col": 21,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 33,
+  "killer": "quantizegap4/4cfd6b5b11",
   "why": "stdout differs"
  },
  {
@@ -3115,8 +3115,8 @@
   "col": 15,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 53,
+  "killer": "identify/42919d044d",
   "why": "stdout differs"
  },
  {
@@ -3127,8 +3127,8 @@
   "col": 15,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 53,
+  "killer": "identify/42919d044d",
   "why": "stdout differs"
  },
  {
@@ -3140,7 +3140,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3152,7 +3152,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3164,7 +3164,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3175,8 +3175,8 @@
   "col": 25,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3211,8 +3211,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3223,8 +3223,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3235,8 +3235,8 @@
   "col": 51,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -3247,8 +3247,8 @@
   "col": 13,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3259,8 +3259,8 @@
   "col": 13,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3271,8 +3271,8 @@
   "col": 13,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3283,8 +3283,8 @@
   "col": 34,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3295,8 +3295,8 @@
   "col": 17,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 200,
-  "killer": "feature/c3d674c33c",
+  "cases": 73,
+  "killer": "feature/559738366c",
   "why": "stdout differs"
  },
  {
@@ -3307,8 +3307,8 @@
   "col": 35,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3319,8 +3319,8 @@
   "col": 17,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3331,8 +3331,8 @@
   "col": 13,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 56,
-  "killer": "identify/c3868cc24e",
+  "cases": 16,
+  "killer": "quantizegap4/0dab2afa17",
   "why": "stdout differs"
  },
  {
@@ -3344,7 +3344,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3356,7 +3356,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3368,7 +3368,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3380,7 +3380,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3391,8 +3391,8 @@
   "col": 42,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 36,
-  "killer": "decode/77dda4847a",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -3403,8 +3403,8 @@
   "col": 44,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 36,
-  "killer": "decode/77dda4847a",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -3415,8 +3415,8 @@
   "col": 43,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 36,
-  "killer": "decode/77dda4847a",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -3427,8 +3427,8 @@
   "col": 42,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 36,
-  "killer": "decode/77dda4847a",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -3440,8 +3440,8 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
-  "why": "exit status [0] -> [-6]; stdout differs"
+  "killer": "gaps/6226b5ce7d",
+  "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/identify.c:1291:62:1291:64",
@@ -3452,7 +3452,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3512,7 +3512,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3524,7 +3524,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3536,7 +3536,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3548,7 +3548,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3560,7 +3560,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3572,7 +3572,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3584,7 +3584,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3596,7 +3596,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3608,7 +3608,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3620,7 +3620,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3632,8 +3632,8 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
-  "why": "exit status [0] -> [-6]; stdout differs"
+  "killer": "gaps/6226b5ce7d",
+  "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/identify.c:1367:35:1367:37",
@@ -3643,7 +3643,7 @@
   "col": 35,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "stdout differs"
  },
@@ -3655,7 +3655,7 @@
   "col": 20,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -3667,7 +3667,7 @@
   "col": 38,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -3679,7 +3679,7 @@
   "col": 28,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -3691,7 +3691,7 @@
   "col": 30,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -3703,7 +3703,7 @@
   "col": 34,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -3727,7 +3727,7 @@
   "col": 67,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -3739,7 +3739,7 @@
   "col": 69,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -3751,7 +3751,7 @@
   "col": 18,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "stdout differs"
  },
@@ -3763,7 +3763,7 @@
   "col": 9,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "stdout differs"
  },
@@ -3775,7 +3775,7 @@
   "col": 25,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "stdout differs"
  },
@@ -3787,7 +3787,7 @@
   "col": 21,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 267,
+  "cases": 258,
   "killer": "gaps/88b4f0f9b3",
   "why": "stdout differs"
  },
@@ -3800,8 +3800,8 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
-  "why": "exit status [0] -> [-6]; stdout differs"
+  "killer": "gaps/6226b5ce7d",
+  "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/identify.c:1409:25:1409:26",
@@ -3823,7 +3823,7 @@
   "col": 25,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 136,
+  "cases": 174,
   "killer": "gaps/74fc85c9ef",
   "why": "stdout differs"
  },
@@ -3836,7 +3836,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3847,7 +3847,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 170,
+  "cases": 128,
   "killer": "gaps/64c5403242",
   "why": "stdout differs"
  },
@@ -3859,7 +3859,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 170,
+  "cases": 128,
   "killer": "gaps/64c5403242",
   "why": "stdout differs"
  },
@@ -3871,7 +3871,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 170,
+  "cases": 128,
   "killer": "gaps/64c5403242",
   "why": "stdout differs"
  },
@@ -3883,7 +3883,7 @@
   "col": 51,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 170,
+  "cases": 128,
   "killer": "gaps/64c5403242",
   "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
@@ -3895,7 +3895,7 @@
   "col": 24,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 170,
+  "cases": 128,
   "killer": "gaps/64c5403242",
   "why": "stdout differs"
  },
@@ -3907,7 +3907,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 170,
+  "cases": 128,
   "killer": "gaps/64c5403242",
   "why": "stdout differs"
  },
@@ -3919,7 +3919,7 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 170,
+  "cases": 128,
   "killer": "gaps/64c5403242",
   "why": "stdout differs"
  },
@@ -3931,7 +3931,7 @@
   "col": 51,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 170,
+  "cases": 128,
   "killer": "gaps/64c5403242",
   "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
@@ -3943,8 +3943,8 @@
   "col": 3,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/ae6a48abff",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -3956,7 +3956,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -3967,8 +3967,8 @@
   "col": 19,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/ae6a48abff",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -3979,8 +3979,8 @@
   "col": 21,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/ae6a48abff",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "exit status [0] -> ['timeout']; stdout differs"
  },
  {
@@ -3991,8 +3991,8 @@
   "col": 40,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4003,8 +4003,8 @@
   "col": 25,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4039,8 +4039,8 @@
   "col": 53,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4051,8 +4051,8 @@
   "col": 28,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4063,8 +4063,8 @@
   "col": 52,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4075,8 +4075,8 @@
   "col": 51,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4087,8 +4087,8 @@
   "col": 61,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4099,8 +4099,8 @@
   "col": 52,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4123,8 +4123,8 @@
   "col": 27,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4135,8 +4135,8 @@
   "col": 63,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4147,8 +4147,8 @@
   "col": 29,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4159,8 +4159,8 @@
   "col": 57,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4171,8 +4171,8 @@
   "col": 38,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4183,8 +4183,8 @@
   "col": 51,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4195,8 +4195,8 @@
   "col": 70,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 19,
-  "killer": "decode/cf8a042b7c",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
@@ -4207,8 +4207,8 @@
   "col": 26,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/ae6a48abff",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4219,8 +4219,8 @@
   "col": 11,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/ae6a48abff",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4232,7 +4232,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4244,7 +4244,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4256,7 +4256,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4268,7 +4268,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4279,8 +4279,8 @@
   "col": 3,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4292,7 +4292,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4303,8 +4303,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4315,8 +4315,8 @@
   "col": 19,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 4,
-  "killer": "identify/46075343f4",
+  "cases": 9,
+  "killer": "gaps/daa830fdbe",
   "why": "stdout differs"
  },
  {
@@ -4327,8 +4327,8 @@
   "col": 3,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/ae6a48abff",
+  "cases": 13,
+  "killer": "gaps/0015a27eec",
   "why": "stdout differs"
  },
  {
@@ -4340,7 +4340,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4351,8 +4351,8 @@
   "col": 23,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/ae6a48abff",
+  "cases": 13,
+  "killer": "gaps/0015a27eec",
   "why": "stdout differs"
  },
  {
@@ -4363,8 +4363,8 @@
   "col": 19,
   "function": "IdentifyImage",
   "status": "killed",
-  "cases": 12,
-  "killer": "gaps/ae6a48abff",
+  "cases": 13,
+  "killer": "gaps/0015a27eec",
   "why": "stdout differs"
  },
  {
@@ -4376,7 +4376,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4400,7 +4400,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4412,7 +4412,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4436,7 +4436,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
@@ -4484,7 +4484,7 @@
   "function": "IdentifyImage",
   "status": "killed",
   "cases": 4,
-  "killer": "identify/46075343f4",
+  "killer": "gaps/6226b5ce7d",
   "why": "stdout differs"
  },
  {
