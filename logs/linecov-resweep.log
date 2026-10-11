@@ -18,3 +18,17 @@
   exec: 9000/15701 (36s)
   exec: 9500/15701 (40s)
   exec: 10000/15701 (43s)
+  exec: 10500/15701 (44s)
+  exec: 11000/15701 (46s)
+  exec: 11500/15701 (47s)
+  exec: 12000/15701 (49s)
+  exec: 12500/15701 (50s)
+  exec: 13000/15701 (52s)
+  exec: 13500/15701 (53s)
+  exec: 14000/15701 (55s)
+  exec: 14500/15701 (56s)
+  exec: 15000/15701 (59s)
+  exec: 15500/15701 (61s)
+  exec: 15701/15701 (74s)
+exec: 15701 cases in 76s, 1060 exit non-zero
+warning: 2 functions have mismatched data
