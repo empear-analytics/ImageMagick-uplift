@@ -5244,6 +5244,9 @@ GAP_XEVENTS_GRAB_CASES = [
     ("xevents grab: dialog, empty", "map key:F3 map grab:out.ppm key:ctrl+u type:0x1 key:Return key:q", []),
     ("xevents grab: dialog, typed", "map key:F3 map key:ctrl+u type:0x1 grab:out.ppm key:Return key:q", []),
     ("xevents grab: Commands widget", "map click:20,20 map grab:out.ppm use:1 key:q", []),
+    # ? shows XDisplayImageInfo's text: its first page names the image by a relative path, the
+    # same in every case directory (2026-10-11); t (Trim) times out, left out.
+    ("xevents grab: image info", "map key:question map grab:out.ppm key:Return use:1 key:q", []),
 ] + [("xevents grab: %s menu" % menu, _xev_menu_grab(menu, item, items), [])
      for menu, item, items in (("View", "Half Size", _XEV_VIEW), ("Transform", "Flip", _XEV_TRANSFORM),
                                ("Enhance", "Spiff", _XEV_ENHANCE))]
