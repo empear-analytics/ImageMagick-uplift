@@ -1,5 +1,5 @@
 mutate: 52 mutants in MagickCore/colormap\.c$, 4 functions
-mutate: baseline over 3320 cases in 0s
+mutate: baseline over 3323 cases in 0s
   mutants: 25/52 (0s)
   mutants: 50/52 (26s)
   mutants: 52/52 (130s)

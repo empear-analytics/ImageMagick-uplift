@@ -1,12 +1,12 @@
 mutate: 114 mutants in MagickCore/random\.c$, 11 functions
-mutate: baseline over 15761 cases in 0s
-  mutants: 25/114 (133s)
-  mutants: 50/114 (273s)
-  mutants: 75/114 (275s)
-  mutants: 100/114 (417s)
-  mutants: 114/114 (531s)
+mutate: baseline over 15792 cases in 0s
+  mutants: 25/114 (146s)
+  mutants: 50/114 (295s)
+  mutants: 75/114 (300s)
+  mutants: 100/114 (451s)
+  mutants: 114/114 (565s)
 
-mutate: 114 mutants, 531s
+mutate: 114 mutants, 565s
   killed 19, survived 88 (88 capped), no coverage 7, errors 0
   mutation score on reached code: 17.8%   overall: 16.7%
 
