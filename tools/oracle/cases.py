@@ -2705,6 +2705,11 @@ def _infra_blob_cases():
                     [[img("rose"), "out.miff." + ext],
                      ["out.miff." + ext] + FLOAT_OUT + ["dec.miff"]],
                     ["out.miff." + ext, "dec.miff"])
+    # More files written in one command than the open-file limit (10240 under WSL): CloseBlob
+    # must close each one, or the last cannot be opened. About 15 s.
+    yield _case("infra", "10300 frames to 10300 files",
+                [["-size", "1x1", "xc:gray", "-duplicate", "10299", "+adjoin", "f%d.pgm"]],
+                ["f0.pgm", "f10299.pgm"])
     for fmt in ("png", "miff", "ppm", "gif", "tiff"):
         yield _case("infra", "stdout " + fmt, [[img("rose"), fmt + ":-"]], [])
     for fmt in ("", "miff:", "ppm:"):

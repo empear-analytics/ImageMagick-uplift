@@ -4219,3 +4219,39 @@ rep1011 do not count.
 **Gated** (sweep1010 alone, against sweep1009 alone): the same short functions in all 34 gated
 files; adjusted scores equal but for magick.c (77% -> 78%). The regular files' trust is
 confirmed on a second sweep on independent baselines.
+
+## Harness 14: the X11 cases' `x:` stamped the clock (2026-10-11)
+
+**The last sentence above does not hold for sweep1010 alone.** On a build without X, an X11 case's
+`x:` output is written as a MIFF file named `x:`, and before HARNESS_VERSION 14 the X11 cases ran
+without the fixed SOURCE_DATE_EPOCH, so its date:timestamp property was the clock: that file
+differed between any baseline and any later run, whatever the mutant. 1919 of sweep1010's kills
+were that file and nothing else (cache.c 411, quantum-import.c 336, blob.c 280, quantum-export.c
+172, color.c 154, resource.c 99, magick.c 84, splay-tree.c 78, token.c 78, the rest fewer).
+`386860819`: the X11 cases keep the fixed epoch on a build without X (oracle.py `has_x`), and
+gate.py reads a kill by an `x11/` case whose only difference is `x: differs` as a survivor, in
+every report; on a build with X, `x:` writes no file, so the rule costs no kill there.
+
+**Rerun** (`xdate1011`): the 1919 mutants against all their cases, capped at 1500, under harness
+14: 1006 killed, 913 survived, 844 of those capped. sweep1010 alone then drops sharply (magick.c
+50%, resource.c 64%, blob.c 70%, timer.c 72%, cache.c 76%), since a capped sweep leaves the heavily
+reached functions (WriteBlob, OpenPixelCache, AcquireMagickResource) to cases it never ran.
+**The merged view, the gate's headline, hardly moves:** the earlier uncapped and targeted reruns
+had killed nearly all of the 913 by real differences, and verdicts.json covered most of the rest
+(I/O error paths, asserts, logging guards). Only 4 were open, all in blob.c (blob.c 96% -> 95%,
+EOFBlob 67%). An uncapped rerun of all 844 (`xuncap1011`) was stopped at 19 (17 survived all
+~15,000 reaching cases, every one with a verdict): about 74 hours for what the merged view already
+says.
+
+The 4 open ones, every reaching case (`xopen1011`): all survived. CloseBlob's `file != NULL` ->
+`==` on a FileStream skips fclose: SyncBlob has flushed the data already, so the file reads back
+whole, and the mutant only leaks a FILE. `infra 10300 frames to 10300 files` writes more files in
+one command than the open-file limit (10240 under WSL): killed (exit 0 -> 1, the last 64 files
+missing). About 15 s, so it sits at the end of the cheap-first order. The other three are verdicts:
+CloneBlobInfo's `mapped` test only moves the map resource's accounting (unobservable); GetBlobSize's
+`extent == 0` fallback is overwritten by fstat at once (equivalent); EOFBlob's bzip2 branch is never
+met by a reader, as ReadImage hands coders a decompressed BlobStream or a temporary file, and its
+one caller on a BZipStream, SyncBlob, then skips BZ2_bzflush, a no-op in libbz2 (equivalent; bz2
+PNM and AVS round trips tried and dropped, `nb1011`). **Merged: blob.c 96%, and all 34 gated
+files as on 10-10.** A sweep alone is a confirmation only where the cap reaches; the merged figures
+stand.

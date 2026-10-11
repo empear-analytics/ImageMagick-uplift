@@ -37411,6 +37411,36 @@
    "src": "if (selection_info != (XWidgetInfo *) NULL)",
    "verdict": "equivalent",
    "why": "the file-scope selection_info is never assigned (the selection_info in the widgets is a local of the same name), so it is always NULL, and RelinquishMagickMemory(NULL) returns NULL: either branch leaves it NULL"
+  },
+  {
+   "at": 22,
+   "file": "MagickCore/blob.c",
+   "function": "CloneBlobInfo",
+   "mutator": "cxx_ne_to_eq",
+   "nth": 0,
+   "src": "if (blob_info->mapped != MagickFalse)",
+   "verdict": "unobservable",
+   "why": "only the map resource's accounting: the clone of an unmapped blob acquires MapResource (and a mapped one does not), which at most makes a later pixel cache fall back from a memory map to disk, with the same pixels. Survived all 15039 reaching cases (xopen1011)"
+  },
+  {
+   "at": 11,
+   "file": "MagickCore/blob.c",
+   "function": "EOFBlob",
+   "mutator": "cxx_eq_to_ne",
+   "nth": 0,
+   "src": "if (status == BZ_UNEXPECTED_EOF)",
+   "verdict": "equivalent",
+   "why": "no reader sees a bzip2 stream: ReadImage hands blob-capable coders the decompressed file as a BlobStream, and seekable ones a temporary file (checked under gdb for AVS). EOFBlob meets a BZipStream only from SyncBlob, where eof skips BZ2_bzflush, which libbz2 implements as a no-op. Survived all 14802 reaching cases and new bz2 PNM/AVS round trips (xopen1011, nb1011)"
+  },
+  {
+   "at": 11,
+   "file": "MagickCore/blob.c",
+   "function": "GetBlobSize",
+   "mutator": "cxx_eq_to_ne",
+   "nth": 0,
+   "src": "if (extent == 0)",
+   "verdict": "equivalent",
+   "why": "the fallback to blob_info->size is overwritten at once: fileno() of an open FILE is never -1 and fstat() on it succeeds, so extent is always st_size from fstat. Survived all 14802 reaching cases (xopen1011)"
   }
  ]
 }
