@@ -6045,3 +6045,7 @@ indexes failed
 22:24 resweep visual-effects:   killed 703, survived 174 (0 capped), no coverage 0, errors 0
 22:33 resweep effect:   killed 1009, survived 184 (1 capped), no coverage 0, errors 0
 22:37 resweep compare:   killed 572, survived 99 (0 capped), no coverage 23, errors 0
+22:38 pushed
+22:42 resweep vision:   killed 633, survived 116 (0 capped), no coverage 0, errors 0
+22:45 resweep threshold:   killed 469, survived 106 (0 capped), no coverage 0, errors 0
+22:48 resweep shear:   killed 429, survived 81 (0 capped), no coverage 45, errors 0
