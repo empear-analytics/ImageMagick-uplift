@@ -6053,3 +6053,7 @@ indexes failed
 22:58 resweep segment:   killed 338, survived 54 (0 capped), no coverage 83, errors 0
 23:02 resweep decorate:   killed 385, survived 16 (0 capped), no coverage 0, errors 0
 23:06 resweep identify:   killed 327, survived 60 (0 capped), no coverage 0, errors 0
+23:06 pushed
+23:10 resweep compress:   killed 190, survived 41 (0 capped), no coverage 0, errors 0
+23:10 resweep cipher:   killed 123, survived 50 (0 capped), no coverage 4, errors 0
+23:12 resweep list:   killed 127, survived 26 (13 capped), no coverage 17, errors 0
