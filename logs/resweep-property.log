@@ -1,41 +1,41 @@
 mutate: 778 mutants in MagickCore/property\.c$, 28 functions
-mutate: baseline over 15047 cases in 0s
+mutate: baseline over 15048 cases in 0s
   mutants: 25/778 (20s)
   mutants: 50/778 (22s)
-  mutants: 75/778 (39s)
+  mutants: 75/778 (36s)
   mutants: 100/778 (60s)
-  mutants: 125/778 (108s)
+  mutants: 125/778 (109s)
   mutants: 150/778 (123s)
-  mutants: 175/778 (152s)
-  mutants: 200/778 (191s)
-  mutants: 225/778 (224s)
+  mutants: 175/778 (149s)
+  mutants: 200/778 (190s)
+  mutants: 225/778 (223s)
   mutants: 250/778 (270s)
-  mutants: 275/778 (291s)
+  mutants: 275/778 (287s)
   mutants: 300/778 (328s)
-  mutants: 325/778 (328s)
-  mutants: 350/778 (329s)
-  mutants: 375/778 (342s)
-  mutants: 400/778 (373s)
-  mutants: 425/778 (408s)
-  mutants: 450/778 (414s)
-  mutants: 475/778 (434s)
-  mutants: 500/778 (442s)
-  mutants: 525/778 (444s)
+  mutants: 325/778 (329s)
+  mutants: 350/778 (331s)
+  mutants: 375/778 (339s)
+  mutants: 400/778 (372s)
+  mutants: 425/778 (409s)
+  mutants: 450/778 (417s)
+  mutants: 475/778 (439s)
+  mutants: 500/778 (444s)
+  mutants: 525/778 (447s)
   mutants: 550/778 (450s)
-  mutants: 575/778 (458s)
-  mutants: 600/778 (468s)
-  mutants: 625/778 (516s)
-  mutants: 650/778 (562s)
-  mutants: 675/778 (580s)
-  mutants: 700/778 (627s)
-  mutants: 725/778 (662s)
-  mutants: 750/778 (696s)
-  mutants: 775/778 (724s)
-  mutants: 778/778 (728s)
+  mutants: 575/778 (454s)
+  mutants: 600/778 (465s)
+  mutants: 625/778 (511s)
+  mutants: 650/778 (551s)
+  mutants: 675/778 (568s)
+  mutants: 700/778 (614s)
+  mutants: 725/778 (644s)
+  mutants: 750/778 (674s)
+  mutants: 775/778 (702s)
+  mutants: 778/778 (704s)
 
-mutate: 778 mutants, 728s
-  killed 478, survived 295 (254 capped), no coverage 5, errors 0
-  mutation score on reached code: 61.8%   overall: 61.4%
+mutate: 778 mutants, 704s
+  killed 476, survived 297 (256 capped), no coverage 5, errors 0
+  mutation score on reached code: 61.6%   overall: 61.2%
 
   function                           total killed survived no-cov
   GetEXIFProperty                      158     59       99      0
@@ -44,7 +44,7 @@ mutate: 778 mutants, 728s
   SetImageProperty                      83     29       54      0
   Get8BIMProperty                       60     51        9      0
   TracePSClippath                       41     35        6      0
-  GetMagickPropertyLetter               35     21       14      0
+  GetMagickPropertyLetter               35     19       16      0
   GetXMPProperty                        30     28        2      0
   TraceSVGClippath                      27     24        3      0
   GetImageProperty                      26     22        4      0
@@ -233,6 +233,8 @@ mutate: 778 mutants, 728s
      c property.c:2775:53 cxx_eq_to_ne               if ((image != (Image *) NULL) && (image->next == (Image *) NULL))
     xc property.c:2800:25 cxx_eq_to_ne               (image->quality == 0 ? 92 : image->quality));
     xc property.c:2816:36 cxx_eq_to_ne               (image_info->number_scenes == 0 ? 2147483647 :
+    xc property.c:2879:27 cxx_ne_to_eq               if ((image->columns != 0) && (image->rows != 0))
+    xc property.c:2879:49 cxx_ne_to_eq               if ((image->columns != 0) && (image->rows != 0))
     xc property.c:2892:17 cxx_ne_to_eq               if (image != (Image *) NULL)
     x  property.c:2920:14 cxx_ne_to_eq               if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
     x  property.c:2920:54 cxx_ne_to_eq               if ((image != (Image *) NULL) && (IsEventLogging() != MagickFalse))
