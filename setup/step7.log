@@ -5355,3 +5355,8 @@ indexes failed
 12:44 confirm version:   killed 0, survived 0 (0 capped), no coverage 6, errors 0
 12:44 confirm module:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 12:44 pushed
+12:44 pushed
+== confirm-loop round done Sun Oct 11 12:44:48 UTC 2026
+12:49 resweep profile:   killed 455, survived 72 (7 capped), no coverage 22, errors 0
+12:53 resweep log:   killed 134, survived 97 (57 capped), no coverage 24, errors 0
+12:57 resweep delegate:   killed 230, survived 78 (23 capped), no coverage 15, errors 0
