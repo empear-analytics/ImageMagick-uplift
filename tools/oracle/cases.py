@@ -5153,6 +5153,8 @@ GAP_XEVENTS_FILE_CASES += [
     for label, picks in (("", ""), (", operator Atop", " use:2 click:65,101 map click:40,59"),
                          (", dissolved 50", " use:2 click:65,133 map key:ctrl+u type:50 key:Return"))
 ]
+# File > Visual Directory... is left out (2026-10-11, measured): after the browser's "*" the
+# montage never shows, and display does not quit on q (timeout).
 # display's menus: a click on the image opens the Commands widget, a click on its button opens a
 # menu, a click on an item runs the command (positions measured on the default font: buttons 32
 # pixels apart from y=101, items 20.2 apart from y=12, the last one below a separator). The
@@ -5416,6 +5418,11 @@ GAP_XEVENTS_CASES += [
         ("flopped, then undone", "use:2 click:65,165 map click:40,15 use:2 click:65,133 map click:40,15 "
                                  "use:2 click:65,357 use:1"),
         ("escaped", "key:Escape"))
+] + [
+    # The second button held on the image: zoom, then XMagnifyImage follows the pointer until
+    # the release; the grab is the magnify window (2026-10-11).
+    ("xevents display magnify by the second button", "map press2:20,20 map use:1 move:30,25 release2:30,25 "
+     "use:2 grab:out.ppm key:q use:1 key:q", ["display", img("rose")]),
 ] + [
     # An image larger than the screen (1024x768): display shows part of it and maps the Pan Icon
     # window, whose rectangle a drag moves (XPanImage); the arrow keys pan too (2026-10-11).
