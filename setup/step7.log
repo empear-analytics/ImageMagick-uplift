@@ -5806,3 +5806,7 @@ indexes failed
 18:39 resweep static:   killed 13, survived 3 (2 capped), no coverage 5, errors 0
 18:41 resweep version:   killed 16, survived 2 (1 capped), no coverage 4, errors 0
 18:43 resweep thread:   killed 2, survived 1 (0 capped), no coverage 0, errors 0
+18:44 pushed
+18:44 resweep module:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
+18:44 resweep client:   killed 3, survived 2 (2 capped), no coverage 0, errors 0
+18:44 resweep image-view:   killed 0, survived 0 (0 capped), no coverage 0, errors 0
