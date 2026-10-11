@@ -32,3 +32,4 @@
   exec: 15701/15701 (74s)
 exec: 15701 cases in 76s, 1060 exit non-zero
 warning: 2 functions have mismatched data
+linecov: build-oracle/oracle.lcov in 78s
