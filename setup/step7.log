@@ -5644,3 +5644,7 @@ indexes failed
 17:07 confirm colormap:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 17:07 confirm random:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 17:07 confirm artifact:   killed 0, survived 0 (0 capped), no coverage 9, errors 0
+17:07 pushed
+17:07 confirm static:   killed 0, survived 0 (0 capped), no coverage 6, errors 0
+17:07 confirm version:   killed 0, survived 1 (0 capped), no coverage 5, errors 0
+17:08 confirm module:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
