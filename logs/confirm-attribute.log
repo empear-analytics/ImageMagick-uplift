@@ -26,4 +26,4 @@ mutate: 81 mutants, 0s
   IdentifyImageType                      1      0        0      1
   IsImageOpaque                          1      0        0      1
 
-  full results: build-oracle/work/mutation-confirm-342bd757f-attribute.json
+  full results: build-oracle/work/mutation-confirm-029569055-attribute.json
