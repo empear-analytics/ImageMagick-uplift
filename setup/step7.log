@@ -5640,3 +5640,7 @@ indexes failed
 17:06 confirm magic:   killed 0, survived 0 (0 capped), no coverage 12, errors 0
 17:06 confirm fourier:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 17:06 confirm coder:   killed 0, survived 0 (0 capped), no coverage 13, errors 0
+17:07 pushed
+17:07 confirm colormap:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
+17:07 confirm random:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
+17:07 confirm artifact:   killed 0, survived 0 (0 capped), no coverage 9, errors 0
