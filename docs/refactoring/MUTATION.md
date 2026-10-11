@@ -4255,3 +4255,23 @@ one caller on a BZipStream, SyncBlob, then skips BZ2_bzflush, a no-op in libbz2 
 PNM and AVS round trips tried and dropped, `nb1011`). **Merged: blob.c 96%, and all 34 gated
 files as on 10-10.** A sweep alone is a confirmation only where the cap reaches; the merged figures
 stand.
+
+## W01: display's edit modes through their own menus (Windows, 2026-10-11, afternoon)
+
+Draw, Color, Matte and Annotate keep the Commands window open with their own widget, and map an
+Info window (70x26, the pointer position) over the image's top left. **A press there reaches Info,
+not the image**, so the earlier draw case never drew: presses now go below y=30 (`6f364d5cf`,
+`info1011`: 49 kills, XDrawImage 0% -> 46%, XDrawEditImage 4% -> 13%). Line coverage then showed
+a second trap: after a pick from one of these widgets' menus, **a press at x >= 20 never reached
+display's loop**, while one at x < 20 did (no pointer grab, no window over the point; the cause is
+not found). The cases below press at 10,38. The widgets' menus are 22 pixels apart from y=15,
+not display's 20.2; Color and Matte's Method menu lists Undefined first.
+
+| round | cases | kills | effect |
+|---|---|---|---|
+| `draw1011` | 13: each element, a width, a pen, a stipple, an undo (`342bd757f`) | 77 | XDrawEditImage 13% -> 39%, XDrawImage 46% -> 57% |
+| `color1011` | 16: each paint method in Color and Matte, a fuzz, a border, an undo (`029569055`) | 100 | XColorEditImage 9% -> 54%, XMatteEditImage 4% -> 52% |
+
+display.c 16% -> 23% adjusted (x11cl12 and every W01 rerun merged), xwindow.c 34% -> 35%. Left
+out, measured: a point element (freehand: it draws only while the pointer moves), Annotate's
+Font Name > 6x10 (no such font under Xvfb; a notice waits).
