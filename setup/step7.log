@@ -5656,3 +5656,12 @@ indexes failed
 17:17 resweep vision:   killed 633, survived 116 (0 capped), no coverage 0, errors 0
 17:19 resweep threshold:   killed 469, survived 106 (0 capped), no coverage 0, errors 0
 17:22 resweep shear:   killed 429, survived 81 (0 capped), no coverage 45, errors 0
+17:22 pushed
+17:36 resweep segment:   killed 338, survived 54 (0 capped), no coverage 83, errors 0
+17:40 resweep decorate:   killed 385, survived 16 (0 capped), no coverage 0, errors 0
+== confirm-loop Sun Oct 11 17:40:52 UTC 2026: cases since 0142f2326, at 913664ccd X11 cases: display's pan window, on an image larger than the
+17:44 3 new cases since 0142f2326
+17:44 selfcheck: 3 cases, 6 runs each, 0 nondeterministic
+17:45 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+17:45 confirm image:   killed 0, survived 0 (0 capped), no coverage 93, errors 0
+17:45 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0

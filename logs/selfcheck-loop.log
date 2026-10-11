@@ -1,7 +1,7 @@
-  run 1: 20/20 (1s)
-  run 2: 20/20 (1s)
-  run 3: 20/20 (1s)
-  run 4: 20/20 (1s)
-  run 5: 20/20 (1s)
-  run 6: 20/20 (1s)
-selfcheck: 20 cases, 6 runs each, 0 nondeterministic
+  run 1: 3/3 (0s)
+  run 2: 3/3 (0s)
+  run 3: 3/3 (0s)
+  run 4: 3/3 (0s)
+  run 5: 3/3 (0s)
+  run 6: 3/3 (0s)
+selfcheck: 3 cases, 6 runs each, 0 nondeterministic
