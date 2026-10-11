@@ -5157,12 +5157,14 @@ _XEV_MENUS = ["File", "Edit", "View", "Transform", "Enhance", "Effects", "F/X", 
               "Miscellany", "Help"]
 
 
-def _xev_menu(menu, item, items, reply=None, after=""):
+def _xev_menu(menu, item, items, reply=None, after="", step=20.2):
     i = items.index(item)
-    y = 12 + 20.2 * i + (5 if i == len(items) - 1 else 0)
+    y = 12 + step * i + (5 if i == len(items) - 1 else 0)
     script = "map click:20,20 map click:65,%d map click:40,%d" % (101 + 32 * _XEV_MENUS.index(menu), y)
     if reply is not None:
-        script += " map key:ctrl+u type:%s key:Return" % reply
+        # The dialog maps in the menu's window, so the pointer stays where the item was; the
+        # dialog, 127 pixels high, reads the keys only with the pointer in it (2026-10-11).
+        script += " map%s key:ctrl+u type:%s key:Return" % (" point:150,50" if y > 120 else "", reply)
     return script + after + " use:1 grab:out.ppm key:q"
 
 
@@ -5228,9 +5230,9 @@ GAP_XEVENTS_GRAB_CASES = [
 # window (no new map) and chops along the line dragged. Left out, measured: Region of Interest
 # never settles and leaves temporary files; in Draw, Escape quits display; Color and Matte do
 # not exit after a click.
-def _xev_menu_pick(menu, item, items):
+def _xev_menu_pick(menu, item, items, step=20.2):
     i = items.index(item)
-    y = 12 + 20.2 * i + (5 if i == len(items) - 1 else 0)
+    y = 12 + step * i + (5 if i == len(items) - 1 else 0)
     return "map click:20,20 map click:65,%d map click:40,%d" % (101 + 32 * _XEV_MENUS.index(menu), y)
 
 
@@ -5264,6 +5266,10 @@ _XEV_COLOR_MENUS = {"Method": _XEV_METHODS, "Pixel Color": _XEV_PENS, "Border Co
 _XEV_MATTE_BUTTONS = ["Method", "Border Color", "Fuzz", "Matte Value", "Undo", "Help", "Dismiss"]
 _XEV_MATTE_MENUS = {"Method": _XEV_METHODS, "Border Color": _XEV_PENS, "Fuzz": _XEV_FUZZ,
                     "Matte Value": ["Opaque", "Transparent", "Dialog..."]}
+_XEV_ROTATE_BUTTONS = ["Pixel Color", "Direction", "Help", "Dismiss"]
+_XEV_ROTATE_MENUS = {"Pixel Color": _XEV_PENS, "Direction": ["horizontal", "vertical"]}
+_XEV_CHOP_BUTTONS = ["Direction", "Help", "Dismiss"]
+_XEV_CHOP_MENUS = {"Direction": ["horizontal", "vertical"]}
 # Annotate's widget (XAnnotateEditImage): fonts are xwindow.c's font1..font0 defaults.
 _XEV_ANNOTATE_BUTTONS = ["Font Name", "Font Color", "Box Color", "Rotate Text", "Help", "Dismiss"]
 _XEV_ANNOTATE_MENUS = {"Font Name": ["fixed", "variable", "5x8", "6x10", "7x13bold", "8x13bold", "9x15bold",
@@ -5347,6 +5353,23 @@ GAP_XEVENTS_CASES += [
         ("rotated -45", [("Rotate Text", "-45")], "type:Hi key:Escape"))
     # left out, measured: Font Name > 6x10 never settles (no such font under Xvfb; a notice waits)
 ] + [
+    # Rotate, Chop and Crop's own widgets (2026-10-11): a slanted drag gives Rotate an angle (a
+    # level one gives 0, and nothing turns); Chop's Direction; Crop's Crop button after the drag.
+    ("xevents display %s" % label, _xev_menu_pick("Transform", item, _XEV_TRANSFORM, step=22) +
+     "".join(_xev_draw_pick(b, it, buttons, menus) for b, it in picks) + " use:1 " + gesture +
+     " grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")])
+    for label, item, buttons, menus, picks, gesture in (
+        ("rotate, a slanted drag", "Rotate...", _XEV_ROTATE_BUTTONS, _XEV_ROTATE_MENUS, [], "drag:10,34,60,44"),
+        ("rotate, a steep drag", "Rotate...", _XEV_ROTATE_BUTTONS, _XEV_ROTATE_MENUS, [], "drag:10,32,30,44"),
+        ("rotate, vertical", "Rotate...", _XEV_ROTATE_BUTTONS, _XEV_ROTATE_MENUS,
+         [("Direction", "vertical")], "drag:10,32,16,44"),
+        ("rotate, red pen", "Rotate...", _XEV_ROTATE_BUTTONS, _XEV_ROTATE_MENUS,
+         [("Pixel Color", "red")], "drag:10,34,60,44"),
+        ("chop, vertical direction", "Chop", _XEV_CHOP_BUTTONS, _XEV_CHOP_MENUS,
+         [("Direction", "vertical")], "drag:15,32,15,44"),
+        ("crop, the Crop button", "Crop", ["Crop", "Help", "Dismiss"], {}, [],
+         "drag:10,32,50,44 use:2 click:65,101 use:1"))
+] + [
     ("xevents display rotate by drag", _xev_menu_pick("Transform", "Rotate...", _XEV_TRANSFORM) +
      " use:1 drag:10,38,60,38 grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
     ("xevents display chop, horizontal", _xev_menu_pick("Transform", "Chop", _XEV_TRANSFORM) +
@@ -5378,6 +5401,22 @@ GAP_XEVENTS_IMPORT_CASES = [
 ]
 GAP_XEVENTS_CASES += [("xevents display menu %s > %s" % (menu, item), _xev_menu(menu, item, items, reply),
                        ["display", img("rose")]) for menu, item, items, reply in _XEV_MENU_ITEMS]
+# Display's menus are 22 pixels apart, not 20.2 (measured on a grab of Transform, 2026-10-11): from
+# the seventh item on, the cases above pressed the item before the one named. "Restore" was
+# Refresh, "Equalize" Normalize, "Negate" Equalize, "Grayscale" Negate; they keep their labels and
+# ids, as their kills are real. The items they missed, and those "left out, measured" through
+# the same error (Threshold, Edge Detect, Spread, Shade, Raise, Normalize), placed right:
+_XEV_MENU_ITEMS_22 = ([("View", "Restore", _XEV_VIEW, None)] +
+                      [("Enhance", it, _XEV_ENHANCE, None) for it in ("Normalize", "Equalize", "Negate", "Grayscale")] +
+                      [("Effects", it, _XEV_EFFECTS, r) for it, r in (("Threshold...", "50%"), ("Edge Detect...", "1"),
+                                                                    ("Spread...", "3"), ("Shade...", "30x30"),
+                                                                    ("Raise...", "5x5"), ("Segment...", "1x1.5"))] +
+                      [("F/X", it, _XEV_FX, r) for it, r in (("Oil Paint...", "3"), ("Charcoal Draw...", "1"))] +
+                      [("Transform", it, _XEV_TRANSFORM, r) for it, r in (("Roll...", "+10+10"),)])
+# left out, measured: Shear, Trim Edges, Add Frame, Slide Show and Preferences time out; Comment
+# never settles. Raise 5x5 fails on rose ("size must exceed bevel width"): kept, an error path.
+GAP_XEVENTS_CASES += [("xevents display menu item %s > %s" % (menu, item), _xev_menu(menu, item, items, reply, step=22),
+                       ["display", img("rose")]) for menu, item, items, reply in _XEV_MENU_ITEMS_22]
 # Widgets grabbed themselves, without the @ before the grab that the image-window cases get: the
 # confirmation display asks before quitting when its resources say so (XConfirmWidget), and Help
 # > Overview's text view (XTextViewWidget), closed with its Dismiss button. Help > Browse
