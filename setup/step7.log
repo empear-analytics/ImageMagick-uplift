@@ -5977,3 +5977,7 @@ indexes failed
 21:02 confirm utility:   killed 0, survived 0 (0 capped), no coverage 51, errors 0
 21:02 confirm policy:   killed 0, survived 0 (0 capped), no coverage 45, errors 0
 21:02 confirm locale:   killed 0, survived 14 (0 capped), no coverage 9, errors 0
+21:02 pushed
+21:02 confirm memory:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
+21:02 confirm configure:   killed 0, survived 0 (0 capped), no coverage 46, errors 0
+21:03 confirm delegate:   killed 0, survived 0 (0 capped), no coverage 50, errors 0
