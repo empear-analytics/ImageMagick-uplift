@@ -79,7 +79,7 @@
   "col": 9,
   "function": "resize.c:CubicBC",
   "status": "killed",
-  "cases": 3,
+  "cases": 4,
   "killer": "unary/8c77159a26",
   "why": "out.miff differs"
  },
@@ -1615,7 +1615,7 @@
   "col": 9,
   "function": "resize.c:SincFast",
   "status": "killed",
-  "cases": 3,
+  "cases": 2,
   "killer": "gaps/ed5a7f7a5d",
   "why": "out.miff differs"
  },
@@ -1831,7 +1831,7 @@
   "col": 20,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 83,
+  "cases": 85,
   "killer": "filter/38877bab85",
   "why": "out.miff differs"
  },
@@ -1855,7 +1855,7 @@
   "col": 15,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 117,
+  "cases": 115,
   "killer": "filter/88896657e1",
   "why": "out.miff differs"
  },
@@ -1867,7 +1867,7 @@
   "col": 30,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 33,
+  "cases": 34,
   "killer": "resize/34430ec9bc",
   "why": "out.miff differs"
  },
@@ -1987,7 +1987,7 @@
   "col": 20,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 33,
+  "cases": 34,
   "killer": "resize/34430ec9bc",
   "why": "out.miff differs"
  },
@@ -1999,7 +1999,7 @@
   "col": 32,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 33,
+  "cases": 34,
   "killer": "resize/34430ec9bc",
   "why": "out.miff differs"
  },
@@ -2011,7 +2011,7 @@
   "col": 32,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 135,
+  "cases": 134,
   "killer": "gaps/1663ded79c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2023,7 +2023,7 @@
   "col": 53,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 33,
+  "cases": 34,
   "killer": "resize/34430ec9bc",
   "why": "out.miff differs"
  },
@@ -2047,7 +2047,7 @@
   "col": 40,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 33,
+  "cases": 34,
   "killer": "resize/34430ec9bc",
   "why": "out.miff differs"
  },
@@ -2071,7 +2071,7 @@
   "col": 30,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 31,
+  "cases": 32,
   "killer": "gaps/92fd54478c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2083,7 +2083,7 @@
   "col": 30,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 138,
+  "cases": 137,
   "killer": "filter-curve/080049445f",
   "why": "stdout differs"
  },
@@ -2095,7 +2095,7 @@
   "col": 18,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 31,
+  "cases": 32,
   "killer": "gaps/92fd54478c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2107,7 +2107,7 @@
   "col": 59,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 31,
+  "cases": 32,
   "killer": "gaps/92fd54478c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2119,7 +2119,7 @@
   "col": 65,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 31,
+  "cases": 32,
   "killer": "gaps/92fd54478c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2167,7 +2167,7 @@
   "col": 16,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 31,
+  "cases": 32,
   "killer": "gaps/92fd54478c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2179,7 +2179,7 @@
   "col": 34,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 31,
+  "cases": 32,
   "killer": "gaps/92fd54478c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2191,7 +2191,7 @@
   "col": 30,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 31,
+  "cases": 32,
   "killer": "gaps/92fd54478c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2203,7 +2203,7 @@
   "col": 30,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 31,
+  "cases": 32,
   "killer": "gaps/92fd54478c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2215,7 +2215,7 @@
   "col": 18,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 33,
+  "cases": 34,
   "killer": "resize/34430ec9bc",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -2227,7 +2227,7 @@
   "col": 18,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 33,
+  "cases": 34,
   "killer": "resize/34430ec9bc",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -2239,7 +2239,7 @@
   "col": 18,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 33,
+  "cases": 34,
   "killer": "resize/34430ec9bc",
   "why": "out.miff differs"
  },
@@ -2251,7 +2251,7 @@
   "col": 52,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 33,
+  "cases": 34,
   "killer": "resize/34430ec9bc",
   "why": "out.miff differs"
  },
@@ -2323,7 +2323,7 @@
   "col": 34,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 12,
+  "cases": 13,
   "killer": "filter/8bd9b02ced",
   "why": "out.miff differs"
  },
@@ -2335,7 +2335,7 @@
   "col": 74,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 12,
+  "cases": 13,
   "killer": "filter/8bd9b02ced",
   "why": "out.miff differs"
  },
@@ -2347,7 +2347,7 @@
   "col": 23,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 12,
+  "cases": 13,
   "killer": "filter/8bd9b02ced",
   "why": "out.miff differs"
  },
@@ -2359,7 +2359,7 @@
   "col": 59,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 126,
+  "cases": 125,
   "killer": "filter/3aefa4e094",
   "why": "out.miff differs"
  },
@@ -2443,7 +2443,7 @@
   "col": 30,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 31,
+  "cases": 32,
   "killer": "gaps/92fd54478c",
   "why": "stdout differs; out.miff differs"
  },
@@ -2479,7 +2479,7 @@
   "col": 17,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 80,
+  "cases": 82,
   "killer": "gaps/b99e3579b9",
   "why": "stdout differs; out.miff differs"
  },
@@ -2491,7 +2491,7 @@
   "col": 20,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 80,
+  "cases": 82,
   "killer": "gaps/b99e3579b9",
   "why": "stdout differs; out.miff differs"
  },
@@ -2503,7 +2503,7 @@
   "col": 24,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 80,
+  "cases": 82,
   "killer": "gaps/b99e3579b9",
   "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
@@ -2599,7 +2599,7 @@
   "col": 33,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "filter-curve/00539342a5",
   "why": "stdout differs"
  },
@@ -2611,7 +2611,7 @@
   "col": 33,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "filter-curve/00539342a5",
   "why": "stdout differs"
  },
@@ -2659,7 +2659,7 @@
   "col": 33,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 97,
+  "cases": 96,
   "killer": "filter-curve/2ea956a4dc",
   "why": "stdout differs"
  },
@@ -2671,7 +2671,7 @@
   "col": 33,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "filter-curve/00539342a5",
   "why": "stdout differs"
  },
@@ -2803,7 +2803,7 @@
   "col": 21,
   "function": "AcquireResizeFilter",
   "status": "killed",
-  "cases": 129,
+  "cases": 128,
   "killer": "filter-curve/3abcb1de03",
   "why": "stdout differs"
  },
@@ -7607,7 +7607,7 @@
   "col": 25,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 83,
+  "cases": 82,
   "killer": "resize/b2bc27c27d",
   "why": "out.miff differs"
  },
@@ -7619,7 +7619,7 @@
   "col": 25,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -7789,7 +7789,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/3e8aae1d43",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/resize.c:3427:34:3427:36",
@@ -8015,7 +8015,7 @@
   "col": 17,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 5,
+  "cases": 6,
   "killer": "unary/4ec8a53df5",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
@@ -8135,7 +8135,7 @@
   "col": 24,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -8159,7 +8159,7 @@
   "col": 32,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -8171,7 +8171,7 @@
   "col": 41,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -8183,7 +8183,7 @@
   "col": 63,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -8195,7 +8195,7 @@
   "col": 66,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 112,
+  "cases": 111,
   "killer": "resize/981d3610ce",
   "why": "out.miff differs"
  },
@@ -8207,7 +8207,7 @@
   "col": 30,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -8219,7 +8219,7 @@
   "col": 43,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -8231,7 +8231,7 @@
   "col": 13,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -8243,7 +8243,7 @@
   "col": 18,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -8255,7 +8255,7 @@
   "col": 52,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -8267,7 +8267,7 @@
   "col": 47,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 27,
+  "cases": 28,
   "killer": "resize/4bdd34811a",
   "why": "out.miff differs"
  },
@@ -8423,7 +8423,7 @@
   "col": 21,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8435,7 +8435,7 @@
   "col": 21,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -8447,7 +8447,7 @@
   "col": 27,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -8459,7 +8459,7 @@
   "col": 14,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8471,7 +8471,7 @@
   "col": 30,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -8483,7 +8483,7 @@
   "col": 39,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8495,7 +8495,7 @@
   "col": 61,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8507,7 +8507,7 @@
   "col": 64,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8519,7 +8519,7 @@
   "col": 35,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8531,7 +8531,7 @@
   "col": 39,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 104,
+  "cases": 103,
   "killer": "convert/d053a7472e",
   "why": "out.miff differs"
  },
@@ -8543,7 +8543,7 @@
   "col": 52,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8555,7 +8555,7 @@
   "col": 45,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8567,7 +8567,7 @@
   "col": 36,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8579,7 +8579,7 @@
   "col": 70,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8591,7 +8591,7 @@
   "col": 9,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8603,7 +8603,7 @@
   "col": 66,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -8627,7 +8627,7 @@
   "col": 33,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 27,
+  "cases": 28,
   "killer": "resize/4bdd34811a",
   "why": "stderr differs"
  },
@@ -8639,7 +8639,7 @@
   "col": 20,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 27,
+  "cases": 28,
   "killer": "resize/4bdd34811a",
   "why": "stderr differs"
  },
@@ -8651,7 +8651,7 @@
   "col": 21,
   "function": "resize.c:HorizontalFilter",
   "status": "killed",
-  "cases": 27,
+  "cases": 28,
   "killer": "resize/4bdd34811a",
   "why": "stderr differs; out.miff differs"
  },
@@ -8675,7 +8675,7 @@
   "col": 25,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 83,
+  "cases": 82,
   "killer": "resize/b2bc27c27d",
   "why": "out.miff differs"
  },
@@ -8687,7 +8687,7 @@
   "col": 25,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -8857,7 +8857,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/3e8aae1d43",
-  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/resize.c:3641:34:3641:36",
@@ -8869,7 +8869,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/3e8aae1d43",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_add_to_sub:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/resize.c:3643:34:3643:35",
@@ -9203,7 +9203,7 @@
   "col": 24,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -9215,7 +9215,7 @@
   "col": 41,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -9227,7 +9227,7 @@
   "col": 54,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -9251,7 +9251,7 @@
   "col": 39,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -9263,7 +9263,7 @@
   "col": 13,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -9275,7 +9275,7 @@
   "col": 53,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -9287,7 +9287,7 @@
   "col": 38,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 11,
+  "cases": 12,
   "killer": "resize/4b05b7b622",
   "why": "out.miff differs"
  },
@@ -9299,7 +9299,7 @@
   "col": 47,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9419,7 +9419,7 @@
   "col": 21,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9431,7 +9431,7 @@
   "col": 21,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -9443,7 +9443,7 @@
   "col": 27,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -9455,7 +9455,7 @@
   "col": 46,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9467,7 +9467,7 @@
   "col": 69,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9479,7 +9479,7 @@
   "col": 37,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9503,7 +9503,7 @@
   "col": 52,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9515,7 +9515,7 @@
   "col": 35,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9527,7 +9527,7 @@
   "col": 36,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9539,7 +9539,7 @@
   "col": 70,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9551,7 +9551,7 @@
   "col": 9,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9563,7 +9563,7 @@
   "col": 66,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 6,
+  "cases": 5,
   "killer": "convert/6b8b551190",
   "why": "out.miff differs"
  },
@@ -9587,7 +9587,7 @@
   "col": 33,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 27,
+  "cases": 28,
   "killer": "resize/4bdd34811a",
   "why": "stderr differs"
  },
@@ -9599,7 +9599,7 @@
   "col": 20,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 27,
+  "cases": 28,
   "killer": "resize/4bdd34811a",
   "why": "stderr differs"
  },
@@ -9611,7 +9611,7 @@
   "col": 21,
   "function": "resize.c:VerticalFilter",
   "status": "killed",
-  "cases": 27,
+  "cases": 28,
   "killer": "resize/4bdd34811a",
   "why": "stderr differs; out.miff differs"
  },
@@ -9659,7 +9659,7 @@
   "col": 16,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 86,
+  "cases": 85,
   "killer": "resize/8ae567d4e0",
   "why": "out.miff differs"
  },
@@ -9671,7 +9671,7 @@
   "col": 44,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 40,
+  "cases": 42,
   "killer": "gaps/b16d47a716",
   "why": "out.miff differs"
  },
@@ -9683,7 +9683,7 @@
   "col": 15,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 119,
+  "cases": 118,
   "killer": "encode/c0445ec3b7",
   "why": "dec.miff differs; enc.yuv differs"
  },
@@ -9731,7 +9731,7 @@
   "col": 19,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 86,
+  "cases": 85,
   "killer": "resize/8ae567d4e0",
   "why": "out.miff differs"
  },
@@ -9743,7 +9743,7 @@
   "col": 40,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 40,
+  "cases": 42,
   "killer": "gaps/b16d47a716",
   "why": "out.miff differs"
  },
@@ -9755,8 +9755,8 @@
   "col": 33,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 3,
-  "killer": "gaps/0c1e2558f3",
+  "cases": 4,
+  "killer": "gaps/ed5a7f7a5d",
   "why": "out.miff differs"
  },
  {
@@ -9767,8 +9767,8 @@
   "col": 31,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 3,
-  "killer": "gaps/0c1e2558f3",
+  "cases": 4,
+  "killer": "gaps/ed5a7f7a5d",
   "why": "out.miff differs"
  },
  {
@@ -9779,7 +9779,7 @@
   "col": 21,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 22,
+  "cases": 23,
   "killer": "gaps/fe8cbbe647",
   "why": "stdout differs; out.miff differs"
  },
@@ -9791,7 +9791,7 @@
   "col": 32,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "unary/be065bada8",
   "why": "out.miff differs"
  },
@@ -9827,7 +9827,7 @@
   "col": 16,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 6,
   "killer": "unary/4ec8a53df5",
   "why": "out.miff differs"
  },
@@ -9863,7 +9863,7 @@
   "col": 16,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 5,
+  "cases": 6,
   "killer": "unary/4ec8a53df5",
   "why": "out.miff differs"
  },
@@ -9887,7 +9887,7 @@
   "col": 51,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 118,
+  "cases": 117,
   "killer": "resize/96f9fd5697",
   "why": "stderr differs"
  },
@@ -9899,7 +9899,7 @@
   "col": 48,
   "function": "ResizeImage",
   "status": "killed",
-  "cases": 29,
+  "cases": 30,
   "killer": "resize/4bdd34811a",
   "why": "stderr differs"
  },

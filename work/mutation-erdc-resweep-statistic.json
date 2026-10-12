@@ -2505,7 +2505,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "evaluate/b52a628d3f",
-  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:895:46:895:48",
@@ -6987,7 +6987,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "identify/15d9590616",
-  "why": "exit status [0] -> [-6]; stderr differs"
+  "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
   "id": "cxx_le_to_gt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:1981:14:1981:16",
@@ -7009,7 +7009,7 @@
   "col": 14,
   "function": "statistic.c:GetMedianPixel",
   "status": "killed",
-  "cases": 17,
+  "cases": 16,
   "killer": "gaps/a976cf937e",
   "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
  },
@@ -7191,7 +7191,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "identify/15d9590616",
-  "why": "stdout differs"
+  "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
   "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:2000:13:2000:14",
@@ -7597,7 +7597,7 @@
   "col": 37,
   "function": "GetImageStatistics",
   "status": "killed",
-  "cases": 11,
+  "cases": 10,
   "killer": "gaps/855daf7162",
   "why": "stdout differs"
  },
@@ -8101,7 +8101,7 @@
   "col": 18,
   "function": "GetImageStatistics",
   "status": "killed",
-  "cases": 11,
+  "cases": 10,
   "killer": "gaps/855daf7162",
   "why": "stdout differs"
  },
@@ -8679,7 +8679,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "identify/15d9590616",
-  "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
+  "why": "exit status [0] -> [-6]; stdout differs"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/statistic.c:2280:19:2280:21",
@@ -8845,7 +8845,7 @@
   "col": 43,
   "function": "GetImageStatistics",
   "status": "killed",
-  "cases": 11,
+  "cases": 10,
   "killer": "gaps/855daf7162",
   "why": "stdout differs"
  },
