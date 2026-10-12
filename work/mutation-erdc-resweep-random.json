@@ -1193,9 +1193,9 @@
   "col": 12,
   "function": "SetRandomKey",
   "status": "killed",
-  "cases": 134,
+  "cases": 132,
   "killer": "gaps/b0b255df3b",
-  "why": "exit status [0] -> ['timeout']; magick-B8pXbCaEgVZmtAh-VLu8DKUyTgdHW81J only in candidate; magick-PaQxYCTTg1nlZyheHJOag-VZKY0F9fFw only in candidate; magick-suFwy3Ndi_Wgpodjxj0Oggp4rGjvC5eK only in ca"
+  "why": "exit status [0] -> ['timeout']; magick-iTZ2oWqVPinosBo3m3inMCh2uP6PVxqY only in candidate; magick-qSuuHM0VXed_gIlNTzaOKyPG0RXvRIal only in candidate; magick-qd3rmxxCM8WQOA9EmMyDgZX7u_ljVgiB only in ca"
  },
  {
   "id": "cxx_ge_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/random.c:916:12:916:14",

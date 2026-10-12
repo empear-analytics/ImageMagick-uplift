@@ -127,7 +127,7 @@
   "col": 5,
   "function": "AcquireImageColormap",
   "status": "killed",
-  "cases": 34,
+  "cases": 35,
   "killer": "decode/108d33ad83",
   "why": "stdout differs"
  },
@@ -139,9 +139,9 @@
   "col": 22,
   "function": "AcquireImageColormap",
   "status": "killed",
-  "cases": 34,
-  "killer": "decode/108d33ad83",
-  "why": "stdout differs"
+  "cases": 14,
+  "killer": "gaps/b3bfc0d62a",
+  "why": "out.jpg differs"
  },
  {
   "id": "cxx_div_to_mul:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/colormap.c:145:36:145:37",
