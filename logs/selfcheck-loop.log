@@ -1,7 +1,7 @@
-  run 1: 8/8 (0s)
-  run 2: 8/8 (0s)
-  run 3: 8/8 (0s)
-  run 4: 8/8 (0s)
-  run 5: 8/8 (0s)
-  run 6: 8/8 (0s)
-selfcheck: 8 cases, 6 runs each, 0 nondeterministic
+  run 1: 10/10 (0s)
+  run 2: 10/10 (0s)
+  run 3: 10/10 (0s)
+  run 4: 10/10 (0s)
+  run 5: 10/10 (0s)
+  run 6: 10/10 (0s)
+selfcheck: 10 cases, 6 runs each, 0 nondeterministic

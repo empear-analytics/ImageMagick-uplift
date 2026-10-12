@@ -1,29 +1,29 @@
 mutate: 549 mutants in MagickCore/profile\.c$, 44 functions
-mutate: baseline over 15071 cases in 0s
+mutate: baseline over 15090 cases in 0s
   mutants: 25/549 (1s)
   mutants: 50/549 (2s)
   mutants: 75/549 (3s)
   mutants: 100/549 (7s)
-  mutants: 125/549 (18s)
-  mutants: 150/549 (22s)
+  mutants: 125/549 (17s)
+  mutants: 150/549 (23s)
   mutants: 175/549 (25s)
   mutants: 200/549 (27s)
-  mutants: 225/549 (31s)
-  mutants: 250/549 (34s)
-  mutants: 275/549 (35s)
-  mutants: 300/549 (36s)
-  mutants: 325/549 (38s)
-  mutants: 350/549 (42s)
-  mutants: 375/549 (43s)
-  mutants: 400/549 (44s)
-  mutants: 425/549 (46s)
-  mutants: 450/549 (47s)
-  mutants: 475/549 (48s)
-  mutants: 500/549 (48s)
-  mutants: 525/549 (53s)
-  mutants: 549/549 (182s)
+  mutants: 225/549 (32s)
+  mutants: 250/549 (36s)
+  mutants: 275/549 (36s)
+  mutants: 300/549 (38s)
+  mutants: 325/549 (40s)
+  mutants: 350/549 (43s)
+  mutants: 375/549 (45s)
+  mutants: 400/549 (46s)
+  mutants: 425/549 (47s)
+  mutants: 450/549 (49s)
+  mutants: 475/549 (50s)
+  mutants: 500/549 (50s)
+  mutants: 525/549 (55s)
+  mutants: 549/549 (185s)
 
-mutate: 549 mutants, 182s
+mutate: 549 mutants, 185s
   killed 455, survived 72 (7 capped), no coverage 22, errors 0
   mutation score on reached code: 86.3%   overall: 82.9%
 

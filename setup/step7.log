@@ -6535,3 +6535,14 @@ indexes failed
 12:45 resweep client:   killed 3, survived 2 (2 capped), no coverage 0, errors 0
 12:45 resweep image-view:   killed 0, survived 0 (0 capped), no coverage 0, errors 0
 12:46 pushed
+12:46 pushed
+== resweep pass done Mon Oct 12 12:46:14 UTC 2026, at 03917a44e
+12:46 resweep: cases changed since last pass, starting fresh
+== resweep Mon Oct 12 12:50:00 UTC 2026: all Mac files at 26e4e9dad, untrusted first
+12:53 resweep profile:   killed 455, survived 72 (7 capped), no coverage 22, errors 0
+== confirm-loop Mon Oct 12 12:53:13 UTC 2026: cases since ad6d08b47, at 26e4e9dad X11 cases: the Resize and Shade dialogs' own toggles (10)
+12:56 10 new cases since ad6d08b47
+12:56 selfcheck: 10 cases, 6 runs each, 0 nondeterministic
+12:57 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+12:57 confirm image:   killed 0, survived 0 (0 capped), no coverage 93, errors 0
+12:57 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0
