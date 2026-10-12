@@ -6635,3 +6635,7 @@ indexes failed
 15:36 resweep enhance:   killed 902, survived 155 (0 capped), no coverage 0, errors 0
 15:44 resweep resize:   killed 958, survived 138 (38 capped), no coverage 40, errors 0
 15:50 resweep statistic:   killed 766, survived 146 (34 capped), no coverage 3, errors 0
+15:50 pushed
+15:55 resweep visual-effects:   killed 703, survived 174 (0 capped), no coverage 0, errors 0
+16:04 resweep effect:   killed 1008, survived 185 (1 capped), no coverage 0, errors 0
+16:08 resweep compare:   killed 572, survived 99 (0 capped), no coverage 23, errors 0

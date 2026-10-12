@@ -2853,7 +2853,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "compare/911bcf8bc0",
-  "why": "exit status [1] -> [-6]; stdout differs; stderr differs; diff.miff missing in candidate"
+  "why": "exit status [1] -> ['timeout']; stdout differs; stderr differs; diff.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/compare.c:1072:38:1072:40",
