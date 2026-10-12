@@ -141,7 +141,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "infra/935fcee82a",
-  "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
+  "why": "out.miff differs"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/list.c:248:62:248:64",
