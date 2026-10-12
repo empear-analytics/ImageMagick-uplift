@@ -4319,6 +4319,28 @@ holds them there:
   start external programs.
 - **xwindow.c**: XMakeImageMSBFirst needs an MSB-first server (Xvfb is LSB-first), and XDitherImage
   an HP Color Recovery visual. XRenderImage is reachable (annotate.c draws text in an X11 font,
-  a font name starting with "-"): a case for it is next, after the sweep.
+  a font name starting with "-"): 11 cases for it since (`7777ec712`, round `font1012`: 48
+  kills; xwindow.c 39% -> 41%, XRenderImage 68%, XAnnotateImage 63%, XBestFont 85%, FontToList
+  84%, from no coverage). Xvfb serves the Type1 fonts of /usr/share/fonts/X11/Type1 and "fixed";
+  the cases name a sized courier and helvetica.
 
 Overnight `x11cl13`: a confirmation sweep of all six W01 files on fresh baselines (cap 1500).
+
+**`x11cl13` result (2026-10-12, 07ad48eb5; 10 h for stage 1, as many display cases each wait
+for display to go idle): the merged figures hold.** On its own the sweep gives
+
+| file | merged view (kills, adjusted) | x11cl13 alone | both |
+|---|---|---|---|
+| display.c | 901, 34% | 897, 34% | 903, 34% |
+| xwindow.c | 685, 39% | 681, 39% | 694, 40% |
+| widget.c | 1094, 45% | 1081, 45% | 1094, 45% |
+| animate.c | 78, 17% | 78, 17% | 78, 17% |
+| accelerate.c | 496, 64% | 496, 64% | 496, 64% |
+| opencl.c | 272, 71% | 274, 72% | 276, 73% |
+
+Of the 32 kills the merged view has and the sweep did not make, 16 (13 in XInfoWidget) belonged
+to `xevents/187c160aad`, the draw-mode drag from y=10: moving its presses below the Info window
+(`6f364d5cf`) gave the case a new id, and the old drag, which started on the Info window and so
+updated it, ran no more. It is back as its own case with its old id. The other 16 are 4 cases
+whose kill did not repeat (copy and paste: 12, mostly DestroyXResources' frees), against 11 the
+sweep made that the merged view lacked: timing, a few each way, within a point.
