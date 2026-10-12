@@ -6187,3 +6187,7 @@ indexes failed
 07:40 confirm vision: failed, see build-oracle/confirm-vision.log
 07:40 confirm threshold: failed, see build-oracle/confirm-threshold.log
 07:40 confirm shear: failed, see build-oracle/confirm-shear.log
+07:40 pushed
+07:40 confirm segment: failed, see build-oracle/confirm-segment.log
+07:40 confirm decorate: failed, see build-oracle/confirm-decorate.log
+07:41 confirm identify: failed, see build-oracle/confirm-identify.log
