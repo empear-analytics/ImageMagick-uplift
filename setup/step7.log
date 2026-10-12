@@ -6154,3 +6154,7 @@ indexes failed
 07:33 confirm string:   killed 0, survived 15 (0 capped), no coverage 27, errors 0
 07:36 confirm annotate:   killed 2, survived 19 (0 capped), no coverage 138, errors 0
 07:36 confirm property:   killed 0, survived 33 (0 capped), no coverage 48, errors 0
+07:36 pushed
+07:36 confirm utility:   killed 0, survived 17 (0 capped), no coverage 34, errors 0
+07:36 confirm policy:   killed 0, survived 0 (0 capped), no coverage 45, errors 0
+07:37 confirm locale:   killed 0, survived 14 (0 capped), no coverage 9, errors 0
