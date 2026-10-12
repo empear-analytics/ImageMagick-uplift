@@ -5231,6 +5231,31 @@ _XEV_BROWSER_CASES = [
         ("icons, slider dragged", _XEV_ICONS + " key:Return drag:266,80,266,200 grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
         ("icons, scroll arrow pressed", _XEV_ICONS + " key:Return click:266,292 click:266,292 click:266,292 grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
     )]
+# XListBrowserWidget on long lists (2026-10-12; measured on grabs): Miscellany > Show
+# Preview... (the preview types: entries 17 px apart from y=52, scroll bar x=238, field 130,322,
+# Preview 145,360, Cancel 217,360), and a save as PostScript's page geometry (scroll bar x=209,
+# field 115,322, Select 127,360, Cancel 190,360). Same grab-style list: no "@" before the grab.
+# Left out, measured: a preview run (it starts "magick" as a program, absent in the sandbox:
+# nondeterministic); the page list's keys and slider (all its sizes fit, nothing scrolls).
+_XEV_PREVIEW = "map click:20,20 map click:65,357 map click:40,52 map "
+_XEV_PAGE = "map key:ctrl+s " + _XEV_FIELD + "out.ps key:Return map "
+_XEV_LIST_CASES = [
+    ("xevents grab: preview list, %s" % label, _XEV_PREVIEW + steps, ["rose"])
+    for label, steps in (
+        ("cancelled", "grab:out.ppm click:217,360 use:1 key:q"),
+        ("End", "point:120,150 key:End grab:out.ppm click:217,360 use:1 key:q"),
+        ("Page Down, Up", "point:120,150 key:Next key:Up*2 grab:out.ppm click:217,360 use:1 key:q"),
+        ("slider dragged", "drag:238,80,238,230 grab:out.ppm click:217,360 use:1 key:q"),
+        ("trough pressed", "click:238,250 grab:out.ppm click:217,360 use:1 key:q"),
+        ("scroll arrow pressed", "click:238,292 click:238,292 grab:out.ppm click:217,360 use:1 key:q"),
+        ("Blur selected", "click:60,103 grab:out.ppm click:217,360 use:1 key:q"),
+    )] + [
+    ("xevents grab: page geometry list, %s" % label, _XEV_PAGE + steps, ["rose"])
+    for label, steps in (
+        ("Letter", "grab:out.ppm click:127,360 use:1 key:q"),
+        ("A4 selected", "click:60,171 grab:out.ppm click:127,360 use:1 key:q"),
+        ("cancelled", "grab:out.ppm click:190,360 use:1 key:q"),
+    )]
 # File > Visual Directory... is left out (2026-10-11, measured): after the browser's "*" the
 # montage never shows, and display does not quit on q (timeout).
 # display's menus: a click on the image opens the Commands widget, a click on its button opens a
@@ -5746,7 +5771,7 @@ def _gap_x11_opencl_cases():
     for label, script, files in GAP_XEVENTS_WIDGET_CASES:
         yield _with_run(_with_inputs(_case("xevents", label, [["@xevents", script, "display", img("rose")]],
                                            ["out.ppm"]), files=files or None), env=_XEV_ENV, x11=True)
-    for label, script, names in GAP_XEVENTS_GRAB_CASES + _XEV_BROWSER_CASES:
+    for label, script, names in GAP_XEVENTS_GRAB_CASES + _XEV_BROWSER_CASES + _XEV_LIST_CASES:
         copies = [[img(n), "-strip", "%s.miff" % n] for n in names]
         target = "%s.miff" % names[0] if names else img("rose")
         yield _with_run(_case("xevents", label, copies + [["@xevents", script, "display", target]], ["out.ppm"]),
