@@ -6183,3 +6183,7 @@ indexes failed
 07:40 confirm visual-effects: failed, see build-oracle/confirm-visual-effects.log
 07:40 confirm effect: failed, see build-oracle/confirm-effect.log
 07:40 confirm compare: failed, see build-oracle/confirm-compare.log
+07:40 pushed
+07:40 confirm vision: failed, see build-oracle/confirm-vision.log
+07:40 confirm threshold: failed, see build-oracle/confirm-threshold.log
+07:40 confirm shear: failed, see build-oracle/confirm-shear.log
