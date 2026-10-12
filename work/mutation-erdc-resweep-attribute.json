@@ -2431,7 +2431,7 @@
   "col": 19,
   "function": "GetImageDepth",
   "status": "killed",
-  "cases": 27,
+  "cases": 26,
   "killer": "decode/a2cb4551d5",
   "why": "stdout differs"
  },
@@ -2467,7 +2467,7 @@
   "col": 34,
   "function": "GetImageDepth",
   "status": "killed",
-  "cases": 27,
+  "cases": 26,
   "killer": "decode/a2cb4551d5",
   "why": "stdout differs"
  },
@@ -2599,7 +2599,7 @@
   "col": 28,
   "function": "GetImageDepth",
   "status": "killed",
-  "cases": 27,
+  "cases": 26,
   "killer": "decode/a2cb4551d5",
   "why": "stdout differs"
  },
@@ -2623,8 +2623,8 @@
   "col": 19,
   "function": "GetImageDepth",
   "status": "killed",
-  "cases": 8,
-  "killer": "decode/108d33ad83",
+  "cases": 39,
+  "killer": "decode/d6166e4cb8",
   "why": "stdout differs"
  },
  {
@@ -2683,7 +2683,7 @@
   "col": 15,
   "function": "GetImageDepth",
   "status": "killed",
-  "cases": 83,
+  "cases": 82,
   "killer": "gaps/9af321a0bf",
   "why": "stdout differs"
  },
@@ -2887,8 +2887,8 @@
   "col": 15,
   "function": "GetImageDepth",
   "status": "killed",
-  "cases": 9,
-  "killer": "gaps/0015a27eec",
+  "cases": 6,
+  "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
  {
@@ -4515,7 +4515,7 @@
   "col": 15,
   "function": "IdentifyImageGray",
   "status": "killed",
-  "cases": 152,
+  "cases": 150,
   "killer": "gaps/d2bcf947d2",
   "why": "stdout differs"
  },
@@ -4635,7 +4635,7 @@
   "col": 13,
   "function": "IdentifyImageGray",
   "status": "killed",
-  "cases": 35,
+  "cases": 33,
   "killer": "decode/04adcb7b7e",
   "why": "stdout differs"
  },
@@ -4851,8 +4851,8 @@
   "col": 50,
   "function": "IdentifyImageType",
   "status": "killed",
-  "cases": 21,
-  "killer": "identify/0852d8efbf",
+  "cases": 14,
+  "killer": "gaps/c835b42360",
   "why": "stdout differs"
  },
  {
@@ -5762,10 +5762,10 @@
   "line": 2098,
   "col": 13,
   "function": "SetImageDepth",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 238,
+  "killer": "gaps/c38725b7af",
+  "why": "out.miff differs"
  },
  {
   "id": "cxx_ge_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/attribute.c:2098:13:2098:15",
@@ -5907,7 +5907,7 @@
   "col": 15,
   "function": "SetImageDepth",
   "status": "killed",
-  "cases": 270,
+  "cases": 276,
   "killer": "decode/51eef41a71",
   "why": "stdout differs"
  },
@@ -5943,7 +5943,7 @@
   "col": 16,
   "function": "SetImageDepth",
   "status": "killed",
-  "cases": 270,
+  "cases": 276,
   "killer": "decode/51eef41a71",
   "why": "stdout differs"
  },
@@ -5979,7 +5979,7 @@
   "col": 17,
   "function": "SetImageDepth",
   "status": "killed",
-  "cases": 85,
+  "cases": 84,
   "killer": "gaps/65e85b929b",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
