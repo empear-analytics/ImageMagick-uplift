@@ -14,8 +14,8 @@ mutate: baseline over 193 cases in 0s
   mutants: 300/423 (11s)
   mutants: 325/423 (11s)
   mutants: 350/423 (12s)
-  mutants: 375/423 (13s)
-  mutants: 400/423 (15s)
+  mutants: 375/423 (12s)
+  mutants: 400/423 (14s)
   mutants: 423/423 (141s)
 
 mutate: 423 mutants, 141s
