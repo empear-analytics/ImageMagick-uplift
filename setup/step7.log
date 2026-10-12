@@ -6363,3 +6363,8 @@ indexes failed
 10:19 confirm version:   killed 0, survived 1 (0 capped), no coverage 5, errors 0
 10:19 confirm module:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 10:20 pushed
+10:20 pushed
+== confirm-loop round done Mon Oct 12 10:20:18 UTC 2026
+10:22 resweep paint:   killed 243, survived 37 (0 capped), no coverage 31, errors 0
+10:31 resweep geometry:   killed 239, survived 95 (92 capped), no coverage 4, errors 0
+10:38 resweep channel:   killed 202, survived 32 (10 capped), no coverage 2, errors 0

@@ -1,21 +1,21 @@
 mutate: 338 mutants in MagickCore/geometry\.c$, 14 functions
-mutate: baseline over 14924 cases in 0s
+mutate: baseline over 14953 cases in 0s
   mutants: 25/338 (2s)
   mutants: 50/338 (38s)
-  mutants: 75/338 (63s)
-  mutants: 100/338 (64s)
-  mutants: 125/338 (75s)
-  mutants: 150/338 (120s)
-  mutants: 175/338 (145s)
-  mutants: 200/338 (193s)
-  mutants: 225/338 (236s)
-  mutants: 250/338 (272s)
-  mutants: 275/338 (344s)
-  mutants: 300/338 (466s)
-  mutants: 325/338 (507s)
-  mutants: 338/338 (553s)
+  mutants: 75/338 (61s)
+  mutants: 100/338 (63s)
+  mutants: 125/338 (72s)
+  mutants: 150/338 (115s)
+  mutants: 175/338 (138s)
+  mutants: 200/338 (189s)
+  mutants: 225/338 (225s)
+  mutants: 250/338 (259s)
+  mutants: 275/338 (318s)
+  mutants: 300/338 (455s)
+  mutants: 325/338 (487s)
+  mutants: 338/338 (534s)
 
-mutate: 338 mutants, 553s
+mutate: 338 mutants, 534s
   killed 239, survived 95 (92 capped), no coverage 4, errors 0
   mutation score on reached code: 71.6%   overall: 70.7%
 
