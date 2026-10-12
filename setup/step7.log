@@ -6142,3 +6142,11 @@ indexes failed
 03:39 resweep client:   killed 3, survived 2 (2 capped), no coverage 0, errors 0
 03:39 resweep image-view:   killed 0, survived 0 (0 capped), no coverage 0, errors 0
 03:39 pushed
+03:39 pushed
+== resweep pass done Mon Oct 12 03:39:57 UTC 2026, at b5895e08a
+== confirm-loop Mon Oct 12 07:28:58 UTC 2026: cases since b5895e08a, at b5ee45d45 X11 cases: X11-font text turned by quarters, font lists, two
+07:32 21 new cases since b5895e08a
+07:32 selfcheck: 21 cases, 6 runs each, 0 nondeterministic
+07:33 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+07:33 confirm image:   killed 0, survived 5 (0 capped), no coverage 88, errors 0
+07:33 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0
