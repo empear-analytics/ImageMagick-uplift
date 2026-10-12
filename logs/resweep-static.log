@@ -1,5 +1,5 @@
 mutate: 21 mutants in MagickCore/static\.c$, 4 functions
-mutate: baseline over 15792 cases in 0s
+mutate: baseline over 15866 cases in 0s
   mutants: 21/21 (23s)
 
 mutate: 21 mutants, 23s
