@@ -145,7 +145,7 @@
   "col": 15,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -157,7 +157,7 @@
   "col": 13,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -169,7 +169,7 @@
   "col": 15,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -205,7 +205,7 @@
   "col": 14,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -229,7 +229,7 @@
   "col": 22,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -241,7 +241,7 @@
   "col": 50,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -289,7 +289,7 @@
   "col": 21,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -313,7 +313,7 @@
   "col": 21,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -337,7 +337,7 @@
   "col": 18,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -349,7 +349,7 @@
   "col": 51,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs; stderr differs"
  },
@@ -373,7 +373,7 @@
   "col": 30,
   "function": "property.c:GetIPTCProperty",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs"
  },
@@ -3493,7 +3493,7 @@
   "col": 36,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3517,7 +3517,7 @@
   "col": 17,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3529,7 +3529,7 @@
   "col": 55,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3541,7 +3541,7 @@
   "col": 19,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3553,7 +3553,7 @@
   "col": 26,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3565,7 +3565,7 @@
   "col": 13,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3577,7 +3577,7 @@
   "col": 32,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3589,7 +3589,7 @@
   "col": 11,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3601,7 +3601,7 @@
   "col": 11,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3625,7 +3625,7 @@
   "col": 26,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3637,7 +3637,7 @@
   "col": 21,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3649,7 +3649,7 @@
   "col": 22,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3661,7 +3661,7 @@
   "col": 38,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -3673,7 +3673,7 @@
   "col": 41,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3685,7 +3685,7 @@
   "col": 41,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3697,7 +3697,7 @@
   "col": 57,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3709,7 +3709,7 @@
   "col": 62,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3721,7 +3721,7 @@
   "col": 57,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3733,7 +3733,7 @@
   "col": 62,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3757,7 +3757,7 @@
   "col": 39,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3769,7 +3769,7 @@
   "col": 43,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3793,7 +3793,7 @@
   "col": 59,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3805,7 +3805,7 @@
   "col": 64,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3817,7 +3817,7 @@
   "col": 59,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -3829,7 +3829,7 @@
   "col": 64,
   "function": "property.c:GetXMPProperty",
   "status": "killed",
-  "cases": 244,
+  "cases": 262,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -4741,7 +4741,7 @@
   "col": 24,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 245,
+  "cases": 263,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -4753,7 +4753,7 @@
   "col": 24,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 245,
+  "cases": 263,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs"
  },
@@ -4801,7 +4801,7 @@
   "col": 40,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 150,
+  "cases": 149,
   "killer": "gaps/b188d296ca",
   "why": "exit status [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] -> [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]; stderr differs; g[filename:t].miff only in candidate; gz.miff missing in candidate; out.miff missing in candidate"
  },
@@ -4849,7 +4849,7 @@
   "col": 32,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 72,
+  "cases": 74,
   "killer": "gaps/f42fa67617",
   "why": "stdout differs; stderr differs"
  },
@@ -4861,7 +4861,7 @@
   "col": 46,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 72,
+  "cases": 74,
   "killer": "gaps/f42fa67617",
   "why": "stdout differs; stderr differs"
  },
@@ -4873,7 +4873,7 @@
   "col": 11,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 72,
+  "cases": 74,
   "killer": "gaps/f42fa67617",
   "why": "stdout differs; stderr differs"
  },
@@ -4885,7 +4885,7 @@
   "col": 46,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 80,
+  "cases": 81,
   "killer": "gaps/cf299826d0",
   "why": "out.miff differs"
  },
@@ -4897,7 +4897,7 @@
   "col": 11,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 80,
+  "cases": 81,
   "killer": "gaps/cf299826d0",
   "why": "out.miff differs"
  },
@@ -4969,7 +4969,7 @@
   "col": 45,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 245,
+  "cases": 263,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -4981,7 +4981,7 @@
   "col": 11,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 245,
+  "cases": 263,
   "killer": "gaps/fa20d7fa74",
   "why": "stdout differs; stderr differs"
  },
@@ -5005,7 +5005,7 @@
   "col": 29,
   "function": "GetImageProperty",
   "status": "killed",
-  "cases": 72,
+  "cases": 74,
   "killer": "gaps/f42fa67617",
   "why": "stdout differs; stderr differs"
  },
@@ -5065,7 +5065,7 @@
   "col": 25,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5077,7 +5077,7 @@
   "col": 19,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stderr differs"
  },
@@ -5089,7 +5089,7 @@
   "col": 7,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5101,7 +5101,7 @@
   "col": 18,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5113,7 +5113,7 @@
   "col": 7,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5125,7 +5125,7 @@
   "col": 18,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5137,7 +5137,7 @@
   "col": 7,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 25,
+  "cases": 26,
   "killer": "token/35ea92b6c2",
   "why": "stdout differs"
  },
@@ -5149,7 +5149,7 @@
   "col": 18,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 25,
+  "cases": 26,
   "killer": "token/35ea92b6c2",
   "why": "stdout differs"
  },
@@ -5173,7 +5173,7 @@
   "col": 18,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stderr differs"
  },
@@ -5185,7 +5185,7 @@
   "col": 18,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5197,7 +5197,7 @@
   "col": 50,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5209,7 +5209,7 @@
   "col": 7,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5221,7 +5221,7 @@
   "col": 18,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5257,7 +5257,7 @@
   "col": 35,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5269,7 +5269,7 @@
   "col": 22,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5293,7 +5293,7 @@
   "col": 35,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -5305,7 +5305,7 @@
   "col": 22,
   "function": "property.c:GetMagickPropertyLetter",
   "status": "killed",
-  "cases": 179,
+  "cases": 178,
   "killer": "format/f66d334448",
   "why": "stdout differs"
  },
@@ -7525,7 +7525,7 @@
   "col": 23,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7537,7 +7537,7 @@
   "col": 25,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7573,7 +7573,7 @@
   "col": 23,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7585,7 +7585,7 @@
   "col": 42,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7597,7 +7597,7 @@
   "col": 44,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7609,7 +7609,7 @@
   "col": 43,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7657,7 +7657,7 @@
   "col": 25,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7669,7 +7669,7 @@
   "col": 15,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7693,7 +7693,7 @@
   "col": 11,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7705,7 +7705,7 @@
   "col": 23,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7717,7 +7717,7 @@
   "col": 42,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7729,7 +7729,7 @@
   "col": 44,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7741,7 +7741,7 @@
   "col": 43,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7789,7 +7789,7 @@
   "col": 25,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7801,7 +7801,7 @@
   "col": 15,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -7813,7 +7813,7 @@
   "col": 26,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 214,
+  "cases": 215,
   "killer": "format/5c30467873",
   "why": "stdout differs"
  },
@@ -8101,7 +8101,7 @@
   "col": 11,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 110,
+  "cases": 107,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs"
  },
@@ -8113,7 +8113,7 @@
   "col": 61,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 110,
+  "cases": 107,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs"
  },
@@ -8125,7 +8125,7 @@
   "col": 56,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 110,
+  "cases": 107,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs"
  },
@@ -8137,7 +8137,7 @@
   "col": 28,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 110,
+  "cases": 107,
   "killer": "gaps/1f10d17bc8",
   "why": "stdout differs"
  },
@@ -8173,7 +8173,7 @@
   "col": 18,
   "function": "InterpretImageProperties",
   "status": "killed",
-  "cases": 210,
+  "cases": 211,
   "killer": "gaps/3939862d60",
   "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
  },
@@ -8457,7 +8457,7 @@
   "col": 40,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 139,
+  "cases": 137,
   "killer": "gaps/b188d296ca",
   "why": "exit status [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] -> [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]; stderr differs; g[filename:t].miff only in candidate; gz.miff missing in candidate; out.miff missing in candidate"
  },
@@ -8481,7 +8481,7 @@
   "col": 46,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "format/e37fad76a6",
   "why": "stdout differs; stderr differs"
  },
@@ -8493,7 +8493,7 @@
   "col": 48,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "format/e37fad76a6",
   "why": "stdout differs"
  },
@@ -8529,7 +8529,7 @@
   "col": 45,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "format/e37fad76a6",
   "why": "stdout differs"
  },
@@ -8565,7 +8565,7 @@
   "col": 46,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "format/e37fad76a6",
   "why": "stdout differs"
  },
@@ -9057,7 +9057,7 @@
   "col": 45,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "format/e37fad76a6",
   "why": "stdout differs; stderr differs"
  },
@@ -9069,7 +9069,7 @@
   "col": 42,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "format/e37fad76a6",
   "why": "stdout differs; stderr differs"
  },
@@ -9081,7 +9081,7 @@
   "col": 43,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "format/e37fad76a6",
   "why": "stdout differs; stderr differs"
  },
@@ -9093,7 +9093,7 @@
   "col": 42,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "format/e37fad76a6",
   "why": "stdout differs; stderr differs"
  },
@@ -9105,7 +9105,7 @@
   "col": 42,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 18,
+  "cases": 19,
   "killer": "format/e37fad76a6",
   "why": "stdout differs; stderr differs"
  },
@@ -9225,7 +9225,7 @@
   "col": 49,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 93,
+  "cases": 92,
   "killer": "resize/64b5d74bf0",
   "why": "out.miff differs"
  },
@@ -9237,7 +9237,7 @@
   "col": 42,
   "function": "SetImageProperty",
   "status": "killed",
-  "cases": 93,
+  "cases": 92,
   "killer": "resize/64b5d74bf0",
   "why": "out.miff differs"
  },

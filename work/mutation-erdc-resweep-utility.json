@@ -81,7 +81,7 @@
   "status": "killed",
   "cases": 3,
   "killer": "gaps/59d708bd70",
-  "why": "magick-3tsU62DGUWa5OYWRl97hfXkAwv0tIq3m only in candidate"
+  "why": "magick-Tn22gFD82KNP_xF6yCE2zipi-I8ez59a only in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/utility.c:206:47:206:49",
@@ -105,7 +105,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/d38d0134d8",
-  "why": "stdout differs; magick-vDyccLdzuEJFsJJ1qawZHqllGCZQyhLQ only in candidate"
+  "why": "stdout differs; magick-lflVcsa-S32HyDfwPqz0jmfd9dflKNjt only in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/utility.c:221:24:221:26",
@@ -201,7 +201,7 @@
   "status": "killed",
   "cases": 2,
   "killer": "gaps/f8c5963ae7",
-  "why": "exit status [0] -> ['timeout']; stdout differs; magick-IYORol60t1PsVYV0AZeV9oHltg6v3Wql only in candidate"
+  "why": "exit status [0] -> ['timeout']; stdout differs; magick-W61pGpYDR9x3C489MchwapBFhDJruWbv only in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/utility.c:249:24:249:26",
@@ -345,7 +345,7 @@
   "status": "killed",
   "cases": 125,
   "killer": "gaps/dff60ae4a8",
-  "why": "P\udcfa\udcaf\udcd5\u0010V.B.gz only in candidate; P\udcfa\udcaf\udcd5\u0010V.G.gz only in candidate; P\udcfa\udcaf\udcd5\u0010V.R.gz only in candidate; out.B.gz missing in candidate; out.G.gz missing in candidate; out.R.gz missing in candidate"
+  "why": "P\udcdaP\udcdf\u0012V.B.gz only in candidate; P\udcdaP\udcdf\u0012V.G.gz only in candidate; P\udcdaP\udcdf\u0012V.R.gz only in candidate; out.B.gz missing in candidate; out.G.gz missing in candidate; out.R.gz missing in candidate"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/utility.c:320:7:320:47",
@@ -369,7 +369,7 @@
   "status": "killed",
   "cases": 23,
   "killer": "encode/c54cd0e55a",
-  "why": "V\udce4\udca1\u001eUV.png only in candidate; V\udce4\udca1\u001eUV_map.shtml only in candidate; enc.html differs; enc.png missing in candidate; enc_map.shtml missing in candidate"
+  "why": "V\udc84\udcec\u007fbU.png only in candidate; V\udc84\udcec\u007fbU_map.shtml only in candidate; enc.html differs; enc.png missing in candidate; enc_map.shtml missing in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/utility.c:372:24:372:26",
@@ -1295,7 +1295,7 @@
   "col": 20,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1379,7 +1379,7 @@
   "col": 18,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1391,7 +1391,7 @@
   "col": 38,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1403,7 +1403,7 @@
   "col": 5,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1427,7 +1427,7 @@
   "col": 42,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1439,7 +1439,7 @@
   "col": 40,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1451,7 +1451,7 @@
   "col": 40,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1463,7 +1463,7 @@
   "col": 38,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1475,7 +1475,7 @@
   "col": 27,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1499,7 +1499,7 @@
   "col": 34,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1511,7 +1511,7 @@
   "col": 17,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1559,7 +1559,7 @@
   "col": 29,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1571,7 +1571,7 @@
   "col": 11,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1583,7 +1583,7 @@
   "col": 34,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1691,7 +1691,7 @@
   "col": 18,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1739,7 +1739,7 @@
   "col": 40,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1751,7 +1751,7 @@
   "col": 40,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1763,7 +1763,7 @@
   "col": 11,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1823,7 +1823,7 @@
   "col": 30,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 237,
+  "cases": 234,
   "killer": "gaps/c790546882",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -1847,7 +1847,7 @@
   "col": 16,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1895,7 +1895,7 @@
   "col": 17,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -1907,7 +1907,7 @@
   "col": 17,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, -6]; stdout differs"
  },
@@ -1919,7 +1919,7 @@
   "col": 44,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, -6]; stdout differs"
  },
@@ -1943,7 +1943,7 @@
   "col": 22,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2039,7 +2039,7 @@
   "col": 17,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2051,7 +2051,7 @@
   "col": 23,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2075,7 +2075,7 @@
   "col": 28,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 11]; stdout differs; stderr differs"
  },
@@ -2087,7 +2087,7 @@
   "col": 37,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2099,7 +2099,7 @@
   "col": 37,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2111,7 +2111,7 @@
   "col": 23,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2123,7 +2123,7 @@
   "col": 25,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2147,7 +2147,7 @@
   "col": 33,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 11]; stdout differs; stderr differs"
  },
@@ -2159,7 +2159,7 @@
   "col": 23,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2171,7 +2171,7 @@
   "col": 23,
   "function": "ExpandFilenames",
   "status": "killed",
-  "cases": 54,
+  "cases": 56,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, -6]; stdout differs; stderr differs"
  },
@@ -2377,7 +2377,7 @@
   "col": 12,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 193,
+  "cases": 191,
   "killer": "infra/79e1ddca5b",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -2401,7 +2401,7 @@
   "col": 30,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 193,
+  "cases": 191,
   "killer": "infra/79e1ddca5b",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -2413,7 +2413,7 @@
   "col": 42,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 58,
+  "cases": 60,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2425,7 +2425,7 @@
   "col": 17,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 193,
+  "cases": 191,
   "killer": "infra/79e1ddca5b",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -2473,7 +2473,7 @@
   "col": 40,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 193,
+  "cases": 191,
   "killer": "infra/79e1ddca5b",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -2485,7 +2485,7 @@
   "col": 50,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 193,
+  "cases": 191,
   "killer": "infra/79e1ddca5b",
   "why": "out.miff differs"
  },
@@ -2497,7 +2497,7 @@
   "col": 50,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 193,
+  "cases": 191,
   "killer": "infra/79e1ddca5b",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -2509,7 +2509,7 @@
   "col": 60,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 193,
+  "cases": 191,
   "killer": "infra/79e1ddca5b",
   "why": "out.miff differs"
  },
@@ -2677,7 +2677,7 @@
   "col": 38,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 18,
+  "cases": 17,
   "killer": "gaps/2f9555c8d7",
   "why": "exit status [0] -> [1]; stdout differs; stderr differs; out.miff missing in candidate"
  },
@@ -2725,7 +2725,7 @@
   "col": 45,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 58,
+  "cases": 60,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -2761,7 +2761,7 @@
   "col": 25,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 18,
+  "cases": 17,
   "killer": "gaps/2f9555c8d7",
   "why": "exit status [0] -> [1]; stdout differs; stderr differs; out.miff missing in candidate"
  },
@@ -3097,7 +3097,7 @@
   "col": 28,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 193,
+  "cases": 191,
   "killer": "infra/79e1ddca5b",
   "why": "out.miff differs"
  },
@@ -3109,7 +3109,7 @@
   "col": 52,
   "function": "GetPathComponent",
   "status": "killed",
-  "cases": 193,
+  "cases": 191,
   "killer": "infra/79e1ddca5b",
   "why": "out.miff differs"
  },
@@ -3577,7 +3577,7 @@
   "col": 35,
   "function": "utility.c:IsPathDirectory",
   "status": "killed",
-  "cases": 14,
+  "cases": 17,
   "killer": "token/35ea92b6c2",
   "why": "exit status [0, 0] -> [0, 1]; stdout differs; stderr differs"
  },
@@ -4013,7 +4013,7 @@
   "status": "killed",
   "cases": 174,
   "killer": "gaps/b0b255df3b",
-  "why": "exit status [0] -> ['timeout']; magick-GeuPP-4HPuyBjPIlhCOSSpf_RbeGuAtU only in candidate; out.miff missing in candidate"
+  "why": "exit status [0] -> ['timeout']; magick-0oI5ajB7EBO7QMDcwwSAx95DIAXkL4OF only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/utility.c:2069:32:2069:33",
