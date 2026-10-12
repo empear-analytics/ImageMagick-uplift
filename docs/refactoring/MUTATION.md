@@ -4356,6 +4356,9 @@ More rounds after the sweep, each against the open display, xwindow and widget m
 | `magd1012` | the magnifiers on 16, 15, 30-bit and StaticGray screens (`03917a44e`) | 1 |
 | `fb1012` | the file browser on fixed directories (`7ad6de118`) | 167 |
 | `br1012` | the color and font browsers: patterns, keys, slider, trough (`cfdf831a3`) | 76 |
+| `lb1012` | the list browser on Show Preview's types and the page geometry (`8082d8bf2`) | 47 |
+| `dg1012` | the dialog by the pointer: buttons, a press released off one, the field, editing keys (`ad6d08b47`) | 8 |
+| `tg1012` | the Resize and Shade dialogs' own toggles (`26e4e9dad`) | 10 |
 
 **The file browser had only ever listed the case directory**, whose path names the run, so its
 grabs could not be compared (1818 false kills on 10-06) and XFileBrowserWidget stood at 6%. Up,
@@ -4368,6 +4371,14 @@ fails, and the notice that follows busy-waits on a timer. XFileBrowserWidget 6% 
 Seen on the way, not yet analysed: after a directory is listed the field shows empty, but a
 reply typed next lands in front of the old text's tail ("*.pngsr/share/pixmaps").
 
-**Adjusted, merged with x11cl13 and these rounds: widget.c 45% -> 55%, xwindow.c 39% -> 42%,
-display.c 34%, animate.c 17%.** The magnifiers at other depths and the second font round
-show xwindow.c at its plateau; widget.c still moves with each browser opened on a fixed list.
+**Adjusted, merged with x11cl13 and these rounds: widget.c 45% -> 57%, xwindow.c 39% -> 42%,
+display.c 34%, animate.c 17%.** The magnifiers at other depths and the second font round show
+xwindow.c at its plateau, and the two dialog rounds (8 and 10 kills) widget.c at its own: what
+the dialog still holds is its sizing and the buttons' bevels, drawn and then drawn over before
+any grab, and the window manager's messages (WM_PROTOCOLS, take focus, delete window), which
+no window manager sends under Xvfb. Widget functions now: file browser 48%, color 59%, font 60%,
+list 56%, dialog 65%, menu 57%, text view 55%, confirm 52%, preferences 53%, command 60%.
+
+Measuring positions: grabs read back as pictures can come scaled; take a widget's size from the
+file (the PNG header) before reading positions off it (the dialog's buttons were first placed
+from a 323x101 view of a 335x129 grab, and missed).
