@@ -1195,7 +1195,7 @@
   "status": "killed",
   "cases": 133,
   "killer": "gaps/b0b255df3b",
-  "why": "exit status [0] -> ['timeout']; magick-MtH-mO6Rfe2XfGNwWvGyJDCnlsa6aTzp only in candidate; magick-Qx2O7ApVxqzRIQc4xbMMbyJjAhFEYa2X only in candidate; magick-bkeqqKKBbdJ6X-9jg2Ns8VMFx9eBhSZ8 only in ca"
+  "why": "exit status [0] -> ['timeout']; magick-79JRKxxZqtw4XcTa6hwbW0xlXEtksPxu only in candidate; magick-avNIGnhOpoKbTbC7SM0Sgzwzv5mbhkHj only in candidate; magick-qvzmlK0gfi0WwrRscYA-go-s6RtFsDWv only in ca"
  },
  {
   "id": "cxx_ge_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/random.c:916:12:916:14",
