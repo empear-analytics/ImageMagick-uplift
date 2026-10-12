@@ -6376,3 +6376,12 @@ indexes failed
 11:02 resweep visual-effects:   killed 703, survived 174 (0 capped), no coverage 0, errors 0
 11:10 resweep effect:   killed 1008, survived 185 (1 capped), no coverage 0, errors 0
 11:15 resweep compare:   killed 572, survived 99 (0 capped), no coverage 23, errors 0
+11:15 pushed
+11:20 resweep vision:   killed 633, survived 116 (0 capped), no coverage 0, errors 0
+11:22 resweep threshold:   killed 469, survived 106 (0 capped), no coverage 0, errors 0
+== confirm-loop Mon Oct 12 11:22:50 UTC 2026: cases since cfdf831a3, at f364c9243 MUTATION.md: W01 browser rounds (widget.c 45% -> 55%)
+11:26 10 new cases since cfdf831a3
+11:26 selfcheck: 10 cases, 6 runs each, 0 nondeterministic
+11:27 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+11:27 confirm image:   killed 0, survived 5 (0 capped), no coverage 88, errors 0
+11:27 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0
