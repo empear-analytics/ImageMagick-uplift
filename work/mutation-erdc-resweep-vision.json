@@ -931,8 +931,8 @@
   "col": 22,
   "function": "vision.c:CircularityThreshold",
   "status": "killed",
-  "cases": 1,
-  "killer": "gaps/8c2ca91c0d",
+  "cases": 2,
+  "killer": "gaps/54fc2ec38b",
   "why": "stdout differs"
  },
  {
@@ -7509,7 +7509,7 @@
   "status": "killed",
   "cases": 2,
   "killer": "gaps/cb2bae0cfe",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/vision.c:1493:33:1493:35",
@@ -8001,7 +8001,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/b1aaee9895",
-  "why": "stdout differs"
+  "why": "exit status [0] -> [-6]; stdout differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/vision.c:1591:60:1591:62",
@@ -8733,7 +8733,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/6e95444f14",
-  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff differs"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/vision.c:1790:55:1790:57",

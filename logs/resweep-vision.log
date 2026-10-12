@@ -17,21 +17,21 @@ mutate: baseline over 62 cases in 0s
   mutants: 375/749 (14s)
   mutants: 400/749 (19s)
   mutants: 425/749 (30s)
-  mutants: 450/749 (45s)
-  mutants: 475/749 (56s)
-  mutants: 500/749 (75s)
-  mutants: 525/749 (96s)
-  mutants: 550/749 (111s)
-  mutants: 575/749 (122s)
-  mutants: 600/749 (127s)
-  mutants: 625/749 (130s)
-  mutants: 650/749 (132s)
-  mutants: 675/749 (134s)
-  mutants: 700/749 (135s)
-  mutants: 725/749 (135s)
-  mutants: 749/749 (261s)
+  mutants: 450/749 (43s)
+  mutants: 475/749 (54s)
+  mutants: 500/749 (69s)
+  mutants: 525/749 (87s)
+  mutants: 550/749 (100s)
+  mutants: 575/749 (109s)
+  mutants: 600/749 (113s)
+  mutants: 625/749 (119s)
+  mutants: 650/749 (131s)
+  mutants: 675/749 (133s)
+  mutants: 700/749 (134s)
+  mutants: 725/749 (134s)
+  mutants: 749/749 (255s)
 
-mutate: 749 mutants, 261s
+mutate: 749 mutants, 255s
   killed 633, survived 116 (0 capped), no coverage 0, errors 0
   mutation score on reached code: 84.5%   overall: 84.5%
 
