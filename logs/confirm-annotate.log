@@ -1,26 +1,27 @@
 mutate: 159 mutants in MagickCore/annotate\.c$, 15 functions
-mutate: baseline over 0 cases in 0s
+mutate: baseline over 20 cases in 0s
   mutants: 25/159 (0s)
   mutants: 50/159 (0s)
   mutants: 75/159 (0s)
   mutants: 100/159 (0s)
   mutants: 125/159 (0s)
-  mutants: 150/159 (0s)
-  mutants: 159/159 (0s)
+  mutants: 150/159 (1s)
+  mutants: 159/159 (130s)
 
-mutate: 159 mutants, 0s
-  killed 0, survived 0 (0 capped), no coverage 159, errors 0
+mutate: 159 mutants, 130s
+  killed 2, survived 19 (0 capped), no coverage 138, errors 0
+  mutation score on reached code: 9.5%   overall: 1.3%
 
   function                           total killed survived no-cov
   RenderPostscript                      81      0        0     81
   RenderFreetype                        40      0        0     40
-  RenderType                             7      0        0      7
+  RenderType                             7      0        7      0
   IsValidPostscriptFontname              7      0        0      7
-  AnnotateImage                          5      0        0      5
+  AnnotateImage                          5      0        5      0
   FormatMagickCaption                    4      0        0      4
-  RenderX11                              4      0        0      4
-  GetMultilineTypeMetrics                3      0        0      3
-  GetTypeMetrics                         2      0        0      2
+  RenderX11                              4      2        2      0
+  GetMultilineTypeMetrics                3      0        3      0
+  GetTypeMetrics                         2      0        2      0
   ReplaceSpaceWithNewline                1      0        0      1
   FreetypeReadStream                     1      0        0      1
   IsEmptyOutline                         1      0        0      1
@@ -28,4 +29,26 @@ mutate: 159 mutants, 0s
   FreetypeRealloc                        1      0        0      1
   FreetypeInit                           1      0        0      1
 
-  full results: build-oracle/work/mutation-confirm-b5895e08a-annotate.json
+  survivors (equivalent, or a gap in the catalogue):
+    x  annotate.c:271:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  annotate.c:315:3 cxx_remove_void_call       SetGeometryInfo(&geometry_info);
+    x  annotate.c:357:44 cxx_mul_to_div             offset.y=annotate_info->affine.ty+i*annotate_info->affine.sy*height;
+    x  annotate.c:412:32 cxx_mul_to_div             geometry.height/2.0+i*annotate_info->affine.sy*height-
+    x  annotate.c:550:64 cxx_add_to_sub             annotate_info->affine.ty-=(draw_info->affine.sy*(height+
+    x  annotate.c:800:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  annotate.c:867:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) count; i++)
+    x  annotate.c:867:15 cxx_lt_to_le               for (i=0; i < (ssize_t) count; i++)
+    x  annotate.c:933:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  annotate.c:945:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  annotate.c:1056:28 cxx_ne_to_eq               if ((type_info != (const TypeInfo *) NULL) &&
+    x  annotate.c:1060:23 cxx_lt_to_ge               for (i=0; i < (ssize_t) number_families; i++)
+    x  annotate.c:1060:23 cxx_lt_to_le               for (i=0; i < (ssize_t) number_families; i++)
+    x  annotate.c:1069:12 cxx_ne_to_eq               if (font != (char *) NULL)
+       annotate.c:1071:34 cxx_ne_to_eq               if (IsPathAccessible(font) != MagickFalse)
+    x  annotate.c:1097:21 cxx_eq_to_ne               if (type_info == (const TypeInfo *) NULL)
+    x  annotate.c:1109:26 cxx_ne_to_eq               if (type_info->metrics != (char *) NULL)
+    x  annotate.c:2501:26 cxx_eq_to_ne               if (annotate_semaphore == (SemaphoreInfo *) NULL)
+       annotate.c:2502:5 cxx_remove_void_call       ActivateSemaphoreInfo(&annotate_semaphore);
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-confirm-b5ee45d45-annotate.json
