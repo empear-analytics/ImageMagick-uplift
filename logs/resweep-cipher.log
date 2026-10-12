@@ -6,10 +6,10 @@ mutate: baseline over 6 cases in 0s
   mutants: 100/177 (1s)
   mutants: 125/177 (2s)
   mutants: 150/177 (2s)
-  mutants: 175/177 (3s)
-  mutants: 177/177 (3s)
+  mutants: 175/177 (2s)
+  mutants: 177/177 (2s)
 
-mutate: 177 mutants, 3s
+mutate: 177 mutants, 2s
   killed 123, survived 50 (0 capped), no coverage 4, errors 0
   mutation score on reached code: 71.1%   overall: 69.5%
 
