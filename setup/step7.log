@@ -6300,3 +6300,9 @@ indexes failed
 10:03 resweep transform:   killed 469, survived 123 (18 capped), no coverage 47, errors 0
 10:06 resweep attribute:   killed 437, survived 87 (27 capped), no coverage 8, errors 0
 == confirm-loop Mon Oct 12 10:07:02 UTC 2026: cases since 7ad6de118, at cfdf831a3 X11 cases: color and font browsers' patterns, keys, slider, 
+10:07 pushed
+10:10 18 new cases since 7ad6de118
+10:10 selfcheck: 18 cases, 6 runs each, 0 nondeterministic
+10:11 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+10:11 confirm image:   killed 0, survived 0 (0 capped), no coverage 93, errors 0
+10:11 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0
