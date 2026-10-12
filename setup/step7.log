@@ -6199,3 +6199,7 @@ indexes failed
 07:41 confirm magic: failed, see build-oracle/confirm-magic.log
 07:41 confirm fourier: failed, see build-oracle/confirm-fourier.log
 07:41 confirm coder: failed, see build-oracle/confirm-coder.log
+07:41 pushed
+07:41 confirm colormap: failed, see build-oracle/confirm-colormap.log
+07:41 confirm random: failed, see build-oracle/confirm-random.log
+07:41 confirm artifact: failed, see build-oracle/confirm-artifact.log
