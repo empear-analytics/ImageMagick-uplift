@@ -489,7 +489,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "unary/9b758299b0",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/transform.c:284:46:284:48",
@@ -513,7 +513,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "unary/9b758299b0",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/transform.c:286:14:286:15",
@@ -835,8 +835,8 @@
   "col": 17,
   "function": "ChopImage",
   "status": "killed",
-  "cases": 2,
-  "killer": "unary/3d98114bf1",
+  "cases": 4,
+  "killer": "unary/0ba85298f7",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff differs"
  },
  {
@@ -3815,7 +3815,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "unary/6d79905ff4",
-  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff differs"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/transform.c:1268:51:1268:53",
@@ -4079,7 +4079,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "infra/8878af8807",
-  "why": "exit status [0] -> ['timeout']; magick-1Hj6VZ42XbEFYZpsV5tCw4rVIhrpMoJ1 only in candidate; magick-UcoZalm3NWUdkuKFGRfyal5xsNg428Wa only in candidate; out.miff missing in candidate"
+  "why": "exit status [0] -> ['timeout']; magick-kqaUn-9ywvMHhmqBrB6qpFTdCsyispse only in candidate; magick-rCJQLUn62jkQiAMsHVAcYZyVV_YpvQwu only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/transform.c:1403:16:1403:18",
@@ -6491,7 +6491,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "convert/06ff96985f",
-  "why": "exit status [0] -> ['timeout']; stderr differs; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
   "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/transform.c:2229:19:2229:20",

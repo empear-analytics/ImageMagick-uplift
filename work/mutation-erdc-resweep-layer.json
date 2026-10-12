@@ -1365,7 +1365,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/50dc0f76c6",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/layer.c:652:7:652:52",
