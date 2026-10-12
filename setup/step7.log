@@ -6287,3 +6287,7 @@ indexes failed
 08:34 pushed
 == confirm-loop round done Mon Oct 12 08:34:54 UTC 2026
 09:12 resweep draw:   killed 1914, survived 538 (326 capped), no coverage 92, errors 0
+09:14 pushed
+09:19 resweep string:   killed 279, survived 94 (57 capped), no coverage 4, errors 0
+09:22 resweep locale:   killed 131, survived 56 (51 capped), no coverage 4, errors 0
+09:31 resweep image:   killed 464, survived 218 (175 capped), no coverage 40, errors 0

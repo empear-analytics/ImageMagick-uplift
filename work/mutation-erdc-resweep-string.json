@@ -969,7 +969,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "draw/20f4646909",
-  "why": "exit status [0] -> [1]; stderr differs; magick-EXt6eEcYPyuvDYXxRyNNYW3PeDoClOHl only in candidate; magick-XqfXFWPUN3gZd1QX-QAE5A-jaHunEfbp only in candidate; out.miff missing in candidate"
+  "why": "exit status [0] -> [1]; stderr differs; magick-AsSYP3nQTH2lrAM4UQ24_gmY-ttNvnLh only in candidate; magick-NLQTtzctGhDnpkoIeCLj2EfU3ZXMZO07 only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_ge_to_gt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/string.c:687:15:687:17",
@@ -3383,7 +3383,7 @@
   "col": 17,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },
@@ -3419,7 +3419,7 @@
   "col": 37,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": true
  },
@@ -3623,7 +3623,7 @@
   "col": 25,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },
@@ -3635,7 +3635,7 @@
   "col": 25,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },
@@ -3647,7 +3647,7 @@
   "col": 31,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },
@@ -3755,7 +3755,7 @@
   "col": 19,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": true
  },
@@ -3791,7 +3791,7 @@
   "col": 25,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },
@@ -3803,7 +3803,7 @@
   "col": 25,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },
@@ -3815,7 +3815,7 @@
   "col": 31,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },
@@ -4019,7 +4019,7 @@
   "col": 24,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": true
  },
@@ -4043,7 +4043,7 @@
   "col": 27,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },
@@ -4055,7 +4055,7 @@
   "col": 27,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },
@@ -4067,7 +4067,7 @@
   "col": 33,
   "function": "StringToStrings",
   "status": "survived",
-  "cases": 67,
+  "cases": 71,
   "capped": false,
   "line_executed": false
  },

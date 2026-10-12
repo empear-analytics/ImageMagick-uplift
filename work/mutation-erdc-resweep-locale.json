@@ -1247,7 +1247,7 @@
   "col": 22,
   "function": "locale.c:LoadLocaleCache",
   "status": "killed",
-  "cases": 114,
+  "cases": 115,
   "killer": "gaps/19d209ea93",
   "why": "stdout differs"
  },
@@ -1319,7 +1319,7 @@
   "col": 41,
   "function": "locale.c:LoadLocaleCache",
   "status": "killed",
-  "cases": 104,
+  "cases": 105,
   "killer": "gaps/c22eb68f8c",
   "why": "stdout differs"
  },
