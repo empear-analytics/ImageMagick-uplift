@@ -1967,7 +1967,7 @@
   "col": 13,
   "function": "LocaleCompare",
   "status": "killed",
-  "cases": 225,
+  "cases": 226,
   "killer": "gaps/855daf7162",
   "why": "stdout differs"
  },
@@ -2183,7 +2183,7 @@
   "col": 21,
   "function": "LocaleUpper",
   "status": "killed",
-  "cases": 77,
+  "cases": 75,
   "killer": "gaps/9ede1b5681",
   "why": "stdout differs"
  },
