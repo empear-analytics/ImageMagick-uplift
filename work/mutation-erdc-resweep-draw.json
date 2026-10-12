@@ -366,10 +366,10 @@
   "line": 428,
   "col": 27,
   "function": "draw.c:DestroyPolygonInfo",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-AOUvE_DdCjhFshgpukKSfGTVXcK9Q5Zf only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:430:19:430:20",
@@ -417,7 +417,7 @@
   "status": "killed",
   "cases": 208,
   "killer": "matrix/f2913328b4",
-  "why": "exit status [0] -> ['timeout']; magick-hsWCH9vDJDoEXwBO9Eg3_QtryiYHr0RK only in candidate; magick-iAigBbtna7expD3xXdtRnmn80paqgaGG only in candidate; magick-lnz3Zb8OHogZjVJqsmJFB0Va1kQEsFxV only in ca"
+  "why": "exit status [0] -> ['timeout']; magick-o_J2gBUksi6i90ODpPJkAKEv_aKf7Ubd only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:486:15:486:16",
@@ -617,7 +617,7 @@
   "status": "killed",
   "cases": 208,
   "killer": "matrix/f2913328b4",
-  "why": "exit status [0] -> ['timeout']; magick-esxgm2jiUe3kVejy8ZEPVWckJQrwR9Ve only in candidate; magick-jmG0sfiXhykI85bs-z-2PAhu3-nEdVQP only in candidate; magick-jtC-wk5bZa5JKoLk_tYH8FMS30le8QmH only in ca"
+  "why": "exit status [0] -> ['timeout']; magick-DijmN7HFTnLl9eQ7KufDl97jSEgyV6rN only in candidate; magick-Hcl2jpjImfGbIip151RjV965agsVym4c only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:587:31:587:33",
@@ -746,10 +746,10 @@
   "line": 615,
   "col": 70,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-AHAMZI8PAVBnMiuphVucwFTyW1fpUT5y only in candidate; magick-MmonKI1W4_fgNZOMmzg874u5Th13pAQb only in candidate; out.miff differs"
  },
  {
   "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:615:70:615:71",
@@ -782,10 +782,10 @@
   "line": 616,
   "col": 27,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-AFfO9Mg7rEWI4M_L-_KrrnhTC3yzTFpv only in candidate; magick-tvm499Y7xBm4p8bQJjfcIx6q3gK6SbU0 only in candidate; out.miff differs"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:617:15:617:47",
@@ -914,10 +914,10 @@
   "line": 652,
   "col": 44,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-T48OS_dRKML3JLhz6BTNUrekVNZR689r only in candidate; magick-ezWBdVxlAIStYYh3dUHEZyrI7Y7vXIFh only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:653:30:653:31",
@@ -926,10 +926,10 @@
   "line": 653,
   "col": 30,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-U4fj_LUm2jlhf0i5uKjNQ938cagoyMTP only in candidate; magick-qYwLQ7GAGOffW9QOPR0AxWVi7drtLB2H only in candidate; out.miff differs"
  },
  {
   "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:653:30:653:31",
@@ -998,10 +998,10 @@
   "line": 661,
   "col": 18,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-k72IVDxafLC4c5D-n5dhTJeFqnjtGWKg only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:667:37:667:39",
@@ -1010,10 +1010,10 @@
   "line": 667,
   "col": 37,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": false
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-uNdORCx6Uc31DJ3l6AifweL_afT0W3Kw only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:679:66:679:67",
@@ -1022,10 +1022,10 @@
   "line": 679,
   "col": 66,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-SC0XPrkIBATymnitMSaTeHKDRFst2tQe only in candidate; magick-wIEnnlG69KoEgJA64PzfJ5rs0AIc7cxq only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:679:66:679:67",
@@ -1058,10 +1058,10 @@
   "line": 680,
   "col": 23,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-Mr_1E4F5teM3SKyEtKzPoUd6hhGGY1Lv only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:681:11:681:43",
@@ -1094,10 +1094,10 @@
   "line": 686,
   "col": 40,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-Xinh4YHo7h2IuaIDUVLNgDvRKXQMN6su only in candidate; magick-hwNfsIRpW2iTJ8gQ4SfodGQ6cwicVzX5 only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:691:20:691:22",
@@ -1178,10 +1178,10 @@
   "line": 721,
   "col": 17,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-j40Yx1hpX-VTD43XZBJ08cJx7uAGvnXw only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:723:17:723:18",
@@ -1190,10 +1190,10 @@
   "line": 723,
   "col": 17,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-TGheR1AbhjEhNGPvwPIVDLM9yzME9DpU only in candidate; magick-z3C0KanI9ZLaCEAuT-AEnEwpph6SiHmx only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:723:17:723:18",
@@ -1286,10 +1286,10 @@
   "line": 750,
   "col": 68,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 208,
+  "killer": "matrix/f2913328b4",
+  "why": "exit status [0] -> ['timeout']; magick-IL5CCmdP_5jMq0nVxIgPr3snOxHpPtGN only in candidate; magick-WyWZn-Ms-20RI8kY4ZChIyEcNJbHyyFg only in candidate; out.miff differs"
  },
  {
   "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:750:68:750:69",
@@ -1442,10 +1442,10 @@
   "line": 789,
   "col": 39,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 199,
+  "killer": "matrix/e1095950b7",
+  "why": "exit status [0] -> ['timeout']; magick-vl7qnTYgUUb2bptYULcwtM4UpK2hT85v only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:790:5:790:33",
@@ -1454,10 +1454,10 @@
   "line": 790,
   "col": 5,
   "function": "draw.c:ConvertPathToPolygon",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": false
+  "status": "killed",
+  "cases": 199,
+  "killer": "matrix/e1095950b7",
+  "why": "exit status [0] -> ['timeout']; magick-Gqj_6wJQlIlUp6AZyHfr6eGxCcClYgC0 only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:830:29:830:31",
@@ -1552,10 +1552,10 @@
   "line": 878,
   "col": 62,
   "function": "draw.c:ConvertPrimitiveToPath",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 199,
+  "killer": "matrix/e1095950b7",
+  "why": "exit status [0] -> ['timeout']; magick-wATEhsWIiyV6Cu1g4BrekgHueGK7708i only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:880:17:880:19",
@@ -1675,7 +1675,7 @@
   "status": "killed",
   "cases": 199,
   "killer": "matrix/e1095950b7",
-  "why": "exit status [0] -> ['timeout']; magick-XAbm4gcv7Ha8C0O1yUzncIs2ybEefj7x only in candidate; magick-jZn6c4gxUqQTnQoyEB6jxjfvGY4n8AU7 only in candidate; magick-m0bt9a5LOIIrecjcIvxeUrRcqxJkvvcb only in ca"
+  "why": "exit status [0] -> ['timeout']; magick-faVqECsQ99b4rBR4dfz6Usj4VpR2f6ok only in candidate; magick-ntplqEfTfaaP2HSJVsrkSdjWVTZ53tJY only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_ge_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:910:46:910:48",
@@ -1711,7 +1711,7 @@
   "status": "killed",
   "cases": 199,
   "killer": "matrix/e1095950b7",
-  "why": "exit status [0] -> ['timeout']; magick-Qr3ta7Wi28ipsl-WLoFtcpWFVsVkM2X0 only in candidate; out.miff missing in candidate"
+  "why": "exit status [0] -> ['timeout']; magick-wSGVsVC2uVOoywePX6Sje6Ecp6Ujtffc only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_ge_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:911:46:911:48",
@@ -1804,10 +1804,10 @@
   "line": 942,
   "col": 24,
   "function": "draw.c:ConvertPrimitiveToPath",
-  "status": "survived",
-  "cases": 300,
-  "capped": true,
-  "line_executed": true
+  "status": "killed",
+  "cases": 199,
+  "killer": "matrix/e1095950b7",
+  "why": "exit status [0] -> ['timeout']"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:943:5:943:27",
@@ -1819,7 +1819,7 @@
   "status": "killed",
   "cases": 199,
   "killer": "matrix/e1095950b7",
-  "why": "exit status [0] -> ['timeout']; magick-19H8ZvccFp8S2YDnvrTkXClnkZqmC4yY only in candidate; out.miff missing in candidate"
+  "why": "exit status [0] -> ['timeout']; magick-ORuQnKhHk9C0y31i7bhfQCUZBCgXXEcJ only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_add_to_sub:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:944:67:944:68",
@@ -24689,7 +24689,7 @@
   "status": "killed",
   "cases": 6,
   "killer": "gaps/59d708bd70",
-  "why": "exit status [0] -> [1]; stderr differs; m.miff differs"
+  "why": "exit status [0] -> [-6]; m.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/draw.c:7023:63:7023:65",
