@@ -5612,7 +5612,20 @@ GAP_XEVENTS_WIDGET_CASES = [
     for label, steps in (("item selected", "click:150,160 grab:out.ppm click:175,360"),
                          ("scrolled, item selected", "click:262,290*5 click:150,100 grab:out.ppm click:175,360"),
                          ("reset, cancelled", "click:37,88 grab:out.ppm click:240,360"),
-                         ("cancelled", "grab:out.ppm click:240,360"))] + [
+                         ("cancelled", "grab:out.ppm click:240,360"),
+                         # 2026-10-12 (measured on a grab: the field 170,322 holds "gray", the
+                         # scroll bar at x=262, its thumb near y=110): typed pattern and name,
+                         # the list's keys, the slider, the trough, a double click
+                         ("pattern *blue*", "point:170,322 key:BackSpace*4 type:*blue* key:Return grab:out.ppm click:240,360"),
+                         ("pattern *0, then Up", "point:170,322 key:BackSpace*4 type:*0 key:Return point:150,150 key:Up*2 grab:out.ppm click:240,360"),
+                         ("name typed", "point:170,322 key:BackSpace*4 type:navy grab:out.ppm click:240,360"),
+                         ("name typed, selected", "point:170,322 key:BackSpace*4 type:navy key:Return use:1 key:at grab:out.ppm use:2"),
+                         ("End", "point:150,150 key:End grab:out.ppm click:240,360"),
+                         ("End, Home", "point:150,150 key:End key:Home grab:out.ppm click:240,360"),
+                         ("Page Down twice", "point:150,150 key:Next*2 grab:out.ppm click:240,360"),
+                         ("slider dragged", "drag:262,110,262,250 grab:out.ppm click:240,360"),
+                         ("trough pressed", "click:262,250 grab:out.ppm click:240,360"),
+                         ("item double-clicked", "click:150,160 click:150,160 use:1 key:at grab:out.ppm use:2"))] + [
     # Image Edit > Annotate..., Font Name > Browser... (XFontBrowserWidget, 2026-10-08): the X
     # server's font list (this machine's fonts), pick, scroll, reset, Select or Cancel; Dismiss
     # leaves Annotate mode
@@ -5622,7 +5635,17 @@ GAP_XEVENTS_WIDGET_CASES = [
     for label, steps in (("item selected", "click:200,150 grab:out.ppm click:434,376"),
                          ("scrolled, item selected", "click:517,48*6 click:200,120 grab:out.ppm click:434,376"),
                          ("reset, cancelled", "click:37,88 grab:out.ppm click:497,376"),
-                         ("cancelled", "grab:out.ppm click:497,376"))] + [
+                         ("cancelled", "grab:out.ppm click:497,376"),
+                         # 2026-10-12 (measured: the field 300,322 holds "fixed", the scroll bar
+                         # at x=517, its thumb at the bottom)
+                         ("pattern -adobe-courier*", "point:300,322 key:BackSpace*5 type:-adobe-courier* key:Return grab:out.ppm click:497,376"),
+                         ("pattern, then Back", "point:300,322 key:BackSpace*5 type:*bold* key:Return click:37,55 grab:out.ppm click:497,376"),
+                         ("name typed", "point:300,322 key:BackSpace*5 type:6x13 grab:out.ppm click:497,376"),
+                         ("Home", "point:250,150 key:Home grab:out.ppm click:497,376"),
+                         ("Home, Page Down", "point:250,150 key:Home key:Next grab:out.ppm click:497,376"),
+                         ("slider dragged", "drag:517,280,517,120 grab:out.ppm click:497,376"),
+                         ("trough pressed", "click:517,150 grab:out.ppm click:497,376"),
+                         ("item double-clicked", "click:200,150 click:200,150 use:1 key:at grab:out.ppm use:2"))] + [
     # Effects > Add Noise... (XListBrowserWidget over the noise types, 2026-10-08): the list
     # grabbed with Impulse picked, the image after Impulse noise, and cancelled
     ("xevents display add noise browser, %s" % label, "map click:20,20 map click:65,261 map click:40,73 map " + steps, {})
