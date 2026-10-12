@@ -1,16 +1,16 @@
 mutate: 323 mutants in MagickCore/delegate\.c$, 21 functions
-mutate: baseline over 15792 cases in 0s
-  mutants: 25/323 (6s)
-  mutants: 50/323 (16s)
-  mutants: 75/323 (16s)
-  mutants: 100/323 (19s)
-  mutants: 125/323 (27s)
-  mutants: 150/323 (29s)
-  mutants: 175/323 (42s)
-  mutants: 200/323 (46s)
-  mutants: 225/323 (55s)
-  mutants: 250/323 (58s)
-  mutants: 275/323 (118s)
+mutate: baseline over 15821 cases in 0s
+  mutants: 25/323 (5s)
+  mutants: 50/323 (15s)
+  mutants: 75/323 (15s)
+  mutants: 100/323 (20s)
+  mutants: 125/323 (26s)
+  mutants: 150/323 (27s)
+  mutants: 175/323 (38s)
+  mutants: 200/323 (43s)
+  mutants: 225/323 (52s)
+  mutants: 250/323 (55s)
+  mutants: 275/323 (113s)
   mutants: 300/323 (160s)
   mutants: 323/323 (236s)
 
