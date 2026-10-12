@@ -969,7 +969,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "draw/20f4646909",
-  "why": "exit status [0] -> [1]; stderr differs; magick-AsSYP3nQTH2lrAM4UQ24_gmY-ttNvnLh only in candidate; magick-NLQTtzctGhDnpkoIeCLj2EfU3ZXMZO07 only in candidate; out.miff missing in candidate"
+  "why": "exit status [0] -> [1]; stderr differs; magick-hEr-jMMtAbSXQdSB90ZL6WlIulpjKdaq only in candidate; magick-l_TORuh0jSlGvCclsumscR1OWHzDc86x only in candidate; out.miff missing in candidate"
  },
  {
   "id": "cxx_ge_to_gt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/string.c:687:15:687:17",

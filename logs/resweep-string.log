@@ -1,23 +1,23 @@
 mutate: 377 mutants in MagickCore/string\.c$, 38 functions
-mutate: baseline over 15830 cases in 5s
+mutate: baseline over 15876 cases in 3s
   mutants: 25/377 (2s)
-  mutants: 50/377 (49s)
-  mutants: 75/377 (54s)
-  mutants: 100/377 (60s)
-  mutants: 125/377 (69s)
-  mutants: 150/377 (101s)
-  mutants: 175/377 (103s)
-  mutants: 200/377 (105s)
-  mutants: 225/377 (119s)
-  mutants: 250/377 (120s)
-  mutants: 275/377 (121s)
-  mutants: 300/377 (129s)
-  mutants: 325/377 (131s)
-  mutants: 350/377 (143s)
-  mutants: 375/377 (238s)
-  mutants: 377/377 (262s)
+  mutants: 50/377 (47s)
+  mutants: 75/377 (53s)
+  mutants: 100/377 (59s)
+  mutants: 125/377 (66s)
+  mutants: 150/377 (95s)
+  mutants: 175/377 (97s)
+  mutants: 200/377 (99s)
+  mutants: 225/377 (112s)
+  mutants: 250/377 (113s)
+  mutants: 275/377 (114s)
+  mutants: 300/377 (122s)
+  mutants: 325/377 (124s)
+  mutants: 350/377 (132s)
+  mutants: 375/377 (232s)
+  mutants: 377/377 (257s)
 
-mutate: 377 mutants, 262s
+mutate: 377 mutants, 257s
   killed 279, survived 94 (57 capped), no coverage 4, errors 0
   mutation score on reached code: 74.8%   overall: 74.0%
 

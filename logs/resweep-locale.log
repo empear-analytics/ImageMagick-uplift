@@ -1,12 +1,12 @@
 mutate: 191 mutants in MagickCore/locale\.c$, 26 functions
-mutate: baseline over 15830 cases in 0s
+mutate: baseline over 15876 cases in 0s
   mutants: 25/191 (1s)
-  mutants: 50/191 (33s)
-  mutants: 75/191 (34s)
-  mutants: 100/191 (50s)
-  mutants: 125/191 (60s)
-  mutants: 150/191 (87s)
-  mutants: 175/191 (98s)
+  mutants: 50/191 (32s)
+  mutants: 75/191 (32s)
+  mutants: 100/191 (48s)
+  mutants: 125/191 (59s)
+  mutants: 150/191 (85s)
+  mutants: 175/191 (96s)
   mutants: 191/191 (203s)
 
 mutate: 191 mutants, 203s
