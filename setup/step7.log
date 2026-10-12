@@ -6195,3 +6195,7 @@ indexes failed
 07:41 confirm compress: failed, see build-oracle/confirm-compress.log
 07:41 confirm cipher: failed, see build-oracle/confirm-cipher.log
 07:41 confirm list: failed, see build-oracle/confirm-list.log
+07:41 pushed
+07:41 confirm magic: failed, see build-oracle/confirm-magic.log
+07:41 confirm fourier: failed, see build-oracle/confirm-fourier.log
+07:41 confirm coder: failed, see build-oracle/confirm-coder.log
