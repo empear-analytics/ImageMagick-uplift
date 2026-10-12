@@ -5334,6 +5334,22 @@ def _xev_menu_grab(menu, item, items):
 GAP_XEVENTS_GRAB_CASES = [
     ("xevents grab: dialog, empty", "map key:F3 map grab:out.ppm key:ctrl+u type:0x1 key:Return key:q", []),
     ("xevents grab: dialog, typed", "map key:F3 map key:ctrl+u type:0x1 grab:out.ppm key:Return key:q", []),
+] + [
+    # XDialogWidget by the pointer (2026-10-12; measured on a grab of F3's 335x129 dialog: the
+    # field at 166,43, Emboss 227,87, Cancel 296,87): its buttons clicked, the pointer over them,
+    # a press released off a button, a click in the field, editing keys, a reply longer than it
+    ("xevents grab: dialog, %s" % label, "map key:F3 map " + steps, [])
+    for label, steps in (
+        ("action button clicked", "key:ctrl+u type:0x1 click:227,87 use:1 key:at grab:out.ppm key:q"),
+        ("Cancel clicked", "click:296,87 use:1 key:at grab:out.ppm key:q"),
+        ("pointer over the buttons", "point:227,87 point:296,87 point:166,43 grab:out.ppm click:296,87 use:1 key:q"),
+        ("press released off a button", "drag:227,87,40,10 grab:out.ppm click:296,87 use:1 key:q"),
+        ("a click in the field", "click:20,43 type:1 grab:out.ppm click:296,87 use:1 key:q"),
+        ("Left and BackSpace", "key:Left*3 key:BackSpace type:9 grab:out.ppm click:296,87 use:1 key:q"),
+        ("a long reply", "type:0123456789012345678901234567890123456789012345 grab:out.ppm click:296,87 use:1 key:q"),
+        ("a long reply, then Home", "type:0123456789012345678901234567890123456789012345 key:Home grab:out.ppm "
+                                    "click:296,87 use:1 key:q"))
+] + [
     ("xevents grab: Commands widget", "map click:20,20 map grab:out.ppm use:1 key:q", []),
     # ? shows XDisplayImageInfo's text: its first page names the image by a relative path, the
     # same in every case directory (2026-10-11); t (Trim) times out, left out.
