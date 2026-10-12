@@ -1755,7 +1755,7 @@
   "col": 18,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1767,7 +1767,7 @@
   "col": 19,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1779,7 +1779,7 @@
   "col": 19,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -1791,7 +1791,7 @@
   "col": 45,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
@@ -1803,7 +1803,7 @@
   "col": 20,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1815,7 +1815,7 @@
   "col": 15,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1827,7 +1827,7 @@
   "col": 21,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1839,7 +1839,7 @@
   "col": 21,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
@@ -1851,7 +1851,7 @@
   "col": 50,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -1863,7 +1863,7 @@
   "col": 29,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1875,7 +1875,7 @@
   "col": 23,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1887,7 +1887,7 @@
   "col": 23,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1899,7 +1899,7 @@
   "col": 61,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -1911,7 +1911,7 @@
   "col": 25,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1923,7 +1923,7 @@
   "col": 45,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1935,7 +1935,7 @@
   "col": 38,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -1947,7 +1947,7 @@
   "col": 64,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 127,
+  "cases": 137,
   "killer": "gaps/2939e4e752",
   "why": "out.miff differs"
  },
@@ -2139,7 +2139,7 @@
   "col": 18,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2151,7 +2151,7 @@
   "col": 19,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2163,7 +2163,7 @@
   "col": 19,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -2175,7 +2175,7 @@
   "col": 45,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
@@ -2187,7 +2187,7 @@
   "col": 20,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2199,7 +2199,7 @@
   "col": 15,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2211,7 +2211,7 @@
   "col": 21,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2223,7 +2223,7 @@
   "col": 21,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
@@ -2235,7 +2235,7 @@
   "col": 50,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -2247,7 +2247,7 @@
   "col": 26,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2259,7 +2259,7 @@
   "col": 23,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2271,7 +2271,7 @@
   "col": 23,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2283,7 +2283,7 @@
   "col": 61,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -2295,7 +2295,7 @@
   "col": 25,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2307,7 +2307,7 @@
   "col": 45,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2319,7 +2319,7 @@
   "col": 38,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2331,7 +2331,7 @@
   "col": 64,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 124,
+  "cases": 132,
   "killer": "gaps/60c6eb6d51",
   "why": "out.miff differs"
  },
@@ -2355,7 +2355,7 @@
   "col": 50,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 143,
+  "cases": 147,
   "killer": "filter/3960cac43e",
   "why": "out.miff differs"
  },
@@ -2367,7 +2367,7 @@
   "col": 50,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 260,
+  "cases": 257,
   "killer": "gaps/a50a6d8e44",
   "why": "out.miff differs"
  },
@@ -2403,7 +2403,7 @@
   "col": 45,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 260,
+  "cases": 257,
   "killer": "gaps/a50a6d8e44",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
@@ -2439,7 +2439,7 @@
   "col": 15,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 260,
+  "cases": 257,
   "killer": "gaps/a50a6d8e44",
   "why": "out.miff differs"
  },
@@ -2463,7 +2463,7 @@
   "col": 21,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 260,
+  "cases": 257,
   "killer": "gaps/a50a6d8e44",
   "why": "out.miff differs"
  },
@@ -2475,7 +2475,7 @@
   "col": 50,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 260,
+  "cases": 257,
   "killer": "gaps/a50a6d8e44",
   "why": "out.miff differs"
  },
@@ -2487,7 +2487,7 @@
   "col": 38,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 260,
+  "cases": 257,
   "killer": "gaps/a50a6d8e44",
   "why": "out.miff differs"
  },
@@ -2499,7 +2499,7 @@
   "col": 18,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 260,
+  "cases": 257,
   "killer": "gaps/a50a6d8e44",
   "why": "out.miff differs"
  },
@@ -2523,7 +2523,7 @@
   "col": 50,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "out.miff differs"
  },
@@ -2535,7 +2535,7 @@
   "col": 18,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "out.miff differs"
  },
@@ -2547,7 +2547,7 @@
   "col": 19,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "out.miff differs"
  },
@@ -2559,7 +2559,7 @@
   "col": 19,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -2571,7 +2571,7 @@
   "col": 45,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
@@ -2583,7 +2583,7 @@
   "col": 20,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "out.miff differs"
  },
@@ -2595,7 +2595,7 @@
   "col": 15,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "out.miff differs"
  },
@@ -2607,7 +2607,7 @@
   "col": 21,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "out.miff differs"
  },
@@ -2619,7 +2619,7 @@
   "col": 21,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
@@ -2631,7 +2631,7 @@
   "col": 50,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -2643,7 +2643,7 @@
   "col": 11,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "out.miff differs"
  },
@@ -2655,7 +2655,7 @@
   "col": 64,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "out.miff differs"
  },
@@ -2667,7 +2667,7 @@
   "col": 50,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 78,
+  "cases": 77,
   "killer": "gaps/9daecc6d8c",
   "why": "out.miff differs"
  },
@@ -2679,7 +2679,7 @@
   "col": 7,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "out.miff differs"
  },
@@ -2691,7 +2691,7 @@
   "col": 18,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "out.miff differs"
  },
@@ -2703,7 +2703,7 @@
   "col": 19,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "out.miff differs"
  },
@@ -2715,7 +2715,7 @@
   "col": 19,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "exit status [0] -> [1]; stderr differs; out.miff missing in candidate"
  },
@@ -2727,7 +2727,7 @@
   "col": 45,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "exit status [0] -> ['timeout']; out.miff missing in candidate"
  },
@@ -2739,7 +2739,7 @@
   "col": 20,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "out.miff differs"
  },
@@ -2751,7 +2751,7 @@
   "col": 15,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "out.miff differs"
  },
@@ -2763,7 +2763,7 @@
   "col": 21,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "out.miff differs"
  },
@@ -2775,7 +2775,7 @@
   "col": 21,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
  },
@@ -2787,7 +2787,7 @@
   "col": 50,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
@@ -2799,7 +2799,7 @@
   "col": 11,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "out.miff differs"
  },
@@ -2811,7 +2811,7 @@
   "col": 64,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 107,
+  "cases": 112,
   "killer": "unary/41a0dfe2ca",
   "why": "out.miff differs"
  },
@@ -2823,7 +2823,7 @@
   "col": 14,
   "function": "SetImageAlphaChannel",
   "status": "killed",
-  "cases": 47,
+  "cases": 46,
   "killer": "unary/d4c0f592d3",
   "why": "out.miff differs"
  }
