@@ -6461,3 +6461,7 @@ indexes failed
 12:13 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
 12:13 confirm image:   killed 0, survived 0 (0 capped), no coverage 93, errors 0
 12:13 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0
+12:13 pushed
+12:13 confirm string:   killed 0, survived 0 (0 capped), no coverage 42, errors 0
+12:13 confirm annotate:   killed 0, survived 0 (0 capped), no coverage 157, errors 0
+12:14 confirm property:   killed 0, survived 0 (0 capped), no coverage 81, errors 0
