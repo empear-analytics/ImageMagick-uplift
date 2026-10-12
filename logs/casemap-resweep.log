@@ -29,3 +29,5 @@
   casemap: 14500/15323 (94s)
   casemap: 15000/15323 (97s)
   casemap: 15323/15323 (108s)
+  casemap opencl: 500/500 (29s)
+casemap: 15823 cases, 4469 functions reached, 0 cases without a profile, 141s
