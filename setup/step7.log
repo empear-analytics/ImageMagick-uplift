@@ -6191,3 +6191,7 @@ indexes failed
 07:40 confirm segment: failed, see build-oracle/confirm-segment.log
 07:40 confirm decorate: failed, see build-oracle/confirm-decorate.log
 07:41 confirm identify: failed, see build-oracle/confirm-identify.log
+07:41 pushed
+07:41 confirm compress: failed, see build-oracle/confirm-compress.log
+07:41 confirm cipher: failed, see build-oracle/confirm-cipher.log
+07:41 confirm list: failed, see build-oracle/confirm-list.log
