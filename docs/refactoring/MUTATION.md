@@ -4344,3 +4344,30 @@ to `xevents/187c160aad`, the draw-mode drag from y=10: moving its presses below 
 updated it, ran no more. It is back as its own case with its old id. The other 16 are 4 cases
 whose kill did not repeat (copy and paste: 12, mostly DestroyXResources' frees), against 11 the
 sweep made that the merged view lacked: timing, a few each way, within a point.
+
+### W01: the widgets' browsers on fixed lists (Windows, 2026-10-12)
+
+More rounds after the sweep, each against the open display, xwindow and widget mutants:
+
+| round | cases | kills |
+|---|---|---|
+| `font1012` | text in an X11 font, the Info-window drag back (`7777ec712`) | 48 |
+| `font1012b` | X11-font text by quarter turns, font lists, two lines, sizes (`b5ee45d45`) | 3 more |
+| `magd1012` | the magnifiers on 16, 15, 30-bit and StaticGray screens (`03917a44e`) | 1 |
+| `fb1012` | the file browser on fixed directories (`7ad6de118`) | 167 |
+| `br1012` | the color and font browsers: patterns, keys, slider, trough (`cfdf831a3`) | 76 |
+
+**The file browser had only ever listed the case directory**, whose path names the run, so its
+grabs could not be compared (1818 false kills on 10-06) and XFileBrowserWidget stood at 6%. Up,
+pressed more often than any case directory is deep, stops at "/"; a directory typed then
+(relative to "/") is the same in every run: /usr/share/pixmaps and an Adwaita icon directory of
+27 PNGs, the system's own, fixed on this machine (the baselines are per machine). A list entry
+clicked twice opens it and ends the browser; Cancel returns the directory, display's read of it
+fails, and the notice that follows busy-waits on a timer. XFileBrowserWidget 6% -> 48%.
+
+Seen on the way, not yet analysed: after a directory is listed the field shows empty, but a
+reply typed next lands in front of the old text's tail ("*.pngsr/share/pixmaps").
+
+**Adjusted, merged with x11cl13 and these rounds: widget.c 45% -> 55%, xwindow.c 39% -> 42%,
+display.c 34%, animate.c 17%.** The magnifiers at other depths and the second font round
+show xwindow.c at its plateau; widget.c still moves with each browser opened on a fixed list.
