@@ -1,18 +1,18 @@
 mutate: 269 mutants in MagickCore/policy\.c$, 19 functions
-mutate: baseline over 15821 cases in 0s
+mutate: baseline over 15876 cases in 0s
   mutants: 25/269 (36s)
-  mutants: 50/269 (46s)
+  mutants: 50/269 (45s)
   mutants: 75/269 (47s)
   mutants: 100/269 (84s)
-  mutants: 125/269 (284s)
-  mutants: 150/269 (301s)
-  mutants: 175/269 (335s)
-  mutants: 200/269 (351s)
-  mutants: 225/269 (367s)
-  mutants: 250/269 (383s)
-  mutants: 269/269 (411s)
+  mutants: 125/269 (438s)
+  mutants: 150/269 (462s)
+  mutants: 175/269 (489s)
+  mutants: 200/269 (512s)
+  mutants: 225/269 (530s)
+  mutants: 250/269 (540s)
+  mutants: 269/269 (567s)
 
-mutate: 269 mutants, 411s
+mutate: 269 mutants, 567s
   killed 138, survived 99 (86 capped), no coverage 32, errors 0
   mutation score on reached code: 58.2%   overall: 51.3%
 

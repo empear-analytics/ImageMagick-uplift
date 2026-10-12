@@ -407,7 +407,7 @@
   "status": "killed",
   "cases": 3,
   "killer": "gaps/2857e5295a",
-  "why": "exit status [0] -> [-6]; stdout differs; stderr differs; magick-zq4sm2NDn_QuQ7BDWKJA_GE-pajv59ui only in candidate"
+  "why": "exit status [0] -> [-6]; stdout differs; stderr differs; magick-_GkW2zI8j6cs1iKFoDgEaEvC5OmBr7RP only in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:465:15:465:17",
@@ -479,7 +479,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/4fe813fc68",
-  "why": "exit status [0] -> [-11]; stdout differs; magick-OlPSd3Spn03ZYaBm2HxHQx8c-NIkHqwd only in candidate"
+  "why": "exit status [0] -> [-11]; stdout differs; magick-bi1LyKeo-Ouff6CrPEnsAv0YZCuFPXDw only in candidate"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:480:3:480:43",
@@ -503,7 +503,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/4fe813fc68",
-  "why": "exit status [0] -> [-11]; stdout differs; magick-rowh-MexSX_9pdOm6H_y0DhqwYul1ctm only in candidate"
+  "why": "exit status [0] -> [-11]; stdout differs; magick-UEdrBmfhDk9O7HWGPl3PdFyBsaIzVaJs only in candidate"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:485:7:485:79",
@@ -961,7 +961,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/4fe813fc68",
-  "why": "exit status [0] -> ['timeout']; stdout differs; magick-lJz2Po1V5X-kA96UlOolzQx1rFmhlHIr only in candidate"
+  "why": "exit status [0] -> ['timeout']; stdout differs; magick-JYdI8AKRZxFeax5_kwMrg_zIMaxxxShL only in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:1038:26:1038:28",
@@ -1105,7 +1105,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/2857e5295a",
-  "why": "exit status [0] -> ['timeout']; stdout differs; magick-36t7m2MLkHhitEX-wYo2x1sTrNMS9qtG only in candidate"
+  "why": "exit status [0] -> ['timeout']; stdout differs; magick-LAQevj-hM0v2DVEtbWkQaD29aQxqdume only in candidate"
  },
  {
   "id": "cxx_le_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:1111:38:1111:40",
@@ -1129,7 +1129,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/2857e5295a",
-  "why": "exit status [0] -> ['timeout']; stdout differs; magick-HsQxWbPLqP6rD_RK4SRALzoPWCoDGE0l only in candidate"
+  "why": "exit status [0] -> ['timeout']; stdout differs; magick-2LYpTl8lNEolixNpoqhxbJ6yGXS3IfgG only in candidate"
  },
  {
   "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:1115:34:1115:36",
@@ -1549,7 +1549,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/4fe813fc68",
-  "why": "exit status [0] -> [-11]; stdout differs; magick-c4Wm2DcxOOFECGgwTc9DV9T6t972S50t only in candidate"
+  "why": "exit status [0] -> [-11]; stdout differs; magick-akULrLlk0cqzSD2ZNl3VSequYv80EKva only in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/configure.c:1302:38:1302:40",
