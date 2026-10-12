@@ -4966,6 +4966,26 @@ GAP_X11_CASES += [("x11 font text: label %s" % opts,
                    [_split(opts) + ["ppm:out.ppm"]], {})
                   for opts in ("-font %s label:Hello" % _X11_FONT,
                                "-font %s -background yellow -fill blue label:Rose" % _X11_FONT)]
+# More of the same (2026-10-12, after font1012's survivors): XAnnotateImage's quarter turns, the
+# other list separators, two lines, and the metrics printed (label's size, and -annotate's
+# bounding box through -format).
+GAP_X11_CASES += [("x11 font text: %s" % opts,
+                   [[img("rose")] + _split(opts) + ["ppm:out.ppm"]], {})
+                  for opts in ("-font %s -annotate 90x90+20+5 Hi" % _X11_FONT,
+                               "-font %s -annotate 180x180+40+30 Hi" % _X11_FONT,
+                               "-font %s -annotate 270x270+20+40 Hi" % _X11_FONT,
+                               "-font %s -annotate 135x135+30+20 Hi" % _X11_FONT,
+                               "-font -nosuch-font-name;%s -annotate +5+20 Hi" % _X11_FONT,
+                               "-font -nosuch-font-name:%s -annotate +5+20 Hi" % _X11_FONT)]
+GAP_X11_CASES += [("x11 font text: two lines, interline spacing 6",
+                   [[img("rose"), "-font", _X11_FONT, "-interline-spacing", "6",
+                     "-annotate", "+5+15", "Hi\\nRose", "ppm:out.ppm"]], {}),
+                  ("x11 font text: label size printed",
+                   [["-font", _X11_FONT, "label:Hello", "-format", "%w %h\\n", "-write", "info:-",
+                     "ppm:out.ppm"]], {}),
+                  ("x11 font text: label size printed, bold 20",
+                   [["-font", _X11_FONT_BOLD, "label:Rose\\nbud", "-format", "%w %h\\n", "-write",
+                     "info:-", "ppm:out.ppm"]], {})]
 
 # OpenCL (accelerate.c, opencl.c; W01): MAGICK_OCL_DEVICE=CPU through pocl, from a fixed device
 # profile (oracle.py, seed_opencl_profile). Each operator over inputs the kernels take (RGB,
