@@ -4944,6 +4944,28 @@ for _rname, _rtext in _X11_RESOURCES.items():
                             ("display", [["display"] + _X11_SHOW + [img("rose")]])):
         GAP_X11_CASES.append(("x11 resources %s: %s" % (_rname, " ".join(_steps[0][:3])), _steps,
                               {".%src" % _client: _rtext, ".magickrc": _rtext}))
+# Text in an X11 font: a font name starting with "-" sends annotate.c's RenderType to RenderX11,
+# and so to xwindow.c's XRenderImage and XAnnotateImage (2026-10-12): the font loaded, changed
+# and missing, a font list, a fill, none, a rotation and a skew. Xvfb serves the Type1 fonts of
+# /usr/share/fonts/X11/Type1 (scalable: a size in the name loads) and "fixed"; XBestFont falls
+# back through its own list for a name it cannot load.
+_X11_FONT = "-adobe-courier-medium-r-normal--14-*-*-*-*-*-iso8859-1"
+_X11_FONT_BOLD = "-adobe-helvetica-bold-r-normal--20-*-*-*-*-*-iso8859-1"
+GAP_X11_CASES += [("x11 font text: %s" % opts,
+                   [[img("rose")] + _split(opts) + ["ppm:out.ppm"]], {})
+                  for opts in ("-font %s -annotate +5+20 Hi" % _X11_FONT,
+                               "-font %s -fill red -annotate +5+20 Rose" % _X11_FONT,
+                               "-font %s -fill none -annotate +5+20 Hi" % _X11_FONT,
+                               "-font %s -annotate 30x30+10+30 Hi" % _X11_FONT,
+                               "-font %s -annotate 0x20+5+20 Hi" % _X11_FONT,
+                               "-font %s -gravity center -annotate +0+0 Hi" % _X11_FONT,
+                               "-font %s -annotate +5+15 A -font %s -annotate +5+35 B" % (_X11_FONT, _X11_FONT_BOLD),
+                               "-font -nosuch-font-name -annotate +5+20 Hi",
+                               "-font -nosuch-font-name,%s -annotate +5+20 Hi" % _X11_FONT)]
+GAP_X11_CASES += [("x11 font text: label %s" % opts,
+                   [_split(opts) + ["ppm:out.ppm"]], {})
+                  for opts in ("-font %s label:Hello" % _X11_FONT,
+                               "-font %s -background yellow -fill blue label:Rose" % _X11_FONT)]
 
 # OpenCL (accelerate.c, opencl.c; W01): MAGICK_OCL_DEVICE=CPU through pocl, from a fixed device
 # profile (oracle.py, seed_opencl_profile). Each operator over inputs the kernels take (RGB,
@@ -5341,6 +5363,11 @@ GAP_XEVENTS_CASES += [
     # draw mode never drew).
     ("xevents display draw by drag", _xev_menu_pick("Image Edit", "Draw...", _XEV_EDIT) +
      " use:1 drag:10,34,60,44 grab:out.ppm key:Escape key:q", ["display", "-geometry", "+300+50", img("rose")]),
+    # The drag before that move, kept for what it does reach: it starts on the Info window, whose
+    # updates (XInfoWidget) it drives (2026-10-12; the x11cl13 sweep lost 13 widget.c kills with it).
+    ("xevents display draw mode, a drag from the Info window",
+     _xev_menu_pick("Image Edit", "Draw...", _XEV_EDIT) +
+     " use:1 drag:10,10,60,40 grab:out.ppm key:Escape key:q", ["display", "-geometry", "+300+50", img("rose")]),
 ] + [
     # Draw mode's own menus (2026-10-11): the Draw widget takes the Commands window's place, so
     # use:2 reaches it; its buttons are where the Commands widget's are, each menu like display's.
