@@ -6203,3 +6203,7 @@ indexes failed
 07:41 confirm colormap: failed, see build-oracle/confirm-colormap.log
 07:41 confirm random: failed, see build-oracle/confirm-random.log
 07:41 confirm artifact: failed, see build-oracle/confirm-artifact.log
+07:42 pushed
+07:42 confirm static: failed, see build-oracle/confirm-static.log
+07:42 confirm version: failed, see build-oracle/confirm-version.log
+07:42 confirm module: failed, see build-oracle/confirm-module.log
