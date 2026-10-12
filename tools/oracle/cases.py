@@ -5512,6 +5512,18 @@ GAP_XEVENTS_CASES += [
     ("xevents display magnifier, rose_alpha",
      "map key:plus map grab:out.ppm use:2 key:q use:1 key:q", ["display", img("rose_alpha")]),
 ]
+# The magnifiers on the other screens (2026-10-12): XMakeMagnifyImage writes the magnified
+# pixels in a branch per depth and byte order, and every xevents case so far ran at depth 24.
+# Each entry: label, script, magick arguments, screen. Left out: 640x480x8 (PseudoColor), where
+# the window never settles under xevents (exit 125, measured).
+GAP_XEVENTS_SCREEN_CASES = [
+    ("xevents %s display %s" % (_screen, label), script, ["display", img("rose")], _screen)
+    for _screen in ("640x480x16", "640x480x15", "640x480x30", "640x480x8 -cc 0")
+    for label, script in (
+        ("magnifier moved right and down",
+         "map key:plus map use:2 key:Right*5 key:Down*5 grab:out.ppm key:q use:1 key:q"),
+        ("magnify by the second button",
+         "map press2:20,20 map use:1 move:30,25 release2:30,25 use:2 grab:out.ppm key:q use:1 key:q"))]
 # import with no -window: it grabs the server and the pointer and waits for a click or a dragged
 # region (xwindow.c XSelectWindow, XImportImage). xevents' idle waits for that, with no window to
 # map, and its clicks reach import through the grab (XTestGrabControl). The Xvfb root of a fresh
@@ -5678,6 +5690,9 @@ def _gap_x11_opencl_cases():
     for label, script, args in GAP_XEVENTS_CASES:
         yield _with_run(_case("xevents", label, [["@xevents", script.replace("grab:", "key:at grab:")] + args],
                               ["out.ppm"]), env=_XEV_ENV, x11=True)
+    for label, script, args, screen in GAP_XEVENTS_SCREEN_CASES:
+        yield _with_run(_case("xevents", label, [["@xevents", script.replace("grab:", "key:at grab:")] + args],
+                              ["out.ppm"]), env=_XEV_ENV, x11=screen)
     for label, script, args in GAP_XEVENTS_IMPORT_CASES:
         yield _with_run(_case("xevents", label, [["@xevents", script] + args], ["out.miff"]),
                         env=_XEV_ENV, x11=True)
