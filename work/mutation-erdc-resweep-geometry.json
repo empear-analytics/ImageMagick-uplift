@@ -175,7 +175,7 @@
   "col": 15,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 169,
+  "cases": 170,
   "killer": "montage/bd93b2aa63",
   "why": "out.miff differs"
  },
@@ -379,7 +379,7 @@
   "col": 26,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 170,
+  "cases": 171,
   "killer": "gaps/3455faa9d4",
   "why": "out.8bim differs; out.miff differs"
  },
@@ -391,7 +391,7 @@
   "col": 18,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 170,
+  "cases": 171,
   "killer": "gaps/3455faa9d4",
   "why": "out.8bim differs; out.miff differs"
  },
@@ -463,7 +463,7 @@
   "col": 48,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 170,
+  "cases": 171,
   "killer": "gaps/3455faa9d4",
   "why": "out.8bim differs; out.miff differs"
  },
@@ -475,7 +475,7 @@
   "col": 39,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 170,
+  "cases": 171,
   "killer": "gaps/3455faa9d4",
   "why": "out.8bim differs; out.miff differs"
  },
@@ -499,7 +499,7 @@
   "col": 26,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 170,
+  "cases": 171,
   "killer": "gaps/3455faa9d4",
   "why": "out.8bim differs; out.miff differs"
  },
@@ -511,7 +511,7 @@
   "col": 18,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 170,
+  "cases": 171,
   "killer": "gaps/3455faa9d4",
   "why": "out.8bim differs; out.miff differs"
  },
@@ -583,7 +583,7 @@
   "col": 48,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 170,
+  "cases": 171,
   "killer": "gaps/3455faa9d4",
   "why": "out.8bim differs; out.miff differs"
  },
@@ -595,7 +595,7 @@
   "col": 39,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 170,
+  "cases": 171,
   "killer": "gaps/3455faa9d4",
   "why": "out.8bim differs; out.miff differs"
  },
@@ -607,7 +607,7 @@
   "col": 30,
   "function": "GetGeometry",
   "status": "killed",
-  "cases": 36,
+  "cases": 37,
   "killer": "gaps/612cc00825",
   "why": "out.miff differs"
  },
@@ -1063,7 +1063,7 @@
   "col": 40,
   "function": "IsSceneGeometry",
   "status": "killed",
-  "cases": 145,
+  "cases": 144,
   "killer": "infra/79e1ddca5b",
   "why": "out.miff differs"
  },
@@ -2651,7 +2651,7 @@
   "col": 26,
   "function": "ParseGravityGeometry",
   "status": "killed",
-  "cases": 125,
+  "cases": 124,
   "killer": "gaps/236fb64244",
   "why": "stdout differs; out.miff differs"
  },
@@ -2891,7 +2891,7 @@
   "col": 30,
   "function": "ParseGravityGeometry",
   "status": "killed",
-  "cases": 114,
+  "cases": 113,
   "killer": "gaps/8db13e7c06",
   "why": "stdout differs; out.miff differs"
  },

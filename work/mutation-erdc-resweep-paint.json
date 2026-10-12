@@ -981,7 +981,7 @@
   "status": "killed",
   "cases": 2,
   "killer": "gaps/f49d8d71a2",
-  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs"
  },
  {
   "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/paint.c:354:46:354:48",
