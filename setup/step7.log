@@ -6271,3 +6271,7 @@ indexes failed
 08:32 confirm compress:   killed 0, survived 0 (0 capped), no coverage 37, errors 0
 08:32 confirm cipher:   killed 0, survived 0 (0 capped), no coverage 54, errors 0
 08:32 confirm list:   killed 0, survived 1 (0 capped), no coverage 33, errors 0
+08:32 pushed
+08:32 confirm magic:   killed 0, survived 0 (0 capped), no coverage 12, errors 0
+08:33 confirm fourier:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
+08:33 confirm coder:   killed 0, survived 0 (0 capped), no coverage 13, errors 0
