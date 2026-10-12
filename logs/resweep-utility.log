@@ -1,21 +1,21 @@
 mutate: 350 mutants in MagickCore/utility\.c$, 20 functions
-mutate: baseline over 15830 cases in 0s
+mutate: baseline over 15876 cases in 0s
   mutants: 25/350 (1s)
   mutants: 50/350 (2s)
-  mutants: 75/350 (3s)
+  mutants: 75/350 (2s)
   mutants: 100/350 (5s)
-  mutants: 125/350 (39s)
-  mutants: 150/350 (70s)
-  mutants: 175/350 (109s)
-  mutants: 200/350 (130s)
-  mutants: 225/350 (149s)
-  mutants: 250/350 (156s)
-  mutants: 275/350 (166s)
-  mutants: 300/350 (169s)
-  mutants: 325/350 (238s)
-  mutants: 350/350 (389s)
+  mutants: 125/350 (42s)
+  mutants: 150/350 (68s)
+  mutants: 175/350 (102s)
+  mutants: 200/350 (125s)
+  mutants: 225/350 (143s)
+  mutants: 250/350 (153s)
+  mutants: 275/350 (157s)
+  mutants: 300/350 (161s)
+  mutants: 325/350 (219s)
+  mutants: 350/350 (315s)
 
-mutate: 350 mutants, 389s
+mutate: 350 mutants, 315s
   killed 232, survived 104 (56 capped), no coverage 14, errors 0
   mutation score on reached code: 69.0%   overall: 66.3%
 
