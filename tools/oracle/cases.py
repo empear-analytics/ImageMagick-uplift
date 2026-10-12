@@ -5350,6 +5350,22 @@ GAP_XEVENTS_GRAB_CASES = [
         ("a long reply, then Home", "type:0123456789012345678901234567890123456789012345 key:Home grab:out.ppm "
                                     "click:296,87 use:1 key:q"))
 ] + [
+    # The dialogs with a toggle of their own (XDialogWidget's special button): View > Resize...
+    # (Constrain ratio; 314x129, the toggle at 22,106, Resize 220,89, Cancel 286,89) and Effects >
+    # Shade... (Color shading; 346x129, Shade 232,89, Cancel 300,89), measured on grabs
+    ("xevents grab: %s dialog, %s" % (name, label), menu + " map " + steps, [])
+    for name, menu, act, cancel in (
+        ("resize", "map click:20,20 map click:65,165 map click:40,78", "220,89", "286,89"),
+        ("shade", "map click:20,20 map click:65,261 map click:40,210", "232,89", "300,89"))
+    for label, steps in (
+        ("shown", "grab:out.ppm click:%s use:1 key:q" % cancel),
+        ("toggled", "click:22,106 grab:out.ppm click:%s use:1 key:q" % cancel),
+        ("toggled twice", "click:22,106 click:22,106 grab:out.ppm click:%s use:1 key:q" % cancel),
+        ("toggled, applied", "key:ctrl+u type:%s click:22,106 click:%s use:1 key:at grab:out.ppm key:q"
+                             % ("100x30" if name == "resize" else "45x20", act)),
+        ("applied", "key:ctrl+u type:%s click:%s use:1 key:at grab:out.ppm key:q"
+                    % ("100x30" if name == "resize" else "45x20", act)))
+] + [
     ("xevents grab: Commands widget", "map click:20,20 map grab:out.ppm use:1 key:q", []),
     # ? shows XDisplayImageInfo's text: its first page names the image by a relative path, the
     # same in every case directory (2026-10-11); t (Trim) times out, left out.
