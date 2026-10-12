@@ -1893,7 +1893,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "compare/7db255370b",
-  "why": "exit status [1] -> [-6]; stderr differs; diff.miff missing in candidate"
+  "why": "exit status [1] -> ['timeout']; stderr differs; diff.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/compare.c:782:38:782:40",
@@ -4809,7 +4809,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "compare/9927c15485",
-  "why": "exit status [1] -> ['timeout']; stderr differs; diff.miff missing in candidate"
+  "why": "exit status [1] -> [-6]; stderr differs; diff.miff missing in candidate"
  },
  {
   "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/compare.c:1664:42:1664:44",
