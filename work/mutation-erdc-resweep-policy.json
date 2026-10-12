@@ -705,7 +705,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "gaps/3babda0f49",
-  "why": "exit status [0] -> [-11]; stdout differs"
+  "why": "exit status [0] -> [-6]; stdout differs; stderr differs"
  },
  {
   "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/policy.c:518:3:518:40",
