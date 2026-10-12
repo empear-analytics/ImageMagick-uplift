@@ -1,6 +1,6 @@
 mutate: 401 mutants in MagickCore/decorate\.c$, 3 functions
 mutate: baseline over 150 cases in 4s
-  mutants: 25/401 (2s)
+  mutants: 25/401 (1s)
   mutants: 50/401 (3s)
   mutants: 75/401 (6s)
   mutants: 100/401 (7s)
@@ -8,17 +8,17 @@ mutate: baseline over 150 cases in 4s
   mutants: 150/401 (9s)
   mutants: 175/401 (11s)
   mutants: 200/401 (13s)
-  mutants: 225/401 (16s)
-  mutants: 250/401 (17s)
-  mutants: 275/401 (18s)
-  mutants: 300/401 (18s)
-  mutants: 325/401 (19s)
+  mutants: 225/401 (14s)
+  mutants: 250/401 (16s)
+  mutants: 275/401 (17s)
+  mutants: 300/401 (17s)
+  mutants: 325/401 (18s)
   mutants: 350/401 (20s)
   mutants: 375/401 (25s)
   mutants: 400/401 (151s)
-  mutants: 401/401 (153s)
+  mutants: 401/401 (152s)
 
-mutate: 401 mutants, 153s
+mutate: 401 mutants, 152s
   killed 385, survived 16 (0 capped), no coverage 0, errors 0
   mutation score on reached code: 96.0%   overall: 96.0%
 

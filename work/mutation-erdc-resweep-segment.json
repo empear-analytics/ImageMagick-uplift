@@ -477,7 +477,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "unary/970e28e7e6",
-  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; stderr differs; out.miff differs"
  },
  {
   "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/segment.c:435:25:435:26",
@@ -777,7 +777,7 @@
   "status": "killed",
   "cases": 1,
   "killer": "unary/970e28e7e6",
-  "why": "exit status [0] -> [-6]; stderr differs; out.miff missing in candidate"
+  "why": "exit status [0] -> [-6]; out.miff missing in candidate"
  },
  {
   "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/segment.c:549:15:549:16",
