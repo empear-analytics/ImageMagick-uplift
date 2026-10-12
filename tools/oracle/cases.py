@@ -5207,6 +5207,30 @@ GAP_XEVENTS_FILE_CASES += [
     for label, picks in (("", ""), (", operator Atop", " use:2 click:65,101 map click:40,59"),
                          (", dissolved 50", " use:2 click:65,133 map key:ctrl+u type:50 key:Return"))
 ]
+# The file browser's own drawing on fixed directories (2026-10-12): Up, pressed more often than
+# the case directory is deep, stops at "/", so a directory typed then (relative to "/") is the
+# same in every run, where the case directory named the run (see GAP_XEVENTS_GRAB_CASES).
+# Typed once only: after a directory is listed the field keeps the old text's tail, and a
+# second reply lands in front of it. A list entry clicked twice opens it, which ends the
+# browser; Cancel would return the directory, and display's notice of the failed read never
+# lets it settle. Positions measured on the default font (Up 40,55; the field 175,322; entries
+# 17 px apart from y=52; the scroll bar at x=266). /usr/share/pixmaps and an Adwaita icon
+# directory of 27 PNGs (more than the list shows) are the system's, fixed on this machine.
+_XEV_ROOT = "map key:ctrl+o map " + "click:40,55 " * 12 + "point:175,322 type:"
+_XEV_ICONS = "usr/share/icons/Adwaita/16x16/mimetypes"
+_XEV_BROWSER_CASES = [
+    ("xevents grab: file browser, %s" % label, _XEV_ROOT + steps, ["rose"])
+    for label, steps in (
+        ("pixmaps listed", "usr/share/pixmaps key:Return grab:out.ppm click:120,86 click:120,86 use:1 key:q"),
+        ("pixmaps, python3.xpm opened", "usr/share/pixmaps key:Return click:120,86 click:120,86 use:1 grab:out.ppm key:q"),
+        ("pixmaps, an entry selected", "usr/share/pixmaps key:Return click:120,52 grab:out.ppm click:120,52 use:1 key:q"),
+        ("icons listed", _XEV_ICONS + " key:Return grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, End", _XEV_ICONS + " key:Return point:120,150 key:End grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, Page Down", _XEV_ICONS + " key:Return point:120,150 key:Next grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, Down twice", _XEV_ICONS + " key:Return point:120,150 key:Down*2 grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, slider dragged", _XEV_ICONS + " key:Return drag:266,80,266,200 grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, scroll arrow pressed", _XEV_ICONS + " key:Return click:266,292 click:266,292 click:266,292 grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+    )]
 # File > Visual Directory... is left out (2026-10-11, measured): after the browser's "*" the
 # montage never shows, and display does not quit on q (timeout).
 # display's menus: a click on the image opens the Commands widget, a click on its button opens a
@@ -5699,7 +5723,7 @@ def _gap_x11_opencl_cases():
     for label, script, files in GAP_XEVENTS_WIDGET_CASES:
         yield _with_run(_with_inputs(_case("xevents", label, [["@xevents", script, "display", img("rose")]],
                                            ["out.ppm"]), files=files or None), env=_XEV_ENV, x11=True)
-    for label, script, names in GAP_XEVENTS_GRAB_CASES:
+    for label, script, names in GAP_XEVENTS_GRAB_CASES + _XEV_BROWSER_CASES:
         copies = [[img(n), "-strip", "%s.miff" % n] for n in names]
         target = "%s.miff" % names[0] if names else img("rose")
         yield _with_run(_case("xevents", label, copies + [["@xevents", script, "display", target]], ["out.ppm"]),
