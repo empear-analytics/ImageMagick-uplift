@@ -1,34 +1,34 @@
 mutate: 605 mutants in MagickCore/annotate\.c$, 23 functions
-mutate: baseline over 15792 cases in 0s
+mutate: baseline over 15821 cases in 0s
   mutants: 25/605 (1s)
   mutants: 50/605 (3s)
   mutants: 75/605 (6s)
-  mutants: 100/605 (8s)
-  mutants: 125/605 (9s)
-  mutants: 150/605 (16s)
-  mutants: 175/605 (22s)
-  mutants: 200/605 (28s)
-  mutants: 225/605 (44s)
-  mutants: 250/605 (60s)
-  mutants: 275/605 (61s)
-  mutants: 300/605 (62s)
-  mutants: 325/605 (116s)
+  mutants: 100/605 (7s)
+  mutants: 125/605 (8s)
+  mutants: 150/605 (14s)
+  mutants: 175/605 (18s)
+  mutants: 200/605 (21s)
+  mutants: 225/605 (32s)
+  mutants: 250/605 (58s)
+  mutants: 275/605 (59s)
+  mutants: 300/605 (61s)
+  mutants: 325/605 (109s)
   mutants: 350/605 (121s)
-  mutants: 375/605 (189s)
-  mutants: 400/605 (201s)
-  mutants: 425/605 (219s)
-  mutants: 450/605 (286s)
-  mutants: 475/605 (320s)
-  mutants: 500/605 (328s)
-  mutants: 525/605 (328s)
-  mutants: 550/605 (328s)
-  mutants: 575/605 (329s)
-  mutants: 600/605 (446s)
-  mutants: 605/605 (450s)
+  mutants: 375/605 (187s)
+  mutants: 400/605 (199s)
+  mutants: 425/605 (224s)
+  mutants: 450/605 (280s)
+  mutants: 475/605 (322s)
+  mutants: 500/605 (326s)
+  mutants: 525/605 (326s)
+  mutants: 550/605 (327s)
+  mutants: 575/605 (327s)
+  mutants: 600/605 (445s)
+  mutants: 605/605 (457s)
 
-mutate: 605 mutants, 450s
-  killed 442, survived 71 (4 capped), no coverage 92, errors 0
-  mutation score on reached code: 86.2%   overall: 73.1%
+mutate: 605 mutants, 457s
+  killed 444, survived 73 (4 capped), no coverage 88, errors 0
+  mutation score on reached code: 85.9%   overall: 73.4%
 
   function                           total killed survived no-cov
   RenderFreetype                       192    152       40      0
@@ -46,7 +46,7 @@ mutate: 605 mutants, 450s
   FreetypeRealloc                        5      4        1      0
   TraceLineTo                            4      4        0      0
   TraceMoveTo                            4      4        0      0
-  RenderX11                              4      0        0      4
+  RenderX11                              4      2        2      0
   AnnotateComponentTerminus              3      0        3      0
   IsEmptyOutline                         3      2        1      0
   FreetypeInit                           3      2        1      0
@@ -127,6 +127,8 @@ mutate: 605 mutants, 450s
     x  annotate.c:2136:19 cxx_ne_to_eq               if (glyph.image != (FT_Glyph) NULL)
     x  annotate.c:2138:7 cxx_remove_void_call       FT_Done_Glyph(glyph.image);
     x  annotate.c:2156:3 cxx_remove_void_call       FreetypeDone(memory,library,stream);
+    x  annotate.c:2501:26 cxx_eq_to_ne               if (annotate_semaphore == (SemaphoreInfo *) NULL)
+       annotate.c:2502:5 cxx_remove_void_call       ActivateSemaphoreInfo(&annotate_semaphore);
   (x: the oracle executes this line; c: capped, not every reaching case ran)
 
   full results: build-oracle/work/mutation-resweep-annotate.json

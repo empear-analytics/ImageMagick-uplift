@@ -1,7 +1,7 @@
 mutate: 72 mutants in MagickCore/memory\.c$, 18 functions
-mutate: baseline over 15792 cases in 9s
-  mutants: 25/72 (49s)
-  mutants: 50/72 (57s)
+mutate: baseline over 15821 cases in 5s
+  mutants: 25/72 (44s)
+  mutants: 50/72 (53s)
   mutants: 72/72 (130s)
 
 mutate: 72 mutants, 130s

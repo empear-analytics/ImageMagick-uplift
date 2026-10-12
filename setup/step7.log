@@ -6218,3 +6218,12 @@ indexes failed
 07:57 resweep configure:   killed 86, survived 28 (10 capped), no coverage 28, errors 0
 08:00 resweep mime:   killed 121, survived 24 (4 capped), no coverage 3, errors 0
 08:07 resweep policy:   killed 138, survived 99 (86 capped), no coverage 32, errors 0
+08:09 pushed
+08:11 resweep memory:   killed 23, survived 42 (42 capped), no coverage 7, errors 0
+08:19 resweep annotate:   killed 444, survived 73 (4 capped), no coverage 88, errors 0
+== confirm-loop Mon Oct 12 08:19:42 UTC 2026: cases since b5ee45d45, at 7ad6de118 X11 cases: display's file browser on fixed directories (XFil
+08:23 17 new cases since b5ee45d45
+08:24 selfcheck: 17 cases, 6 runs each, 0 nondeterministic
+08:24 confirm draw:   killed 0, survived 21 (0 capped), no coverage 595, errors 0
+08:24 confirm image:   killed 0, survived 5 (0 capped), no coverage 88, errors 0
+08:24 confirm profile:   killed 0, survived 0 (0 capped), no coverage 89, errors 0
