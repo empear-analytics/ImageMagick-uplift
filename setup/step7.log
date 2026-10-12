@@ -6603,3 +6603,7 @@ indexes failed
 13:06 confirm version:   killed 0, survived 1 (0 capped), no coverage 5, errors 0
 13:06 confirm module:   killed 0, survived 0 (0 capped), no coverage 7, errors 0
 13:06 pushed
+13:06 pushed
+== confirm-loop round done Mon Oct 12 13:06:42 UTC 2026
+13:10 resweep log:   killed 134, survived 97 (57 capped), no coverage 24, errors 0
+13:14 resweep delegate:   killed 230, survived 78 (23 capped), no coverage 15, errors 0
