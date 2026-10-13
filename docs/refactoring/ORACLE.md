@@ -203,3 +203,42 @@ refactoring commit.
   output file's ctime, which cannot be set. So PDF output is not reproducible
   without that define. This is a design choice rather than a bug, but it is
   inconsistent with the rest of ImageMagick.
+- **Single-channel raw reads and `-sample` under a write mask read unwritten heap
+  memory** (found on Linux, 2026-09-30). Reading `r:`, `g:`, `k:`, `o:` and the other
+  one-channel raw formats back into a full image, and `-sample` under a write mask,
+  gave different output from run to run under glibc: 40 of 9,745 cases in the first
+  `selfcheck`. With `MALLOC_PERTURB_` set, the output is the same for the same fill byte
+  and differs between fill bytes, so the code reads heap memory it never wrote. The
+  oracle sets a fixed `MALLOC_PERTURB_` on Linux (`oracle.env_for`), which makes the
+  cases reproducible but hides the reads. On the Mac they happened to be stable.
+- **Reading BGRO as floating point is not reproducible** (Linux, 2026-09-30).
+  `magick -size 70x46 -depth 64 -define quantum:format=floating-point bgro:enc out.miff`,
+  on a file the same build wrote, gives 3 different images in 12 runs, single-threaded
+  and with a fixed `MALLOC_PERTURB_`; 24- and 32-bit floats vary too, integer and signed
+  BGRO do not, nor does RGBO at any depth. So it is not a heap read the fill byte would
+  pin down: `ImportBGROQuantum` in `MagickCore/quantum-import.c`, floating-point branch,
+  is the place to look (MemorySanitizer or Valgrind would say more). The catalogue
+  leaves those cases out (`QUANTUM_UNSTABLE` in `cases.py`).
+- **`tile:` under `-compose multiply` composes onto an uninitialised canvas** (Windows,
+  2026-10-02). `magick -size 40x30 -compose multiply tile:rose_patch.miff out.miff` gave
+  a different image in 1 of 4 runs without a fixed `MALLOC_PERTURB_`, and a mean near
+  5e-50 where black is expected: `TextureImage` composes the tile onto a canvas it never
+  cleared. The oracle's fixed `MALLOC_PERTURB_` may hide it, so the catalogue keeps
+  `tile:` to the default compose (`_texture_gap_cases` in `cases.py`).
+- **Quantizing an image with very many colours is not reproducible** (Windows,
+  2026-10-02). `magick hald:8 -colors 64 out.miff` (262,144 colours) gave two different
+  images in 10 runs (4 and 6), under the oracle's environment (one thread, fixed
+  `MALLOC_PERTURB_`), with or without `-treedepth` and dithering; `hald:8` alone was the
+  same every time. Likely the colour-tree pruning that runs when the tree outgrows
+  `MaxQNodes` (`PruneLevel` in `quantize.c`), so that function stays untested.
+- **`+noise Random` with `-seed` is not reproducible at 600x600** (Windows, 2026-10-02).
+  `magick -seed 3 -size 600x600 xc: +noise Random out.miff` gave two different images in
+  12 runs (7 and 5) under the oracle's environment; at 48x48 it was the same in 12 of 12,
+  so the catalogue's noise images stay small.
+- **The raw single-channel writers switch on the input's format** (Windows,
+  2026-10-02). `WriteRAWImage` (`coders/raw.c`) picks the channel from `*image->magick`,
+  the format the image was read from, not the one being written. From a MIFF (`M...`)
+  every `r:`, `g:`, `b:`, `a:`, `o:`, `k:` write fails with ColorSeparatedImageRequired
+  (the Magenta case); from a PNG, `o:` writes 3,220 bytes through the default case, not
+  opacity. The catalogue's raw single-channel cases read MIFF, so they test this error, and
+  `ExportOpacityQuantum` is reached only through RGBO and BGRO with `-interlace line`.

@@ -15,9 +15,13 @@ Placeholders in argv:
   {FONT}     a TrueType font shipped in the corpus
 """
 
+import base64
 import hashlib
 import itertools
 import json
+import math
+import string
+import struct
 
 # Written as floating point at 32 bits so no HDRI precision is lost on output:
 # under Q16 HDRI, SetImageDepth() leaves pixels untouched for depth >= 16, so
@@ -94,6 +98,11 @@ EXTERNAL_DECODE = (".ps", ".eps", ".pdf", ".ai", ".m2v", ".mpg", ".fpx", ".hdf",
                    ".hpgl")  # the hp2xx delegate, run through /bin/sh
 
 FONT = "Generic.ttf"  # copied from PerlMagick/t
+FONT2 = "Narrow.ttf"  # a 0.6x-condensed derivative of Generic.ttf (tools/oracle/mknarrow.py):
+# a second, visually distinct corpus font, so the oracle can see which TypeInfo the font
+# matcher picks (type.c GetTypeInfoByFamily, annotate.c), which one glyph file cannot
+FONT3 = "Quirk.ttf"  # Generic.ttf with a 'kern' table, zero ascender/descender and only a Mac Roman
+# character map (tools/oracle/mkquirk.py): RenderFreetype's and ComplexTextLayout's other branches
 
 
 # Upstream bug (docs/refactoring/ORACLE.md, "Known upstream issues"): the
@@ -106,7 +115,9 @@ DEST_WIDER_UNSTABLE = ("Displace", "Distort")
 # pixels unwritten, so the image holds whatever memory held: under a parallel
 # load 19 of 64 runs of the same command differed. selfcheck, which runs each
 # case twice, missed it, and it counted as a kill in 155 mutation runs.
-WRITE_MASK_UNSTABLE = ("-scale 50%",)
+# -scale 150x100% does the same, more rarely: 1 of 80 runs under a load of ten
+# (2026-10-03), once in a cached baseline, so every mutant it met counted as killed.
+WRITE_MASK_UNSTABLE = ("-scale 50%", "-scale 150x100%")
 
 
 def img(name):
@@ -312,7 +323,6 @@ TWO_IMAGE_OPS = [
     ("-channel-fx 'red; blue=>green'", ["rose", "rose_blur"]),
     ("-compose multiply -composite", ["rose", "gray8"]),
     ("-set option:distort:viewport 50x30+5+5 -distort SRT 10 -compose over -composite", ["granite", "rose_alpha"]),
-    ("-stereo +3+2", ["rose", "rose_blur"]),
 ]
 
 SEQ_OPS = [
@@ -464,10 +474,14 @@ def _each(lists, listname):
     return [v for v in lists.get(listname, []) if v.lower() != "undefined"]
 
 
-def _case_id(family, steps, files=None, stdin=None):
+def _case_id(family, steps, files=None, stdin=None, env=None, x11=False):
     key = steps if not files else [steps, sorted(files.items())]
     if stdin:
         key = [key, "stdin", stdin]
+    if env:
+        key = [key, "env", sorted(env.items())]
+    if x11:
+        key = [key, "x11"] if x11 is True else [key, "x11", x11]
     ident = hashlib.sha1(json.dumps(key).encode()).hexdigest()[:10]
     return "%s/%s" % (family, ident)
 
@@ -481,11 +495,26 @@ def _with_inputs(case, files=None, stdin=None):
     """`files` maps a name to text written into the case directory first;
     `stdin` names a file (corpus paths as `{C}/...`) fed to every step.
     Both are part of the case's id."""
-    case["id"] = _case_id(case["family"], case["steps"], files, stdin)
+    case["id"] = _case_id(case["family"], case["steps"], files, stdin, case.get("env"),
+                          case.get("x11", False))
     if files:
         case["files"] = files
     if stdin:
         case["stdin"] = stdin
+    return case
+
+
+def _with_run(case, env=None, x11=False):
+    """`env` adds variables to every step's environment (None removes one), e.g.
+    MAGICK_OCL_DEVICE for OpenCL; `x11` gives the case an X server of its own (oracle.py,
+    start_xvfb), True for the default screen or a screen like "640x480x8". Both are part of
+    the case's id."""
+    if env:
+        case["env"] = env
+    if x11:
+        case["x11"] = x11
+    case["id"] = _case_id(case["family"], case["steps"], case.get("files"), case.get("stdin"),
+                          env, x11)
     return case
 
 
@@ -651,12 +680,17 @@ def _generator_cases():
 
 # ---- enumerated families
 def _colorspace_cases(lists):
-    for name, cs in itertools.product(FAMILY_INPUTS + ["hdri", "cmyk"],
+    # palette: a PseudoClass image converts through its colormap, a separate
+    # branch in TransformsRGBImage and sRGBTransformImage.
+    for name, cs in itertools.product(FAMILY_INPUTS + ["hdri", "cmyk", "palette"],
                                       _each(lists, "Colorspace")):
         yield _op("colorspace", "%s -> %s" % (name, cs), [img(name)],
                   ["-colorspace", cs])
         yield _op("colorspace", "%s -> %s -> sRGB" % (name, cs), [img(name)],
                   ["-colorspace", cs, "-colorspace", "sRGB"])
+    for illuminant in ("A", "nosuch"):
+        yield _op("colorspace", "rose illuminant %s -> Lab" % illuminant, [img("rose")],
+                  ["-define", "colorspace:illuminant=" + illuminant, "-colorspace", "Lab"])
 
 
 def _compose_cases(lists):
@@ -737,6 +771,67 @@ def _morphology_cases(lists):
                                         ("rose", "bilevel")):
         yield _op("morphology", "%s -morphology %s %s" % (name, m, k),
                   [img(name)], ["-morphology", m, k])
+
+
+# Kernel names alone take their default arguments, which leave LoG and Comet
+# degenerate and never rotate a kernel; a ",angle" rotates it, by 45 degrees
+# only if it is 3x3 (other sizes warn, and the warning is compared too).
+MORPHOLOGY_KERNEL_ARGS = [
+    "LoG:0x1", "LoG:5x1.5", "DoG:0x1,2", "Comet:0x2", "Comet:5x2+2,30",
+    "Comet:1x1,45", "Blur:0x1,90", "Blur:0x2,45", "Blur:1x0.5,45", "Blur:0x1,135",
+    "Gaussian:0x1,30", "Sobel:45", "Sobel:135",
+]
+CONVOLVE_SCALES = ["!", "^", "50%", "0.5,2", "1.5!", "-1^", "0,1"]
+# Rotating a symmetric kernel (Blur) by 90 or 270 degrees gives the same
+# kernel, so a wrong rotation passes unseen; these are asymmetric, some with
+# an off-centre origin, and "@" or ">" expands them through 45 or 90 degrees.
+ROTATED_KERNELS = [
+    "Comet:0x2,90", "Comet:0x2,180", "Comet:0x2,270",
+    "3x3+2+2@:1,2,3,4,5,6,7,8,9", "3x3+0+1@:1,2,3,4,5,6,7,8,9",
+    "3x3+1+0@:1,-2,3,4,5,-6,7,8,9", "5x1+0+0>:1,2,3,4,5", "1x5+0+2>:1,2,3,4,5",
+]
+# Scaling treats positive and negative kernel values apart only when a kernel
+# has both, which Blur does not.
+MIXED_SIGN_SCALES = [("DoG:0x1,2", "^"), ("DoG:0x1,2", "!"), ("DoG:0x1,2", "50%!"),
+                     ("DoG:0x1,2", "0.5^"), ("Laplacian:3", "^")]
+# Voronoi fills transparent pixels from the nearest opaque seed: it needs an
+# image that is mostly transparent.
+VORONOI_SEEDS = ["-size", "60x40", "xc:none", "-fill", "red", "-draw", "point 10,10",
+                 "-fill", "blue", "-draw", "point 45,30", "-fill", "lime",
+                 "-draw", "point 30,5"]
+
+
+def _morphology_arg_cases():
+    for k in MORPHOLOGY_KERNEL_ARGS:
+        yield _op("morphology", "rose -morphology Convolve %s" % k, [img("rose")],
+                  ["-morphology", "Convolve", k])
+    for k in ("Euclidean:4", "Manhattan", "Chebyshev:2"):
+        yield _op("morphology", "seeds -morphology Voronoi %s" % k, VORONOI_SEEDS,
+                  ["-morphology", "Voronoi", k])
+    yield _op("morphology", "rose_alpha thresholded alpha -morphology Voronoi",
+              [img("rose_alpha")],
+              ["-channel", "A", "-threshold", "50%", "+channel",
+               "-morphology", "Voronoi", "Euclidean:2"])
+    for s in CONVOLVE_SCALES:
+        yield _op("morphology", "rose convolve:scale=%s Blur:0x1" % s, [img("rose")],
+                  ["-define", "convolve:scale=" + s, "-morphology", "Convolve", "Blur:0x1"])
+    yield _op("morphology", "rose showKernel Laplacian:3", [img("rose")],
+              ["-define", "morphology:showKernel=1", "-morphology", "Convolve",
+               "Laplacian:3"])
+    yield from _shown_kernel_cases()
+
+
+def _shown_kernel_cases():
+    """Rotated and scaled kernels, printed with showKernel so that the kernel
+    values are compared as well as the image they produce."""
+    show = ["-define", "morphology:showKernel=1"]
+    for k in ROTATED_KERNELS:
+        yield _op("morphology", "rose showKernel rotated %s" % k, [img("rose")],
+                  show + ["-morphology", "Convolve", k])
+    for k, s in MIXED_SIGN_SCALES:
+        yield _op("morphology", "rose showKernel convolve:scale=%s %s" % (s, k),
+                  [img("rose")],
+                  show + ["-define", "convolve:scale=" + s, "-morphology", "Convolve", k])
 
 
 def _evaluate_cases(lists):
@@ -929,6 +1024,1640 @@ def _raw_format_cases(f):
                     steps, [enc, "dec.miff"])
 
 
+# ---- gaps found on the Windows machine (docs/refactoring/HARNESS-SPLIT.md)
+# quantum-import.c and quantum-export.c: one routine per pixel layout and
+# depth, and the raw family above reaches only some of them.
+_FLOAT = ["-define", "quantum:format=floating-point"]
+_SIGNED = ["-define", "quantum:format=signed"]
+# Layouts the raw family never writes: GrayAlpha, BGRO and YCbCrA.
+QUANTUM_NEW_FORMATS = ["graya", "bgro", "ycbcra"]
+QUANTUM_NEW_FORMAT_DEPTHS = [
+    ("8", []), ("1", []), ("2", []), ("4", []), ("10", []), ("12", []), ("16", []),
+    ("24", []), ("32", []), ("16", _FLOAT), ("24", _FLOAT), ("32", _FLOAT),
+    ("64", _FLOAT), ("8", _SIGNED), ("16", _SIGNED), ("16", ["-endian", "LSB"]),
+    ("8", ["-interlace", "plane"]),
+]
+# Depths and sample formats the raw family skips, for the layouts it has:
+# 2, 10 and 24 bits, 24-bit floats, signed samples, little-endian.
+QUANTUM_OLD_FORMATS = ["gray", "rgb", "bgr", "rgba", "bgra", "rgbo", "o", "a", "cmyk",
+                       "cmyka"]
+QUANTUM_EXTRA_DEPTHS = [
+    ("2", []), ("10", []), ("24", []), ("24", _FLOAT), ("8", _SIGNED), ("16", _SIGNED),
+    ("16", ["-endian", "LSB"]),
+]
+# Palette images are stored as colormap indexes, at their own depths.
+QUANTUM_INDEX_DEPTHS = ["1", "2", "4", "8", "16"]
+# Upstream bug (ORACLE.md, "Known upstream issues"): reading BGRO as
+# floating point gives a different image from run to run, single-threaded and
+# with a fixed malloc fill: 3 decodes in 12 runs at 64 bits, 2 at 24 and 32.
+# Integer and signed BGRO, and RGBO at every depth, are stable.
+QUANTUM_UNSTABLE = {("bgro", "floating-point")}
+
+
+def _quantum_unstable(f, extra):
+    return (f, "floating-point") in QUANTUM_UNSTABLE and _FLOAT[1] in extra
+
+
+def _quantum_round_trip(f, depth, extra, name):
+    enc = "enc.%s" % f
+    steps = [[img(name), "-depth", depth] + extra + ["%s:%s" % (f, enc)],
+             ["-size", "{W:%s}x{H:%s}" % (name, name), "-depth", depth] + extra
+             + ["%s:%s" % (f, enc)] + FLOAT_OUT + ["dec.miff"]]
+    return _case("quantum", "%s -depth %s %s -> %s" % (name, depth, " ".join(extra), f),
+                 steps, [enc, "dec.miff"])
+
+
+def _quantum_layout_cases(writable_formats):
+    combos = itertools.chain(
+        itertools.product(QUANTUM_NEW_FORMATS, QUANTUM_NEW_FORMAT_DEPTHS),
+        itertools.product(QUANTUM_OLD_FORMATS, QUANTUM_EXTRA_DEPTHS))
+    for (f, (depth, extra)), name in itertools.product(combos, ("rose_alpha", "hdri")):
+        if f in writable_formats and not _quantum_unstable(f, extra):
+            yield _quantum_round_trip(f, depth, extra, name)
+
+
+def _quantum_yuv_cases():
+    # CbYCrY: UYVY and PAL, 16 bits a pixel, read back with the geometry.
+    for f in ("uyvy", "pal"):
+        steps = [[img("rose"), "%s:enc.%s" % (f, f)],
+                 ["-size", "{W:rose}x{H:rose}", "%s:enc.%s" % (f, f)] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantum", "rose -> %s -> miff" % f, steps, ["enc." + f, "dec.miff"])
+
+
+def _quantum_index_cases():
+    for depth in QUANTUM_INDEX_DEPTHS:
+        steps = [[img("palette"), "-depth", depth, "miff:enc.miff"],
+                 ["enc.miff"] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantum", "palette -depth %s -> miff" % depth, steps,
+                    ["enc.miff", "dec.miff"])
+    steps = [[img("rose_alpha"), "-colors", "8", "-type", "PaletteAlpha", "miff:enc.miff"],
+             ["enc.miff"] + FLOAT_OUT + ["dec.miff"]]
+    yield _case("quantum", "rose_alpha PaletteAlpha -> miff", steps, ["enc.miff", "dec.miff"])
+
+
+def _quantum_meta_cases():
+    # A meta channel makes the image multispectral: its own import and export,
+    # whose floating-point branch needs a floating-point MIFF.
+    for extra in ([], ["-depth", "16"]) + tuple(["-depth", d] + _FLOAT for d in ("16", "32", "64")):
+        steps = [[img("rose"), "-channel-fx", "red=>meta"] + extra + ["miff:enc.miff"],
+                 ["enc.miff"] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantum", "rose red=>meta %s -> miff" % " ".join(extra), steps,
+                    ["enc.miff", "dec.miff"])
+
+
+# The second round: branches the first left unreached. Palette indexes as
+# floating point, and at depth 1, which needs a two-colour palette; opacity
+# and alpha as floating point; gray little-endian at more depths.
+QUANTUM_INDEX_VARIANTS = [
+    ("bilevel", ["-type", "Palette", "-depth", "1"]),
+    ("bilevel", ["-type", "PaletteBilevelAlpha", "-depth", "1"]),
+    ("palette", ["-depth", "16"] + _FLOAT), ("palette", ["-depth", "32"] + _FLOAT),
+    ("rose_alpha", ["-colors", "8", "-type", "PaletteAlpha", "-depth", "32"] + _FLOAT),
+]
+QUANTUM_ROUND2 = [
+    (f, depth, extra) for f in ("o", "a")
+    for depth, extra in (("16", _FLOAT), ("32", _FLOAT), ("64", _FLOAT))
+] + [("gray", depth, ["-endian", "LSB"] + x)
+     for depth, x in (("32", []), ("64", _FLOAT), ("32", _FLOAT), ("24", []), ("8", []))]
+
+
+def _quantum_round2_cases(writable_formats):
+    for name, args in QUANTUM_INDEX_VARIANTS:
+        steps = [[img(name)] + args + ["miff:enc.miff"], ["enc.miff"] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantum", "%s %s -> miff" % (name, " ".join(args)), steps,
+                    ["enc.miff", "dec.miff"])
+    for (f, depth, extra), name in itertools.product(QUANTUM_ROUND2, ("rose_alpha", "hdri")):
+        if f in writable_formats:
+            yield _quantum_round_trip(f, depth, extra, name)
+
+
+# pixel.c: the typed Import/Export*Pixel routines are called from the command
+# line only through the JXL coder, which picks the storage type by depth (8 bits
+# char, 16 short, floating point float) and the map by channels (RGB, RGBA, I,
+# IA). The double, long, long-long and quantum routines are API only.
+_GRAY_ALPHA = ["-alpha", "set", "-channel", "A", "-evaluate", "set", "60%", "+channel"]
+PIXEL_JXL_INPUTS = [
+    ("rose", []), ("rose_alpha", []), ("gray16", []), ("gray16", _GRAY_ALPHA),
+]
+PIXEL_JXL_DEPTHS = [["-depth", "8"], ["-depth", "16"], ["-depth", "32"] + _FLOAT]
+
+
+def _pixel_jxl_cases(writable_formats):
+    if "jxl" not in writable_formats:
+        return
+    for (name, pre), depth in itertools.product(PIXEL_JXL_INPUTS, PIXEL_JXL_DEPTHS):
+        args = [img(name)] + pre + depth + ["-quality", "100", "enc.jxl"]
+        steps = [args, ["enc.jxl"] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("pixel", "%s %s -> jxl" % (name, " ".join(pre + depth)), steps,
+                    ["enc.jxl", "dec.miff"])
+
+
+# constitute.c: pinging a range of scenes through a filename pattern, and the
+# MIME types of inline data URIs (GetImplicitDataImageType): a plain type, an
+# "x-" prefix, a "+suffix", and malformed ones, whose errors are compared too.
+_PPM_2X1 = "P3\n2 1\n255\n255 0 0 0 0 255\n"
+_SVG_4X3 = ('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="3">'
+            '<rect width="4" height="3" fill="red"/></svg>')
+DATA_URI_TYPES = [("image/ppm", _PPM_2X1), ("image/x-portable-pixmap", _PPM_2X1),
+                  ("image/svg+xml", _SVG_4X3), ("image/x-svg", _SVG_4X3),
+                  ("noslash", _PPM_2X1), ("image/", _PPM_2X1), ("image/x-", _PPM_2X1)]
+PING_SCENES = ["frame%d.miff[0-2]", "frame%d.miff[1]", "frame%d.miff[0-1]"]
+
+
+def _constitute_cases():
+    for mime, text in DATA_URI_TYPES:
+        uri = "inline:data:%s;base64,%s" % (mime, base64.b64encode(text.encode()).decode())
+        yield _op_to("constitute", "inline data %s" % mime, [uri] + FLOAT_OUT, "out.miff")
+    for pattern in PING_SCENES:
+        steps = [[img("anim"), "+adjoin", "frame%d.miff"], ["identify", "-ping", pattern]]
+        yield _case("constitute", "identify -ping %s" % pattern, steps, [])
+    # Pings that fail: PingImage must not touch the image the reader did not return.
+    for name, text in (("bad.miff", "garbage"), ("zero.ppm", "P6\n0 0\n255\n")):
+        yield _with_inputs(_case("constitute", "identify -ping failing %s" % name,
+                                 [["identify", "-ping", name]], []), files={name: text})
+    yield _case("constitute", "identify -ping missing file",
+                [["identify", "-ping", "missing.miff"]], [])
+
+
+# token.c: GlobExpression, reached through wildcards in input filenames,
+# which ImageMagick expands itself. Some patterns match surprisingly
+# (`frame[!0]` gives frame0 only, `frame[0-]` every frame); that is what the
+# oracle keeps.
+GLOB_PATTERNS = ["frame*.miff", "frame?.miff", "frame[0-1].miff", "frame[!0].miff",
+                 "frame[^0].miff", "frame{0,2}.miff", "fr*me?.miff", "frame[12]*",
+                 "fram\\e1.miff", "frame\\*.miff", "*[2].miff", "frame[0-].miff",
+                 "frame{1,}.miff", "**.miff"]
+
+
+def _glob_cases():
+    for pattern in GLOB_PATTERNS:
+        steps = [[img("anim"), "+adjoin", "frame%d.miff"],
+                 [pattern, "-format", "%f %wx%h\\n", "info:"]]
+        yield _case("token", "glob %s" % pattern, steps, [])
+
+
+# blob.c: ReadBlobString, which the text coders read lines with. Every text
+# file the catalogue read ended in a newline, and the parsers ignore trailing
+# whitespace, so the end-of-line and end-of-file handling was never tested:
+# these end without a newline, or with CRLF.
+_TXT_HEADER = "# ImageMagick pixel enumeration: 2,1,255,srgb"
+_TXT_LINES = [_TXT_HEADER, "0,0: (255,0,0)", "1,0: (0,0,255)"]
+_CUBE_LINES = ["LUT_3D_SIZE 2", "0 0 0", "1 0 0", "0 1 0", "1 1 0", "0 0 1", "1 0 1",
+               "0 1 1", "1 1 1"]
+LINE_ENDINGS = [("lf", "\n", "\n"), ("lf, no final newline", "\n", ""),
+                ("crlf", "\r\n", "\r\n"), ("crlf, no final newline", "\r\n", "")]
+
+
+def _text_file(lines, eol, final):
+    return eol.join(lines) + final
+
+
+def _read_blob_string_cases():
+    for label, eol, final in LINE_ENDINGS:
+        case = _op_to("blob", "txt %s" % label, ["txt:in.txt"] + FLOAT_OUT, "out.miff")
+        yield _with_inputs(case, files={"in.txt": _text_file(_TXT_LINES, eol, final)})
+    for label, eol, final in LINE_ENDINGS[1:]:
+        case = _case("blob", "cube %s" % label,
+                     [["cube:lut.cube", "-format", "%wx%h %[fx:mean]\\n", "info:"]], [])
+        yield _with_inputs(case, files={"lut.cube": _text_file(_CUBE_LINES, eol, final)})
+
+
+# blob.c: the paths through a temporary file and past the end of a file.
+# ImageToBlob writes formats without blob support (SVG) to a temporary file and
+# reads it back; the PNG that SVG embeds would carry dates without the define.
+# ImageToFile copies a non-seekable stdin to a temporary file in 1 MiB chunks,
+# and the hald image (1.5 MB) takes two. A raw header offset past the end of
+# the file makes DiscardBlobBytes reach EOF.
+def _poly_points():
+    """25 control points on a 5x5 grid over rose, each moved by a smooth wave:
+    enough for a quintic (21 terms), and not a plain affine map."""
+    pts = []
+    for j in range(5):
+        for i in range(5):
+            x, y = i * 17.0, j * 11.0
+            u = x + 2.0 * math.sin(0.09 * x + 0.13 * y)
+            v = y + 1.5 * math.cos(0.11 * x - 0.07 * y)
+            pts.append("%g,%g %.2f,%.2f" % (x, y, u, v))
+    return "  ".join(pts)
+
+
+# distort.c: the catalogue's only polynomial was order 2, so the bilinear
+# order, the cubic to quintic terms (poly_basis_fn/dx/dy) and the order and
+# control-point checks never ran. -verbose prints the fitted terms as an -fx
+# expression; +verbose keeps the timing line of the write out.
+def _distort_poly_cases():
+    pts = _poly_points()
+    for order in ("1", "1.5", "3", "4", "5"):
+        yield _op("distort", "polynomial order %s" % order, [img("rose")],
+                  ["-distort", "Polynomial", "%s %s" % (order, pts)])
+        yield _op("distort", "polynomial order %s verbose" % order, [img("rose")],
+                  ["-verbose", "-distort", "Polynomial", "%s %s" % (order, pts), "+verbose"])
+    yield _op("distort", "polynomial order 3 +distort", [img("rose")],
+              ["+distort", "Polynomial", "3 " + pts])
+    for order in ("0.5", "2.5", "6"):
+        yield _op("distort", "polynomial invalid order %s" % order, [img("rose")],
+                  ["-distort", "Polynomial", "%s %s" % (order, pts)])
+    yield _op("distort", "polynomial too few points", [img("rose")],
+              ["-distort", "Polynomial", "3 0,0 1,1  69,0 65,4  0,45 3,41  69,45 60,40"])
+
+
+# fx.c: image statistics per pixel (ImageStat), hexadecimal colours
+# (GetHexColour), %[...] properties and epoch() (GetProperty), attributes of
+# other images, and the fx:debug dump of the compiled expression (DumpTables,
+# DumpRPN, OprStr), none of which the catalogue's expressions used.
+FX_EXPRESSIONS = [
+    "u.mean", "u.maxima-u.minima", "u.standard_deviation", "u.kurtosis", "u.skewness/10",
+    "u.median", "u.depth/16", "u.mean.r", "mean.g", "u.r.mean",
+    "u.extent/1e5", "u.page.x", "u.resolution.x", "u.printsize.x", "u.quality/100",
+    "#ff8000", "#f80", "#ff800080", "#ff80", "u*0.5+#102030", "#ff8",
+    "%[w]/100", "%[myval]", "epoch(%[mydate])/1e10", "%[nosuch",
+]
+FX_DEBUG_EXPRESSIONS = ["u*0.5+0.1", "xx=u.mean; yy=#ff0000; u*xx+yy*(1-xx)",
+                        "u.mean.r+v.maxima+u[1].minima", "%[w]>50 ? u : 1-u"]
+
+
+def _fx_gap_cases():
+    props = ["-set", "myval", "0.25", "-set", "mydate", "2020-01-02T03:04:05"]
+    for e in FX_EXPRESSIONS:
+        yield _op("fx", "-fx %s" % e, [img("rose")] + props, ["-fx", e])
+    yield _op("fx", "-fx attributes of other images", [img("rose"), img("granite")],
+              ["-fx", "v.mean+u[1].maxima-s.minima"])
+    for e in FX_DEBUG_EXPRESSIONS:
+        yield _case("fx", "fx:debug %s" % e,
+                    [[img("rose"), img("granite"), "-define", "fx:debug=true", "-fx", e,
+                      "null:"]], [])
+
+
+# composite.c: compose:args forms the catalogue never gave. Blur with an
+# ellipse, an angle and an angle range; displace and distort with percent,
+# aspect (!) and centre offsets; dissolve above 100% and below 0; blend with
+# both factors; threshold with and without its threshold; the blends' iteration
+# arguments; and the compose:illuminant and compose:colorspace defines.
+COMPOSE_ARGS = [
+    ("blur", "3", "gray8"), ("blur", "3x1.5", "gray8"), ("blur", "3x1.5+30", "gray8"),
+    ("blur", "3x1.5+0+90", "gray8"),
+    ("displace", "50x50%", "gray8"), ("displace", "50x50%!", "gray8"),
+    ("displace", "20x10!", "gray8"), ("displace", "20x10+5+3", "gray8"),
+    ("displace", "20x10+5+3!", "gray8"),
+    ("distort", "50x50%", "gray8"), ("distort", "50x50%!", "gray8"),
+    ("distort", "20x10!", "gray8"), ("distort", "20x10+5+3", "gray8"),
+    ("distort", "20x10+5+3!", "gray8"),
+    ("dissolve", "150", "rose_alpha"), ("dissolve", "60x150", "rose_alpha"),
+    ("dissolve", "-10", "rose_alpha"), ("blend", "30x80", "rose_blur"),
+    ("threshold", "0.5x0.1", "rose_blur"), ("threshold", "0.5", "rose_blur"),
+    ("saliency-blend", "20x0.001+5", "rose_patch"),
+    ("seamless-blend", "20x0.001+5", "rose_patch"),
+]
+COMPOSE_DEFINES = ["compose:illuminant=nosuch", "compose:colorspace=nosuch",
+                   "compose:illuminant=A"]
+
+
+# colorspace.c and composite.c: Hue, Saturate, Luminize and Colorize convert
+# through compose:colorspace (HCL by default). A colorspace the generic
+# converters do not list (sRGB, Gray) takes their default branch, which no
+# case reached; XYZ and Lab take listed ones.
+COMPOSE_HUE_OPS = ["hue", "saturate", "luminize", "colorize"]
+COMPOSE_COLORSPACES = ["sRGB", "Gray", "XYZ", "Lab"]
+
+
+def _compose_colorspace_gap_cases():
+    for c, cs in itertools.product(COMPOSE_HUE_OPS, COMPOSE_COLORSPACES):
+        yield _op("composite", "rose %s rose_blur compose:colorspace=%s" % (c, cs),
+                  [img("rose"), img("rose_blur")],
+                  ["-define", "compose:colorspace=" + cs, "-compose", c, "-composite"])
+
+
+def _composite_gap_cases():
+    for c, args, src in COMPOSE_ARGS:
+        yield _op("composite", "rose %s compose:args=%s %s" % (c, args, src),
+                  [img("rose"), img(src)],
+                  ["-define", "compose:args=" + args, "-compose", c, "-composite"])
+    for define in COMPOSE_DEFINES:
+        yield _op("composite", "rose over rose_alpha %s" % define,
+                  [img("rose"), img("rose_alpha")],
+                  ["-define", define, "-compose", "over", "-composite"])
+
+
+# feature.c: the information measures of correlation sum p*log2(p) over every
+# pair of grey levels, so they print NaN unless every pair occurs in every
+# direction: in the catalogue's images they always did, and no mutant there
+# could show. Noise images with two or three levels give finite values; with
+# CMYK and alpha for those channels, and distances at and past the image size.
+# The images are made in the command and printed with -verbose info:, and the
+# date properties removed, which would otherwise date each run.
+_NOISE = ["-seed", "5", "-size", "48x48", "xc:", "+noise", "Random"]
+FEATURE_IMAGES = [
+    ("gray, 2 levels", ["-seed", "3", "-size", "32x32", "xc:", "+noise", "Random",
+                        "-colorspace", "gray", "-threshold", "50%"]),
+    ("gray, 3 levels", _NOISE + ["-colorspace", "gray", "-posterize", "3"]),
+    ("rgb, 2 levels", _NOISE + ["-posterize", "2"]),
+    ("cmyk, 2 levels", _NOISE + ["-colorspace", "CMYK", "-posterize", "2"]),
+    ("rgba, 2 levels", _NOISE + ["-posterize", "2", "(", "-seed", "9", "-size", "48x48",
+                                 "xc:", "+noise", "Random", "-colorspace", "gray",
+                                 "-threshold", "50%", ")", "-alpha", "off", "-compose",
+                                 "CopyOpacity", "-composite"]),
+]
+_NO_DATES = ["+set", "date:create", "+set", "date:modify", "+set", "date:timestamp"]
+
+
+def _feature_cases():
+    for label, make in FEATURE_IMAGES:
+        for distance in ("1", "2"):
+            yield _case("feature", "features %s distance %s" % (label, distance),
+                        [make + _NO_DATES + ["-precision", "17", "-features", distance,
+                                             "-verbose", "info:"]], [])
+    small = ["-seed", "3", "-size", "8x8", "xc:", "+noise", "Random", "-colorspace", "gray",
+             "-threshold", "50%"]
+    for distance in ("7", "8"):
+        yield _case("feature", "features 8x8 distance %s" % distance,
+                    [small + _NO_DATES + ["-precision", "17", "-features", distance,
+                                          "-verbose", "info:"]], [])
+
+
+# resample.c: ResamplePixelColor's shortcuts for areas outside the image,
+# per virtual-pixel method, and its averaged result once the EWA ellipse hits
+# its limits. A steep perspective puts a horizon in the viewport, where the
+# ellipses grow without bound; a 2.5x magnification near the edges gives small
+# ellipses that straddle the border.
+RESAMPLE_VIRTUAL_PIXELS = [
+    "background", "black", "checker-tile", "dither", "edge", "gray", "horizontal-tile",
+    "horizontal-tile-edge", "mirror", "none", "random", "tile", "transparent",
+    "vertical-tile", "vertical-tile-edge", "white",
+]
+RESAMPLE_DISTORTIONS = [
+    ("steep perspective", ["-define", "distort:viewport=90x70-10-10", "+distort",
+                           "Perspective", "0,0 0,0  69,0 69,0  0,45 30,6  69,45 39,6"]),
+    ("2.5x near the edges", ["-define", "distort:viewport=60x40+150+95", "-distort", "SRT",
+                             "0,0 2.5 0 0,0"]),
+]
+
+
+# distort.c: SparseColorImage only ever ran on RGB with the default channels.
+# Every method on CMYK (-channel CMYK), with alpha (-channel RGBA, colours with
+# alpha) and on a gray image; the -verbose report of the fitted coefficients for
+# the two fitted methods, in RGBA and CMYK; and two points closer than a pixel,
+# which caps the inverse-distance weight. Colours in hex: names need colors.xml.
+SPARSE_METHODS = ["Barycentric", "Bilinear", "Shepards", "Inverse", "Voronoi", "Manhattan"]
+_SPARSE_CMYK = "5,5 cmyk(10%,20%,30%,40%)  60,10 cmyk(80%,0,0,10%)  30,40 cmyk(0,50%,50%,0)"
+_SPARSE_RGBA = "5,5 #ff000080  60,10 #0000ff  30,40 #00ff0040  10,40 #ffff00"
+_SPARSE_GRAY = "5,5 #ffffff  30,10 #000000  10,25 #808080"
+
+
+def _sparse_color_gap_cases():
+    for s in SPARSE_METHODS:
+        yield _op("distort", "cmyk -sparse-color %s" % s, [img("cmyk")],
+                  ["-channel", "CMYK", "-sparse-color", s, _SPARSE_CMYK])
+        yield _op("distort", "rose_alpha -channel RGBA -sparse-color %s" % s,
+                  [img("rose_alpha")], ["-channel", "RGBA", "-sparse-color", s, _SPARSE_RGBA])
+        yield _op("distort", "gray8 -sparse-color %s" % s, [img("gray8")],
+                  ["-sparse-color", s, _SPARSE_GRAY])
+    for s in ("Barycentric", "Bilinear"):
+        yield _op("distort", "rose_alpha -verbose -sparse-color %s" % s, [img("rose_alpha")],
+                  ["-verbose", "-channel", "RGBA", "-sparse-color", s, _SPARSE_RGBA,
+                   "+verbose"])
+        yield _op("distort", "cmyk -verbose -sparse-color %s" % s, [img("cmyk")],
+                  ["-verbose", "-channel", "CMYK", "-sparse-color", s, _SPARSE_CMYK,
+                   "+verbose"])
+    for s in ("Shepards", "Inverse"):
+        yield _op("distort", "rose -sparse-color %s points 0.2 apart" % s, [img("rose")],
+                  ["-sparse-color", s, "5,5 #ff0000  5.2,5 #0000ff  40,30 #00ff00"])
+
+
+# quantum.c: SetQuantumMetaChannel and SetQuantumPad are called by the TIFF and
+# PSD coders for images with meta channels, which no case had. -combine with
+# five gray images makes one (RGBA plus a meta channel); written as TIFF,
+# contiguous and planar at 8 and 16 bits, and as PSD, then read back.
+_META5 = [img("rose"), "-separate", img("gray8"), "-resize", "70x46!", img("granite"),
+          "-resize", "70x46!", "-colorspace", "gray", "-combine", "m5.miff"]
+META_CHANNEL_WRITES = [
+    ("tif", []), ("tif", ["-interlace", "plane"]), ("tif", ["-depth", "16"]),
+    ("tif", ["-depth", "16", "-interlace", "plane"]), ("psd", []),
+]
+
+
+def _meta_channel_gap_cases():
+    for fmt, extra in META_CHANNEL_WRITES:
+        enc = "enc." + fmt
+        yield _case("metachannel", "5 channels %s %s" % (" ".join(extra), fmt),
+                    [_META5, ["m5.miff"] + extra + [enc],
+                     [enc] + FLOAT_OUT + ["dec.miff"]], ["dec.miff"])
+
+
+# exception.c: InheritException is reached when looking up a coder raises a
+# policy error, which a module policy does (static.c, RegisterStaticModule).
+# The policy file is the case's own ($HOME is the case directory).
+def _exception_gap_cases():
+    policy = (".config/ImageMagick/policy.xml",
+              '<policymap>\n  <policy domain="module" rights="none" pattern="GIF" />\n'
+              '</policymap>\n')
+    # x.gif holds MIFF (the policy forbids writing GIF too); gif: forces the GIF lookup.
+    steps = [[img("rose"), "miff:x.gif"], ["gif:x.gif", "out.miff"], [img("rose"), "out.miff"]]
+    yield _with_inputs(_case("exception", "module policy denies GIF, then read a GIF",
+                             steps, ["out.miff"]), files=dict([policy]))
+
+
+# histogram.c: MinMaxStretchImage skips LevelImage when the image is flat
+# (minimum equals maximum), overall and per channel; no -auto-level case had a
+# flat image or a flat channel.
+def _auto_level_gap_cases():
+    yield _op("histogram", "flat gray -auto-level", ["-size", "8x6", "xc:#666666"],
+              ["-auto-level"])
+    yield _op("histogram", "flat red channel -channel R -auto-level",
+              ["-size", "8x6", "gradient:#406080-#40a0ff"], ["-channel", "R", "-auto-level"])
+    # IsPaletteImage's boundary: a PseudoClass image of exactly MaxColormapSize colours.
+    yield _case("histogram", "65536-colour palette, type and colours",
+                [["-size", "256x256", "xc:#000000", "-channel", "R", "-fx", "i/255",
+                  "-channel", "G", "-fx", "j/255", "+channel", "-depth", "16", "+dither",
+                  "-colors", "65536", "-format", "%[type] %k %r\n", "info:"]], [])
+    yield _op("histogram", "gradient -channel RGB -auto-level",
+              ["-size", "8x6", "gradient:#406080-#40a0ff"], ["-channel", "RGB", "-auto-level"])
+
+
+# matrix.c: MatrixToImage runs only for hough-lines:accumulator, and the matrix
+# is kept in a file (SetMatrixExtent, Read/WriteMatrixElements) only when memory
+# and map are exhausted, which -limit memory 0 -limit map 0 forces.
+_HOUGH_INPUT = ["-size", "40x30", "xc:#000000", "-fill", "#ffffff", "-draw", "line 2,3 37,25",
+                "-draw", "line 5,27 35,4"]
+_NO_MEMORY = ["-limit", "memory", "0", "-limit", "map", "0"]
+
+
+def _matrix_gap_cases():
+    for label, pre in (("accumulator", ["-define", "hough-lines:accumulator=true"]),
+                       ("accumulator, matrix on disk",
+                        _NO_MEMORY + ["-define", "hough-lines:accumulator=true"]),
+                       ("matrix on disk", _NO_MEMORY)):
+        yield _op("matrix", "-hough-lines %s" % label, _HOUGH_INPUT,
+                  pre + ["-hough-lines", "9x9+10"])
+
+
+# stream.c: StreamImagePixels has a fast path per map and storage type, and
+# the generic loop for the rest. The stream family above has no BGRA or BGRP
+# map, and no multi-letter map with O (opacity) or I (intensity), which only the
+# generic loop handles.
+STREAM_GAP_MAPS = ["bgra", "bgrp", "ro", "gi"]
+STREAM_STORAGE_TYPES = ["char", "short", "long", "longlong", "float", "double", "quantum"]
+
+
+def _stream_gap_cases():
+    for name, m, t in itertools.product(("rose", "rose_alpha"), STREAM_GAP_MAPS,
+                                        STREAM_STORAGE_TYPES):
+        yield _case("stream", "stream %s -map %s -storage-type %s" % (name, m, t),
+                    [["stream", "-map", m, "-storage-type", t, img(name), "out.raw"]],
+                    ["out.raw"])
+
+
+# signature.c: FinalizeSignature pads the message to 56 bytes mod 64, with an
+# extra block when it is already past 56. An image signature hashes 4 bytes per
+# channel and pixel, and the catalogue's images all ended below 56 mod 64. RGB
+# rows of 10 and 5 pixels (120 and 60 bytes) and gray rows of 14 and 15 (56,
+# 60) end past it; with one and three rows.
+SIGNATURE_IMAGES = [("rgb", "10x1"), ("rgb", "5x1"), ("rgb", "10x3"), ("gray", "14x1"),
+                    ("gray", "15x1"), ("gray", "15x3")]
+
+
+def _signature_gap_cases():
+    for kind, size in SIGNATURE_IMAGES:
+        make = ["-size", size, "gradient:#336699-#99ccff"]
+        if kind == "gray":
+            make += ["-colorspace", "gray"]
+        yield _case("signature", "%%# of a %s %s image" % (kind, size),
+                    [make + ["-format", "%# %[channels]\\n", "info:"]], [])
+
+
+# quantize.c: GetImageQuantizeError runs only under -verbose, whose report
+# prints the mean and maximum error; posterize with dithering and per channel,
+# k-means with an iteration limit and tolerance and with seed colours, and
+# Floyd-Steinberg on alpha, CMYK and gray, which the catalogue gave only rose.
+QUANTIZE_GAP_OPS = [
+    ["-posterize", "3", "-dither", "FloydSteinberg"], ["-channel", "R", "-posterize", "2"],
+    ["-kmeans", "5x10+0.01"],
+    ["-define", "kmeans:seed-colors=#ff0000;#00ff00;#0000ff", "-kmeans", "3"],
+    ["-dither", "FloydSteinberg", "-colors", "6"],
+]
+
+
+def _quantize_gap_cases():
+    for name in ("rose", "rose_alpha"):
+        yield _case("quantizegap", "%s -verbose -colors 16 info:" % name,
+                    [[img(name), "-verbose", "-colors", "16", "info:"]], [])
+    for name, op in itertools.product(("rose_alpha", "cmyk", "gray8"), QUANTIZE_GAP_OPS):
+        yield _op("quantizegap", "%s %s" % (name, " ".join(op)), [img(name)], op)
+
+
+# resource.c: FormatTimeToLive prints the time limit in -list resource, as
+# years, months, weeks, days, hours, minutes or seconds; no case set a time
+# limit. -limit before -list is rejected, so a policy.xml of the case's own
+# sets it.
+RESOURCE_TIME_LIMITS = ["31536000", "2628000", "1209600", "172800", "7200", "120", "61"]
+
+
+def _resource_gap_cases():
+    for t in RESOURCE_TIME_LIMITS:
+        policy = ('<policymap>\n  <policy domain="resource" name="time" value="%s"/>\n'
+                  '</policymap>\n' % t)
+        yield _with_inputs(_case("resource", "-list resource with a time limit of %s" % t,
+                                 [["-list", "resource"]], []),
+                           files={".config/ImageMagick/policy.xml": policy})
+
+
+# quantize.c, second round: every posterize case dithered, so PosterizeImage's
+# plain loop and its colormap branch never ran (+dither); k-means with fewer
+# seed colours than clusters, and under -verbose (the colours per iteration);
+# a remap over a sequence (RemapImages, -remap and +remap).
+QUANTIZE_GAP2_OPS = [
+    ["+dither", "-posterize", "3"], ["+dither", "-channel", "R", "-posterize", "2"],
+]
+
+
+def _quantize_gap2_cases():
+    for name, op in itertools.product(("rose", "palette", "rose_alpha"), QUANTIZE_GAP2_OPS):
+        yield _op("quantizegap2", "%s %s" % (name, " ".join(op)), [img(name)], op)
+    yield _op("quantizegap2", "rose -kmeans 4 with two seed colours", [img("rose")],
+              ["-define", "kmeans:seed-colors=#ff0000;#00ff00", "-kmeans", "4"])
+    for name in ("rose", "rose_alpha", "cmyk"):
+        yield _case("quantizegap2", "%s -verbose -kmeans 4x5+0.001" % name,
+                    [[img(name), "-verbose", "-kmeans", "4x5+0.001", "+verbose", "null:"]], [])
+    yield _op("quantizegap2", "seq -remap palette", [img("seq")], ["-remap", img("palette")])
+    yield _op("quantizegap2", "seq +remap", [img("seq")], ["+remap"])
+
+
+# distort.c, DistortImage: -verbose prints each method's coefficients as an
+# -fx expression, which only Polynomial had; +distort (best fit) for every
+# method; distort:scale above and below 1; and a perspective whose viewport
+# shows the horizon, where pixels past it are invalid.
+def _distort_gap_cases():
+    for m, args in sorted(_DISTORT_ARGS.items()):
+        yield _op("distortgap", "rose -verbose -distort %s" % m, [img("rose")],
+                  ["-verbose", "-distort", m, args, "+verbose"])
+        yield _op("distortgap", "rose +distort %s" % m, [img("rose")], ["+distort", m, args])
+    for m in ("SRT", "Arc", "Barrel", "Cylinder2Plane"):
+        for scale in ("2", "0.05"):
+            yield _op("distortgap", "rose distort:scale=%s -distort %s" % (scale, m),
+                      [img("rose")], ["-define", "distort:scale=" + scale, "-distort", m,
+                                      _DISTORT_ARGS[m]])
+    yield _op("distortgap", "rose +distort Perspective past the horizon", [img("rose")],
+              ["-define", "distort:viewport=90x70-10-10", "+distort", "Perspective",
+               "0,0 0,0  69,0 69,0  0,45 30,6  69,45 39,6"])
+
+
+# fx.c, ExecuteRPN: operators, functions and symbols no expression used (!=,
+# <=, >=, ||, !, jinc, clamp, drc, squish, ++ on a user symbol), the
+# per-channel symbols a b c g k m o r y, channel qualifiers on p{} and p[]
+# lookups, also of the second image (u[1], v, s), the loops, and printsize; on
+# an image with alpha and on CMYK, with granite as the second image.
+FX_GAP2_EXPRESSIONS = [
+    "u!=0.5", "u<=0.5", "u>=0.5", "u||0", "0||u", "!u", "jinc(u)", "jinc(0)",
+    "clamp(u*2-0.5)", "drc(u,0.5)", "squish(u)", "xx=0.1; xx++; xx",
+    "a", "b", "c", "g", "k", "m", "o", "r", "y",
+    "p{1,1}.hue", "p{1,1}.saturation", "p{1,1}.lightness", "p{1,1}.intensity",
+    "p[1,1].hue", "p[1,1].intensity", "u[1].p{2,2}.hue", "v.p{1,1}.intensity",
+    "v.p[1,1].lightness", "s.p{1,1}.saturation",
+    "xx=0; while(xx<3, xx++); xx/3", "xx=0; do(xx++, xx<3); xx/3",
+    "for(xx=0, xx<3, xx++); xx/3", "u.printsize.y/1e14",
+]
+
+
+def _fx_gap2_cases():
+    for name, e in itertools.product(("rose_alpha", "cmyk"), FX_GAP2_EXPRESSIONS):
+        yield _op("fxgap2", "%s granite -fx %s" % (name, e), [img(name), img("granite")],
+                  ["-fx", e])
+
+
+# cache.c: PersistPixelCache runs only for the MPC format, which no case wrote
+# or read; written and read back for four kinds of image. And an MVG mask
+# (draw.c sets a composite mask), which may reach MaskPixelCacheNexus.
+_MVG_MASK = ("viewbox 0 0 40 30\npush defs\npush mask m1\nfill #ffffff\n"
+             "circle 20,15 20,4\npop mask\npop defs\npush graphic-context\n"
+             "mask url(#m1)\nfill #ff0000\nrectangle 0,0 40,30\npop graphic-context\n")
+
+
+def _cache_gap_cases():
+    for name in ("rose", "rose_alpha", "cmyk", "palette"):
+        yield _case("cachegap", "%s through MPC" % name,
+                    [[img(name), "out.mpc"], ["out.mpc"] + FLOAT_OUT + ["dec.miff"]],
+                    ["dec.miff"])
+    yield _with_inputs(_op_to("cachegap", "MVG with a mask",
+                              ["-size", "40x30", "xc:#0000ff", "-draw", "@m.mvg"] + FLOAT_OUT,
+                              "out.miff"), files={"m.mvg": _MVG_MASK})
+
+
+# xml-tree.c: ValidateEntities checks parameter entities in an internal
+# DOCTYPE, which no configuration file had: nested, circular and undefined
+# ones, in a policy.xml of the case's own, listed. The other unreached
+# functions (XMLTreeInfoToXML, AddPathToXMLTree, CanonicalXMLContent, ...) are
+# called only from MagickWand's drawing wand, or nowhere.
+XML_DOCTYPES = {
+    "nested": '<!ENTITY % w "10KP">\n  <!ENTITY % nested "%w;">\n  <!ENTITY limit "%nested;">',
+    "circular": '<!ENTITY % a "%b;">\n  <!ENTITY % b "%a;">\n  <!ENTITY limit "%a;">',
+    "undefined": '<!ENTITY limit "%nosuch;">',
+}
+
+
+def _xml_gap_cases():
+    for label, doctype in sorted(XML_DOCTYPES.items()):
+        policy = ('<?xml version="1.0"?>\n<!DOCTYPE policymap [\n  %s\n]>\n<policymap>\n'
+                  '  <policy domain="resource" name="width" value="&limit;"/>\n'
+                  '</policymap>\n' % doctype)
+        yield _with_inputs(_case("xmlgap", "policy.xml with %s parameter entities" % label,
+                                 [["-list", "policy"]], []),
+                           files={".config/ImageMagick/policy.xml": policy})
+
+
+# color.c: -list color (ListColorInfo, GetColorInfoList, GetColorList), and
+# %[pixel:] on CMYK, Oklch (the hue component), HDRI (QueryColorname above 16
+# bits) and on colours that are not exact at 8 bits (IsSVGCompliant).
+COLOR_PIXEL_IMAGES = [
+    ("cmyk", [img("cmyk")]), ("oklch", [img("rose"), "-colorspace", "Oklch"]),
+    ("hdri", [img("hdri")]), ("16-bit", ["-size", "1x1", "xc:srgb(50.5%,10.25%,20%)",
+                                        "-depth", "16"]),
+    ("8-bit off by one", ["-size", "1x1", "xc:#ff0001"]),
+]
+
+
+def _color_gap_cases():
+    yield _case("colorgap", "-list color", [["-list", "color"]], [])
+    for label, make in COLOR_PIXEL_IMAGES:
+        yield _case("colorgap", "%%[pixel:] of %s" % label,
+                    [make + ["-format", "%[pixel:p{0,0}] %[pixel:p]\\n", "info:"]], [])
+
+
+# composite.c: TextureImage with a tile offset and a texture with alpha
+# (tile:), and SeamlessBlendImage under -verbose, which prints its residual per
+# tick. Not under -compose multiply: tile: then composes onto a canvas that is
+# not initialised, and the output differs from run to run (1 in 4; ORACLE.md,
+# "Known upstream issues").
+def _texture_gap_cases():
+    for t, offset in itertools.product(("rose_patch", "rose_alpha"), ("+3+2", "+7+1")):
+        yield _op_to("texturegap", "tile:%s -tile-offset %s" % (t, offset),
+                     ["-size", "40x30", "-tile-offset", offset, "tile:" + img(t)] + FLOAT_OUT,
+                     "out.miff")
+    yield _case("texturegap", "seamless-blend -verbose",
+                [[img("rose"), img("rose_patch"), "-verbose", "-define",
+                  "compose:args=50x0.0001+10", "-compose", "seamless-blend", "-composite",
+                  "+verbose", "null:"]], [])
+
+
+# distort.c, GenerateCoefficients: argument counts the distort table never
+# gave. Affine with one and two control points; Arc with one to four
+# arguments; Polar and DePolar with each optional argument, the -1 radius and
+# too many; Barrel with three and eight; out-of-range fields of view for the
+# cylinder methods; shepards:power; too few points for Perspective and
+# Bilinear. Errors are compared too.
+DISTORT_ARG_CASES = [
+    ("Affine", "10,10 20,15"), ("Affine", "10,10 20,15  50,30 55,40"),
+    ("Arc", "60"), ("Arc", "60 10"), ("Arc", "60 10 50"), ("Arc", "60 10 50 20"),
+    # rotations whose normalised start angle is exactly 0.5 or 0 turns (MagickRound's tie)
+    ("Arc", "60 270"), ("Arc", "360 90"),
+    ("Polar", "-1"), ("Polar", "40 10"), ("Polar", "40 10 30 20"),
+    ("Polar", "40 10 30 20 10 350"), ("Polar", "1 2 3 4 5 6 7"),
+    ("DePolar", "-1"), ("DePolar", "40 10 30 20 10 350"),
+    ("Barrel", "0.1 0.0 -0.2"), ("Barrel", "0.0 0.0 -0.2 1.1 0.1 0.0 0.05 1.0"),
+    ("Barrel", "1 2 3 4 5 6 7"),
+    ("Cylinder2Plane", "170"), ("Cylinder2Plane", "0"), ("Plane2Cylinder", "170"),
+    ("Perspective", "0,0 3,4  69,0 60,5  0,45 8,40"),
+    ("BilinearForward", "0,0 3,4  69,0 60,5  0,45 8,40"),
+]
+
+
+def _distort_args_gap_cases():
+    for m, args in DISTORT_ARG_CASES:
+        yield _op("distortargs", "rose -distort %s %s" % (m, args), [img("rose")],
+                  ["-distort", m, args])
+    for power in ("3", "0.5"):
+        yield _op("distortargs", "rose shepards:power=%s" % power, [img("rose")],
+                  ["-define", "shepards:power=" + power, "-distort", "Shepards",
+                   _DISTORT_ARGS["Shepards"]])
+
+
+# fx.c, third round: colour constants in an expression (GetConstantColour,
+# 20%): colour functions srgb, rgb, hsl, cmyk, srgba, gray, device-gray, a
+# named colour, an out-of-range component and a missing ')'; page.width and
+# page.height (MaybeXYWH, 23%); and channel qualifiers on u, v, u[1] and s
+# (GetChannelQualifier, 47%).
+FX_GAP3_EXPRESSIONS = [
+    "srgb(50%,20%,10%)", "rgb(255,0,0)*u", "hsl(120,50%,50%)", "cmyk(0,50%,50%,0)",
+    "srgba(10%,20%,30%,0.5)", "navy", "u*red", "rgb(300,0,0)", "srgb(10%,20%",
+    "gray(50%)", "device-gray(0.5)",
+    "u.page.width/100", "u.page.height/100", "u.page.x+u.page.width/100",
+    "u.r", "v.g", "u[1].b", "s.b",
+]
+
+
+def _fx_gap3_cases():
+    for e in FX_GAP3_EXPRESSIONS:
+        yield _op("fxgap3", "rose granite -fx %s" % e, [img("rose"), img("granite")], ["-fx", e])
+
+
+# matrix.c: AcquireMatrixInfo keeps a matrix in a file only when it is larger
+# than the max-memory-request policy (not when memory is limited), so
+# SetMatrixExtent never ran; a policy.xml of the case's own sets it to 256 bytes.
+def _matrix_gap2_cases():
+    policy = ('<policymap>\n  <policy domain="system" name="max-memory-request" '
+              'value="256"/>\n</policymap>\n')
+    for label, pre in (("accumulator", ["-define", "hough-lines:accumulator=true"]), ("lines", [])):
+        yield _with_inputs(_op("matrixgap2", "-hough-lines %s, max-memory-request 256" % label,
+                               _HOUGH_INPUT, pre + ["-hough-lines", "9x9+10"]),
+                           files={".config/ImageMagick/policy.xml": policy})
+
+
+# quantize.c, third round: -dither None for posterize (+dither does not reach
+# PosterizeImage's dither method); two colours in gray, with and without
+# dithering (AssignImageColors' and SetAssociatedAlpha's two-colour branches);
+# eight colours in gray (SetGrayscaleImage's IntensityCompare); -treedepth. (A
+# 600x600 noise image is not reproducible; ORACLE.md, Known upstream issues.)
+QUANTIZE_GAP3_OPS = [
+    ["-dither", "None", "-posterize", "3"], ["-colorspace", "gray", "+dither", "-colors", "2"],
+    ["-colorspace", "gray", "-colors", "2"], ["-colorspace", "gray", "-colors", "8"],
+    ["-treedepth", "3", "-colors", "16"],
+]
+
+
+def _quantize_gap3_cases():
+    for name, op in itertools.product(("rose", "palette", "rose_alpha"), QUANTIZE_GAP3_OPS):
+        yield _op("quantizegap3", "%s %s" % (name, " ".join(op)), [img(name)], op)
+
+
+# quantize.c, fourth round, routes checked with the coverage build first:
+# IntensityCompare sorts a gray colormap, whose order a float write loses, so
+# these write a palette MIFF or print the colormap. PruneLevel is left out: it
+# runs only on images with very many colours, whose quantization is not
+# reproducible (ORACLE.md, Known upstream issues).
+def _quantize_gap4_cases():
+    for name in ("rose", "rose_alpha", "gray16"):
+        yield _op_to("quantizegap4", "%s -colorspace gray -colors 8, palette MIFF" % name,
+                     [img(name), "-colorspace", "gray", "-colors", "8"], "out.miff")
+        yield _case("quantizegap4", "%s -colorspace gray -colors 8 -verbose info:" % name,
+                    [[img(name), "-colorspace", "gray", "-colors", "8", "-verbose", "info:"]], [])
+
+
+# montage.c: GetMontageGeometry fills in whichever tile count is missing, or
+# both. The montage family has -tile 3x and 2x2 only; rows only (x2, x3), columns
+# only (2x), 1x1 (one image per page) and an offset with no counts.
+MONTAGE_TILES = ["x2", "x3", "2x", "1x1", "+0+0"]
+
+
+def _montage_gap_cases():
+    inputs = [img(n) for n in ("rose", "granite", "logo", "wizard", "tiny")]
+    for t in MONTAGE_TILES:
+        yield _op_to("montagegap", "montage of five -tile %s" % t,
+                     ["montage"] + inputs + ["-tile", t, "-geometry", "20x20+1+1"] + FLOAT_OUT,
+                     "out.miff")
+
+
+# composite.c: CompositeOverImage's virtual composite (outside the source),
+# run only with compose:clip-to-self=false, sets the alpha of every pixel the
+# source does not cover; it shows only with a source that has alpha (line
+# coverage showed the path run but change nothing with an opaque source).
+_ALPHA_PATCH = ["(", img("rose_alpha"), "-crop", "20x15+10+10", "+repage", ")"]
+
+
+def _compose_over_gap_cases():
+    for dest, offset, clip in itertools.product(("rose", "rose_alpha"), ("-3-2", "+40+25"),
+                                                ("false", "true")):
+        yield _op("composegap", "%s over an alpha patch at %s, clip-to-self=%s"
+                  % (dest, offset, clip), [img(dest)] + _ALPHA_PATCH,
+                  ["-geometry", offset, "-define", "compose:clip-to-self=" + clip,
+                   "-compose", "over", "-composite"])
+
+
+# composite.c: SeamlessBlendImage's residual is 0 from the first iteration on
+# (one iteration and five give the same image), so with any threshold above 0
+# the loop stops at once and the iteration code never runs. A threshold of 0
+# makes it run every iteration, and -verbose prints one residual per tick.
+def _seamless_gap_cases():
+    for args, verbose in (("5x0+1", True), ("5x0+2", True), ("5x0+1", False)):
+        pre = ["-verbose"] if verbose else []
+        post = ["+verbose", "null:"] if verbose else FLOAT_OUT + ["out.miff"]
+        yield _case("composegap2", "seamless-blend args=%s%s" % (args, " -verbose" if verbose else ""),
+                    [[img("rose")] + _ALPHA_PATCH + ["-geometry", "+20+10"] + pre
+                     + ["-define", "compose:args=" + args, "-compose", "seamless-blend",
+                        "-composite"] + post], [] if verbose else ["out.miff"])
+
+
+# fx.c, fourth round (routes checked with line coverage): an image attribute
+# with a virtual channel qualifier is an error (GetChannelQualifier), and with
+# u[1] another one (GetFunction); with a real channel it is allowed.
+FX_GAP4_EXPRESSIONS = ["mean.hue", "maxima.intensity", "minima.lightness",
+                       "u[1].mean.saturation", "mean.r", "maxima.g", "standard_deviation.b"]
+
+
+def _fx_gap4_cases():
+    for e in FX_GAP4_EXPRESSIONS:
+        yield _op("fxgap4", "rose granite -fx %s" % e, [img("rose"), img("granite")], ["-fx", e])
+
+
+# quantum-import.c, quantum-export.c: Export/ImportOpacityQuantum run only for
+# RGBO and BGRO with -interlace line (reach.py: not with plane or none), and
+# the raw o: writer cannot reach them (it switches on the input's format;
+# ORACLE.md, Known upstream issues). Line-interlaced round trips at each depth,
+# integer and floating point.
+OPACITY_LINE_DEPTHS = [("8", []), ("16", []), ("32", []), ("16", _FLOAT), ("32", _FLOAT),
+                       ("64", _FLOAT)]
+
+
+def _opacity_line_gap_cases():
+    for f, (depth, extra) in itertools.product(("rgbo", "bgro"), OPACITY_LINE_DEPTHS):
+        if _quantum_unstable(f, extra):
+            continue
+        enc = "enc." + f
+        steps = [[img("rose_alpha"), "-depth", depth] + extra + ["-interlace", "line", "%s:%s" % (f, enc)],
+                 ["-size", "{W:rose_alpha}x{H:rose_alpha}", "-depth", depth] + extra
+                 + ["-interlace", "line", "%s:%s" % (f, enc)] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantumgap5", "rose_alpha -depth %s %s -interlace line -> %s"
+                    % (depth, " ".join(extra), f), steps, [enc, "dec.miff"])
+
+
+# Second line-interlaced round: the other depths (1, 4, 10, 12, 24, and 24-bit
+# floating point), for RGBO, BGRO and BGR. (Line-interlaced BGRO comes out the
+# size of BGR, as if its opacity were not written; kept as it is.)
+OPACITY_LINE_DEPTHS2 = [("1", []), ("4", []), ("10", []), ("12", []), ("24", [])]
+
+
+def _opacity_line_gap2_cases():
+    combos = list(itertools.product(("rgbo", "bgro", "bgr"), OPACITY_LINE_DEPTHS2))
+    combos.append(("rgbo", ("24", _FLOAT)))
+    for f, (depth, extra) in combos:
+        enc = "enc." + f
+        steps = [[img("rose_alpha"), "-depth", depth] + extra + ["-interlace", "line", "%s:%s" % (f, enc)],
+                 ["-size", "{W:rose_alpha}x{H:rose_alpha}", "-depth", depth] + extra
+                 + ["-interlace", "line", "%s:%s" % (f, enc)] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantumgap6", "rose_alpha -depth %s %s -interlace line -> %s"
+                    % (depth, " ".join(extra), f), steps, [enc, "dec.miff"])
+
+
+# signature.c: SignatureImage skips pixels a read mask excludes (mask at or
+# below half), which no %# case had: a bilevel mask, a gray mask with values on
+# both sides of half, and the mask removed again.
+def _signature_gap2_cases():
+    for label, mask in (("bilevel", ["-read-mask", img("bilevel")]),
+                        ("gray8", ["-read-mask", img("gray8")]),
+                        ("gray8, removed", ["-read-mask", img("gray8"), "+read-mask"])):
+        yield _case("signaturegap2", "rose %%# under a %s read mask" % label,
+                    [[img("rose")] + mask + ["-format", "%#\\n", "info:"]], [])
+
+
+# histogram.c: IsPaletteImage's boundary at MaxColormapSize. -colors N on a
+# palette image of N colours or fewer calls CompressImageColormap, and that
+# IsPaletteImage (GetImageType, the other caller, is MagickWand only); a
+# palette of exactly 65536 colours, reproducible and quick (checked: no tree
+# pruning). The boundary mutant was run by hand on this route: it differs.
+_PALETTE_65536 = ["-size", "256x256", "xc:#000000", "-channel", "R", "-fx", "i/255",
+                  "-channel", "G", "-fx", "j/255", "+channel", "-depth", "16", "+dither",
+                  "-colors", "65536"]
+
+
+def _histogram_gap3_cases():
+    yield _case("histogramgap3", "65536-colour palette, -colors 65536 again",
+                [_PALETTE_65536 + ["p.miff"], ["p.miff", "-colors", "65536", "-depth", "16", "out.miff"]],
+                ["out.miff"])
+
+
+# stream.c, second round (reach.py): every stream case read MIFF; PNG and TIFF
+# reach GetAuthenticPixelsStream, which no case did. And a GIF whose two frames
+# differ in size, so the stream's pixel cache changes geometry between frames
+# (ValidatePixelCacheMorphology).
+def _stream_gap2_cases():
+    for fmt, (m, t) in itertools.product(("png", "tif"), (("rgba", "char"), ("rgb", "float"))):
+        yield _case("streamgap2", "stream %s -map %s -storage-type %s" % (fmt, m, t),
+                    [[img("rose_alpha"), "in." + fmt],
+                     ["stream", "-map", m, "-storage-type", t, "in." + fmt, "out.raw"]], ["out.raw"])
+    yield _case("streamgap2", "stream a GIF of two frame sizes",
+                [[img("rose"), "(", img("rose"), "-resize", "50%", ")", "seq.gif"],
+                 ["stream", "-map", "rgb", "-storage-type", "char", "seq.gif", "out.raw"]], ["out.raw"])
+
+
+# color.c, second round: IsSVGCompliant checks red, green and blue in turn
+# (and black for CMYK), and %[pixel:] prints percentages when one is not exact
+# at 8 bits. The first round's colour was off in all three; these are off in one
+# channel each, in black, in none, and in alpha only.
+COLOR_SVG_COMPLIANCE = ["srgb(50.5%,40%,20%)", "srgb(40%,50.5%,20%)", "srgb(40%,20%,50.5%)",
+                        "srgb(40%,20%,60%)", "cmyk(10%,20%,30%,40.5%)", "cmyk(10%,20%,30%,40%)",
+                        "srgba(40%,20%,60%,0.505)"]
+
+
+def _color_gap2_cases():
+    for c in COLOR_SVG_COMPLIANCE:
+        yield _case("colorgap2", "%%[pixel:] of %s at 16 bits" % c,
+                    [["-size", "1x1", "xc:" + c, "-depth", "16", "-format", "%[pixel:p{0,0}]\\n",
+                      "info:"]], [])
+
+
+# timer.c and registry.c: -define registry:date:precision=N (DefineImageRegistry,
+# then SetMagickDatePrecision) cuts the timestamps FormatMagickTime writes, as in
+# the PostScript CreationDate. The timestamp is 25 characters, so 24, 25 and 26
+# sit on the boundary; 4 and 10 cut it, 0 leaves it. Also a registry string
+# defined and removed again (+define).
+TIMER_PRECISIONS = ["0", "4", "10", "24", "25", "26"]
+
+
+def _timer_gap_cases():
+    for prec in TIMER_PRECISIONS:
+        yield _op_to("timergap", "rose -> PostScript, registry date precision %s" % prec,
+                     ["-define", "registry:date:precision=" + prec, img("rose")], "out.ps")
+    yield _op_to("timergap", "registry string defined and removed",
+                 ["-define", "registry:mykey=myvalue", "+define", "registry:mykey", img("rose")]
+                 + FLOAT_OUT, "out.miff")
+
+
+# monitor.c: SetImageProgress records its last message (percentage, tag and
+# file) as the artifact monitor:progress, which %[monitor:progress] prints; no
+# case printed it. Under -monitor, after three operators.
+def _monitor_gap_cases():
+    for op in (["-negate"], ["-resize", "50%"], ["-blur", "0x1"]):
+        yield _case("monitorgap", "rose -monitor %s, %%[monitor:progress]" % " ".join(op),
+                    [[img("rose"), "-monitor"] + op + ["-format", "%[monitor:progress]\\n", "info:"]], [])
+
+
+# montage.c: MontageImageList sorts the images by scene (SceneCompare) when
+# none has scene 0, which frames picked out of a sequence keep; out of order.
+def _montage_gap2_cases():
+    yield _op_to("montagegap2", "montage of anim frames 3,1,2 (sorted by scene)",
+                 ["montage", img("anim") + "[3,1,2]", "-tile", "3x", "-geometry", "+1+1"] + FLOAT_OUT,
+                 "out.miff")
+
+
+# morphology.c: convolve:scale with a second, blending factor adds a scaled
+# unity kernel (UnityAddKernelInfo), to every kernel of a list; single and
+# multi-kernel, plain, percent and normalised ('!') scales.
+MORPH_SCALE_KERNELS = ["Sobel", "Sobel:0;Sobel:90", "3x3:1,2,1,0,0,0,-1,-2,-1"]
+MORPH_SCALES = ["1,0.5", "50%,25%", "!,0.5"]
+
+
+def _morph_gap_cases():
+    for k, sc in itertools.product(MORPH_SCALE_KERNELS, MORPH_SCALES):
+        yield _op("morphgap", "gray16 convolve:scale=%s -morphology Convolve %s" % (sc, k),
+                  [img("gray16")], ["-define", "convolve:scale=" + sc, "-morphology", "Convolve", k])
+
+
+# morphology.c, MorphologyApply: -define debug=true prints the changes per
+# iteration and stage, which no case printed; iterations of -1 (until nothing
+# changes); multi-stage methods (Close, Open) and multi-kernel lists (Corners).
+MORPH_DEBUG_OPS = [("Thinning:-1", "Skeleton"), ("Close:2", "Disk:1"), ("Open", "Disk:1"),
+                   ("HitAndMiss", "Corners"), ("Dilate:-1", "Diamond")]
+
+
+def _morph_gap2_cases():
+    for method, kernel in MORPH_DEBUG_OPS:
+        yield _case("morphgap2", "bilevel debug -morphology %s %s" % (method, kernel),
+                    [[img("bilevel"), "-define", "debug=true", "-morphology", method, kernel,
+                      "null:"]], [])
+        yield _op("morphgap2", "bilevel -morphology %s %s" % (method, kernel), [img("bilevel")],
+                  ["-morphology", method, kernel])
+
+
+# morphology.c, AcquireKernelBuiltIn: kernel types and arguments the catalogue
+# never built (FreiChen's numbered kernels, Ridges, Skeleton, Peaks, the shape
+# and distance kernels with sizes and scales); morphology:showKernel prints the
+# values, so any change to the builder shows.
+MORPH_SHOW_KERNELS = [
+    "FreiChen:0", "FreiChen:1", "FreiChen:2", "FreiChen:5", "FreiChen:7", "FreiChen:10",
+    "FreiChen:11", "FreiChen:1,45", "Ridges:1", "Ridges:2", "Skeleton:1", "Skeleton:2",
+    "Skeleton:3", "Peaks:1.5,2.5", "Peaks:2,4", "Binomial:1", "Binomial:2", "Binomial:3",
+    "Diamond:2,3", "Octagon:2,5", "Plus:2,3", "Cross:2,3", "Disk:2.5,3", "Rectangle:3x2+1+1",
+    "Manhattan:2,3", "Octagonal:2,3", "Chebyshev:2,3", "Euclidean:2,3", "Comet:2,3",
+    "Comet:2,3,45", "LoG:0x1", "Blur:0x1,45", "Roberts:45", "Prewitt:90", "Compass:45",
+    "Kirsch:90", "LineEnds:1", "LineJunctions:1", "ThinSE:41", "Diagonals:1",
+]
+
+
+def _morph_gap3_cases():
+    for k in MORPH_SHOW_KERNELS:
+        yield _case("morphgap3", "showKernel %s" % k,
+                    [["-size", "4x4", "xc:#808080", "-define", "morphology:showKernel=1",
+                      "-morphology", "Convolve:1", k, "null:"]], [])
+
+
+# morphology.c, MorphologyImage: an invalid convolve:bias (a warning) and a
+# valid one; morphology:compose Undefined (parses to 0, the boundary of its
+# check), Lighten and an unknown name, on a multi-kernel list, where the compose
+# method combines the kernels' results.
+MORPH_IMAGE_DEFINES = ["convolve:bias=abc", "convolve:bias=10%", "morphology:compose=Undefined",
+                       "morphology:compose=Lighten", "morphology:compose=nosuch"]
+
+
+def _morph_gap4_cases():
+    for d in MORPH_IMAGE_DEFINES:
+        yield _op("morphgap4", "gray16 %s -morphology Convolve Sobel:>" % d, [img("gray16")],
+                  ["-define", d, "-morphology", "Convolve", "Sobel:>"])
+
+
+# quantize.c, RemapImages with a reference image: the command line passes none
+# (+remap quantizes the list instead); MSL's <map image="id"/> passes one (line
+# coverage: the reference branch runs). With and without dithering.
+_MSL_MAP = """<?xml version="1.0" encoding="UTF-8"?>
+<group>
+  <image id="pal">
+    <read filename="%s" />
+  </image>
+  <image>
+    <read filename="%s" />
+    <map image="pal" dither="%s" />
+    <write filename="out.miff" />
+  </image>
+</group>
+"""
+
+
+def _quantize_gap5_cases():
+    for dither in ("false", "true"):
+        yield _with_inputs(_case("quantizegap5", "msl map to palette, dither %s" % dither,
+                                 [["conjure", "msl:map.msl"]], ["out.miff"]),
+                           files={"map.msl": _MSL_MAP % (img("palette"), img("rose"), dither)})
+
+
+# quantize.c: PruneLevel runs only once the colour tree passes MaxQNodes (266817)
+# nodes, which needs a deep tree (-treedepth 8; for 64 colours QuantizeImage
+# picks depth 4) and some 360,000 distinct colours: colour noise, opaque and with
+# noisy alpha (16 children a node). RemapImage reduces the reference only when
+# it has more than MaxColormapSize (65536) colours: a 300x300 noise palette.
+_COLOUR_NOISE = ["-seed", "3", "-size", "600x600", "xc:#808080", "+noise", "Random"]
+
+
+def _quantize_gap6_cases():
+    yield _op_to("quantizegap6", "600x600 colour noise -treedepth 8 -colors 64",
+                 _COLOUR_NOISE + ["-treedepth", "8", "-colors", "64"], "out.miff")
+    yield _op_to("quantizegap6", "600x600 colour noise, noisy alpha, -treedepth 8 -colors 64",
+                 _COLOUR_NOISE + ["-alpha", "set", "-channel", "A", "+noise", "Random", "+channel",
+                                  "-treedepth", "8", "-colors", "64"], "out.miff")
+    yield _op_to("quantizegap6", "rose -remap a 300x300 colour noise palette",
+                 ["-seed", "3", "-size", "300x300", "xc:#808080", "+noise", "Random",
+                  "-write", "mpr:pal", "+delete", img("rose"), "-remap", "mpr:pal"], "out.miff")
+
+
+# quantize.c: AssignImageColors' monochrome step (-quantize gray -colors 2) sets
+# colormap 0 black or white by which entry is brighter. Undithered (+dither must
+# come before -colors), the entry of a parent that took in pruned children comes
+# after its surviving child (DefineImageColormap is post-order), so entry 0 is
+# the brighter one for a gradient, logo and wizard; one-colour images take the
+# colors == 1 branch.
+def _quantize_gap7_cases():
+    for name, src in (("gradient", ["-size", "16x256", "gradient:"]),
+                      ("three grays", ["-size", "2x2", "xc:gray(5%)", "-size", "30x30", "xc:gray(60%)",
+                                       "xc:gray(70%)", "+append"]),
+                      ("logo", [img("logo")]), ("wizard", [img("wizard")]), ("rose", [img("rose")]),
+                      ("white", ["-size", "8x8", "xc:white"]), ("gray50", ["-size", "8x8", "xc:gray50"])):
+        for dither in ("+dither", "-dither"):
+            yield _op_to("quantizegap7", "%s %s -quantize gray -colors 2" % (name, dither),
+                         src + ([dither] if dither == "+dither" else ["-dither", "FloydSteinberg"])
+                         + ["-quantize", "gray", "-colors", "2"], "out.miff")
+
+
+# quantize.c: -verbose before -colors sets measure_error, and AssignImageColors
+# then leaves the pixels for GetImageQuantizeError, whose figures -verbose info:
+# prints ("Mean error per pixel"); undithered, so the loop that skips them runs.
+def _quantize_gap8_cases():
+    for name in ("rose", "rose_alpha"):
+        yield _case("quantizegap8", "%s +dither -verbose -colors 16 info:" % name,
+                    [[img(name), "+dither", "-verbose", "-colors", "16", "info:"]], [])
+
+
+# quantize.c: PosterizePixel's MagickRound breaks a tie (fraction exactly .5)
+# upwards: in HDRI rgb(127.5,63.75,191.25) is exactly such a tie at 2 and 3
+# levels. -monitor prints ReduceImageColors' progress. SetAssociatedAlpha leaves
+# alpha out for two gray colours only: an alpha image at 2 and 8 gray colours.
+def _quantize_gap9_cases():
+    for levels in ("2", "3"):
+        yield _op_to("quantizegap9", "half-way colour +dither -posterize %s" % levels,
+                     ["-size", "4x4", "xc:rgb(127.5,63.75,191.25)", "+dither", "-posterize", levels],
+                     "out.miff")
+    yield _case("quantizegap9", "rose -monitor -colors 16",
+                [[img("rose"), "-monitor", "-colors", "16", "null:"]], [])
+    for colors in ("2", "8"):
+        for dither in (["+dither"], ["-dither", "FloydSteinberg"]):
+            yield _op_to("quantizegap9", "rose_alpha %s -quantize gray -colors %s" % (dither[0], colors),
+                         [img("rose_alpha")] + dither + ["-quantize", "gray", "-colors", colors],
+                         "out.miff")
+
+
+# quantize.c: PosterizeImage dithers through a map image for 2..16 levels only:
+# 1 and 17 levels, dithered, take the other path; -monitor prints its progress,
+# dithered and not (each hand-run first).
+def _quantize_gap10_cases():
+    for levels in ("1", "17"):
+        yield _op_to("quantizegap10", "rose -posterize %s, dithered" % levels,
+                     [img("rose"), "-posterize", levels], "out.miff")
+    for dither in ([], ["+dither"]):
+        yield _case("quantizegap10", "rose %s-monitor -posterize 4" % (dither[0] + " " if dither else ""),
+                    [[img("rose")] + dither + ["-monitor", "-posterize", "4", "null:"]], [])
+
+
+# cache.c: MaskPixelCacheNexus and ApplyPixelCompositeMask run under a composite
+# mask, which MVG sets for `mask "id"` only when the mask is a quoted, named
+# macro (GetMVGMacros skips `push mask m1`, so cachegap's MVG never reached
+# them; reach.py: now reached), with greys in the mask, on opaque and alpha
+# images and under SVG compliance (draw.c sets the mask per primitive).
+# ClonePixelCacheOnDisk runs when a cache on disk is cloned to another on disk:
+# +clone under -limit memory 0 -limit map 0.
+def _mvg_named_mask(compliance=""):
+    return ("viewbox 0 0 40 30\npush defs\npush mask \"m1\"\nfill white\ncircle 20,15 20,4\n"
+            "fill gray50\nrectangle 0,0 10,30\npop mask\npop defs\npush graphic-context\n%s"
+            "mask \"m1\"\nfill #ff0000\nrectangle 0,0 40,30\npop graphic-context\n" % compliance)
+
+
+def _cache_gap2_cases():
+    for label, src in (("blue", ["-size", "40x30", "xc:#0000ff"]),
+                       ("rose_alpha", [img("rose_alpha"), "-resize", "40x30!"])):
+        for compliance in ("", "compliance SVG\n"):
+            yield _with_inputs(_op_to("cachegap2", "named MVG mask on %s%s" % (
+                label, ", SVG compliance" if compliance else ""),
+                src + ["-draw", "@m.mvg"] + FLOAT_OUT, "out.miff"),
+                files={"m.mvg": _mvg_named_mask(compliance)})
+    for name in ("rose", "rose_alpha", "cmyk"):
+        yield _op("cachegap2", "%s on disk, a negated clone composed over it" % name,
+                  _NO_MEMORY + [img(name)], ["(", "+clone", "-negate", ")", "-compose", "over",
+                                             "-composite"])
+    yield _op("cachegap2", "rose on disk, resized and flipped",
+              _NO_MEMORY + [img("rose")], ["-resize", "50%", "-flip"])
+    # PersistPixelCache steps each image's offset in the .cache file to a page
+    # boundary; only a list of images uses it (cachegap's MPCs held one).
+    three = [img("rose"), img("granite"), img("logo")]
+    yield _case("cachegap2", "three images to one MPC", [three + ["out.mpc"]], ["out.mpc"])
+    yield _case("cachegap2", "three images to one MPC, read back",
+                [three + ["-write", "out.mpc", "-delete", "0--1", "out.mpc"] + FLOAT_OUT + ["dec.miff"]],
+                ["dec.miff"])
+
+
+# fx.c, with fx:debug=true (DumpRPN names every element, OprStr, and marks the
+# in-place operators): compound assignments (+= is operator 0, -- the last in
+# place), the symbols table, more than 100 elements and more than 50 user
+# symbols (the tables grow), and user symbols 99 and 100 letters long (the
+# token limit). User symbols must be letters only and longer than one letter.
+# Each hand-run first: 9 survivors killed.
+def _fx_gap5_cases():
+    names = ["zq" + a + b for a, b in itertools.product("abc", string.ascii_lowercase)][:55]
+    exprs = [("compound assignments", "zz=0.5; zz+=u; zz-=0.1; zz*=2; zz/=3; zz++; zz--; zz"),
+             ("symbols", "r*0.5+hue+luma+intensity-lightness+saturation+b+g+a+c+y+k+m+o"),
+             ("60 terms", "+".join(["u"] * 60) + "-59*u"),
+             ("55 user symbols", ";".join("%s=%d" % (n, i) for i, n in enumerate(names))
+              + "; (%s+%s)/100" % (names[1], names[54])),
+             ("99-letter symbol", "a" * 99 + "=0.5; " + "a" * 99),
+             ("100-letter symbol", "a" * 100 + "=0.5; " + "a" * 100)]
+    for label, e in exprs:
+        yield _op("fxgap5", "fx:debug %s" % label, ["-size", "4x4", "xc:gray"],
+                  ["-define", "fx:debug=true", "-fx", e])
+
+
+# fx.c: lines no case executed: jinc (and jinc(0)), SI and binary number
+# prefixes (1ki is 1024; K is not a prefix), the lightness and intensity
+# qualifiers on u, p, u[1] and v, printsize.x/y, a while loop, gcd with the
+# smaller argument first, -monitor over FxImage, and a constant expression
+# (DumpRPN's CornerOnly) under fx:debug. Two images, so u[1] and v exist.
+_FX_GAP6 = [
+    ("jinc", "jinc(u*2)/2+jinc(0)/4"),
+    ("number prefixes", "1ki/4000+1Mi/8388608+2m*100+1c*10+1h/800+1.5Gi/3e10"),
+    ("lightness and intensity", "u.lightness*0.3+u.intensity*0.3+p[1,1].lightness*0.2+p[1,1].intensity*0.2"),
+    ("lightness and intensity of the second image", "u[1].intensity*0.5+u[1].lightness*0.25+v.p[1,1].lightness*0.25"),
+    ("printsize", "u.printsize.x/10+u.printsize.y/10"),
+    ("while", "zz=0; while(zz<3, zz=zz+1); zz/4"),
+    ("gcd both ways", "gcd(8,12)/8+gcd(12,8)/8"),
+]
+
+
+def _fx_gap6_cases():
+    two = [img("rose"), "-resize", "8x8", img("granite"), "-resize", "8x8", "-density", "72"]
+    for label, e in _FX_GAP6:
+        yield _op("fxgap6", "fx %s" % label, two, ["-fx", e])
+    yield _case("fxgap6", "-monitor -fx", [[img("rose"), "-monitor", "-fx", "u*0.5", "null:"]], [])
+    yield _op("fxgap6", "fx:debug, a constant expression", ["-size", "4x4", "xc:gray"],
+              ["-define", "fx:debug=true", "-fx", "0.25"])
+
+
+# fx.c: gcd(1,0.001) meets FxGcd's 0.001 cut-off exactly, and gcd(3,3) has equal
+# arguments (x <= y would swap them for ever); rand() under -seed
+# shows how many values AllocFxRt discards first; a sum nested 120 deep needs
+# a value stack larger than the minimum of 100 (hand-run: 5 survivors killed).
+def _fx_gap7_cases():
+    deep = "u*0.001" + "".join(["+(u*0.001"] * 120) + ")" * 120
+    yield _op("fxgap7", "fx gcd at the cut-off", ["-size", "2x2", "xc:gray"], ["-fx", "gcd(1,0.001)/2"])
+    yield _op("fxgap7", "fx gcd of equal arguments", ["-size", "2x2", "xc:gray"], ["-fx", "gcd(3,3)/6"])
+    yield _op("fxgap7", "fx rand() under -seed", ["-seed", "7", "-size", "4x4", "xc:gray"], ["-fx", "rand()"])
+    yield _op("fxgap7", "fx sum nested 120 deep", ["-size", "2x2", "xc:gray"], ["-fx", deep])
+
+
+# fx.c: ImageStat for kurtosis, maxima, median, minima, skewness and standard
+# deviation, which only u.mean reached before. An attribute with no qualifier
+# reads the composite channel (MaxPixelChannels), with .r channel 0; under
+# %[fx:] the statistics are collected per call, under -fx once (hand-run: 10
+# survivors killed).
+_FX_STATS = "u.kurtosis%s/100+u.maxima%s+u.median%s+u.minima%s+u.skewness%s/10+u.standard_deviation%s"
+
+
+def _fx_gap8_cases():
+    small = [img("rose"), "-resize", "8x8"]
+    for q in ("", ".r"):
+        e = _FX_STATS % ((q,) * 6)
+        yield _case("fxgap8", "%%[fx:] statistics%s" % (" of red" if q else ""),
+                    [small + ["-format", "%%[fx:%s]" % e, "info:"]], [])
+        yield _op("fxgap8", "-fx statistics%s" % (" of red" if q else ""), small, ["-fx", e])
+
+
+# fx.c: an expression read from a file (-fx @file), and "@" alone, which
+# AcquireFxInfoPrivate takes literally (hand-run: both length tests killed),
+# and a "?" with no ":".
+def _fx_gap9_cases():
+    yield _with_inputs(_op("fxgap9", "-fx @file", ["-size", "2x2", "xc:gray"], ["-fx", "@e.fx"]),
+                       files={"e.fx": "u*0.5\n"})
+    yield _case("fxgap9", "-fx @ alone", [["-size", "2x2", "xc:gray", "-fx", "@", "null:"]], [])
+    # A "?" with no ":" (ResolveTernaryAddresses' error; hand-run: 2 killed).
+    # A standalone attribute with a channel qualifier, depth being the first
+    # attribute (GetChannelQualifier's range tests; hand-run: 2 killed).
+    # And an operand followed by "(" or "}", which GetOperator rejects as not a
+    # real operator (IsRealOperator's two bounds; hand-run: 2 killed).
+    for e in ("u>0.5 ? 1", "zz=u>0.5 ? 1; zz", "depth.r/32", "depth.hue", "0.5(0.5)", "0.5}"):
+        yield _case("fxgap9", "-fx %s" % e, [["-size", "2x2", "xc:gray", "-fx", e, "null:"]], [])
+
+
+# fx.c, ExecuteRPN's boundaries: comparisons of equal operands, shifts by 64 and
+# by a fraction, | and >> rounding a fraction, ~ of a fraction (exact in a long
+# double, so ~2.6 - ~0 shows it), sign(0), airy, and signed zeros, which %[fx:]
+# prints as -0: clamp(-0), max(0,-0), min(-0,0) (hand-run: 21 survivors killed).
+_FX_GAP10 = ["(0.5<=0.5)/2+(0.5>=0.5)/4+(0.5>0.5)/8+(0.5!=0.5)/16",
+             "((1<<64)+(1>>64)+(1<<63.6)+(4>>63.6))/4",
+             "(2.6>>0)/16+(2.6|0)/32+(0|2.6)/64",
+             "((~2.6)-(~0)+4)/8",
+             "sign(0)/2+0.5",
+             "airy(0)/2+airy(0.3)/2",
+             "clamp(-0)", "max(0,-0)", "min(-0,0)"]
+
+
+def _fx_gap10_cases():
+    for e in _FX_GAP10:
+        yield _case("fxgap10", "%%[fx:%s]" % e, [["-size", "2x2", "xc:gray", "-format", "%%[fx:%s]" % e, "info:"]], [])
+
+
+# fx.c, ExecuteRPN's image references under %[fx:] on each image of a list
+# (pfx->ImgNum is 1 for the second): u with a computed index (a constant 0
+# compiles to u0) and qualifiers, u[1].p relative and absolute, and u, u.r;
+# the HSL symbols alone (each sets NeedHsl itself); nesting exactly at the
+# 600 limit, by parentheses and by unary minus (hand-run: 36 killed).
+_FX_GAP11_TWO = ["u[1-1]", "u[1-1].r", "u[1-1].lightness", "u[1-1].intensity", "u[1-1].hue",
+                 "u[1].p[1,1].r", "u[1].p{2,2}", "u[1].p[1,1].lightness", "u[1].p[1,1].intensity",
+                 "u", "u.r",
+                 # GetFunction's qualifier errors, which name the attribute, and if()'s jump
+                 "u.depth.hue", "u.w.r", "u.mean.intensity", "if(u>0.5,0.25,0.75)"]
+
+
+def _fx_gap11_cases():
+    two = [img("rose"), "-resize", "6x6", img("granite"), "-resize", "6x6"]
+    for e in _FX_GAP11_TWO:
+        yield _case("fxgap11", "%%[fx:%s] on two images" % e, [two + ["-format", "%%[fx:%s]\\n" % e, "info:"]], [])
+    for label, e in (("hue", "hue"), ("saturation", "saturation"), ("lightness", "lightness"),
+                     ("600 parentheses", "(" * 600 + "0.5" + ")" * 600), ("600 minus signs", "-" * 600 + "0.5")):
+        yield _case("fxgap11", "%%[fx:] %s" % label,
+                    [[img("rose"), "-resize", "4x4", "-format", "%%[fx:%s]\\n" % e, "info:"]], [])
+    # An operand GetOperand cannot read ($zz), and image artifacts used as
+    # variables, a number and not (hand-run: 3 killed).
+    for e in ("$zz", "zzk", "zzb"):
+        yield _case("fxgap11", "-fx %s with artifacts" % e,
+                    [["-size", "2x2", "xc:gray", "-define", "zzk=0.25", "-define", "zzb=abc",
+                      "-fx", e, "-format", "%[fx:u]", "info:"]], [])
+
+
+# matrix.c: MatrixToImage scales the hough accumulator by its range: all zero
+# for a black image, a white one, and one horizontal line (its round: 31 killed in all).
+# And SetMatrixExtent, below.
+def _matrix_gap3_cases():
+    for label, src in (("black", ["-size", "20x15", "xc:black"]),
+                       ("white", ["-size", "20x15", "xc:white"]),
+                       ("one horizontal line", ["-size", "20x15", "xc:black", "-fill", "white",
+                                                "-draw", "line 0,7 19,7"])):
+        yield _op("matrixgap3", "hough accumulator of %s" % label, src,
+                  ["-define", "hough-lines:accumulator=true", "-hough-lines", "5x5+3"])
+    # With memory exhausted but mapping allowed (-limit memory 0 alone), the
+    # matrix is a file mapped into memory, the one route to SetMatrixExtent
+    # (reached; the hand-run kills were false, from a shared run directory).
+    yield _op("matrixgap3", "hough accumulator, matrix mapped from a file",
+              ["-limit", "memory", "0"] + _HOUGH_INPUT,
+              ["-define", "hough-lines:accumulator=true", "-hough-lines", "9x9+10"])
+
+
+# resample.c: resample:verbose prints SetResampleFilter's weighting table, and a
+# perspective squeezed into 20x20 drives ScaleResampleFilter near its limit
+# (its round: 5 killed).
+def _resample_gap_cases():
+    yield _case("resamplegap", "distort with resample:verbose",
+                [[img("rose"), "-define", "resample:verbose=1", "-distort", "SRT", "0.5,10", "null:"]], [])
+    yield _op("resamplegap", "perspective squeezed into 20x20", [img("rose")],
+              ["-define", "distort:viewport=20x20", "-distort", "Perspective",
+               "0,0 0,0  69,0 69,0  0,45 30,1  69,45 39,1"])
+
+
+# quantum-import.c / quantum-export.c: branches no round trip reached. The
+# min-is-white polarity (quantum:polarity) for gray and gray-alpha at every
+# depth; an odd width (7 pixels) for the packed depths 1, 2 and 4, whose last
+# byte holds fewer pixels, in every raw layout; palette with alpha (index and
+# alpha) at the packed depths, odd width, both polarities. A 7x5 crop.
+_ODD = ["-crop", "7x5+20+10", "+repage"]
+QUANTUM_ALL_DEPTHS = [("1", []), ("2", []), ("4", []), ("8", []), ("10", []), ("12", []), ("16", []),
+                      ("24", []), ("32", []), ("16", _FLOAT), ("32", _FLOAT), ("64", _FLOAT)]
+QUANTUM_PACKED_LAYOUTS = ["gray", "graya", "rgb", "rgba", "bgr", "bgra", "rgbo", "cmyk", "cmyka",
+                          "o", "a", "ycbcr", "ycbcra"]
+_MIN_IS_WHITE = ["-define", "quantum:polarity=min-is-white"]
+
+
+def _quantum_odd_round_trip(family, label, f, pre):
+    enc = "enc.%s" % f
+    steps = [[img("rose_alpha")] + _ODD + pre + ["%s:%s" % (f, enc)],
+             ["-size", "7x5"] + pre + ["%s:%s" % (f, enc)] + FLOAT_OUT + ["dec.miff"]]
+    return _case(family, label, steps, [enc, "dec.miff"])
+
+
+def _quantum_gap7_cases(writable_formats):
+    for f, (depth, extra) in itertools.product(("gray", "graya"), QUANTUM_ALL_DEPTHS):
+        if f in writable_formats:
+            yield _quantum_odd_round_trip("quantumgap7", "7x5 -depth %s %s min-is-white -> %s"
+                                          % (depth, " ".join(extra), f), f,
+                                          ["-depth", depth] + extra + _MIN_IS_WHITE)
+    for f, depth in itertools.product(QUANTUM_PACKED_LAYOUTS, ("1", "2", "4")):
+        if f in writable_formats and not (f in ("gray", "graya")):
+            yield _quantum_odd_round_trip("quantumgap7", "7x5 -depth %s -> %s" % (depth, f), f,
+                                          ["-depth", depth])
+    for depth, pol in itertools.product(("1", "2", "4", "8", "16"), ([], _MIN_IS_WHITE)):
+        steps = [[img("rose_alpha")] + _ODD + ["-colors", "4", "-type", "PaletteAlpha", "-depth", depth]
+                 + pol + ["miff:enc.miff"], pol + ["enc.miff"] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantumgap7", "7x5 PaletteAlpha -depth %s%s -> miff"
+                    % (depth, " min-is-white" if pol else ""), steps, ["enc.miff", "dec.miff"])
+
+
+# blob.c: ReadBlobString strips a line's trailing newline; the TEXT reader
+# renders each line it reads, so an unstripped newline shows. A file with an
+# empty line, a CRLF line and no final newline (hand-run: 3 killed).
+def _blob_gap_cases():
+    yield _with_inputs(_op_to("blobgap", "text: with empty, CRLF and unterminated lines",
+                              ["-size", "60x60", "-pointsize", "10", "text:t.txt"] + FLOAT_OUT, "out.miff"),
+                       files={"t.txt": "ab\n\ncd\r\nef"})
+    # FileToBlob's stream branch: "@-" reads an option's value from stdin, which FileToBlob
+    # treats as a stream even when it is a file. Small, empty, past one read (64 KB) and
+    # large (1.3 MB, the buffer's growth) (2026-10-07, hand-run: 14 killed)
+    big = "".join("line %05d of a long comment read from stdin\n" % i for i in range(30000))
+    for label, text, fmt in (("small", "hello from stdin\n", "%c"), ("empty", "", "[%c]"),
+                             ("big", big, "%[fx:0]%c"), ("64k", "x" * 65536, "%c")):
+        yield _with_inputs(_case("blobgap", "comment from %s stdin (@-)" % label,
+                                 [[img("rose"), "-set", "comment", "@-", "-format", fmt, "info:"]], []),
+                           files={"t.txt": text}, stdin="t.txt")
+    # stdin read twice (FileToBlob leaves it open: the second read finds its end) and an empty
+    # file read through the mapped branch (no map: the read loop's end test) (hand-run: 3 killed)
+    yield _with_inputs(_case("blobgap", "comment and label from stdin (@- twice)",
+                             [[img("rose"), "-set", "comment", "@-", "-set", "label", "@-", "-format", "[%c][%l]",
+                               "info:"]], []), files={"t.txt": "once\n"}, stdin="t.txt")
+    yield _with_inputs(_case("blobgap", "comment from an empty file (@e.txt)",
+                             [[img("rose"), "-set", "comment", "@e.txt", "-format", "[%c]", "info:"]], []),
+                       files={"e.txt": ""})
+    # OpenBlob: an "fd:" name (the descriptor branch: fdopen of stdout), and a file whose path
+    # policy grants reading only, read (the rights OpenBlob asks for) (hand-run: 4 killed)
+    yield _case("blobgap", "write PPM to fd:1", [[img("rose"), "-depth", "8", "ppm:fd:1"]], [])
+    yield _with_inputs(_case("blobgap", "read a PPM whose path policy allows reading only",
+                             [["x.ppm", "-format", "%wx%h %#", "info:"]], []),
+                       files={_POLICY: _policy('<policy domain="path" rights="read" pattern="*.ppm" />'),
+                              "x.ppm": "P3\n2 2\n255\n255 0 0 0 255 0\n0 0 255 255 255 255\n"})
+
+
+# pixel.c (2026-10-07): the interpolation methods on images with alpha and in CMYK (with and
+# without alpha), through -fx (InterpolatePixelChannel), -interpolative-resize
+# (InterpolatePixelChannels) and -distort (InterpolatePixelInfo), and the -intensity methods
+# through %[fx:intensity] in sRGB and linear RGB. The cases that first killed something among
+# 153 candidates (hand-run: 127 of 205 open mutants).
+_PIXEL_GAP = (
+    ("fx", "Spline", "alpha"), ("fx", "Catrom", "alpha"), ("fx", "Blend", "alpha"), ("ires", "Blend", "alpha"),
+    ("ires", "Spline", "alpha"), ("ires", "Catrom", "alpha"), ("fx", "Mesh", "alpha"), ("ires", "Average", "alpha"),
+    ("distort", "Spline", "cmyka"), ("distort", "Catrom", "cmyka"), ("fx", "Average", "alpha"),
+    ("distort", "Spline", "alpha"), ("distort", "Mesh", "cmyka"), ("distort", "Mesh", "alpha"),
+    ("fx", "Average9", "cmyka"), ("fx", "Average16", "alpha"), ("distort", "Blend", "cmyka"),
+    ("distort", "Blend", "alpha"), ("distort", "Average9", "cmyka"), ("distort", "Average", "cmyka"))
+_PIXEL_GAP_INTENSITY = (("Average", "sRGB"), ("Rec601Luminance", "sRGB"), ("RMS", "sRGB"), ("MS", "sRGB"),
+                        ("Lightness", "sRGB"), ("Rec709Luminance", "RGB"), ("Rec601Luminance", "RGB"))
+
+
+def _pixel_gap_cases():
+    images = {"alpha": [img("rose_alpha")], "cmyka": [img("rose_alpha"), "-colorspace", "cmyk"]}
+    ops = {"distort": ["-virtual-pixel", "edge", "-distort", "SRT", "0.73,17"],
+           "fx": ["-fx", "p{i*0.71+0.37,j*0.67+0.61}"], "ires": ["-interpolative-resize", "57x41"]}
+    for op, meth, image in _PIXEL_GAP:
+        yield _case("pixelgap", "%s -interpolate %s, %s" % (op, meth, image),
+                    [images[image] + ["-interpolate", meth] + ops[op] + ["-depth", "16", "out.miff"]], ["out.miff"])
+    # sample points at exact quarter offsets: Average's blend test, Blend's 0.25/0.75 cut-offs
+    # (hand-run: 4 killed)
+    for meth, fx, fy in (("Average", "0.25", "0.75"), ("Blend", "0.75", "0.25")):
+        yield _case("pixelgap", "fx -interpolate %s, alpha, at +%s,+%s" % (meth, fx, fy),
+                    [[img("rose_alpha"), "-interpolate", meth, "-fx", "p{i+%s,j+%s}" % (fx, fy), "-depth", "16",
+                      "out.miff"]], ["out.miff"])
+    for meth, cs in _PIXEL_GAP_INTENSITY:
+        yield _case("pixelgap", "%%[fx:intensity] -intensity %s in %s" % (meth, cs),
+                    [[img("rose"), "-colorspace", cs, "-intensity", meth, "-format", "%[fx:intensity]", "info:"]], [])
+
+
+# fx.c: loops of 300 iterations, where an element that should not push would
+# overflow the value stack (GetFunction's do_push for while and do), and for()
+# and while() with too many arguments (hand-run: 3 killed).
+def _fx_gap12_cases():
+    for e in ("zz=0; while(zz<300, zz=zz+1); zz/600", "zz=0; do(zz<300, zz=zz+1); zz/600",
+              "zz=0; for(ii=0, ii<300, ii=ii+1, zz=zz+2); zz/1000",
+              "zz=0; while(zz<3, zz=zz+1, zz=zz+0.5); zz/8",
+              # an in-place operator on the second user symbol, which the
+              # element must name (TranslateExpression; hand-run: killed)
+              "aa=0.1; bb=0.2; bb+=0.3; bb", "aa=0.1; bb=0.2; bb*=2; aa+bb"):
+        yield _case("fxgap12", "%%[fx:%s]" % e, [["-size", "2x2", "xc:gray", "-format", "%%[fx:%s]\\n" % e, "info:"]], [])
+
+
+# cache.c: with the cache:synchronize policy, SetPixelCacheExtent reserves the
+# disk cache with posix_fallocate (hand-run: 2 killed).
+_SYNC_POLICY = '<policymap>\n  <policy domain="cache" name="synchronize" value="True"/>\n</policymap>\n'
+
+
+def _cache_gap3_cases():
+    yield _with_inputs(_op("cachegap3", "disk cache under cache:synchronize",
+                           _NO_MEMORY + [img("rose")], ["(", "+clone", "-negate", ")", "-compose", "over", "-composite"]),
+                       files={".config/ImageMagick/policy.xml": _SYNC_POLICY})
+
+
+# token.c: a policy's coder pattern is matched case-sensitively, so "g*" does
+# not block GIF (hand-run: GlobExpression_'s case test killed).
+def _token_gap_cases():
+    pol = '<policymap>\n  <policy domain="coder" rights="none" pattern="g*" />\n</policymap>\n'
+    yield _with_inputs(_case("tokengap", "write GIF under a coder policy for g*",
+                             [[img("rose"), "-resize", "8x8", "gif:out.gif"]], ["out.gif"]),
+                       files={".config/ImageMagick/policy.xml": pol})
+
+
+# quantum-import.c: importers no writer feeds. ImportOpacityQuantum reads the O
+# line of a line-interlaced RGBO or BGRO file, which the writers leave out
+# (ORACLE.md); one row built by hand is that layout: -separate -append stacks
+# the R, G, B (or B, G, R) and A lines. ImportGrayAlphaQuantum reads a gray
+# file twice as wide as gray-alpha, the same bytes (reach.py: both reached).
+QUANTUM_GAP8_DEPTHS = [("1", []), ("4", []), ("8", []), ("10", []), ("12", []), ("16", []), ("24", []),
+                       ("32", []), ("16", _FLOAT), ("24", _FLOAT), ("32", _FLOAT), ("64", _FLOAT)]
+
+
+def _quantum_gap8_cases():
+    for (depth, extra), f in itertools.product(QUANTUM_GAP8_DEPTHS, ("rgbo", "bgro")):
+        if _quantum_unstable(f, extra):
+            continue
+        swap = ["-swap", "0,2"] if f == "bgro" else []
+        steps = [[img("rose_alpha"), "-crop", "7x1+20+10", "+repage", "-separate"] + swap
+                 + ["-append", "-depth", depth] + extra + ["gray:l.raw"],
+                 ["-size", "7x1", "-depth", depth] + extra + ["-interlace", "line", "%s:l.raw" % f]
+                 + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantumgap8", "one hand-built line-interlaced %s row, -depth %s %s"
+                    % (f, depth, " ".join(extra)), steps, ["l.raw", "dec.miff"])
+    for depth, extra in QUANTUM_GAP8_DEPTHS + [("2", [])]:
+        steps = [[img("rose"), "-resize", "14x5!", "-colorspace", "gray", "-depth", depth] + extra + ["gray:g.raw"],
+                 ["-size", "7x5", "-depth", depth] + extra + ["graya:g.raw"] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantumgap8", "a 14x5 gray file read as 7x5 gray-alpha, -depth %s %s"
+                    % (depth, " ".join(extra)), steps, ["g.raw", "dec.miff"])
+    # ImportIndexQuantum at 1, 2 and 4 bits: palette TIFFs keep the palette's
+    # own bits per sample (MIFF stores indexes in 8 bits or more), at an odd
+    # width, under both polarities (line probe: the 1- and 4-bit branches run).
+    for (colors, depth), pol in itertools.product((("2", "1"), ("4", "2"), ("16", "4")), ([], _MIN_IS_WHITE)):
+        steps = [[img("rose"), "-resize", "7x5!", "-colors", colors, "-type", "Palette", "-depth", depth,
+                  "tiff:p.tif"], pol + ["p.tif"] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantumgap8", "7x5 palette TIFF, %s colours at %s bits%s"
+                    % (colors, depth, ", min-is-white" if pol else ""), steps, ["p.tif", "dec.miff"])
+
+
+# fx.c: SetPtrShortExp cuts an error message's expression after 20 characters;
+# an unreadable operand of exactly 20 puts it at the cut (hand-run: killed at
+# 20, not at 19 or 21).
+def _fx_gap13_cases():
+    yield _case("fxgap13", "-fx with a 20-character unreadable operand",
+                [["-size", "2x2", "xc:gray", "-fx", "$abcdefghijklmnopqrs", "null:"]], [])
+
+
+# quantum-import/export.c: multispectral (meta channel) samples at 32-bit
+# integer (MIFF and TIFF) and 64-bit (TIFF only: MIFF stores 64 as 32), written
+# and read back (line probe: the 32-bit integer and both 64-bit branches run).
+def _quantum_gap9_cases():
+    for fmt, args in (("miff", ["-depth", "32"]), ("tiff", ["-depth", "32"]), ("tiff", ["-depth", "64"]),
+                      ("tiff", ["-depth", "64"] + _FLOAT), ("tiff", ["-depth", "16"])):
+        steps = [[img("rose"), "-resize", "8x6!", "-channel-fx", "red=>meta"] + args + ["%s:enc.%s" % (fmt, fmt)],
+                 ["enc.%s" % fmt] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantumgap9", "rose with a meta channel %s -> %s" % (" ".join(args), fmt), steps,
+                    ["enc.%s" % fmt, "dec.miff"])
+
+
+# quantum-import/export.c: RGB at 10 and 12 bits with packing off, which only
+# Cineon and DPX ask for (line probe: the 10- and 12-bit unpacked branches run),
+# written and read back at an odd and an even width.
+def _quantum_gap10_cases():
+    for fmt, depth, size in itertools.product(("cin", "dpx"), ("10", "12"), ("7x5", "8x5")):
+        steps = [[img("rose"), "-resize", size + "!", "-depth", depth, "%s:enc.%s" % (fmt, fmt)],
+                 ["enc.%s" % fmt] + FLOAT_OUT + ["dec.miff"]]
+        yield _case("quantumgap10", "rose %s -depth %s -> %s" % (size, depth, fmt), steps,
+                    ["enc.%s" % fmt, "dec.miff"])
+
+
+# morphology.c, statement deletion: built-in kernels whose construction rotates,
+# scales or expands them (deleted RotateKernelInfo, ScaleKernelInfo,
+# CalcKernelMetaData, Expand*KernelInfo calls); morphology:showKernel prints the
+# kernel. Edge kernels with an angle, every FreiChen type, and the expanding
+# kernels (hand-run with the mull-sdl-win build: 27 survivors killed).
+MORPH_GAP5_KERNELS = (["Roberts:90", "Prewitt:135", "Compass:180", "Kirsch:225"]
+                      + ["FreiChen:%d" % t for t in range(12)]
+                      + ["FreiChen:3,45", "FreiChen:11,90", "Diagonals:1,45", "LineEnds:1,90",
+                         "LineJunctions:2,45", "Ridges:2", "Skeleton:1", "Skeleton:2", "Skeleton:3",
+                         "ThinSE:41,90", "ConvexHull"])
+
+
+def _morph_gap5_cases():
+    for k in MORPH_GAP5_KERNELS:
+        yield _case("morphgap5", "showKernel %s" % k,
+                    [["-size", "3x3", "xc:gray", "-define", "morphology:showKernel=1",
+                      "-morphology", "Convolve:1", k, "null:"]], [])
+
+
+# fx.c, statement deletion: expressions spaced around operators, after commas
+# and inside brackets, where TranslateExpression's SkipSpaces calls matter
+# (hand-run with the mull-sdl-win build: 2 survivors killed).
+_FX_GAP14 = [" u * 0.5 + 0.1 ", "( u + 0.1 ) * 2", "max( u , 0.2 )", " zz = 0.5 ; zz + 0.1 ",
+             "p[ 1 , 1 ].r * 0.5"]
+
+
+def _fx_gap14_cases():
+    for e in _FX_GAP14:
+        yield _case("fxgap14", "%%[fx:%s] spaced" % e.strip(),
+                    [["-size", "2x2", "xc:gray", "-format", "%%[fx:%s]\\n" % e, "info:"]], [])
+
+
+# fx.c: a space between a token and the bracket or qualifier after it ("abs (u)", "u [1]",
+# "p {2,3}", "u .r"), which only PeekChar's own SkipSpaces skips (hand-run with exact mutant ids,
+# mull-sdl-win: PeekChar's statement deletion killed), over two images so u[1] differs from u
+_FX_GAP15 = ["p {2,3}.r", "u [1]", "abs (u)", "u .r", "max (u, v)", "rand ()", "v .p [-1,0].b",
+             "for (i=0, i<3, i=i+1); i/3",
+             # second batch (hand-run, one kill each): a trailing ';' (AcquireFxInfoPrivate's
+             # chLimit test), a nested property (GetProperty's bracket level), a bare '#'
+             # (GetHexColour's length), the image one past the last (ChkImgNum)
+             "u;", "%[fx:%[fx:0.25]]", "#", "u[2]",
+             # third batch: spaces where only TranslateExpression's, the after-operator and
+             # the after-unary-prefix SkipSpaces skip them (hand-run, one kill each)
+             "( )", "u+( )", "a= 1;a", "- ",
+             # fourth batch: unary prefixes nested deeper than the operator stack's later top,
+             # then a user symbol after a binary operator (TopOprIsUnaryPrefix reads the slot
+             # the earlier, deeper prefixes left; hand-run: killed)
+             "zz=0.5; (-(-(-zz))) + zz * zz", "zz=0.5; -(-(-(-zz))) * zz + zz", "zz=0.5; (!(!(!zz))) - zz*zz"]
+
+
+def _fx_gap15_cases():
+    for e in _FX_GAP15:
+        yield _case("fxgap15", "-fx %s of two images" % e,
+                    [[img("rose"), img("granite"), "-fx", e, "-format", "%[fx:mean]\\n", "info:"]], [])
+    # epoch( with a space before the property: only PeekStr's SkipSpaces skips it (hand-run:
+    # killed); a fixed date property, not the file's
+    for e in ("epoch( %[date:x])", "epoch(%[date:x])"):
+        yield _case("fxgap15", "%%[fx:%s] of a set date" % e,
+                    [[img("rose"), "-set", "date:x", "2020-01-02T03:04:05Z", "-format", "%%[fx:%s]\\n" % e, "info:"]], [])
+
+
+# color.c, statement deletion: colours given in the HCL, HSB, HSL, HSV and HWB
+# models, which QueryColorCompliance converts to RGB, upper-case and with alpha
+# (hand-run with the mull-sdl-win build: the five conversions killed).
+_COLOR_GAP3 = ["hcl(120,50%,50%)", "hsb(120,50%,50%)", "hsl(120,50%,50%)", "hsv(120,50%,50%)",
+               "hwb(120,20%,30%)", "HSL(120,50%,50%)", "hsla(200,40%,60%,0.5)"]
+
+
+def _color_gap3_cases():
+    for c in _COLOR_GAP3:
+        yield _case("colorgap3", "xc:%s" % c,
+                    [["-size", "1x1", "xc:%s" % c, "-format", "%[pixel:p{0,0}]\\n", "info:"]], [])
+
+
+# quantize.c, statement deletion: +remap quantizes a list with more colours
+# than 256 together (QuantizeImages must reduce them), and -monitor prints its
+# per-image progress (hand-run with mull-sdl-win: the deleted
+# ReduceImageColors and both progress counters killed).
+def _quantize_gap11_cases():
+    two = [img("rose"), img("granite")]
+    yield _op_to("quantizegap11", "rose granite +remap -append", two + ["+remap", "-append"], "out.miff")
+    yield _case("quantizegap11", "rose granite -monitor +remap", [two + ["-monitor", "+remap", "null:"]], [])
+
+
+def _resample_cases():
+    for v in RESAMPLE_VIRTUAL_PIXELS:
+        for label, how in RESAMPLE_DISTORTIONS:
+            yield _op("resample", "rose_alpha -virtual-pixel %s %s" % (v, label),
+                      [img("rose_alpha")], ["-virtual-pixel", v] + how)
+
+
+def _blob_path_cases():
+    yield _case("blob", "inline svg through a temporary file",
+                [[img("rose"), "-resize", "4x4", "-define", "png:exclude-chunk=date,time",
+                  "-write", "inline:svg:-", "null:"]], [])
+    yield _with_inputs(_case("blob", "stdin miff over 1 MiB",
+                             [["miff:-", "-scale", "16x16"] + FLOAT_OUT + ["out.miff"]],
+                             ["out.miff"]), stdin=img("hald"))
+    raw = [img("rose"), "-depth", "8", "gray:raw.gray"]
+    for offset in ("70", "3220", "100000"):
+        yield _case("blob", "raw header offset %s" % offset,
+                    [raw, ["-size", "70x45+" + offset, "-depth", "8", "gray:raw.gray",
+                           "-format", "%[fx:mean]\\n", "info:"]], [])
+
+
+def _quantum_cases(writable_formats):
+    yield from _quantum_layout_cases(writable_formats)
+    yield from _quantum_yuv_cases()
+    yield from _quantum_index_cases()
+    yield from _quantum_meta_cases()
+    yield from _quantum_round2_cases(writable_formats)
+
+
 # ---- decoders over the frozen reader corpus
 # Raw decode files, read with an explicit format prefix.
 _RAW_DECODE_SUFFIXES = (".cmyk", ".gray", ".rgba", ".rgb", ".uyvy", ".yuv")
@@ -976,6 +2705,11 @@ def _infra_blob_cases():
                     [[img("rose"), "out.miff." + ext],
                      ["out.miff." + ext] + FLOAT_OUT + ["dec.miff"]],
                     ["out.miff." + ext, "dec.miff"])
+    # More files written in one command than the open-file limit (10240 under WSL): CloseBlob
+    # must close each one, or the last cannot be opened. About 15 s.
+    yield _case("infra", "10300 frames to 10300 files",
+                [["-size", "1x1", "xc:gray", "-duplicate", "10299", "+adjoin", "f%d.pgm"]],
+                ["f0.pgm", "f10299.pgm"])
     for fmt in ("png", "miff", "ppm", "gif", "tiff"):
         yield _case("infra", "stdout " + fmt, [[img("rose"), fmt + ":-"]], [])
     for fmt in ("", "miff:", "ppm:"):
@@ -1043,7 +2777,7 @@ def _cipher_cases():
 def _info_cases():
     yield _case("info", "version", [["-version"]], [])
     for name in ("configure", "mime", "policy", "log", "locale", "type", "font", "delegate",
-                 "coder", "magic", "resource", "format"):
+                 "coder", "magic", "resource", "format", "threshold"):
         yield _case("info", "list " + name, [["-list", name]], [])
 
 
@@ -1054,6 +2788,3065 @@ def _mvg_cases():
                     ["out.miff"])
         yield _case("mvg", "svg-out " + mvg,
                     [["{C}/%s" % mvg.replace(".mvg", ".svg")] + FLOAT_OUT + ["out.miff"]],
+                    ["out.miff"])
+
+
+# ---- gaps found by reading surviving mutants (tools/oracle/verdicts.json).
+# Each case killed the survivors named beside it when it was added; the
+# verdict explains why no existing case could.
+GAP_CASES = [
+    # enhance.c
+    ("rose -clahe 10x20!+64+3", ["-clahe", "10x20!+64+3"], ["rose"]),  # bins other than 128, tall padding
+    ("gray16 rose -clut", ["-clut"], ["gray16", "rose"]),                # colour clut on gray; clut varies in x
+    ("cmyk rose -clut", ["-clut"], ["cmyk", "rose"]),
+    ("rose_alpha rose -clut", ["-clut"], ["rose_alpha", "rose"]),
+    ("rose rose_alpha -clut", ["-clut"], ["rose", "rose_alpha"]),         # clut with alpha
+    ("gray16 -contrast-stretch 64x64", ["-contrast-stretch", "64x64"], ["gray16"]),  # 64 pixels a level
+    ("gray16 -linear-stretch 64x64", ["-linear-stretch", "64x64"], ["gray16"]),
+    ("gray16 hald -hald-clut", ["-hald-clut"], ["gray16", "hald"]),       # colorspace differs from the clut's
+    ("rose_alpha hald -hald-clut", ["-hald-clut"], ["rose_alpha", "hald"]),
+    ("cmyk hald-cmyk -hald-clut", ["(", img("hald"), "-colorspace", "CMYK", ")", "-hald-clut"],
+     ["cmyk"]),
+    ("rose_alpha -colors 16 -level", ["-colors", "16", "-level", "10%,90%"], ["rose_alpha"]),
+    ("gray16 -level-colors navy,gray", ["-level-colors", "navy,gray(80%)"], ["gray16"]),
+    ("gray16 -level-colors gray,gold", ["-level-colors", "gray(20%),gold"], ["gray16"]),
+    ("rose +level-colors mid red", ["+level-colors", "#402000,#c0e0ff"], ["rose"]),
+    ("rose modulate:colorspace", ["-define", "modulate:colorspace=HSB", "-modulate", "110/90/80"],
+     ["rose"]),
+    ("rose modulate color:illuminant", ["-define", "color:illuminant=D50", "-define",
+                                        "modulate:colorspace=LCHab", "-modulate", "110/90/80"],
+     ["rose"]),
+]
+# Code in enhance.c that no case executed.
+REACH_CASES = [
+    ("rose -channel RG -auto-gamma", ["-channel", "RG", "-auto-gamma"], ["rose"]),  # per channel
+    ("rose +negate", ["+negate"], ["rose"]),                                # gray pixels only
+    ("gray16 +negate", ["+negate"], ["gray16"]),
+    ("palette +negate", ["+negate"], ["palette"]),
+    ("rose nearest hald -hald-clut", ["-interpolate", "Nearest", img("hald"), "-hald-clut"],
+     ["rose"]),
+    ("rose_alpha -colors 16 -equalize", ["-colors", "16", "-equalize"], ["rose_alpha"]),
+    ("rose_alpha -colors 16 -contrast-stretch", ["-colors", "16", "-contrast-stretch", "2%x1%"],
+     ["rose_alpha"]),
+    ("rose invalid color:illuminant", ["-define", "color:illuminant=bogus", "-define",
+                                       "modulate:colorspace=LCHab", "-modulate", "110/90/80"],
+     ["rose"]),  # an invalid illuminant also resets the colorspace to the default
+    ("rose white-balance:vibrance %", ["-define", "white-balance:vibrance=10%", "-white-balance"],
+     ["rose"]),
+    ("rose white-balance:vibrance", ["-define", "white-balance:vibrance=2000", "-white-balance"],
+     ["rose"]),
+] + [("%s modulate:colorspace=%s" % (name, cs), ["-define", "modulate:colorspace=" + cs,
+                                                 "-modulate", "110/100/95"], [name])
+     # the HDRI image's out-of-gamut values make a wrong hue wrap visible
+     for name in ("rose", "hdri")
+     for cs in ("HCL", "HCLp", "HSB", "HSI", "HSV", "HWB", "LCHab", "LCHuv")]
+# ColorDecisionListImage: the sample from its documentation, with offsets that
+# keep every value positive (a negative base to Power 0.8 is NaN).
+CDL = """<ColorCorrectionCollection xmlns="urn:ASC:CDL:v1.2">
+  <ColorCorrection id="cc03345">
+    <SOPNode>
+      <Slope> 0.9 1.2 0.5 </Slope>
+      <Offset> 0.04 0.05 0.06 </Offset>
+      <Power> 1.0 0.8 1.5 </Power>
+    </SOPNode>
+    <SATNode>
+      <Saturation> 0.85 </Saturation>
+    </SATNode>
+  </ColorCorrection>
+</ColorCorrectionCollection>
+"""
+CDL_INPUTS = ["rose", "rose_alpha", "palette", "gray16"]
+# Whole commands, {C} for the corpus, as tools/oracle/verdicts.json names them.
+_VERBOSE_AT = "-precision 17 -define auto-threshold:verbose=1 -auto-threshold "
+GAP_COMMANDS = [
+    # threshold.c: -auto-threshold prints its threshold; a histogram whose maximum
+    # entropy is at bin 0 (Kapur), one not starting at 0 and one symmetric about
+    # its peak (Triangle)
+    "{C}/rose.miff " + _VERBOSE_AT + "Triangle",
+    "-size 18x1 xc:black -size 1x1 xc:gray50 xc:white +append " + _VERBOSE_AT + "Kapur",
+    "-size 1x1 xc:rgb(20,20,20) xc:rgb(30,30,30) xc:rgb(40,40,40) xc:rgb(40,40,40) "
+    "xc:rgb(40,40,40) xc:rgb(40,40,40) xc:rgb(60,60,60) xc:rgb(80,80,80) "
+    "xc:rgb(100,100,100) +append " + _VERBOSE_AT + "Triangle",
+    "-size 1x1 xc:rgb(0,0,0) xc:rgb(5,5,5) xc:rgb(5,5,5) xc:rgb(5,5,5) xc:rgb(1,1,1) "
+    "xc:rgb(9,9,9) xc:rgb(10,10,10) +append " + _VERBOSE_AT + "Triangle",
+    # per-channel thresholds, CMYK with alpha included
+    "{C}/rose.miff -black-threshold 20,40,60%",
+    "{C}/cmyk.miff -black-threshold 20,30,40,50,60%",
+    "{C}/rose_alpha.miff -colorspace CMYK -black-threshold 20,30,40,50,60%",
+    "{C}/rose.miff -white-threshold 60,70,80%",
+    "{C}/cmyk.miff -white-threshold 60,70,80,50,40%",
+    "{C}/rose_alpha.miff -colorspace CMYK -white-threshold 60,70,80,50,40%",
+    "{C}/rose.miff -colorspace Lab -define color:illuminant=A "
+    "-color-threshold 'cielab(50,10,10)-cielab(80,40,40)'",
+    # -ordered-dither: the divisor-2 map, a leading separator, several levels, level 1
+    "{C}/rose.miff -ordered-dither threshold",
+    "{C}/rose.miff -ordered-dither ,o4x4",
+    "{C}/rose.miff -ordered-dither o4x4,3,6,9",
+    "{C}/rose.miff -ordered-dither o4x4,1",
+    "{C}/rose.miff -ordered-dither o4x4,1,3",
+    # limits in percent, and pixels exactly on the -range-threshold limits
+    "{C}/rose.miff -seed 3 -random-threshold 20x80%",
+    "-size 1x1 xc:gray(10%) xc:gray(20%) xc:gray(50%) xc:gray(80%) xc:gray(90%) +append "
+    "( {C}/gray16.miff -scale 5x5! ) -append -range-threshold 10,20,80,90%",
+    # decorate.c: frames smaller than their bevels (errors), a matte colour with
+    # alpha or with black, a frame larger than a 1x1 image, bevels of exactly half
+    "{C}/rose.miff -frame 3x10+2+2",
+    "{C}/rose.miff -frame 10x3+2+2",
+    "{C}/rose.miff -mattecolor #8888 -frame 10x10+3+3",
+    "{C}/cmyk.miff -mattecolor cmyk(10%,20%,30%,40%) -frame 10x10+3+3",
+    "{C}/tiny.miff -frame 2x2+1+1",
+    "{C}/rose.miff -raise 35x10",
+    "{C}/rose.miff -raise 10x23",
+    # segment.c: a cluster with no pixels; cluster thresholds that prune
+    "{C}/wizard.miff -segment 1x0.01",
+    "{C}/photo.miff -segment 50x0.5",
+    "{C}/photo.miff -segment 99x0.5",
+    # shear.c: rotating a virtual canvas, images taller than one rotation tile,
+    # shears of 0 on one axis and with transparent background, and -deskew on
+    # skewed images with the angle printed (one with pixels on the threshold)
+    "{C}/rose.miff -repage 100x80+5+7 -rotate 90",
+    "{C}/rose.miff -repage 100x80+5+7 -rotate 180",
+    "{C}/rose.miff -repage 100x80+5+7 -rotate 270",
+    "{C}/rose.miff -scale 300x200! -rotate 90",
+    "{C}/rose.miff -scale 300x200! -rotate 270",
+    "{C}/rose.miff -shear 0x20",
+    "{C}/rose.miff -shear 20x0",
+    "{C}/rose.miff -background none -shear 10x30",
+    # auto-crop averages the border for the background; =1 is the only width
+    # IsStringTrue lets through, =true gives width 0
+    "{C}/rose.miff -define deskew:auto-crop=1 -deskew 40%",
+    "{C}/rose_alpha.miff -define deskew:auto-crop=1 -deskew 40%",
+    "{C}/rose.miff -define deskew:auto-crop=true -deskew 40%",
+    "{C}/rose.miff -background white -rotate 7 -define deskew:auto-crop=1 -deskew 40%",
+    "{C}/rose.miff -background white -rotate 7 -deskew 40% -precision 17 "
+    "-print %[deskew:angle]",
+    "-size 70x40 xc:white -fill rgb(102,200,200) -draw 'line 0,10 69,16' "
+    "-fill rgb(200,102,200) -draw 'line 0,20 69,26' -fill rgb(200,200,102) "
+    "-draw 'line 0,30 69,36' -deskew 26214 -precision 17 -print %[deskew:angle]",
+    # compare.c: a 1x1 PHASE, a masklight colour, subimage searches with an equal-size
+    # and an inexact patch
+    "compare -metric PHASE {C}/tiny.miff {C}/tiny.miff",
+    "compare -metric AE -size 70x46 -read-mask xc:gray(20%) -define compare:masklight-color=blue "
+    "{C}/rose.miff {C}/rose_blur.miff",
+    # (small: a full-size equal search is too slow on a Mull build, and a baseline
+    # that times out is dropped)
+    "compare -metric RMSE -subimage-search ( {C}/rose.miff -crop 20x20+0+0 +repage ) "
+    "( {C}/rose_blur.miff -crop 20x20+0+0 +repage )",
+    "compare -metric RMSE -subimage-search {C}/rose.miff "
+    "( {C}/rose_blur.miff -crop 20x20+10+10 +repage )",
+    # visual-effects.c: plasma on images small enough for segments to degenerate,
+    # CMYK and alpha inputs, transparent backgrounds, a matrix above 6x6, a
+    # virtual canvas for -shadow, exact -solarize thresholds, a -tint colour with
+    # green and blue
+    "{C}/cmyk.miff -fill cmyk(20%,40%,60%,30%) -colorize 10,20,30,40,50",
+    "{C}/rose.miff -color-matrix '1 0 0 0 0 0 0, 0 1 0 0 0 0 0, 0 0 0.9 0 0 0 0, 0 0 0 1 0 0 0, 0 0 0 0 1 0 0, 0 0 0 0 0 1 0, 0.1 0 0 0 0 0 1'",
+    "{C}/cmyk.miff -color-matrix '0.9 0 0 0 0.1, 0 1 0 0 0, 0 0 1.1 0 0, 0 0 0 0.8 0, 0 0 0 0 1'",
+    "{C}/rose_alpha.miff -color-matrix '0.9 0 0 0 0.1, 0 1 0 0 0, 0 0 1.1 0 0, 0 0 0 0.8 0, 0 0 0 0 1'",
+    "{C}/rose.miff -background none -implode 0.5",
+    "-seed 1 -size 1x1 plasma:",
+    "-seed 1 -size 2x2 plasma:",
+    "{C}/gray16.miff -shadow 80x3+5+5",
+    "{C}/rose.miff -repage 100x80+5+7 -shadow 80x3+5+5",
+    "-size 1x1 xc:rgb(102,102,102) xc:rgb(10,200,102) xc:rgb(102,30,250) +append -type palette -solarize 26214",
+    "-size 1x1 xc:rgb(102,102,102) xc:rgb(10,200,102) xc:rgb(102,30,250) +append -solarize 26214",
+    "{C}/rose.miff -fill #80c040 -tint 50",
+    "{C}/cmyk.miff -fill cmyk(20%,40%,60%,30%) -tint 10,20,30,40,50",
+    "{C}/rose.miff -background none -wave 5x20",
+]
+# visual-effects.c: -stegano and -stereo exist only in the composite utility (a
+# `magick ... -stereo` case failed on both sides and tested nothing), -polaroid
+GAP_COMMANDS += [
+    "composite -stereo +3+2 {C}/rose_blur.miff {C}/rose.miff",
+    "composite -stereo -2-1 {C}/rose_alpha.miff {C}/rose.miff",
+    "{C}/rose.miff -polaroid 10",
+    "{C}/rose.miff -scale 300x200! -polaroid 10",
+    "composite -stereo 0 {C}/rose.miff {C}/rose_alpha.miff",
+    "{C}/rose.miff -font {C}/Generic.ttf -caption Hi -background white +polaroid",
+]
+# statistic.c: moments of a uniform image, mixed sizes for -evaluate-sequence and
+# ties in its median, each -function with exactly as many parameters as a default
+# test counts, HDRI powers and clamping, -poly with 3 terms, write masks for
+# -statistic, and phash colorspace lists
+GAP_COMMANDS += [
+    "-size 1x1 xc:rgb(30,20,10) xc:rgb(10,20,30) xc:rgb(20,20,20) xc:rgb(20,30,10) -evaluate-sequence median",
+    "{C}/hdri.miff -evaluate pow 2",
+    "{C}/tall.miff {C}/rose.miff -evaluate-sequence mean",
+    "{C}/rose.miff {C}/tall.miff -evaluate-sequence mean",
+    "{C}/rose.miff {C}/gray16.miff -evaluate-sequence mean",
+    "{C}/hdri.miff -define evaluate:clamp=true -evaluate add 50%",
+    "{C}/rose.miff -function Sinusoid 3",
+    "{C}/rose.miff -function Sinusoid 3,-90,0.2",
+    "{C}/rose.miff -function Sinusoid 3,-90,0.2,0.6",
+    "{C}/rose.miff -function ArcSin 2",
+    "{C}/rose.miff -function ArcSin 2,0.4",
+    "{C}/rose.miff -function ArcSin 2,0.4,0.8",
+    "{C}/rose.miff -function ArcSin 2,0.4,0.8,0.3",
+    "{C}/rose.miff -function ArcTan 10",
+    "{C}/rose.miff -function ArcTan 10,.7,0.8",
+    "{C}/rose.miff -function ArcTan 10,.7,0.8,0.3",
+    "identify -verbose -precision 17 -moments {C}/tiny.miff",
+    "identify -verbose -precision 17 -moments -define phash:colorspaces=sRGB,HCLp,Lab,XYZ,HSB,HSV,HSL,LCH {C}/rose.miff",
+    "identify -verbose -precision 17 -moments -define phash:colorspaces=Undefined,sRGB {C}/rose.miff",
+    "{C}/rose.miff {C}/rose_blur.miff {C}/rose.miff -poly '0.5,1 0.3,2 0.2,1'",
+    "{C}/rose.miff -size 70x46 -write-mask gradient: -statistic Median 3",
+    "{C}/rose.miff -size 70x46 -write-mask gradient: -statistic Median 5",
+    "{C}/rose.miff -size 70x46 -read-mask xc:gray(50%) -precision 17 -verbose -write info:",
+    "{C}/rose.miff -size 70x46 -write-mask xc:gray(50%) -statistic Median 3",
+]
+# resize.c: -resample without -density (the setting overwrites the resolution
+# ResampleImage sets), and filter defines no case set
+GAP_COMMANDS += [
+    "{C}/rose.miff -resample 144",
+    "{C}/rose.miff -define filter:window=Undefined -define filter:verbose=1 -resize 50%",
+    "{C}/rose.miff -filter Gaussian -define filter:sigma=0.8 -define filter:verbose=1 -resize 50%",
+    "{C}/rose.miff -filter Cubic -define filter:b=0.3 -define filter:verbose=1 -resize 50%",
+]
+# annotate.c: every gravity with two lines and with a rotation, decorations, no
+# antialiasing, undercolor, kerning, wrapping captions, font encodings
+GAP_COMMANDS += [
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity NorthWest -annotate +2+2 'one\\ntwo'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity NorthWest -annotate 15x0+3+4 'Tilt'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity North -annotate +2+2 'one\\ntwo'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity North -annotate 15x0+3+4 'Tilt'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity West -annotate +2+2 'one\\ntwo'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity West -annotate 15x0+3+4 'Tilt'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity Center -annotate +2+2 'one\\ntwo'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity Center -annotate 15x0+3+4 'Tilt'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity East -annotate +2+2 'one\\ntwo'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity East -annotate 15x0+3+4 'Tilt'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity SouthWest -annotate +2+2 'one\\ntwo'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity SouthWest -annotate 15x0+3+4 'Tilt'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity South -annotate +2+2 'one\\ntwo'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity South -annotate 15x0+3+4 'Tilt'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity SouthEast -annotate +2+2 'one\\ntwo'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity SouthEast -annotate 15x0+3+4 'Tilt'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -draw \"decorate underline text 5,20 'Deco'\"",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -draw \"decorate overline text 5,20 'Deco'\"",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -draw \"decorate line-through text 5,20 'Deco'\"",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 +antialias -annotate +5+20 Mono",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -undercolor navy -fill white -annotate +5+20 'Under'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -kerning 2 -interword-spacing 6 -annotate +2+20 'a b c'",
+    "-size 40x -font {C}/Generic.ttf -pointsize 11 caption:'a bb ccc dddd eeeee'",
+    "-size 30x -font {C}/Generic.ttf -pointsize 11 caption:'nospacesinthislongword'",
+    "-size 60x40 -font {C}/Generic.ttf -pointsize 11 caption:'line one\\nline two'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -encoding Unicode -annotate +5+20 'Enc'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -encoding None -annotate +5+20 'Enc'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -encoding AppleRoman -annotate +5+20 'Enc'",
+]
+# vision.c: a few distinct blobs through every connected-components define, and
+# -integral
+GAP_COMMANDS += [
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -connected-components 4",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:area-threshold=10-200 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:angle-threshold=10-80 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:circularity-threshold=0.3-0.9 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:eccentricity-threshold=0.1-0.9 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:major-axis-threshold=5-30 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:minor-axis-threshold=2-12 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:perimeter-threshold=10-60 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:mean-color=true -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:keep=1,2 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:remove=2 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:keep-colors=white -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:remove-colors=gray -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:keep-top=2 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:sort=area -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:sort-order=decreasing -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:exclude-header=true -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:background-id=0 -connected-components 8",
+    "{C}/rose.miff -define connected-components:verbose=true -define connected-components:sort=circularity -define connected-components:area-threshold=20 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:diameter-threshold=5-20 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:keep-ids=9,11 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:remove-ids=58 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:exclude-ids=0 -connected-components 8",
+    "{C}/rose.miff -integral",
+    "{C}/gray16.miff -integral",
+    "{C}/rose_alpha.miff -integral",
+]
+# profile.c: an EXIF block (every byte below 128, so it can be case text), XMP as
+# attributes and as elements, the ICC profile of the one JPEG that carries one,
+# and PSD round trips whose 8BIM holds resolution and ICC resources. Each entry:
+# label, steps (the last writes out.miff), files written into the case first.
+EXIF_BLOCK = "Exif\u0000\u0000II*\u0000\b\u0000\u0000\u0000\u0004\u0000\u0012\u0001\u0003\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u001a\u0001\u0005\u0000\u0001\u0000\u0000\u0000>\u0000\u0000\u0000\u001b\u0001\u0005\u0000\u0001\u0000\u0000\u0000F\u0000\u0000\u0000(\u0001\u0003\u0000\u0001\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000H\u0000\u0000\u0000\u0001\u0000\u0000\u0000H\u0000\u0000\u0000\u0001\u0000\u0000\u0000"
+XMP_ATTRIBUTES = "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n<rdf:Description rdf:about=\"\" xmlns:tiff=\"http://ns.adobe.com/tiff/1.0/\"\n tiff:XResolution=\"72/1\" tiff:YResolution=\"72/1\" tiff:ResolutionUnit=\"2\" tiff:Orientation=\"1\"/>\n</rdf:RDF></x:xmpmeta>\n<?xpacket end=\"w\"?>"
+XMP_ELEMENTS = "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n<rdf:Description rdf:about=\"\" xmlns:tiff=\"http://ns.adobe.com/tiff/1.0/\"\n><tiff:XResolution>72/1</tiff:XResolution><tiff:YResolution>72/1</tiff:YResolution><tiff:ResolutionUnit>2</tiff:ResolutionUnit><tiff:Orientation>1</tiff:Orientation></rdf:Description>\n</rdf:RDF></x:xmpmeta>\n<?xpacket end=\"w\"?>"
+_UHDR_JPG = "{C}/files/tests/cli-uhdr-iptc.jpg"
+GAP_STEP_CASES = [
+    ("rose exif profile, density and orientation",
+     [["{C}/rose.miff", "-profile", "APP1:exif.bin", "-density", "300", "-orient", "BottomLeft",
+       "out.miff"]], {"exif.bin": EXIF_BLOCK}),
+    ("rose xmp attributes, density and orientation",
+     [["{C}/rose.miff", "-profile", "meta.xmp", "-density", "300", "-orient", "BottomLeft",
+       "out.miff"]], {"meta.xmp": XMP_ATTRIBUTES}),
+    ("rose xmp elements, density and orientation",
+     [["{C}/rose.miff", "-profile", "meta.xmp", "-density", "300", "-orient", "BottomLeft",
+       "out.miff"]], {"meta.xmp": XMP_ELEMENTS}),
+    ("rose icc applied twice",
+     [[_UHDR_JPG, "icc.icc"], ["{C}/rose.miff", "-profile", "icc.icc", "-profile", "icc.icc",
+                                "out.miff"]], {}),
+    ("psd 8bim resolution rewritten",
+     [["{C}/rose.miff", "-density", "150", "-units", "PixelsPerInch", "r.psd"],
+      ["r.psd", "-density", "300", "-units", "PixelsPerInch", "out.miff"]], {}),
+    ("psd 8bim with icc, icc removed",
+     [[_UHDR_JPG, "icc.icc"],
+      ["{C}/rose.miff", "-profile", "icc.icc", "-density", "150", "-units", "PixelsPerInch", "r.psd"],
+      ["r.psd", "+profile", "icc", "out.miff"]], {}),
+    ("psd 8bim with icc, xmp added",
+     [[_UHDR_JPG, "icc.icc"],
+      ["{C}/rose.miff", "-profile", "icc.icc", "-density", "150", "-units", "PixelsPerInch", "r.psd"],
+      ["r.psd", "-profile", "meta.xmp", "out.miff"]], {"meta.xmp": XMP_ELEMENTS}),
+    # second round: rationals with denominator 2, big-endian longs, XMP values
+    # changing length and unequal x and y density
+    ("rose exif little-endian rationals /2, density and orientation",
+     [["{C}/rose.miff", "-profile", "APP1:exif.bin", "-density", "300", "-orient", "BottomLeft", "out.miff"]],
+     {"exif.bin": "Exif\u0000\u0000II*\u0000\b\u0000\u0000\u0000\u0004\u0000\u0012\u0001\u0004\u0000\u0001\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u001a\u0001\u0005\u0000\u0001\u0000\u0000\u0000>\u0000\u0000\u0000\u001b\u0001\u0005\u0000\u0001\u0000\u0000\u0000F\u0000\u0000\u0000(\u0001\u0004\u0000\u0001\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000F\u0000\u0000\u0000\u0002\u0000\u0000\u0000F\u0000\u0000\u0000\u0002\u0000\u0000\u0000"}),
+    ("rose exif big-endian longs, density and orientation",
+     [["{C}/rose.miff", "-profile", "APP1:exif.bin", "-density", "300", "-orient", "BottomLeft", "out.miff"]],
+     {"exif.bin": "Exif\u0000\u0000MM\u0000*\u0000\u0000\u0000\b\u0000\u0004\u0001\u0012\u0000\u0004\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0001\u0001\u001a\u0000\u0005\u0000\u0000\u0000\u0001\u0000\u0000\u0000>\u0001\u001b\u0000\u0005\u0000\u0000\u0000\u0001\u0000\u0000\u0000F\u0001(\u0000\u0004\u0000\u0000\u0000\u0001\u0000\u0000\u0000\u0002\u0000\u0000\u0000\u0000\u0000\u0000\u0000F\u0000\u0000\u0000\u0002\u0000\u0000\u0000F\u0000\u0000\u0000\u0002"}),
+    ("rose xmp elements, unequal density",
+     [["{C}/rose.miff", "-profile", "meta.xmp", "-density", "300x150", "out.miff"]],
+     {"meta.xmp": "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n<rdf:Description rdf:about=\"\" xmlns:tiff=\"http://ns.adobe.com/tiff/1.0/\"\n><tiff:XResolution>72/1</tiff:XResolution><tiff:YResolution>72/1</tiff:YResolution><tiff:ResolutionUnit>2</tiff:ResolutionUnit><tiff:Orientation>1</tiff:Orientation></rdf:Description>\n</rdf:RDF></x:xmpmeta>\n<?xpacket end=\"w\"?>"}),
+    ("rose xmp elements, shorter value",
+     [["{C}/rose.miff", "-profile", "meta.xmp", "-density", "7", "out.miff"]],
+     {"meta.xmp": "<?xpacket begin=\"\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\n<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\n<rdf:Description rdf:about=\"\" xmlns:tiff=\"http://ns.adobe.com/tiff/1.0/\"\n><tiff:XResolution>72/1</tiff:XResolution><tiff:YResolution>72/1</tiff:YResolution><tiff:ResolutionUnit>2</tiff:ResolutionUnit><tiff:Orientation>1</tiff:Orientation></rdf:Description>\n</rdf:RDF></x:xmpmeta>\n<?xpacket end=\"w\"?>"}),
+    # compress.c: fax decoding (HuffmanDecodeImage) of a file the case writes first
+    ("fax written and read back",
+     [["{C}/bilevel.miff", "b.fax"], ["fax:b.fax", "out.miff"]],
+     {}),
+    ("fax of a dithered photo read back",
+     [["{C}/rose.miff", "-monochrome", "b.fax"], ["fax:b.fax", "out.miff"]],
+     {}),
+]
+# magic.c (ERDC's runs): files with no extension, so only the signature table decides:
+# PCD_ at 2048 (the farthest signature, which sets how much is read), a file exactly as
+# long as a signature, SVG with and without spaces after the '<' (the only entries
+# that skip spaces), and a file matching two signatures at different offsets
+GAP_STEP_CASES += [
+    ("signature at offset 2048 (pcd)", [["pcdsig", "out.miff"]],
+     {"pcdsig": "A" * 2048 + "PCD_" + "A" * 60}),
+    ("file exactly a signature long (gif)", [["gifsig", "out.miff"]], {"gifsig": "GIF8"}),
+    ("svg signature without extension", [["plainsvg", "out.miff"]],
+     {"plainsvg": "<svg xmlns='http://www.w3.org/2000/svg' width='4' height='3'>"
+                  "<rect width='4' height='3' fill='red'/></svg>\n"}),
+    ("svg signature after spaces", [["spacesvg", "out.miff"]],
+     {"spacesvg": "<  svg xmlns='http://www.w3.org/2000/svg' width='4' height='3'>"
+                  "<rect width='4' height='3' fill='red'/></svg>\n"}),
+    ("gif and dicom signatures in one file", [["gifdcm", "out.miff"]],
+     {"gifdcm": "GIF8" + "A" * 124 + "DICM" + "A" * 60}),
+]
+# policy.c, memory.c (ERDC's runs): a policy.xml of the case's own. The oracle sets HOME
+# to the case directory, and ImageMagick reads every policy.xml on its configure path,
+# $HOME/.config/ImageMagick/ among them, on top of the build's
+_POLICY = ".config/ImageMagick/policy.xml"
+
+
+def _policy(*lines):
+    return "<policymap>\n%s\n</policymap>\n" % "\n".join("  " + x for x in lines)
+
+
+GAP_STEP_CASES += [
+    ("policy denies a coder", [["{C}/rose.miff", "x.gif"], ["{C}/rose.miff", "out.miff"]],
+     {_POLICY: _policy('<policy domain="coder" rights="none" pattern="GIF" />')}),
+    ("policy denies a path pattern",
+     [["{C}/rose.miff", "secret-1.miff"], ["{C}/rose.miff", "out.miff"]],
+     {_POLICY: _policy('<policy domain="path" rights="none" pattern="*secret*" />')}),
+    ("policy denies writing into a directory",
+     [["{C}/rose.miff", "sub/x.miff"], ["{C}/rose.miff", "out.miff"]],
+     {_POLICY: _policy('<policy domain="path" rights="read" pattern="*/sub" />'),
+      "sub/keep.txt": "kept\n"}),
+    ("policy allows reading only",
+     [["{C}/rose.miff", "x.png"], ["x.png", "out.miff"], ["{C}/rose.miff", "out.miff"]],
+     {_POLICY: _policy('<policy domain="path" rights="read" pattern="*.png" />')}),
+    ("policy names, values and stealth, listed", [["-list", "policy"]],
+     {_POLICY: _policy('<policy domain="resource" name="width" value="10KP"/>',
+                       '<policy domain="system" name="precision" value="6"/>',
+                       '<policy domain="cache" name="shared-secret" value="x" stealth="True"/>',
+                       '<policy domain="delegate" rights="none" pattern="HTTPS" />')}),
+    ("policy included from another file",
+     [["{C}/rose.miff", "x.gif"], ["{C}/rose.miff", "out.miff"]],
+     {_POLICY: _policy('<include file="extra.xml"/>'),
+      ".config/ImageMagick/extra.xml": _policy(
+          '<policy domain="coder" rights="none" pattern="GIF" />')}),
+    ("policy forbids following symlinks", [["{C}/rose.miff", "-resize", "50%", "out.miff"]],
+     {_POLICY: _policy('<policy domain="system" name="symlink" rights="none" pattern="follow" />')}),
+    ("policy max-memory-request, scratch buffers in a mapped file",
+     [["{C}/rose.miff", "-resize", "300%", "-despeckle", "out.miff"]],
+     {_POLICY: _policy('<policy domain="system" name="max-memory-request" value="64KiB"/>')}),
+    ("policy shreds memory and temporary files",
+     [["-limit", "memory", "0", "-limit", "map", "0", "{C}/rose.miff", "-resize", "300%",
+       "out.miff"]],
+     {_POLICY: _policy('<policy domain="system" name="shred" value="2"/>')}),
+]
+# color.c (2026-10-07): a colors.xml of the case's own, found the same way, listed and used:
+# a DOCTYPE whose default holds "]>" in quotes, a comment with '>', compliance lists, a stealth
+# entry, single quotes, an include; and a malformed one (a stray attribute, a missing '=', a
+# </policy> close, a colour without a name, an unknown element). Not used: a colour given by
+# name (color="blue"), which deadlocks every command (MUTATION.md, upstream bug: LoadColorCache
+# queries the colour cache it is loading). An entry without compliance is never found by name.
+# Hand-run they kill 28 of LoadColorCache's 45 open mutants.
+_COLORS = ".config/ImageMagick/colors.xml"
+_COLORS_XML = ('<?xml version="1.0"?>\n<!DOCTYPE colormap [\n<!ELEMENT colormap (color)+>\n'
+               '<!ATTLIST color name CDATA "x]>y">\n]>\n<!-- a > comment -->\n<colormap>\n'
+               '  <color name="casecolor" color="rgb(10,20,30)" compliance="SVG, X11"/>\n'
+               '  <color name="casehidden" color="#405060" compliance="XPM" stealth="True"/>\n'
+               '  <color name="caseblue" color="#0000FF" compliance="X11"/>\n  <include file="more.xml"/>\n'
+               "  <color name='casequote' color='#112233'/>\n</colormap>\n")
+GAP_STEP_CASES += [
+    ("colors.xml of the case's own, listed", [["-list", "color"]],
+     {_COLORS: _COLORS_XML,
+      ".config/ImageMagick/more.xml": '<colormap><color name="casemore" color="#010203"/></colormap>'}),
+    ("colors.xml of the case's own, used",
+     [["xc:casecolor", "xc:casehidden", "xc:caseblue", "xc:casequote", "+append", "-format",
+       "%[pixel:p{0,0}] %[pixel:p{1,0}] %[pixel:p{2,0}] %[pixel:p{3,0}]", "info:"]], {_COLORS: _COLORS_XML}),
+    # cache.c: a tall image on disk, a rotated clone composited over it (GetPixelCacheTileSize's
+    # disk tile width; hand-run: 1 killed)
+    ("tall image on disk, rotated clone composited", [["-limit", "memory", "0", "-limit", "map", "0", "{C}/tall.miff",
+                                                       "(", "+clone", "-rotate", "90", ")", "-composite", "out.miff"]], {}),
+    # cache.c: -reshape to a larger area than the image's (ReshapePixelCache refuses it;
+    # hand-run: 1 killed)
+    ("-reshape to a larger area", [["{C}/rose.miff", "-reshape", "100x100", "-format", "%wx%h %#\\n", "info:"]], {}),
+    ("colors.xml malformed, listed", [["-list", "color"]],
+     {_COLORS: '<colormap>\n  <color junk name="casebad" color="#010101"/>\n  <color name "casenoeq" color="#020202"/>\n'
+               '  <color name="casepolicy" color="#030303"></policy>\n  <color color="#040404"/>\n'
+               '  <color name="casecase" color="#050505" compliance="none"/>\n  <unknown x="1"/>\n</colormap>\n'}),
+]
+# type.c (Mac): a type.xml of the case's own, found the same way. Glyph paths relative to
+# the case directory and to type.xml's own directory (both reach the corpus font), one
+# that does not exist (the entry is dropped), a stealth entry and an include
+_TYPE_XML = """<typemap>
+  <type name="Case-Sans" fullname="Case Sans" family="CaseFamily" foundry="Case" style="Italic"
+    stretch="Condensed" weight="Bold" format="truetype" encoding="AppleRoman" face="0"
+    glyphs="{C}/Generic.ttf" metrics="{C}/Generic.ttf"/>
+  <type name="Case-Light" family="CaseFamily" weight="300" glyphs="../../{C}/Generic.ttf"/>
+  <type name="Case-Missing" family="CaseFamily" glyphs="nowhere.ttf"/>
+  <type name="Case-Hidden" stealth="True" glyphs="{C}/Generic.ttf"/>
+  <include file="more.xml"/>
+</typemap>
+"""
+_TYPE_FILES = {".config/ImageMagick/type.xml": _TYPE_XML,
+               ".config/ImageMagick/more.xml":
+                   '<typemap>\n  <type name="Case-More" family="MoreFamily" '
+                   'glyphs="../../{C}/Generic.ttf"/>\n</typemap>\n'}
+# type.c: a type.xml with a DOCTYPE holding brackets and a quoted '>', and comments with a
+# '>' in them, which LoadTypeCache skips by hand
+_TYPE_DOCTYPE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE typemap [
+  <!ELEMENT typemap (type)+>
+  <!ATTLIST type name CDATA #REQUIRED family CDATA "x]y>z" glyphs CDATA #IMPLIED>
+]>
+<!-- a comment before the map, with a > inside -->
+<typemap>
+  <!-- and one inside -->
+  <type name="Doc-Sans" family="DocFamily" glyphs="{C}/Generic.ttf"/>
+</typemap>
+"""
+GAP_STEP_CASES += [
+    ("type.xml of the case's own, listed", [["-list", "font"]], _TYPE_FILES),
+    ("type.xml with a DOCTYPE and comments, listed and used",
+     [["-list", "font"], ["-family", "DocFamily", "-pointsize", "12", "label:Ab", "out.miff"]],
+     {".config/ImageMagick/type.xml": _TYPE_DOCTYPE_XML}),
+
+    ("type.xml fonts by name, family and weight, and from an include",
+     [["-font", "Case-Sans", "-pointsize", "12", "label:Ab", "a.miff"],
+      ["-family", "CaseFamily", "-weight", "300", "-pointsize", "12", "label:Ab", "b.miff"],
+      ["-family", "CaseFamily", "-style", "Italic", "-stretch", "Condensed", "-pointsize", "12",
+       "label:Ab", "c.miff"],
+      ["-family", "MoreFamily", "-pointsize", "12", "label:Ab", "d.miff"],
+      ["-font", "Case-Missing", "-pointsize", "12", "label:Ab", "e.miff"],
+      ["a.miff", "b.miff", "c.miff", "d.miff", "e.miff", "-append", "out.miff"]], _TYPE_FILES),
+]
+# annotate.c, second round: rotated multi-line text for every gravity (a line index
+# times a unit scale hides a * turned into /), a virtual canvas, a gray image, text
+# density, hinting off, UTF-8 text
+GAP_COMMANDS += [
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity None -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity NorthWest -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity North -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity West -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity Center -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity East -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity SouthWest -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity South -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity SouthEast -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -gravity NorthEast -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -affine 1.3,0.2,0.1,0.8,0,0 -annotate +3+10 'one\\ntwo'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -annotate 20x10+3+4 'one\\ntwo\\nthree'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -repage 100x80+5+7 -annotate +3+10 'Page'",
+    "{C}/gray16.miff -font {C}/Generic.ttf -pointsize 11 -fill red -annotate +3+10 'Gray'",
+    "-density 144 -font {C}/Generic.ttf -pointsize 16 label:Hi",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -set type:hinting off -annotate +5+20 'Hint'",
+    "{C}/rose.miff -font {C}/Generic.ttf -pointsize 11 -annotate +5+20 'café ✓'",
+]
+# vision.c, second round: an area range whose ends are object areas, reversed id
+# ranges, ';' in colour lists, sort order with a sort, CMYK mean colours, merging
+# small objects under 4-connectivity
+GAP_COMMANDS += [
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:area-threshold=110-141 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:keep=11-9 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:sort=area -define connected-components:sort-order=decreasing -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:remove-ids=11-9 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:keep-colors=white;gray -connected-components 8",
+    "{C}/cmyk.miff -define connected-components:verbose=true -define connected-components:mean-color=true -define connected-components:area-threshold=20 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define connected-components:verbose=true -define connected-components:area-threshold=10-200 -connected-components 4",
+    "{C}/rose.miff -define connected-components:area-threshold=16 -connected-components 4",
+]
+# utility.c: wildcards in input names, base64 via inline: (GIF: no dates to hide in
+# the base64), paper sizes
+GAP_COMMANDS += [
+    "'{C}/ros*.miff' -append",
+    "'{C}/r?se.miff' -flip",
+    "'{C}/[rt]*.miff' -append",
+    "{C}/tiny.miff -write inline:gif:-",
+    "{C}/rose.miff -resize 5x3 -write inline:gif:-",
+    "{C}/rose.miff -resize 4x4! -write inline:gif:-",
+    "{C}/rose.miff -page A4",
+    "{C}/rose.miff -page Letter+10+10",
+]
+# vision.c, third round: every shape metric over a range that keeps every object, printed at 17 digits, and each sort key
+GAP_COMMANDS += [
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:angle-threshold=0-1000 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:major-axis-threshold=0-1000 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:minor-axis-threshold=0-1000 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:eccentricity-threshold=0-1000 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:circularity-threshold=0-1000 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:perimeter-threshold=0-1000 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:diameter-threshold=0-1000 -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:sort=area -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:sort=width -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:sort=height -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:sort=x -connected-components 8",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -define connected-components:verbose=true -define connected-components:sort=y -connected-components 8",
+]
+# layer.c: a five-frame animation with offsets, a duplicate, partial transparency and a zero delay, through every -layers method under each dispose method
+GAP_COMMANDS += [
+    "-dispose None -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers coalesce",
+    "-dispose None -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers dispose",
+    "-dispose None -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers optimize",
+    "-dispose None -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers coalesce -layers optimize-plus",
+    "-dispose Background -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers coalesce",
+    "-dispose Background -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers dispose",
+    "-dispose Background -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers optimize",
+    "-dispose Background -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers coalesce -layers optimize-plus",
+    "-dispose Previous -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers coalesce",
+    "-dispose Previous -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers dispose",
+    "-dispose Previous -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers optimize",
+    "-dispose Previous -size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers coalesce -layers optimize-plus",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers optimize-transparency",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers remove-dups",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers remove-zero",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers compare-any",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers compare-clear",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers compare-overlay",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers merge",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers flatten",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers mosaic",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers trim-bounds",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) -layers coalesce -layers optimize-frame",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) null: ( -size 4x4 xc:white ) -gravity center -layers composite",
+    "-size 20x16 xc:red -delay 10 ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 8x8 xc:blue -repage 20x16+3+2 ) ( -size 6x6 xc:#00ff0080 -repage 20x16+9+7 ) -delay 0 ( -size 4x4 xc:yellow -repage 20x16+1+10 ) null: ( -size 4x4 xc:white -repage +2+2 ) -compose multiply -layers composite",
+]
+# compress.c: fax encoding (HuffmanEncodeImage) to stdout
+GAP_COMMANDS += [
+    "{C}/bilevel.miff -write fax:-",
+    "{C}/rose.miff -monochrome -write fax:-",
+]
+# attribute.c: Floyd-Steinberg depth reduction, and the minimum-bounding-box properties with each orientation
+GAP_COMMANDS += [
+    "{C}/rose.miff -define dither=FloydSteinberg -depth 4",
+    "{C}/rose_alpha.miff -define dither=FloydSteinberg -depth 2",
+    "{C}/gray16.miff -define dither=FloydSteinberg -depth 3",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -precision 17 -format '%[minimum-bounding-box] %[minimum-bounding-box:area] %[minimum-bounding-box:width] %[minimum-bounding-box:height] %[minimum-bounding-box:angle] %[minimum-bounding-box:unrotate]\\n' -write info:",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define minimum-bounding-box:orientation=landscape -precision 17 -format '%[minimum-bounding-box] %[minimum-bounding-box:area] %[minimum-bounding-box:width] %[minimum-bounding-box:height] %[minimum-bounding-box:angle] %[minimum-bounding-box:unrotate]\\n' -write info:",
+    "-size 40x30 xc:black -fill white -draw 'circle 10,10 10,4' -draw 'rectangle 22,5 35,12' -fill gray -draw 'ellipse 20,22 12,4 20,340' -draw 'line 2,27 12,20' -define minimum-bounding-box:orientation=portrait -precision 17 -format '%[minimum-bounding-box] %[minimum-bounding-box:area] %[minimum-bounding-box:width] %[minimum-bounding-box:height] %[minimum-bounding-box:angle] %[minimum-bounding-box:unrotate]\\n' -write info:",
+    "{C}/rose.miff -fuzz 20% -precision 17 -format '%[minimum-bounding-box] %[minimum-bounding-box:area] %[minimum-bounding-box:width] %[minimum-bounding-box:height] %[minimum-bounding-box:angle] %[minimum-bounding-box:unrotate]\\n' -write info:",
+]
+# annotate.c / type.c: the family-lookup path (lookup by family/weight/style, a comma-separated
+# family list, a family that is not found). Earlier these queried Helvetica/Times/Courier, which
+# the machine's system font config also defines, so the output depended on the installed fonts
+# (a silent baseline shift when a font package is upgraded, and the flaky, non-portable scoring
+# kills corrected on 2026-10-04). They now use case-local families whose entries live in the
+# case's own type.xml and point at the two corpus fonts, so the result depends only on the corpus:
+# the same code path, and which entry won is visible in the glyphs.
+_FAMTEST_XML = """<typemap>
+  <type name="FamT-R" family="FamTest" style="Normal" weight="400" glyphs="{C}/Generic.ttf"/>
+  <type name="FamT-B" family="FamTest" style="Normal" weight="700" glyphs="{C}/Narrow.ttf"/>
+  <type name="FamT-I" family="FamTest" style="Italic" weight="400" glyphs="{C}/Narrow.ttf"/>
+  <type name="FamT-2" family="SecondFam" style="Normal" weight="400" glyphs="{C}/Narrow.ttf"/>
+</typemap>
+"""
+GAP_STEP_CASES += [("annotate.c family lookup: %s" % label,
+                    [["{C}/rose.miff", "-pointsize", "12"] + q + ["-annotate", "+5+20", "Fam", "out.miff"]],
+                    {".config/ImageMagick/type.xml": _FAMTEST_XML})
+                   for label, q in (
+                       ("FamTest", ["-family", "FamTest"]),
+                       ("FamTest weight Bold", ["-family", "FamTest", "-weight", "Bold"]),
+                       ("FamTest style Italic", ["-family", "FamTest", "-style", "Italic"]),
+                       ("a family that is not found", ["-family", "No Such Family"]),
+                       ("a family list, first missing", ["-family", "Missing,SecondFam"]))]
+# transform.c: tile crops (@) with overlap, offset and gravity, and trims of bordered images with -fuzz and the trim: defines
+GAP_COMMANDS += [
+    "{C}/rose.miff -crop 3x2@ +repage",
+    "{C}/rose.miff -crop 2x2@",
+    "{C}/rose.miff -gravity center -crop 3x3@ +repage",
+    "{C}/rose.miff -crop 3x2-2-2@ +repage",
+    "{C}/rose.miff -crop 3x2+3+2@ +repage",
+    "{C}/rose.miff -crop 25x20 +repage",
+    "{C}/rose.miff -crop 50%x40%",
+    "{C}/rose.miff -bordercolor white -border 5 -trim",
+    "{C}/rose.miff -bordercolor white -border 5 -fuzz 15% -trim +repage",
+    "{C}/rose.miff -bordercolor white -border 3x6 -define trim:percent-background=50% -trim",
+    "{C}/rose.miff -bordercolor white -border 5 -define trim:edges=north,east -trim",
+    "{C}/rose_alpha.miff -bordercolor none -border 4 -trim",
+]
+# compare.c: every metric with a read mask of exactly QuantumRange/2 on one image
+# only (the utility masks both, and the test ORs the two masks)
+GAP_COMMANDS += [
+    "-size 70x46 " + images + " -metric " + metric +
+    " -compare -precision 17 -print %[distortion]"
+    for metric in ("AE", "DPC", "DSSIM", "Fuzz", "MAE", "MEPP", "MSE", "NCC", "PAE", "PDC",
+                   "PHASE", "PHASH", "PSNR", "RMSE", "SSIM")
+    for images in ("{C}/rose.miff -read-mask xc:gray(50%) {C}/rose_blur.miff",
+                   "{C}/rose.miff ( {C}/rose_blur.miff -read-mask xc:gray(50%) )")]
+# vision.c, fourth round: lines of both slopes and a tall rectangle, so every angle quadrant of the ellipse fit is taken
+GAP_COMMANDS += [
+    "-size 44x30 xc:black -fill white -stroke white -strokewidth 2 -draw 'line 2,2 15,12' -draw 'line 26,12 40,2' -stroke none -draw 'rectangle 18,14 21,28' -draw 'rectangle 26,20 40,23' -draw 'line 4,26 12,18' -precision 17 -define connected-components:verbose=true -define connected-components:angle-threshold=0-1000 -connected-components 8",
+    "-size 44x30 xc:black -fill white -stroke white -strokewidth 2 -draw 'line 2,2 15,12' -draw 'line 26,12 40,2' -stroke none -draw 'rectangle 18,14 21,28' -draw 'rectangle 26,20 40,23' -draw 'line 4,26 12,18' -precision 17 -define connected-components:verbose=true -define connected-components:angle-threshold=0-1000 -connected-components 4",
+    "-size 44x30 xc:black -fill white -stroke white -strokewidth 2 -draw 'line 2,2 15,12' -draw 'line 26,12 40,2' -stroke none -draw 'rectangle 18,14 21,28' -draw 'rectangle 26,20 40,23' -draw 'line 4,26 12,18' -precision 17 -define connected-components:verbose=true -define connected-components:sort=y -define connected-components:sort-order=decreasing -connected-components 8",
+]
+# layer.c, second round: frames at negative and oversized page offsets under each dispose method, -layers merge, mosaic and flatten with offsets, webp:mux-blend, and -layers composite with null: in each position
+GAP_COMMANDS += [
+    "-size 20x16 xc:none ( +clone -fill blue -draw \"rectangle 2,2 8,8\" ) ( -size 20x16 xc:none -fill blue -draw \"rectangle 10,6 16,12\" ) ( -size 20x16 xc:none -fill red -draw \"rectangle 1,9 5,14\" ) ( -size 20x16 xc:none -fill red -draw \"rectangle 1,9 5,14\" -fill green -draw \"rectangle 12,1 18,4\" ) ( -size 20x16 xc:none ) -delete 0 -layers optimize-plus",
+    "-size 20x16 xc:none ( +clone -fill blue -draw \"rectangle 2,2 8,8\" ) ( -size 20x16 xc:none -fill blue -draw \"rectangle 10,6 16,12\" ) ( -size 20x16 xc:none -fill red -draw \"rectangle 1,9 5,14\" ) ( -size 20x16 xc:none -fill red -draw \"rectangle 1,9 5,14\" -fill green -draw \"rectangle 12,1 18,4\" ) ( -size 20x16 xc:none ) -delete 0 -layers optimize-plus -layers coalesce",
+    "-size 20x16 xc:none ( +clone -fill blue -draw \"rectangle 12,8 18,14\" ) ( -size 20x16 xc:none -fill blue -draw \"rectangle 1,1 6,5\" ) ( -size 20x16 xc:none -fill blue -draw \"rectangle 0,0 19,15\" ) ( -size 20x16 xc:none -fill blue -draw \"rectangle 0,0 3,3\" ) -delete 0 -layers optimize-plus",
+    "-size 20x16 xc:none ( +clone -fill blue -draw \"rectangle 12,8 18,14\" ) ( -size 20x16 xc:none -fill blue -draw \"rectangle 1,1 6,5\" ) ( -size 20x16 xc:none -fill blue -draw \"rectangle 0,0 19,15\" ) ( -size 20x16 xc:none -fill blue -draw \"rectangle 0,0 3,3\" ) -delete 0 -layers remove-dups",
+    "-dispose None -size 20x16 xc:red ( -size 8x8 xc:blue -repage 20x16-3-2 ) ( -size 8x8 xc:#0000ff80 -repage 20x16+15+12 ) ( -size 30x30 xc:green -repage 20x16-5-5 ) -layers merge",
+    "-dispose None -size 20x16 xc:red ( -size 8x8 xc:blue -repage 20x16-3-2 ) ( -size 8x8 xc:#0000ff80 -repage 20x16+15+12 ) ( -size 30x30 xc:green -repage 20x16-5-5 ) -layers mosaic",
+    "-dispose None -size 20x16 xc:red ( -size 8x8 xc:blue -repage 20x16-3-2 ) ( -size 8x8 xc:#0000ff80 -repage 20x16+15+12 ) ( -size 30x30 xc:green -repage 20x16-5-5 ) -layers trim-bounds",
+    "-dispose Background -size 20x16 xc:red ( -size 8x8 xc:blue -repage 20x16-3-2 ) ( -size 8x8 xc:#0000ff80 -repage 20x16+15+12 ) ( -size 30x30 xc:green -repage 20x16-5-5 ) -layers coalesce",
+    "-dispose Background -size 20x16 xc:red ( -size 8x8 xc:blue -repage 20x16-3-2 ) ( -size 8x8 xc:#0000ff80 -repage 20x16+15+12 ) ( -size 30x30 xc:green -repage 20x16-5-5 ) -layers optimize-transparency",
+    "-size 8x6 xc:red -set webp:mux-blend AtopBackgroundAlphaBlend ( -size 4x4 xc:#0000ff80 -set webp:mux-blend AtopBackgroundAlphaBlend -repage +1+1 ) -coalesce",
+    "-size 8x6 xc:red -repage +3+2 ( -size 6x4 xc:blue -repage +5+4 ) ( -size 3x3 xc:green -repage +1+7 ) -layers merge",
+    "-size 10x8 xc:red null: ( -size 4x4 xc:#ffff0080 -repage +2+2 ) ( -size 3x3 xc:white -repage +5+1 ) -layers composite",
+    "-size 10x8 xc:red ( -size 10x8 xc:blue ) null: ( -size 4x4 xc:#ffff0080 -repage +2+2 ) ( -size 3x3 xc:white -repage +5+1 ) ( -size 2x2 xc:black -repage +1+5 ) -layers composite",
+]
+# transform.c, second round: trim:minSize under each gravity, chop, crop and shave at the edges and beyond, splice under each gravity, flip and transverse of a page offset
+GAP_COMMANDS += [
+    "{C}/rose.miff -bordercolor white -border 8 -repage +4+3 -define trim:minSize=200x200 -trim",
+    "{C}/rose.miff -bordercolor white -border 8 -repage +4+3 -define trim:minSize=20x60 -gravity East -trim",
+    "{C}/rose.miff -chop 10x5+70+46",
+    "{C}/rose.miff -chop 30x20-5-3",
+    "{C}/rose.miff -chop 20x10-20-10",
+    "{C}/rose.miff -repage 100x80+10+5 -crop 40x30+50+40",
+    "{C}/rose.miff -crop 3x2-2-3@ +repage -append",
+    "{C}/rose.miff -crop 30x0 +repage -append",
+    "{C}/rose.miff -crop 0x20 +repage -append",
+    "{C}/rose.miff -repage 90x60+3+2 -flip",
+    "{C}/rose.miff -repage 90x60+3+2 -transverse",
+    "{C}/rose.miff -repage +3+2 -shave 5x4",
+    "{C}/rose.miff -shave 35x10",
+    "{C}/rose.miff -shave 10x23",
+    "{C}/rose.miff -background blue -gravity NorthWest -splice 10x6",
+    "{C}/rose.miff -background blue -gravity North -splice 10x6",
+    "{C}/rose.miff -background blue -gravity West -splice 10x6",
+    "{C}/rose.miff -background blue -gravity Center -splice 10x6",
+    "{C}/rose.miff -background blue -gravity East -splice 10x6",
+    "{C}/rose.miff -background blue -gravity South -splice 10x6",
+    "-size 60x40 xc:white -fill red -draw \"rectangle 25,15 32,22\" -gravity NorthWest -define trim:minSize=21x15 -trim",
+    "-size 60x40 xc:white -fill red -draw \"rectangle 25,15 32,22\" -gravity North -define trim:minSize=21x15 -trim",
+    "-size 60x40 xc:white -fill red -draw \"rectangle 50,30 57,37\" -gravity North -define trim:minSize=21x15 -trim",
+    "-size 60x40 xc:white -fill red -draw \"rectangle 25,15 32,22\" -gravity West -define trim:minSize=21x15 -trim",
+    "-size 60x40 xc:white -fill red -draw \"rectangle 50,30 57,37\" -gravity West -define trim:minSize=21x15 -trim",
+    "-size 60x40 xc:white -fill red -draw \"rectangle 25,15 32,22\" -gravity Center -define trim:minSize=21x15 -trim",
+    "-size 60x40 xc:white -fill red -draw \"rectangle 25,15 32,22\" -gravity East -define trim:minSize=21x15 -trim",
+    "-size 60x40 xc:white -fill red -draw \"rectangle 25,15 32,22\" -gravity South -define trim:minSize=21x15 -trim",
+    "{C}/rose.miff -repage 120x90+30+20 -crop 50x40+80+50",
+    "{C}/rose.miff -crop 3x2+0-3@ +repage -append",
+    "{C}/rose.miff -crop 25x20-3-2 -append",
+]
+# attribute.c, second round: trim:edges, Floyd-Steinberg depth on the alpha channel, -type on CMYK and palette images
+GAP_COMMANDS += [
+    "-size 30x20 xc:white -fill black -draw 'rectangle 0,0 4,19' -draw 'rectangle 25,0 29,19' -draw 'rectangle 0,0 29,3' -draw 'rectangle 0,16 29,19' -fill red -draw 'rectangle 12,8 16,11' -define trim:edges=north -trim",
+    "{C}/rose_alpha.miff -define dither=FloydSteinberg -channel A -depth 2",
+    "{C}/rose.miff -colorspace CMYK -type TrueColor",
+    "{C}/rose.miff -colorspace CMYK -type TrueColorAlpha",
+    "{C}/rose.miff -colors 16 -type TrueColor",
+    "{C}/rose.miff -colors 16 -type TrueColorAlpha",
+    "{C}/rose.miff -define dither=None -type PaletteBilevelAlpha",
+]
+# compress.c, second round: fax runs of 1792 pixels and more, which need an image wider than that
+GAP_COMMANDS += [
+    "-size 3000x6 xc:white -fill black -draw \"point 2900,1\" -draw \"line 0,3 1900,3\" -draw \"point 5,5\" -write fax:-",
+]
+# effect.c: -local-contrast on images large enough that its window is wider than one pixel, and -adaptive-sharpen on one channel, a gray image and a larger sigma
+GAP_COMMANDS += [
+    "{C}/rose.miff -adaptive-sharpen 5x2",
+    "{C}/rose.miff -channel R -adaptive-sharpen 3x1",
+    "{C}/gray16.miff -adaptive-sharpen 5x2",
+    "{C}/rose.miff -resize 400x260! -local-contrast 20x40",
+    "{C}/rose.miff -resize 120x500! -local-contrast 100x30",
+]
+# fourier.c: -complex over four images (two complex numbers) with and without complex:snr, and -fft -ift with and without the phase image
+GAP_COMMANDS += [
+    "{C}/rose.miff {C}/rose_blur.miff ( {C}/gray16.miff -resize 70x46! ) ( {C}/rose_patch.miff -resize 70x46! ) -complex add",
+    "{C}/rose.miff {C}/rose_blur.miff ( {C}/gray16.miff -resize 70x46! ) ( {C}/rose_patch.miff -resize 70x46! ) -complex divide",
+    "{C}/rose.miff {C}/rose_blur.miff ( {C}/gray16.miff -resize 70x46! ) ( {C}/rose_patch.miff -resize 70x46! ) -define complex:snr=0.25 -complex divide",
+    "{C}/rose.miff -fft -ift",
+    "{C}/rose.miff -fft +delete -ift",
+]
+# list.c: reversed clone ranges, frames:step, and a swap with negative indexes
+GAP_COMMANDS += [
+    "{C}/seq.miff ( -clone -1-0 ) -append",
+    "{C}/seq.miff -swap -1,-5 -append",
+    "{C}/seq.miff -define frames:step=2 ( -clone 0-4 ) -append",
+]
+# fourier.c, list.c (ERDC's runs): -ift on two images, which reaches the FFTW stub of
+# InverseFourierTransformImage (the oracle builds without FFTW, so -fft never makes
+# the pair); -delete of a range ending at 0; -insert at index 0 (PrependImageToList)
+GAP_COMMANDS += [
+    "{C}/rose.miff {C}/rose_blur.miff -ift",
+    "{C}/seq.miff -delete 0-0 -append",
+    "{C}/seq.miff -delete 2-0 -append",
+    "{C}/seq.miff {C}/rose.miff -insert 0 -append",
+]
+# geometry.c (ERDC's runs): the separators x, X, the multiplication sign and ':'
+# (aspect ratios, also under -gravity), the resize flags ^ < @ with one side only,
+# five values with spaces and negative signs (cmyka colours, -colorize in CMYK),
+# page sizes with % and >, scene lists, -affine with seven values, and geometries of
+# exactly MagickPathExtent-1 characters, which both parsers reject
+GAP_COMMANDS += [
+    "{C}/rose.miff -resize 30×20",
+    "{C}/rose.miff -resize 30X20",
+    "{C}/rose.miff -gravity center -crop 16:9 +repage",
+    "{C}/rose.miff -gravity center -crop 1:2 +repage",
+    "{C}/rose.miff -gravity center -crop 16:9^ +repage",
+    "{C}/rose.miff -gravity center -extent 1:1",
+    "{C}/rose.miff -resize 2:1",
+    "{C}/rose.miff -resize 1:3",
+    "{C}/rose.miff -resize 40^",
+    "{C}/rose.miff -resize x40^",
+    "{C}/rose.miff -resize 200x200<",
+    "{C}/rose.miff -resize 120x20<",
+    "{C}/rose.miff -resize 500@",
+    "{C}/rose.miff -resize 50000@",
+    "-size 4x3 xc:cmyka(10%,20%,30%,40%,0.5)",
+    "-size 4x3 xc:cmyka(10%,20%,30%,40%,-0.25)",
+    "-size 4x3 'xc:cmyka( 10% , 20% , 30% , 40% , 0.5 )'",
+    "-size 4x3 xc:cmyka(10%,20%,30%,-40%,0.5)",
+    "{C}/rose.miff -colorspace cmyk -fill red -colorize 10,20,30,40,50",
+    "{C}/rose.miff -page 50%",
+    "{C}/rose.miff -page 300x200>",
+    "{C}/seq.miff[0,2] -append",
+    "{C}/seq.miff[99999999999999999999] -append",
+    "-size 30x20 xc:white -affine 1,0.3,0,1,0,0 -draw 'rectangle 2,2 10,8'",
+    "-size 30x20 xc:white -affine 1,0.3,0,1,2,3,4 -draw 'rectangle 2,2 10,8'",
+    "{C}/rose.miff -resize " + "0" * 4093 + "10",
+    "{C}/rose.miff -blur " + "0" * 4093 + "x2",
+]
+# image.c (ERDC's runs): settings given before a read (-extract, -density with two values,
+# -delay with > < and x), chromaticity and unit settings synced before an operator,
+# -repage with offsets, appends of images that differ in depth, type and colorspace
+# (bilevel too), +smush over transparent columns, scene ranges, raw RGB by extension
+GAP_COMMANDS += [
+    "-extract 30x20+5+3 {C}/rose.miff",
+    "-extract 30x20 {C}/rose.miff",
+    "-density 150x75 {C}/rose.miff",
+    "-density 150 {C}/rose.miff",
+    "-delay 5> {C}/seq.miff",
+    "-delay 500< {C}/seq.miff",
+    "-delay 20x50 {C}/seq.miff",
+    "{C}/rose.miff -blue-primary 0.15,0.06 -green-primary 0.3,0.6 -red-primary 0.64,0.33 "
+    "-white-point 0.3127,0.329 -resize 50%",
+    "{C}/rose.miff -blue-primary 0.15 -green-primary 0.3 -red-primary 0.64 -white-point 0.31 "
+    "-resize 50%",
+    "{C}/rose.miff -density 300 -units PixelsPerInch -resize 50% -units PixelsPerCentimeter "
+    "-resize 50%",
+    "{C}/rose.miff -density 100 -units PixelsPerCentimeter -resize 50% -units PixelsPerInch "
+    "-resize 50%",
+    "{C}/rose.miff -repage +5+3",
+    "{C}/rose.miff -repage 100x80-4+6",
+    "{C}/rose.miff {C}/gray16.miff -append",
+    "{C}/rose.miff ( {C}/rose.miff -colorspace cmyk ) -append",
+    "{C}/bilevel.miff {C}/bilevel.miff -append",
+    "{C}/rose.miff {C}/gray16.miff +append",
+    "{C}/rose_alpha.miff {C}/rose_alpha.miff +smush 3",
+    "{C}/rose_alpha.miff {C}/rose_alpha.miff +smush -5",
+    "{C}/seq.miff[3-1] -append",
+    "{C}/seq.miff[1-99] -append",
+]
+GAP_STEP_CASES += [
+    ("filename patterns %d %03d %x %o %% %5d and malformed ones, written and read back",
+     [["{C}/seq.miff", "-scene", "9", "a%d.miff"], ["{C}/seq.miff", "-scene", "9", "b%03d.miff"],
+      ["{C}/seq.miff", "-scene", "9", "c%x.miff"], ["{C}/seq.miff", "-scene", "9", "d%o.miff"],
+      ["{C}/seq.miff", "-scene", "9", "e%%d.miff"], ["{C}/seq.miff", "-scene", "9", "h%5d.miff"],
+      ["{C}/seq.miff", "-scene", "9", "k%00d.miff"], ["{C}/seq.miff", "-scene", "9", "m%q.miff"],
+      ["{C}/seq.miff", "-set", "filename:t", "z", "g%[filename:t].miff"],
+      ["-define", "filename:literal=true", "e%d.miff", "k%00d-9.miff", "m%q-9.miff", "+append",
+       "lit.miff"],
+      ["a9.miff", "b013.miff", "cd.miff", "d11.miff", "h   12.miff", "gz.miff", "lit.miff",
+       "-append", "out.miff"]], {}),
+    ("raw rgb chosen by extension", [["{C}/rose.miff", "-depth", "8", "x.rgb"],
+                                     ["-size", "70x46", "-depth", "8", "x.rgb", "out.miff"]], {}),
+    ("jpeg sampling factor through a cloned image_info",
+     [["-sampling-factor", "2x1", "{C}/rose.miff", "x.jpg"], ["x.jpg", "out.miff"]], {}),
+]
+# enhance.c, threshold.c (statement deletion): -modulate under each modulate:colorspace on a
+# palette image, whose colormap is modulated on its own; -color-threshold on images in each
+# colour space ColorThresholdImage converts its start and stop colours into
+GAP_CASES += [("palette modulate:colorspace=%s" % cs, ["-define", "modulate:colorspace=" + cs,
+                                                       "-modulate", "110/100/95"], ["palette"])
+              for cs in ("HCL", "HCLp", "HSB", "HSI", "HSV", "HWB", "LCHab", "LCHuv")]
+GAP_COMMANDS += ["{C}/rose.miff -colorspace %s -color-threshold 'sRGB(10,20,30)-sRGB(200,210,220)'"
+                 % cs for cs in ("HCL", "HSB", "HSL", "HSV", "HWB", "Lab")]
+# ranges that select pixels in each model: every converted component of the start colour
+# below the stop colour's, so a start colour left unconverted (far above any pixel) shows
+GAP_COMMANDS += ["{C}/rose.miff -colorspace %s -color-threshold '%s'" % cs_range for cs_range in (
+    ("HCL", "sRGB(60,20,20)-sRGB(255,0,200)"), ("HSB", "sRGB(60,20,20)-sRGB(255,0,200)"),
+    ("HSL", "sRGB(60,20,20)-sRGB(255,0,200)"), ("HSV", "sRGB(60,20,20)-sRGB(255,0,200)"),
+    ("Lab", "sRGB(10,40,10)-sRGB(255,140,40)"))]  # no HWB range tried selected any pixel
+# compress.c (statement deletion): a fax read back and resized, so the decoded pixels'
+# colours are read, not only their colormap indexes
+GAP_STEP_CASES += [("fax read back and resized",
+                    [["{C}/bilevel.miff", "b.fax"], ["fax:b.fax", "-resize", "50%", "out.miff"]], {})]
+# identify.c: pixel locations (identify:locate, identify:limit) on RGB, CMYK, gray and alpha
+# images, a 16-bit image under -verbose, masks and a meta channel in verbose info, and an
+# image read smaller than stored (jpeg:size), which plain identify prints as WxH=>
+GAP_COMMANDS += [
+    "identify -define identify:locate=maximum -define identify:limit=2 {C}/rose.miff",
+    "identify -define identify:locate=minimum {C}/cmyk.miff",
+    "identify -define identify:locate=mean {C}/gray16.miff",
+    "identify -define identify:locate=maximum {C}/rose_alpha.miff",
+    "identify -verbose {C}/gray16.miff",
+    "{C}/rose.miff -channel-fx 'red=>meta' -verbose -write info: +verbose",
+    "{C}/rose.miff -read-mask {C}/bilevel.miff -verbose -write info: +verbose",
+    "{C}/rose.miff -write-mask {C}/bilevel.miff -verbose -write info: +verbose",
+]
+# cipher.c: passphrases of 48 and 64 characters, whose second halves are 24- and 32-byte
+# keys, exactly the 192- and 256-bit sizes SetAESKey chooses between (the catalogue's
+# passphrase gives 18 bytes, so only the 128-bit schedule ran)
+GAP_STEP_CASES += [
+    ("image read smaller than stored, identified",
+     [["{C}/rose.miff", "x.jpg"], ["identify", "-define", "jpeg:size=20x13", "x.jpg"]], {}),
+    ("encipher with a 192-bit key", [["{C}/rose.miff", "-encipher", "pass.txt", "out.miff"]],
+     {"pass.txt": "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKL"}),
+    ("encipher with a 256-bit key", [["{C}/rose.miff", "-encipher", "pass.txt", "out.miff"]],
+     {"pass.txt": "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ!?"}),
+    ("encipher with a 184-bit key", [["{C}/rose.miff", "-encipher", "pass.txt", "out.miff"]],
+     {"pass.txt": "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJ"}),
+]
+# compare.c, visual-effects.c, resize.c, channel.c: -metric PHASH per channel; subimage
+# searches with a metric where higher is better (NCC) and with similarity and
+# dissimilarity thresholds; -polaroid with a caption set as a property (the -caption
+# setting is not what PolaroidImage reads), under a gravity; -thumbnail of an image
+# with an ICC profile, which a thumbnail keeps; semi-transparent backgrounds for
+# -alpha remove and background, through FlattenPixelInfo
+GAP_COMMANDS += [
+    "compare -metric PHASH -verbose -precision 17 {C}/rose.miff {C}/rose_blur.miff",
+    "compare -metric NCC -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric RMSE -subimage-search -similarity-threshold 0.5 {C}/rose.miff "
+    "( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric NCC -subimage-search -similarity-threshold 0.5 {C}/rose.miff "
+    "( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric RMSE -subimage-search -dissimilarity-threshold 0.01 {C}/rose.miff "
+    "( {C}/rose_blur.miff -crop 20x20+10+10 +repage )",
+    "{C}/rose.miff -font {C}/Generic.ttf -set caption 'A rose' -polaroid 5",
+    "{C}/rose.miff -font {C}/Generic.ttf -gravity south -set caption 'A rose' -polaroid 5",
+    _UHDR_JPG + " -thumbnail 30x20",
+    "{C}/rose_alpha.miff -background 'rgba(255,0,0,0.5)' -alpha remove",
+    "{C}/rose_alpha.miff -background 'rgba(255,0,0,0.5)' -alpha background",
+]
+# statistic.c: a single-colour image, whose one histogram bin makes MagickSafeReciprocalLD
+# take 0 (log2 of one bin) when the entropy is computed
+GAP_COMMANDS += ["identify -verbose -precision 17 -size 4x4 xc:red"]
+# string.c: a label with a control character, which StringToStrings lays out as a hex dump;
+# IsStringFalse's false, off, no and 0 through exif:sync-image, on a JPEG whose EXIF block
+# is rewritten with an orientation (read back as Undefined when the define is false)
+GAP_COMMANDS += ["-font {C}/Generic.ttf -pointsize 8 label:'A\x01B'"]  # label: measures through StringToStrings
+# compare.c: a PHASH subimage search (GetPHASHSimilarity serves only the search), against an
+# exact patch and a blurred one, whose best match is not perfect
+GAP_COMMANDS += [
+    "compare -metric PHASH -subimage-search {C}/rose.miff ( {C}/rose.miff -crop 20x20+10+10 +repage )",
+    "compare -metric PHASH -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
+    "compare -metric RMSE -subimage-search {C}/rose.miff ( {C}/rose_blur.miff -crop 20x20+30+20 +repage )",
+]
+# identify.c, second round: locations and moments on a Lab image (the default branches of
+# the colourspace switches; features on Lab take minutes, so they are left out), the convex
+# hull, a montage's tile directory, a property longer than 80 characters
+GAP_COMMANDS += [
+    "{C}/rose.miff -colorspace Lab -define identify:locate=maximum -write info: +define identify:locate",
+    "{C}/rose.miff -colorspace Lab -define identify:moments=true -verbose -write info: +verbose",
+    "{C}/rose.miff -define identify:convex-hull=true -verbose -write info: +verbose",
+    "{C}/rose.miff -set comment " + "7" * 100 + " -verbose -write info: +verbose",
+]
+# draw.c: square line caps (TraceSquareLinecap), and an image primitive under an affine
+# transform and a rotation (DrawAffineImage, AffineEdge, InverseAffineMatrix). Gradients'
+# reflect and repeat spreads are API-only (gradient: always pads, MVG has no spread), and
+# draw:render-bounding-rectangles aborts (exit 134), so neither has a case
+GAP_COMMANDS += [
+    "-size 60x40 xc:white -stroke blue -strokewidth 6 -draw 'stroke-linecap square line 10,10 50,30'",
+    "-size 80x60 xc:white -draw \"affine 1,0.3,0,1,0,0 image over 5,5 40,30 '{C}/rose.miff'\"",
+    "-size 80x60 xc:white -draw \"rotate 20 image over 10,5 40,30 '{C}/rose.miff'\"",
+]
+# property.c: the profile property readers, which no case asked for: every EXIF property
+# and named tags of a JPEG whose EXIF block was rewritten, the ICC properties, an IPTC
+# dataset and 8BIM resources of the JPEG with those profiles, and XMP values (read by tag
+# name once %[xmp:...] has parsed them; only the element form yields values)
+GAP_COMMANDS += [
+    "identify -format '%[icc:*]' " + _UHDR_JPG,
+    "identify -format '%[IPTC:2:120]|%[8BIM:1028,1028]|%[8BIM:1000,2000]|%[8BIM:*]' " + _UHDR_JPG,
+]
+GAP_STEP_CASES += [
+    ("exif properties of a JPEG, all and by name",
+     [["{C}/rose.miff", "-profile", "APP1:exif.bin", "-density", "300", "-orient", "BottomLeft",
+       "x.jpg"],
+      ["identify", "-format", "%[exif:*]%[exif:Orientation]|%[exif:XResolution]|%[exif:Bogus]\\n",
+       "x.jpg"]], {"exif.bin": EXIF_BLOCK}),
+    ("xmp properties, element and attribute forms",
+     [["{C}/rose.miff", "-profile", "e.xmp", "xe.miff"], ["{C}/rose.miff", "-profile", "a.xmp", "xa.miff"],
+      ["identify", "-format", "%[xmp:load][%[tiff:Orientation]][%[tiff:XResolution]]\\n", "xe.miff",
+       "xa.miff"]], {"e.xmp": XMP_ELEMENTS, "a.xmp": XMP_ATTRIBUTES}),
+]
+# channel.c: +combine at the channel-count boundaries of each target colour space (sRGB
+# with a meta channel, gray with alpha and a meta channel, CMYK with alpha and a meta
+# channel), an undefined target (the gamma test), images of different widths;
+# identify.c: minimum locations on an image with no zero-valued pixel
+GAP_COMMANDS += [
+    "{C}/gray8.miff {C}/gray8.miff {C}/gray8.miff {C}/gray8.miff {C}/gray8.miff -combine",
+    "{C}/gray8.miff {C}/gray8.miff +combine gray",
+    "{C}/gray8.miff {C}/gray8.miff {C}/gray8.miff +combine gray",
+    "{C}/gray8.miff {C}/gray8.miff {C}/gray8.miff {C}/gray8.miff {C}/gray8.miff +combine cmyk",
+    "{C}/gray8.miff {C}/gray8.miff {C}/gray8.miff {C}/gray8.miff {C}/gray8.miff {C}/gray8.miff +combine cmyk",
+    "{C}/gray8.miff {C}/gray8.miff {C}/gray8.miff +combine undefined",
+    "{C}/gray8.miff {C}/gray8.miff {C}/gray8.miff -set gamma 1.0 +combine undefined",
+    "{C}/wide.miff {C}/gray8.miff {C}/gray8.miff -combine",
+    "identify -define identify:locate=minimum {C}/rose.miff",
+]
+# attribute.c: a uniform border, so the corner pixels decide the background, under a
+# virtual-pixel method other than Edge, so a corner read one pixel too far would differ
+GAP_COMMANDS += [
+    "{C}/rose.miff -bordercolor white -border 5 -virtual-pixel Black -trim +repage",
+    "{C}/rose.miff -bordercolor white -border 5 -virtual-pixel Black -set bbox %@ "
+    "-define trim:edges=north,east -trim +repage",
+]
+# transform.c: crops on a virtual canvas with negative and positive offsets, crops that run
+# off the image or start exactly at its edge, tile crops (@) with negative and positive
+# offsets
+GAP_COMMANDS += [
+    "{C}/rose.miff -repage 100x80-10-5 -crop 30x20+0+0",
+    "{C}/rose.miff -repage 100x80+10+5 -crop 40x30+60+40",
+    "{C}/rose.miff -crop 3x2-4-3@ +repage -append",
+    "{C}/rose.miff -crop 3x2+4+3@ +repage -append",
+    "{C}/rose.miff -crop 20x20+65+40",
+    "{C}/rose.miff -crop 20x20+70+0",
+    "{C}/rose.miff -repage 0x0+5+5 -crop 10x10+0+0",
+]
+# layer.c: frames lying partly off the canvas (a negative offset, and one past the right
+# and bottom edges) under coalesce, dispose (first frame off-canvas: DisposeImages only
+# reads the first frame's offsets) and optimize-transparency; -layers composite with
+# compose:clip-to-self=false
+GAP_COMMANDS += [
+    "-dispose Background -size 20x16 xc:red ( -size 8x8 xc:blue -repage 20x16-3-2 ) "
+    "( -size 8x8 xc:green -repage 20x16+15+12 ) -layers coalesce",
+    "-dispose Background ( -size 8x8 xc:blue -repage 20x16-3-2 ) ( -size 20x16 xc:red ) "
+    "( -size 8x8 xc:green -repage 20x16+15+12 ) -layers dispose",
+    "-dispose Previous -size 20x16 xc:red ( -size 8x8 xc:blue -repage 20x16-3-2 ) "
+    "( -size 8x8 xc:green -repage 20x16+15+12 ) -layers optimize-transparency",
+    "-size 20x16 xc:red ( -size 8x8 xc:blue -repage +15+12 ) null: ( -size 20x16 xc:yellow ) "
+    "-define compose:clip-to-self=false -layers composite",
+]
+# colormap.c: PALM files below 8 bits per pixel written to the compared output itself,
+# so the colormap SortColormapByIntensity orders is in the bytes (read back, any order
+# decodes to the same pixels)
+# compare.c: phash:normalize, which GetPHASHSimilarity's per-channel square roots need
+GAP_COMMANDS += ["compare -metric PHASH -define phash:normalize=true -verbose -precision 17 "
+                 "{C}/rose.miff {C}/rose_blur.miff"]
+GAP_STEP_CASES += [
+    ("palm at 4 bits, the file itself", [["{C}/palette.miff", "-colors", "12", "palm:out.miff"]], {}),
+    ("palm at 2 bits, the file itself", [["{C}/gray8.miff", "-colors", "4", "palm:out.miff"]], {}),
+]
+# draw.c: an MVG file with every keyword no case used: named classes and macros
+# (push class "x", push graphic-context "x", class, use), a named mask, a symbol, scale,
+# the clip, compliance, density and encoding settings, the antialias switches, and the
+# font and text settings (stretch, style, weight, direction, spacings, kerning, align, anchor)
+_MVG_ALL_KEYWORDS = """viewbox 0 0 120 80
+push defs
+  push class "warm"
+    fill orange stroke brown stroke-width 2
+  pop class
+  push graphic-context "blob"
+    circle 10,10 10,16
+  pop graphic-context
+  push mask "m1"
+    fill white rectangle 0,0 60,80
+  pop mask
+pop defs
+push symbol
+  rectangle 0,0 5,5
+pop symbol
+push graphic-context
+  border-color red
+  clip-rule evenodd
+  clip-units userSpaceOnUse
+  compliance SVG
+  density 72
+  encoding UTF-8
+  stroke-antialias false
+  text-antialias false
+  scale 1.1,0.9
+  class "warm"
+  rectangle 5,5 40,30
+  use "blob"
+  font '{C}/Generic.ttf'
+  font-stretch condensed
+  font-style italic
+  font-weight bold
+  direction right-to-left
+  interline-spacing 2
+  interword-spacing 3
+  kerning 1
+  letter-spacing 1
+  text-align center
+  text-anchor middle
+  fill navy
+  text 60,60 'Ab cd'
+pop graphic-context
+"""
+GAP_STEP_CASES += [("mvg with every keyword no case used",
+                    [["-size", "120x80", "xc:white", "-draw", "@all.mvg", "out.miff"]],
+                    {"all.mvg": _MVG_ALL_KEYWORDS})]
+# draw.c: stroke joins on a polyline that turns both ways along horizontal and vertical
+# segments, and on a closed acute triangle, under each join with miter limits of 1 and 10
+# (TraceStrokePolygon's left and right turns, axis-aligned slopes, closed paths)
+GAP_COMMANDS += ["-size 60x50 xc:white -fill none -stroke navy -strokewidth 5 -draw "
+                 "\"stroke-linejoin %s stroke-miterlimit %d polyline 10,10 50,10 50,40 20,40 20,20 35,25 "
+                 "path 'M 10,45 L 30,5 L 50,45 Z'\"" % (join, limit)
+                 for join in ("miter", "round", "bevel") for limit in (1, 10)]
+# draw.c: dash offsets in the same graphic context as the pattern (the catalogue set the
+# offset in a separate -draw, so it never applied), inside the first dash, past it and past
+# the whole pattern, and a pattern of odd length (a zero entry is rejected as nonconforming)
+GAP_COMMANDS += ["-size 60x40 xc:white -fill none -stroke black -strokewidth 2 -draw "
+                 "'%s polyline 5,5 55,5 55,35 5,35'" % dash for dash in (
+                     "stroke-dasharray 6 3", "stroke-dasharray 6 3 stroke-dashoffset 2",
+                     "stroke-dasharray 6 3 stroke-dashoffset 8", "stroke-dasharray 6 3 stroke-dashoffset 20",
+                     "stroke-dasharray 5 2 1")]
+# draw.c: the alpha primitive's methods (only floodfill had a case), a single-point path,
+# and a numeric font weight (GetDrawInfo's fallback when the weight is not a name)
+GAP_COMMANDS += ["{C}/rose.miff -fill '#ff000080' -draw 'alpha 10,10 %s'" % method
+                 for method in ("point", "replace", "filltoborder", "reset")]
+GAP_COMMANDS += [
+    "{C}/rose_alpha.miff -fill '#ff000080' -draw 'path \"M 10,10 Z\"'",
+    "-size 80x30 xc:white -font {C}/Generic.ttf -weight 650 -pointsize 14 -annotate +5+20 Ab",
+]
+# draw.c: degenerate primitives whose polygon has no edges (DrawPolygonPrimitive draws a
+# point), and the settings GetDrawInfo copies from the command line, which reach it only
+# through a draw info made afresh, as label: and caption: make them (-draw's comes from
+# the command line directly)
+GAP_COMMANDS += ["{C}/rose.miff -fill red -stroke none -draw '%s'" % primitive for primitive in (
+    "line 10,10 10,10", "polygon 10,10 10,10 10,10", "polyline 10,10 10,10", 'path "M 10,10 L 10,10"')]
+GAP_COMMANDS += [
+    "-font {C}/Generic.ttf -pointsize 14 -kerning 2 -interword-spacing 6 -stroke red -strokewidth 1 "
+    "-undercolor yellow -style italic -weight bold label:'Ab cd'",
+    "-font {C}/Generic.ttf -pointsize 14 -weight 650 -density 150 label:'Ab cd'",
+    "-font {C}/Generic.ttf -pointsize 14 -word-break break-all -size 40x caption:'Abcdefgh ijk'",
+]
+# property.c: the property names GetMagickProperty knows that no case printed (some are
+# unknown for one image and known for the other), and the properties SetImageProperty maps
+# onto image fields, which -set had never set
+_PROPERTY_FORMAT = "%[bounding-box]|%[convex-hull:extreme-points]|%[height]|%[interlace]|%[mime:type]|%[page]|%[profile:icm]|%[printsize.x]|%[printsize.y]|%[profiles]|%[quality]|%[width]\\n"
+GAP_COMMANDS += ["identify -format '" + _PROPERTY_FORMAT + "' {C}/rose.miff",
+                 "identify -format '" + _PROPERTY_FORMAT + "' " + _UHDR_JPG]
+GAP_COMMANDS += ["{C}/rose.miff -set compose Over -set compress Zip -set delay 20x50 -set density 150x100 "
+                 "-set dispose Background -set gravity Center -set intensity Rec709Luma -set intent Perceptual "
+                 "-set interpolate Bilinear -set kurtosis 1 -set opaque true -set rendering-intent Saturation "
+                 "-set type TrueColor -set units PixelsPerInch"]
+# property.c: InterpretImageProperties' rarer paths: a format read from a file with CRLF
+# lines, the &lt; &gt; &amp; entities, globs over options, artifacts and properties (not
+# date:*, whose date:timestamp is the time of the run), a backslash inside %[...], and a
+# name longer than the 64-character pattern buffer
+GAP_COMMANDS += [
+    "identify -define case:one=1 -define case:two=2 -format '%[option:case:*]|' {C}/rose.miff",
+    "{C}/rose.miff -define art:x=7 -format '%[artifact:art:*]|' -write info: +define art:x",
+    "identify -format '&lt;%w&gt; &amp; %h\\n' {C}/rose.miff",
+    "{C}/rose.miff -set case:a 1 -set case:b 2 -format '%[case:*]|' -write info:",
+    "identify -format '%[fx:w\\*2]|%[" + "a" * 70 + "]\\n' {C}/rose.miff",
+]
+GAP_STEP_CASES += [("format read from a file with CRLF lines",
+                    [["identify", "-format", "@fmt.txt", "{C}/rose.miff"]],
+                    {"fmt.txt": "%wx%h\r\n%[case:a]\r\n"})]
+# image.c: smush gaps, which count only fully transparent pixels (rose_alpha has none at its
+# edges, so the gap was always 0): transparent margins, and triangles whose margins vary
+# from row to row, so the gap is the minimum over rows, across and down
+GAP_COMMANDS += [
+    "( {C}/rose.miff -bordercolor none -border 6x0 ) ( {C}/rose.miff -bordercolor none -border 4x0 ) +smush 2",
+    "( {C}/rose.miff -bordercolor none -border 0x6 ) ( {C}/rose.miff -bordercolor none -border 0x4 ) -smush 2",
+    "( -size 30x20 xc:none -fill red -draw 'polygon 0,0 24,10 0,19' ) "
+    "( -size 30x20 xc:none -fill blue -draw 'polygon 29,0 5,10 29,19' ) +smush 0",
+    "( -size 20x30 xc:none -fill red -draw 'polygon 0,0 10,24 19,0' ) "
+    "( -size 20x30 xc:none -fill blue -draw 'polygon 0,29 10,5 19,29' ) -smush 0",
+]
+# image.c: AcquireImage's settings and default colours on images no reader overwrites
+# (the MIFF reader sets delay, density and the colours from its header, so the -delay and
+# -density cases on MIFF files could not show them): xc: images with -delay x, > and <,
+# -density with two values, and operators that use the default background, border and
+# matte colours
+GAP_COMMANDS += [
+    "-delay 20x50 -size 8x8 xc:red",
+    "-delay 5> -size 8x8 xc:red",
+    "-delay 500< -size 8x8 xc:red",
+    "-density 150x75 -size 8x8 xc:red",
+    "-size 20x20 xc:red -rotate 30",
+    "-size 20x20 xc:red -border 2",
+    "-size 20x20 xc:red -frame 3",
+]
+# string.c: StringToArgv's quoted arguments, through an @list of files with double-quoted,
+# single-quoted and bare names (the catalogue's list quotes nothing), and a font family
+# list with a quoted name that the case's type.xml defines
+GAP_STEP_CASES += [
+    ("@list of files with quoted names",
+     [["@list.txt", "-append", "out.miff"]],
+     {"list.txt": '"{C}/rose.miff" \'{C}/granite.miff\' {C}/rose_blur.miff\n'}),
+    ("a font family list with a quoted name",
+     [["-family", '"Case Missing", CaseFamily', "-pointsize", "12", "label:Ab", "out.miff"]],
+     _TYPE_FILES),
+]
+# string.c: CopyMagickString's return value, which the HDR writer uses as its header lengths;
+# the round trips compare the decoded image, so the file itself is the output here
+GAP_STEP_CASES += [("hdr file itself", [["{C}/rose.miff", "hdr:out.miff"]], {})]
+# utility.c: ExpandFilenames' full path, which only runs when an argument holds a wildcard:
+# globs with options that take values before and after them (whose values it copies),
+# a dotted name read with a subimage spec, and an explicit format prefix with a directory
+GAP_STEP_CASES += [
+    ("glob among options with values",
+     [["{C}/seq.miff", "f%d.miff"], ["-define", "case:x=1", "f*.miff", "-resize", "50%", "-append", "out.miff"]], {}),
+    ("glob range among options with values",
+     [["{C}/seq.miff", "f%d.miff"], ["-define", "case:x=1", "f[0-2].miff", "-resize", "50%", "+append", "out.miff"]], {}),
+    ("dotted name with a subimage spec",
+     [["{C}/rose.miff", "a.b.c.miff"], ["a.b.c.miff[0]", "out.miff"]], {}),
+    ("format prefix with a directory",
+     [["{C}/rose.miff", "miff:sub.d/x.y"], ["miff:sub.d/x.y", "out.miff"]], {"sub.d/keep.txt": "kept\n"}),
+]
+# draw.c: shapes aligned exactly with pixel centres, so GetFillAlpha's real-valued
+# distances come out exactly 0 or 1 at some pixels, where its < and <= differ
+GAP_COMMANDS += ["-size 40x30 xc:white -fill navy -stroke %s -draw '%s'" % (stroke, shape)
+                 for stroke, shape in (
+                     ("none", "rectangle 10.5,10.5 30.5,20.5"), ("none", "rectangle 10,10 30,20"),
+                     ("none", "circle 20,15 20,25"), ("red -strokewidth 1", "line 5.5,5 5.5,25"),
+                     ("red -strokewidth 1", "line 5,5.5 35,5.5"), ("red -strokewidth 2", "rectangle 10.5,10.5 30.5,20.5"),
+                     ("none +antialias", "polygon 10.5,10.5 30.5,10.5 20.5,25.5"))]
+# image.c: SyncImageSettings with chromaticity points other than sRGB's own (the earlier case
+# used sRGB's values, which the image already had), with one value and with two; unit
+# conversions on images whose resolution comes from the file, with -units but no -density
+# (a -density option sets the resolution again after the conversion); -background on an
+# image that carries its own
+GAP_COMMANDS += [
+    "{C}/rose.miff -blue-primary 0.2,0.1 -green-primary 0.25,0.65 -red-primary 0.6,0.3 "
+    "-white-point 0.32,0.34 -resize 50%",
+    "{C}/rose.miff -blue-primary 0.2 -green-primary 0.25 -red-primary 0.6 -white-point 0.32 -resize 50%",
+    "{C}/rose.miff -background red -rotate 15",
+]
+GAP_STEP_CASES += [
+    ("resolution in inches converted to centimetres",
+     [["{C}/rose.miff", "-density", "300", "-units", "PixelsPerInch", "x.miff"],
+      ["x.miff", "-units", "PixelsPerCentimeter", "-resize", "50%", "out.miff"]], {}),
+    ("resolution in centimetres converted to inches",
+     [["{C}/rose.miff", "-density", "100", "-units", "PixelsPerCentimeter", "x.miff"],
+      ["x.miff", "-units", "PixelsPerInch", "-resize", "50%", "out.miff"]], {}),
+]
+# image.c: a filename pattern %[name] filled from a -define (InterpretImageFilename looks
+# up the image's properties, then artifacts, then the options; the earlier case used -set,
+# a property). property.c: an EXIF block with text tags (Make, Model, Software, Artist; the
+# catalogue's block holds only numbers), read back whole, by name and by tag number
+def _exif_text_block():
+    entries = [(0x010F, 2, b"CaseMake\0"), (0x0110, 2, b"M1\0"), (0x0131, 2, b"Oracle\0"),
+               (0x013B, 2, b"A\0"), (0x0213, 3, struct.pack("<H", 1))]
+    data_at = 8 + 2 + 12 * len(entries) + 4
+    ifd, data = struct.pack("<H", len(entries)), b""
+    for tag, kind, value in entries:
+        count = len(value) if kind == 2 else 1
+        if len(value) <= 4:
+            ifd += struct.pack("<HHI", tag, kind, count) + value.ljust(4, b"\0")
+        else:
+            ifd += struct.pack("<HHII", tag, kind, count, data_at + len(data))
+            data += value
+    block = b"Exif\0\0II*\0" + struct.pack("<I", 8) + ifd + struct.pack("<I", 0) + data
+    assert max(block) < 128  # case files are text
+    return block.decode("latin-1")
+
+
+GAP_STEP_CASES += [
+    ("filename pattern filled from a -define",
+     [["{C}/rose.miff", "-define", "case:t=zz", "g%[case:t].miff"], ["gzz.miff", "out.miff"]], {}),
+    ("exif text tags, whole, by name and by tag number",
+     [["{C}/rose.miff", "-profile", "APP1:exif.bin", "x.jpg"],
+      ["identify", "-format", "%[exif:*]|%[exif:#010F]|%[exif:#010f]|%[exif:@010F]|%[exif:Make]\\n",
+       "x.jpg"]], {"exif.bin": _exif_text_block()}),
+]
+# The image's depth, class and type, printed before the floating-point write: every _op
+# case writes with FLOAT_OUT (-depth 32), which overwrites the depth an operator set, so no
+# case could see it (AppendImages' depth, -depth, -type, -colors, -monochrome, -separate,
+# -combine, and GetImageDepth and SetImageDepth behind them)
+_DEPTH_FORMAT = "-format '%z %r %[type]\\n' -write info:"
+GAP_COMMANDS += [cmd + " " + _DEPTH_FORMAT for cmd in (
+    "{C}/rose.miff {C}/gray16.miff -append", "{C}/gray16.miff {C}/rose.miff +append",
+    "{C}/bilevel.miff {C}/bilevel.miff -append", "{C}/rose.miff -depth 4",
+    "{C}/rose.miff -type Palette", "{C}/rose.miff -colors 8", "{C}/rose.miff -monochrome",
+    "{C}/rose.miff -separate", "{C}/gray8.miff {C}/gray8.miff {C}/gray8.miff -combine",
+    "{C}/rose.miff -type GrayscaleAlpha", "{C}/rose.miff -type TrueColorAlpha")]
+# attribute.c: SetImageDepth's and GetImageDepth's colormap paths, which quantize a palette
+# image's colormap channel by channel under the channel mask
+GAP_COMMANDS += ["{C}/palette.miff " + ops for ops in (
+    "-depth 4", "-channel R -depth 2 +channel", "-channel RG -depth 3 +channel")]
+GAP_COMMANDS += ["identify -verbose -channel R {C}/palette.miff"]
+# attribute.c: IsImageOpaque scans pixels only when the image has an alpha channel: %[opaque]
+# on an image with transparency and on one whose added alpha channel is fully opaque
+GAP_COMMANDS += ["identify -format '%[opaque]\\n' {C}/rose_alpha.miff",
+                 "{C}/rose.miff -alpha set -format '%[opaque]\\n' -write info:"]
+# attribute.c: GetImageQuantumDepth rounds a depth of 33 to 64 up to 64 and leaves one
+# above 64 alone; the FITS writer asks for it unconstrained and writes it as BITPIX
+GAP_STEP_CASES += [("-depth %d written as FITS" % depth,
+                    [["{C}/rose.miff", "-depth", str(depth), "fits:out.miff"]], {})
+                   for depth in (48, 65)]
+# attribute.c: SetImageDepth on a palette image with an alpha channel scales the
+# colormap's alpha too; -cycle copies the colormap back into the pixels
+GAP_COMMANDS += ["{C}/rose_alpha.miff -colors 16 -depth 2 -write histogram:info:- -alpha extract"]
+GAP_COMMANDS += ["{C}/rose_alpha.miff -colors 16 -depth 2 -cycle %d" % n for n in (0, 1)]
+# attribute.c: GetImageBoundingBox reads the four corners as the background to trim; on a
+# bordered image under a black virtual pixel a corner read from outside the image differs,
+# and an image whose one corner differs from the rest drives the corner rule
+_BBOX = " -format '%@\\n' -write info: -trim"
+GAP_COMMANDS += ["{C}/rose.miff -bordercolor white -border 5 -virtual-pixel black" + _BBOX]
+GAP_COMMANDS += ["-size 12x10 xc:white -fill %s -draw 'point %s' -fill black "
+                 "-draw 'rectangle 4,3 7,6'" % corner + _BBOX
+                 for corner in (("lime", "11,9"), ("red", "11,0"), ("blue", "0,9"))]
+# a 2x4 image whose bottom-left pixel is the only one of its colour: a lower row may not
+# shrink the box's height again
+GAP_COMMANDS += ["-size 1x1 ( xc:white xc:red +append ) ( xc:blue xc:red +append ) "
+                 "( xc:white xc:red +append ) ( xc:white xc:blue +append ) -append" + _BBOX]
+# attribute.c: GetImageDepth on a palette image checks red, green and blue in turn (a colour
+# whose green, or blue, alone needs 8 bits), and an image with alpha by its pixels: two
+# colours at 1 bit under a 16-bit alpha
+GAP_COMMANDS += ["-size 1x1 xc:black xc:%s +append -type Palette -format '%%[bit-depth]\\n' "
+                 "-write info:" % colour for colour in ("rgb(0,37,0)", "rgb(0,0,91)")]
+GAP_COMMANDS += ["-size 13x1 gradient:black-white -threshold 50% ( -size 13x1 gradient: ) -alpha off "
+                 "-compose copy_opacity -composite -type PaletteAlpha -format '%[bit-depth]\\n' -write info:"]
+# attribute.c: the pixel scans read their rows through the virtual pixel method, so a scan one
+# row too far shows only when the row below the image is not a copy of the last one
+_VP_BG = " -virtual-pixel background -background "
+GAP_COMMANDS += ["{C}/rose.miff -alpha set -virtual-pixel transparent -format '%[opaque]\\n' -write info:",
+                 "{C}/rose.miff -depth 8" + _VP_BG + "#123456789abc -format '%[bit-depth]\\n' -write info:",
+                 "-size 4x4 xc:gray50" + _VP_BG + "red -type palette -format '%[type]\\n' -write info:"]
+GAP_STEP_CASES += [("a black canvas as PDB under a red background virtual pixel",
+                    [["-size", "4x4", "xc:black", "-virtual-pixel", "background", "-background", "red",
+                      "pdb:out.miff"]], {})]
+# attribute.c: GetEdgeBackgroundColor reads the corners (through the virtual pixel method) unless
+# convex-hull:background-color, or -background, names the colour
+GAP_COMMANDS += ["{C}/rose.miff -bordercolor white -border 3 " + extra + " -format '%[convex-hull]\\n' -write info:"
+                 for extra in ("-virtual-pixel black", "-define convex-hull:background-color=red")]
+# attribute.c: SetImageType to the palette, colour-separation and truecolor types from CMYK
+GAP_COMMANDS += ["{C}/cmyk.miff " + ops for ops in (
+    "-type PaletteBilevelAlpha", "-type PaletteAlpha", "-colors 8 -type ColorSeparationAlpha",
+    "-colors 8 -type TrueColor")]
+# the colour-separation types keep a CMYK image's colormap unless they make it DirectClass:
+# a CMYK palette image (remapped onto itself), written as plain MIFF
+GAP_STEP_CASES += [("a CMYK palette image -type %s as plain MIFF" % kind,
+                    [["{C}/cmyk.miff", "+dither", "-remap", "{C}/cmyk.miff", "-type", kind, "out.miff"]], {})
+                   for kind in ("ColorSeparation", "ColorSeparationAlpha")]
+# paint.c: GradientImage's gradient:direction for every gravity, each gradient:extent of a
+# radial gradient, and a gradient:bounding-box, on a non-square canvas (columns != rows)
+GAP_COMMANDS += ["-size 60x40 -define gradient:direction=%s gradient:red-blue" % d for d in (
+    "NorthWest", "North", "NorthEast", "West", "SouthWest", "South", "SouthEast")]
+GAP_COMMANDS += ["-size 60x40 -define gradient:extent=%s radial-gradient:red-blue" % e for e in (
+    "Circle", "Diagonal", "Ellipse", "Maximum", "Minimum")]
+GAP_COMMANDS += ["-size 60x40 -define gradient:bounding-box=30x20+10+5 gradient:red-blue",
+                 "-size 60x40 -define gradient:bounding-box=30x20+10+5 radial-gradient:red-blue"]
+# paint.c: FloodfillPaintImage from seeds on each edge of the image and from outside it,
+# and through a serpentine region (the scanline fill turns back on itself), filling to a
+# border and with fuzz
+_SERPENT = ("-size 30x20 xc:white -fill black -draw 'line 5,0 5,15' -draw 'line 15,5 15,19' "
+            "-draw 'line 25,0 25,15' -fill red ")
+GAP_COMMANDS += ["{C}/rose.miff -fill red -floodfill %s white" % seed for seed in (
+    "+0+10", "+69+10", "+10+0", "+10+45", "+70+10", "+10+46")]
+GAP_COMMANDS += [_SERPENT + "-floodfill +0+0 white", _SERPENT + "-floodfill +29+19 white",
+                 _SERPENT + "-bordercolor black -draw 'color 10,10 filltoborder'",
+                 _SERPENT + "-draw 'color 20,2 floodfill'",
+                 "{C}/rose.miff -fuzz 30% -fill red -floodfill +35+20 red"]
+# paint.c: OilPaintImage copies the channels the channel mask leaves out from the centre pixel
+GAP_COMMANDS += ["{C}/rose.miff -channel R -paint 2 +channel",
+                 "{C}/rose_alpha.miff -channel RGB -paint 3 +channel"]
+# type.c: GetTypeInfoByFamily scores a family's entries by style, weight and stretch. The glyphs
+# alternate between the two corpus fonts, Generic.ttf and the condensed Narrow.ttf, so which
+# entry the scorer picked shows directly in the rendered glyphs (a single font would render the
+# same whichever entry won). The families resolve within themselves, so the output does not
+# depend on the machine's installed fonts.
+_TYPE_SCORE_XML = "<typemap>\n" + "".join(
+    '  <type name="Score-%s" family="ScoreFamily" style="%s" weight="%s" stretch="%s" glyphs="{C}/%s"/>\n'
+    % (name, style, weight, stretch, font)
+    for name, style, weight, stretch, font in (
+        ("A", "Normal", 400, "Normal", "Generic.ttf"), ("B", "Italic", 400, "Normal", "Narrow.ttf"),
+        ("C", "Oblique", 700, "Condensed", "Generic.ttf"), ("D", "Normal", 900, "Expanded", "Narrow.ttf"),
+        ("E", "Normal", 100, "UltraCondensed", "Generic.ttf"), ("F", "Italic", 300, "SemiExpanded", "Narrow.ttf"),
+        ("G", "Normal", 600, "Normal", "Narrow.ttf"), ("H", "Normal", 400, "Condensed", "Narrow.ttf"))) + (
+    "</typemap>\n")
+# label: takes its font from image options, where -style and -stretch do not go (they set the
+# command line's draw state), and magick rejects -stretch: -annotate and MVG reach them all
+_SCORE_CANVAS = ["-size", "40x20", "xc:white", "-pointsize", "12"]
+GAP_STEP_CASES += [("type.xml scoring: -family %s %s, annotated" % (family, query),
+                    [_SCORE_CANVAS + ["-family", family] + query.split() + ["-annotate", "+2+14", "Ab",
+                                                                            "out.miff"]],
+                    {".config/ImageMagick/type.xml": _TYPE_SCORE_XML})
+                   for family, query in (
+                       ("ScoreFamily", "-style Normal -weight 400"), ("ScoreFamily", "-style Italic"),
+                       ("ScoreFamily", "-style Oblique"), ("ScoreFamily", "-style Italic -weight 700"),
+                       ("ScoreFamily", "-style Oblique -weight 300"), ("ScoreFamily", "-style Any -weight 650"),
+                       ("ScoreFamily", "-weight 900"), ("ScoreFamily", "-weight 100"),
+                       ("ScoreFamily", "-weight 550"))]
+# NOTE: these scoring cases query only ScoreFamily, whose entries live in the case's own type.xml.
+# A query against a family the system font config also defines (Arial, Helvetica: 64 entries on
+# the Mac) scores among those ambiguous entries, and which one wins depends on the config load
+# order, so such a "kill" is flaky and differs between machines (it made type.c look trusted on
+# the Mac while ERDC, with other system fonts, did not reproduce it). Keep scoring cases to
+# case-local families only.
+GAP_STEP_CASES += [("type.xml scoring in MVG: %s" % mvg,
+                    [_SCORE_CANVAS + ["-draw", "font-family ScoreFamily %s text 2,14 'Ab'" % mvg, "out.miff"]],
+                    {".config/ImageMagick/type.xml": _TYPE_SCORE_XML})
+                   for mvg in ("font-stretch condensed", "font-stretch expanded font-weight 800",
+                               "font-stretch ultra-condensed", "font-stretch semi-expanded font-style italic",
+                               "font-stretch normal font-weight 350", "font-stretch extra-condensed font-style oblique")]
+GAP_STEP_CASES += [("type.xml scoring in MVG: an exact match by stretch",
+                    [_SCORE_CANVAS + ["-draw", "font-family ScoreFamily font-style normal font-weight 400 "
+                                      "font-stretch condensed text 2,14 'Ab'", "out.miff"]],
+                    {".config/ImageMagick/type.xml": _TYPE_SCORE_XML})]
+# type.c: LoadTypeCache skips <!...> declarations and comments by hand. A <type> hidden where
+# only a broken skip would find it: in a quoted string of the DOCTYPE (with "]>" before it),
+# in a comment; and a stray "]" in a DOCTYPE without an internal subset
+_HIDDEN_TYPE = "<type name='Ghost-%s' family='GhostFamily' glyphs='{C}/Generic.ttf'/>"
+_REAL_TYPE = '  <type name="Real-%s" family="RealFamily" glyphs="{C}/Generic.ttf"/>\n'
+GAP_STEP_CASES += [("type.xml skipped by hand: %s, listed" % name, [["-list", "font"]],
+                    {".config/ImageMagick/type.xml": xml})
+                   for name, xml in (
+                       ("a type inside a quoted doctype string",
+                        '<?xml version="1.0"?>\n<!DOCTYPE typemap [\n  <!ENTITY e "x]> %s y">\n]>\n'
+                        "<typemap>\n%s</typemap>\n" % (_HIDDEN_TYPE % "Quote", _REAL_TYPE % "Quote")),
+                       ("a stray bracket in the doctype",
+                        '<?xml version="1.0"?>\n<!DOCTYPE typemap SYSTEM "t" ]>\n'
+                        "<typemap>\n%s</typemap>\n" % (_REAL_TYPE % "Bracket")),
+                       ("a type inside a comment",
+                        "<typemap>\n  <!-- %s -->\n%s</typemap>\n" % (_HIDDEN_TYPE % "Comment",
+                                                                      _REAL_TYPE % "Comment")))]
+# transform.c: tile crops in the overlap form (@!), with positive, negative and mixed
+# offsets; more tiles than pixels; tiles of an image with a page offset
+GAP_COMMANDS += ["{C}/rose.miff %s-crop %s +repage" % (pre, geo) for pre, geo in (
+    ("", "3x2+2+2@!"), ("", "3x2-2-2@!"), ("", "3x2-3+1@!"), ("", "4x3+1-2@!"),
+    ("", "100x60@"), ("-repage +5+3 ", "3x2@"), ("-repage +5+3 ", "3x2+2+1@!"))]
+# transform.c: CropImage against the virtual canvas: offset and negative pages, crops that
+# overhang it or miss it, a crop of exactly the image, and a zero width or height
+GAP_COMMANDS += ["{C}/rose.miff %s-crop %s" % (pre, geo) for pre, geo in (
+    ("-repage 100x80+10+5 ", "30x20+5+5"), ("-repage 100x80+10+5 ", "40x30+80+60"),
+    ("-repage 100x80-10-5 ", "40x30+0+0"), ("-repage 100x80-10-5 ", "30x20-5-5"),
+    ("", "50x30-10-5"), ("", "30x30+60+40"), ("", "100x100"), ("", "70x46+0+0"),
+    ("", "0x20+0+5"), ("", "20x0+5+0"), ("-repage 100x80+10+5 ", "200x200-20-20"))]
+# transform.c: trim:minSize smaller than, equal to and larger than the trimmed box, and
+# larger than the image, under several gravities
+GAP_COMMANDS += ["{C}/rose.miff -bordercolor white -border 5 %s-define trim:minSize=%s -trim" % (grav, size)
+                 for grav, size in (("", "60x40"), ("", "70x46"), ("", "75x46"), ("", "80x50"),
+                                    ("", "90x70"), ("-gravity center ", "80x52"),
+                                    ("-gravity southeast ", "78x50"), ("-gravity north ", "76x54"),
+                                    ("-gravity west ", "74x50"))]
+# transform.c: ExtentImage moves the 8BIM clip path of a JPEG that has one; SpliceImage
+# copies alpha, under each gravity
+GAP_STEP_CASES += [("-extent %s on a JPEG with an 8BIM clip path" % geo,
+                    [[_UHDR_JPG, "-extent", geo, "-write", "8bim:clip.8bim", "out.miff"]], {})
+                   for geo in ("300x300", "120x80+10+10")]
+# transform.c: that JPEG holds no clip path, so ExtentImage's Update8BIMClipPath had nothing to
+# move. A hand-made 8BIM resource does: id 2048 and one subpath of three knots, every byte
+# below 0x80 so that it survives the case's text file
+_CLIP_8BIM = ("8BIM\x08\x00\x00\x00\x00\x00\x00\x68" + "\x00\x00\x00\x03" + "\x00" * 22
+              + "".join("\x00\x01" + ("\x00" + chr(y) + "\x00\x00\x00" + chr(x) + "\x00\x00") * 3
+                        for y, x in ((0x20, 0x20), (0x60, 0x30), (0x40, 0x70))))
+GAP_STEP_CASES += [("-extent %s of an image with a clip path" % geo,
+                    [["{C}/rose.miff", "-profile", "clip.8bim", "-extent", geo,
+                      "-write", "8bim:out.8bim", "out.miff"]], {"clip.8bim": _CLIP_8BIM})
+                   for geo in ("120x80+10+10", "60x40-5-5")]
+# string.c: PrintStringInfo, which identify -verbose calls for each profile when the image's
+# debug flag is set (-define debug=true sets it without turning event logging on): binary
+# profiles as hex rows, a text profile (XMP) as text, and a profile of exactly two rows
+GAP_STEP_CASES += [
+    ("verbose with debug: binary profiles in hex",
+     [[_UHDR_JPG, "-define", "debug=true", "-colorspace", "gray", "-verbose", "info:"]], {}),
+    ("verbose with debug: an XMP profile as text",
+     [["{C}/rose.miff", "-profile", "meta.xmp", "-define", "debug=true", "-verbose", "info:"]],
+     {"meta.xmp": XMP_ELEMENTS}),
+    ("verbose with debug: a 40-byte profile, two full hex rows",
+     [["{C}/rose.miff", "-profile", "APP1:x.bin", "-define", "debug=true", "-verbose", "info:"]],
+     {"x.bin": "".join(chr(1 + i % 7) for i in range(40))}),
+]
+# string.c: StripMagickString, through MSL's <comment> and <label>: surrounding blanks and
+# quotes, a lone quote pair, a quote followed by blanks, and a newline (as &#10;: ReadMSLImage
+# turns the file's own line ends into spaces before the parser sees them)
+_MSL_COMMENT = """<?xml version="1.0" encoding="UTF-8"?>
+<image>
+  <read filename="{C}/rose.miff" />
+  <comment>%s</comment>
+  <label>%s</label>
+  <write filename="out.miff" />
+</image>
+"""
+GAP_STEP_CASES += [("MSL comment and label %r" % text,
+                    [["msl:s.msl", "out.miff", "-format", "[%c|%l]\\n", "info:"]],
+                    {"s.msl": _MSL_COMMENT % (text, text)})
+                   for text in ('  "quoted text"  ', "'\"", "line one&#10;line two", '"   ')]
+# string.c: InterpretSiPrefixValue at the bottom of its letter range, E (10^18), with no B after it: a
+# width limit of 100 that the 70-pixel rose passes
+GAP_STEP_CASES += [("a width limit with an E prefix",
+                    [["-limit", "width", "0.0000000000000001E", "{C}/rose.miff", "-format", "%w\\n", "info:"]], {})]
+# string.c: FileToString strips a leading @ only from a name longer than one character: a
+# color correction file named just "@" is read under that name
+GAP_STEP_CASES += [("-cdl from a file named @", [["{C}/rose.miff", "-cdl", "@", "out.miff"]], {"@": CDL})]
+# annotate.c: AnnotateImage's text-align offsets for the second and later lines: rotated text
+# (affine.ry is 0 without a rotation) of three lines, under each alignment
+GAP_STEP_CASES += [("rotated three-line text, aligned %s" % align,
+                    [["-size", "120x120", "xc:white", "-font", "{C}/Generic.ttf", "-pointsize", "14", "-draw",
+                      "rotate 20 text-align %s text 60,40 'ab\\ncd\\nef'" % align, "out.miff"]], {})
+                   for align in ("left", "center", "right")]
+# annotate.c: RenderFreetype's two other pixel paths. A transparent fill (-fill none) punches
+# the glyphs out of the alpha channel instead of compositing; a BDF bitmap font (plain text, so
+# it fits a case file) gives FreeType's monochrome bitmaps, one byte per row for the 8-pixel A
+# and two for the 16-pixel W
+_BDF_FONT = 'STARTFONT 2.1\nFONT -misc-case-medium-r-normal--8-80-75-75-c-80-iso10646-1\nSIZE 8 75 75\nFONTBOUNDINGBOX 16 8 0 -1\nSTARTPROPERTIES 2\nFONT_ASCENT 7\nFONT_DESCENT 1\nENDPROPERTIES\nCHARS 2\nSTARTCHAR A\nENCODING 65\nSWIDTH 500 0\nDWIDTH 8 0\nBBX 8 8 0 -1\nBITMAP\n18\n24\n42\n42\n7E\n42\n42\n00\nENDCHAR\nSTARTCHAR W\nENCODING 87\nSWIDTH 1000 0\nDWIDTH 16 0\nBBX 16 8 0 -1\nBITMAP\n8001\n8001\n8181\n4242\n4242\n2424\n1818\n0000\nENDCHAR\nENDFONT\n'
+GAP_STEP_CASES += [
+    ("text with a transparent fill over an image with alpha",
+     [["{C}/rose.miff", "-alpha", "set", "-font", "{C}/Generic.ttf", "-pointsize", "18", "-fill", "none",
+       "-annotate", "+5+22", "Hole Ab", "out.miff"]], {}),
+    ("text with a transparent fill over half-transparent blue",
+     [["-size", "90x30", "xc:#0000ff80", "-font", "{C}/Generic.ttf", "-pointsize", "18", "-fill", "none",
+       "-annotate", "+5+22", "Half Ab", "out.miff"]], {}),
+    ("text in a BDF bitmap font",
+     [["-size", "40x16", "xc:white", "-font", "f.bdf", "-pointsize", "8", "-annotate", "+2+10", "AW", "out.miff"]],
+     {"f.bdf": _BDF_FONT}),
+]
+# property.c: Get8BIMProperty and the clip path tracers (TraceSVGClippath, TracePSClippath),
+# through a hand-made 8BIM profile whose every byte is below 0x80 (it lives in a text case file):
+# a plain resource, an unnamed path with stray, unknown and nested records, closed and open
+# subpaths and real curves, two named paths (an even and an odd name length), and a path whose
+# knots give each of TracePSClippath's forms (c, v, l, y, and closes by v and by y). Another
+# profile starts with an empty path; ids 1999 and 2999, whose bytes are not 7-bit, come from
+# ImageMagick's own 8BIMTEXT format.
+def _8bim_long(v):
+    return v.to_bytes(4, "big")
+def _8bim_record(selector, body=b""):
+    return selector.to_bytes(2, "big") + body.ljust(24, b"\0")
+def _8bim_knot(selector, points):
+    return _8bim_record(selector, b"".join(_8bim_long(y) + _8bim_long(x) for y, x in points))
+def _8bim_subpath(selector, knots):
+    return _8bim_record(selector, knots.to_bytes(2, "big"))
+def _8bim_resource(rid, name, data):
+    name = bytes([len(name)]) + name
+    return b"8BIM" + rid.to_bytes(2, "big") + name + b"\0" * (len(name) % 2) + _8bim_long(len(data)) + data
+def _8bim_pt(y, x):  # 8.24 fixed point, every byte below 0x80
+    return (y << 16, x << 16)
+_8BIM_PATH1 = (_8bim_record(6) + _8bim_record(8) + _8bim_knot(1, [_8bim_pt(0x10, 0x10)] * 3)
+               + _8bim_subpath(0, 3)
+               + _8bim_knot(1, [(0x201000, 0x180000), (0x200000, 0x200000), (0x203000, 0x280000)])
+               + _8bim_knot(2, [(0x600000, 0x304000), (0x602000, 0x380000), (0x604000, 0x400000)])
+               + _8bim_knot(1, [_8bim_pt(0x40, 0x70)] * 3)
+               + _8bim_subpath(3, 2) + _8bim_knot(4, [_8bim_pt(0x08, 0x08), _8bim_pt(0x0c, 0x0c), _8bim_pt(0x10, 0x10)])
+               + _8bim_subpath(0, 5) + _8bim_knot(5, [_8bim_pt(0x50, 0x08), _8bim_pt(0x54, 0x0c), _8bim_pt(0x58, 0x10)])
+               + _8bim_record(9))
+_8BIM_PATH2 = _8bim_subpath(0, 2) + _8bim_knot(1, [_8bim_pt(0x30, 0x30)] * 3) + _8bim_knot(2, [_8bim_pt(0x50, 0x50)] * 3)
+def _8bim_curves():
+    A, A2, B0, B = _8bim_pt(0x10, 0x10), _8bim_pt(0x14, 0x18), _8bim_pt(0x20, 0x30), _8bim_pt(0x24, 0x34)
+    C0, C, D, D2, E = _8bim_pt(0x40, 0x20), _8bim_pt(0x44, 0x24), _8bim_pt(0x50, 0x50), _8bim_pt(0x54, 0x58), _8bim_pt(0x60, 0x40)
+    return (_8bim_subpath(0, 5) + b"".join(_8bim_knot(2, k) for k in ([A, A, A2], [B0, B, B], [C0, C, C], [D, D, D2], [E, E, E]))
+            + _8bim_subpath(0, 2) + _8bim_knot(2, [A2, A, A]) + _8bim_knot(2, [B, B, B])
+            + _8bim_subpath(0, 2) + _8bim_knot(2, [C, C, C]) + _8bim_knot(2, [D, D, D2]))
+_8BIM_RICH = (_8bim_resource(0x0430, b"", b"plain resource text") + _8bim_resource(0x0800, b"", _8BIM_PATH1)
+              + _8bim_resource(0x0801, b"Path A", _8BIM_PATH2) + _8bim_resource(0x0802, b"Odd", _8BIM_PATH2)
+              + _8bim_resource(0x0803, b"Curves", _8bim_curves())).decode("ascii")
+_8BIM_EMPTY_FIRST = (_8bim_resource(0x0800, b"", b"") + _8bim_resource(0x0801, b"", _8BIM_PATH2)).decode("ascii")
+def _8bim_format(fmt, profile=None):
+    return ("8BIM properties %r" % fmt, [["{C}/rose.miff", "-profile", "clip.8bim", "-format", fmt, "info:"]],
+            {"clip.8bim": profile or _8BIM_RICH})
+GAP_STEP_CASES += [
+    _8bim_format("%[8BIM:1999,2998:#1]"), _8bim_format("%[8BIM:1999,2998:#1\nPS]"),
+    _8bim_format("%[8BIM:1999,2998:#2]|%[8BIM:1999,2998:#3\nPS]"),
+    _8bim_format("%[8BIM:1999,2998:Path A\nPS]|%[8BIM:1999,2998:Odd]"),
+    _8bim_format("[%[8BIM:1000,1100]][%[8BIM:1999,2998:Nope]][%[8BIM:3000,3001]][%[8BIM:1999,2998:#9]]"),
+    _8bim_format("%[8BIM:1999,2998:Curves\nPS]"), _8bim_format("%[8BIM:1999,2998:Curves]"),
+    _8bim_format("[%[8BIM:1999,2998:#1]][%[8BIM:1999,2998:#2\nPS]]", _8BIM_EMPTY_FIRST),
+    ("8BIM clip path, -clip", [["{C}/rose.miff", "-profile", "clip.8bim", "-clip", "-fill", "red", "-colorize", "50", "out.miff"]],
+     {"clip.8bim": _8BIM_RICH}),
+    ("8BIM clip path, -clip-path by name", [["{C}/rose.miff", "-profile", "clip.8bim", "-clip-path", "Path A", "-fill", "red",
+                                              "-colorize", "50", "out.miff"]], {"clip.8bim": _8BIM_RICH}),
+    ("8BIM clip path, verbose", [["{C}/rose.miff", "-profile", "clip.8bim", "-verbose", "info:"]], {"clip.8bim": _8BIM_RICH}),
+    ("8BIM resources 1999 and 2999 from 8BIMTEXT",
+     [["{C}/rose.miff", "-profile", "8bimtext:t.txt", "-format", "[%[8BIM:1999,1999]] [%[8BIM:2999,2999]]\\n", "info:"]],
+     {"t.txt": '8BIM#1999="low edge"\n8BIM#2999="high edge"\n'}),
+]
+# ... and a profile that ends right after a resource's name (4 zero bytes and an x), which a
+# length test one off would read as a zero-length resource
+GAP_STEP_CASES += [_8bim_format("[%[8BIM:1999,2998:#1]]", "8BIM\x08\x00\x05\x00\x00\x00\x00x")]
+# property.c: GetEXIFProperty over a hand-made little-endian EXIF block, in a 4x4 JPEG passed
+# inline as base64 (its tag numbers have bytes above 0x7f, so no text case file can hold it):
+# IFD0 points to an Exif IFD and a GPS IFD and on to IFD1; the Exif IFD points to an Interop IFD,
+# which points back to the Exif IFD (a loop); values come in every TIFF format. A tag looked up
+# by number (#hex, @hex for GPS) is stored under an empty name, so it shows only as a warning,
+# one per command; exif:! stores every tag as #hex or @hex, read back in the same format.
+_TINY_JPEG = base64.b64decode("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/wAALCAAEAAQBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAAAf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AH//Z")
+def _exif_block(byte_order="<"):
+    BYTE, ASCII, SHORT, LONG, RATIONAL, SBYTE, UNDEF, SSHORT, SLONG, SRATIONAL, FLOAT, DOUBLE = range(1, 13)
+    ifds = {
+        "0": [(0x0100, SHORT, 1, struct.pack(byte_order + "H", 70)), (0x0101, SHORT, 1, struct.pack(byte_order + "H", 46)),
+              (0x010F, ASCII, 8, b"CaseCam\0"), (0x0112, SHORT, 1, struct.pack(byte_order + "H", 6)),
+              (0x011A, RATIONAL, 1, struct.pack(byte_order + "II", 300, 1)), (0x0128, SHORT, 1, struct.pack(byte_order + "H", 2)),
+              (0x8769, LONG, 1, "exif"), (0x8825, LONG, 1, "gps")],
+        "exif": [(0x9000, UNDEF, 4, b"0230"), (0x9286, UNDEF, 16, b"ASCII\0\0\0hello!!"),
+                 (0x9201, SRATIONAL, 1, struct.pack(byte_order + "ii", -7, 3)), (0x920A, RATIONAL, 1, struct.pack(byte_order + "II", 50, 1)),
+                 (0xA002, LONG, 1, struct.pack(byte_order + "I", 70)), (0x9204, SSHORT, 1, struct.pack(byte_order + "h", -2)),
+                 (0x9205, SLONG, 1, struct.pack(byte_order + "i", -40000)), (0x9206, FLOAT, 1, struct.pack(byte_order + "f", 2.5)),
+                 (0x9207, DOUBLE, 1, struct.pack(byte_order + "d", -1.25)), (0x9208, SBYTE, 2, struct.pack(byte_order + "bb", -3, 4)),
+                 (0xA005, LONG, 1, "interop")],
+        "gps": [(0x0000, BYTE, 4, bytes([2, 3, 0, 0])), (0x0001, ASCII, 2, b"N\0"),
+                (0x0002, RATIONAL, 3, struct.pack(byte_order + "IIIIII", 55, 1, 42, 1, 30, 1))],
+        "interop": [(0x0001, ASCII, 4, b"R98\0"), (0x0002, UNDEF, 4, b"0100"), (0x8769, LONG, 1, "exif")],
+        "1": [(0x0103, SHORT, 1, struct.pack(byte_order + "H", 6))],
+    }
+    order = ["0", "exif", "gps", "interop", "1"]
+    offsets, pos = {}, 8
+    for name in order:  # each IFD, then the values that do not fit in its entries
+        offsets[name] = pos
+        pos += 2 + 12 * len(ifds[name]) + 4 + sum(len(v) + len(v) % 2 for _, _, _, v in ifds[name]
+                                                   if not isinstance(v, str) and len(v) > 4)
+    out = bytearray((b"II*\0" if byte_order == "<" else b"MM\0*") + struct.pack(byte_order + "I", offsets["0"]))
+    for name in order:
+        entries, data = bytearray(struct.pack(byte_order + "H", len(ifds[name]))), bytearray()
+        data_at = offsets[name] + 2 + 12 * len(ifds[name]) + 4
+        for tag, fmt, count, v in ifds[name]:
+            if isinstance(v, str):
+                field = struct.pack(byte_order + "I", offsets[v])
+            elif len(v) <= 4:
+                field = v.ljust(4, b"\0")
+            else:
+                field = struct.pack(byte_order + "I", data_at + len(data))
+                data += v + b"\0" * (len(v) % 2)
+            entries += struct.pack(byte_order + "HHI", tag, fmt, count) + field
+        out += entries + struct.pack(byte_order + "I", offsets["1"] if name == "0" else 0) + data
+    return bytes(out)
+def _exif_jpeg_uri(byte_order="<"):
+    app1 = b"Exif\0\0" + _exif_block(byte_order)
+    jpeg = _TINY_JPEG[:2] + b"\xff\xe1" + struct.pack(">H", len(app1) + 2) + app1 + _TINY_JPEG[2:]
+    return "inline:data:image/jpeg;base64," + base64.b64encode(jpeg).decode()
+GAP_STEP_CASES += [("EXIF properties %r" % fmt, [[_exif_jpeg_uri(), "-format", fmt + "\\n", "info:"]], {})
+                   for fmt in ["%[exif:*]",
+                               "%[exif:!][%[#0112]][%[@0000]][%[@0001]][%[#9000]][%[#0001]][%[unknown]]",
+                               "%[exif:GPSLatitudeRef]|%[exif:InteroperabilityIndex]|%[exif:Make]"]
+                   + ["%%[exif:%s]" % key for key in ("#a002", "#A002", "#010f", "#010F", "#9000", "@0001",
+                                                     "#00g0", "#12345", "#1234", "")]]
+GAP_STEP_CASES += [("EXIF properties, big-endian", [[_exif_jpeg_uri(">"), "-format", "%[exif:*]\\n", "info:"]], {})]
+# image.c: SetImageRegionMask through -region (a region inside the image, one centred by gravity
+# and lifted again by +region, and one larger than the image), and GetImageMask through the
+# clip: coder, written and read, with the 8BIM clip paths above
+GAP_STEP_CASES += [
+    ("-region inside the image", [["{C}/rose.miff", "-region", "30x20+10+5", "-negate", "out.miff"]], {}),
+    ("-region by gravity, then +region", [["{C}/rose.miff", "-gravity", "center", "-region", "30x20+3-2", "-negate",
+                                           "+region", "-flop", "out.miff"]], {}),
+    ("-region larger than the image", [["{C}/rose.miff", "-region", "100x100-10-10", "-negate", "out.miff"]], {}),
+    ("clip: written from an 8BIM clip path", [["{C}/rose.miff", "-profile", "clip.8bim", "clip:m.miff"]],
+     {"clip.8bim": _8BIM_RICH}),
+    ("clip: read back", [["{C}/rose.miff", "-profile", "clip.8bim", "m.miff"], ["clip:m.miff", "out.miff"]],
+     {"clip.8bim": _8BIM_RICH}),
+    ("clip: written from a named 8BIM clip path", [["{C}/rose.miff", "-profile", "clip.8bim", "-clip-path", "Path A",
+                                                    "clip:m.miff"]], {"clip.8bim": _8BIM_RICH}),
+]
+# draw.c: round line caps (DrawRoundLinecap) on a line and an open polyline, and a composite mask
+# from a named MVG macro (push mask "m1" ... mask m1: the name must be quoted to become a macro)
+_MVG_MASK = ('push graphic-context\n  push mask "m1"\n    fill white\n    circle 35,23 35,5\n  pop mask\n'
+             '  mask m1\n  fill red\n  rectangle 0,0 70,46\npop graphic-context\n')
+GAP_STEP_CASES += [
+    ("round line caps on a line", [["-size", "70x46", "xc:white", "-draw",
+                                    "stroke blue stroke-width 7 stroke-linecap round line 10,10 60,30", "out.miff"]], {}),
+    # round caps on a polyline fail, filled or not: the command ends in a non-conforming
+    # primitive error and writes nothing (a line, above, draws them)
+    ("round line caps on an open polyline", [["-size", "70x46", "xc:white", "-draw",
+        "fill none stroke blue stroke-width 5 stroke-linecap round polyline 5,40 20,5 35,40 50,5", "out.miff"]], {}),
+    ("an MVG composite mask", [["{C}/rose.miff", "-draw", "@m.mvg", "out.miff"]], {"m.mvg": _MVG_MASK}),
+    ("an MVG composite mask, its red channel", [["{C}/rose.miff", "-draw", "@m.mvg", "-format",
+                                                 "%[fx:mean.r] %[fx:maxima.r]\\n", "info:"]], {"m.mvg": _MVG_MASK}),
+]
+# draw.c: DrawGradientImage's stop lookup where a pixel's offset lands exactly on two stops of
+# the same offset (0 and 0.5 on a 101-pixel ramp, x/100) and on a stop beyond 1; and an
+# elliptical radial gradient at an angle (GetStopColorOffset's rotation)
+_MVG_DUP_STOPS = ("push defs\n  push gradient g1 linear 0,0 100,0\n"
+                  "    stop-color red 0\n    stop-color lime 0\n    stop-color blue 0.5\n    stop-color yellow 0.5\n"
+                  "    stop-color black 1.5\n  pop gradient\npop defs\nfill url(#g1) rectangle 0,0 100,9\n")
+GAP_STEP_CASES += [
+    ("a gradient with stops sharing an offset", [["-size", "101x10", "xc:white", "-draw", "@g.mvg", "out.miff"]],
+     {"g.mvg": _MVG_DUP_STOPS}),
+]
+# property.c: GetXMPProperty, listed after a lookup has parsed the profile: simple elements, an
+# exif: name (renamed xmp:), names ending in :* (skipped, with and without children, and the
+# two-character ":*"), a two-character name, nested elements, two rdf:Description blocks; and
+# the same profile behind junk, which the scan for "<x" skips
+_XMP_PROPS = '<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>\n<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n<rdf:Description rdf:about=""><xmp:Rating>5</xmp:Rating><ab>two</ab><exif:FNumber>28/10</exif:FNumber><c:*>star</c:*><q:>colon</q:><:*>tiny</:*><g:*><h>kid</h></g:*><:*><i>kid2</i></:*>\n<dc:subject><rdf:Bag><rdf:li>one</rdf:li><rdf:li>two</rdf:li></rdf:Bag></dc:subject>\n<dc:title><rdf:Alt><rdf:li xml:lang="x-default">A title</rdf:li></rdf:Alt></dc:title><d:*><rdf:li>skip</rdf:li></d:*><e><f>child</f></e></rdf:Description>\n<rdf:Description rdf:about=""><tiff:Make>CaseCam</tiff:Make></rdf:Description>\n</rdf:RDF></x:xmpmeta>\n<?xpacket end="w"?>\n'
+GAP_STEP_CASES += [("XMP properties listed%s" % label,
+                    [["{C}/rose.miff", "-profile", "p.xmp", "-set", "comment", "%[xmp:Rating]", "-verbose", "info:"]],
+                    {"p.xmp": prefix + _XMP_PROPS}) for label, prefix in (("", ""), (", behind junk", "JUNK x Kx <y "))]
+# property.c: GetIPTCProperty over hand-made IPTC records (all bytes below 0x80): junk before the
+# first marker, a dataset found twice (joined by ;), a record whose declared length runs past the
+# end, a first match that is empty (which hides the property), and IPTC inside an 8BIM profile
+def _iptc(dataset, record, data, declared=None):
+    n = len(data) if declared is None else declared
+    return "\x1c" + chr(dataset) + chr(record) + chr(n >> 8) + chr(n & 0xff) + data
+_IPTC = ("junk" + _iptc(2, 120, "first caption") + _iptc(2, 25, "kw1") + _iptc(2, 25, "kw2") + _iptc(2, 5, "Title")
+         + _iptc(2, 120, "second") + _iptc(2, 90, "Lund", 9))
+GAP_STEP_CASES += [
+    ("IPTC properties", [["{C}/rose.miff", "-profile", "iptc:p.iptc", "-format",
+                          "[%[IPTC:2:120]][%[IPTC:2:25]][%[IPTC:2:5]][%[IPTC:2:90]][%[IPTC:2:7]]\\n", "info:"]],
+     {"p.iptc": _IPTC}),
+    ("IPTC property whose first record is empty", [["{C}/rose.miff", "-profile", "iptc:p.iptc", "-format",
+                                                    "[%[IPTC:2:120]]\\n", "info:"]],
+     {"p.iptc": _iptc(2, 120, "") + _iptc(2, 120, "after empty")}),
+    ("IPTC property inside an 8BIM profile", [["{C}/rose.miff", "-profile", "8bim:p.8bim", "-format",
+                                               "[%[IPTC:2:105]]\\n", "info:"]],
+     {"p.8bim": "8BIM\x04\x04\x00\x00\x00\x00\x00\x14" + _iptc(2, 105, "from 8BIM")}),
+]
+# property.c: SetImageProperty's image attributes through -set: a valid value, Undefined (0) and an
+# unknown name for compress, intent and interpolate; a non-default value then Undefined for dispose,
+# gravity, interpolate and units; each written out (verbose, an interpolative resize, a MIFF
+# header). And -set delay with > and < (where < takes the delay from sigma) at its boundaries.
+_SET_TAIL = ["-verbose", "-write", "info:", "+verbose", "-interpolative-resize", "50%", "out.miff"]
+GAP_STEP_CASES += [("-set %s %s" % (key, value), [["{C}/rose.miff", "-set", key, value] + _SET_TAIL], {})
+                   for key, values in (("compress", ("RLE", "Undefined", "NoSuch")),
+                                       ("intent", ("Saturation", "Undefined", "NoSuch")),
+                                       ("interpolate", ("Nearest",)))
+                   for value in values]
+GAP_STEP_CASES += [("-set %s %s, then Undefined" % (key, value),
+                    [["{C}/rose.miff", "-set", key, value, "-set", key, "Undefined"] + _SET_TAIL], {})
+                   for key, value in (("dispose", "Background"), ("gravity", "South"), ("interpolate", "Nearest"),
+                                      ("units", "PixelsPerCentimeter"))]
+GAP_STEP_CASES += [("-set delay %s, then %s" % (first, second),
+                    [["{C}/rose.miff", "-set", "delay", first, "-set", "delay", second, "-format", "%T\\n", "info:"]], {})
+                   for first, second in (("50", "10>"), ("5", "30x20<"), ("40", "30x20<"), ("20", "20x30<"),
+                                         ("29", "30x7<"))]
+# image.c: SmushImages under gravity, with images of different sizes (each image's gravity offset
+# and the larger width or height), and margins that step from row to row (the gap is their minimum)
+GAP_COMMANDS += [
+    "-gravity center ( -size 30x20 xc:none -fill red -draw 'polygon 0,0 24,10 0,19' ) ( -size 30x40 xc:none -fill blue -draw 'polygon 29,0 5,20 29,39' ) +smush 0",
+    "-gravity center ( -size 30x40 xc:none -fill blue -draw 'polygon 29,0 5,20 29,39' ) ( -size 30x20 xc:none -fill red -draw 'polygon 0,0 24,10 0,19' ) +smush 1",
+    "-gravity south ( -size 30x20 xc:none -fill red -draw 'polygon 0,0 24,10 0,19' ) ( -size 30x40 xc:none -fill blue -draw 'polygon 29,0 5,20 29,39' ) +smush 0",
+    "-gravity center ( -size 20x30 xc:none -fill red -draw 'polygon 0,0 10,24 19,0' ) ( -size 40x30 xc:none -fill blue -draw 'polygon 0,29 20,5 39,29' ) -smush 0",
+    "-gravity center ( -size 40x30 xc:none -fill blue -draw 'polygon 0,29 20,5 39,29' ) ( -size 20x30 xc:none -fill red -draw 'polygon 0,0 10,24 19,0' ) -smush 1",
+    "( -size 20x20 xc:none -fill red -draw 'rectangle 0,0 18,9' -draw 'rectangle 0,10 15,19' ) ( -size 20x20 xc:none -fill blue -draw 'rectangle 1,0 19,9' -draw 'rectangle 4,10 19,19' ) +smush 0",
+    "( -size 20x20 xc:none -fill red -draw 'rectangle 0,0 15,9' -draw 'rectangle 0,10 18,19' ) ( -size 20x20 xc:none -fill blue -draw 'rectangle 4,0 19,9' -draw 'rectangle 1,10 19,19' ) +smush 0",
+    "( -size 20x20 xc:none -fill red -draw 'rectangle 0,0 9,18' -draw 'rectangle 10,0 19,15' ) ( -size 20x20 xc:none -fill blue -draw 'rectangle 0,1 9,19' -draw 'rectangle 10,4 19,19' ) -smush 0",
+    "( -size 20x20 xc:none -fill red -draw 'rectangle 0,0 9,15' -draw 'rectangle 10,0 19,18' ) ( -size 20x20 xc:none -fill blue -draw 'rectangle 0,4 9,19' -draw 'rectangle 10,1 19,19' ) -smush 0",
+]
+# image.c: SetImageInfo turning adjoin off for a format that holds one frame: two images to a
+# JPEG name become out-0.jpg and out-1.jpg
+GAP_STEP_CASES += [("two images to a single-frame format", [["{C}/rose.miff", "{C}/rose.miff", "out.jpg"]], {})]
+# layer.c: OptimizeLayerFrames where a frame clears pixels outside the previous frame's change, so
+# a plain background disposal fails and its area must grow to cover them: cleared areas to the
+# right and above, left and below, left and above, right and below, and inside, under each of
+# optimize-frame, optimize-plus (which may add frames) and optimize
+def _clear_outside(square, hole):
+    (x0, y0, x1, y1), (hx, hy, hw, hh) = square, hole
+    return ("-size 40x40 xc:red -alpha set ( +clone -fill blue -draw 'rectangle %d,%d %d,%d' ) "
+            "( +clone ( -size %dx%d xc:none ) -geometry +%d+%d -compose Copy -composite ) " % (x0, y0, x1, y1, hw, hh, hx, hy))
+GAP_COMMANDS += [_clear_outside(square, hole) + "-layers " + op + " -format '%p %D %g %wx%h|' -write info:"
+                 for square, hole in (((20, 20, 30, 30), (25, 2, 11, 9)), ((20, 20, 30, 30), (2, 25, 9, 11)),
+                                      ((20, 20, 30, 30), (2, 2, 9, 9)), ((5, 5, 15, 15), (25, 25, 11, 11)),
+                                      ((10, 10, 30, 30), (12, 12, 6, 6)))
+                 for op in ("optimize-frame", "optimize-plus", "optimize")]
+# draw.c: a clip path in objectBoundingBox units, which scales to the bounds of what the using
+# context has drawn (a rectangle and a circle; a polygon and a circle)
+_MVG_BBOX_CLIP = 'push defs\n push clip-path "cp"\n  push graphic-context\n   clip-units objectBoundingBox\n   rectangle 0.2,0.2 0.8,0.8\n  pop graphic-context\n pop clip-path\npop defs\npush graphic-context\n clip-path url(#cp)\n fill red rectangle 10,10 60,40\n fill blue circle 30,25 30,12\npop graphic-context\n'
+GAP_STEP_CASES += [("clip path in objectBoundingBox units%s" % label,
+                    [["-size", "70x46", "xc:white", "-draw", "@m.mvg", "out.miff"]],
+                    {"m.mvg": _MVG_BBOX_CLIP.replace("rectangle 10,10 60,40", shape)})
+                   for label, shape in (("", "rectangle 10,10 60,40"), (", polygon", "polygon 60,40 10,35 20,10 55,5"))]
+# draw.c: the MVG opacity keyword outside SVG compliance: a fraction, a percentage, with no fill
+# (the stroke takes it), after compliance SVG, and inside a clip path (where it is ignored)
+GAP_STEP_CASES += [("MVG opacity: %s" % draw, [["-size", "70x46", "xc:white", "-draw", draw, "out.miff"]], {})
+                   for draw in ['fill red opacity 0.5 rectangle 5,5 30,30', 'fill red opacity 50% circle 40,20 40,5', 'fill none stroke blue stroke-width 3 opacity 0.4 rectangle 5,5 60,40', 'compliance SVG fill red opacity 0.5 rectangle 5,5 30,30']]
+GAP_STEP_CASES += [("MVG opacity inside a clip path", [["-size", "70x46", "xc:white", "-draw", "@m.mvg", "out.miff"]],
+                    {"m.mvg": 'push defs\n push clip-path "c"\n  push graphic-context\n   opacity 0.3\n   rectangle 10,10 50,35\n  pop graphic-context\n pop clip-path\npop defs\npush graphic-context\n clip-path url(#c)\n fill red rectangle 0,0 69,45\npop graphic-context\n'})]
+# draw.c: a macro used twice (the expansion counter), transforms stacked on a rotation (the affine
+# composition), and stop colours outside any gradient, one (no gradient) and two (a gradient over
+# the whole image)
+GAP_STEP_CASES += [
+    ("an MVG macro used twice", [["-size", "70x46", "xc:white", "-draw", "@m.mvg", "out.miff"]],
+     {"m.mvg": 'push graphic-context "dot"\n  fill red circle 10,10 10,5\npop graphic-context\nuse dot\n'
+               'translate 30,10\nuse dot\n'}),
+] + [("MVG: %s" % draw, [["-size", "70x46", "xc:white", "-draw", draw, "out.miff"]], {})
+     for draw in ("rotate 20 rotate 15 fill red rectangle 10,10 40,30",
+                  "skewX 10 rotate 15 fill red rectangle 10,10 40,30",
+                  "stop-color red 0", "stop-color red 0 stop-color blue 1")]
+# image.c: StripImage on an image that has profiles (8BIM, ICC, IPTC, MPF): -strip removes them
+GAP_STEP_CASES += [("-strip of a JPEG with profiles", [[_UHDR_JPG, "-strip", "-format", "%[profiles]|%c\\n", "info:"]], {}),
+                   ("-strip of a JPEG with profiles, written", [[_UHDR_JPG, "-strip", "out.miff"]], {})]
+# draw.c: an image primitive under rotations and flips that turn the inverse transform's terms
+# negative or zero (DrawAffineImage, AffineEdge's sign branches), some reaching past the canvas
+GAP_STEP_CASES += [("MVG image primitive: %s" % draw, [["-size", "80x60", "xc:white", "-draw", draw, "out.miff"]], {})
+                   for draw in ["translate 40,30 rotate 90 image over -15,-10 30,20 '{C}/rose.miff'", "translate 40,30 rotate 180 image over -15,-10 30,20 '{C}/rose.miff'", "translate 40,30 rotate 270 image over -15,-10 30,20 '{C}/rose.miff'", "translate 40,30 rotate 135 image over -15,-10 30,20 '{C}/rose.miff'", "translate 40,30 rotate -45 image over -15,-10 30,20 '{C}/rose.miff'", "affine -1,0,0,1,60,0 image over 5,5 40,30 '{C}/rose.miff'", "affine 1,0,0,-1,0,55 image over 5,5 40,30 '{C}/rose.miff'", "translate 70,0 rotate 30 image over -20,-5 50,30 '{C}/rose.miff'"]]
+# draw.c: an image primitive with alpha, rotated over a half-transparent canvas, and a half-transparent
+# rose from mpr: (DrawAffineImage composites each pixel over what is already there)
+GAP_STEP_CASES += [("MVG translucent image primitive %d" % i, [argv[:-1] + ["out.miff"]], {})
+                   for i, argv in enumerate([['-size', '80x60', 'xc:#00ff0080', '-draw', "translate 40,30 rotate 30 image over -15,-10 30,20 '{C}/rose_alpha.miff'", '-depth', '16', 'X'], ['-size', '80x60', 'xc:#00ff0080', '-draw', "translate 40,30 rotate 90 image over -15,-10 30,20 '{C}/rose_alpha.miff'", '-depth', '16', 'X'], ['-size', '80x60', 'xc:white', '(', '{C}/rose.miff', '-alpha', 'set', '-channel', 'A', '-evaluate', 'set', '50%', '+channel', '-write', 'mpr:half', '+delete', ')', '-draw', "translate 40,30 rotate 30 image over -15,-10 30,20 'mpr:half'", '-depth', '16', 'X']])]
+# draw.c: DrawPolygonPrimitive with a one-point polyline, a tiled fill (-tile, whose offset follows
+# the polygon's extent) on a polygon and a point, and a pattern stroke
+GAP_STEP_CASES += [("polygon primitive %d" % i, [spec["argv"][:-1] + ["out.miff"]], spec["files"])
+                   for i, spec in enumerate([{'files': {}, 'argv': ['-size', '40x30', 'xc:white', '-fill', 'red', '-draw', 'polyline 10,10', '-depth', '8', 'rgb:-']}, {'files': {}, 'argv': ['-size', '40x30', 'xc:white', '-tile', '{C}/granite.miff', '-draw', 'polygon 5,3 35,8 20,27', '-depth', '8', 'rgb:-']}, {'files': {}, 'argv': ['-size', '40x30', 'xc:white', '-tile', '{C}/granite.miff', '-draw', 'polyline 12,9', '-depth', '8', 'rgb:-']}, {'files': {'m.mvg': 'push defs\n push pattern p 0,0 6,6\n  fill blue rectangle 0,0 2,2\n  fill yellow rectangle 3,3 5,5\n pop pattern\npop defs\nfill none stroke url(#p) stroke-width 4 polygon 5,3 35,8 20,27\n'}, 'argv': ['-size', '40x30', 'xc:white', '-draw', '@m.mvg', '-depth', '8', 'rgb:-']}])]
+# draw.c: TraceStrokePolygon's joins on a thick stroke with sharp and blunt turns both ways and
+# horizontal and vertical runs: miter (limits 1, 4, 10), round (several arc segments) and bevel,
+# open and closed, and round joins with round caps
+_STROKE_PTS = "10,70 40,15 52,70 80,20 100,20 100,55 70,62"
+GAP_STEP_CASES += [("stroke joins: %s" % draw, [["-size", "110x80", "xc:white", "-draw", draw, "out.miff"]], {})
+                   for draw in (["fill none stroke blue stroke-width 12 stroke-linejoin %s stroke-miterlimit %s polyline %s"
+                                 % (join, limit, _STROKE_PTS) for join in ("miter", "round", "bevel") for limit in ("1", "4", "10")]
+                                + ["fill none stroke blue stroke-width 12 stroke-linejoin %s polygon %s" % (join, _STROKE_PTS)
+                                   for join in ("miter", "round", "bevel")]
+                                + ["fill none stroke blue stroke-width 9 stroke-linejoin round stroke-linecap round "
+                                   "polyline 10,40 60,40 60,10 20,70"])]
+# image.c: CloneImage of a montage (its montage and directory strings are copied), and of an
+# offset image scaled by exactly 3 across and 1 down (or the reverse): a scale difference of
+# exactly 2 keeps the page offsets scaled apart
+GAP_STEP_CASES += [
+    ("a montage cloned and written", [["montage", "{C}/rose.miff", "{C}/rose.miff", "-geometry", "+2+2", "m.miff"],
+                                      ["m.miff", "(", "+clone", ")", "-delete", "0", "out.miff"]], {}),
+    ("an offset image scaled 3 by 1", [["{C}/rose.miff", "-repage", "+10+5", "-resize", "210x46!", "-format", "%g\\n", "info:"]], {}),
+    ("an offset image sampled 1 by 3", [["{C}/rose.miff", "-repage", "+10+5", "-sample", "70x138!", "-format", "%g\\n", "info:"]], {}),
+]
+# draw.c: RenderMVGContent's keywords at their edges: an unbalanced pop, drawing inside defs (not
+# rendered), fill-opacity with no fill and as a percentage, stroke-opacity, zero entries in a dash
+# array, zero and negative stroke widths, and skewY (alone and after skewX)
+GAP_STEP_CASES += [("MVG keyword: %s" % draw, [["-size", "70x46", "xc:white", "-draw", draw, "out.miff"]], {})
+                   for draw in ['pop graphic-context', 'push defs rectangle 5,5 20,20 pop defs fill red rectangle 25,5 40,20', 'fill none fill-opacity 0.5 stroke red stroke-width 3 rectangle 5,5 30,20', 'fill red fill-opacity 50% rectangle 5,5 30,20', 'stroke blue stroke-opacity 0.4 stroke-width 5 line 5,5 60,40', 'stroke blue stroke-width 4 stroke-dasharray 0 4 line 5,20 60,20', 'stroke blue stroke-width 4 stroke-dasharray 5 0 3 line 5,20 60,20', 'stroke blue stroke-width 0 line 5,5 30,30', 'stroke blue stroke-width -1 line 5,5 30,30', 'skewY 20 fill red rectangle 10,5 40,20', 'fill red skewX 15 skewY -10 rectangle 10,5 40,20']]
+# draw.c: RenderMVGContent's checks on degenerate primitives: zero corner radii, zero width and
+# height, zero ellipse radii, too few points for a polyline, polygon or bezier, a closed two-point
+# path, a circle of radius 0 and a zero-size stroked rectangle
+GAP_STEP_CASES += [("MVG degenerate: %s" % draw, [["-size", "70x46", "xc:white", "-draw", draw, "out.miff"]], {})
+                   for draw in ['fill red roundrectangle 5,5 40,30 0,0', 'fill red roundrectangle 5,5 5,30 3,3', 'fill red roundrectangle 5,5 40,5 3,3', 'fill red ellipse 30,20 0,10 0,360', 'fill red ellipse 30,20 10,0 0,360', 'fill red arc 5,5 40,30 0,90', 'fill red polyline 10,10', 'fill red polygon 5,5 30,30', 'fill red polygon 5,5 30,30 10,25', 'fill red bezier 5,5 30,30', 'fill red bezier 5,5 30,30 50,5', "fill red path 'M 10,10 L 30,30 Z'", 'fill red circle 30,20 30,20', 'stroke blue fill none rectangle 5,5 5,5']]
+# policy.c: IsRightsAuthorizedByName's canonical forms of a path. sub/./new.miff does not exist
+# yet, so only its real directory joined to its name matches */sub/new.miff; a policy on */sub
+# matches the real directory; sub/./in.miff, once written, matches by its full real path; and a
+# deny on */sub/* is sticky against a later allow written as the raw path
+GAP_STEP_CASES += [
+    ("policy on a new file's canonical name", [["{C}/rose.miff", "sub/./new.miff"]],
+     {_POLICY: _policy('<policy domain="path" rights="read" pattern="*/sub/new.miff"/>'), "sub/keep.txt": "x"}),
+    ("policy on a file's canonical directory", [["{C}/rose.miff", "sub/./x.miff"]],
+     {_POLICY: _policy('<policy domain="path" rights="none" pattern="*/sub"/>'), "sub/keep.txt": "x"}),
+    ("policy on a file's canonical path", [["{C}/rose.miff", "sub/in.miff"], ["sub/./in.miff", "out.miff"]],
+     {_POLICY: _policy('<policy domain="path" rights="write" pattern="*/sub/in.miff"/>'), "sub/keep.txt": "x"}),
+    ("a canonical deny is sticky", [["{C}/rose.miff", "sub/./ok.miff"]],
+     {_POLICY: _policy('<policy domain="path" rights="none" pattern="*/sub/*"/>',
+                       '<policy domain="path" rights="read|write" pattern="sub/./ok.miff"/>'), "sub/keep.txt": "x"}),
+]
+# policy.c: LoadPolicyCache's DOCTYPE skipping: a quoted string holding "]>" and a ghost policy
+# (denying GIF) that must stay inside the string, and a stray "]" before the real GIF deny
+GAP_STEP_CASES += [("policy.xml with %s" % label, [["{C}/rose.miff", "x.gif"], ["{C}/rose.miff", "y.bmp"]], {_POLICY: xml})
+                   for label, xml in (("a quoted doctype string", '<?xml version="1.0"?>\n<!DOCTYPE policymap [\n  <!ENTITY e "x]> <policy domain=\'coder\' rights=\'none\' pattern=\'GIF\'/> y">\n]>\n<policymap>\n  <policy domain="coder" rights="none" pattern="BMP"/>\n</policymap>\n'), ("a stray doctype bracket", '<?xml version="1.0"?>\n<!DOCTYPE policymap SYSTEM "t" ]>\n<policymap>\n  <policy domain="coder" rights="none" pattern="GIF"/>\n</policymap>\n'))]
+# policy.c: GetPolicyInfo's domain filter: system-domain policies named area and width, ahead of
+# the resource-domain ones that resource:area and resource:width must find
+GAP_STEP_CASES += [("policies of the same name in two domains", [["-list", "resource"], ["{C}/rose.miff", "out.miff"]],
+                    {_POLICY: _policy('<policy domain="system" name="area" value="1KP"/>',
+                                      '<policy domain="resource" name="area" value="10MP"/>',
+                                      '<policy domain="system" name="width" value="9"/>',
+                                      '<policy domain="resource" name="width" value="1000"/>')})]
+# draw.c: GetMVGMacros with an empty named macro after a full one (its body has length 0, so
+# nothing is stored, and using it draws nothing)
+GAP_STEP_CASES += [("an empty MVG macro used", [["-size", "40x30", "xc:white", "-draw", "@m.mvg", "out.miff"]],
+                    {"m.mvg": 'push graphic-context "a"\n  fill red circle 10,10 10,5\npop graphic-context\n'
+                              'push graphic-context "e"\npop graphic-context\nuse e\n'})]
+# draw.c: GetDrawInfo reading -direction for a label (label: builds its own draw info)
+GAP_STEP_CASES += [("label right to left", [["-direction", "right-to-left", "-font", "{C}/Generic.ttf", "-pointsize", "14",
+                                             "label:abc def", "out.miff"]], {})]
+# profile.c: SyncExifProfile rewriting resolution and orientation in the hand-made EXIF block (both
+# byte orders, with Exif, GPS and Interop directories to walk) as a JPEG or MIFF is written; and
+# the 8BIM profile's clip paths through -extent to PSD and through -crop
+GAP_STEP_CASES += [("EXIF synced on write, %s, %s" % ("little-endian" if order == "<" else "big-endian", out),
+                    [[_exif_jpeg_uri(order)] + opts + [out], [out, "-format", "%[exif:*]\\n", "info:"]], {})
+                   for order in ("<", ">")
+                   for opts, out in ((["-density", "150x75", "-units", "PixelsPerInch", "-orient", "RightTop"], "out.jpg"),
+                                     (["-density", "50x60", "-units", "PixelsPerCentimeter", "-orient", "BottomLeft"], "out.miff"),
+                                     (["-resize", "50%"], "out.jpg"))]
+GAP_STEP_CASES += [
+    ("8BIM clip path through -extent to PSD", [["{C}/rose.miff", "-profile", "clip.8bim", "-extent", "90x60-5-5", "-density", "100",
+                                                "out.psd"], ["out.psd", "-format", "%[8BIM:1999,2998:#1]\\n", "info:"]],
+     {"clip.8bim": _8BIM_RICH}),
+    ("8BIM clip path through -crop", [["{C}/rose.miff", "-profile", "clip.8bim", "-crop", "40x30+5+5", "+repage", "out.miff"],
+                                       ["out.miff", "-format", "%[8BIM:1999,2998:#1]\\n", "info:"]], {"clip.8bim": _8BIM_RICH}),
+]
+# policy.c: a delegate policy without the execute right: the SVG reader's svg:decode delegate is
+# refused before any program runs (IsRightsAuthorizedByName's execute test), and MSVG renders it
+GAP_STEP_CASES += [("SVG with delegates not executable", [["{C}/draw.svg", "-format", "%wx%h\\n", "info:"]],
+                    {_POLICY: _policy('<policy domain="delegate" rights="read" pattern="*"/>')})]
+# profile.c: an 8BIM profile carrying IPTC (0x0404), XMP (0x0424, padded so its length bytes stay
+# below 0x80) and a small 7-bit EXIF block (0x0422), which GetProfilesFromResourceBlock lifts out
+# as profiles of their own; read back directly and after a MIFF round trip
+_8BIM_EMBEDDED = (_8bim_resource(0x0404, b"", _IPTC.encode("latin-1"))
+                  + _8bim_resource(0x0424, b"", _XMP_PROPS.encode("ascii").ljust(0x500, b" "))
+                  + _8bim_resource(0x0422, b"", b"Exif\0\0II*\0" + struct.pack("<IH", 8, 2)
+                                   + struct.pack("<HHIHH", 0x0112, 3, 1, 3, 0) + struct.pack("<HHI", 0x0131, 2, 4)
+                                   + b"ABC\0" + b"\0" * 4)).decode("ascii")
+GAP_STEP_CASES += [
+    ("8BIM with embedded profiles", [["{C}/rose.miff", "-profile", "8bim:r.8bim", "-format",
+                                      "%[profiles]|%[IPTC:2:120]|%[xmp:Rating]|%[exif:Orientation]|%[exif:Software]\\n", "info:"]],
+     {"r.8bim": _8BIM_EMBEDDED}),
+    ("8BIM with embedded profiles, written", [["{C}/rose.miff", "-profile", "8bim:r.8bim", "out.miff"],
+                                              ["out.miff", "-format", "%[profiles]\\n", "info:"]], {"r.8bim": _8BIM_EMBEDDED}),
+]
+# profile.c: Sync8BimProfile rewriting the PSD's resolution resource (0x03ED) for a new density in
+# centimetres, x and y apart, written to PSD again and read back from the 8BIM profile
+GAP_STEP_CASES += [("psd 8bim resolution rewritten per centimetre",
+                    [["{C}/rose.miff", "-density", "150", "-units", "PixelsPerInch", "r.psd"],
+                     ["r.psd", "-density", "300x200", "-units", "PixelsPerCentimeter", "out.psd"],
+                     ["out.psd", "-format", "%x %y %U|%[8BIM:1005,1005]\\n", "info:"]], {})]
+# annotate.c: GetMultilineTypeMetrics through multi-line labels (the widest line sets the width,
+# whichever line it is), interline spacing, and a caption fitted to a size
+GAP_STEP_CASES += [("multi-line text metrics: %s" % args[-3], [["-font", "{C}/Generic.ttf"] + args], {})
+                   for args in (["-pointsize", "14", "label:a\\nbbbbbbbbbbb\\ncc", "-format", "%wx%h\\n", "info:"],
+                                ["-pointsize", "14", "label:wwwwwwwwwww\\nb", "-format", "%wx%h\\n", "info:"],
+                                ["-size", "120x60", "caption:aaa bbbbbbbbbbbbbb cc dd", "-format", "%wx%h %[caption:pointsize]\\n", "info:"],
+                                ["-pointsize", "14", "-interline-spacing", "5", "label:a\\nbbbb\\ncc", "-format", "%wx%h\\n", "info:"])]
+# annotate.c: a label whose glyphs reach below the baseline and past their advance (j, g, _), for
+# RenderFreetype's glyph bounds
+GAP_STEP_CASES += [("label with descenders", [["-font", "{C}/Generic.ttf", "-pointsize", "20", "label:Ajg_", "-format",
+                                               "%wx%h\\n", "info:"]], {})]
+# image.c: InterpretImageFilename copying an invalid specifier (%q) literally before a valid one
+GAP_STEP_CASES += [("output name with an invalid specifier before %d",
+                    [["{C}/rose.miff", "{C}/rose.miff", "-scene", "3", "o_%q_%d.miff"]], {})]
+GAP_COMMANDS += ["-size 60x40 -define gradient:angle=30 -define gradient:radii=25,10 radial-gradient:red-blue",
+                 "-size 60x40 -define gradient:angle=120 -define gradient:radii=8,20 -define gradient:center=20,15 "
+                 "radial-gradient:yellow-navy"]
+# transform.c: CropImage at the edges of the virtual canvas: a crop ending exactly where the
+# image's page offset begins (in x, and in y with x inside), a negative crop of an offset image,
+# and pages with a zero width or height, where the crop's page comes from the image size
+GAP_COMMANDS += ["{C}/rose.miff %s -crop %s" % (page, geo) for page, geo in (
+    ("-repage +10+5", "10x10+0+0"), ("-repage +10+5", "80x5+0+0"), ("-repage +10+5", "30x20-5-3"),
+    ("-repage 0x46", "30x20+5+0"), ("-repage 70x0", "30x20+0+5"))]
+# transform.c: CropImageToTiles: an overlap tile crop at y offset -1 (the one value its
+# "< -1" test separates), a single crop in the aspect form (!), tiles a full column or row
+# wide, and fixed-size tiles of an image whose page has no width or height
+GAP_COMMANDS += ["{C}/rose.miff %s-crop %s" % (pre, geo) for pre, geo in (
+    ("", "3x2+0-1@!"), ("", "30x20+5+5!"), ("", "70x20"), ("", "30x46"),
+    ("+repage ", "30x20"), ("-repage 0x46 ", "30x20"))]
+# layer.c: a persistent first frame (dispose None) under frames with Background dispose that
+# overhang the canvas on each side, followed by full frames: the region a disposal clears
+# shows in coalesce and in optimize-transparency (with every frame disposed to background,
+# the whole canvas is cleared and the difference falls on transparent pixels)
+_LAYERS_OVERHANG = ("-dispose None -size 20x16 xc:red -dispose Background ( -size 8x8 xc:blue -repage 20x16%s ) "
+                    "-dispose None ( -size 20x16 xc:red ) -dispose Background ( -size 8x8 xc:lime -repage 20x16%s ) "
+                    "-dispose None ( -size 20x16 xc:red ) ")
+GAP_COMMANDS += [_LAYERS_OVERHANG % offsets + op for offsets in (("-3-2", "+15+12"), ("+2+3", "+10+6"), ("+0+0", "+12+8"))
+                 for op in ("-layers coalesce", "-layers optimize-transparency")]
+# in coalesce the cleared region must stay visible: a small frame follows the disposals
+GAP_COMMANDS += ["-size 20x16 xc:red -dispose Background ( -size 8x8 xc:blue -repage 20x16%s ) "
+                 "( -size 8x8 xc:lime -repage 20x16%s ) -dispose None ( -size 4x4 xc:yellow -repage 20x16+8+6 ) "
+                 "-layers coalesce" % offsets for offsets in (("-3-2", "+15+12"), ("+2+3", "+10+6"))]
+# layer.c: -layers composite with compose:outside-overlay either way, under Copy; and the
+# comparisons at exactly half alpha (HDRI holds 0.5 exactly), in compare-clear and -overlay
+GAP_COMMANDS += ["-size 10x8 xc:red null: ( -size 14x4 xc:#ffff0080 -repage -2+2 ) -compose Copy "
+                 "-define compose:outside-overlay=%s -layers composite" % v for v in ("false", "true")]
+GAP_COMMANDS += ["-size 10x8 xc:rgba(0,0,255,0.5) ( -size 10x8 xc:none -fill rgba(0,0,255,0.5) -draw 'point 2,2' ) "
+                 "( -size 10x8 xc:rgba(0,0,255,0.5) ) -layers %s" % m for m in ("compare-clear", "compare-overlay")]
+# layer.c: MergeImageLayers with offsets in one direction at a time, negative and past the
+# first frame, under each merge method; and frames without a page size
+_MERGE_FRAMES = ("-size 10x8 xc:red -repage %s ( -size 6x4 xc:blue -repage %s ) "
+                 "( -size 3x3 xc:green -repage %s ) ")
+GAP_COMMANDS += [_MERGE_FRAMES % offsets + "-layers " + method
+                 for offsets in (("+0+3", "+0-2", "+0+9"), ("+3+0", "-2+0", "+9+0"), ("+4+3", "+1+1", "+2+5"))
+                 for method in ("merge", "mosaic", "flatten", "trim-bounds")]
+GAP_COMMANDS += ["-size 10x8 xc:red +repage ( -size 6x4 xc:blue +repage -page +12+3 ) -layers " + method
+                 for method in ("merge", "mosaic")]
+# a mosaic on a page wider than every frame, and mosaic and merge from a first frame whose page
+# has no size but a negative offset (it does not cover the canvas its size implies)
+GAP_COMMANDS += ["-size 10x8 xc:red -repage 30x20+0+0 ( -size 6x4 xc:blue -repage +1+1 ) -layers mosaic",
+                 "-size 10x8 xc:red -repage 0x0-3-2 ( -size 6x4 xc:blue -repage +1+1 ) -layers mosaic",
+                 "-size 10x8 xc:red -repage 0x0-3-2 ( -size 6x4 xc:blue -repage -5-4 ) -layers merge"]
+# layer.c: OptimizeLayerFrames on sequences that grow, shrink back (needing a background or
+# previous disposal), repeat a frame (DupDispose) and clear to transparency, for optimize,
+# optimize-plus (which may add frames) and optimize-frame
+_OPT_SEQ = ("-size 20x16 xc:red ( -size 20x16 xc:red -fill blue -draw 'rectangle 2,2 15,12' ) "
+            "( -size 20x16 xc:red -fill blue -draw 'rectangle 5,5 8,8' ) ( -size 20x16 xc:red ) "
+            "( -size 20x16 xc:red ) ( -size 20x16 xc:none -fill lime -draw 'rectangle 0,0 3,3' ) ")
+GAP_COMMANDS += [_OPT_SEQ + "-layers " + m for m in ("optimize", "optimize-plus", "optimize-frame")]
+GAP_COMMANDS += ["-size 12x10 xc:none ( -size 12x10 xc:none -fill blue -draw 'rectangle 1,1 10,8' ) "
+                 "( -size 12x10 xc:none -fill blue -draw 'rectangle 4,4 6,6' ) ( -size 12x10 xc:none ) -layers " + m
+                 for m in ("optimize-plus", "optimize-frame")]
+# layer.c: OptimizeLayerFrames refuses frames of different sizes and pages not coalesced
+GAP_COMMANDS += ["-size 10x8 xc:red -size 6x4 xc:blue -layers optimize-frame",
+                 "-size 10x8 xc:red ( -size 10x8 xc:blue -repage +1+1 ) -layers optimize-frame",
+                 "-size 10x8 xc:red ( -size 10x8 xc:blue -repage 12x8 ) -layers optimize-plus"]
+# geometry.c: ParseGravityGeometry's aspect ratios with '#' (the larger of the two fits), its
+# '<' and '>' tests on sizes and ratios either side of the image, and offset-only geometries on
+# a page with a size, where the region takes the page size
+GAP_COMMANDS += ["{C}/rose.miff %s %s -format '%%wx%%h%%O\\n' -write info:" % (op, geo)
+                 for geo in ("16:9#", "9:16#", "70:46#", "9:16<", "30x20<", "30x80<", "100x80>", "100x30>")
+                 for op in ("-crop", "-extent")]
+GAP_COMMANDS += ["{C}/rose.miff -repage 100x80 %s+5+5 -format '%%wx%%h%%O %%g\\n' -write info:" % op
+                 for op in ("-extent ", "-gravity center -crop ")]
+# geometry.c: ParseGeometry's separators, signs and spacing in up to six values, through
+# operators that use each value (-colorize and the thresholds read all five as channels; the
+# -alpha set ones make the fifth visible); chosen from 500 random strings as the smallest
+# set that kills what any of them killed
+GAP_COMMANDS += [
+    "'{C}/rose.miff' -fill blue -colorize 25x-10:10X5x+10 -depth 16",
+    "'{C}/rose.miff' -fill blue -colorize '2,+2,0.5x+2+2+-40 ' -depth 16",
+    "'{C}/rose.miff' -fill blue -colorize -25x-2,2-+10 -depth 16",
+    "'{C}/rose.miff' -fill blue -colorize ' 40-+10+-5' -depth 16",
+    "'{C}/rose.miff' -fill blue -colorize -5x-0+-2 -depth 16",
+    "'{C}/rose.miff' -fill blue -colorize '+0 10:0.5' -depth 16",
+    "'{C}/rose.miff' -alpha set -fill 'rgba(0,0,255,0.5)' -black-threshold -0-+2-+25++80+60% -depth 16",
+    "'{C}/rose.miff' -alpha set -fill 'rgba(0,0,255,0.5)' -white-threshold +2x-10-+60x+80X40% -depth 16",
+    "'{C}/rose.miff' -alpha set -bilateral-blur '10/2+40 3-+5%'",
+    "'{C}/rose.miff' -alpha set -bilateral-blur 5:10%",
+    "'{C}/rose.miff' -alpha set -shadow 1:10+3++2x10",
+    "'{C}/rose.miff' -resize '(3)x(4)'",
+]
+# utility.c: ExpandFilename's "~" (HOME is the case directory; magick expands it only in a glob)
+# and "~user", and ExpandFilenames
+# on @lists holding options with arguments, lists of directories only, and globs over files
+# the case wrote, with and without a subimage
+GAP_STEP_CASES += [
+    ("a file read back through a glob under ~/", [["{C}/rose.miff", "f.miff"], ["~/f*.miff", "-negate", "out.miff"]], {}),
+    # the glob's head is "~/d", not "~": ExpandFilename's "~/" test and its $HOME lookup, seen
+    # in the directory the file was found in ($HOME/d, or ./d when $HOME is not substituted)
+    ("a glob under ~/ in a subdirectory, with its directory",
+     [["{C}/rose.miff", "d/f.miff"], ["~/d/f*.miff", "-format", "%d|%f %wx%h\\n", "info:"]],
+     {"d/keep.txt": "x"}),
+    ("a file under ~root", [["~root/no-such-file.miff", "out.miff"]], {}),
+    ("a glob under ~root (the user's home is looked up)", [["~root/no-such-*.miff", "out.miff"]], {}),
+    ("a glob under ~ of no such user", [["~no-such-user-x/no-such-*.miff", "out.miff"]], {}),
+    ("an @list with options and their arguments", [["@opts.txt", "out.miff"]],
+     {"opts.txt": "-resize 50% {C}/rose.miff -negate\n"}),
+    ("an @list of directories only", [["@dirs.txt", "{C}/rose.miff", "out.miff"]], {"dirs.txt": ". ..\n"}),
+    ("an @list mixing a directory, an option and images", [["@mix.txt", "-append", "out.miff"]],
+     {"mix.txt": ". -flip {C}/rose.miff {C}/granite.miff\n"}),
+    ("a glob over files the case wrote", [["{C}/rose.miff", "a1.miff"], ["{C}/granite.miff", "a2.miff"],
+                                          ["a*.miff", "-append", "out.miff"]], {}),
+    ("a glob with a subimage", [["{C}/rose.miff", "{C}/granite.miff", "b1.miff"], ["{C}/rose.miff", "b2.miff"],
+                                ["b*.miff[0]", "-append", "out.miff"]], {}),
+]
+# utility.c: AppendImageFormat's branch for a compressed name (.gz and the like), which keeps
+# the compression suffix last: a raw RGB file interlaced by partition, one file per channel
+GAP_STEP_CASES += [("rgb by partition to a .gz name",
+                    [["{C}/rose.miff", "-depth", "8", "-interlace", "partition", "out.rgb.gz"]], {})]
+# geometry.c: ParseMetaGeometry's area form with a shrink-only flag; ParseAffineGeometry's
+# determinant (a matrix that inverts, and one that does not); IsSceneGeometry at the limits of a
+# 64-bit scene number
+GAP_COMMANDS += ["{C}/rose.miff -resize 5000@> -format '%wx%h\\n' -write info:",
+                 "-size 30x20 xc:white -affine 2,0.5,0.25,1,3,4 -draw 'rectangle 2,2 10,8'",
+                 "-size 30x20 xc:white -affine 1,2,2,4,0,0 -draw 'rectangle 2,2 10,8'",
+                 "{C}/rose.miff {C}/rose.miff -delete 9223372036854775807 -format '%s\\n' -write info:",
+                 "{C}/rose.miff {C}/rose.miff -delete -9223372036854775808 -format '%s\\n' -write info:"]
+# policy.c: path policies matched against the literal and the canonical path: a symlink policy
+# read through a doubled slash, a path rule naming the corpus file as the case names it, and a
+# read-only rule on the corpus directory itself
+GAP_STEP_CASES += [
+    ("a symlink policy, read through a doubled slash", [["{C}//rose.miff", "out.miff"]],
+     {_POLICY: _policy('<policy domain="system" name="symlink" rights="none" pattern="follow"/>')}),
+    ("a path policy on the corpus file as the case names it", [["{C}/rose.miff", "out.miff"]],
+     {_POLICY: _policy('<policy domain="path" rights="none" pattern="{C}/rose.miff"/>')}),
+    ("a read-only path policy on the corpus directory", [["{C}/rose.miff", "out.miff"]],
+     {_POLICY: _policy('<policy domain="path" rights="read" pattern="*/corpus"/>')}),
+]
+# configure.c: AcquireConfigureCache loads only the first configure.xml that parses (the
+# build's own), so a case's configure.xml is searched for and never read: listed, it must not
+# appear
+GAP_STEP_CASES += [("a configure.xml of the case's own, shadowed by the build's", [["-list", "configure"]],
+                    {".config/ImageMagick/configure.xml":
+                         '<configuremap>\n  <configure name="CASE-ENTRY" value="x"/>\n</configuremap>\n'})]
+# locale.c: a case's own locale.xml is read (listed with -list locale): the hand-skipping of
+# <!...> and comments, the include and the nesting of messages. (A case's log.xml is read too,
+# but -list log orders it by path among the build's own, so which build lists it first, and
+# which one governs logging, depends on where the build lives: no log case can be compared.)
+_LOCALE = ".config/ImageMagick/locale.xml"
+def _localemap(body):
+    return '<?xml version="1.0"?>\n<localemap>\n  <locale name="C">\n' + body + '  </locale>\n</localemap>\n'
+_LOCALE_FILES = {
+    "nested messages": _localemap('    <Exception>\n      <Message name="CaseOne">first text</Message>\n'
+                                  '      <Case>\n        <Message name="CaseTwo">  spaced   text  </Message>\n      </Case>\n'
+                                  '    </Exception>\n'),
+    "a quoted doctype string": '<?xml version="1.0"?>\n<!DOCTYPE localemap [\n  <!ENTITY e "x]> <Message name=\'Ghost\'>g</Message> y">\n]>\n'
+                               '<localemap>\n  <locale name="C">\n    <Message name="Real">r</Message>\n  </locale>\n</localemap>\n',
+    "a stray bracket": '<?xml version="1.0"?>\n<!DOCTYPE localemap SYSTEM "t" ]>\n<localemap>\n  <locale name="C">\n'
+                       '    <Message name="Real">r</Message>\n  </locale>\n</localemap>\n',
+    "a comment": _localemap('    <!-- <Message name="Ghost">g</Message> -->\n    <Message name="Real">r</Message>\n'),
+    "another locale": '<?xml version="1.0"?>\n<localemap>\n  <locale name="xx_XX">\n    <Message name="Other">o</Message>\n'
+                      '  </locale>\n  <locale name="C">\n    <Message name="Real">r</Message>\n  </locale>\n</localemap>\n',
+}
+GAP_STEP_CASES += [("locale.xml of the case's own: %s, listed" % name, [["-list", "locale"]], {_LOCALE: xml})
+                   for name, xml in _LOCALE_FILES.items()]
+GAP_STEP_CASES += [("locale.xml with an include, listed", [["-list", "locale"]],
+                    {_LOCALE: '<localemap>\n  <include locale="C" file="more.xml"/>\n  <locale name="C">\n'
+                              '    <Message name="Real">r</Message>\n  </locale>\n</localemap>\n',
+                     ".config/ImageMagick/more.xml": _localemap('    <Message name="More">m</Message>\n')}),
+                   ("locale.xml including itself, listed", [["-list", "locale"]],
+                    {_LOCALE: '<localemap>\n  <include locale="C" file="locale.xml"/>\n  <locale name="C">\n'
+                              '    <Message name="Self">s</Message>\n  </locale>\n</localemap>\n'})]
+# annotate.c: FormatMagickCaption wraps at a multi-byte space (ReplaceSpaceWithNewline's other
+# branch): ideographic, no-break and em spaces in a narrow caption
+GAP_COMMANDS += ["-font {C}/Generic.ttf -pointsize 12 -size 40x caption:'%s'" % t for t in (
+    "word\u3000word\u3000word\u3000word", "word\u00a0word\u00a0word", "longword\u2003longword\u2003x")]
+# transform.c: SpliceImage on an image without alpha under a transparent background: the
+# splice image gains an alpha channel the source lacks, which only the explicit SetPixelAlpha
+# after each channel loop sets (the loop skips a channel the source does not have)
+GAP_COMMANDS += ["{C}/rose.miff -background none %s-splice 5x4+10+8" % grav
+                 for grav in ("", "-gravity center ", "-gravity southeast ")]
+GAP_COMMANDS += ["{C}/rose_alpha.miff -background none %s-splice 5x4+10+8" % grav
+                 for grav in ("", "-gravity center ", "-gravity southeast ")]
+# type.c: LoadFontConfigFonts sorts each fontconfig font into ImageMagick's width and weight
+# buckets. The case's own fonts.conf (fontconfig reads $HOME/.config/fontconfig, and HOME is
+# the case directory) adds the corpus directory and, at scan time, gives its font an exact
+# bucket boundary: every width and weight threshold the function compares against.
+# A plain file at .cache/fontconfig keeps fontconfig from writing its cache into the case
+# directory: whether it writes one there depends on the shared caches other runs left in
+# Homebrew's cache directory, so the file came and went between baseline and mutant runs
+def _fonts_conf(width, weight, style):
+    return ('<?xml version="1.0"?>\n<!DOCTYPE fontconfig SYSTEM "fonts.dtd">\n<fontconfig>\n'
+            '  <dir prefix="relative">../../{C}</dir>\n'
+            '  <match target="scan">\n'
+            '    <test name="file" compare="contains"><string>Generic.ttf</string></test>\n'
+            '    <edit name="width" mode="assign"><int>%d</int></edit>\n'
+            '    <edit name="weight" mode="assign"><int>%d</int></edit>\n'
+            '    <edit name="style" mode="assign"><string>%s</string></edit>\n'
+            '  </match>\n</fontconfig>\n' % (width, weight, style))
+GAP_STEP_CASES += [("fontconfig font at width %d, weight %d, style %s, listed" % (width, weight, style),
+                    [["-list", "font"]], {".config/fontconfig/fonts.conf": _fonts_conf(width, weight, style),
+                     ".cache/fontconfig": ""})
+                   for width, weight, style in (
+                       (30, 0, "Regular"), (50, 40, "Italic"), (63, 50, "Bold"), (75, 75, "Regular"),
+                       (87, 80, "Oblique"), (100, 100, "Regular"), (113, 180, "Italic"),
+                       (125, 200, "Regular"), (150, 205, "Bold Italic"), (200, 210, "Regular"))]
+# attribute.c: the minimum bounding box's orientation: a rectangle at 30 degrees, axis-aligned
+# rectangles (angle 0) under each orientation and an unknown one, a square (equal lengths) and
+# a diamond (two corners equally near the origin)
+_MBB = (" -precision 17 -format '%[minimum-bounding-box] %[minimum-bounding-box:angle]\\n' -write info:")
+GAP_COMMANDS += ["-size 60x60 xc:black -fill white -draw '%s'%s" % (shape, orient) + _MBB
+                 for shape, orients in (
+                     ("polygon 19,23 43,29 41,37 17,31", ("landscape", "portrait")),
+                     ("rectangle 10,20 40,30", ("landscape", "portrait", "other")),
+                     ("rectangle 20,10 30,40", ("landscape", "portrait", "other")),
+                     ("rectangle 10,10 40,40", ("landscape", "portrait")),
+                     ("polygon 30,10 50,30 30,50 10,30", ("",)))
+                 for orient in [(" -define minimum-bounding-box:orientation=" + o) if o else ""
+                                for o in orients]]
+GAP_STEP_CASES += [("a montage's tile directory under identify -verbose",
+                    [["montage", "{C}/rose.miff", "{C}/rose.miff", "-geometry", "+2+2", "m.miff"],
+                     ["identify", "-verbose", "m.miff"]], {})]
+GAP_STEP_CASES += [("exif:sync-image=%s on a JPEG with EXIF" % value,
+                    [["{C}/rose.miff", "-profile", "APP1:exif.bin", "-density", "300", "-orient",
+                      "BottomLeft", "x.jpg"],
+                     ["-define", "exif:sync-image=" + value, "x.jpg", "out.miff"]],
+                    {"exif.bin": EXIF_BLOCK})
+                   for value in ("false", "off", "no", "0", "true")]
+# channel.c: the -alpha methods the catalogue lacked (activate, associate, disassociate, discrete, off-if-opaque, on) on images with and without alpha
+GAP_COMMANDS += [
+    "{C}/rose.miff -alpha activate",
+    "{C}/rose_alpha.miff -alpha associate",
+    "{C}/rose_alpha.miff -alpha disassociate",
+    "{C}/rose_alpha.miff -alpha discrete",
+    "{C}/rose_alpha.miff -alpha off-if-opaque",
+    "{C}/rose_alpha.miff -alpha on",
+    "{C}/rose.miff -alpha set -alpha off-if-opaque",
+]
+# magic.c: format detection of a file with no extension, written by -format and info: and read back: SVG with spaces after the <, and one that ends where the pattern does
+GAP_COMMANDS += [
+    "-size 1x1 xc:red -format \"<  svg width='4' height='4'/>\" -write info:t.dat +delete t.dat",
+    "-size 1x1 xc:red -format \"<svg\" -write info:t.dat +delete t.dat",
+]
+# compress.c, third round: fax and Group 4 written and read back in one command
+GAP_COMMANDS += [
+    "-size 3000x6 xc:white -fill black -draw \"point 2900,1\" -draw \"line 0,3 1900,3\" -draw \"point 5,5\" -write fax:t.fax +delete fax:t.fax",
+    "-size 100x6 xc:white -fill black -draw \"line 0,1 99,1\" -draw \"line 50,3 99,3\" -draw \"point 99,5\" -write fax:t.fax +delete fax:t.fax",
+]
+# Commands whose output must not be converted to floating point: -stegano hides
+# the watermark in the low-order bits, which a float output does not keep.
+GAP_PLAIN_COMMANDS = [
+    "composite -stegano 5 {C}/gray8.miff {C}/rose.miff",
+    "composite -stegano 0 {C}/logo.miff {C}/rose.miff",
+]
+# Through mogrify.c, whose -gamma is GammaImage (`magick -gamma` uses EvaluateImage).
+GAP_CONVERT_CASES = [
+    ("convert palette -gamma", ["-gamma", "1.6"], "palette"),
+    # `magick -perceptible` fails: the option is missing from MagickCore/option.c
+    ("convert palette -perceptible", ["-perceptible", "0.1"], "palette"),
+    ("convert hdri -perceptible", ["-perceptible", "0.1"], "hdri"),
+    # epsilon is in quantum units: 0.1 changes almost nothing
+    ("convert palette -perceptible 30000", ["-perceptible", "30000"], "palette"),
+    ("convert rose_alpha colors -perceptible 30000",
+     ["-colors", "16", "-channel", "RGBA", "-perceptible", "30000"], "rose_alpha"),
+]
+
+
+# X11 (display.c, animate.c, xwindow.c, widget.c; W01, 2026-10-05). Each case gets an Xvfb of its
+# own (oracle.py, start_xvfb), 640x480x24, no window manager. A window's content is gone when
+# display exits, so what a case can compare is what stays on the root window, read back with
+# `import -window root` (or the x: coder), plus exit status and stderr. display and x: leave on
+# their own only with a delay set and -loop 1 (their timer runs on GetMagickTime, so the oracle
+# drops SOURCE_DATE_EPOCH for these cases). PPM out: import's images carry today's date.
+_X11_GRAB = ["import", "-window", "root", "ppm:out.ppm"]
+_X11_SHOW = ["-delay", "1", "-loop", "1"]
+GAP_X11_CASES = [("x11 import of the bare root window", [_X11_GRAB], {}),
+                 ("x11 x:root read", [["x:root", "ppm:out.ppm"]], {})]
+GAP_X11_CASES += [("x11 display -window root: %s" % name,
+                   [["display", "-window", "root", img(name)], _X11_GRAB], {})
+                  for name in UNARY_INPUTS]
+GAP_X11_CASES += [("x11 display -window root %s" % opts,
+                   [["display", "-window", "root"] + _split(opts) + [img("rose")], _X11_GRAB], {})
+                  for opts in ("-geometry +30+40", "-resize 300x200", "-colors 8", "-monochrome",
+                               "-dither None -colors 8", "-visual TrueColor", "-visual DirectColor",
+                               "-visual PseudoColor", "-visual StaticGray", "-gamma 2.2",
+                               "-map best", "-map default", "-map gray", "-colormap private",
+                               "-shared-memory", "+shared-memory", "-contrast", "-sharpen 0x1",
+                               "-crop 30x20+5+5", "-page 640x480+100+100", "-backdrop",
+                               "-border 5 -bordercolor red", "-gravity center",
+                               "-geometry 600x400+0+0")]
+GAP_X11_CASES += [("x11 animate -window root: %s" % " ".join(names),
+                   [["animate", "-window", "root"] + _X11_SHOW + [img(n) for n in names], _X11_GRAB], {})
+                  for names in (("rose",), ("rose", "rose_alpha"), ("palette", "gray16", "cmyk"))]
+GAP_X11_CASES += [("x11 import %s" % opts,
+                   [["display", "-window", "root", img("rose")],
+                    ["import", "-window", "root"] + _split(opts) + ["ppm:out.ppm"]], {})
+                  for opts in ("-crop 64x64+0+0", "-screen", "-silent", "-frame", "-descend",
+                               "-border", "-colors 16", "-monochrome", "-snaps 2", "-depth 4",
+                               "-negate", "-resize 50%", "-quality 50", "-trim", "-geometry +5+5")]
+GAP_X11_CASES += [("x11 x: window: %s" % args,
+                   [_X11_SHOW[:2] + _split(args) + _X11_SHOW[2:] + ["x:"]], {})
+                  for args in ("{C}/rose.miff", "{C}/palette.miff", "{C}/rose_alpha.miff",
+                               "{C}/rose.miff {C}/gray16.miff", "{C}/tall.miff", "{C}/tiny.miff",
+                               "{C}/cmyk.miff -resize 700x500")]
+GAP_X11_CASES += [("x11 display window %s" % opts,
+                   [["display"] + _X11_SHOW + _split(opts) + [img("rose")]], {})
+                  for opts in ("", "-title Rose", "-name rosewin", "-geometry 200x150+10+10",
+                               "-backdrop", "-immutable", "-colormap private", "-visual DirectColor",
+                               "-iconic", "-borderwidth 3", "-monochrome", "-dither None",
+                               "-magnify 3", "-coalesce", "-flatten",
+                               "-window-group 1", "-use-pixmap", "-cache 16", "-quantize gray")]
+GAP_X11_CASES += [("x11 animate window %s" % opts,
+                   [["animate"] + _X11_SHOW + _split(opts) + [img("rose"), img("rose_alpha")]], {})
+                  for opts in ("", "-title Roses", "-geometry +20+20", "-backdrop", "-pause 0",
+                               "-colormap private", "-visual DirectColor", "-monochrome",
+                               "-colors 8", "-immutable", "-borderwidth 2")]
+# X resources: there is no -xrm; display, animate and import read ~/.<client>rc, and HOME is
+# the case directory.
+_X11_RESOURCES = {
+    "backdrop and colors": "*backdrop: True\n*background: blue\n*foreground: yellow\n*borderColor: red\n",
+    "visual and map": "*visual: DirectColor\n*map: best\n*colormap: Private\n",
+    "gamma and quantum": "*gammaCorrect: True\n*displayGamma: 2.2\n*quantum: 2\n",
+    "geometry and gravity": "*geometry: 300x200+40+40\n*gravity: south\n*borderWidth: 4\n",
+    "misc flags": "*iconic: True\n*immutable: True\n*usePixmap: True\n*sharedMemory: False\n"
+                  "*confirmExit: False\n*displayWarnings: False\n",
+    "delay and pause": "*delay: 1\n*pause: 0\n*undoCache: 4\n*magnify: 2\n",
+}
+for _rname, _rtext in _X11_RESOURCES.items():
+    for _client, _steps in (("display", [["display", "-window", "root", img("rose")], _X11_GRAB]),
+                            ("animate", [["animate", "-window", "root"] + _X11_SHOW + [img("rose")], _X11_GRAB]),
+                            ("display", [["display"] + _X11_SHOW + [img("rose")]])):
+        GAP_X11_CASES.append(("x11 resources %s: %s" % (_rname, " ".join(_steps[0][:3])), _steps,
+                              {".%src" % _client: _rtext, ".magickrc": _rtext}))
+# Text in an X11 font: a font name starting with "-" sends annotate.c's RenderType to RenderX11,
+# and so to xwindow.c's XRenderImage and XAnnotateImage (2026-10-12): the font loaded, changed
+# and missing, a font list, a fill, none, a rotation and a skew. Xvfb serves the Type1 fonts of
+# /usr/share/fonts/X11/Type1 (scalable: a size in the name loads) and "fixed"; XBestFont falls
+# back through its own list for a name it cannot load.
+_X11_FONT = "-adobe-courier-medium-r-normal--14-*-*-*-*-*-iso8859-1"
+_X11_FONT_BOLD = "-adobe-helvetica-bold-r-normal--20-*-*-*-*-*-iso8859-1"
+GAP_X11_CASES += [("x11 font text: %s" % opts,
+                   [[img("rose")] + _split(opts) + ["ppm:out.ppm"]], {})
+                  for opts in ("-font %s -annotate +5+20 Hi" % _X11_FONT,
+                               "-font %s -fill red -annotate +5+20 Rose" % _X11_FONT,
+                               "-font %s -fill none -annotate +5+20 Hi" % _X11_FONT,
+                               "-font %s -annotate 30x30+10+30 Hi" % _X11_FONT,
+                               "-font %s -annotate 0x20+5+20 Hi" % _X11_FONT,
+                               "-font %s -gravity center -annotate +0+0 Hi" % _X11_FONT,
+                               "-font %s -annotate +5+15 A -font %s -annotate +5+35 B" % (_X11_FONT, _X11_FONT_BOLD),
+                               "-font -nosuch-font-name -annotate +5+20 Hi",
+                               "-font -nosuch-font-name,%s -annotate +5+20 Hi" % _X11_FONT)]
+GAP_X11_CASES += [("x11 font text: label %s" % opts,
+                   [_split(opts) + ["ppm:out.ppm"]], {})
+                  for opts in ("-font %s label:Hello" % _X11_FONT,
+                               "-font %s -background yellow -fill blue label:Rose" % _X11_FONT)]
+# More of the same (2026-10-12, after font1012's survivors): XAnnotateImage's quarter turns, the
+# other list separators, two lines, and the metrics printed (label's size, and -annotate's
+# bounding box through -format).
+GAP_X11_CASES += [("x11 font text: %s" % opts,
+                   [[img("rose")] + _split(opts) + ["ppm:out.ppm"]], {})
+                  for opts in ("-font %s -annotate 90x90+20+5 Hi" % _X11_FONT,
+                               "-font %s -annotate 180x180+40+30 Hi" % _X11_FONT,
+                               "-font %s -annotate 270x270+20+40 Hi" % _X11_FONT,
+                               "-font %s -annotate 135x135+30+20 Hi" % _X11_FONT,
+                               "-font -nosuch-font-name;%s -annotate +5+20 Hi" % _X11_FONT,
+                               "-font -nosuch-font-name:%s -annotate +5+20 Hi" % _X11_FONT)]
+GAP_X11_CASES += [("x11 font text: two lines, interline spacing 6",
+                   [[img("rose"), "-font", _X11_FONT, "-interline-spacing", "6",
+                     "-annotate", "+5+15", "Hi\\nRose", "ppm:out.ppm"]], {}),
+                  ("x11 font text: label size printed",
+                   [["-font", _X11_FONT, "label:Hello", "-format", "%w %h\\n", "-write", "info:-",
+                     "ppm:out.ppm"]], {}),
+                  ("x11 font text: label size printed, bold 20",
+                   [["-font", _X11_FONT_BOLD, "label:Rose\\nbud", "-format", "%w %h\\n", "-write",
+                     "info:-", "ppm:out.ppm"]], {})]
+
+# OpenCL (accelerate.c, opencl.c; W01): MAGICK_OCL_DEVICE=CPU through pocl, from a fixed device
+# profile (oracle.py, seed_opencl_profile). Each operator over inputs the kernels take (RGB,
+# RGBA, gray) and inputs accelerate.c hands back to the CPU path (palette, CMYK, a mask, a
+# virtual-pixel method, a channel subset), so both sides of every check are compared.
+_OCL_INPUTS = ["rose", "rose_alpha", "gray16", "palette", "cmyk", "tiny", "tall"]
+_OCL_OPS = ["-blur 0x2", "-blur 3x1", "-despeckle", "-local-contrast 10x20", "-local-contrast 4x80",
+            "-motion-blur 0x3+30", "-motion-blur 5x2+200", "-rotational-blur 10", "-rotational-blur 45",
+            "-unsharp 0x1", "-unsharp 2x1+1+0.05", "-contrast", "+contrast", "-equalize",
+            "-grayscale Rec601Luma", "-grayscale Rec709Luminance", "-grayscale Average",
+            "-grayscale Brightness", "-grayscale Lightness", "-grayscale RMS",
+            "-grayscale Rec601Luminance", "-grayscale Rec709Luma",  # not MS: under OpenCL it varies
+            # (2026-10-08: rose in 1 run of 4, tiny 1 of 8, tall 3 of 8)
+            "-modulate 110,80,90", "-modulate 90,120,40 -define modulate:colorspace=HSB",
+            "-modulate 100,150 -define modulate:colorspace=HSL",
+            "-modulate 100,100,150 -define modulate:colorspace=HWB",
+            "-resize 50%", "-resize 230%", "-resize 37x41!", "-filter Lanczos -resize 160%",
+            "-filter Point -resize 77%", "-filter Box -resize 300x20!", "-filter Gaussian -resize 20x300!",
+            "-thumbnail 30x30", "-function polynomial 1,-0.2,0.1", "-function sinusoid 3,90",
+            "-function arcsin 1", "-function arctan 1,2", "-wavelet-denoise 5%",
+            "-wavelet-denoise 10%x0.2"]
+_OCL_ENV = {"MAGICK_OCL_DEVICE": "CPU"}
+
+
+def _ocl_step(inputs, op):
+    """One step: inputs, then op, written as floating-point MIFF. -contrast runs only in
+    convert's syntax (magick's warns that -level replaced it and skips it)."""
+    pre = ["convert"] if op.lstrip("-+").startswith("contrast") else []
+    return [pre + inputs + _split(op) + FLOAT_OUT + ["out.miff"]]
+
+
+GAP_OPENCL_CASES = [("opencl %s %s" % (name, op), _ocl_step([img(name)], op), {})
+                    for op in _OCL_OPS for name in _OCL_INPUTS]
+GAP_OPENCL_CASES += [("opencl rose %s %s" % (pre, op),
+                      _ocl_step([img("rose")] + _fmt(pre), op), {})
+                     for pre in ("-virtual-pixel Edge", "-virtual-pixel Black", "-channel R",
+                                 "-channel RGBA", "-channel Gray", "-colorspace Lab",
+                                 "-colorspace RGB", "-colorspace LinearGray", "-alpha set -channel A",
+                                 "-write-mask {C}/bilevel.miff", "-read-mask {C}/bilevel.miff",
+                                 "-intensity Rec709Luminance", "-intensity Rec601Luma",
+                                 "-size 300x200 xc:gray +swap -composite")
+                     for op in ("-blur 0x2", "-unsharp 0x1", "-equalize", "-contrast", "-modulate 110,80,90",
+                                "-resize 150%", "-grayscale Rec709Luma", "-local-contrast 10x20",
+                                "-motion-blur 0x3+30", "-function polynomial 1,0", "-despeckle",
+                                "-rotational-blur 10", "-wavelet-denoise 5%")]
+GAP_OPENCL_CASES += [("opencl large %s" % op,
+                      _ocl_step(["-seed", "7", "-size", "700x500", "plasma:"], op), {})
+                     for op in ("-blur 0x8", "-resize 33%", "-resize 180%", "-unsharp 5x3", "-equalize",
+                                "-local-contrast 30x40", "-motion-blur 0x12+75", "-wavelet-denoise 8%",
+                                "-despeckle", "-rotational-blur 5", "-modulate 80,120,60", "-contrast")]
+# ComputeWaveletDenoiseImage splits its launch into passes of about 2 Mpixel; 1600x1300 gives
+# two, so the pass loop and its row offset are compared (W01, 2026-10-06). A gradient is cheap.
+GAP_OPENCL_CASES += [("opencl huge -wavelet-denoise 5%",
+                      _ocl_step(["-size", "1600x1300", "gradient:red-blue"], "-wavelet-denoise 5%"), {})]
+# A resize to exactly the work-group size (256 on pocl), for resizeHorizontalFilter's and
+# resizeVerticalFilter's `resized < workgroupSize` tests and the local memory they size.
+GAP_OPENCL_CASES += [("opencl rose_alpha -resize 256x256!", _ocl_step([img("rose_alpha")], "-resize 256x256!"), {})]
+# Three accelerated operators in one command: each waits on the events the one before left on
+# the image's OpenCL cache, so CopyOpenCLEvents merges two event lists (opencl.c).
+GAP_OPENCL_CASES += [("opencl rose_alpha chained blur, resize, local contrast",
+                      _ocl_step([img("rose_alpha")], "-blur 0x2 -resize 50% -local-contrast 10x20"), {})]
+# Gray with alpha (two channels, which checkAccelerateCondition sends to the CPU path) resized:
+# the one of ten candidates that killed (round x11cl2-ocl1008, 2026-10-08: 31, accelerate.c 14 and
+# opencl.c 17; the other nine, partial channel masks, modulate in HSB and HWB and two -grayscale
+# methods, killed nothing beyond it and were dropped)
+GAP_OPENCL_CASES += [("opencl graya -resize 57%",
+                      _ocl_step([img("rose_alpha"), "-colorspace", "gray"], "-resize 57%"), {})]
+# Downscales so steep that a work group's cached pixels outgrow the device's local memory
+# (factor 0.0005: about 510000 pixels), so resizeHorizontalFilter's and resizeVerticalFilter's
+# halving loop runs (W01, 2026-10-09; hand-run on mull-x11cl with OpenCL in use: 4 survivors of
+# each filter killed, among them the halving and its fallback test).
+GAP_OPENCL_CASES += [("opencl %s" % label, _ocl_step(["-size", size, "gradient:red-blue"], op), {})
+                     for label, size, op in (("wide 20000x2 -resize 10x2!", "20000x2", "-resize 10x2!"),
+                                             ("tall 2x20000 -resize 2x10!", "2x20000", "-resize 2x10!"))]
+# Device profiles the case brings (opencl.c LoadOpenCLDeviceBenchmark's parser; 2026-10-09, after
+# the owner's go for the placeholder): the oracle writes {OCL_DEVICE} as this boot's device
+# (oracle.opencl_device_attributes). The CPU scores 1e+06 and the device 1, so a correct parse
+# keeps OpenCL on, and -blur differs between the two paths. A decoy entry scoring the device
+# 1e+09 hides in a DOCTYPE's internal subset (behind a "]>" in double and single quotes and a
+# nested bracket) or in a comment: a parse that leaves the DOCTYPE or comment early reads the
+# decoy and turns the device off. One that never leaves it is caught by a last entry after the
+# DOCTYPE that turns the device off: the parse that swallows it keeps OpenCL on. (Not by losing
+# the only device entry: the device is then benchmarked, and which path wins varies; measured.)
+_OCL_PROFILE = ".opencl/ImageMagick/ImagemagickOpenCLDeviceProfile.xml"
+_OCL_CPU, _OCL_REAL, _OCL_DECOY = ('  <device name="CPU" score="1e+06"/>\n',
+                                   '  <device {OCL_DEVICE} score="1"/>\n',
+                                   '<device {OCL_DEVICE} score="1e+09"/>')
+# (a stray "]" at depth 0, which the parse ignores, and a quoted ">" outside the brackets)
+_OCL_DOCTYPE = ("  <!DOCTYPE devices ] SYSTEM \"x>y\" [ <!ENTITY a \"]>\"> <!ENTITY b ']>'> [nested] %s ]>\n"
+                % _OCL_DECOY)
+for _label, _xml in (("DOCTYPE after the device", _OCL_CPU + _OCL_REAL + _OCL_DOCTYPE),
+                     ("DOCTYPE before an entry turning the device off",
+                      _OCL_CPU + _OCL_REAL + _OCL_DOCTYPE + "  " + _OCL_DECOY + "\n"),
+                     ("comment after the device", _OCL_CPU + _OCL_REAL + "  <!-- %s -->\n" % _OCL_DECOY)):
+    GAP_OPENCL_CASES.append(("opencl profile with a %s, rose_alpha -blur 0x2" % _label,
+                             _ocl_step([img("rose_alpha")], "-blur 0x2"),
+                             {_OCL_PROFILE: "<devices>\n%s</devices>\n" % _xml}))
+# The device choice: GPU finds none (the CPU path), true takes the profile's best device, false
+# leaves OpenCL off. Each entry: label, environment.
+GAP_OPENCL_DEVICE_CASES = [("opencl device %s" % dev, {"MAGICK_OCL_DEVICE": dev})
+                           for dev in ("GPU", "true", "false")]
+# The OpenCL cache directory made from scratch: with OpenCL off, a relative
+# MAGICK_OPENCL_CACHE_DIR that does not exist yet is created, then ImageMagick/ inside it, each
+# only if the mkdir before succeeded (MagickCreateDirectory's status). A second step writes into
+# ocl/ImageMagick, so a missing directory shows (the oracle compares files, not directories).
+GAP_OPENCL_CACHE_DIR_CASES = [("opencl cache directory made, then written into",
+                               [["rose:", "-blur", "0x2", "null:"], ["rose:", "ocl/ImageMagick/seen.ppm"]],
+                               {"MAGICK_OPENCL_CACHE_DIR": "ocl"})]
+# The same without MAGICK_OPENCL_CACHE_DIR (and XDG_CACHE_HOME, which the oracle never sets): the
+# directory falls back to $HOME/.cache/ImageMagick, $HOME being the case directory
+# (GetOpenCLCacheDirectory's HOME branch, 2026-10-09).
+GAP_OPENCL_CACHE_DIR_CASES += [("opencl cache directory under $HOME/.cache, then written into",
+                                [["rose:", "-blur", "0x2", "null:"], ["rose:", ".cache/ImageMagick/seen.ppm"]],
+                                {"MAGICK_OPENCL_CACHE_DIR": None})]
+# Round 2 (W01): other screens, for xwindow.c's colormap, dither and visual paths (8-bit
+# PseudoColor, StaticGray, GrayScale and StaticColor; 15-, 16- and 30-bit TrueColor; 24-bit
+# DirectColor); AnimateImages and opencl.c's API through imdriver. (`display -remote` with no
+# window to receive the command waits for one: out of reach.) Each entry: label, steps,
+# files, screen.
+GAP_X11_SCREEN_CASES = []
+for _screen in ("640x480x8", "640x480x16", "640x480x15", "640x480x30", "640x480x8 -cc 0",
+                "640x480x8 -cc 1", "640x480x8 -cc 2", "640x480x24 -cc 5"):
+    GAP_X11_SCREEN_CASES += [("x11 %s display -window root: %s" % (_screen, name),
+                              [["display", "-window", "root", img(name)], _X11_GRAB], {}, _screen)
+                             for name in ("rose", "palette", "rose_alpha", "gray16")]
+    GAP_X11_SCREEN_CASES += [("x11 %s display -window root %s" % (_screen, opts),
+                              [["display", "-window", "root"] + _split(opts) + [img("rose")], _X11_GRAB],
+                              {}, _screen)
+                             for opts in ("-map best", "-map gray", "-colormap private", "-colors 16",
+                                          "-monochrome", "-visual StaticColor", "-visual GrayScale",
+                                          "-dither None")]
+    GAP_X11_SCREEN_CASES += [
+        ("x11 %s x: window" % _screen, [_X11_SHOW[:2] + [img("rose")] + _X11_SHOW[2:] + ["x:"]], {}, _screen),
+        ("x11 %s display window -colormap private" % _screen,
+         [["display"] + _X11_SHOW + ["-colormap", "private", img("palette")]], {}, _screen),
+        ("x11 %s animate window" % _screen,
+         [["animate"] + _X11_SHOW + [img("rose"), img("palette")]], {}, _screen),
+        ("x11 %s import -colors 8" % _screen,
+         [["display", "-window", "root", img("palette")],
+          ["import", "-window", "root", "-colors", "8", "ppm:out.ppm"]], {}, _screen),
+        ("x11 %s driver animate" % _screen, [["@driver", "animate", img("rose"), img("palette")]], {}, _screen)]
+# X resources of the case's own (~/.displayrc, read through XGetResourceDatabase with HOME as the
+# case directory): colour recovery, gamma, a private colormap, borders and colours, no pixmap or
+# shared memory (2026-10-08, hand-run: 3 killed in xwindow.c)
+_X11_RC = ("*colorRecovery: True\n*gammaCorrect: True\n*displayGamma: 1.6\n*colormap: private\n*borderWidth: 5\n"
+           "*background: #102030\n*foreground: yellow\n*matteColor: #405060\n*font: fixed\n*usePixmap: False\n"
+           "*sharedMemory: False\n*backdrop: True\n*gravity: NorthWest\n*magnify: 2\n*undoCache: 16\n*update: True\n"
+           "*quantum: 2\n*displayWarnings: False\n")
+_X11_RC_FILES = {".displayrc": _X11_RC, ".magickrc": _X11_RC, ".importrc": _X11_RC}
+GAP_X11_SCREEN_CASES += [
+    ("x11 640x480x8 display -window root with X resources", [["display", "-window", "root", img("rose")], _X11_GRAB],
+     _X11_RC_FILES, "640x480x8"),
+    ("x11 640x480x8 animate window with X resources", [["animate"] + _X11_SHOW + [img("rose"), img("palette")]],
+     _X11_RC_FILES, "640x480x8")]
+GAP_X11_SCREEN_CASES += [
+    ("x11 driver animate", [["@driver", "animate", img("rose"), img("rose_alpha"), img("gray16")]], {}, True),
+    ("x11 driver animate, one frame", [["@driver", "animate", img("tall")]], {}, True)]
+# Round 3 (W01): display's interactive commands, driven with synthetic key presses through
+# xevents (driver/xevents.c; the oracle's @xevents step). Each script waits for display's window
+# (map), presses the command's key, answers a dialog where there is one (map, ctrl+u to clear
+# the preset reply, the reply, Return), grabs the image window and quits (q). Each entry: label,
+# script, magick arguments.
+# Left out, each for a reason measured: t (trim), F5 (add noise: a menu), s (shear) and asterisk
+# (rotate) leave a widget open that q does not close; F13 has no key on this keymap; numbersign
+# and space (next image) replace the window under the script; plus (zoom) opens a magnifier that
+# q does not close; question (image information) shows text that differs between the sandbox
+# and a plain run.
+# The fixed epoch the oracle sets for every other case (oracle.FIXED_MTIME), kept here: display
+# repaints a resized window depending on GetMagickTime() (oracle.py, run_case).
+_XEV_ENV = {"SOURCE_DATE_EPOCH": "1000000000"}
+_XEV_KEYS = ["slash", "backslash", "h", "equal", "asciitilde", "period", "N", "C", "Z",
+             "less", "greater", "minus", "at", "F2"]
+_XEV_DIALOGS = [("F3", "0x1"), ("F4", "3"), ("F6", "0x1"), ("F7", "0x2"), ("F8", "50%"),
+                ("F9", "2"), ("F10", "3"), ("F11", "30x30"), ("F12", "5x5"),
+                ("H", "120"), ("S", "150"), ("L", "80"), ("G", "1.6"), ("percent", "60x40")]
+GAP_XEVENTS_CASES = [("xevents display key %s" % k, "map key:%s grab:out.ppm key:q" % k,
+                      ["display", img("rose")]) for k in _XEV_KEYS]
+GAP_XEVENTS_CASES += [("xevents display key %s, reply %s" % (k, reply),
+                       "map key:%s map key:ctrl+u type:%s key:Return grab:out.ppm key:q" % (k, reply),
+                       ["display", img("rose")]) for k, reply in _XEV_DIALOGS]
+GAP_XEVENTS_CASES += [
+    ("xevents display undo after negate", "map key:asciitilde key:ctrl+z grab:out.ppm key:q", ["display", img("rose")]),
+    ("xevents display several commands", "map key:slash key:h key:equal key:asciitilde key:period grab:out.ppm key:q",
+     ["display", img("rose_alpha")]),
+]
+# More of XImageWindowCommand's keys (2026-10-11): v flips, ctrl+r redoes, Alt with an arrow
+# trims one pixel off that edge (xevents' alt+ is Mod1), and Alt with s, p, c, i, w asks for
+# Swirl, Oil Paint, Charcoal, Implode and Wave.
+GAP_XEVENTS_CASES += [("xevents display key %s" % k, "map key:%s grab:out.ppm key:q" % k, ["display", img("rose")])
+                      for k in ("v", "alt+Left", "alt+Right", "alt+Up", "alt+Down", "alt+Left*3")]
+GAP_XEVENTS_CASES += [("xevents display key %s, reply %s" % (k, reply),
+                       "map key:%s map key:ctrl+u type:%s key:Return grab:out.ppm key:q" % (k, reply),
+                       ["display", img("rose")])
+                      for k, reply in (("alt+s", "60"), ("alt+p", "3"), ("alt+c", "1"), ("alt+i", "0.5"),
+                                       ("alt+w", "5x30"), ("r", "+10+10"))]
+GAP_XEVENTS_CASES += [("xevents display redo after undo", "map key:asciitilde key:ctrl+z key:ctrl+r grab:out.ppm key:q",
+                       ["display", img("rose")])]
+# The file browser (ctrl+s, ctrl+o) starts in the image's directory, so these cases first copy
+# their input into the case directory: a save then cannot land in the corpus. Keys reach the
+# browser's text field only with the pointer over it (point:170,355); Right and BackSpace clear
+# the preset name. Print (ctrl+p) would start lpr, and New leaves a widget open: left out; so does
+# a save as JPEG (its quality dialog never settles). The copies are stripped of their date
+# properties. Each entry: label, script, magick arguments, files copied in first.
+_XEV_FIELD = "map point:170,355 key:Right*16 key:BackSpace*16 type:"
+GAP_XEVENTS_FILE_CASES = [("xevents display save as %s" % ext,
+                           "map key:ctrl+s " + _XEV_FIELD + "out.%s key:Return%s key:q" % (ext, extra),
+                           ["display", "rose.miff"], ["rose"])
+                          for ext, extra in (("gif", ""), ("ppm", ""), ("tiff", ""), ("png", ""), ("miff", ""))]
+GAP_XEVENTS_FILE_CASES += [
+    ("xevents display open palette.miff", "map key:ctrl+o " + _XEV_FIELD + "palette.miff key:Return grab:out.ppm key:q",
+     ["display", "rose.miff"], ["rose", "palette"]),
+] + [
+    # Image Edit > Composite... (2026-10-11): the browser names the image to composite, then the
+    # Composite widget (Operators, Dissolve, Displace) holds the Commands window and a press on
+    # the image places it (at 10,34: below the Info window, left of x=20, as for Draw).
+    ("xevents display composite palette.miff%s" % label,
+     "map click:20,20 map click:65,325 map click:40,100 " + _XEV_FIELD + "palette.miff key:Return" + picks +
+     " use:1 click:10,34 grab:out.ppm key:q", ["display", "-geometry", "+300+50", "rose.miff"], ["rose", "palette"])
+    for label, picks in (("", ""), (", operator Atop", " use:2 click:65,101 map click:40,59"),
+                         (", dissolved 50", " use:2 click:65,133 map key:ctrl+u type:50 key:Return"))
+]
+# The file browser's own drawing on fixed directories (2026-10-12): Up, pressed more often than
+# the case directory is deep, stops at "/", so a directory typed then (relative to "/") is the
+# same in every run, where the case directory named the run (see GAP_XEVENTS_GRAB_CASES).
+# Typed once only: after a directory is listed the field keeps the old text's tail, and a
+# second reply lands in front of it. A list entry clicked twice opens it, which ends the
+# browser; Cancel would return the directory, and display's notice of the failed read never
+# lets it settle. Positions measured on the default font (Up 40,55; the field 175,322; entries
+# 17 px apart from y=52; the scroll bar at x=266). /usr/share/pixmaps and an Adwaita icon
+# directory of 27 PNGs (more than the list shows) are the system's, fixed on this machine.
+_XEV_ROOT = "map key:ctrl+o map " + "click:40,55 " * 12 + "point:175,322 type:"
+_XEV_ICONS = "usr/share/icons/Adwaita/16x16/mimetypes"
+_XEV_BROWSER_CASES = [
+    ("xevents grab: file browser, %s" % label, _XEV_ROOT + steps, ["rose"])
+    for label, steps in (
+        ("pixmaps listed", "usr/share/pixmaps key:Return grab:out.ppm click:120,86 click:120,86 use:1 key:q"),
+        ("pixmaps, python3.xpm opened", "usr/share/pixmaps key:Return click:120,86 click:120,86 use:1 grab:out.ppm key:q"),
+        ("pixmaps, an entry selected", "usr/share/pixmaps key:Return click:120,52 grab:out.ppm click:120,52 use:1 key:q"),
+        ("icons listed", _XEV_ICONS + " key:Return grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, End", _XEV_ICONS + " key:Return point:120,150 key:End grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, Page Down", _XEV_ICONS + " key:Return point:120,150 key:Next grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, Down twice", _XEV_ICONS + " key:Return point:120,150 key:Down*2 grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, slider dragged", _XEV_ICONS + " key:Return drag:266,80,266,200 grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+        ("icons, scroll arrow pressed", _XEV_ICONS + " key:Return click:266,292 click:266,292 click:266,292 grab:out.ppm click:120,52 click:120,52 use:1 key:q"),
+    )]
+# XListBrowserWidget on long lists (2026-10-12; measured on grabs): Miscellany > Show
+# Preview... (the preview types: entries 17 px apart from y=52, scroll bar x=238, field 130,322,
+# Preview 145,360, Cancel 217,360), and a save as PostScript's page geometry (scroll bar x=209,
+# field 115,322, Select 127,360, Cancel 190,360). Same grab-style list: no "@" before the grab.
+# Left out, measured: a preview run (it starts "magick" as a program, absent in the sandbox:
+# nondeterministic); the page list's keys and slider (all its sizes fit, nothing scrolls).
+_XEV_PREVIEW = "map click:20,20 map click:65,357 map click:40,52 map "
+_XEV_PAGE = "map key:ctrl+s " + _XEV_FIELD + "out.ps key:Return map "
+_XEV_LIST_CASES = [
+    ("xevents grab: preview list, %s" % label, _XEV_PREVIEW + steps, ["rose"])
+    for label, steps in (
+        ("cancelled", "grab:out.ppm click:217,360 use:1 key:q"),
+        ("End", "point:120,150 key:End grab:out.ppm click:217,360 use:1 key:q"),
+        ("Page Down, Up", "point:120,150 key:Next key:Up*2 grab:out.ppm click:217,360 use:1 key:q"),
+        ("slider dragged", "drag:238,80,238,230 grab:out.ppm click:217,360 use:1 key:q"),
+        ("trough pressed", "click:238,250 grab:out.ppm click:217,360 use:1 key:q"),
+        ("scroll arrow pressed", "click:238,292 click:238,292 grab:out.ppm click:217,360 use:1 key:q"),
+        ("Blur selected", "click:60,103 grab:out.ppm click:217,360 use:1 key:q"),
+    )] + [
+    ("xevents grab: page geometry list, %s" % label, _XEV_PAGE + steps, ["rose"])
+    for label, steps in (
+        ("Letter", "grab:out.ppm click:127,360 use:1 key:q"),
+        ("A4 selected", "click:60,171 grab:out.ppm click:127,360 use:1 key:q"),
+        ("cancelled", "grab:out.ppm click:190,360 use:1 key:q"),
+    )]
+# File > Visual Directory... is left out (2026-10-11, measured): after the browser's "*" the
+# montage never shows, and display does not quit on q (timeout).
+# display's menus: a click on the image opens the Commands widget, a click on its button opens a
+# menu, a click on an item runs the command (positions measured on the default font: buttons 32
+# pixels apart from y=101, items 20.2 apart from y=12, the last one below a separator). The
+# widget stays open, so use:1 points the grab and q back at the image window. Left out, measured:
+# Emboss, Reduce Noise, Add Noise, Preferences and Show Preview leave a widget open that q does
+# not close, and so do Roll, Contrast Stretch, Sigmoidal Contrast, Segment, Oil Paint, Charcoal
+# Draw, Add Border and Add Frame after their reply; Show Histogram leaves a temporary file with a
+# random name in the case directory; Quantize, Show Matte and Background wait on a timer that the
+# fixed epoch stops.
+_XEV_MENUS = ["File", "Edit", "View", "Transform", "Enhance", "Effects", "F/X", "Image Edit",
+              "Miscellany", "Help"]
+
+
+def _xev_menu(menu, item, items, reply=None, after="", step=20.2):
+    i = items.index(item)
+    y = 12 + step * i + (5 if i == len(items) - 1 else 0)
+    script = "map click:20,20 map click:65,%d map click:40,%d" % (101 + 32 * _XEV_MENUS.index(menu), y)
+    if reply is not None:
+        # The dialog maps in the menu's window, so the pointer stays where the item was; the
+        # dialog, 127 pixels high, reads the keys only with the pointer in it (2026-10-11).
+        script += " map%s key:ctrl+u type:%s key:Return" % (" point:150,50" if y > 120 else "", reply)
+    return script + after + " use:1 grab:out.ppm key:q"
+
+
+_XEV_VIEW = ["Half Size", "Original Size", "Double Size", "Resize...", "Apply", "Refresh", "Restore"]
+_XEV_ENHANCE = ["Hue...", "Saturation...", "Brightness...", "Gamma...", "Spiff", "Dull",
+                "Contrast Stretch...", "Sigmoidal Contrast...", "Normalize", "Equalize", "Negate",
+                "Grayscale", "Map...", "Quantize..."]
+_XEV_EFFECTS = ["Despeckle", "Emboss", "Reduce Noise", "Add Noise...", "Sharpen...", "Blur...",
+                "Threshold...", "Edge Detect...", "Spread...", "Shade...", "Raise...", "Segment..."]
+_XEV_FX = ["Solarize...", "Sepia Tone...", "Swirl...", "Implode...", "Vignette...", "Wave...",
+           "Oil Paint...", "Charcoal Draw..."]
+_XEV_EDIT = ["Annotate...", "Draw...", "Color...", "Matte...", "Composite...", "Add Border...",
+             "Add Frame...", "Comment...", "Launch...", "Region of Interest..."]
+_XEV_MISC = ["Image Info", "Zoom Image", "Show Preview...", "Show Histogram", "Show Matte",
+             "Background...", "Slide Show...", "Preferences..."]
+_XEV_TRANSFORM = ["Crop", "Chop", "Flop", "Flip", "Rotate Right", "Rotate Left", "Rotate...", "Shear...",
+                  "Roll...", "Trim Edges"]
+_XEV_MENU_ITEMS = ([("View", it, _XEV_VIEW, r) for it, r in (("Half Size", None), ("Resize...", "60x40"),
+                                                           ("Restore", None), ("Double Size", None))] +
+                   [("Transform", it, _XEV_TRANSFORM, r) for it, r in (("Flip", None),)] +
+                   [("Enhance", it, _XEV_ENHANCE, r) for it, r in (("Spiff", None), ("Dull", None),
+                                                                 ("Hue...", "120"))] +
+                   [("F/X", it, _XEV_FX, r) for it, r in (("Solarize...", "50%"), ("Sepia Tone...", "80%"),
+                                                        ("Swirl...", "60"), ("Implode...", "0.5"),
+                                                        ("Vignette...", "0x5"), ("Wave...", "5x30"))] +
+                   # 2026-10-08: more of Effects, Enhance and Transform (left out, measured:
+                   # Threshold, Edge Detect, Spread, Shade, Raise and Normalize time out; Rotate
+                   # Left and Blur grabbed the same as Rotate Right and Sharpen)
+                   [("Effects", it, _XEV_EFFECTS, r) for it, r in (("Despeckle", None), ("Sharpen...", "0x1"))] +
+                   [("Enhance", it, _XEV_ENHANCE, r) for it, r in (("Saturation...", "50"), ("Brightness...", "120"),
+                                                                 ("Gamma...", "1.5"), ("Equalize", None),
+                                                                 ("Negate", None), ("Grayscale", None))] +
+                   [("Transform", it, _XEV_TRANSFORM, r) for it, r in (("Flop", None), ("Rotate Right", None))] +
+                   # commands that leave the image as it is (their own branches still run; left out,
+                   # measured: Rotate... and Shear... wait on a drag, Trim Edges and Slide Show time out)
+                   [("View", it, _XEV_VIEW, None) for it in ("Apply", "Refresh")] +
+                   [("Miscellany", "Zoom Image", _XEV_MISC, None)])
+# The widgets grabbed while open (W01, 2026-10-06): the cases above grab the image window after
+# a widget has closed, so the widgets' drawing (bevels, text, highlights, layout) was never
+# compared. Here the grab comes right after the widget maps, with no @ before it (@ would go to
+# the widget). Each entry: label, script, files copied in first (display opens the first copy,
+# so the file browser lists the case directory, not the corpus; else display opens rose).
+def _xev_menu_grab(menu, item, items):
+    i = items.index(item)
+    y = 12 + 20.2 * i + (5 if i == len(items) - 1 else 0)
+    return "map click:20,20 map click:65,%d map grab:out.ppm click:40,%d use:1 key:q" % (
+        101 + 32 * _XEV_MENUS.index(menu), y)
+
+
+# No file browser here: it shows its directory's path, which in the case directory names the
+# run (mbase-..., mut-<hash>), so every mutant's grab differed (1818 false kills, 2026-10-06);
+# opened on the corpus it fails. Check new grab cases across two case-directory names.
+GAP_XEVENTS_GRAB_CASES = [
+    ("xevents grab: dialog, empty", "map key:F3 map grab:out.ppm key:ctrl+u type:0x1 key:Return key:q", []),
+    ("xevents grab: dialog, typed", "map key:F3 map key:ctrl+u type:0x1 grab:out.ppm key:Return key:q", []),
+] + [
+    # XDialogWidget by the pointer (2026-10-12; measured on a grab of F3's 335x129 dialog: the
+    # field at 166,43, Emboss 227,87, Cancel 296,87): its buttons clicked, the pointer over them,
+    # a press released off a button, a click in the field, editing keys, a reply longer than it
+    ("xevents grab: dialog, %s" % label, "map key:F3 map " + steps, [])
+    for label, steps in (
+        ("action button clicked", "key:ctrl+u type:0x1 click:227,87 use:1 key:at grab:out.ppm key:q"),
+        ("Cancel clicked", "click:296,87 use:1 key:at grab:out.ppm key:q"),
+        ("pointer over the buttons", "point:227,87 point:296,87 point:166,43 grab:out.ppm click:296,87 use:1 key:q"),
+        ("press released off a button", "drag:227,87,40,10 grab:out.ppm click:296,87 use:1 key:q"),
+        ("a click in the field", "click:20,43 type:1 grab:out.ppm click:296,87 use:1 key:q"),
+        ("Left and BackSpace", "key:Left*3 key:BackSpace type:9 grab:out.ppm click:296,87 use:1 key:q"),
+        ("a long reply", "type:0123456789012345678901234567890123456789012345 grab:out.ppm click:296,87 use:1 key:q"),
+        ("a long reply, then Home", "type:0123456789012345678901234567890123456789012345 key:Home grab:out.ppm "
+                                    "click:296,87 use:1 key:q"))
+] + [
+    # The dialogs with a toggle of their own (XDialogWidget's special button): View > Resize...
+    # (Constrain ratio; 314x129, the toggle at 22,106, Resize 220,89, Cancel 286,89) and Effects >
+    # Shade... (Color shading; 346x129, Shade 232,89, Cancel 300,89), measured on grabs
+    ("xevents grab: %s dialog, %s" % (name, label), menu + " map " + steps, [])
+    for name, menu, act, cancel in (
+        ("resize", "map click:20,20 map click:65,165 map click:40,78", "220,89", "286,89"),
+        ("shade", "map click:20,20 map click:65,261 map click:40,210", "232,89", "300,89"))
+    for label, steps in (
+        ("shown", "grab:out.ppm click:%s use:1 key:q" % cancel),
+        ("toggled", "click:22,106 grab:out.ppm click:%s use:1 key:q" % cancel),
+        ("toggled twice", "click:22,106 click:22,106 grab:out.ppm click:%s use:1 key:q" % cancel),
+        ("toggled, applied", "key:ctrl+u type:%s click:22,106 click:%s use:1 key:at grab:out.ppm key:q"
+                             % ("100x30" if name == "resize" else "45x20", act)),
+        ("applied", "key:ctrl+u type:%s click:%s use:1 key:at grab:out.ppm key:q"
+                    % ("100x30" if name == "resize" else "45x20", act)))
+] + [
+    ("xevents grab: Commands widget", "map click:20,20 map grab:out.ppm use:1 key:q", []),
+    # ? shows XDisplayImageInfo's text: its first page names the image by a relative path, the
+    # same in every case directory (2026-10-11); t (Trim) times out, left out.
+    ("xevents grab: image info", "map key:question map grab:out.ppm key:Return use:1 key:q", []),
+] + [("xevents grab: %s menu" % menu, _xev_menu_grab(menu, item, items), [])
+     for menu, item, items in (("View", "Half Size", _XEV_VIEW), ("Transform", "Flip", _XEV_TRANSFORM),
+                               ("Enhance", "Spiff", _XEV_ENHANCE))]
+# Drags (xevents press/move/release, 2026-10-06): display's crop and chop modes. c enters crop
+# mode (its mode widget maps; use:1 keeps the image window), a drag marks the rectangle, arrow
+# keys move its corner, Return crops and Escape gives up; Transform > Chop reuses the Commands
+# window (no new map) and chops along the line dragged. Left out, measured: Region of Interest
+# never settles and leaves temporary files; in Draw, Escape quits display; Color and Matte do
+# not exit after a click.
+def _xev_menu_pick(menu, item, items, step=20.2):
+    i = items.index(item)
+    y = 12 + step * i + (5 if i == len(items) - 1 else 0)
+    return "map click:20,20 map click:65,%d map click:40,%d" % (101 + 32 * _XEV_MENUS.index(menu), y)
+
+
+# Draw mode's widget (display.c XDrawEditImage): its buttons, and the items of each one's menu.
+_XEV_DRAW_MENUS = {
+    "Element": ["point", "line", "rectangle", "fill rectangle", "circle", "fill circle", "ellipse",
+                "fill ellipse", "polygon", "fill polygon"],
+    "Color": ["black", "blue", "cyan", "green", "gray", "red", "magenta", "yellow", "white",
+              "transparent", "Browser..."],
+    "Stipple": ["Brick", "Diagonal", "Scales", "Vertical", "Wavy", "Translucent", "Opaque", "Open..."],
+    "Width": ["1", "2", "4", "8", "16", "Dialog..."],
+}
+_XEV_DRAW_BUTTONS = ["Element", "Color", "Stipple", "Width", "Undo", "Help", "Dismiss"]
+
+
+def _xev_draw_pick(button, item, buttons=_XEV_DRAW_BUTTONS, menus=_XEV_DRAW_MENUS):
+    """The button clicked, then the item: these menus' items are 22 pixels apart from y=15
+    (measured on a grab of the Element menu; display's own menus are closer)."""
+    return " use:2 click:65,%d map click:40,%d" % (101 + 32 * buttons.index(button),
+                                                  15 + 22 * menus[button].index(item))
+
+
+# Color and Matte Edit's widgets (display.c XColorEditImage, XMatteEditImage), placed like Draw's.
+# Method lists option.c's paint methods, Undefined too; the pens are Draw's but transparent.
+_XEV_PENS = ["black", "blue", "cyan", "green", "gray", "red", "magenta", "yellow", "white", "Browser..."]
+_XEV_METHODS = ["Undefined", "FillToBorder", "Floodfill", "Point", "Replace", "Reset"]
+_XEV_FUZZ = ["0%", "2%", "5%", "10%", "15%", "Dialog..."]
+_XEV_COLOR_BUTTONS = ["Method", "Pixel Color", "Border Color", "Fuzz", "Undo", "Help", "Dismiss"]
+_XEV_COLOR_MENUS = {"Method": _XEV_METHODS, "Pixel Color": _XEV_PENS, "Border Color": _XEV_PENS,
+                    "Fuzz": _XEV_FUZZ}
+_XEV_MATTE_BUTTONS = ["Method", "Border Color", "Fuzz", "Matte Value", "Undo", "Help", "Dismiss"]
+_XEV_MATTE_MENUS = {"Method": _XEV_METHODS, "Border Color": _XEV_PENS, "Fuzz": _XEV_FUZZ,
+                    "Matte Value": ["Opaque", "Transparent", "Dialog..."]}
+_XEV_ROTATE_BUTTONS =["Pixel Color", "Direction", "Help", "Dismiss"]
+_XEV_ROTATE_MENUS = {"Pixel Color": _XEV_PENS, "Direction": ["horizontal", "vertical"]}
+_XEV_CHOP_BUTTONS = ["Direction", "Help", "Dismiss"]
+_XEV_CHOP_MENUS = {"Direction": ["horizontal", "vertical"]}
+# Annotate's widget (XAnnotateEditImage): fonts are xwindow.c's font1..font0 defaults.
+_XEV_ANNOTATE_BUTTONS = ["Font Name", "Font Color", "Box Color", "Rotate Text", "Help", "Dismiss"]
+_XEV_ANNOTATE_MENUS = {"Font Name": ["fixed", "variable", "5x8", "6x10", "7x13bold", "8x13bold", "9x15bold",
+                                     "10x20", "12x24", "Browser..."],
+                       "Font Color": _XEV_DRAW_MENUS["Color"], "Box Color": _XEV_DRAW_MENUS["Color"],
+                       "Rotate Text": ["-90", "-45", "-30", "0", "30", "45", "90", "180", "Dialog..."]}
+
+
+GAP_XEVENTS_CASES += [
+    ("xevents display crop by drag", "map key:c map use:1 drag:10,10,50,40 key:Return grab:out.ppm key:q",
+     ["display", img("rose")]),
+    ("xevents display crop by drag, corner moved", "map key:c map use:1 drag:10,10,50,40 key:Right key:Down "
+     "key:Return grab:out.ppm key:q", ["display", img("rose")]),
+    ("xevents display crop by drag, escaped", "map key:c map use:1 drag:10,10,50,40 key:Escape grab:out.ppm key:q",
+     ["display", img("rose")]),
+    ("xevents display cut by drag", "map key:ctrl+x map use:1 drag:10,10,50,40 key:Return grab:out.ppm key:q",
+     ["display", img("rose")]),
+] + [
+    # The rectangle adjusted before Return (2026-10-11): the other arrow keys, Home, Page Up and
+    # Down, a corner dragged (a press within RoiDelta of it), and Escape before any drag.
+    ("xevents display crop, %s" % label, "map key:c map use:1 " + steps + " grab:out.ppm key:q", ["display", img("rose")])
+    for label, steps in (("corner moved left and up", "drag:10,10,50,40 key:Left*3 key:Up*2 key:Return"),
+                         ("Home, Page Down, Page Up", "drag:10,10,50,40 key:Home key:Next key:Prior key:Return"),
+                         ("bottom right corner dragged", "drag:10,10,50,40 drag:50,40,60,44 key:Return"),
+                         ("top left corner dragged", "drag:10,10,50,40 drag:10,10,18,16 key:Return"),
+                         ("escaped before a drag", "key:Escape"))
+] + [
+    # Copy a region, then paste it (ctrl+v reuses the mode widget's window; a click places it).
+    ("xevents display copy and paste", "map key:ctrl+c map use:1 drag:10,10,50,40 key:Return key:ctrl+v "
+     "use:1 click:20,20 key:Return grab:out.ppm key:q", ["display", img("rose")]),
+] + [
+    # Paste's Operator menu (2026-10-11): option.c's compose operators, the hidden ones too, 22
+    # pixels apart in the mode widget (the copy's, reused); the copy placed at 10,34.
+    ("xevents display paste, operator %s" % op, "map key:ctrl+c map use:1 drag:10,10,50,40 key:Return key:ctrl+v "
+     "use:2 click:65,101 map click:40,%d use:1 click:10,34 key:Return grab:out.ppm key:q" % (15 + 22 * i),
+     ["display", img("rose")])
+    for i, op in ((2, "Atop"), (7, "Clear"))  # Blend, ColorBurn, Colorize grabbed as Atop on rose
+] + [
+    # Modes that keep the Commands widget open over the (small) image window: the image is placed
+    # at +300+50, clear of it, else the drag lands on the widget and opens a menu. These modes
+    # also map an Info window (70x26, the pointer position) over the image's top left, so a press
+    # there reaches Info, not the image: the presses go below y=30 (2026-10-11; at 10,10 and 30,20
+    # draw mode never drew).
+    ("xevents display draw by drag", _xev_menu_pick("Image Edit", "Draw...", _XEV_EDIT) +
+     " use:1 drag:10,34,60,44 grab:out.ppm key:Escape key:q", ["display", "-geometry", "+300+50", img("rose")]),
+    # The drag before that move, kept for what it does reach: it starts on the Info window, whose
+    # updates (XInfoWidget) it drives (2026-10-12; the x11cl13 sweep lost 13 widget.c kills with it).
+    ("xevents display draw mode, a drag from the Info window",
+     _xev_menu_pick("Image Edit", "Draw...", _XEV_EDIT) +
+     " use:1 drag:10,10,60,40 grab:out.ppm key:Escape key:q", ["display", "-geometry", "+300+50", img("rose")]),
+] + [
+    # Draw mode's own menus (2026-10-11): the Draw widget takes the Commands window's place, so
+    # use:2 reaches it; its buttons are where the Commands widget's are, each menu like display's.
+    ("xevents display draw %s" % label, _xev_menu_pick("Image Edit", "Draw...", _XEV_EDIT) +
+     "".join(_xev_draw_pick(*p) for p in picks) + " use:1 " + gesture + " grab:out.ppm key:Escape key:q",
+     ["display", "-geometry", "+300+50", img("rose")])
+    for label, picks, gesture in (
+        [(el + " by drag", [("Element", el)], "drag:10,34,60,44")
+         for el in ("line", "rectangle", "fill rectangle", "circle", "fill circle", "ellipse", "fill ellipse")] +
+        [(el + ", three corners", [("Element", el)], "drag:10,34,40,44 click:60,34 click:60,34")
+         for el in ("polygon", "fill polygon")] +
+        [("line, width 8", [("Element", "line"), ("Width", "8")], "drag:10,34,60,44"),
+         ("rectangle, red pen", [("Element", "rectangle"), ("Color", "red")], "drag:10,34,60,44"),
+         ("fill rectangle, brick stipple", [("Element", "fill rectangle"), ("Stipple", "Brick")], "drag:10,34,60,44"),
+         ("line, then undone", [("Element", "line")], "drag:10,34,60,44 use:2 click:65,229 use:1")])
+] + [
+    ("xevents display color edit, a click", _xev_menu_pick("Image Edit", "Color...", _XEV_EDIT) +
+     " use:1 click:30,38 key:Escape grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
+    ("xevents display matte edit, a click", _xev_menu_pick("Image Edit", "Matte...", _XEV_EDIT) +
+     " use:1 click:30,38 key:Escape grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
+] + [
+    # Color and Matte Edit through their own menus (2026-10-11): each paint method, a fuzz, a
+    # border color and an undo. One click, at 10,38: below the Info window, and left of x=20, as
+    # measured (line coverage): there a press after a menu pick never reached display.
+    ("xevents display %s edit %s" % (mode, label), _xev_menu_pick("Image Edit", mode.capitalize() + "...", _XEV_EDIT) +
+     "".join(_xev_draw_pick(b, it, buttons, menus) for b, it in picks) + " use:1 " + gesture +
+     " key:Escape grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")])
+    for mode, buttons, menus, first, undo in (
+        ("color", _XEV_COLOR_BUTTONS, _XEV_COLOR_MENUS, ("Pixel Color", "red"), 229),
+        ("matte", _XEV_MATTE_BUTTONS, _XEV_MATTE_MENUS, ("Matte Value", "Transparent"), 229))
+    for label, picks, gesture in (
+        [("%s, a click" % m.lower(), [("Method", m), first], "click:10,38") for m in _XEV_METHODS[1:]] +
+        [("floodfill, fuzz 10%", [("Method", "Floodfill"), first, ("Fuzz", "10%")], "click:10,38"),
+         ("filltoborder, black border", [("Method", "FillToBorder"), first, ("Border Color", "black")],
+          "click:10,38"),
+         ("point, then undone", [("Method", "Point"), first], "click:10,38 use:2 click:65,%d use:1" % undo)])
+] + [
+    # Annotate (2026-10-11): a click places the text cursor (at 10,38, as above), the keys type
+    # the text, Escape or the Text widget's Apply (in the Commands window) puts it on the image
+    # (xwindow.c XAnnotateImage). The Annotate widget's menus pick font, colors and angle first.
+    ("xevents display annotate %s" % label, _xev_menu_pick("Image Edit", "Annotate...", _XEV_EDIT) +
+     "".join(_xev_draw_pick(b, it, _XEV_ANNOTATE_BUTTONS, _XEV_ANNOTATE_MENUS) for b, it in picks) +
+     " use:1 click:10,38 " + keys + " grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")])
+    for label, picks, keys in (
+        ("Hi, escaped", [], "type:Hi key:Escape"),
+        ("Hi, applied", [], "type:Hi use:2 click:65,133 use:1"),
+        ("two lines", [], "type:Hi key:Return type:Yo key:Escape"),
+        ("a letter erased", [], "type:Hix key:BackSpace key:Escape"),
+        ("a line erased, retyped", [], "type:Hix key:ctrl+u type:Yo key:Escape"),
+        ("in red", [("Font Color", "red")], "type:Hi key:Escape"),
+        ("on a yellow box", [("Box Color", "yellow")], "type:Hi key:Escape"),
+        ("in transparent", [("Font Color", "transparent")], "type:Hi key:Escape"),
+        ("rotated 90", [("Rotate Text", "90")], "type:Hi key:Escape"),
+        ("rotated -45", [("Rotate Text", "-45")], "type:Hi key:Escape"))
+    # left out, measured: Font Name > 6x10 never settles (no such font under Xvfb; a notice waits)
+] + [
+    # Rotate, Chop and Crop's own widgets (2026-10-11): a slanted drag gives Rotate an angle (a
+    # level one gives 0, and nothing turns); Chop's Direction; Crop's Crop button after the drag.
+    ("xevents display %s" % label, _xev_menu_pick("Transform", item, _XEV_TRANSFORM, step=22) +
+     "".join(_xev_draw_pick(b, it, buttons, menus) for b, it in picks) + " use:1 " + gesture +
+     " grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")])
+    for label, item, buttons, menus, picks, gesture in (
+        ("rotate, a slanted drag", "Rotate...", _XEV_ROTATE_BUTTONS, _XEV_ROTATE_MENUS, [], "drag:10,34,60,44"),
+        ("rotate, a steep drag", "Rotate...", _XEV_ROTATE_BUTTONS, _XEV_ROTATE_MENUS, [], "drag:10,32,30,44"),
+        ("rotate, vertical", "Rotate...", _XEV_ROTATE_BUTTONS, _XEV_ROTATE_MENUS,
+         [("Direction", "vertical")], "drag:10,32,16,44"),
+        ("rotate, red pen", "Rotate...", _XEV_ROTATE_BUTTONS, _XEV_ROTATE_MENUS,
+         [("Pixel Color", "red")], "drag:10,34,60,44"),
+        ("chop, vertical direction", "Chop", _XEV_CHOP_BUTTONS, _XEV_CHOP_MENUS,
+         [("Direction", "vertical")], "drag:15,32,15,44"),
+        ("crop, the Crop button", "Crop", ["Crop", "Help", "Dismiss"], {}, [],
+         "drag:10,32,50,44 use:2 click:65,101 use:1"))
+] + [
+    # animate is left out (2026-10-11, measured): it plays at once, stepping frames after XDelay
+    # sleeps of real time, so under xevents it is never idle and no key reaches it in step.
+] + [
+    # Region of Interest (2026-10-11; the earlier "never settles" was Launch..., pressed through the
+    # 20.2 spacing): a drag marks the region, then the Apply widget (in the Commands window: File,
+    # Edit, Transform, Enhance, Effects, F/X, Miscellany, Help, Dismiss) runs a command on it;
+    # Dismiss ends the mode.
+    ("xevents display region of interest, %s" % label,
+     _xev_menu_pick("Image Edit", "Region of Interest...", _XEV_EDIT, step=22) + " use:1 drag:10,32,50,44 " +
+     steps + " grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")])
+    for label, steps in (
+        ("flopped", "use:2 click:65,165 map click:40,15 use:2 click:65,357 use:1"),
+        ("negated", "use:2 click:65,197 map click:40,235 use:2 click:65,357 use:1"),
+        ("despeckled", "use:2 click:65,229 map click:40,15 use:2 click:65,357 use:1"),
+        ("solarized", "use:2 click:65,261 map click:40,15 map key:ctrl+u type:50% key:Return "
+                      "use:2 click:65,357 use:1"),
+        ("flopped, then undone", "use:2 click:65,165 map click:40,15 use:2 click:65,133 map click:40,15 "
+                                 "use:2 click:65,357 use:1"),
+        ("escaped", "key:Escape"))
+] + [
+    # The second button held on the image: zoom, then XMagnifyImage follows the pointer until
+    # the release; the grab is the magnify window (2026-10-11).
+    ("xevents display magnify by the second button", "map press2:20,20 map use:1 move:30,25 release2:30,25 "
+     "use:2 grab:out.ppm key:q use:1 key:q", ["display", img("rose")]),
+] + [
+    # An image larger than the screen (1024x768): display shows part of it and maps the Pan Icon
+    # window, whose rectangle a drag moves (XPanImage); the arrow keys pan too (2026-10-11).
+    ("xevents display pan, %s" % label, "map map " + steps + " use:1 grab:out.ppm key:q",
+     ["display", "-resize", "1600x1100!", img("rose")])
+    for label, steps in (("icon dragged", "use:2 drag:20,20,60,50"), ("icon clicked", "use:2 click:80,55"),
+                         ("arrow keys", "use:1 key:Right*3 key:Down*2"))
+] + [
+    ("xevents display rotate by drag", _xev_menu_pick("Transform", "Rotate...", _XEV_TRANSFORM) +
+     " use:1 drag:10,38,60,38 grab:out.ppm key:q", ["display", "-geometry", "+300+50", img("rose")]),
+    ("xevents display chop, horizontal", _xev_menu_pick("Transform", "Chop", _XEV_TRANSFORM) +
+     " use:1 drag:5,20,60,20 grab:out.ppm key:q", ["display", img("rose")]),
+    ("xevents display chop, vertical", _xev_menu_pick("Transform", "Chop", _XEV_TRANSFORM) +
+     " use:1 drag:30,5,30,40 grab:out.ppm key:q", ["display", img("rose")]),
+]
+# The magnifier (plus): a q or Escape sent to the magnify window itself (use:2) closes it, which a
+# q to the image window did not; the grab, with no use before it, is the magnify window. Moved
+# with the arrow keys, its factor set with a digit (xwindow.c XMakeMagnifyImage, display.c's
+# magnify commands; 2026-10-10, hand-run on mull-x11cl: 62 survivors killed by these three).
+GAP_XEVENTS_CASES += [
+    ("xevents display magnifier moved right and down",
+     "map key:plus map use:2 key:Right*5 key:Down*5 grab:out.ppm key:q use:1 key:q", ["display", img("rose")]),
+    ("xevents display magnifier moved left and up, factor 5",
+     "map key:plus map use:2 key:Left*3 key:Up*3 key:5 grab:out.ppm key:Escape use:1 key:q", ["display", img("rose")]),
+    ("xevents display magnifier, rose_alpha",
+     "map key:plus map grab:out.ppm use:2 key:q use:1 key:q", ["display", img("rose_alpha")]),
+]
+# The magnifiers on the other screens (2026-10-12): XMakeMagnifyImage writes the magnified
+# pixels in a branch per depth and byte order, and every xevents case so far ran at depth 24.
+# Each entry: label, script, magick arguments, screen. Left out: 640x480x8 (PseudoColor), where
+# the window never settles under xevents (exit 125, measured).
+GAP_XEVENTS_SCREEN_CASES = [
+    ("xevents %s display %s" % (_screen, label), script, ["display", img("rose")], _screen)
+    for _screen in ("640x480x16", "640x480x15", "640x480x30", "640x480x8 -cc 0")
+    for label, script in (
+        ("magnifier moved right and down",
+         "map key:plus map use:2 key:Right*5 key:Down*5 grab:out.ppm key:q use:1 key:q"),
+        ("magnify by the second button",
+         "map press2:20,20 map use:1 move:30,25 release2:30,25 use:2 grab:out.ppm key:q use:1 key:q"))]
+# import with no -window: it grabs the server and the pointer and waits for a click or a dragged
+# region (xwindow.c XSelectWindow, XImportImage). xevents' idle waits for that, with no window to
+# map, and its clicks reach import through the grab (XTestGrabControl). The Xvfb root of a fresh
+# server is the same in every run. Each entry: label, script, magick arguments (2026-10-10,
+# hand-run on mull-x11cl: 26 + 18 + 15 kills, together covering all).
+GAP_XEVENTS_IMPORT_CASES = [
+    ("xevents import, region dragged", "idle drag:20,15,140,90,6", ["import", "out.miff"]),
+    ("xevents import -screen, region dragged up and left", "idle drag:140,90,20,15,6", ["import", "-screen", "out.miff"]),
+    ("xevents import -screen, root clicked", "idle click:5,5", ["import", "-screen", "out.miff"]),
+]
+GAP_XEVENTS_CASES += [("xevents display menu %s > %s" % (menu, item), _xev_menu(menu, item, items, reply),
+                       ["display", img("rose")]) for menu, item, items, reply in _XEV_MENU_ITEMS]
+# Display's menus are 22 pixels apart, not 20.2 (measured on a grab of Transform, 2026-10-11): from
+# the seventh item on, the cases above pressed the item before the one named. "Restore" was
+# Refresh, "Equalize" Normalize, "Negate" Equalize, "Grayscale" Negate; they keep their labels and
+# ids, as their kills are real. The items they missed, and those "left out, measured" through
+# the same error (Threshold, Edge Detect, Spread, Shade, Raise, Normalize), placed right:
+_XEV_MENU_ITEMS_22 = ([("View", "Restore", _XEV_VIEW, None)] +
+                      [("Enhance", it, _XEV_ENHANCE, None) for it in ("Normalize", "Equalize", "Negate", "Grayscale")] +
+                      [("Effects", it, _XEV_EFFECTS, r) for it, r in (("Threshold...", "50%"), ("Edge Detect...", "1"),
+                                                                    ("Spread...", "3"), ("Shade...", "30x30"),
+                                                                    ("Raise...", "5x5"), ("Segment...", "1x1.5"))] +
+                      [("F/X", it, _XEV_FX, r) for it, r in (("Oil Paint...", "3"), ("Charcoal Draw...", "1"))] +
+                      [("Transform", it, _XEV_TRANSFORM, r) for it, r in (("Roll...", "+10+10"),)])
+# left out, measured: Shear, Trim Edges, Add Frame, Slide Show and Preferences time out; Comment
+# never settles. Raise 5x5 fails on rose ("size must exceed bevel width"): kept, an error path.
+GAP_XEVENTS_CASES += [("xevents display menu item %s > %s" % (menu, item), _xev_menu(menu, item, items, reply, step=22),
+                       ["display", img("rose")]) for menu, item, items, reply in _XEV_MENU_ITEMS_22]
+# Widgets grabbed themselves, without the @ before the grab that the image-window cases get: the
+# confirmation display asks before quitting when its resources say so (XConfirmWidget), and Help
+# > Overview's text view (XTextViewWidget), closed with its Dismiss button. Help > Browse
+# Documentation would start xdg-open, and About Display never settles: left out. Each entry:
+# label, script, files.
+_XEV_CONFIRM = {".displayrc": "display.confirmExit: True\n", ".magickrc": "display.confirmExit: True\n"}
+GAP_XEVENTS_WIDGET_CASES = [
+    ("xevents display quit, confirmed", "map key:q map grab:out.ppm key:Return", _XEV_CONFIRM),
+    # the confirmation by the mouse (XConfirmWidget's button and motion events, 2026-10-08): Yes;
+    # Cancel or Dismiss, then quit again; Yes pressed, dragged off, released, then clicked
+    ("xevents display quit, Yes clicked", "map key:q map grab:out.ppm click:37,147", _XEV_CONFIRM),
+    ("xevents display quit, Cancel clicked, then confirmed",
+     "map key:q map grab:out.ppm click:172,147 use:1 key:q map key:Return", _XEV_CONFIRM),
+    ("xevents display quit, Dismiss clicked, then confirmed",
+     "map key:q map grab:out.ppm click:105,147 use:1 key:q map key:Return", _XEV_CONFIRM),
+    ("xevents display quit, Yes dragged off, then clicked",
+     "map key:q map press:37,147 move:120,40 release:120,40 grab:out.ppm click:37,147", _XEV_CONFIRM),
+    ("xevents display help overview",
+     "map click:20,20 map click:65,388 map click:40,12 map grab:out.ppm click:397,607 use:1 key:q", {}),
+    # Miscellany > Preferences (2026-10-08): toggles (display gamma; Floyd/Steinberg), the grab
+    # while open, then Apply (XUserPreferences writes ~/.displayrc into the case directory) or
+    # Cancel; not the backdrop toggle, after which q no longer reaches display
+    ("xevents display preferences, applied",
+     "map click:20,20 map click:65,357 map click:40,158 map click:25,96 click:25,180 grab:out.ppm click:45,248 use:1 key:q",
+     {}),
+    ("xevents display preferences, cancelled",
+     "map click:20,20 map click:65,357 map click:40,158 map click:25,96 grab:out.ppm click:303,248 use:1 key:q", {}),
+] + [
+    # Image Edit > Color..., Pixel Color > Browser... (XColorBrowserWidget, 2026-10-08): pick from
+    # the list, scroll it, reset, then Select or Cancel; Dismiss leaves Color mode
+    ("xevents display color browser, %s" % label,
+     "map click:20,20 map click:65,325 map click:40,52 click:65,133 map click:40,203 map " + steps +
+     " click:65,293 use:1 key:q", {})
+    for label, steps in (("item selected", "click:150,160 grab:out.ppm click:175,360"),
+                         ("scrolled, item selected", "click:262,290*5 click:150,100 grab:out.ppm click:175,360"),
+                         ("reset, cancelled", "click:37,88 grab:out.ppm click:240,360"),
+                         ("cancelled", "grab:out.ppm click:240,360"),
+                         # 2026-10-12 (measured on a grab: the field 170,322 holds "gray", the
+                         # scroll bar at x=262, its thumb near y=110): typed pattern and name,
+                         # the list's keys, the slider, the trough, a double click
+                         ("pattern *blue*", "point:170,322 key:BackSpace*4 type:*blue* key:Return grab:out.ppm click:240,360"),
+                         ("pattern *0, then Up", "point:170,322 key:BackSpace*4 type:*0 key:Return point:150,150 key:Up*2 grab:out.ppm click:240,360"),
+                         ("name typed", "point:170,322 key:BackSpace*4 type:navy grab:out.ppm click:240,360"),
+                         ("name typed, selected", "point:170,322 key:BackSpace*4 type:navy key:Return use:1 key:at grab:out.ppm use:2"),
+                         ("End", "point:150,150 key:End grab:out.ppm click:240,360"),
+                         ("End, Home", "point:150,150 key:End key:Home grab:out.ppm click:240,360"),
+                         ("Page Down twice", "point:150,150 key:Next*2 grab:out.ppm click:240,360"),
+                         ("slider dragged", "drag:262,110,262,250 grab:out.ppm click:240,360"),
+                         ("trough pressed", "click:262,250 grab:out.ppm click:240,360"),
+                         ("item double-clicked", "click:150,160 click:150,160 use:1 key:at grab:out.ppm use:2"))] + [
+    # Image Edit > Annotate..., Font Name > Browser... (XFontBrowserWidget, 2026-10-08): the X
+    # server's font list (this machine's fonts), pick, scroll, reset, Select or Cancel; Dismiss
+    # leaves Annotate mode
+    ("xevents display font browser, %s" % label,
+     "map click:20,20 map click:65,325 map click:40,12 click:65,101 map click:40,203 map " + steps +
+     " click:65,261 use:1 key:q", {})
+    for label, steps in (("item selected", "click:200,150 grab:out.ppm click:434,376"),
+                         ("scrolled, item selected", "click:517,48*6 click:200,120 grab:out.ppm click:434,376"),
+                         ("reset, cancelled", "click:37,88 grab:out.ppm click:497,376"),
+                         ("cancelled", "grab:out.ppm click:497,376"),
+                         # 2026-10-12 (measured: the field 300,322 holds "fixed", the scroll bar
+                         # at x=517, its thumb at the bottom)
+                         ("pattern -adobe-courier*", "point:300,322 key:BackSpace*5 type:-adobe-courier* key:Return grab:out.ppm click:497,376"),
+                         ("pattern, then Back", "point:300,322 key:BackSpace*5 type:*bold* key:Return click:37,55 grab:out.ppm click:497,376"),
+                         ("name typed", "point:300,322 key:BackSpace*5 type:6x13 grab:out.ppm click:497,376"),
+                         ("Home", "point:250,150 key:Home grab:out.ppm click:497,376"),
+                         ("Home, Page Down", "point:250,150 key:Home key:Next grab:out.ppm click:497,376"),
+                         ("slider dragged", "drag:517,280,517,120 grab:out.ppm click:497,376"),
+                         ("trough pressed", "click:517,150 grab:out.ppm click:497,376"),
+                         ("item double-clicked", "click:200,150 click:200,150 use:1 key:at grab:out.ppm use:2"))] + [
+    # Effects > Add Noise... (XListBrowserWidget over the noise types, 2026-10-08): the list
+    # grabbed with Impulse picked, the image after Impulse noise, and cancelled
+    ("xevents display add noise browser, %s" % label, "map click:20,20 map click:65,261 map click:40,73 map " + steps, {})
+    for label, steps in (("Impulse picked", "click:60,85 grab:out.ppm click:159,358 use:1 key:q"),
+                         ("Impulse noise added", "click:60,85 click:159,358 use:1 key:at grab:out.ppm key:q"),
+                         ("cancelled", "grab:out.ppm click:237,358 use:1 key:q"))] + [
+    # Help > Overview scrolled (XTextViewWidget, 2026-10-08): by Page Down, by the scroll bar's
+    # arrow, by paging in its trough then Home and End. Not used: XNoticeWidget (Edit > Paste with
+    # nothing copied), which polls a timer to dismiss itself, so display never goes idle for xevents
+    ("xevents display help overview, %s" % label,
+     "map click:20,20 map click:65,388 map click:40,12 map " + steps + " grab:out.ppm click:397,607 use:1 key:q", {})
+    for label, steps in (("paged down", "key:Next*3"), ("scrolled by the arrow", "click:419,577*10"),
+                         ("paged in the trough, Home, End", "click:419,400*3 key:Home key:End"))] + [
+    # The third button's Short Cuts menu (XMenuWidget without a submenu, 2026-10-08; xevents'
+    # press3:/release3:): shown, dragged over its items, moved out and back, then released on
+    # its title, which picks nothing (Restore never lets display idle; after Undo q is lost)
+    ("xevents display short cuts menu, %s" % label, "map press3:30,20 map " + steps + " use:1 key:q", {})
+    for label, steps in (("shown", "grab:out.ppm release3:5,5"),
+                         ("dragged over its items", "move:30,40 move:30,80 move:30,120 grab:out.ppm release3:5,5"),
+                         ("moved out and back", "move:30,60 move:200,60 move:30,100 grab:out.ppm release3:5,5"))] + [
+    # The emboss dialog (F3) by the mouse (XDialogWidget's button and motion events, 2026-10-08):
+    # a click in the reply field and on Emboss, a click on Cancel, Emboss pressed and the pointer
+    # dragged off before the release, a double click then a middle-button paste in the field
+    ("xevents display dialog by the mouse, %s" % label, "map key:F3 map " + steps + " use:1 key:q", {})
+    for label, steps in (("typed, Emboss clicked", "click:100,62 key:ctrl+u type:0x2 grab:out.ppm click:205,101"),
+                         ("Cancel clicked", "grab:out.ppm click:291,101"),
+                         ("Emboss pressed, dragged off",
+                          "press:205,101 move:100,20 release:100,20 grab:out.ppm click:291,101"),
+                         ("pasted with the middle button", "click:40,62 click:40,62 click2:120,62 grab:out.ppm key:Return"))]
+# label, steps, environment. Without the fixed device profile (oracle.py, seed_opencl_profile)
+# switching OpenCL on runs ImageMagick's device benchmark, whose scores and choice vary from run
+# to run. Not used: MAGICK_OCL_DEVICE=false, which runs that benchmark in spite of the profile
+# (the 10-07 selfcheck: score 3.6 to 4.7, the device enabled or not; no kill rested on them),
+# nor profile of rose_alpha or palette, whose blur re-runs the benchmark too (score 10.4 to 11.3
+# between two runs; their 3 kills were taken out and rerun).
+GAP_OPENCL_DRIVER_CASES = [("opencl driver %s" % " ".join(args), [["@driver", "opencl"] + list(args)], env)
+                           for args in (("list",), ("list", img("rose")), ("off", img("rose")),
+                                        ("on", img("rose")), ("deviceoff", img("rose")),
+                                        ("profile", img("rose")))
+                           for env in (_OCL_ENV, {"MAGICK_OCL_DEVICE": "GPU"})]
+# DumpOpenCLProfileData writes the kernel profile log at exit only while a device still profiles:
+# profilelog leaves profiling on (two blurs, so kernels run twice), and a second step prints the
+# log with its times reduced to what holds whatever they are (2026-10-10).
+GAP_OPENCL_DRIVER_CASES += [("opencl driver profilelog, then the kernel profile log",
+                             [["@driver", "opencl", "profilelog", img("rose")],
+                              ["@driver", "ocllog", ".opencl/ImageMagick/ImageMagickOpenCL.log"]], _OCL_ENV)]
+
+
+def _gap_cases():
+    yield from _gap_image_cases(GAP_CASES)
+    yield from _gap_plain_cases()
+    yield from _gap_image_cases(REACH_CASES)
+    yield from _gap_cdl_cases()
+    yield from _gap_command_cases()
+    yield from _gap_convert_cases()
+    yield from _gap_step_cases()
+    yield from _gap_x11_opencl_cases()
+
+
+def _gap_x11_opencl_cases():
+    # Families of their own (x11, opencl, xevents), not gaps: mutate.py's case cap gives every
+    # family a share, and these slow cases lost to cheap CPU-only ones within gaps (W01).
+    for label, steps, files in GAP_X11_CASES:
+        yield _with_run(_with_inputs(_case("x11", label, steps, ["out.ppm"]), files=files or None),
+                        x11=True)
+    for label, steps, files in GAP_OPENCL_CASES:
+        yield _with_run(_with_inputs(_case("opencl", label, steps, ["out.miff"]), files=files or None),
+                        env=_OCL_ENV)
+    # Two OpenCL devices (pocl's CPU device twice, POCL_DEVICES): opencl.c's code for more than one
+    # device (RequestOpenCLDevice's choice and its lock, the per-device loops of HasOpenCLDevices
+    # and LoadOpenCLDevices), which one device never runs. Both match the pinned profile, so
+    # nothing is benchmarked; the output equals the one-device run (2026-10-09; hand-run on
+    # mull-x11cl: 8 kills of survivors whose verdicts said a second device was needed).
+    yield _with_run(_case("opencl", "opencl two devices, rose_alpha -blur 0x2 -resize 50% -local-contrast 10x20",
+                          _ocl_step([img("rose_alpha")], "-blur 0x2 -resize 50% -local-contrast 10x20"),
+                          ["out.miff"]), env=dict(_OCL_ENV, POCL_DEVICES="cpu cpu"))
+    for label, env in GAP_OPENCL_DEVICE_CASES:
+        yield _with_run(_case("opencl", label, [[img("rose"), "-blur", "0x2"] + FLOAT_OUT + ["out.miff"]],
+                              ["out.miff"]), env=env)
+    for label, steps, env in GAP_OPENCL_CACHE_DIR_CASES:
+        yield _with_run(_case("opencl", label, steps, [steps[-1][-1]]), env=env)
+    for label, steps, files, screen in GAP_X11_SCREEN_CASES:
+        yield _with_run(_with_inputs(_case("x11", label, steps, ["out.ppm"]), files=files or None),
+                        x11=screen)
+    for label, steps, env in GAP_OPENCL_DRIVER_CASES:
+        yield _with_run(_case("opencl", label, steps, []), env=env)
+    # @ (Refresh) repaints the whole image window before each grab: display repaints a window it
+    # has just resized from an Expose that may arrive before or after it swaps in the new image.
+    for label, script, args in GAP_XEVENTS_CASES:
+        yield _with_run(_case("xevents", label, [["@xevents", script.replace("grab:", "key:at grab:")] + args],
+                              ["out.ppm"]), env=_XEV_ENV, x11=True)
+    for label, script, args, screen in GAP_XEVENTS_SCREEN_CASES:
+        yield _with_run(_case("xevents", label, [["@xevents", script.replace("grab:", "key:at grab:")] + args],
+                              ["out.ppm"]), env=_XEV_ENV, x11=screen)
+    for label, script, args in GAP_XEVENTS_IMPORT_CASES:
+        yield _with_run(_case("xevents", label, [["@xevents", script] + args], ["out.miff"]),
+                        env=_XEV_ENV, x11=True)
+    for label, script, files in GAP_XEVENTS_WIDGET_CASES:
+        yield _with_run(_with_inputs(_case("xevents", label, [["@xevents", script, "display", img("rose")]],
+                                           ["out.ppm"]), files=files or None), env=_XEV_ENV, x11=True)
+    for label, script, names in GAP_XEVENTS_GRAB_CASES + _XEV_BROWSER_CASES + _XEV_LIST_CASES:
+        copies = [[img(n), "-strip", "%s.miff" % n] for n in names]
+        target = "%s.miff" % names[0] if names else img("rose")
+        yield _with_run(_case("xevents", label, copies + [["@xevents", script, "display", target]], ["out.ppm"]),
+                        env=_XEV_ENV, x11=True)
+    for label, script, args, names in GAP_XEVENTS_FILE_CASES:
+        copies = [[img(n), "-strip", "%s.miff" % n] for n in names]
+        yield _with_run(_case("xevents", label, copies + [["@xevents", script.replace("grab:", "key:at grab:")] + args],
+                              ["out.ppm"]), env=_XEV_ENV, x11=True)
+
+
+def _gap_image_cases(entries):
+    for label, args, names in entries:
+        yield _op("gaps", label, [img(n) for n in names], args)
+
+
+def _gap_plain_cases():
+    for command in GAP_PLAIN_COMMANDS:
+        yield _op_to("gaps", command.replace("{C}/", ""), _fmt(command), "out.miff")
+
+
+def _gap_cdl_cases():
+    for name in CDL_INPUTS:
+        yield _with_inputs(_op("gaps", name + " -cdl", [img(name)], ["-cdl", "cc.xml"]),
+                           files={"cc.xml": CDL})
+
+
+def _gap_command_cases():
+    for command in GAP_COMMANDS:
+        label = command.replace("{C}/", "")
+        if command.startswith("identify "):  # prints, writes nothing
+            yield _case("gaps", label, [_fmt(command)], [])
+        else:
+            yield _op("gaps", label, [], _fmt(command))
+
+
+def _gap_step_cases():
+    for label, steps, files in GAP_STEP_CASES:
+        yield _with_inputs(_case("gaps", label, steps, ["out.miff"]), files=files or None)
+
+
+def _gap_convert_cases():
+    for label, args, name in GAP_CONVERT_CASES:
+        yield _case("gaps", label, [["convert", img(name)] + args + FLOAT_OUT + ["out.miff"]],
                     ["out.miff"])
 
 
@@ -1081,16 +5874,19 @@ def generate(lists, writable_formats):
         # enumerated families
         _colorspace_cases(lists), _compose_cases(lists), _distort_cases(lists),
         _filter_cases(lists), _interpolate_cases(lists), _virtual_pixel_cases(lists),
-        _morphology_cases(lists), _evaluate_cases(lists), _statistic_cases(lists),
+        _morphology_cases(lists), _morphology_arg_cases(), _evaluate_cases(lists),
+        _statistic_cases(lists),
         _noise_cases(lists), _dither_cases(lists), _layers_cases(lists),
         _complex_cases(lists), _intensity_cases(lists), _sparse_color_cases(lists),
         _type_cases(lists), _preview_cases(lists),
         _multi_cases(), _sequence_cases(), _compare_cases(lists), _text_output_cases(),
         _montage_cases(), _encode_cases(writable_formats), _raw_cases(writable_formats),
+        _quantum_cases(writable_formats), _quantum_gap7_cases(writable_formats), _pixel_jxl_cases(writable_formats),
+        _constitute_cases(), _glob_cases(), _read_blob_string_cases(), _blob_path_cases(), _distort_poly_cases(), _fx_gap_cases(), _composite_gap_cases(), _compose_colorspace_gap_cases(), _feature_cases(), _resample_cases(), _sparse_color_gap_cases(), _meta_channel_gap_cases(), _exception_gap_cases(), _auto_level_gap_cases(), _matrix_gap_cases(), _stream_gap_cases(), _signature_gap_cases(), _quantize_gap_cases(), _resource_gap_cases(), _quantize_gap2_cases(), _distort_gap_cases(), _fx_gap2_cases(), _cache_gap_cases(), _xml_gap_cases(), _color_gap_cases(), _texture_gap_cases(), _distort_args_gap_cases(), _fx_gap3_cases(), _matrix_gap2_cases(), _quantize_gap3_cases(), _quantize_gap4_cases(), _montage_gap_cases(), _compose_over_gap_cases(), _seamless_gap_cases(), _fx_gap4_cases(), _opacity_line_gap_cases(), _opacity_line_gap2_cases(), _signature_gap2_cases(), _histogram_gap3_cases(), _stream_gap2_cases(), _color_gap2_cases(), _timer_gap_cases(), _monitor_gap_cases(), _montage_gap2_cases(), _morph_gap_cases(), _morph_gap2_cases(), _morph_gap3_cases(), _morph_gap4_cases(), _quantize_gap5_cases(), _quantize_gap6_cases(), _quantize_gap7_cases(), _quantize_gap8_cases(), _quantize_gap9_cases(), _quantize_gap10_cases(), _cache_gap2_cases(), _fx_gap5_cases(), _fx_gap6_cases(), _fx_gap7_cases(), _fx_gap8_cases(), _fx_gap9_cases(), _fx_gap10_cases(), _fx_gap11_cases(), _matrix_gap3_cases(), _resample_gap_cases(), _blob_gap_cases(), _pixel_gap_cases(), _fx_gap12_cases(), _cache_gap3_cases(), _token_gap_cases(), _quantum_gap8_cases(), _fx_gap13_cases(), _quantum_gap9_cases(), _quantum_gap10_cases(), _morph_gap5_cases(), _fx_gap14_cases(), _fx_gap15_cases(), _color_gap3_cases(), _quantize_gap11_cases(), _windrv_cases(),
         _decode_cases(lists),
         _infra_cache_cases(), _infra_blob_cases(), _infra_filename_cases(),
         _infra_property_cases(),
-        _cipher_cases(), _info_cases(), _mvg_cases(),
+        _cipher_cases(), _info_cases(), _mvg_cases(), _gap_cases(),
     )
     return _unique(c for family in families for c in family)
 
@@ -1165,3 +5961,1146 @@ SVG = """<svg xmlns="http://www.w3.org/2000/svg" width="120" height="90" viewBox
   <text x="15" y="50" font-size="12" fill="black">svg text</text>
 </svg>
 """
+# string.c: StringToArgv counts a quoted argument as one, through the closing quote, before it
+# splits the text; an @file list (ExpandFilenames) whose file name holds a space is split by it,
+# in double and in single quotes
+GAP_STEP_CASES += [("@file list with a %s-quoted name holding a space" % kind,
+                    [["{C}/rose.miff", "-resize", "20x20", "a b.miff"],
+                     ["{C}/rose.miff", "-resize", "10x10", "c.miff"],
+                     ["@list.txt", "-append", "-format", "%w %h %n\\n", "info:"]],
+                    {"list.txt": "%sa b.miff%s c.miff\n" % (q, q)})
+                   for kind, q in (("double", '"'), ("single", "'"))]
+# profile.c: ProfileImage's colour transforms. The corpus holds no ICC profile, so the cases
+# build their own: a matrix/TRC display profile (RGB) or a kTRC one (GRAY), ICC v2, with every
+# byte below 0x80 so it fits a text case file (fixed-point values, tag offsets and the size are
+# chosen for it). Little CMS accepts them; two RGB profiles that differ only in gamma make a
+# real transform, two of the same length that differ only in their description make
+# CompareStringInfo (string.c) tell them apart
+def _icc_s15(v):
+    b = struct.pack(">i", int(round(v * 65536)))
+    assert all(x < 0x80 for x in b), v
+    return b
+def _icc(name, gamma256=0x0100, gray=False):
+    xyz = lambda x, y, z: b"XYZ " + b"\0" * 4 + _icc_s15(x) + _icc_s15(y) + _icc_s15(z)
+    curv = b"curv" + b"\0" * 4 + struct.pack(">IH", 1, gamma256) + b"\0\0"
+    text = name.encode() + b"\0"
+    desc = b"desc" + b"\0" * 4 + struct.pack(">I", len(text)) + text + b"\0" * 78
+    tags = [(b"desc", desc), (b"wtpt", xyz(1.0, 1.0, 1.0))]
+    if gray:
+        tags += [(b"kTRC", curv)]
+    else:
+        tags += [(b"rXYZ", xyz(0.4375, 0.25, 0.0625)), (b"gXYZ", xyz(0.3125, 0.4375, 0.125)),
+                 (b"bXYZ", xyz(0.25, 0.3125, 0.4375)), (b"rTRC", curv), (b"gTRC", curv), (b"bTRC", curv)]
+    off = 128 + 4 + 12 * len(tags); table = b""; data = b""
+    for sig, body in tags:  # every offset, length and the size with each byte below 0x80
+        body += b"\0" * (-len(body) % 4)
+        while ((off + len(data)) & 0xff) + len(body) > 0x7f or (off + len(data)) & 0x8080:
+            data += b"\0" * 4
+        table += sig + struct.pack(">II", off + len(data), len(body)); data += body
+    while (off + len(data)) & 0x8080:
+        data += b"\0" * 4
+    header = (struct.pack(">I", off + len(data)) + b"lcms" + bytes([2, 0x10, 0, 0]) + b"mntr"
+              + (b"GRAY" if gray else b"RGB ") + b"XYZ " + b"\0" * 12 + b"acspAPPL").ljust(128, b"\0")
+    out = header + struct.pack(">I", len(tags)) + table + data
+    assert all(x < 0x80 for x in out)
+    return out.decode("ascii")
+_ICC = {"a.icc": _icc("tiny"), "b.icc": _icc("tiny", 0x0200), "z.icc": _icc("tinz"),
+        "g.icc": _icc("gray", 0x0200, gray=True), "h.icc": _icc("grey", gray=True)}
+def _icc_case(label, args, src="rose", out=("out.miff",)):
+    return ("ICC " + label, [["{C}/%s.miff" % src] + args + list(out)], _ICC)
+GAP_STEP_CASES += [
+    _icc_case("assigned", ["-profile", "a.icc"]),
+    _icc_case("RGB to RGB", ["-profile", "a.icc", "-profile", "b.icc"]),
+    _icc_case("the same profile twice", ["-profile", "a.icc", "-profile", "a.icc"]),
+    _icc_case("same length, other description", ["-profile", "a.icc", "-profile", "z.icc"]),
+    _icc_case("black-point compensation", ["-profile", "a.icc", "-black-point-compensation", "-profile", "b.icc"]),
+    _icc_case("RGB to RGB with alpha", ["-profile", "a.icc", "-profile", "b.icc"], "rose_alpha"),
+    _icc_case("RGB to RGB at depth 16", ["-depth", "16", "-profile", "a.icc", "-profile", "b.icc"]),
+    _icc_case("RGB to RGB in floating point", ["-define", "quantum:format=floating-point", "-depth", "32",
+                                               "-profile", "a.icc", "-profile", "b.icc"]),
+    _icc_case("removed, then another", ["-profile", "a.icc", "+profile", "icc", "-profile", "b.icc"]),
+    _icc_case("CMYK image, RGB profiles", ["-colorspace", "cmyk", "-profile", "a.icc", "-profile", "b.icc"]),
+    _icc_case("RGB there and back", ["-profile", "a.icc", "-profile", "b.icc", "-profile", "a.icc"]),
+    _icc_case("RGB to gray", ["-profile", "a.icc", "-profile", "g.icc"]),
+    _icc_case("RGB to gray with alpha", ["-profile", "a.icc", "-profile", "g.icc"], "rose_alpha"),
+    _icc_case("gray to RGB", ["-colorspace", "gray", "-profile", "g.icc", "-profile", "a.icc"]),
+    _icc_case("gray to RGB with alpha", ["-colorspace", "gray", "-profile", "g.icc", "-profile", "a.icc"], "rose_alpha"),
+    _icc_case("gray to gray", ["-colorspace", "gray", "-profile", "g.icc", "-profile", "h.icc"]),
+    _icc_case("RGB to gray, type", ["-profile", "a.icc", "-profile", "g.icc", "-format", "%[type]\\n"], out=("info:",)),
+    _icc_case("RGB to gray with alpha, type", ["-profile", "a.icc", "-profile", "g.icc", "-format", "%[type]\\n"],
+              "rose_alpha", out=("info:",)),
+]
+# ... a profile that is not ICC at all (Little CMS's error reaches stderr through the handler
+# ProfileImage installs), on an image without and with a profile, and a transform under
+# -monitor (its progress lines)
+_ICC_BAD = dict(_ICC, **{"x.icc": "A" * 200})
+GAP_STEP_CASES += [
+    ("ICC not a profile", [["{C}/rose.miff", "-profile", "x.icc", "out.miff"]], _ICC_BAD),
+    ("ICC not a profile, after one", [["{C}/rose.miff", "-profile", "a.icc", "-profile", "x.icc", "out.miff"]], _ICC_BAD),
+    _icc_case("RGB to RGB under -monitor", ["-profile", "a.icc", "-monitor", "-profile", "b.icc"]),
+    _icc_case("RGB to gray under -monitor", ["-profile", "a.icc", "-monitor", "-profile", "g.icc"]),
+]
+# ... and profiles built on lut16 tables (A2B0 and B2A0, two grid points, every table value at
+# most 0x7F7F so its bytes stay below 0x80): CMYK (an output profile), Lab and XYZ (colour space
+# profiles). They reach ProfileImage's CMYK, Lab and XYZ branches as source and as target, and
+# make black-point compensation matter (the matrix profiles' black is already zero)
+def _icc_lut16(nin, nout, rows):
+    body = b"mft2" + b"\0" * 4 + bytes([nin, nout, 2, 0])
+    body += b"".join(struct.pack(">i", 65536 if i == j else 0) for i in range(3) for j in range(3))
+    body += struct.pack(">HH", 2, 2) + struct.pack(">HH", 0, 0x7F7F) * nin
+    body += b"".join(struct.pack(">H", v) for row in rows for v in row)
+    return body + struct.pack(">HH", 0, 0x7F7F) * nout
+def _icc_corners(nin, f):
+    rows = []
+    for k in range(2 ** nin):
+        bits = [(k >> (nin - 1 - i)) & 1 for i in range(nin)]
+        row = [min(0x7F7F, max(0, int(v))) & 0x7F7F for v in f(bits)]
+        rows.append([v if (v & 0xFF) < 0x80 else (v & 0x7F00) | 0x7F for v in row])
+    return rows
+def _icc_with_luts(name, space, pcs, cls, a2b, b2a):
+    text = name.encode() + b"\0"
+    desc = b"desc" + b"\0" * 4 + struct.pack(">I", len(text)) + text + b"\0" * 78
+    white = b"XYZ " + b"\0" * 4 + _icc_s15(1.0) * 3
+    tags = [(b"desc", desc), (b"wtpt", white), (b"A2B0", a2b), (b"B2A0", b2a)]
+    off = 128 + 4 + 12 * len(tags); table = b""; data = b""
+    for sig, body in tags:
+        body += b"\0" * (-len(body) % 4)
+        while len(body) & 0x8080:  # trailing zeros after a tag's content are ignored
+            body += b"\0" * 4
+        while (off + len(data)) & 0x8080:
+            data += b"\0" * 4
+        table += sig + struct.pack(">II", off + len(data), len(body)); data += body
+    while (off + len(data)) & 0x8080:
+        data += b"\0" * 4
+    header = (struct.pack(">I", off + len(data)) + b"lcms" + bytes([2, 0x10, 0, 0]) + cls + space + pcs
+              + b"\0" * 12 + b"acspAPPL").ljust(128, b"\0")
+    out = header + struct.pack(">I", len(tags)) + table + data
+    assert all(x < 0x80 for x in out)
+    return out.decode("ascii")
+def _icc_cmyk():
+    a2b = _icc_lut16(4, 3, _icc_corners(4, lambda b: [0x7F7F * (1 - b[0]) * (1 - b[3]) * (0.75 + 0.25 * (1 - b[1])),
+                                                       0x7F7F * (1 - b[1]) * (1 - b[3]) * (0.75 + 0.25 * (1 - b[2])),
+                                                       0x7F7F * (1 - b[2]) * (1 - b[3]) * (0.75 + 0.25 * (1 - b[0]))]))
+    b2a = _icc_lut16(3, 4, _icc_corners(3, lambda b: [0x7F7F * (1 - b[0]), 0x7F7F * (1 - b[1]), 0x7F7F * (1 - b[2]),
+                                                       0x2020 * (1 - max(b))]))
+    return _icc_with_luts("cmyk", b"CMYK", b"XYZ ", b"prtr", a2b, b2a)
+def _icc_space(name, sig):
+    rows = _icc_corners(3, lambda b: [0x7F7F * b[0], 0x4040 + 0x1010 * b[1], 0x4040 + 0x2020 * b[2]])
+    return _icc_with_luts(name, sig, sig, b"spac", _icc_lut16(3, 3, rows), _icc_lut16(3, 3, rows))
+_ICC_LUT = dict(_ICC, **{"c.icc": _icc_cmyk(), "l.icc": _icc_space("lab", b"Lab "), "x.icc": _icc_space("xyz", b"XYZ ")})
+def _icc_lut_case(label, profiles, src="rose", out=("out.miff",), extra=()):
+    return ("ICC " + label, [["{C}/%s.miff" % src] + list(extra) + [a for p in profiles for a in ("-profile", p)]
+                             + list(out)], _ICC_LUT)
+GAP_STEP_CASES += [
+    _icc_lut_case("RGB to CMYK", ["a.icc", "c.icc"]),
+    _icc_lut_case("RGB to CMYK and back", ["a.icc", "c.icc", "a.icc"]),
+    _icc_lut_case("RGB to CMYK with alpha", ["a.icc", "c.icc"], "rose_alpha"),
+    _icc_lut_case("RGB to CMYK, black-point compensation", ["a.icc", "c.icc"], extra=("-black-point-compensation",)),
+    _icc_lut_case("RGB to Lab", ["a.icc", "l.icc"]),
+    _icc_lut_case("RGB to Lab and back", ["a.icc", "l.icc", "a.icc"]),
+    _icc_lut_case("RGB to XYZ", ["a.icc", "x.icc"]),
+    _icc_lut_case("RGB to XYZ and back", ["a.icc", "x.icc", "a.icc"]),
+    _icc_lut_case("RGB to CMYK, type", ["a.icc", "c.icc"], out=("-format", "%[type]\\n", "info:")),
+    _icc_lut_case("RGB to CMYK with alpha, type", ["a.icc", "c.icc"], "rose_alpha", out=("-format", "%[type]\\n", "info:")),
+]
+# profile.c: an 8BIM block holding an IPTC record and an ICC profile (the hand-built one).
+# Reading it gives the image both profiles (GetProfilesFromResourceBlock); a new ICC profile,
+# or one removed, rewrites the 8BIM resource in place (WriteTo8BimProfile), padding an
+# odd-length profile to an even one
+def _8bim_with_icc(icc):
+    return (_8bim_resource(0x0404, b"", b"\x1c\x02\x78\x00\x05hello")
+            + _8bim_resource(0x040F, b"", icc)).decode("ascii")
+_ICC_ODD = _icc("tiny") + "\0"  # one byte past the declared size
+_ICC_8BIM = dict(_ICC, **{"x.8bim": _8bim_with_icc(_ICC["a.icc"].encode()),
+                          "o.8bim": _8bim_with_icc(_ICC_ODD.encode()), "o.icc": _ICC_ODD})
+GAP_STEP_CASES += [("8BIM with ICC: %s" % label, [["{C}/rose.miff", "-profile", load] + args], _ICC_8BIM)
+                   for label, load, args in (
+                       ("profiles listed", "x.8bim", ["-format", "%[profiles]|%[icc:description]\\n", "info:"]),
+                       ("converted", "x.8bim", ["-profile", "b.icc", "-write", "8bim:out.8bim", "out.miff"]),
+                       ("ICC removed", "x.8bim", ["+profile", "icc", "8bim:out.8bim"]),
+                       ("IPTC removed", "x.8bim", ["+profile", "iptc", "8bim:out.8bim"]),
+                       ("odd-length ICC, converted", "o.8bim", ["-profile", "b.icc", "8bim:out.8bim"]),
+                       ("odd-length ICC set", "x.8bim", ["-profile", "o.icc", "8bim:out.8bim"]),
+                       ("the same ICC set", "x.8bim", ["-profile", "a.icc", "8bim:out.8bim"]))]
+# profile.c: Sync8BimProfile rewrites the 8BIM resolution resource (0x03ED) from the image's
+# density as the image is written. The resource id has a byte above 0x7F, so the 8BIM comes
+# from a PSD the first step writes (the PSD writer adds the resource; the reader keeps the
+# block as the image's 8BIM profile); the density is then changed per inch and per centimetre
+GAP_STEP_CASES += [("8BIM resolution from a PSD, new density %s" % units,
+                    [["{C}/rose.miff", "-units", "PixelsPerInch", "-density", "72", "a.psd"],
+                     ["a.psd[0]", "-units", units, "-density", density, "8bim:out.8bim"]], {})
+                   for units, density in (("PixelsPerInch", "150x100"), ("PixelsPerCentimeter", "40x30"))]
+# profile.c: SyncExifProfile's limits, with small hand-made IFDs in a JPEG resized (so the sync
+# rewrites ImageWidth): an IFD that exactly fits the block, and entries before ImageWidth that
+# a bound one off would stop at (a DOUBLE and a FLOAT, the last two formats; no components)
+def _exif_ifd0(entries, tail=b""):
+    return (b"II*\0" + struct.pack("<IH", 8, len(entries)) + b"".join(entries) + struct.pack("<I", 0) + tail)
+def _exif_entry(tag, fmt, count, field):
+    return struct.pack("<HHI", tag, fmt, count) + field
+def _exif_uri(block):
+    app1 = b"Exif\0\0" + block
+    jpeg = _TINY_JPEG[:2] + b"\xff\xe1" + struct.pack(">H", len(app1) + 2) + app1 + _TINY_JPEG[2:]
+    return "inline:data:image/jpeg;base64," + base64.b64encode(jpeg).decode()
+_EXIF_W = _exif_entry(0x0100, 3, 1, struct.pack("<HH", 70, 0))
+_EXIF_H = _exif_entry(0x0101, 3, 1, struct.pack("<HH", 46, 0))
+GAP_STEP_CASES += [("EXIF sync, %s" % label, [[_exif_uri(block), "-resize", "50%", "out.jpg"]], {})
+                   for label, block in (
+                       ("an IFD that exactly fits", _exif_ifd0([_EXIF_W, _EXIF_H])),
+                       ("a DOUBLE before the width",
+                        _exif_ifd0([_exif_entry(0x0110, 12, 1, struct.pack("<I", 50)), _EXIF_W, _EXIF_H],
+                                   struct.pack("<d", 1.5))),
+                       ("a FLOAT before the width",
+                        _exif_ifd0([_exif_entry(0x0110, 11, 1, struct.pack("<f", 1.5)), _EXIF_W, _EXIF_H])),
+                       ("no components before the width",
+                        _exif_ifd0([_exif_entry(0x010F, 2, 0, b"\0" * 4), _EXIF_W, _EXIF_H])))]
+# image.c: AppendImages under gravity (GravityAdjustGeometry offsets the smaller image across
+# the stack, which way depending on -append or +append), and CopyImagePixels through -copy:
+# a region with a source offset, one that overruns the right or the bottom edge (refused), one
+# at the corner, and one under -monitor
+GAP_STEP_CASES += [("rose and half a rose, -gravity %s %sappend" % (grav, sign),
+                    [["{C}/rose.miff", "(", "{C}/rose.miff", "-resize", "50%", ")", "-gravity", grav,
+                      sign + "append", "out.miff"]], {})
+                   for grav, sign in (("center", "-"), ("southeast", "+"), ("east", "-"), ("south", "+"))]
+GAP_STEP_CASES += [("-copy %s %s%s" % (geometry, offset, " under -monitor" if monitor else ""),
+                    [["{C}/rose.miff", "(", "{C}/rose.miff", "-negate", ")"] + (["-monitor"] if monitor else [])
+                     + ["-copy", geometry, offset, "out.miff"]], {})
+                   for geometry, offset, monitor in (("20x10+5+7", "+30+20", False), ("20x10+5+7", "+60+20", False),
+                                                     ("20x10+5+7", "+30+40", False), ("20x10+5+7", "+30+20", True),
+                                                     ("20x10", "+50+36", False))]
+# image.c: SetImageInfoFromExtension, with a PNG written under extensions that say otherwise:
+# .edit and .show (in its table of explicit formats with no coder: the extension is trusted
+# and the read fails), .rgb (trust withdrawn: often SGI) and .gray (an explicit raw format)
+GAP_STEP_CASES += [("a PNG named %s, read" % name,
+                    [["{C}/rose.miff", "-resize", "8x6", "png:" + name], read + [name, "-format", "%m %w %h\\n", "info:"]], {})
+                   for name, read in (("x.edit", []), ("a.show", []), ("x.rgb", []), ("x.gray", ["-size", "8x6"]))]
+# annotate.c: RenderFreetype takes the vertical resolution from -density's second value
+GAP_STEP_CASES += [("label at -density 72x144", [["-font", "{C}/Generic.ttf", "-density", "72x144", "-pointsize", "20",
+                                                  "label:Hi", "out.miff"]], {})]
+# image.c: SetImageMask with a write mask smaller than the image: past the mask's last column
+# and row the image is left unmasked, where a bound one off would read the mask's edge
+GAP_STEP_CASES += [("write mask smaller than the image, %s" % colour,
+                    [["-size", "60x40", "xc:" + colour, "m.miff"],
+                     ["{C}/rose.miff", "-write-mask", "m.miff", "-negate", "+write-mask", "out.miff"]], {})
+                   for colour in ("white", "black")]
+# image.c: ResetImagePage with a relative offset (-repage ...!), which adds to the page offset
+GAP_STEP_CASES += [("-repage %s after 100x80+10+5" % g,
+                    [["{C}/rose.miff", "-repage", "100x80+10+5", "-repage", g, "-format", "%g\\n", "info:"]], {})
+                   for g in ("+3+2!", "+3!")]
+# image.c: IsValidFormatSpecifier refuses a %0d (a lone zero is no width) in an output name
+# written frame by frame; SetImageAlpha under a write mask of exactly one half (only a mask
+# above one half lets the alpha through)
+GAP_STEP_CASES += [
+    ("two frames to o_%0d.miff, +adjoin", [["{C}/rose.miff", "{C}/rose.miff", "+adjoin", "o_%0d.miff"]], {}),
+    ("alpha set under a write mask of one half",
+     [["-size", "70x46", "xc:gray(50%)", "h.miff"],
+      ["{C}/rose.miff", "-write-mask", "h.miff", "-alpha", "set", "-channel", "A", "-evaluate", "set", "50%",
+       "+channel", "+write-mask", "out.miff"]], {}),
+]
+# Cases that call the API through imdriver (tools/oracle/driver: the owner allowed a C driver,
+# 2026-10-03), for code the command line cannot reach. draw.c: GradientImage with each spread
+# method (every caller in the library passes PadSpread), linear and radial, with a short
+# vector or radii so the spread matters, an angle, an extent and a centre. image.c: the read,
+# write and composite masks under four operations, GetImageMask of each, and AcquireImage
+# from ImageInfo fields the command line overwrites. Policy, locale and mime lists, and a
+# mime lookup (the driver sorts the mime list: GetMimeList's order varies between runs)
+def _driver(*args):
+    return [["@driver"] + list(args)]
+_DRIVER_CASES = []
+for _drv_type, _drv_art in (("linear", "gradient:vector=10,5,20,8"), ("radial", "gradient:radii=6,4")):
+    for _drv_spread in ("pad", "reflect", "repeat"):
+        _DRIVER_CASES.append(("driver gradient %s %s, %s" % (_drv_type, _drv_spread, _drv_art),
+                              _driver("gradient", _drv_type, _drv_spread, "40x20", _drv_art, "red:0.0", "yellow:0.4",
+                                      "blue:1.0", "out.miff")))
+_DRIVER_CASES += [
+    ("driver gradient linear reflect at 30 degrees",
+     _driver("gradient", "linear", "reflect", "40x20", "gradient:angle=30", "red:0.2", "blue:0.7", "out.miff")),
+    ("driver gradient radial repeat, maximum extent, off centre",
+     _driver("gradient", "radial", "repeat", "40x20", "gradient:extent=Maximum", "gradient:center=10,8",
+             "red:0.1", "blue:0.5", "out.miff")),
+    ("driver gradient radial reflect, diagonal extent, equal stops",
+     _driver("gradient", "radial", "reflect", "40x20", "gradient:extent=Diagonal", "red:0.3", "green:0.3",
+             "blue:0.9", "out.miff")),
+]
+for _drv_kind in ("read", "write", "composite"):
+    for _drv_op in ("negate", "blur", "composite", "colorize"):
+        _DRIVER_CASES.append(("driver %s mask, %s" % (_drv_kind, _drv_op),
+                              _driver("mask", _drv_kind, "{C}/rose.miff", "{C}/bilevel.miff", _drv_op, "out.miff")))
+    _DRIVER_CASES.append(("driver %s mask, GetImageMask" % _drv_kind,
+                          _driver("getmask", _drv_kind, "{C}/rose.miff", "{C}/bilevel.miff", "out.miff")))
+_DRIVER_CASES += [
+    ("driver AcquireImage, size, page, density, depth, quality, units, extract, interlace",
+     _driver("acquire", "size=30x20+2+3", "page=100x80+5+6", "density=72x96", "depth=8", "quality=90",
+             "units=PixelsPerInch", "extract=10x10+1+1", "interlace=Plane")),
+    ("driver AcquireImage, per centimetre, options",
+     _driver("acquire", "size=30x20", "page=+5+6", "density=150", "units=PixelsPerCentimeter", "dither=false",
+             "ping=1")),
+    ("driver AcquireImage, extract and page alone, colour options",
+     _driver("acquire", "extract=10x10", "page=100x80", "background=red", "border-color=blue",
+             "matte-color=green", "delay=5", "dispose=Background")),
+    ("driver AcquireImage, odd geometries", _driver("acquire", "size=30", "extract=50%", "page=A4")),
+]
+_DRIVER_CASES += [("driver %s list %r" % (kind, pattern), _driver("list", kind, pattern))
+                  for kind, pattern in (("policy", "*"), ("policy", "system*"), ("locale", "*"),
+                                        ("locale", "Magick/*"), ("mime", "*"), ("mime", "image/*"), ("mime", "*nope*"))]
+_DRIVER_CASES += [("driver mime of %s" % name, _driver("mime", "{C}/%s" % name)) for name in ("rose.miff", "bilevel.miff")]
+# string.c through imdriver: functions the command line cannot reach, or reaches only where the
+# result is not observable. EscapeString (no MagickCore caller at all), SanitizeString (its
+# replacement loop), CompareStringInfo (the length branch that decides the sign), the truncation
+# arithmetic of ConcatenateMagickString, and ConfigureFileToStringInfo. All are pure of the
+# machine's fonts/locale, so the kills are portable.
+_DRIVER_CASES += [
+    ("driver string escape backslash and percent", _driver("string", "escape", "a\\b%c%", "%")),
+    ("driver string escape with a quote escape", _driver("string", "escape", 'say "hi" \\ok', '"')),
+    ("driver string sanitize control bytes", _driver("string", "sanitize", "61010263")),
+    ("driver string sanitize leading and trailing control", _driver("string", "sanitize", "0141420a")),
+    ("driver string compare shorter first", _driver("string", "compare", "2", "5")),
+    ("driver string compare longer first", _driver("string", "compare", "5", "2")),
+    ("driver string concat truncating", _driver("string", "concat", "abc", "defgh", "6")),
+    ("driver string concat exact fit", _driver("string", "concat", "abcd", "ef", "7")),
+    ("driver string concat with room", _driver("string", "concat", "abc", "defgh", "100")),
+]
+GAP_STEP_CASES += [(label, steps, {}) for label, steps in _DRIVER_CASES]
+# ConfigureFileToStringInfo reads a file (it maps it); the case ships one.
+GAP_STEP_CASES += [("driver string configfile", _driver("string", "configfile", "cf.dat"),
+                    {"cf.dat": "hello world\n12345\x01\x02end"})]
+# annotate.c through imdriver: GetTypeMetrics and GetMultilineTypeMetrics, printing the whole
+# TypeMetric. label:, caption: and -annotate size and place text from width/ascent/descent/
+# bounds.x1/bounds.y2 only, and GetMultilineTypeMetrics overwrites height, so RenderFreetype's
+# height, max_advance, initial bounds and underline never reach a command-line output. Also an
+# '@'-prefixed font (the path-policy check, allowed and denied), a font encoding, and Latin-1 text
+# (invalid UTF-8, converted).
+_METRIC_POLICY = {".config/ImageMagick/policy.xml":
+                  '<policymap>\n  <policy domain="path" rights="none" pattern="@*Narrow*"/>\n</policymap>\n'}
+GAP_STEP_CASES += [("driver metrics: %s" % label, _driver("metrics", *args), files)
+                   for label, args, files in (
+    ("Generic 20 Agjy", ("{C}/Generic.ttf", "20", "Agjy"), {}),
+    ("Narrow 20 two lines", ("{C}/Narrow.ttf", "20", "one\ntwo"), {}),
+    ("Generic 14 stroked", ("{C}/Generic.ttf", "14", "Hi", "stroke=3"), {}),
+    ("Generic 12 without antialiasing", ("{C}/Generic.ttf", "12", "AV", "antialias=0"), {}),
+    ("Generic 16 kerning 2", ("{C}/Generic.ttf", "16", "Ab", "kerning=2"), {}),
+    ("Generic 18 right to left", ("{C}/Generic.ttf", "18", "Wq", "direction=rtl"), {}),
+    ("Generic 20 a space only", ("{C}/Generic.ttf", "20", " "), {}),
+    ("Generic 20 no text", ("{C}/Generic.ttf", "20", ""), {}),
+    ("Generic 16 at 144 dpi", ("{C}/Generic.ttf", "16", "Mix", "density=144"), {}),
+    ("Narrow 9 punctuation", ("{C}/Narrow.ttf", "9", ".,;"), {}),
+    ("Generic 30 three descender lines", ("{C}/Generic.ttf", "30", "g\nj\ny"), {}),
+    ("AppleRoman encoding", ("{C}/Generic.ttf", "20", "Abc", "encoding=AppleRoman"), {}),
+    ("AdobeStandard encoding (not in the font)", ("{C}/Generic.ttf", "20", "Ab", "encoding=AdobeStandard"), {}),
+    ("Latin-1 text", ("{C}/Generic.ttf", "20", "x", "texthex=636166e92078"), {}),
+    ("an @ font", ("@{C}/Generic.ttf", "20", "At"), {}),
+    ("an @ font a path policy denies", ("@{C}/Narrow.ttf", "20", "At"), _METRIC_POLICY),
+    ("an @ font a path policy does not deny", ("@{C}/Generic.ttf", "20", "At"), _METRIC_POLICY),
+    ("an @ font that does not exist", ("@nonexistent.ttf", "20", "At"), {}),
+    # Quirk.ttf: kerning pairs (ComplexTextLayout), zero ascender/descender (the sanitised
+    # metrics), and no Unicode map or glyph names (the fallback to the first character map)
+    ("Quirk 30 kerning pairs", ("{C}/Quirk.ttf", "30", "AVAT"), {}),
+    ("Quirk 30 kerning pairs right to left", ("{C}/Quirk.ttf", "30", "AVAT", "direction=rtl"), {}),
+    ("Quirk 30 more kerning pairs", ("{C}/Quirk.ttf", "30", "ToWaLT"), {}),
+    ("Quirk 20 no kerning pair", ("{C}/Quirk.ttf", "20", "Hello"), {}),
+    ("Quirk 20 two kerned lines", ("{C}/Quirk.ttf", "20", "AV\nTo"), {}),
+    ("Quirk 30 Latin-1 text", ("{C}/Quirk.ttf", "30", "x", "texthex=e9e8fc"), {}))]
+# memory.c through imdriver: allocations exactly at and one byte over the max-memory-request a
+# policy sets (raised to 16 MiB at least), through AcquireQuantumMemory, ResizeQuantumMemory and
+# AcquireAlignedMemory. A command-line case would need a 16 MiB input to meet that boundary.
+GAP_STEP_CASES += [("driver memory at the max-memory-request", _driver("memory"),
+                    {".config/ImageMagick/policy.xml":
+                     '<policymap>\n  <policy domain="system" name="max-memory-request" value="16MiB"/>\n</policymap>\n'})]
+# policy.c through imdriver: IsPathAuthorized over a tree the driver builds in the case directory
+# with symbolic links (a case's files cannot be links): a link to a directory, one in the middle of
+# a path, one to a file; relative, absolute, './', '//' and trailing-separator forms and lengths
+# around MagickPathExtent. With a policy forbidding symlink follow, IsPathContainsSymlink decides.
+_PATHAUTH = ("real/f.txt", "link/f.txt", "flink", "real/slink/g.txt", "real//f.txt", "real/./f.txt",
+             "./link/f.txt", "real/", "link/", "+real/f.txt", "+link/f.txt", "/", "//", "link", "real/sub/",
+             "nosuch/f.txt", "L4085:/f.txt", "L4089:/f.txt", "L4090:/f.txt", "L4091:/f.txt", "L4095:/x",
+             "L4096:/x", "L5000:/x", "link//f.txt")
+GAP_STEP_CASES += [
+    ("driver pathauth, symlinks followed", _driver("pathauth", *_PATHAUTH), {}),
+    ("driver pathauth, symlink follow forbidden", _driver("pathauth", *_PATHAUTH),
+     {".config/ImageMagick/policy.xml":
+      '<policymap>\n  <policy domain="system" name="symlink" rights="none" pattern="follow"/>\n</policymap>\n'})]
+# image.c through imdriver: AcquireNextImage (the next frame is named from image_info when one is
+# given, shares the image's blob) and DisassociateImageStream (the next frame then has a blob of its
+# own, so closing it leaves the image's stream readable). Coders always pass an image_info naming the
+# same file, so the command line cannot tell either apart.
+GAP_STEP_CASES += [("driver nextimage", _driver("nextimage", "d.bin"), {"d.bin": "ABCDEFGHIJ"})]
+# draw.c through imdriver: GetDrawInfo from image options and CloneDrawInfo of a draw info with an
+# id, a primitive, a metrics file, a clip mask and gradient stops, both printed field by field. The
+# command line clones draw infos whose id, metrics and clip mask are unset, and sets few of the
+# options GetDrawInfo reads.
+_DRAWINFO_OPTIONS = ("encoding=AppleRoman", "family=Serif", "fill=red", "gravity=East", "interline-spacing=3",
+                     "interword-spacing=2", "kerning=1.5", "stroke=blue", "strokewidth=2.5", "style=Italic",
+                     "undercolor=yellow", "weight=Bold", "word-break=break-all", "direction=right-to-left")
+GAP_STEP_CASES += [("driver drawinfo: %s" % label, _driver("drawinfo", *args), {}) for label, args in (
+    ("no options", ()), ("every option", _DRAWINFO_OPTIONS), ("a numeric weight", ("weight=650",)),
+    ("a weight that is no name or number", ("weight=nonsense",)))]
+# configure.c through imdriver: AcquireConfigureCache parses only the first configure.xml it finds,
+# the build's, so a case's own configure.xml is never read (see the configure case above). The
+# driver puts the case directory first on MAGICK_CONFIGURE_PATH before MagickCoreGenesis, so
+# LoadConfigureCache parses the case's file: a DOCTYPE with a quoted '>' and brackets, a stray ']',
+# a quoted SYSTEM id, a comment holding '>', one never closed, an include (which never loads: see
+# MUTATION.md, FileToXML), a stealth entry, and files just over 4 KB.
+_CFG_E = ('<configure name="CASE-ONE" value="first"/>\n'
+          '  <configure name="CASE-HIDDEN" value="h" stealth="True"/>\n')
+_CFG_FILES = {
+    "a DOCTYPE, a comment and an include":
+        '<?xml version="1.0"?>\n<!DOCTYPE configuremap [\n  <!ATTLIST configure name CDATA "x]>y" '
+        'value CDATA #IMPLIED>\n]>\n<!-- a comment with a > inside -->\n<configuremap>\n'
+        '  <include file="more.xml"/>\n  ' + _CFG_E + '</configuremap>\n',
+    "a stray bracket": '<!DOCTYPE configuremap SYSTEM "t" ]>\n<configuremap>\n  ' + _CFG_E + '</configuremap>\n',
+    "a quoted SYSTEM id": "<!DOCTYPE configuremap SYSTEM 'a>b'>\n<configuremap>\n  " + _CFG_E + '</configuremap>\n',
+    "a comment never closed": '<configuremap>\n  ' + _CFG_E + '</configuremap>\n<!-- never closed ',
+    "just over 4 KB, the padding first": '<configuremap>\n  <!-- ' + 'p' * 4040 + ' -->\n  ' + _CFG_E + '</configuremap>\n',
+    "just over 4 KB, the padding last": '<configuremap>\n  ' + _CFG_E + '  <!-- ' + 'q' * 3990 + ' -->\n</configuremap>\n',
+    "an absolute include": '<configuremap>\n  <include file="/nonexistent/more.xml"/>\n  ' + _CFG_E + '</configuremap>\n',
+}
+GAP_STEP_CASES += [("driver configure: %s" % name, _driver("configure"), {"configure.xml": xml})
+                   for name, xml in _CFG_FILES.items()]
+# log.c through imdriver: a case's log.xml is read, but -list log orders it by path among the build's
+# own, so no command-line case can compare it (see the locale cases). With the case directory first
+# on MAGICK_CONFIGURE_PATH the case's log.xml is parsed first and governs logging; the driver prints
+# ListLogInfo's section for it (path as CASE), IsEventLogging, and logs through the case's handler
+# with a format of domain and message only (no times, pids or line numbers).
+def _log_xml(attrs, before=""):
+    return "<logmap>\n" + before + "  <log " + attrs + "/>\n</logmap>\n"
+_LOG_BASE = 'events="None" output="stdout" filename="log-%g.txt" generations="3" format="%d %e"'
+_LOG_FILES = (
+    ("a 2000-byte limit", _log_xml(_LOG_BASE + ' limit="2000"'), ("Annotate",)),
+    ("a limit of exactly 1024", _log_xml(_LOG_BASE + ' limit="1024"'), ()),
+    ("a limit below 1024 (megabytes)", _log_xml(_LOG_BASE + ' limit="500"'), ()),
+    ("an unlimited limit", _log_xml(_LOG_BASE + ' limit="unlimited"'), ()),
+    ("handlers with spaces", _log_xml('events="None" output=" console ,  stdout" format="%d %e"'), ("Trace",)),
+    ("events set in the file", _log_xml('events="Annotate" output="stdout" format="%d %e"'), ("Annotate",)),
+    ("a stealth entry", _log_xml(_LOG_BASE + ' stealth="True"'), ()),
+    ("a DOCTYPE, comments and an include",
+     '<?xml version="1.0"?>\n<!DOCTYPE logmap [\n  <!ATTLIST log events CDATA "x]>y">\n]>\n'
+     '<!-- a > in a comment -->\n<logmap>\n  <include file="more.xml"/>\n  <log ' + _LOG_BASE +
+     '/>\n</logmap>\n<!-- unclosed', ("Annotate",)))
+GAP_STEP_CASES += [("driver logcfg: %s" % name, _driver("logcfg", *args), {"log.xml": xml})
+                   for name, xml, args in _LOG_FILES]
+# And events through the case's handlers: logcfg EVENTS COUNT LEN [method] logs COUNT annotate
+# events of LEN characters, then two from modules named without a directory and with a leading
+# separator, and lists the log files the file handler left. Formats use only the reproducible
+# letters (not %i, %p, %r, %t, %u); %l is a line of imdriver.c, %m and %f name its function.
+_LOG_FILES2 = (
+    ('every reproducible format letter, escapes and a trailing %', '<logmap>\n  <log events="None" output="stdout" format="%c|%d|%e|%f|%l|%m|%n|%v|%%|%z|a\\rb\\nc|end%"/>\n</logmap>\n', ('Annotate', '2', '12'), {}),
+    ('no format', '<logmap>\n  <log events="None" output="stdout"/>\n</logmap>\n', ('Annotate', '1', '5'), {}),
+    ('events of 5000 characters, three times over', '<logmap>\n  <log events="None" output="stdout" format="%e|%e|%e"/>\n</logmap>\n', ('Annotate', '2', '5000'), {}),
+    ('an event of 4090 characters', '<logmap>\n  <log events="None" output="stdout" format="[%e]"/>\n</logmap>\n', ('Annotate', '1', '4090'), {}),
+    ('a file handler rotating three generations at 1024 bytes', '<logmap>\n  <log events="None" output="file" filename="log-%g.xml" generations="3" limit="1024" format="%d %e"/>\n</logmap>\n', ('Annotate', '40', '60'), {}),
+    ('a file handler of one generation', '<logmap>\n  <log events="None" output="file" filename="log-%g.xml" generations="1" limit="1024" format="%d %e"/>\n</logmap>\n', ('Annotate', '40', '60'), {}),
+    ('a file handler appending to an existing log', '<logmap>\n  <log events="None" output="file" filename="log-%g.xml" generations="2" limit="2000" format="%d %e"/>\n</logmap>\n', ('Annotate', '5', '10'), {'log-0.xml': 'earlier\n'}),
+    ('a log method', '<logmap>\n  <log events="None" output="stdout" format="%d %e"/>\n</logmap>\n', ('Annotate', '2', '8', 'method'), {}),
+    ('console, debug, event and stderr handlers', '<logmap>\n  <log events="None" output="console,debug,event,stderr" format="%d %e"/>\n</logmap>\n', ('Annotate', '2', '8'), {}),
+    ('a file handler rotating two generations', '<logmap>\n  <log events="None" output="file" filename="log-%g.xml" generations="2" limit="1024" format="%d %e"/>\n</logmap>\n', ('Annotate', '40', '60'), {}),
+    ('a log element inside a comment', '<logmap>\n  <!-- <log events="Annotate" output="stdout" format="hidden %e"/> -->\n  <log events="None" output="stdout" format="%d %e"/>\n</logmap>\n', ('Annotate', '1', '5'), {}),
+    ('two log elements in one map', '<logmap>\n  <log events="None" output="stdout" format="%d %e"/>\n  <log events="None" output="stderr" format="second %e"/>\n</logmap>\n', ('Annotate', '1', '5'), {}),
+    ('a file handler whose directory does not exist', '<logmap>\n  <log events="None" output="file" filename="nodir/log-%g.xml" format="%d %e"/>\n</logmap>\n', ('Annotate', '3', '5'), {}),
+    ('modules with no directory and a leading separator', '<logmap>\n  <log events="None" output="stdout" format="%m|%f|%l|%e"/>\n</logmap>\n', ('Annotate', '0', '1'), {}),
+    ('a log file that reaches its limit exactly', '<logmap>\n  <log events="None" output="file" filename="log-%g.xml" generations="3" limit="1024" format="%e"/>\n</logmap>\n', ('Annotate', '40', '21'), {}),
+    ('two log maps in one file', '<logmap>\n  <log events="None" output="stdout" format="first %e"/>\n</logmap>\n<logmap>\n  <log events="None" output="stdout" format="second %e"/>\n</logmap>\n', ('Annotate', '1', '5'), {}),
+    ('an event mask that is not one', '<logmap>\n  <log events="Annotate" output="stdout" format="%d %e"/>\n</logmap>\n', ('Nonsense', '1', '4'), {}),
+)
+_LOG_FILES2 += (("a format of 60 plain characters (60 buffer doublings if the growth test is wrong)",
+                 '<logmap>\n  <log events="None" output="stdout" format="%s%%e"/>\n</logmap>\n' % ("x" * 60),
+                 ("Annotate", "1", "5"), {}),)
+GAP_STEP_CASES += [("driver logcfg: %s" % name, _driver("logcfg", *args), dict({"log.xml": xml}, **extra))
+                   for name, xml, args, extra in _LOG_FILES2]
+# mime.c GetMimeInfo through imdriver: its byte, short, long and string matching reads mime.xml's
+# data-type, offset, mask and endian fields, and no command-line case reaches it with an entry the
+# build's mime.xml does not have. With the case directory first on MAGICK_CONFIGURE_PATH the case's
+# mime.xml is parsed first; its entries have priority -100, so a match beats every build entry. Each
+# lookup is a hex byte string, sized at and around the offset+4 (or offset+extent+length) bound;
+# a lookup that misses falls to whichever build entry matches (pattern-only entries match any bytes
+# when no filename is given), and - (a NULL magic) shows the head of the list, where the last match
+# was moved.
+def _mime_xml(*entries, include=""):
+    return "<mimemap>\n" + include + "".join("  <mime %s/>\n" % e for e in entries) + "</mimemap>\n"
+_MIME_P = ' priority="-100"'
+_MIME_FILES = (
+    ("a byte at offset 2",
+     _mime_xml('type="case/byte" description="byte at 2" data-type="byte" offset="2" magic="0x41"' + _MIME_P),
+     ("000041000000", "0000410000", "000041", "000042000000", "-")),
+    ("a byte after a relative and an absolute include",
+     _mime_xml('type="case/byte" description="byte at 2" data-type="byte" offset="2" magic="0x41"' + _MIME_P,
+               include='  <include file="more.xml"/>\n  <include file="/nonexistent/more.xml"/>\n'),
+     ("000041000000", "-")),
+    ("a masked byte",
+     _mime_xml('type="case/bytemask" description="masked byte" data-type="byte" offset="1" magic="0x4F" mask="0x0F"' + _MIME_P),
+     ("000f000000", "004f000000", "000e000000", "000f0000")),
+    ("shorts LSB, MSB, host and masked",
+     _mime_xml('type="case/short-lsb" description="short LSB" data-type="short" offset="1" magic="0x4142" endian="LSB"' + _MIME_P,
+               'type="case/short-msb" description="short MSB" data-type="short" offset="1" magic="0x4344" endian="MSB"' + _MIME_P,
+               'type="case/short-host" description="short host" data-type="short" offset="1" magic="0x4546"' + _MIME_P,
+               'type="case/short-mask" description="short masked" data-type="short" offset="1" magic="0x47FF" mask="0x00FF"' + _MIME_P),
+     ("0042410000", "00424100", "0041420000", "0043440000", "0044430000", "0046450000", "00ff000000", "00ff470000", "-")),
+    ("longs LSB, MSB, host and masked",
+     _mime_xml('type="case/long-lsb" description="long LSB" data-type="long" offset="1" magic="0x41424344" endian="LSB"' + _MIME_P,
+               'type="case/long-msb" description="long MSB" data-type="long" offset="1" magic="0x45464748" endian="MSB"' + _MIME_P,
+               'type="case/long-host" description="long host" data-type="long" offset="1" magic="0x494A4B4C"' + _MIME_P,
+               'type="case/long-mask" description="long masked" data-type="long" offset="1" magic="0x4D4E4FFF" mask="0x000000FF"' + _MIME_P),
+     ("0044434241", "00444342", "0041424344", "0045464748", "0048474645", "004c4b4a49", "00ff000000", "00ff4f4e4d", "-")),
+    ("a string within an extent",
+     _mime_xml('type="case/string" description="ABC within 1:3" magic="ABC" offset="1:3"' + _MIME_P),
+     ("78414243", "7878414243", "78787878414243", "7878787841", "7878787878414243", "787878787841424378",
+      "78787878787841424378", "787878414278", "-")),
+    ("a string with octal and letter escapes",
+     _mime_xml('type="case/escaped" description="escaped string" magic="\\101B\\tC\\nD" offset="0"' + _MIME_P),
+     ("414209430a4400", "414209430a44", "4142094300", "-")),
+    ("priorities and a pattern",
+     _mime_xml('type="case/low" description="priority -100" data-type="byte" offset="0" magic="0x41" priority="-100"',
+               'type="case/high" description="priority -50" data-type="byte" offset="0" magic="0x41" priority="-50"',
+               'type="case/pat" description="a pattern" pattern="*.qqq" priority="-200"'),
+     ("41000000", "-", "name=a.qqq", "41000000", "-", "name=a.rrr", "41000000", "empty")))
+GAP_STEP_CASES += [("driver mimecfg: %s" % name, _driver("mimecfg", *args), {"mime.xml": xml})
+                   for name, xml, args in _MIME_FILES]
+# delegate.c through imdriver: the command line reads a case's delegates.xml but only after the
+# build's, and runs no delegate the oracle's sandbox would let start. With the case directory first
+# on MAGICK_CONFIGURE_PATH, delegatecfg parses the case's delegates.xml first and runs ops in order:
+# GetDelegateInfo and GetDelegateCommand (the %-letters expanded for rose:, its fields set by the
+# ops in between), the lists, InvokeDelegate of programs that do not exist (status, the files left
+# behind), and ExternalDelegateCommand against a case policy that refuses every token but a few:
+# which tokens IsExecutableToken hands to the policy shows in which are refused. @SELF is the
+# driver itself, whose selfkill command dies by a signal (status -1). No case starts a shell.
+_DELEGATE_FILES = (
+    ('property letters as image fields change',
+     {'delegates.xml': '<delegatemap>\n  <delegate decode="caseletters" command="&quot;%a|%b|%d|%e|%f|%g|%h|%i|%m|%n|%o|%p|%q|%r|%s|%t|%u|%w|%x|%y|%z|%A|%C|%D|%F|%G|%H|%I|%M|%O|%P|%Q|%S|%T|%U|%W|%X|%Y|%~|%%&quot;"/>\n</delegatemap>\n'},
+     ('cmd=caseletters', 'quality=75', 'units=2', 'xres=0', 'yres=0', 'cmd=caseletters', 'xres=eps', 'yres=eps', 'extent=1234', 'rows=0', 'columns=0', 'scenes=3', 'alpha=1', 'file=c/d.tar.gz', 'cmd=caseletters', 'units=1', 'quality=0', 'cmd=caseletters')),
+    ('escapes, entities and percents',
+     {'delegates.xml': '<delegatemap>\n  <delegate decode="caseesc" command="a\\rb\\nc\\\\d\\x &LT;&GT;&AMP;&amp;amp;lt; 5%x %% end%"/>\n  <delegate decode="caseq" command="q%\'x %&quot;y"/>\n  <delegate decode="casews" command="   "/>\n</delegatemap>\n'},
+     ('cmd=caseesc', 'cmd=caseq', 'cmd=casews', 'cmd=nosuchdelegate')),
+    ('lookups by decode, encode and mode, lists',
+     {'delegates.xml': '<delegatemap>\n  <delegate decode="case-d" command="dec"/>\n  <delegate encode="case-e" command="enc"/>\n  <delegate decode="case-x" encode="case-y" command="bi"/>\n  <delegate decode="case-m" encode="case-n" mode="bi" command="mode bi"/>\n  <delegate decode="case-s" stealth="True" spawn="True" thread-support="False" command="s"/>\n  <delegate decode="case-r" encode="case-q" mode="encode" command="mode encode"/>\n  <delegate encode="case-e3" command="e3"/>\n  <delegate encode="case-e1" command="e1"/>\n  <delegate encode="case-e2" command="e2"/>\n  <delegate decode="case-d3" encode="z" command="d3"/>\n  <delegate decode="case-d1" command="d1"/>\n</delegatemap>\n'},
+     ('info=case-d,', 'info=,case-e', 'info=case-x,case-y', 'info=*,case-y', 'info=case-x,*', 'info=case-w,case-y', 'info=case-x,case-w', 'info=case-m,case-n', 'info=case-z,case-n', 'info=*,*', 'info=case-s,', 'info=*,*', 'info=case-r,case-q', 'info=nope,case-q', 'info=*,*', 'list=case-*', 'list=case-e*', 'list=z', 'listinfo')),
+    ('a multi-line command',
+     {'delegates.xml': '<delegatemap>\n  <delegate decode="case-ml" command="first\nsecond\nthird"/>\n  <delegate decode="case-ml2" encode="o" command="only"/>\n</delegatemap>\n'},
+     ('listinfo', 'cmd=case-ml')),
+    ('a DOCTYPE, comments and an include',
+     {'delegates.xml': '<?xml version="1.0"?>\n<!DOCTYPE delegatemap [\n  <!ATTLIST delegate decode CDATA "x]>y" command CDATA \'a>b\'>\n]>\n<!-- a comment with a > inside -->\n<delegatemap>\n  <include file="more.xml"/>\n  <delegate decode="case-s1" command="one"/>\n</delegatemap>\n'},
+     ('info=case-s1,', 'listinfo')),
+    ('a stray bracket',
+     {'delegates.xml': '<!DOCTYPE delegatemap SYSTEM "t" ]>\n<delegatemap>\n  <delegate decode="case-s2" command="two"/>\n</delegatemap>\n'},
+     ('info=case-s2,',)),
+    ('nested brackets in a DOCTYPE',
+     {'delegates.xml': '<!DOCTYPE delegatemap [ [ ] <!ENTITY e "]>"> ]>\n<delegatemap>\n  <delegate decode="case-s3" command="three"/>\n</delegatemap>\n'},
+     ('info=case-s3,',)),
+    ('a comment with -> inside, one never closed',
+     {'delegates.xml': '<delegatemap>\n  <!-- c - d -> <delegate decode="case-hidden" command="h"/> -->\n  <delegate decode="case-s4" command="four"/>\n</delegatemap>\n<!-- never closed '},
+     ('info=case-s4,', 'info=case-hidden,')),
+    ('includes, relative, absolute and empty',
+     {'delegates.xml': '<delegatemap>\n  <include junk file="more.xml" />\n  <include file="/nonexistent/more.xml"/>\n  <include/>\n  <delegate decode="case-s5" command="five"/>\n</delegatemap>\n', 'more.xml': '<delegatemap>\n  <delegate decode="case-more" command="more"/>\n</delegatemap>\n'},
+     ('info=case-s5,', 'info=case-more,')),
+    ('a delegate inside a quoted SYSTEM id and inside a comment',
+     {'delegates.xml': '<!DOCTYPE delegatemap SYSTEM \'x> <delegate decode="case-ghost" command="g"/> \'>\n<delegatemap>\n  <!-- <delegate decode="case-ghost2" command="g2"/> -->\n  <delegate decode="case-s6" command="six"/>\n</delegatemap>\n'},
+     ('info=case-ghost,', 'info=case-ghost2,', 'info=case-s6,')),
+    ('an include inside an open delegate',
+     {'delegates.xml': '<delegatemap>\n  <delegate decode="case-inc" <include file="more.xml"/> command="after"/>\n  <delegate decode="case-inc2" <include file = "more.xml" /> command="after2"/>\n</delegatemap>\n'},
+     ('info=case-inc,', 'info=case-inc2,')),
+    ('InvokeDelegate of programs that do not exist',
+     {'case-f:out.dat': 'kept', 'delegates.xml': '<delegatemap>\n  <delegate decode="case-a" command="nosuch %i %o"/>\n  <delegate decode="case-b" encode="ppm" command="nosuch %i"/>\n  <delegate decode="case-c" encode="null" command="nosuch %i"/>\n  <delegate encode="case-e" command="nosuch %o"/>\n  <delegate decode="case-f" encode="nosuchformat" command="nosuch %i"/>\n</delegatemap>\n'},
+     ('invoke=case-a,', 'invoke=nosuchdelegate,', 'invoke=case-b,ppm', 'invoke=case-c,null', 'invoke=,case-e', 'invoke=,nosuchenc', 'invoke=case-f,nosuchformat')),
+    ('ExternalDelegateCommand against a delegate policy',
+     {'delegates.xml': '<delegatemap>\n  <delegate decode="case-d" command="dec"/>\n</delegatemap>\n', '.config/ImageMagick/policy.xml': '<policymap>\n  <policy domain="delegate" rights="none" pattern="*"/>\n  <policy domain="delegate" rights="execute" pattern="nosuch"/>\n  <policy domain="delegate" rights="execute" pattern="*imdriver"/>\n  <policy domain="delegate" rights="execute" pattern="selfkill"/>\n</policymap>\n'},
+     ('ext=nosuch ./', 'ext=nosuch ./x', 'ext=nosuch .\\\\x', 'ext=nosuch .x', 'ext=nosuch -x', 'ext=nosuch %x', 'ext=nosuch x9', 'ext=nosuch ?:/x', 'ext=nosuch a:/x', 'ext=nosuch a:\\\\x', 'ext=nosuch /x', 'extv=nosuch .y', "ext=''", "ext=''  b", 'ext=@SELF selfkill', 'ext=forbidden')),
+)
+GAP_STEP_CASES += [("driver delegatecfg: %s" % name, _driver("delegatecfg", *args), files)
+                   for name, files, args in _DELEGATE_FILES]
+# draw.c at two bounds no case reached. CheckPrimitiveExtent refuses an extent above
+# max-memory-request/sizeof(PrimitiveInfo); the policy's floor is 16 MiB, and an ellipse of radius
+# 10000 swept to 247.2495 degrees needs exactly that many primitives (the window is 0.0007 degrees
+# wide, found by bisection; 247.2495 is in its middle), so the resize after the test is the one
+# that fails. And DrawPolygonPrimitive clamps a polygon that starts just past the right edge to
+# the last column: one starting at 8 or 8.75 on an 8-wide image, with no stroke.
+GAP_STEP_CASES += [
+    ("draw an ellipse whose extent is exactly the max-memory-request",
+     [["-size", "8x8", "xc:white", "-fill", "red", "-draw", "ellipse 0,0 10000,10000 0,247.2495", "txt:-"]],
+     {".config/ImageMagick/policy.xml":
+          '<policymap>\n  <policy domain="system" name="max-memory-request" value="16MiB"/>\n</policymap>\n'}),
+] + [
+    ("draw a polygon starting at x=%s on an 8-wide image" % x,
+     [["-size", "8x8", "xc:white", "-fill", "red", "-stroke", "blue", "-strokewidth", "0",
+       "-draw", "polygon %s,2 %s,2 %s,5" % (x, x2, x3), "txt:-"]], {})
+    for x, x2, x3 in (("8", "11", "9"), ("8.75", "11.75", "9.75"))]
+# qsort comparators (draw.c StopInfoCompare, locale.c LocaleInfoCompare, log.c LogInfoCompare):
+# their mutants only change how ties, or an order the mutant makes inconsistent, come out of
+# qsort. With seven or more elements macOS's BSD qsort partitions and reorders such ties, so
+# these cases kill them on the Mac; glibc may not (owner's decision, 2026-10-05: a Mac kill
+# counts for these, and their refactoring is checked on the Mac). Eight gradient stops with
+# repeated offsets, eight with offsets exactly MagickEpsilon apart; twelve locale messages in
+# one file; eight log maps in one file (the driver lists the case's section).
+def _gradient(stops):
+    return ("push defs push gradient g linear 0,0 39,0 " +
+            " ".join("stop-color %s %s" % (c, o) for c, o in stops) +
+            " pop gradient pop defs fill url(#g) rectangle 0,0 39,3")
+GAP_STEP_CASES += [
+    ("draw a gradient of eight stops with repeated offsets (StopInfoCompare)",
+     [["-size", "40x4", "xc:white", "-draw", _gradient(
+         [("red", "0.5"), ("lime", "0.5"), ("blue", "0.2"), ("yellow", "0.5"), ("cyan", "0.8"),
+          ("magenta", "0.5"), ("black", "0.2"), ("orange", "0.8")]), "txt:-"]], {}),
+    ("draw a gradient of eight stops MagickEpsilon apart (StopInfoCompare)",
+     [["-size", "40x4", "xc:white", "-draw", _gradient(
+         [("red", "0"), ("blue", "1e-12"), ("lime", "0.5"), ("black", "0"), ("yellow", "1e-12"),
+          ("cyan", "0.5"), ("pink", "1"), ("navy", "1")]), "txt:-"]], {}),
+    ("locale.xml of the case's own with twelve messages, listed (LocaleInfoCompare)", [["-list", "locale"]],
+     {".config/ImageMagick/locale.xml": '<?xml version="1.0"?>\n<localemap>\n  <locale name="C">\n' +
+      "".join('    <Message name="M%03d">text %d</Message>\n' % (k, k) for k in range(12)) +
+      '  </locale>\n</localemap>\n'}),
+    ("driver logcfg: eight log maps in one file (LogInfoCompare)", _driver("logcfg"),
+     {"log.xml": "".join('<logmap>\n  <log events="None" output="stdout" format="m%d %%e"/>\n</logmap>\n' % k
+                         for k in range(8))}),
+]
+# profile.c through imdriver: SetImageProfile, SyncImageProfiles, Update8BIMClipPath and the rest
+# on blobs built byte by byte at each bound (profilecases.py says which); the profiles' bytes are
+# printed after every op. The command line reaches these functions only with whole files.
+import profilecases as _profilecases
+GAP_STEP_CASES += [("driver profile: %s" % name, _driver("profile", *args), files)
+                   for name, args, files in _profilecases.CASES]
+# utility.c AcquireUniqueSymbolicLink through imdriver: it is reached only by a delegate, and its
+# copy path (when symlinks are forbidden by policy, or shred is set) by no command-line case. The
+# driver calls it and reads the destination back (= the source either way). Two cases: the default
+# policy takes the symlink path, a policy forbidding symlinks the file-copy path.
+GAP_STEP_CASES += [
+    ("driver symlink, symlink path", _driver("symlink", "src.dat"),
+     {"src.dat": "symlink test content 12345"}),
+    ("driver symlink, copy path (symlinks forbidden)", _driver("symlink", "src.dat"),
+     {"src.dat": "symlink test content 12345",
+      ".config/ImageMagick/policy.xml":
+          '<policymap>\n  <policy domain="system" name="symlink" rights="none" pattern="follow"/>\n'
+          '</policymap>\n'}),
+    # an empty source: the copy sizes its buffer from fstat's st_size only when it is > 0
+    ("driver symlink, copy path of an empty file", _driver("symlink", "src.dat"),
+     {"src.dat": "",
+      ".config/ImageMagick/policy.xml":
+          '<policymap>\n  <policy domain="system" name="symlink" rights="none" pattern="follow"/>\n'
+          '</policymap>\n'})]
+
+
+# Windows files through imdriver (2026-10-04). pixel.c: ExportImagePixels and ImportImagePixels
+# with every storage type, over the maps with a fast path (RGB, BGR, RGBA, BGRA, RGBP, BGRP, I)
+# and the generic loop (ARGB, OIP; CMYK, CMYKA and KYMC on a CMYK image), into and from a region,
+# plus the refusals (an unknown channel, CMYK of an RGB image, a region outside the image).
+# linked-list.c and splay-tree.c: scripts of every operation (the driver interns its strings, so a
+# removal by value finds what was stored); a 1100-node ascending chain makes the splay tree
+# balance itself past depth 1024. InsertValueInLinkedList at a middle index drops the new element
+# but counts it (upstream bug), after which RemoveLastElementFromLinkedList walks off the list,
+# so a middle insertion is only ever a script's last step. cache-view.c: the one-pixel getters,
+# with each virtual pixel method but Random, inside and outside the image.
+_WINDRV_TYPES = ("char", "short", "long", "longlong", "float", "double", "quantum")
+_WINDRV_MAPS = [("-", m) for m in ("RGB", "BGR", "RGBA", "BGRA", "RGBP", "BGRP", "I", "ARGB", "OIP",
+                                    "BGRO", "RGBO")] + \
+               [("CMYK", m) for m in ("CMYK", "CMYKA", "KYMC")]
+
+
+def _windrv(label, args, outputs=()):
+    return _case("windrv", label, _driver(*args), list(outputs))
+
+
+def _windrv_cases():
+    for t in _WINDRV_TYPES:
+        for cs, m in _WINDRV_MAPS:
+            yield _windrv("export %s %s%s" % (m, t, "" if cs == "-" else " of a CMYK image"),
+                          ("pixels", "export", "{C}/rose_alpha.miff", cs, m, t, "4x3+20+15"))
+            yield _windrv("import %s %s%s" % (m, t, "" if cs == "-" else " into a CMYK image"),
+                          ("pixels", "import", "{C}/rose_alpha.miff", cs, m, t, "4x3+20+15", "out.miff"),
+                          ["out.miff"])
+        yield _windrv("export RGB %s of the whole image" % t,
+                      ("pixels", "export", "{C}/tiny.miff", "-", "RGB", t, "1x1"))
+    for direction in ("export", "import"):
+        extra = ["out.miff"] if direction == "import" else []
+        for label, cs, m, geometry in (("an unknown channel", "-", "RGBX", "2x2"),
+                                       ("CMYK of an RGB image", "-", "CMYK", "2x2"),
+                                       ("a region outside the image", "-", "RGB", "4x3+68+44"),
+                                       ("a gray image as I", "-", "I", "3x2+1+1")):
+            yield _windrv("%s refused or not: %s" % (direction, label),
+                          tuple(["pixels", direction, "{C}/gray16.miff" if "gray" in label else "{C}/rose.miff",
+                                 cs, m, "char", geometry] + extra), extra)
+    for label, ops in (
+            ("append, iterate, get and remove at each end",
+             "3 append:a append:b append:c append:d get:0 get:2 get:5 next next reset next removeat:0 "
+             "removeat:1 removeat:7 removelast removelast removelast removelast"),
+            ("insert at the head and the tail, remove by value",
+             "0 insert:0:b insert:0:a insert:2:c insert:9:x remove:b remove:zz remove:a remove:c remove:a"),
+            ("sorted insertion with replacement, array, clear",
+             "0 sorted:m sorted:c sorted:x sorted:c sorted:a sorted:z array clear array append:q array"),
+            ("iterator across removals", "0 append:a append:b append:c next remove:b next next reset "
+                                         "next removeat:0 next removelast next"),
+            ("removal of the iterator's element", "0 append:a append:b append:c next next remove:b next "
+                                                  "reset next next removelast next"),
+            ("a middle insertion, last", "0 append:a append:b append:c insert:1:m"),
+            ("a middle insertion further in, last", "0 append:a append:b append:c append:d insert:3:m"),
+            ("empty list operations", "0 get:0 next removelast removeat:0 remove:a array clear"),
+    ):
+        yield _windrv("linked list: %s" % label, tuple(["linkedlist"] + ops.split()))
+    for label, ops in (
+            ("add, get, delete and remove", "add:m=1 add:c=2 add:x=3 add:a=4 add:z=5 add:c=6 get:c get:q "
+                                            "delete:x delete:q remove:a remove:q removevalue:5 removevalue:9 "
+                                            "deletevalue:1 deletevalue:9 values clone reset values"),
+            ("removal by value of an inner node", "add:d=1 add:b=2 add:f=3 add:a=4 add:c=5 add:e=6 add:g=7 "
+                                                  "removevalue:2 deletevalue:6 removevalue:1 values"),
+            ("a chain deep enough to balance", "quiet addrange:1100 loud get:k0000 get:k0550 get:k1099 "
+                                               "quiet delete:k0001 removevalue:v0002 remove:k0003 loud get:k0004"),
+            ("a balanced tree, deleted by value", "quiet addrange:1100 get:k0000 deletevalue:v0500 "
+                                                  "removevalue:v1099 loud remove:k0000 get:k0001"),
+            ("an empty tree", "get:a delete:a remove:a removevalue:a deletevalue:a values clone reset"),
+    ):
+        yield _windrv("splay tree: %s" % label, tuple(["splaytree"] + ops.split()))
+    # second wave (2026-10-04, after the first round): iterator checks after each kind of change,
+    # a middle get and removal, trees with relinquish functions. Not kept: keys compared by address
+    # (their order follows heap addresses, which varied in one of four runs) and -debug pixel logs
+    # (LogPixelChannels; stable by hand with -log %e, not under the oracle)
+    for label, ops in (
+            ("iterator at the head, then an insertion at the head", "0 append:a append:b reset insert:0:z next next"),
+            ("iterator at the end, then an append and a tail insertion",
+             "0 append:a next next insert:1:b next insert:2:c next"),
+            ("middle get and removal", "0 append:a append:b append:c append:d append:e get:1 get:3 removeat:2 "
+                                       "removeat:2 get:2 removeat:1"),
+            ("iterator on the removed head, by value and by index",
+             "0 append:a append:b append:c reset remove:a next reset removeat:0 next"),
+            ("iterator on a removed middle element", "0 append:a append:b append:c append:d next next "
+                                                     "removeat:1 next next"),
+            ("iterator on the removed tail", "0 append:a append:b next next removelast next append:c next"),
+    ):
+        yield _windrv("linked list: %s" % label, tuple(["linkedlist"] + ops.split()))
+    for mode in ("free",):
+        for label, ops in (
+                ("add, delete and remove", "add:m=1 add:c=2 add:x=3 add:a=4 add:c=5 delete:x remove:a "
+                                           "removevalue:5 deletevalue:1 deletevalue:9 removevalue:9 values"),
+                ("reset of a tree with inner nodes", "add:d=1 add:b=2 add:f=3 add:a=4 add:c=5 add:e=6 add:g=7 "
+                                                     "get:a get:g reset values add:q=8"),
+                ("remove the root and leaves", "add:d=1 add:b=2 add:f=3 remove:d remove:b get:f deletevalue:3 "
+                                               "add:k=4 removevalue:4 clone"),
+        ):
+            yield _windrv("splay tree, %s: %s" % (mode, label), tuple(["splaytree", "mode:" + mode] + ops.split()))
+    # trees without a compare function, as profile.c and property.c make them (keys compared as
+    # pointers; here small integers, so the order is the same every run)
+    for mode in ("int", "freeint"):
+        for label, ops in (
+                ("add, delete and remove", "add:50=m add:20=c add:90=x add:10=a add:20=r delete:90 remove:10 "
+                                           "removevalue:r deletevalue:m deletevalue:q removevalue:q get:20 values"),
+                ("reset of a tree with inner nodes", "add:40=d add:20=b add:60=f add:10=a add:30=c add:50=e "
+                                                     "add:70=g get:10 get:70 reset values add:80=q"),
+                ("remove the root and leaves", "add:40=d add:20=b add:60=f remove:40 remove:20 get:60 "
+                                               "deletevalue:f add:11=k removevalue:k get:99 delete:99 remove:99 clone"),
+                ("a chain deep enough to balance", "quiet addrange:1100 loud get:0 get:550 quiet delete:1 "
+                                                   "removevalue:v0002 remove:3 deletevalue:v0004 loud get:5"),
+        ):
+            yield _windrv("splay tree, %s: %s" % (mode, label), tuple(["splaytree", "mode:" + mode] + ops.split()))
+    # xml-tree.c (third wave): NewXMLTree over documents with attributes, entities, CDATA, a
+    # processing instruction and a comment; a DOCTYPE with entities and an attribute default; a
+    # circular entity (ValidateEntities); characters EncodePredefinedEntities must escape; a
+    # mismatched closing tag. Then navigation, AddChildToXMLTree at offsets, SetXMLTreeContent,
+    # AddPathToXMLTree, and XMLTreeInfoToXML. Not used: an attribute written a="q\"x" (no such
+    # escape in XML) parses into an attribute with no value, on which XMLTreeInfoToXML crashes
+    # (CanonicalXMLContent(NULL), an upstream bug).
+    xml_docs = {
+        "plain": '<?xml version="1.0"?>\n<r a="1 &lt; 2" b="&#65;&#x42;">t &amp; u<b>one</b><b k="v">two'
+                 '<![CDATA[<raw>&]]></b><?pi data?><!-- c --><c/>tail</r>\n',
+        "doctype": '<!DOCTYPE r [ <!ATTLIST b k CDATA "dflt"> <!ENTITY e "x&#65;"> <!ENTITY g "gee"> ]>\n'
+                   '<r>&e; and &g;<b/><b k="z">&g;</b></r>\n',
+        "circular": '<!DOCTYPE r [ <!ENTITY e "&f;"> <!ENTITY f "&e;"> ]>\n<r>&e;</r>\n',
+        "chained": '<!DOCTYPE r [ <!ENTITY e "x"> <!ENTITY f "&e;y"> ]>\n<r>&f;</r>\n',
+        "special": '<r t="a\tb\rc\nd" q="&quot;&apos;&lt;&gt;&amp;">x &gt; y &apos; &quot; z\r\nw\ttab</r>\n',
+        "mismatched": '<r><a></b></r>\n',
+        "nested": '<r><a>1<b>2<c>3</c>4</b>5</a><a>6</a><d/></r>\n',
+        # fourth wave: output past the writers' 4 KB buffers (their growth checks), processing
+        # instructions before and after the root, a control character (CanonicalXMLContent's
+        # base64 branch)
+        "big": '<r a="%s">' % ("A" * 5000) + "".join('<e%d k="%s" j="%s">%s</e%d>' % (i, "v" * 40, "w" * 30, "t" * 60, i)
+                                                   for i in range(300)) + "</r>\n",
+        "pis": '<?a one?><?a two?><?b three?>\n<r>x<?c inside?></r>\n<?d after?><?a three?>\n',
+        "control": '<r k="a&#1;b">c&#2;d&#9;e</r>\n',
+        # fifth wave: single items longer than the writers' 4 KB slack (a tag name, an attribute
+        # name, a DTD default attribute, processing instructions); entities with '%' and a
+        # predefined reference (ValidateEntities, hand-run: kills three)
+        "huge": '<?p %s?>\n<?%s x?>\n<!DOCTYPE r [ <!ATTLIST %s %s CDATA "%s"> <!ATTLIST o x CDATA "1"> ]>\n'
+                '<r><%s %s="v"/><%s/><%s>x</%s><o/></r>\n<?z %s?>\n<?%s y?>\n' % (
+                    "q" * 5000, "P" * 5000, "T" * 5000, "N" * 5000, "D" * 50, "T" * 5000, "A" * 5000,
+                    "T" * 5000, "T" * 5000, "T" * 5000, "y" * 5000, "Z" * 5000),
+        "percent": '<!DOCTYPE r [ <!ENTITY e "a%b"> <!ENTITY g "&lt;"> ]>\n<r>&e;&g;</r>\n',
+        # sixth wave (2026-10-07, after the kills sweep1007 could not reproduce were dropped;
+        # hand-run they kill 49): text before the root, unquoted and spaced attributes, ATTLIST
+        # defaults and non-CDATA values ParseEntities normalises, character references of two to
+        # four UTF-8 bytes, parameter entities, comments and PIs in the internal subset, a DOCTYPE
+        # without one, an entity value holding "]>", an invalid entity name, unterminated documents
+        "lead": '  text before <r a="1">x</r>',
+        "lead2": '\n\n<!-- c -->\n<r/>',
+        "noquote": '<r a=1 b="2">x</r>\n',
+        "spaces": '<r  a = "1"   b= "2" >x</r >\n',
+        "attlist": '<!DOCTYPE r [ <!ATTLIST r a CDATA "da" b CDATA "db"> <!ATTLIST s k NMTOKEN "  x   y  " '
+                   'm CDATA "m1"> <!ATTLIST r c ID #IMPLIED> ]>\n<r b="given"><s/><s k="  p   q  "/><s m="  sp  ace "/></r>\n',
+        "ws_attr": '<!DOCTYPE r [ <!ATTLIST r k NMTOKEN #IMPLIED> ]>\n<r k="\t  a \n  b\t "/>\n',
+        "charref": '<r a="&#x4E2D;&#x10000;&#128;&#2047;&#2048;&#65535;">&#x4E2D;&#x1F600;&#169;&#x7F;&#x80;'
+                   '&#x800;&#xFFFF;&#x10FFFF;</r>\n',
+        # (as probed: "%%" doubled, which ParseInternalDoctype reads as a stray '%')
+        "pent": '<!DOCTYPE r [ <!ENTITY %% p "<!ENTITY q \'qq\'>"> %%p; <!ENTITY %% s "x"> <!ENTITY t "%%s;y"> ]>\n'
+                '<r>&q;&t;</r>\n',
+        "notation": '<!DOCTYPE r [ <!NOTATION n SYSTEM "x"> <!ELEMENT r ANY> <!-- comment in dtd --> <?pi in dtd?> '
+                    '<!ENTITY e "z"> ]>\n<r>&e;</r>\n',
+        "badent": '<!DOCTYPE r [ <!ENTITY 1e "x"> <!ENTITY e x> <!ENTITY f "y"> <!ENTITY> ]>\n<r>&f;&e;&1e;</r>\n',
+        "doctypenosubset": '<!DOCTYPE r SYSTEM "r.dtd">\n<r>x</r>\n',
+        "doctypebracket": '<!DOCTYPE r [ <!ENTITY e "]>"> ]>\n<r>&e;</r>\n',
+        "unterminated2": '<r><a k="v"',
+        "unterminated3": '<r>text',
+        # seventh wave: entities declared before the ATTLISTs (an ATTLIST stops the internal subset:
+        # an upstream bug), defaults on two attributes, PIs before, between and after (hand-run: 2 killed)
+        "full": '<?pi one?><!DOCTYPE r [<!ENTITY e "hello"><!ENTITY g "gee"><!ATTLIST b k CDATA "dflt" '
+                'm CDATA "m2"><!ATTLIST c n CDATA "n1">]><?pj two three?><r>&e;&g;<b/><c/><b k="z"/></r><?pk four?>',
+        # XMP: rdf:Bag and rdf:Seq, the tags NewXMLTree skips (IsSkipTag; hand-run: 1 killed)
+        "rdf": '<x:xmpmeta><rdf:RDF><rdf:Description a="1"><dc:subject><rdf:Bag><rdf:li>one</rdf:li><rdf:li>two</rdf:li>'
+               '</rdf:Bag></dc:subject><dc:seq><rdf:Seq><rdf:li>s</rdf:li></rdf:Seq></dc:seq></rdf:Description></rdf:RDF></x:xmpmeta>',
+    }
+    for name, ops in (
+            ("plain", "print child:b attr:k sibling attr:k attr:zz next top attr:a attr:b"),
+            ("plain", "addchild:n:3 content:a<b>&c\"d'e top addchild:m:0 top print"),
+            ("doctype", "print child:b attr:k sibling attr:k top"),
+            ("circular", "print"), ("chained", "print"), ("special", "print top attr:t attr:q"),
+            ("mismatched", "print"),
+            ("nested", "child:a child:b child:c top child:a sibling next top path:a/b/z:1 path:q/r:0 print"),
+            ("nested", "child:a content:changed top child:d addchild:e:0 content:x\r\ny top print"),
+            ("big", "print"), ("big", "child:e299 attr:k top addchild:z:0 content:%s top print" % ("Z" * 5000)),
+            ("pis", "print"), ("control", "print"), ("huge", "print"), ("percent", "print"),
+            ("nested", "path:a[1]/b/q:0 path:a[0]/n:2 path:a/b/c/d:0 print"),
+    ) + tuple((name, "print") for name in ("lead", "lead2", "noquote", "spaces", "attlist", "ws_attr", "charref", "pent",
+                                           "notation", "badent", "doctypenosubset", "doctypebracket",
+                                           "unterminated2", "unterminated3", "full", "rdf")):
+        yield _with_inputs(_windrv("xml %s: %s" % (name, ops), tuple(["xml", "%s.xml" % name] + ops.split())),
+                           files={"%s.xml" % name: xml_docs[name]})
+    for ops in ("addchild:a:0 addchild:b:0 content:hi top child:a sibling print",
+                "path:a/b/c:0 path:a/b/d:5 path:a/e:2 content:<&> top print",
+                "content:t&ext addchild:x:9 addchild:y:1 top print"):
+        yield _windrv("xml from NewXMLTreeTag: %s" % ops, tuple(["xml", "-root"] + ops.split()))
+    # ConvertUTF16ToUTF8: NewXMLTree takes any text whose first byte is 0xFE or 0xFF for UTF-16,
+    # but measures it with strlen, so real UTF-16 stops at its first zero byte and every such
+    # text ends in "root tag missing". The conversion still runs: case files must be ASCII, so
+    # magick writes the bytes (one gray pixel each, none zero) and the driver parses them. Short
+    # and past the 4 KB growth, big- and little-endian, with surrogate pairs (kills 10, hand-run)
+    for label, first, n, fx in (
+            ("BE short", 254, 41, "(40+mod(i*37,200))/255"), ("LE short", 255, 41, "(40+mod(i*37,200))/255"),
+            ("BE long", 254, 9001, "(40+mod(i*37,200))/255"), ("LE long", 255, 9001, "(40+mod(i*37,200))/255"),
+            ("BE surrogates", 254, 401, "(mod(i,4)==1?216:mod(i,4)==3?220:(30+mod(i*13,90)))/255"),
+            ("LE surrogates", 255, 401, "(mod(i,4)==0?216:mod(i,4)==2?220:(30+mod(i*13,90)))/255"),
+            ("BE ascii-ish", 254, 33, "(1+mod(i,127))/255"), ("LE ascii-ish", 255, 34, "(1+mod(i,127))/255"),
+            ("BE lone high surrogate at the end", 254, 3, "(mod(i,2)==1?216:65)/255"),
+            # nothing to convert: the final resize to length+1 (kills 2, hand-run)
+            ("BE two bytes", 254, 1, "65/255"), ("LE three bytes", 255, 2, "(65+i)/255")):
+        yield _case("windrv", "xml of UTF-16-looking bytes, %s" % label,
+                    [["-size", "1x1", "xc:gray(%d)" % first, "(", "-size", "%dx1" % n, "xc:", "-fx", fx, ")",
+                      "+append", "-depth", "8", "gray:u.xml"]] + _driver("xml", "u.xml", "print"), [])
+    # blob.c: ImageToBlob and ImagesToBlob, BlobToImage and PingBlob back; custom streams over a
+    # memory buffer (with and without seek and tell), ImageToCustomStream, ImagesToCustomStream
+    # and CustomStreamToImage; MSBOrderLong and MSBOrderShort; FileToImage into a blob. PS is
+    # left out: it writes the date.
+    for name, fmt, frames in (("rose", "MIFF", 1), ("rose", "PNG", 1), ("rose", "GIF", 1), ("rose", "PPM", 1),
+                              ("rose", "TIFF", 1), ("rose", "JPEG", 1), ("rose_alpha", "PNG", 1),
+                              ("rose", "GIF", 3), ("rose", "MIFF", 2), ("rose", "TIFF", 2), ("rose", "PNG", 2),
+                              # formats without blob support: the temporary-file route
+                              # (not HTML: WriteHTMLImage through ImageToBlob frees an invalid pointer
+                              # in DestroyImageInfo, an upstream crash; not JSON: it varies between runs;
+                              # not INFO: it writes the elapsed time, e.g. 0.000u 0:00.001, ERDC 2026-10-07)
+                              ("rose", "MPC", 1), ("rose", "MPC", 2), ("rose", "SHTML", 1),
+                              ("rose", "VICAR", 1),
+                              # MAT: no blob support, but read back: the temporary-file route both ways
+                              ("rose", "MAT", 1), ("rose", "MAT", 2), ("rose_alpha", "MAT", 1)):
+        yield _windrv("blob of %d %s %s" % (frames, name, fmt), ("blob", "toblob", img(name), fmt, str(frames)))
+    # WriteImages into a caller's memory blob (image_info->blob), frame by frame: SyncBlobStream
+    # hands each later frame's buffer to the list's owner. Not used: adjoin off for MIFF, PNG,
+    # TIFF, PPM and BMP, which corrupts the heap (realloc(): invalid next size; double free)
+    for fmt, frames, adjoin in (("GIF", "3", "noadjoin"), ("GIF", "3", "adjoin"), ("JPEG", "3", "noadjoin"),
+                                ("JPEG", "2", "adjoin"), ("TIFF", "3", "adjoin"), ("PPM", "2", "adjoin"),
+                                ("MIFF", "2", "adjoin"), ("GIF", "1", "noadjoin")):
+        yield _windrv("WriteImages of %s rose as %s into a caller's blob, %s" % (frames, fmt, adjoin),
+                      ("blob", "writeimages", img("rose"), fmt, frames, adjoin))
+    # PDF: no blob support and several pages to one file, so ImagesToBlob's temporary-file route
+    # for a list; the bytes carry the date, so only the length is printed
+    for name, frames in (("rose", "1"), ("rose", "2"), ("rose_alpha", "3")):
+        yield _windrv("blob of %s %s PDF, length only" % (frames, name), ("blob", "toblob", img(name), "PDF", frames, "nohash"))
+    # No PostScript here: its %%Title holds the temporary file's path, which lies in the case
+    # directory, so even the length depends on the directory's name (mbase-..., mut-<hash>):
+    # 7 false kills in blob.c (2026-10-07). PDF's length does not.
+    for name, fmt, frames in (("rose", "MIFF", 1), ("rose", "PNG", 1), ("rose", "TIFF", 1), ("rose", "GIF", 1),
+                              ("rose", "JPEG", 1), ("rose", "GIF", 3), ("rose", "TIFF", 2), ("rose", "MIFF", 2),
+                              ("rose", "MPC", 1), ("rose", "MPC", 2), ("rose", "HTML", 1),
+                              ("rose", "MAT", 1), ("rose", "MAT", 2),  # not INFO: see above
+                              # BMP asks the stream where it is (TellBlob's teller); PCX of two
+                              # frames, the list writer's seeker and teller (hand-run: 3 killed)
+                              ("rose", "BMP", 1), ("rose", "PCX", 2)):
+        for seekable in ("1", "0"):
+            yield _windrv("custom stream of %d %s %s%s" % (frames, name, fmt, "" if seekable == "1" else ", no seek"),
+                          ("blob", "custom", img(name), fmt, str(frames), seekable))
+    for n in (0, 1, 2, 3, 4, 5, 8, 13, 16):
+        yield _windrv("MSBOrderLong and MSBOrderShort of %d bytes" % n, ("blob", "msb", str(n)))
+    yield _with_inputs(_windrv("FileToImage", ("blob", "filetoimage", "in.txt", "o.txt"), ["o.txt"]),
+                       files={"in.txt": "hello\n" * 2000})
+    # option.c: ParsePixelChannelOption's numeric channels (-channel-fx with a number, a negative,
+    # the last and one past the last of MaxPixelChannels, a non-number) and ParseChannelOption's
+    # ",type" after the shorthand; GetCommandOptionFlags in convert's option loop, with options
+    # written with dashes or underscores inside (its retry without them) and a '|' list
+    for expr in ("0=>2", "2<=>0", "1=>0,0=>2", "63=>0", "64=>0", "-1=>0", "foo=>0", "2.5=>1", "|0=>1", ";1=>2"):
+        yield _case("optgap", "-channel-fx %s" % expr,
+                    [[img("rose"), "-channel-fx", expr] + FLOAT_OUT + ["out.miff"]], ["out.miff"])
+    for spec in ("RGB,sync", "RG,Index", "RGB,bogus", "Red,", "CMY,Black", "K,Sync", "Undefined", "RGB,Undefined"):
+        yield _case("optgap", "-channel %s -negate" % spec,
+                    [[img("cmyk" if "K" in spec or "CMY" in spec else "rose"), "-channel", spec, "-negate"] + FLOAT_OUT
+                     + ["out.miff"]], ["out.miff"])
+    for opt in (["-auto_orient"], ["-auto-orient"], ["-autoorient"], ["-flip_"], ["-trim-"], ["-negate_x"]):
+        yield _case("optgap", "convert %s" % opt[0], [["convert", img("rose")] + opt + FLOAT_OUT + ["out.miff"]],
+                    ["out.miff"])
+    yield _case("optgap", "identify -verbose -auto_orient", [["identify", "-format", "%wx%h\\n", "-auto_orient", img("rose")]], [])
+    # quantum-import.c, quantum-export.c: every quantum type over every depth, through
+    # ExportQuantumPixels (each row's bytes) and ImportQuantumPixels (a byte pattern for unsigned
+    # formats, a round trip for floating point), the first three rows; MSB order, min-is-white,
+    # unpacked and padded variants
+    quantum_sources = dict([(t, "rose_alpha") for t in (
+        "rgb", "bgr", "rgba", "bgra", "rgbo", "bgro", "rgbpad", "red", "green", "blue", "alpha", "opacity",
+        "gray", "grayalpha", "cbycr", "cbycra", "cbycry")] +
+        [(t, "cmyk") for t in ("cmyk", "cmyka", "cmyko", "cyan", "magenta", "yellow", "black")] +
+        [("index", "palette"), ("indexalpha", "palette"), ("multispectral", "rose")])
+    for t, src in sorted(quantum_sources.items()):
+        extra = ["meta=2"] if t == "multispectral" else []
+        for depth in (1, 2, 4, 8, 10, 12, 16, 24, 32, 64):
+            yield _windrv("quantum export %s %d unsigned" % (t, depth),
+                          tuple(["quantum", "export", img(src), t, str(depth), "Unsigned", "LSB"] + extra))
+            yield _windrv("quantum import %s %d unsigned" % (t, depth),
+                          tuple(["quantum", "import", img(src), t, str(depth), "Unsigned", "LSB", "out.miff"] + extra),
+                          ["out.miff"])
+        for depth in (16, 24, 32, 64):
+            yield _windrv("quantum export %s %d float" % (t, depth),
+                          tuple(["quantum", "export", img(src), t, str(depth), "FloatingPoint", "LSB"] + extra))
+            yield _windrv("quantum round trip %s %d float" % (t, depth),
+                          tuple(["quantum", "roundtrip", img(src), t, str(depth), "FloatingPoint", "LSB", "out.miff"]
+                                + extra), ["out.miff"])
+        for depth, fmt in ((16, "Unsigned"), (32, "Unsigned"), (64, "Unsigned"), (32, "FloatingPoint")):
+            yield _windrv("quantum export %s %d %s MSB" % (t, depth, fmt),
+                          tuple(["quantum", "export", img(src), t, str(depth), fmt, "MSB"] + extra))
+    # second wave: unpacked rows and a 32-bit quantum (the PushQuantumLongPixel and
+    # PopQuantumLongPixel paths) for every type at the depths that have them
+    for t, src in sorted(quantum_sources.items()):
+        extra = ["meta=2"] if t == "multispectral" else []
+        for depth in (10, 12, 16):
+            for opts in (["nopack"], ["quantum=32"]):
+                yield _windrv("quantum export %s %d %s" % (t, depth, opts[0]),
+                              tuple(["quantum", "export", img(src), t, str(depth), "Unsigned", "LSB"] + opts + extra))
+                yield _windrv("quantum import %s %d %s" % (t, depth, opts[0]),
+                              tuple(["quantum", "import", img(src), t, str(depth), "Unsigned", "LSB", "out.miff"]
+                                    + opts + extra), ["out.miff"])
+    # third wave (after the round trip's target was blanked): index+alpha and opacity types on a
+    # palette image given an alpha channel, at every depth, all three ways
+    for t in ("indexalpha", "index", "opacity", "alpha"):
+        for depth in (1, 2, 4, 8, 16, 32):
+            for mode, fmt, out in (("export", "Unsigned", []), ("import", "Unsigned", ["out.miff"]),
+                                   ("roundtrip", "Unsigned", ["out.miff"])):
+                yield _windrv("quantum %s %s %d of a palette image with alpha" % (mode, t, depth),
+                              tuple(["quantum", mode, img("palette"), t, str(depth), fmt, "LSB"] + out + ["alpha"]), out)
+        for depth in (16, 24, 32, 64):
+            yield _windrv("quantum round trip %s %d float of a palette image with alpha" % (t, depth),
+                          tuple(["quantum", "roundtrip", img("palette"), t, str(depth), "FloatingPoint", "LSB", "out.miff",
+                                 "alpha"]), ["out.miff"])
+    for t, src in (("gray", "rose"), ("index", "palette"), ("grayalpha", "rose_alpha"), ("indexalpha", "palette")):
+        for depth in (1, 8, 16):
+            for mode, out in (("export", []), ("import", ["out.miff"])):
+                yield _windrv("quantum %s %s %d min-is-white" % (mode, t, depth),
+                              tuple(["quantum", mode, img(src), t, str(depth), "Unsigned", "LSB"] + out + ["minwhite"]),
+                              out)
+    for t, src in (("rgb", "rose"), ("gray", "rose"), ("cmyk", "cmyk"), ("rgba", "rose_alpha")):
+        for opts in (["nopack"], ["pad=2"], ["pad=5", "nopack"]):
+            for depth in (10, 12):
+                yield _windrv("quantum export %s %d %s" % (t, depth, " ".join(opts)),
+                              tuple(["quantum", "export", img(src), t, str(depth), "Unsigned", "LSB"] + opts))
+                yield _windrv("quantum import %s %d %s" % (t, depth, " ".join(opts)),
+                              tuple(["quantum", "import", img(src), t, str(depth), "Unsigned", "LSB", "out.miff"] + opts),
+                              ["out.miff"])
+    # matrix.c: MatrixInfo in memory, mapped and on disk (the driver sets the resource limits
+    # itself), set and read back in and out of range, NullMatrix, MatrixToImage; and
+    # GaussJordanElimination over regular, nearly singular, exactly singular and pivoting systems,
+    # and least squares through LeastSquaresAddTerms
+    for w, h in ((1, 1), (4, 3), (7, 5), (2, 9)):
+        for storage in ("memory", "map", "disk", "disksync"):
+            yield _windrv("matrix %dx%d in %s" % (w, h, storage), ("matrix", "info", str(w), str(h), storage))
+    for n in (1, 2, 3, 4, 6):
+        for kind in ("regular", "singular", "zero", "pivot", "lsq"):
+            for vectors in (1, 3):
+                yield _windrv("gauss-jordan %d %s, %d vectors" % (n, kind, vectors),
+                              ("matrix", "gauss", str(n), kind, str(vectors)))
+    # resample.c: ResamplePixelColor on a half-pixel grid around and across the edges (the
+    # outside-the-image shortcuts and their boundaries), every virtual pixel method but Random,
+    # point sampling with three interpolations and elliptical filters at three scales
+    for name in ("tiny", "rose"):
+        for vp in ("Background", "Dither", "Edge", "Mirror", "Tile", "Transparent", "Mask", "Black",
+                   "Gray", "White", "HorizontalTile", "VerticalTile", "HorizontalTileEdge", "VerticalTileEdge",
+                   "CheckerTile"):
+            for filt, scale, extra in (("Point", "0", ["interpolate=Bilinear"]), ("Point", "0", ["interpolate=Nearest"]),
+                                       ("Point", "0", ["interpolate=Catrom"]), ("Gaussian", "1", []),
+                                       ("Gaussian", "3", []), ("Lanczos", "1.5", []), ("Box", "0.7", [])):
+                yield _windrv("resample %s %s %s %s %s" % (name, vp, filt, scale, " ".join(extra)),
+                              tuple(["resample", img(name), vp, filt, scale] + extra))
+            # second wave: 40 pixels beyond the edges, past the tiling shortcuts' 32-pixel bounds
+            for filt, scale in (("Point", "0"), ("Gaussian", "1"), ("Gaussian", "3")):
+                yield _windrv("resample %s %s %s %s margin 40" % (name, vp, filt, scale),
+                              ("resample", img(name), vp, filt, scale, "margin=40"))
+    # timer.c: -bench (AcquireTimerInfo) and -duration (ContinueTimer) in magick-cli.c; the
+    # oracle masks the report's timings (owner's decision, 2026-10-04). A duration far longer
+    # than the run keeps every iteration, so the output is the same each time.
+    for args in (["-bench", "2"], ["-bench", "3", "-duration", "1000"], ["-bench", "2", "-concurrent", "-duration", "1000"]):
+        yield _case("benchgap", "rose %s -negate" % " ".join(args),
+                    [args + [img("rose"), "-negate"] + FLOAT_OUT + ["out.miff"]], ["out.miff"])
+    # token.c: GlobExpression directly: '*', '?', '[...]' sets and ranges with '-' and '!',
+    # '{a,b}' alternatives, '\\' escapes, the subimage check, case folding, UTF-8, an empty
+    # pattern and expression, and a pattern of many '*' over a long expression (the recursion)
+    exprs = ["", "a", "abc", "ABC", "abcabc", "a.png", "a.PNG", "x[1].png", "rose.miff", "b-c", "a*c", "a?c",
+             "été.txt", "{x}", "a\\b", "zzz", "repeat:40:ab"]
+    for pattern in ("", "*", "**", "a*", "*c", "a?c", "?", "a*b*c", "*.png", "*.[pP][nN][gG]", "[a-c]*",
+                    "[!a-c]*", "[]a]*", "[a-]*", "{a,b}*", "{abc,x}", "a{b,c}c", "{,a}bc", "a\\*c", "a\\?c",
+                    "rose.miff[1]", "x\\[1\\].png", "é*", "?t?.txt", "*b*c*a*", "repeat-*", "*a*b*z",
+                    "[[]*", "a[b", "{a,b",
+                    # an escaped backslash: the only escape that matches (the others compare the
+                    # backslash itself, an upstream bug)
+                    "a\\\\b", "x\\\\*"):
+        for case in ("exact", "nocase"):
+            yield _windrv("glob %r %s" % (pattern, case), tuple(["glob", pattern, case] + exprs))
+    # token.c: Tokenizer directly, with what no caller in ImageMagick passes: a short maximum
+    # token length (StoreToken's truncation), whitespace and escape characters, two quote
+    # characters, upper- and lower-case flags
+    for line, maxlen, white, breaks, quotes, escape, flag in (
+            ("alpha=beta gamma", "5", " ", "=", "\"", "-", "0"),
+            ("alpha=beta gamma", "6", " ", "=", "\"", "-", "1"),
+            ("alpha=beta gamma", "4", " ", "=", "\"", "-", "2"),
+            ('key = "quoted value" next', "64", " ", "=", "\"'", "\\", "0"),
+            ("a\\=b = 'c d' \"e'f\" g\\", "64", " ", "=,", "\"'", "\\", "1"),
+            ("one,two, three ,,four", "3", " \t", ",", "", "-", "0"),
+            ("\\ lead \\\\back x\\", "64", " ", ",", "\"", "\\", "2"),
+            ("'it''s' \"a\"\"b\" x", "64", " ", "", "\"'", "-", "0"),
+            ("tab\tsep\tline", "64", "\t", "", "", "-", "1"),
+            ("abcdefgh=ijklmnop", "8", "", "=", "", "-", "0"),
+            ("abcdefgh=ijklmnop", "9", "", "=", "", "-", "0"),
+            ("", "64", " ", "=", "\"", "-", "0")):
+        yield _windrv("tokenize %r max %s escape %s flag %s" % (line, maxlen, escape, flag),
+                      ("tokenize", line, maxlen, white, breaks, quotes, escape, flag))
+    # quantum.c: SetQuantumMetaChannel at and beyond its bounds (-1 and the number of meta
+    # channels) on an image with two meta channels, exporting the multispectral row; and
+    # SetQuantumPad at its overflow guard (MAGICK_SSIZE_MAX over the channel count)
+    for ch in ("-2", "-1", "0", "1", "2"):
+        yield _windrv("quantum meta channel %s of 2" % ch,
+                      ("quantum", "export", img("rose"), "multispectral", "8", "Unsigned", "LSB", "meta=2",
+                       "metachannel=" + ch))
+    for pad in ("0", "3", "3074457345618258602", "3074457345618258603"):  # (one below the guard crashes on its allocation)
+        yield _windrv("quantum pad %s" % pad, ("quantum", "export", img("rose"), "rgb", "8", "Unsigned", "LSB",
+                                               "pad=" + pad))
+    # color.c: GetColorTuple and QueryColorname from a PixelInfo of doubles, exactly SVGEpsilon
+    # (1e-6) away from an 8-bit value in each channel (IsSVGCompliant's boundary, which image
+    # pixels, 32-bit floats, cannot reach), at depth 8 and 16, RGB, gray and CMYK, with alpha;
+    # IsEquivalentAlpha and IsEquivalentIntensity around the fuzz; IsEquivalentImage
+    for r, g, b, k in (("1e-06", "0", "0", "0"), ("0", "1e-06", "0", "0"), ("0", "0", "1e-06", "0"),
+                       ("0", "0", "0", "1e-06"), ("2e-06", "0", "0", "0"), ("5e-07", "0", "0", "0"),
+                       ("257", "514", "771", "0"), ("257.5", "0", "65535", "0"), ("0", "0", "0", "0")):
+        for depth, cs, alpha in (("16", "sRGB", "0"), ("8", "sRGB", "0"), ("16", "sRGB", "1"),
+                                 ("16", "CMYK", "0"), ("16", "Gray", "0")):
+            yield _windrv("color tuple %s,%s,%s,%s depth %s %s%s" % (r, g, b, k, depth, cs, " alpha" if alpha == "1" else ""),
+                          ("color", "tuple", r, g, b, k, "32768", depth, cs, alpha))
+    for fuzz, p, q in (("0", "100 100 100 65535", "100 100 100 65535"), ("0", "100 100 100 65535", "100 100 101 65535"),
+                       ("1000", "100 100 100 65535", "900 100 100 65535"), ("1000", "100 100 100 65535", "2000 100 100 0"),
+                       ("1000", "100 100 100 65535", "100 100 100 64000"), ("1", "0 0 0 0", "0 0 0 1"),
+                       ("65535", "0 0 0 0", "65535 65535 65535 65535"),
+                       # second wave: the windows in which each mutation changes the answer
+                       # (fuzz^2 vs fuzz, the sum vs the difference, the square vs 1)
+                       ("1000", "100 100 100 65535", "5744 100 100 65535"),
+                       ("1000", "1000 1000 1000 65535", "1001 1000 1000 65535"),
+                       ("0.5", "100 100 100 65535", "100.5 100 100 65535"),
+                       ("1000", "100 100 100 30000", "100 100 100 31200"),
+                       ("1000", "100 100 100 1000", "100 100 100 1001"),
+                       ("0.5", "100 100 100 1000", "100 100 100 1000.1")):
+        yield _windrv("color equivalence fuzz %s: %s ~ %s" % (fuzz, p, q), tuple(["color", "equiv", fuzz] + p.split() + q.split()))
+    for target, fuzz in (("{C}/rose.miff", "0"), ("{C}/rose.miff[10x8+5+4]", "0"), ("{C}/rose.miff[10x8+5+4]", "5000"),
+                         ("{C}/tiny.miff", "0"), ("{C}/tiny.miff", "30000"), ("{C}/granite.miff[4x4+0+0]", "0")):
+        yield _windrv("color subimage %s fuzz %s" % (target, fuzz), ("color", "subimage", img("rose"), target, fuzz))
+    # stream.c: ReadStream with a handler that hashes each row, and one that also asks the
+    # streaming image for pixels (the stream cache methods: the stream then ends after its
+    # first row, every run alike); WriteStream with a handler that takes the encoded bytes
+    for name in ("rose", "rose_alpha", "cmyk", "palette", "gray16", "anim"):
+        for mode in ("plain", "read"):
+            yield _windrv("stream %s %s" % (mode, name), ("stream", mode, img(name)))
+    for fmt in ("png", "ppm", "gif", "jpg", "tif", "bmp", "pam"):
+        for mode in ("plain", "read"):
+            yield _case("windrv", "stream %s of rose as %s" % (mode, fmt),
+                        [[img("rose_alpha"), "r." + fmt], ["@driver", "stream", mode, "r." + fmt]], [])
+    for name, fmt in (("rose", "PNG"), ("rose", "PPM"), ("rose", "GIF"), ("rose", "MIFF"), ("rose_alpha", "PNG"),
+                      ("cmyk", "TIFF"), ("anim", "GIF"), ("palette", "BMP")):
+        yield _windrv("stream write %s as %s" % (name, fmt), ("stream", "write", img(name), fmt))
+    # cache.c: the pixel cache in memory and on disk (the driver sets the limits), with
+    # metacontent written and read back (Read/WritePixelCacheMetacontent), GetPixelCachePixels,
+    # GetOneVirtualPixelInfo with every virtual pixel method but Random, a clone (on disk,
+    # ClonePixelCacheOnDisk), ReshapePixelCache and DestroyImagePixels
+    for name in ("rose", "rose_alpha", "cmyk", "palette", "tiny"):
+        for storage in ("memory", "disk"):
+            for meta in ("0", "3", "8"):
+                yield _windrv("cache %s in %s, metacontent %s" % (name, storage, meta),
+                              ("cache", img(name), storage, meta))
+    # a memory limit of 1 byte and no map limit: the cache is a MapCache (GetPixelCachePixels
+    # hands its pixels out for a memory or map cache only; hand-run: 1 killed)
+    case = _windrv("cache rose as a map (MAGICK_MEMORY_LIMIT=1), metacontent 0", ("cache", img("rose"), "memory", "0"))
+    case["env"] = {"MAGICK_MEMORY_LIMIT": "1"}
+    yield _with_inputs(case)
+    # magick.c SetMagickPrecision: the precision from MAGICK_PRECISION (no registry entry, no
+    # -precision), read when GetMagickPrecision first asks (2026-10-10). Its env and policy
+    # lookups were killed only by -list resource cases, whose output followed the machine's memory
+    # size: those kills stopped after the host's upgrade; this one prints a fixed number.
+    case = _case("format", "MAGICK_PRECISION=3 -format %[fx:pi] info:",
+                 [["xc:", "-format", "%[fx:pi]\\n", "info:"]], [])
+    case["env"] = {"MAGICK_PRECISION": "3"}
+    yield _with_inputs(case)
+    # blob.c: blob input over a file (DiscardBlobBytes, ReadBlobMSBLongLong, ErrorBlob,
+    # ReadBlobString over LF, CRLF and CR endings, a line longer than its 4 KB buffer and a last
+    # line without one, EOFBlob, DuplicateBlob, ImageToFile) and SetBlobExtent on a file opened
+    # for writing
+    blob_texts = {
+        "lines": "ABCDEFGHIJ first\nsecond\r\nthird\rfourth\n\n" + "x" * 5000 + "\nlast no newline",
+        "short": "abc",
+        "empty": "",
+        "crlf": "one\r\ntwo\r\n\r\nthree\r\n",
+        # a last line without a newline after a CRLF line: the strip clears the '\n' but leaves
+        # the '\r' in the buffer, just past the last line's end (ReadBlobString's i-1 -> i+1);
+        # 8 bytes first for ReadBlobMSBLongLong
+        "stale": "12345678abc\r\nzz",
+        "stalecr": "12345678ab\r\nz",
+    }
+    for name, discard in (("lines", "3"), ("lines", "0"), ("lines", "9000"), ("short", "1"), ("empty", "0"),
+                          ("crlf", "2"), ("stale", "0"), ("stalecr", "0")):
+        yield _with_inputs(_windrv("blob input over %s, discard %s" % (name, discard),
+                                   ("blobio", "read", "%s.txt" % name, discard), ["copy.out"]),
+                           files={"%s.txt" % name: blob_texts[name]})
+    for extent in ("0", "1", "100", "5000"):
+        yield _windrv("SetBlobExtent %s" % extent, ("blobio", "extent", "e.bin", extent), ["e.bin"])
+    # second wave: an extent below, at and above what is already written, and with
+    # MAGICK_SYNCHRONIZE (posix_fallocate); FileToImage of an empty file (a zero buffer size)
+    for prewrite, extent in (("10", "5"), ("10", "10"), ("10", "11"), ("10", "300")):
+        for sync in ("", "sync"):
+            yield _windrv("SetBlobExtent %s after %s bytes%s" % (extent, prewrite, ", synchronized" if sync else ""),
+                          tuple(["blobio", "extent", "e.bin", extent, prewrite] + ([sync] if sync else [])), ["e.bin"])
+    # third wave: synchronized through ImageInfo (the environment variable is read when the
+    # ImageInfo is made, before the driver could set it), and closed right after the extent
+    for prewrite, extent in (("10", "5"), ("10", "11"), ("0", "1"), ("10", "300")):
+        for opts in (["nowrite"], ["sync"], ["sync", "nowrite"]):
+            yield _windrv("SetBlobExtent %s after %s bytes, %s" % (extent, prewrite, " ".join(opts)),
+                          tuple(["blobio", "extent", "e.bin", extent, prewrite] + opts), ["e.bin"])
+    # fourth wave: ReadBlobString through zlib (a text image written as .gz) and DiscardBlobBytes
+    # over more than one chunk of a large file
+    yield _case("windrv", "blob input over a gzip text file",
+                [["-size", "3x2", "xc:red", "txt:t.txt.gz"], ["@driver", "blobio", "read", "t.txt.gz", "2"]], ["copy.out"])
+    big = "".join("line %05d %s\n" % (i, "y" * 50) for i in range(1000))
+    for discard in ("20000", "40000", "61999"):
+        yield _with_inputs(_windrv("blob input over a 62000-byte file, discard %s" % discard,
+                                   ("blobio", "read", "big.txt", discard), ["copy.out"]), files={"big.txt": big})
+    yield _with_inputs(_windrv("FileToImage of an empty file", ("blob", "filetoimage", "empty.txt", "o.txt"), ["o.txt"]),
+                       files={"empty.txt": ""})
+    # pixel.c: SortImagePixels (-sort-pixels)
+    for name in ("rose", "rose_alpha", "gray16", "cmyk", "tiny", "palette"):
+        yield _op("windrv", "%s -sort-pixels" % name, [img(name)], ["-sort-pixels"])
+    for name, x, y in (("rose", 5, 5), ("rose_alpha", -3, 100), ("palette", 69, 45), ("cmyk", 100, -20),
+                       ("gray16", 2, 2), ("tiny", 0, 0), ("bilevel", -1, -1)):
+        yield _windrv("cache view of %s at %d,%d" % (name, x, y), ("cacheview", "{C}/%s.miff" % name, str(x), str(y)))
+# delegate.c: PostScript read back through Ghostscript (the owner allowed external programs,
+# 2026-10-03; gs from Homebrew, on the oracle's PATH), and PostScript written as EPS. Where gs is
+# missing the read fails alike in every run. Inkscape's SVG output and Graphviz's (dot) vary
+# between runs, so no case uses them.
+GAP_STEP_CASES += [
+    ("PostScript through Ghostscript, read back", [["{C}/rose.miff", "a.ps"], ["a.ps", "out.miff"]], {}),
+    ("PostScript through Ghostscript, as EPS", [["{C}/rose.miff", "a.ps"], ["a.ps", "b.eps"], ["b.eps", "out.miff"]], {}),
+]

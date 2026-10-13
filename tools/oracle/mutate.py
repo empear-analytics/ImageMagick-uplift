@@ -76,7 +76,8 @@ MUTANT_TIMEOUT_MAX = 60
 # false kills; a timeout is therefore rerun once with this limit before it
 # counts. A mutant that really loops forever costs this much, once.
 MUTANT_TIMEOUT_CONFIRM = 120
-LCOV = os.path.join(oracle.OUT, "oracle.lcov")
+SANDBOX = []  # sandbox(binary), set in main(); oracle.WRAPPER adds the memory cap's prefix
+LCOV = os.path.join(oracle.OUT, "oracle%s.lcov" % oracle.WIDE)
 
 
 def _source_order(m):
@@ -109,8 +110,8 @@ def list_mutants(binary, file_regex):
 def function_ranges(file_regex):
     """(name, file, first line, last line) for every function in the matching
     files, from the coverage build's mapping."""
-    cov_bin = os.path.join(oracle.OUT, "cov", "utilities", "magick")
-    prof = os.path.join(oracle.OUT, "oracle.profdata")
+    cov_bin = os.path.join(oracle.OUT, "cov" + oracle.WIDE, "utilities", "magick")
+    prof = os.path.join(oracle.OUT, "oracle%s.profdata" % oracle.WIDE)
     out = subprocess.run([LLVM_COV, "export", "-skip-expansions", cov_bin,
                           "-instr-profile=" + prof], stdout=subprocess.PIPE,
                          stderr=subprocess.DEVNULL, check=True).stdout
@@ -163,7 +164,8 @@ def plain(name):
 
 def sandbox(binary):
     """A prefix that lets a mutant run magick and write under build-oracle/,
-    and nothing else: sandbox-exec on macOS, bubblewrap on Linux.
+    and nothing else: sandbox-exec on macOS, bubblewrap on Linux (Landlock
+    where bwrap is not installed).
 
     delegate.c runs the commands in delegates.xml: lpr, `open -a Preview`,
     curl, gimp, `... ; /bin/rm`. The case catalogue never asks for those, but
@@ -173,13 +175,17 @@ def sandbox(binary):
     """
     out = os.path.realpath(oracle.OUT)
     if not oracle.MACOS:
-        return bwrap_sandbox(out)
+        return bwrap_sandbox(out) if shutil.which("bwrap") else landlock_sandbox(out)
+    # The @driver cases run imdriver beside the binary; allow it to exec too, else every driver
+    # case fails alike under the sandbox and can kill nothing (it did, silently, on macOS until
+    # 2026-10-04). imdriver is part of the harness, built from driver/imdriver.c, not a delegate.
+    driver = os.path.realpath(oracle.driver_path(binary))
     profile = ("(version 1)(allow default)"
-               "(deny process-exec)(allow process-exec (literal \"%s\"))"
+               "(deny process-exec)(allow process-exec (literal \"%s\") (literal \"%s\"))"
                "(deny network*)"
                "(deny file-write*)(allow file-write* (subpath \"%s\")"
                " (literal \"/dev/null\") (literal \"/dev/tty\") (literal \"/dev/dtracehelper\"))"
-               % (os.path.realpath(binary), out))
+               % (os.path.realpath(binary), driver, out))
     return ["/usr/bin/sandbox-exec", "-p", profile]
 
 
@@ -197,8 +203,24 @@ def bwrap_sandbox(out):
     args += ["--ro-bind", "/usr/share", "/usr/share", "--ro-bind", "/etc", "/etc"]
     if os.path.isdir("/var/cache/fontconfig"):  # without it every case rebuilds the font cache
         args += ["--ro-bind", "/var/cache/fontconfig", "/var/cache/fontconfig"]
+    # pocl (OpenCL on the CPU) reads the CPU topology in /sys and links each kernel with ld,
+    # which is a linker, not a shell: no delegate command line can run through it.
+    args += ["--ro-bind", "/sys", "/sys"]
+    if os.path.exists("/usr/bin/ld"):
+        args += ["--ro-bind", os.path.realpath("/usr/bin/ld"), "/usr/bin/ld"]
+    os.makedirs(oracle.X11_SOCKETS, exist_ok=True)  # the X11 cases' servers (oracle.start_xvfb)
     return args + ["--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
-                   "--ro-bind", root, root, "--bind", out, out, "--"]
+                   "--ro-bind", root, root, "--bind", out, out,
+                   "--bind", oracle.X11_SOCKETS, "/tmp/.X11-unix", "--"]
+
+
+def landlock_sandbox(out):
+    """Where bwrap cannot run (a container that forbids mounts): a fresh
+    network namespace for no network, and landlock.py for writes only under
+    build-oracle/ and no program but magick. See landlock.py."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    return ["/usr/bin/unshare", "--user", "--map-current-user", "--net",
+            sys.executable, os.path.join(here, "landlock.py"), out]
 
 
 def _is_case_kill(r):
@@ -252,7 +274,7 @@ def _parse_args():
     p.add_argument("--max-cases", type=int, default=300,
                    help="cases tried per mutant, spread over case families (0: all)")
     p.add_argument("--seed", type=int, default=1)
-    p.add_argument("-j", "--jobs", type=int, default=os.cpu_count())
+    p.add_argument("-j", "--jobs", type=int, default=oracle.default_jobs())
     return p.parse_args()
 
 
@@ -260,6 +282,27 @@ def _limit_file_size():
     # No child may write a file over 2 GB (it gets SIGXFSZ instead): a
     # runaway mutant must not fill the disk. Children inherit the limit.
     resource.setrlimit(resource.RLIMIT_FSIZE, (2 << 30, resource.getrlimit(resource.RLIMIT_FSIZE)[1]))
+
+
+def _limit_memory():
+    # ORACLE_MEM_GB=N caps each child's address space at N GB, for a machine
+    # whose RAM a few runaway mutants can fill before their timeout (one that
+    # stops pruning quantize.c's colour tree grew it without bound, and six at
+    # once froze an 8 GB WSL). Such a mutant then fails to allocate, and is
+    # killed, as it would be at the timeout. Off unless set.
+    # Returns a command prefix: prlimit caps the child only. A limit set here
+    # would cap this process too, and at 24 jobs its threads (a stack and a
+    # malloc arena each, beside the casemap) passed 2 GB: 2176 mutants of the
+    # W01 run came back as MemoryError (2026-10-05). Without prlimit, fall back
+    # to that, so keep -j low.
+    gb = os.environ.get("ORACLE_MEM_GB")
+    if not gb:
+        return []
+    if shutil.which("prlimit"):
+        return ["prlimit", "--as=%d" % (int(gb) << 30), "--"]
+    print("mutate: no prlimit, so ORACLE_MEM_GB caps this process as well", file=sys.stderr)
+    resource.setrlimit(resource.RLIMIT_AS, (int(gb) << 30, resource.getrlimit(resource.RLIMIT_AS)[1]))
+    return []
 
 
 def _in_function(m, function):
@@ -345,8 +388,9 @@ class _Run:
         Kept per binary, catalogue and way of running (the wrapper), so a
         resumed run does not spend minutes recomputing it. The wrapper is in
         the key because adding the sandbox changed two cases' stderr, and a
-        cache from before it turned those into 28 false kills."""
-        wrap = hashlib.sha1(json.dumps(oracle.WRAPPER).encode()).hexdigest()[:8]
+        cache from before it turned those into 28 false kills. The memory cap's
+        prefix is not: it caps the same children as the limit it replaced."""
+        wrap = hashlib.sha1(json.dumps(SANDBOX).encode()).hexdigest()[:8]
         cache_file = (oracle.cache_path(self.binary, self.manifest).replace(".json", "")
                       + "-mull-%s.json" % wrap)
         base = _cached_baseline(cache_file)
@@ -356,12 +400,19 @@ class _Run:
             base.update(oracle.parallel(
                 lambda c: oracle.run_case(self.binary, side, c, self.manifest),
                 todo, self.jobs, "baseline"))
+            os.makedirs(os.path.dirname(cache_file), exist_ok=True)  # new machine: no cache yet
             with open(cache_file, "w") as f:
                 json.dump(base, f)
         base = {i: base[i] for i in needed}
         unstable = sorted(i for i in needed if "timeout" in base[i]["rc"])
         for i in unstable:  # a case that times out unmutated can kill nothing honestly
             base.pop(i)
+        if unstable:
+            # Say so: a dropped case tests nothing, and a mutant it was meant
+            # for then survives or shows no coverage with no sign of why.
+            # Subimage search on a full-size image was one, on a Mull build.
+            print("mutate: %d case(s) time out unmutated and are left out: %s"
+                  % (len(unstable), " ".join(unstable[:10])), flush=True)
         shutil.rmtree(os.path.join(oracle.WORK, "runs", "mbase-" + self.slug), ignore_errors=True)
         return base
 
@@ -462,8 +513,10 @@ def main():
     binary = os.path.abspath(args.bin or os.path.join(oracle.OUT, "mull-" + slug,
                                                       "utilities", "magick"))
     base_bin = oracle.build("base", "origin/main")  # only for the corpus and option lists
-    oracle.WRAPPER = sandbox(binary)  # baseline and mutants alike
+    global SANDBOX
+    SANDBOX = sandbox(binary)
     _limit_file_size()
+    oracle.WRAPPER = _limit_memory() + SANDBOX  # baseline and mutants alike
     manifest, cases = oracle.load_cases(base_bin)
     run = _Run(binary, slug, manifest, {c["id"]: c for c in cases})
     run.max_cases, run.jobs = args.max_cases, args.jobs

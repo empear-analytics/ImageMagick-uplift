@@ -33,6 +33,8 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
+import threading
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -47,13 +49,23 @@ FIXED_MTIME = 1000000000       # 2001-09-09; file dates end up in properties
 # Prepended to every magick invocation by run_case, e.g. a sandbox (mutate.py).
 WRAPPER = []
 TIMEOUT = 30                   # the slowest legitimate case takes under 3s
-HARNESS_VERSION = "9"        # bump when normalisation or execution changes
+HARNESS_VERSION = "14"        # bump when normalisation or execution changes (13: OpenCL profile at this boot's clock; 14: X11 cases keep the fixed epoch on a build without X)
+# WIDE=1, as for build.sh: the builds with X11 and OpenCL (base-wide, cov-wide, ...), with a
+# case map and line coverage of their own (casemap-wide.json, oracle-wide.profdata, ...).
+WIDE = "-wide" if os.environ.get("WIDE") else ""
 
 LISTS = ["Colorspace", "Compose", "Distort", "Filter", "Interpolate",
          "VirtualPixel", "Morphology", "Kernel", "Evaluate", "Statistic",
          "Noise", "Dither", "Layers", "Complex", "Intensity", "SparseColor",
          "Type", "Preview", "Metric"]
 MACOS = sys.platform == "darwin"
+
+
+def default_jobs():
+    """Parallel processes when no -j is given: ORACLE_JOBS if set, else one per
+    CPU. On a machine short of memory, ORACLE_JOBS=4 bounds every tool at once,
+    casemap.py and linecov.py too, which take no -j of their own."""
+    return int(os.environ.get("ORACLE_JOBS") or os.cpu_count())
 
 
 def llvm_tool(name):
@@ -84,6 +96,10 @@ def env_for(binary, case_dir, extra_env=None):
         "MAGICK_TEMPORARY_PATH": case_dir,
         "MAGICK_THREAD_LIMIT": "1", "OMP_NUM_THREADS": "1",
         "SOURCE_DATE_EPOCH": str(FIXED_MTIME),
+        # OpenCL (see seed_opencl_profile); inert unless a case sets MAGICK_OCL_DEVICE.
+        "MAGICK_OPENCL_CACHE_DIR": os.path.join(case_dir, OPENCL_CACHE),
+        "POCL_CACHE_DIR": os.path.join(WORK, "pocl-cache"),
+        "POCL_WORK_GROUP_METHOD": "cbs",  # pocl 5.0's default methods abort on ImageMagick's kernels
     }
     if not MACOS:
         # Some paths read heap memory they never wrote (single-channel raw
@@ -93,8 +109,139 @@ def env_for(binary, case_dir, extra_env=None):
         env["MALLOC_PERTURB_"] = "165"
     if "LLVM_PROFILE_FILE" in os.environ:
         env["LLVM_PROFILE_FILE"] = os.environ["LLVM_PROFILE_FILE"]
-    env.update(extra_env or {})  # per-case profiles, Mull mutant switches
+    # An AddressSanitizer build (SANITIZE=address build.sh mull) is run with the caller's
+    # ASAN_OPTIONS, e.g. ASAN_OPTIONS=detect_leaks=0:exitcode=86 so a report kills the mutant.
+    if "ASAN_OPTIONS" in os.environ:
+        env["ASAN_OPTIONS"] = os.environ["ASAN_OPTIONS"]
+    for name, value in (extra_env or {}).items():  # per-case profiles, Mull mutant switches
+        if value is None:  # a case may remove a variable: X11 cases drop SOURCE_DATE_EPOCH
+            env.pop(name, None)
+        else:
+            env[name] = value
     return env
+
+
+# ---------------------------------------------------------------------------
+# X11 and OpenCL, for the builds configured with them (build.sh wide)
+# ---------------------------------------------------------------------------
+# An X11 case ("x11": True) gets an X server of its own, so that what one case draws on the
+# root window cannot reach another running beside it. Xvfb runs with a fixed screen and no
+# window manager. Its socket goes into X11_SOCKETS, mounted over /tmp/.X11-unix for Xvfb and
+# for the mutation sandbox (mutate.py), whose network namespace hides the abstract socket;
+# under WSLg /tmp/.X11-unix is read-only anyway. Displays from :100 up, so that a client whose
+# server is gone cannot fall through to a real desktop on :0. "x11" may name another screen,
+# e.g. "640x480x8" for an 8-bit PseudoColor root visual, and Xvfb options after it, e.g.
+# "640x480x8 -cc 0" for StaticGray (this Xvfb starts no screen of depth 1, 4 or 12).
+X11_SOCKETS = os.path.join(WORK, "x11")
+XVFB_SCREEN = "640x480x24"
+
+
+def start_xvfb(screen=XVFB_SCREEN):
+    """(process, display) of a new Xvfb, or None where Xvfb or bwrap is missing: the case
+    then fails alike on both sides (UnableToOpenXServer)."""
+    if not (shutil.which("Xvfb") and shutil.which("bwrap")):
+        return None
+    os.makedirs(X11_SOCKETS, exist_ok=True)
+    first = os.getpid() * 37
+    for k in range(64):
+        display = ":%d" % (100 + (first + k) % 800)
+        ready_r, ready_w = os.pipe()
+        # Xvfb's lock file in /tmp refuses a display already in use; it then exits at once.
+        p = subprocess.Popen(["bwrap", "--dev-bind", "/", "/", "--bind", X11_SOCKETS,
+                              "/tmp/.X11-unix", "--die-with-parent", "Xvfb", display,
+                              "-displayfd", str(ready_w), "-nolisten", "tcp",
+                              "-screen", "0"] + screen.split(),
+                             pass_fds=(ready_w,), stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        os.close(ready_w)
+        with os.fdopen(ready_r) as ready:
+            if ready.readline().strip():
+                return p, display
+        p.wait()
+    raise RuntimeError("Xvfb did not start with the screen %s" % screen)
+
+
+def stop_xvfb(xvfb):
+    if xvfb is not None:
+        xvfb[0].terminate()
+        try:
+            xvfb[0].wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            xvfb[0].kill()
+            xvfb[0].wait()
+
+
+# An OpenCL case sets "env": {"MAGICK_OCL_DEVICE": "CPU"}. pocl, the CPU implementation, is
+# not under test: its kernel cache (POCL_CACHE_DIR) is shared and stays warm. ImageMagick's
+# own cache, compiled kernels and the device profile, goes into OPENCL_CACHE in the case
+# directory and is removed before the files are compared. MAGICK_OCL_DEVICE alone does not
+# pin the device: without a profile ImageMagick times the OpenCL device against its CPU path
+# and disables the device when the CPU path wins, which varies from run to run. So every
+# case starts from a profile in which the OpenCL devices win.
+OPENCL_CACHE = ".opencl"
+OPENCL_PROFILE = os.path.join(WORK, "opencl-profile.xml")  # delete after a pocl upgrade
+
+
+def opencl_profile(binary):
+    """This machine's device profile with every OpenCL device scored best, or None where
+    binary finds no OpenCL device. Made once from a run that benchmarks the devices; the
+    device's name, version, clock and units must match for ImageMagick to use the score."""
+    if not os.path.exists(OPENCL_PROFILE):
+        os.makedirs(WORK, exist_ok=True)
+        tmp = tempfile.mkdtemp(dir=WORK, prefix="opencl-")
+        try:
+            subprocess.run([binary, "rose:", "-blur", "0x1", "null:"], cwd=tmp,
+                           env=env_for(binary, tmp, {"MAGICK_OCL_DEVICE": "CPU"}),
+                           stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, timeout=300)
+            with open(os.path.join(tmp, OPENCL_CACHE, "ImageMagick",
+                                   "ImagemagickOpenCLDeviceProfile.xml")) as f:
+                xml = f.read()
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        xml = re.sub(r'(<device name="CPU" score=")[^"]*', r"\g<1>1e+06", xml)
+        xml = re.sub(r'(<device platform=[^>]* score=")[^"]*', r"\g<1>1", xml)
+        with tempfile.NamedTemporaryFile("w", dir=WORK, delete=False) as f:
+            f.write(xml)
+        os.replace(f.name, OPENCL_PROFILE)  # parallel cases may race to write the same
+    with open(OPENCL_PROFILE) as f:
+        xml = f.read()
+    # ImageMagick matches a device's maxClockFrequency exactly, and pocl takes it from the clock
+    # the CPU reports, which under WSL moves by a MHz between boots (3792, then 3791.999 read as
+    # 3791): with the profile of an earlier boot every OpenCL case benchmarked the devices, the
+    # CPU path won, and OpenCL ran disabled (2026-10-09). So the clock is this boot's. (Several
+    # entries for nearby clocks would also match, but would hide mutants of the matching itself.)
+    clock = cpu_clock()
+    if clock is not None:
+        xml = re.sub(r'(maxClockFrequency=")\d+', r"\g<1>%d" % clock, xml)
+    return xml
+
+
+_CPU_CLOCK = []
+
+
+def cpu_clock():
+    """The CPU clock in whole MHz as pocl reports it (cpu MHz in /proc/cpuinfo, truncated), or
+    None where there is no such line (macOS)."""
+    if not _CPU_CLOCK:
+        try:
+            with open("/proc/cpuinfo") as f:
+                m = re.search(r"^cpu MHz\s*:\s*([\d.]+)", f.read(), re.M)
+            _CPU_CLOCK.append(int(float(m.group(1))) if m else None)
+        except OSError:
+            _CPU_CLOCK.append(None)
+    return _CPU_CLOCK[0]
+
+
+def seed_opencl_profile(binary, d):
+    xml = opencl_profile(binary)
+    path = os.path.join(d, OPENCL_CACHE, "ImageMagick", "ImagemagickOpenCLDeviceProfile.xml")
+    if xml is not None and not os.path.exists(path):  # a case may bring a profile of its own
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write(xml)
 
 
 def source_dir_of(build_dir):
@@ -119,12 +266,24 @@ NORMALISE = [
      rb"\1BUILDSTAMP"),
     # Temporary file names are random.
     (re.compile(rb"magick-[A-Za-z0-9_-]{8,}"), rb"magick-TMPFILE"),
+    # pocl reports each kernel it compiles, so only while its cache is cold (OpenCL cases).
+    (re.compile(rb"(?m)^\[SubCFG\] Form SubCFGs in \w+\n"), rb""),
     # Timing lines in identify -verbose, info:, json:, yaml:.
     (re.compile(rb"(?im)^(\s*(elapsed time|user time|pixels per second)\s*:).*$"), rb"\1 TIME"),
     (re.compile(rb'(?i)("?(elapsedTime|userTime|pixelsPerSecond)"?\s*:\s*)"?[^",\n]*"?'),
      rb"\1TIME"),
+    # The -bench report (magick-cli.c): iterations per second, efficiency, user and elapsed
+    # time vary; the thread count and the iterations stay (owner's decision, 2026-10-04).
+    (re.compile(rb"(Performance\[[0-9]+\]: [0-9]+i) \S+ips \S+e \S+u \S+"),
+     rb"\1 TIMEips TIMEe TIMEu TIME"),
     # User and elapsed time closing a plain identify / info: line.
     (re.compile(rb"\b[0-9]+\.[0-9]+u [0-9]+:[0-9]+\.[0-9]+"), rb"TIMEu TIME"),
+    # -list configure's toolchain lines: the compiler flags and libraries a build was configured
+    # with, include paths of the installed Homebrew versions among them. Base and candidate
+    # configured on different days differ there (a library upgraded in between), which says
+    # nothing about ImageMagick; DELEGATES, FEATURES and the rest stay compared.
+    (re.compile(rb"(?m)^(CC|CFLAGS|CONFIGURE|CPPFLAGS|CXX|CXXFLAGS|DEFS|DISTCHECK_CONFIG_FLAGS|"
+                rb"LDFLAGS|LIBS|PCFLAGS)( +)\S.*$"), rb"\1\2BUILDFLAGS"),
     # The PDF writer dates its output from the file ctime, not SOURCE_DATE_EPOCH.
     (re.compile(rb"/(CreationDate|ModDate) \(D:[0-9]+[^)]*\)"), rb"/\1 (D:DATE)"),
     (re.compile(rb"<xmp:(CreateDate|ModifyDate|MetadataDate)>[^<]*<"), rb"<xmp:\1>DATE<"),
@@ -136,7 +295,7 @@ BUILD_TREE_RE = re.compile(re.escape(OUT.encode()) +
 UNSEEDED = ("conjure", "-version", "-list")
 # Subcommands take their options after the subcommand name.
 SUBCOMMANDS = ("compare", "identify", "montage", "composite", "conjure", "stream",
-               "convert", "mogrify")
+               "convert", "mogrify", "display", "animate", "import")
 
 
 def normalise(data, case_dir=None):
@@ -176,12 +335,27 @@ CORPUS_EXTRAS = {
 }
 
 
+# Bump when the corpus's contents change (a file added or altered), so a machine with an
+# older cached corpus rebuilds it instead of silently running against the stale one. (2):
+# Narrow.ttf added for the font-matching cases. (3): Quirk.ttf (kerning, buggy metrics, no
+# Unicode character map) for annotate.c's RenderFreetype and ComplexTextLayout.
+CORPUS_VERSION = 3
+
+
 def ensure_corpus(binary):
     """Build the input corpus once and freeze it. Returns the manifest."""
     manifest_path = os.path.join(CORPUS, "manifest.json")
     if os.path.exists(manifest_path):
         with open(manifest_path) as f:
-            return json.load(f)
+            manifest = json.load(f)
+        # The version guards against an added or changed file; the font check is a belt-and-braces
+        # guard against a corpus left half-built (e.g. a crash or a race on the shared dir): a
+        # stale corpus that still answered would silently fail the cases that need the new file.
+        fonts_present = all(os.path.exists(os.path.join(CORPUS, fn))
+                            for fn in (catalogue.FONT, catalogue.FONT2, catalogue.FONT3))
+        if manifest.get("version") == CORPUS_VERSION and fonts_present:
+            return manifest
+        shutil.rmtree(CORPUS, ignore_errors=True)  # stale: a file was added, changed or missing
     tmp = CORPUS + ".tmp"
     shutil.rmtree(tmp, ignore_errors=True)
     os.makedirs(os.path.join(tmp, "files"))
@@ -191,7 +365,7 @@ def ensure_corpus(binary):
     files = decode_files()
     copy_decode_files(files, tmp)
     dims = corpus_dims(binary, tmp)
-    manifest = {"digest": freeze(tmp), "dims": dims, "decode_files": files}
+    manifest = {"version": CORPUS_VERSION, "digest": freeze(tmp), "dims": dims, "decode_files": files}
     with open(os.path.join(tmp, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=1)
     os.rename(tmp, CORPUS)
@@ -219,6 +393,8 @@ def make_extra_images(binary, tmp):
 def write_corpus_texts(tmp):
     shutil.copyfile(os.path.join(ROOT, "PerlMagick/t", catalogue.FONT),
                     os.path.join(tmp, catalogue.FONT))
+    for font in (catalogue.FONT2, catalogue.FONT3):
+        shutil.copyfile(os.path.join(ROOT, "tools/oracle", font), os.path.join(tmp, font))
     with open(os.path.join(tmp, "draw.mvg"), "w") as f:
         f.write(catalogue.MVG)
     with open(os.path.join(tmp, "draw.svg"), "w") as f:
@@ -321,25 +497,56 @@ def read_capped(path):
     return data
 
 
+_HAS_X = {}
+
+
+def has_x(binary):
+    """Whether the binary was built with X11: `x` among -version's built-in delegates."""
+    if binary not in _HAS_X:
+        r = magick(binary, ["-version"], WORK)
+        line = next((l for l in r.stdout.decode().splitlines() if l.startswith("Delegates")), "")
+        _HAS_X[binary] = " x " in line + " "
+    return _HAS_X[binary]
+
+
 def run_case(binary, side, case, manifest, extra_env=None, timeout=None):
     d = case_dir(side, case)
     shutil.rmtree(d, ignore_errors=True)
     os.makedirs(d)
-    write_case_files(d, case)
+    write_case_files(d, case, binary)
     rcs, outs, errs = [], [], []
     # stdin is a named file for the cases that read "-", and nothing otherwise;
     # inheriting the driver's stdin would make results depend on how it was run.
     stdin_path = os.path.join(d, expand([case["stdin"]], manifest)[0]) if case.get("stdin") \
         else os.devnull
+    env = dict(case.get("env", {}), **(extra_env or {}))
+    if env.get("MAGICK_OCL_DEVICE"):
+        seed_opencl_profile(binary, d)
     started = time.time()
-    for step in case["steps"]:
-        fix_dates(d)
-        argv = command_line(binary, expand(step, manifest))
-        rc, step_out, step_err = run_step(argv, d, stdin_path, env=env_for(binary, d, extra_env),
-                                          timeout=timeout or TIMEOUT)
-        rcs.append(rc)
-        outs.append(step_out)
-        errs.append(step_err)
+    x11 = case.get("x11")
+    xvfb = start_xvfb(x11 if isinstance(x11, str) else XVFB_SCREEN) if x11 else None
+    if xvfb is not None:
+        env["DISPLAY"] = xvfb[1]
+        # display and animate advance on GetMagickTime(), which a fixed epoch stops, so X11 cases
+        # drop it, unless the case sets it itself: display also handles ConfigureNotify only once
+        # GetMagickTime() has moved on from the event (its "stasis"), so under a running clock a
+        # resized window is repainted or not depending on a second boundary. The interactive
+        # cases (xevents, no delays) keep the fixed epoch for that reason. A build without X keeps
+        # it too: there `x:` writes a MIFF file named "x:", whose date:timestamp would be the clock.
+        if "SOURCE_DATE_EPOCH" not in case.get("env", {}) and has_x(binary):
+            env["SOURCE_DATE_EPOCH"] = None
+    try:
+        for step in case["steps"]:
+            fix_dates(d)
+            argv = command_line(binary, expand(step, manifest))
+            rc, step_out, step_err = run_step(argv, d, stdin_path, env=env_for(binary, d, env),
+                                              timeout=timeout or TIMEOUT)
+            rcs.append(rc)
+            outs.append(step_out)
+            errs.append(step_err)
+    finally:
+        stop_xvfb(xvfb)
+    shutil.rmtree(os.path.join(d, OPENCL_CACHE), ignore_errors=True)
     files = case_files(d)
     out, err = b"\n".join(outs), b"\n".join(errs)
     return {"rc": rcs, "out": digest(out), "err": digest(err), "files": files,
@@ -348,26 +555,97 @@ def run_case(binary, side, case, manifest, extra_env=None, timeout=None):
             "err_text": err[:600].decode(errors="replace")}
 
 
-def write_case_files(d, case):
+def write_case_files(d, case, binary=None):
     for name, text in case.get("files", {}).items():  # e.g. an MSL script
-        with open(os.path.join(d, name), "w") as f:
-            f.write(text.replace("{C}", CORPUS_REL))
+        path = os.path.join(d, name)  # a name may hold directories (.config/...)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        text = text.replace("{C}", CORPUS_REL)
+        if "{OCL_DEVICE}" in text:
+            text = text.replace("{OCL_DEVICE}", opencl_device_attributes(binary))
+        with open(path, "w") as f:
+            f.write(text)
+
+
+def opencl_device_attributes(binary):
+    """The attributes that identify this machine's OpenCL device in a device profile (platform,
+    vendor, name, version, maxClockFrequency at this boot's clock, maxComputeUnits), for a case
+    that brings a profile of its own: its files write `<device {OCL_DEVICE} score="..."/>`. A
+    static profile cannot name the clock, which moves between boots (opencl_profile). Where
+    binary finds no OpenCL device, attributes that match none."""
+    xml = opencl_profile(binary) if binary else None
+    m = re.search(r'<device (platform=[^>]*?) score="', xml or "")
+    return m.group(1) if m else 'platform="none" name="none"'
 
 
 def fix_dates(d):
     for n in os.listdir(d):  # files read back must not carry today's date
-        os.utime(os.path.join(d, n), (FIXED_MTIME, FIXED_MTIME))
+        try:
+            os.utime(os.path.join(d, n), (FIXED_MTIME, FIXED_MTIME))
+        except FileNotFoundError:  # a temporary file removed since the listing
+            pass
+
+
+DRIVER_STEP = "@driver"  # a step that calls the API through imdriver (tools/oracle/driver)
+
+
+def driver_path(binary):
+    """The imdriver built against the same build as binary (driver/build.sh)."""
+    return os.path.join(os.path.dirname(binary), "imdriver")
+
+
+# A step that drives an X client with synthetic key presses: ["@xevents", SCRIPT, magick args...]
+# runs `xevents SCRIPT -- magick args...` (driver/xevents.c), for display's commands and widgets.
+XEVENTS_STEP = "@xevents"
+XEVENTS = os.path.join(OUT, "xevents", "xevents")
+
+
+XEVENTS_LOCK = threading.Lock()  # the oracle's workers are threads
+
+
+def xevents_path():
+    """xevents, compiled from driver/xevents.c when missing or older than it; None where it
+    cannot be built (no Xlib or XTEST headers): the step then fails alike in every run."""
+    src = os.path.join(ROOT, "tools", "oracle", "driver", "xevents.c")
+    with XEVENTS_LOCK:
+        if os.path.exists(XEVENTS) and os.path.getmtime(XEVENTS) >= os.path.getmtime(src):
+            return XEVENTS
+        os.makedirs(os.path.dirname(XEVENTS), exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=os.path.dirname(XEVENTS))  # other processes may build too
+        os.close(fd)
+        r = subprocess.run(["cc", "-O2", "-o", tmp, src, "-lX11", "-lXtst"],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if r.returncode != 0:
+            os.remove(tmp)
+            return None
+        os.chmod(tmp, 0o755)
+        os.replace(tmp, XEVENTS)
+        return XEVENTS
 
 
 def command_line(binary, argv):
     """The full command for one expanded step, wrapper and seed included."""
+    if argv and argv[0] == DRIVER_STEP:
+        # Without a driver beside the binary the step fails alike in every run of this
+        # build, so a driver case can neither kill a mutant nor reach a function there.
+        if not os.path.exists(driver_path(binary)):
+            return WRAPPER + [binary, "-imdriver-not-built"]
+        return WRAPPER + [driver_path(binary)] + argv[1:]
+    if argv and argv[0] == XEVENTS_STEP:
+        helper = xevents_path()
+        if helper is None:
+            return WRAPPER + [binary, "-xevents-not-built"]
+        return WRAPPER + [helper, argv[1], "--"] + magick_line(binary, argv[2:])
+    return WRAPPER + magick_line(binary, argv)
+
+
+def magick_line(binary, argv):
     # Every random generator is seeded; unseeded ones read /dev/urandom.
     # conjure takes `-key value` script variables, not options, so MSL
     # cases must avoid random operators instead.
     if argv and argv[0] in UNSEEDED:
-        return WRAPPER + [binary] + argv
+        return [binary] + argv
     at = 1 if argv and argv[0] in SUBCOMMANDS else 0
-    return WRAPPER + [binary] + argv[:at] + ["-seed", "1"] + argv[at:]
+    return [binary] + argv[:at] + ["-seed", "1"] + argv[at:]
 
 
 def run_step(argv, d, stdin_path, **run_options):
@@ -473,8 +751,72 @@ def file_sha(path):
     return h.hexdigest()
 
 
+def library_fingerprint(binary):
+    """The shared libraries binary loads, by resolved path and size: an upgrade of one
+    (Homebrew upgrades dependencies as it installs) changes results the binary's own
+    hash does not see, so it must start a new baseline (2026-10-03)."""
+    if sys.platform == "darwin":
+        r = subprocess.run(["otool", "-L", binary], capture_output=True, text=True)
+        paths = [l.split(" (")[0].strip() for l in r.stdout.splitlines()[1:]]
+    else:
+        r = subprocess.run(["ldd", binary], capture_output=True, text=True)
+        paths = [l.split("=>")[-1].split(" (")[0].strip() for l in r.stdout.splitlines() if "/" in l]
+    parts = []
+    for path in sorted(p for p in paths if p.startswith("/")):
+        real = os.path.realpath(path)
+        size = os.path.getsize(real) if os.path.exists(real) else -1
+        parts.append("%s:%d" % (real, size))
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+
+def program_fingerprint(binary):
+    """The external programs the build's delegates.xml names, as found on the oracle's PATH,
+    by resolved path and size, or absent. Installing or removing one (Inkscape, 2026-10-04)
+    changes what the cases that reach its delegate produce, so it starts a new baseline."""
+    bld = os.path.dirname(os.path.dirname(os.path.abspath(binary)))
+    try:
+        xml = open(os.path.join(bld, "config", "delegates.xml"), errors="replace").read()
+    except OSError:
+        xml = ""
+    names = sorted(set(re.findall(r"&apos;([A-Za-z0-9_.+-]+)&apos;", xml)))
+    path = env_for(binary, "/")["PATH"]
+    parts = []
+    for name in names:
+        found = shutil.which(name, path=path)
+        real = os.path.realpath(found) if found else None
+        parts.append("%s=%s:%d" % (name, real, os.path.getsize(real)) if real else name + "=")
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+
+def driver_fingerprint(binary):
+    """The imdriver beside the binary, by hash: a @driver case's baseline depends on it, so a
+    rebuilt driver (a new or changed command) must start a fresh baseline, which the binary's own
+    hash does not capture (2026-10-04). The xevents helper's source likewise: an @xevents case's
+    exit status is the helper's when it gives up (2026-10-11)."""
+    driver = driver_path(binary)
+    xev = os.path.join(ROOT, "tools", "oracle", "driver", "xevents.c")
+    return ((file_sha(driver)[:8] if os.path.exists(driver) else "none") +
+            (file_sha(xev)[:8] if os.path.exists(xev) else ""))
+
+
+def machine_fingerprint():
+    """The physical memory and the open-file limit, which `-list resource` prints (Memory, Map,
+    Area and File follow them): a WSL boot can report a slightly different memory size, and a
+    baseline recorded on another boot then turns every mutant those cases reach into a false
+    kill (x11cl11: 17 in opencl.c's exit path, 2026-10-10)."""
+    import resource
+    try:
+        mem = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (ValueError, OSError):
+        mem = 0
+    files = resource.getrlimit(resource.RLIMIT_NOFILE)[0]
+    return hashlib.sha256(("%d %d" % (mem, files)).encode()).hexdigest()
+
+
 def cache_path(binary, manifest):
-    key = "%s-%s-h%s" % (file_sha(binary)[:16], manifest["digest"][:12], HARNESS_VERSION)
+    key = "%s-%s-h%s-l%s-p%s-d%s-m%s" % (file_sha(binary)[:16], manifest["digest"][:12], HARNESS_VERSION,
+                                         library_fingerprint(binary)[:8], program_fingerprint(binary)[:8],
+                                         driver_fingerprint(binary), machine_fingerprint()[:8])
     return os.path.join(WORK, "cache", key + ".json")
 
 
@@ -744,7 +1086,7 @@ def add_common_arguments(s):
     s.add_argument("--filter", help="regex on case id or label")
     s.add_argument("--function", action="append",
                    help="only cases executing this function (casemap.json); repeatable")
-    s.add_argument("-j", "--jobs", type=int, default=os.cpu_count())
+    s.add_argument("-j", "--jobs", type=int, default=default_jobs())
 
 
 def add_run_arguments(s):
