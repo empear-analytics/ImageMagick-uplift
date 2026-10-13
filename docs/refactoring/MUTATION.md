@@ -4382,3 +4382,60 @@ list 56%, dialog 65%, menu 57%, text view 55%, confirm 52%, preferences 53%, com
 Measuring positions: grabs read back as pictures can come scaled; take a widget's size from the
 file (the PNG header) before reading positions off it (the dialog's buttons were first placed
 from a 323x101 view of a 335x129 grab, and missed).
+
+## x11cl14 and the end of the harness phase on Windows (2026-10-13)
+
+**`x11cl14`**: a confirmation sweep of display.c, xwindow.c, widget.c, animate.c and accelerate.c
+on fresh baselines (cap 1500) at `6f44a7d5d`, after the font, browser, list and dialog rounds.
+It was stopped cleanly at 4350 of 8807 on 10-12 (the in-flight cases have wall-clock timeouts, so
+a frozen run would make false kills), then resumed from its partial file and finished 10-13 05:31:
+3586 killed, 4381 survived (44 capped), 840 not covered, 0 errors. opencl.c was not in it; its
+figure is x11cl13's.
+
+| file | merged view (kills, adjusted) | x11cl14 alone | both |
+|---|---|---|---|
+| display.c | 914, 34% | 910, 34% | 915, 34% |
+| xwindow.c | 727, 42% | 717, 41% | 738, 42% |
+| widget.c | 1385, 57% | 1385, 57% | 1385, 57% |
+| animate.c | 78, 17% | 78, 17% | 78, 17% |
+| accelerate.c | 496, 64% | 496, 64% | 496, 64% |
+
+**The rounds' figures hold.** widget.c reproduces kill for kill, the browser and dialog
+rounds' kills included. In display.c and xwindow.c, 26 merged kills did not repeat and 12 kills
+are new. Nearly all of both belong to four xevents cases (kills lost and new, all files): copy
+and paste (`4da5236465`: 15 lost, 4 new), `2254927511` (6, 3), `ba59a5f189` (4, 4) and
+`651c471d6e` (3, 0). Their difference is almost always `out.ppm`, and the mutants are mostly
+frees and tests in DestroyXResources, XMakeStandardColormap and XMakeImageLSBFirst. These cases
+make most of their kills every time (`ba59a5f189` repeats 17 of 21, `651c471d6e` 17 of 20), so
+they are not voided whole. Their
+odd kills are timing, within a point either way, and the merged view keeps them as kills
+(a kill stands). Finding why their final grab varies is left open.
+
+### Where the harness phase ends (Windows files)
+
+The owner closes the harness phase after x11cl14. No new case rounds follow. Final state of the
+Windows files, merged (all reports oldest first, verdicts applied):
+
+- **Regular files:** gated as on 10-11 (for example blob 96%, cache 99%, colorspace 90%,
+  composite 84%, magick 78%, stream 91% with the short functions below), confirmed by two sweeps
+  on independent baselines (sweep1009, sweep1010). constitute.c and semaphore.c trusted (ERDC's
+  builds). distribute-cache.c written off (needs a TCP cache server).
+- **accelerate.c** trusted since x11cl10 (64% adjusted over the file, gated per function with
+  OpenCL in use).
+- **The interactive X11 files** at their plateau, the owner's accepted level (10-11): display.c
+  34%, xwindow.c 42%, widget.c 57%, animate.c 17%, for the causes listed in "the X11 files'
+  plateau" above.
+
+Open items, none of them blocking a refactoring of a trusted file:
+
+1. **stream.c**: six functions short (QueueAuthenticPixelsStream 60%, GetVirtualPixelStream 48%,
+   ReadStream 60%, ValidatePixelCacheMorphology 10%, two at 0%). Their survivors are equivalent in
+   practice: stream mode queues one row at a time (see the 10-08 AddressSanitizer section).
+2. **opencl.c** 73% (x11cl13): the rest needs two *different* OpenCL devices, a GPU, or failing
+   OpenCL calls. A profile entry per pocl device is the next step, if wanted.
+3. **The X11 files' lower level**, as above; four xevents cases with a varying final grab
+   (this section).
+4. **widget.c's dialog field**: after a directory is listed the field shows empty, but a reply
+   typed next lands in front of the old text's tail ("*.pngsr/share/pixmaps"). A likely upstream
+   bug, not analysed.
+5. **xml-tree.c's internal subset** upstream bugs (10-07), documented above.
