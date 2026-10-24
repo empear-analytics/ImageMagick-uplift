@@ -906,13 +906,41 @@ static void ClutImageRow(const Image *image,const PixelInfo *clut_map,
   }
 }
 
+static MagickBooleanType BuildClutMap(const Image *clut_image,
+  const PixelInterpolateMethod method,PixelInfo *clut_map,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *clut_view;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  ssize_t
+    adjust,
+    i;
+
+  adjust=(ssize_t) (method == IntegerInterpolatePixel ? 0 : 1);
+  clut_view=AcquireVirtualCacheView(clut_image,exception);
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    GetPixelInfo(clut_image,clut_map+i);
+    status=InterpolatePixelInfo(clut_image,clut_view,method,(double) i*
+      ((double) clut_image->columns-adjust)/MaxMap,(double) i*
+      ((double) clut_image->rows-adjust)/MaxMap,clut_map+i,exception);
+    if (status == MagickFalse)
+      break;
+  }
+  clut_view=DestroyCacheView(clut_view);
+  return(status);
+}
+
 MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
   const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
 #define ClutImageTag  "Clut/Image"
 
   CacheView
-    *clut_view,
     *image_view;
 
   MagickBooleanType
@@ -925,8 +953,6 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
     *clut_map;
 
   ssize_t
-    adjust,
-    i,
     y;
 
   assert(image != (Image *) NULL);
@@ -949,18 +975,7 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
   */
   status=MagickTrue;
   progress=0;
-  adjust=(ssize_t) (method == IntegerInterpolatePixel ? 0 : 1);
-  clut_view=AcquireVirtualCacheView(clut_image,exception);
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    GetPixelInfo(clut_image,clut_map+i);
-    status=InterpolatePixelInfo(clut_image,clut_view,method,(double) i*
-      ((double) clut_image->columns-adjust)/MaxMap,(double) i*
-      ((double) clut_image->rows-adjust)/MaxMap,clut_map+i,exception);
-    if (status == MagickFalse)
-      break;
-  }
-  clut_view=DestroyCacheView(clut_view);
+  status=BuildClutMap(clut_image,method,clut_map,exception);
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(progress,status) \
