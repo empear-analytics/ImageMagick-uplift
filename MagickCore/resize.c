@@ -892,6 +892,17 @@ static void SharpenResizeFilter(ResizeFilter *resize_filter,
   }
 }
 
+static FilterType GetWeightingFilterType(
+  double (*function)(const double,const ResizeFilter *),FilterType filter_type)
+{
+  if (function == Box)       filter_type=BoxFilter;
+  if (function == Sinc)      filter_type=SincFilter;
+  if (function == SincFast)  filter_type=SincFastFilter;
+  if (function == Jinc)      filter_type=JincFilter;
+  if (function == CubicBC)   filter_type=CubicFilter;
+  return(filter_type);
+}
+
 static void ReportResizeFilter(const Image *image,
   const ResizeFilter *resize_filter,FilterType filter_type,
   FilterType window_type,const double B,const double C)
@@ -906,11 +917,7 @@ static void ReportResizeFilter(const Image *image,
     really uses a Box weighting function with a different support than is
     typically used.
   */
-  if (resize_filter->filter == Box)       filter_type=BoxFilter;
-  if (resize_filter->filter == Sinc)      filter_type=SincFilter;
-  if (resize_filter->filter == SincFast)  filter_type=SincFastFilter;
-  if (resize_filter->filter == Jinc)      filter_type=JincFilter;
-  if (resize_filter->filter == CubicBC)   filter_type=CubicFilter;
+  filter_type=GetWeightingFilterType(resize_filter->filter,filter_type);
   if (resize_filter->window == Box)       window_type=BoxFilter;
   if (resize_filter->window == Sinc)      window_type=SincFilter;
   if (resize_filter->window == SincFast)  window_type=SincFastFilter;
