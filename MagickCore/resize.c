@@ -4402,6 +4402,24 @@ static void ResetScalePixel(const Image *image,double *pixel)
     pixel[i]=0.0;
 }
 
+static void AccumulateScalePixel(const Image *image,const PointInfo span,
+  const double *scanline,const ssize_t x,const ssize_t t,double *pixel,
+  double *scale_scanline)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    pixel[i]+=span.x*scanline[x*(ssize_t) GetPixelChannels(image)+i];
+    scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
+  }
+}
+
 static void ScaleScanlineX(const Image *image,const Image *scale_image,
   const double *scanline,double *scale_scanline)
 {
@@ -4434,15 +4452,7 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
           ResetScalePixel(image,pixel);
           t++;
         }
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        pixel[i]+=span.x*scanline[x*(ssize_t) GetPixelChannels(image)+i];
-        scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
-      }
+      AccumulateScalePixel(image,span,scanline,x,t,pixel,scale_scanline);
       scale.x-=span.x;
       span.x=1.0;
       next_column=MagickTrue;
