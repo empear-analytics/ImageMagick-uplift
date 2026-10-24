@@ -334,6 +334,12 @@ The per-colorspace and per-channel blocks in `colorspace.c`, `quantum-import.c` 
 `quantum-export.c` often *look* identical and differ in one scale factor or one channel
 index. That is exactly one value, and D applies; two, and it does not.
 
+Variables count as the helper's parameters, not as differences: two blocks that are the
+same text once the variables each reads or writes are renamed consistently (block A's
+`channel_norm` wherever block B has `channel_variance`) are identical, and the helper
+takes those variables as arguments. Check it by script: rename, then compare the text.
+Literals and operators are not renamed; one that differs is a differing value.
+
 **Evidence level:** oracle.
 
 **Provenance:** founding recipe (2026-09-29).
@@ -869,6 +875,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | AMEND | E | Step 7: a block that runs to the end of a `void` function may contain `return;`; the new function is `void` and its call is the caller's last statement; macros used only by the block move with it | `Fish2X`'s ladder of early returns (probe: 6.52 to 6.56), refused by the founding wording, which covers only the throw macros' returns | mandate (2026-10-24) |
 | 2026-10-24 | WORDING | T | Provenance corrected (the shape is in `SampleImage` only, not `InterpolativeResizeImage` or the filters); the Careful note now refuses blocks that test or assign `status`, not a `break` of an inner loop after `status=MagickFalse;` | Reading the three loops after the recipe was added | after the fact |
 | 2026-10-24 | NEW | K | Extract Accumulating Block with Out-Parameters: a per-pixel accumulation inside a parallel loop body that writes two to four of the iteration's own variables moves to a `static void` function taking them by pointer | `compare.c`'s FUZZ, MEPP, DPC and NCC similarity loops, refused by Recipe E's step 4; their single-accumulator siblings each gained about 0.02 with Recipe E | mandate (2026-10-24) |
+| 2026-10-24 | AMEND | D | Blocks identical up to a consistent renaming of the variables they read or write count as identical; the variables become the helper's arguments; checked by script | M02's `GetNCCSimilarity`, deduplicated onto `GetDPCSimilarity`'s helper under this reading before it was written down; `ColorDecisionListImage`'s three parse blocks | after the fact |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
