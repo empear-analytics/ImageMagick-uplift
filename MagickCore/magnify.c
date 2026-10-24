@@ -1096,6 +1096,17 @@ static void CopyMagnifiedPixels(const MagnifyRow *row,const size_t channels,
         row->r[j*row->magnification*(ssize_t) channels+i];
 }
 
+static const char *GetMagnifyMethodOption(const Image *image)
+{
+  const char
+    *option;
+
+  option=GetImageOption(image->image_info,"magnify:method");
+  if (option == (char *) NULL)
+    option="scale2x";
+  return(option);
+}
+
 static void SelectMagnifyMethod(const char *option,
   void (**scaling_method)(const Image *,const Quantum *,Quantum *,size_t),
   size_t *magnification,size_t *width)
@@ -1306,9 +1317,7 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  option=GetImageOption(image->image_info,"magnify:method");
-  if (option == (char *) NULL)
-    option="scale2x";
+  option=GetMagnifyMethodOption(image);
   SelectMagnifyMethod(option,&scaling_method,&magnification,&width);
   assert((magnification*magnification) <= MaxMagnification);
   /*
