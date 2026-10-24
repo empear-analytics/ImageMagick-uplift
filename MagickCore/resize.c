@@ -3710,15 +3710,10 @@ static MagickBooleanType VerticalFilter(
       continue;
     if ((density != 0.0) && (density != 1.0))
       {
-        ssize_t
-          i;
-
         /*
           Normalize.
         */
-        density=MagickSafeReciprocal(density);
-        for (i=0; i < n; i++)
-          contribution[i].weight*=density;
+        NormalizeContributions(contribution,n,density);
       }
     p=GetCacheViewVirtualPixels(image_view,0,contribution[0].pixel,
       image->columns,(size_t) (contribution[n-1].pixel-contribution[0].pixel+1),
