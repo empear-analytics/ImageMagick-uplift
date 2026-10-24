@@ -4040,6 +4040,29 @@ static void NegateImageRow(const Image *image,Quantum *q)
   }
 }
 
+static void NegateColormap(Image *image,const MagickBooleanType grayscale)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    /*
+      Negate colormap.
+    */
+    if (grayscale != MagickFalse)
+      if ((image->colormap[i].red != image->colormap[i].green) ||
+          (image->colormap[i].green != image->colormap[i].blue))
+        continue;
+    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].red=(double) QuantumRange-image->colormap[i].red;
+    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].green=(double) QuantumRange-image->colormap[i].green;
+    if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].blue=(double) QuantumRange-image->colormap[i].blue;
+  }
+}
+
 MagickExport MagickBooleanType NegateImage(Image *image,
   const MagickBooleanType grayscale,ExceptionInfo *exception)
 {
@@ -4055,9 +4078,6 @@ MagickExport MagickBooleanType NegateImage(Image *image,
     progress;
 
   ssize_t
-    i;
-
-  ssize_t
     y;
 
   assert(image != (Image *) NULL);
@@ -4065,22 +4085,7 @@ MagickExport MagickBooleanType NegateImage(Image *image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (image->storage_class == PseudoClass)
-    for (i=0; i < (ssize_t) image->colors; i++)
-    {
-      /*
-        Negate colormap.
-      */
-      if (grayscale != MagickFalse)
-        if ((image->colormap[i].red != image->colormap[i].green) ||
-            (image->colormap[i].green != image->colormap[i].blue))
-          continue;
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].red=(double) QuantumRange-image->colormap[i].red;
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].green=(double) QuantumRange-image->colormap[i].green;
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].blue=(double) QuantumRange-image->colormap[i].blue;
-    }
+    NegateColormap(image,grayscale);
   /*
     Negate image.
   */
