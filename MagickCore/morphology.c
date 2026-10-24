@@ -997,6 +997,19 @@ static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireUnityKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  kernel->height = kernel->width = (size_t) 1;
+  kernel->x = kernel->y = (ssize_t) 0;
+  kernel->values=(MagickRealType *) MagickAssumeAligned(
+    AcquireAlignedMemory(1,sizeof(*kernel->values)));
+  if (kernel->values == (MagickRealType *) NULL)
+    return(DestroyKernelInfo(kernel));
+  kernel->maximum = kernel->values[0] = args->rho;
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1081,17 +1094,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       Convolution Kernels
     */
     case UnityKernel:
-      {
-        kernel->height = kernel->width = (size_t) 1;
-        kernel->x = kernel->y = (ssize_t) 0;
-        kernel->values=(MagickRealType *) MagickAssumeAligned(
-          AcquireAlignedMemory(1,sizeof(*kernel->values)));
-        if (kernel->values == (MagickRealType *) NULL)
-          return(DestroyKernelInfo(kernel));
-        kernel->maximum = kernel->values[0] = args->rho;
-        break;
-      }
-      break;
+      return(AcquireUnityKernel(kernel,args));
     case GaussianKernel:
     case DoGKernel:
     case LoGKernel:
