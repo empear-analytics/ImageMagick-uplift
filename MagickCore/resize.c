@@ -3986,6 +3986,13 @@ static FilterType SelectResizeFilterType(const Image *image,
   return(filter_type);
 }
 
+static inline MagickBooleanType IsResizeIdentity(const Image *image,
+  const size_t columns,const size_t rows,const FilterType filter)
+{
+  return(((columns == image->columns) && (rows == image->rows) &&
+    (filter == UndefinedFilter)) ? MagickTrue : MagickFalse);
+}
+
 static void RecordResizeTransform(const Image *image,Image *resize_image,
   const FilterType filter_type,ExceptionInfo *exception)
 {
@@ -4037,8 +4044,7 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if ((columns == 0) || (rows == 0))
     ThrowImageException(ImageError,"NegativeOrZeroImageSize");
-  if ((columns == image->columns) && (rows == image->rows) &&
-      (filter == UndefinedFilter))
+  if (IsResizeIdentity(image,columns,rows,filter) != MagickFalse)
     return(CloneImage(image,0,0,MagickTrue,exception));
   /*
     Acquire resize filter.
