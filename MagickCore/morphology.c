@@ -1463,6 +1463,40 @@ static KernelInfo *AcquireEdgesKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireDiagonalsKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  switch ( (int) args->rho ) {
+    case 0:
+    default:
+      { KernelInfo
+          *new_kernel;
+        kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
+        if (kernel == (KernelInfo *) NULL)
+          return(kernel);
+        kernel->type = type;
+        new_kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
+        if (new_kernel == (KernelInfo *) NULL)
+          return(DestroyKernelInfo(kernel));
+        new_kernel->type = type;
+        LastKernelInfo(kernel)->next = new_kernel;
+        ExpandMirrorKernelInfo(kernel);
+        return(kernel);
+      }
+    case 1:
+      kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
+      break;
+    case 2:
+      kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->sigma);
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1854,37 +1888,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
           break;
         }
       case DiagonalsKernel:
-        {
-          switch ( (int) args->rho ) {
-            case 0:
-            default:
-              { KernelInfo
-                  *new_kernel;
-                kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
-                if (kernel == (KernelInfo *) NULL)
-                  return(kernel);
-                kernel->type = type;
-                new_kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
-                if (new_kernel == (KernelInfo *) NULL)
-                  return(DestroyKernelInfo(kernel));
-                new_kernel->type = type;
-                LastKernelInfo(kernel)->next = new_kernel;
-                ExpandMirrorKernelInfo(kernel);
-                return(kernel);
-              }
-            case 1:
-              kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
-              break;
-            case 2:
-              kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
-              break;
-          }
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          RotateKernelInfo(kernel, args->sigma);
-          break;
-        }
+        return(AcquireDiagonalsKernel(kernel,type,args));
       case LineEndsKernel:
         { /* Kernels for finding the end of thin lines */
           switch ( (int) args->rho ) {
