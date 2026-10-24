@@ -377,6 +377,58 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   return(kernel);
 }
 
+static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  switch( type ) {
+    /* Shape Kernel Defaults */
+    case UnityKernel:
+      if ( (flags & WidthValue) == 0 )
+        args.rho = 1.0;    /* Default scale = 1.0, zero is valid */
+      break;
+    case SquareKernel:
+    case DiamondKernel:
+    case OctagonKernel:
+    case DiskKernel:
+    case PlusKernel:
+    case CrossKernel:
+      if ( (flags & HeightValue) == 0 )
+        args.sigma = 1.0;    /* Default scale = 1.0, zero is valid */
+      break;
+    case RingKernel:
+      if ( (flags & XValue) == 0 )
+        args.xi = 1.0;       /* Default scale = 1.0, zero is valid */
+      break;
+    case RectangleKernel:    /* Rectangle - set size defaults */
+      if ( (flags & WidthValue) == 0 ) /* if no width then */
+        args.rho = args.sigma;         /* then  width = height */
+      if ( args.rho < 1.0 )            /* if width too small */
+          args.rho = 3;                /* then  width = 3 */
+      if ( args.sigma < 1.0 )          /* if height too small */
+        args.sigma = args.rho;         /* then  height = width */
+      if ( (flags & XValue) == 0 )     /* center offset if not defined */
+        args.xi = (double)(((ssize_t)args.rho-1)/2);
+      if ( (flags & YValue) == 0 )
+        args.psi = (double)(((ssize_t)args.sigma-1)/2);
+      break;
+    /* Distance Kernel Defaults */
+    case ChebyshevKernel:
+    case ManhattanKernel:
+    case OctagonalKernel:
+    case EuclideanKernel:
+      if ( (flags & HeightValue) == 0 )           /* no distance scale */
+        args.sigma = 100.0;                       /* default distance scaling */
+      else if ( (flags & AspectValue ) != 0 )     /* '!' flag */
+        args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
+      else if ( (flags & PercentValue ) != 0 )    /* '%' flag */
+        args.sigma *= (double) QuantumRange/100.0;         /* percentage of color range */
+      break;
+    default:
+      break;
+  }
+  return(args);
+}
+
 static KernelInfo *ParseKernelName(const char *kernel_string,
   ExceptionInfo *exception)
 {
@@ -430,52 +482,7 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
 #endif
 
   /* special handling of missing values in input string */
-  switch( type ) {
-    /* Shape Kernel Defaults */
-    case UnityKernel:
-      if ( (flags & WidthValue) == 0 )
-        args.rho = 1.0;    /* Default scale = 1.0, zero is valid */
-      break;
-    case SquareKernel:
-    case DiamondKernel:
-    case OctagonKernel:
-    case DiskKernel:
-    case PlusKernel:
-    case CrossKernel:
-      if ( (flags & HeightValue) == 0 )
-        args.sigma = 1.0;    /* Default scale = 1.0, zero is valid */
-      break;
-    case RingKernel:
-      if ( (flags & XValue) == 0 )
-        args.xi = 1.0;       /* Default scale = 1.0, zero is valid */
-      break;
-    case RectangleKernel:    /* Rectangle - set size defaults */
-      if ( (flags & WidthValue) == 0 ) /* if no width then */
-        args.rho = args.sigma;         /* then  width = height */
-      if ( args.rho < 1.0 )            /* if width too small */
-          args.rho = 3;                /* then  width = 3 */
-      if ( args.sigma < 1.0 )          /* if height too small */
-        args.sigma = args.rho;         /* then  height = width */
-      if ( (flags & XValue) == 0 )     /* center offset if not defined */
-        args.xi = (double)(((ssize_t)args.rho-1)/2);
-      if ( (flags & YValue) == 0 )
-        args.psi = (double)(((ssize_t)args.sigma-1)/2);
-      break;
-    /* Distance Kernel Defaults */
-    case ChebyshevKernel:
-    case ManhattanKernel:
-    case OctagonalKernel:
-    case EuclideanKernel:
-      if ( (flags & HeightValue) == 0 )           /* no distance scale */
-        args.sigma = 100.0;                       /* default distance scaling */
-      else if ( (flags & AspectValue ) != 0 )     /* '!' flag */
-        args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
-      else if ( (flags & PercentValue ) != 0 )    /* '%' flag */
-        args.sigma *= (double) QuantumRange/100.0;         /* percentage of color range */
-      break;
-    default:
-      break;
-  }
+  args=SetKernelArgumentDefaults(type,flags,args);
 
   kernel = AcquireKernelBuiltIn((KernelInfoType)type, &args, exception);
   if ( kernel == (KernelInfo *) NULL )
