@@ -79,6 +79,20 @@
 #include "MagickCore/transform.h"
 #include "MagickCore/utility.h"
 #include "MagickCore/version.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _ComparePixels
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  const Quantum
+    *p,
+    *q;
+} ComparePixels;
 
 static inline MagickBooleanType IsCompareRowMissing(const Quantum *p,
   const Quantum *q,const Quantum *r)
@@ -276,10 +290,17 @@ MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
   return(difference_image);
 }
 
-static void AccumulateAEPixel(const Image *image,
-  const Image *reconstruct_image,const Quantum *p,const Quantum *q,
-  const double fuzz,double *channel_similarity)
+static void AccumulateAEPixel(const ComparePixels *pixels,const double fuzz,
+  double *channel_similarity)
 {
+  const Image
+    *image = pixels->image,
+    *reconstruct_image = pixels->reconstruct_image;
+
+  const Quantum
+    *p = pixels->p,
+    *q = pixels->q;
+
   double
     Da,
     Sa;
@@ -408,6 +429,8 @@ static MagickBooleanType GetAESimilarity(const Image *image,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
+      const ComparePixels pixels = { image, reconstruct_image, p, q };
+
       if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
           (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
         {
@@ -415,7 +438,7 @@ static MagickBooleanType GetAESimilarity(const Image *image,
           q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
           continue;
         }
-      AccumulateAEPixel(image,reconstruct_image,p,q,fuzz,channel_similarity);
+      AccumulateAEPixel(&pixels,fuzz,channel_similarity);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
     }
