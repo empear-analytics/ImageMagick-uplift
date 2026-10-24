@@ -3660,10 +3660,14 @@ static inline void ModulateHSL(const ModulateInfo *modulate_info,
   ConvertHSLToRGB(hue,saturation,lightness,red,green,blue);
 }
 
-static inline void ModulateHSV(const double percent_hue,
-  const double percent_saturation,const double percent_value,double *red,
-  double *green,double *blue)
+static inline void ModulateHSV(const ModulateInfo *modulate_info,
+  double *red,double *green,double *blue)
 {
+  const double
+    percent_hue = modulate_info->percent_hue,
+    percent_saturation = modulate_info->percent_saturation,
+    percent_value = modulate_info->percent_brightness;
+
   double
     hue,
     saturation,
@@ -3780,8 +3784,7 @@ static void ModulateColor(const ModulateInfo *modulate_info,double *red,
     }
     case HSVColorspace:
     {
-      ModulateHSV(percent_hue,percent_saturation,percent_brightness,
-        red,green,blue);
+      ModulateHSV(modulate_info,red,green,blue);
       break;
     }
     case HWBColorspace:
