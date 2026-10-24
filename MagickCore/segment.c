@@ -314,6 +314,27 @@ static void PrintClusterStatistics(const Cluster *head,
   (void) FormatLocaleFile(stdout,"\n");
 }
 
+static void SetClusterColormap(Image *image,const Cluster *head)
+{
+  const Cluster
+    *cluster;
+
+  ssize_t
+    i;
+
+  i=0;
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
+  {
+    image->colormap[i].red=(double) ScaleCharToQuantum((unsigned char)
+      (cluster->red.center+0.5));
+    image->colormap[i].green=(double) ScaleCharToQuantum((unsigned char)
+      (cluster->green.center+0.5));
+    image->colormap[i].blue=(double) ScaleCharToQuantum((unsigned char)
+      (cluster->blue.center+0.5));
+    i++;
+  }
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const double cluster_threshold,const double weighting_exponent,
   const MagickBooleanType verbose,ExceptionInfo *exception)
@@ -544,17 +565,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   if (AcquireImageColormap(image,number_clusters,exception) == MagickFalse)
     ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  i=0;
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-  {
-    image->colormap[i].red=(double) ScaleCharToQuantum((unsigned char)
-      (cluster->red.center+0.5));
-    image->colormap[i].green=(double) ScaleCharToQuantum((unsigned char)
-      (cluster->green.center+0.5));
-    image->colormap[i].blue=(double) ScaleCharToQuantum((unsigned char)
-      (cluster->blue.center+0.5));
-    i++;
-  }
+  SetClusterColormap(image,head);
   /*
     Do course grain classes.
   */
