@@ -1406,6 +1406,16 @@ static inline MagickBooleanType IsPlasmaPixelMissing(const Quantum *u,
     (q == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsPlasmaSegmentAtMidpoint(
+  const SegmentInfo *magick_restrict segment,const ssize_t x_mid,
+  const ssize_t y_mid)
+{
+  return(((fabs(segment->x1-x_mid) < MagickEpsilon) &&
+    (fabs(segment->x2-x_mid) < MagickEpsilon) &&
+    (fabs(segment->y1-y_mid) < MagickEpsilon) &&
+    (fabs(segment->y2-y_mid) < MagickEpsilon)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
   CacheView *u_view,CacheView *v_view,RandomInfo *magick_restrict random_info,
   const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth,
@@ -1472,10 +1482,7 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
     }
   x_mid=CastDoubleToSsizeT(ceil((segment->x1+segment->x2)/2-0.5));
   y_mid=CastDoubleToSsizeT(ceil((segment->y1+segment->y2)/2-0.5));
-  if ((fabs(segment->x1-x_mid) < MagickEpsilon) &&
-      (fabs(segment->x2-x_mid) < MagickEpsilon) &&
-      (fabs(segment->y1-y_mid) < MagickEpsilon) &&
-      (fabs(segment->y2-y_mid) < MagickEpsilon))
+  if (IsPlasmaSegmentAtMidpoint(segment,x_mid,y_mid) != MagickFalse)
     return(MagickFalse);
   /*
     Average pixels and apply plasma.
