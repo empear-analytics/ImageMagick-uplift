@@ -73,7 +73,7 @@ needs before refactoring:
 
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
-| 1.39 | `MagickCore/resize.c` | 4704 | 97% | 88% | plateau at 2.45 (OpenMP-bound nesting, survivor lines, H/V duplication), [M01](tasks/M01-resize.md) |
+| 1.39 | `MagickCore/resize.c` | 4704 | 97% | 88% | plateau at 2.87 after Recipe S (OpenMP-bound nesting, survivor lines); magnify family split to `magnify.c` (6.21), [M01](tasks/M01-resize.md) |
 | 1.46 | `MagickCore/compare.c` | 4987 | 88% | 86% | open, [M02](tasks/M02-compare.md) |
 | 1.53 | `MagickCore/enhance.c` | 4596 | 78% | 86% | open, [M03](tasks/M03-enhance.md) |
 | 1.53 | `MagickCore/morphology.c` | 4764 | 81% | 80% | open, [M04](tasks/M04-morphology.md) |

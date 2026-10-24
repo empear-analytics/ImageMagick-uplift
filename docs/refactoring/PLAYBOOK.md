@@ -454,7 +454,7 @@ and you do not add one, record it here: the file, its score, and the smells left
 
 | File | Score | Smells left, and why no recipe reaches them | Recorded |
 | --- | ---: | --- | --- |
-| `MagickCore/resize.c` | 2.45 | Brain Method and Deep Nesting (`InterpolativeResizeImage`'s loops write the shared `status` inside `omp parallel for`; `ScaleImage`'s bookkeeping writes six variables on survivor lines); Duplication (H/V filters differ by an index expression); Bumpy Road, Complex and Large Method, Excess Arguments (OpenMP-bound, survivor lines, public signatures, LQR not compiled). Recipe S on the magnify family would reach 2.87. See [M01's report](tasks/M01-resize.md) | 2026-10-24, Mac |
+| `MagickCore/resize.c` | 2.87 | Brain Method and Deep Nesting (`InterpolativeResizeImage`'s loops write the shared `status` inside `omp parallel for`; `ScaleImage`'s bookkeeping writes six variables on survivor lines); Bumpy Road, Complex and Large Method, Excess Arguments (OpenMP-bound, survivor lines, public signatures, LQR not compiled). 2.45 before Recipe S moved the magnify family to `magnify.c` (6.21). See [M01's report](tasks/M01-resize.md) | 2026-10-24, Mac |
 
 ### Tool notes
 
