@@ -1397,6 +1397,61 @@ static KernelInfo *AcquireDiskKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,const double nan)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  ssize_t
+    limit1,
+    limit2,
+    scale;
+
+  if (args->rho < args->sigma)
+    {
+      kernel->width = CastDoubleToSizeT(args->sigma)*2+1;
+      limit1 = (ssize_t)(args->rho*args->rho);
+      limit2 = (ssize_t)(args->sigma*args->sigma);
+    }
+  else
+    {
+      kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+      limit1 = (ssize_t)(args->sigma*args->sigma);
+      limit2 = (ssize_t)(args->rho*args->rho);
+    }
+  if ( limit2 <= 0 )
+    kernel->width = 7L, limit1 = 7L, limit2 = 11L;
+
+  kernel->height = kernel->width;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set a ring of points of 'scale' ( 0.0 for PeaksKernel ) */
+  scale = (ssize_t) (( type == PeaksKernel) ? 0.0 : args->xi);
+  for ( i=0, v= -kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      { ssize_t radius=u*u+v*v;
+        if (limit1 < radius && radius <= limit2)
+          kernel->positive_range += kernel->values[i] = (double) scale;
+        else
+          kernel->values[i] = nan;
+      }
+  kernel->minimum = kernel->maximum = (double) scale;
+  if ( type == PeaksKernel ) {
+    /* set the central point in the middle */
+    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    kernel->positive_range = 1.0;
+    kernel->maximum = 1.0;
+  }
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1775,51 +1830,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       */
       case RingKernel:
       case PeaksKernel:
-        {
-          ssize_t
-            limit1,
-            limit2,
-            scale;
-
-          if (args->rho < args->sigma)
-            {
-              kernel->width = CastDoubleToSizeT(args->sigma)*2+1;
-              limit1 = (ssize_t)(args->rho*args->rho);
-              limit2 = (ssize_t)(args->sigma*args->sigma);
-            }
-          else
-            {
-              kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-              limit1 = (ssize_t)(args->sigma*args->sigma);
-              limit2 = (ssize_t)(args->rho*args->rho);
-            }
-          if ( limit2 <= 0 )
-            kernel->width = 7L, limit1 = 7L, limit2 = 11L;
-
-          kernel->height = kernel->width;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          /* set a ring of points of 'scale' ( 0.0 for PeaksKernel ) */
-          scale = (ssize_t) (( type == PeaksKernel) ? 0.0 : args->xi);
-          for ( i=0, v= -kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              { ssize_t radius=u*u+v*v;
-                if (limit1 < radius && radius <= limit2)
-                  kernel->positive_range += kernel->values[i] = (double) scale;
-                else
-                  kernel->values[i] = nan;
-              }
-          kernel->minimum = kernel->maximum = (double) scale;
-          if ( type == PeaksKernel ) {
-            /* set the central point in the middle */
-            kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-            kernel->positive_range = 1.0;
-            kernel->maximum = 1.0;
-          }
-          break;
-        }
+        return(AcquireRingKernel(kernel,type,args,nan));
       case EdgesKernel:
         {
           kernel=AcquireKernelInfo("ThinSE:482",exception);
