@@ -555,8 +555,9 @@ static inline MagickBooleanType IsFish2XAntiDiagonal(const int bd,
     MagickFalse);
 }
 
-static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
-  const size_t channels)
+static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
+  const Quantum *pixels,const size_t channels,
+  const MagickFloatType *intensities)
 {
 #define Corner(A,B,C,D) \
   { \
@@ -565,26 +566,24 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
         const ssize_t    \
           offsets[3] = { B, C, D }; \
  \
-        MixPixels(&magnify,offsets,3,3); \
+        MixPixels(magnify,offsets,3,3); \
       } \
     else \
       { \
         const ssize_t    \
           offsets[3] = { A, B, C }; \
  \
-        MixPixels(&magnify,offsets,3,3); \
+        MixPixels(magnify,offsets,3,3); \
       } \
   }
 
 #define Line(A,B,C,D) \
   { \
     if (intensities[C] > intensities[A]) \
-      Mix2Pixels(&magnify,C,D,3); \
+      Mix2Pixels(magnify,C,D,3); \
     else \
-      Mix2Pixels(&magnify,A,B,3); \
+      Mix2Pixels(magnify,A,B,3); \
   }
-
-  const MagnifyPixels magnify = { pixels, result, channels };
 
   const ssize_t
     pixels_offsets[4] = { 0, 1, 3, 4 };
@@ -597,18 +596,6 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
     be,
     de;
 
-  MagickFloatType
-    intensities[9];
-
-  ssize_t
-    i;
-
-  for (i=0; i < 9; i++)
-    intensities[i]=(MagickFloatType) GetPixelIntensity(source,pixels+
-      i*(ssize_t) channels);
-  CopyPixels(&magnify,0,0);
-  CopyPixels(&magnify,(ssize_t) (intensities[0] > intensities[1] ? 0 : 1),1);
-  CopyPixels(&magnify,(ssize_t) (intensities[0] > intensities[3] ? 0 : 3),2);
   ae=PixelsEqual(pixels,0,4,channels);
   bd=PixelsEqual(pixels,1,3,channels);
   ab=PixelsEqual(pixels,0,1,channels);
@@ -617,7 +604,7 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
   be=PixelsEqual(pixels,1,4,channels);
   if (IsFish2XUniform(ae,bd,ab) != MagickFalse)
     {
-      CopyPixels(&magnify,0,3);
+      CopyPixels(magnify,0,3);
       return;
     }
   if (IsFish2XTopOdd(ad,de,ab) != MagickFalse)
@@ -642,12 +629,12 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
     }
   if (IsFish2XMainDiagonal(ae,bd,intensities) != MagickFalse)
     {
-      Mix2Pixels(&magnify,0,4,3);
+      Mix2Pixels(magnify,0,4,3);
       return;
     }
   if (IsFish2XAntiDiagonal(bd,ae,intensities) != MagickFalse)
     {
-      Mix2Pixels(&magnify,1,3,3);
+      Mix2Pixels(magnify,1,3,3);
       return;
     }
   if (ab)
@@ -670,9 +657,29 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
       Line(1,4,0,3)
       return;
     }
-  MixPixels(&magnify,pixels_offsets,4,3);
+  MixPixels(magnify,pixels_offsets,4,3);
 #undef Corner
 #undef Line
+}
+
+static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
+  const size_t channels)
+{
+  const MagnifyPixels magnify = { pixels, result, channels };
+
+  MagickFloatType
+    intensities[9];
+
+  ssize_t
+    i;
+
+  for (i=0; i < 9; i++)
+    intensities[i]=(MagickFloatType) GetPixelIntensity(source,pixels+
+      i*(ssize_t) channels);
+  CopyPixels(&magnify,0,0);
+  CopyPixels(&magnify,(ssize_t) (intensities[0] > intensities[1] ? 0 : 1),1);
+  CopyPixels(&magnify,(ssize_t) (intensities[0] > intensities[3] ? 0 : 3),2);
+  Fish2XBottomRightPixel(&magnify,pixels,channels,intensities);
 }
 
 static void Xbr2X(const Image *magick_unused(source),const Quantum *pixels,
