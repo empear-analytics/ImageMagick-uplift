@@ -833,6 +833,13 @@ static void SetKaiserCoefficients(const Image *image,
     /* normalization */
 }
 
+static inline MagickBooleanType IsCubicBCResizeFilter(
+  const ResizeFilter *resize_filter)
+{
+  return(((resize_filter->filter == CubicBC) ||
+    (resize_filter->window == CubicBC) ) ? MagickTrue : MagickFalse);
+}
+
 static void SetCubicBCCoefficients(ResizeFilter *resize_filter,const double B,
   const double C)
 {
@@ -1223,8 +1230,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   */
   B=0.0;
   C=0.0;
-  if ((resize_filter->filter == CubicBC) ||
-      (resize_filter->window == CubicBC) )
+  if (IsCubicBCResizeFilter(resize_filter) != MagickFalse)
     {
       B=filters[filter_type].B;
       C=filters[filter_type].C;
