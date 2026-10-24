@@ -7,7 +7,7 @@
 | Hand-off point | **4.00** leaves the Red band. A small model stops there and hands on |
 | File size | 1831 lines |
 | Functions with findings | 10 |
-| Measured with | `cs-mcp` 1.5.6, `cs` 1.0.46 |
+| Measured with | `cs-mcp` 1.5.12, `cs` not installed |
 
 ## 1. Read these first
 
@@ -35,6 +35,7 @@ The score must read 2.05. If it does not, this file changed after the task was w
 | Complex Method | 8 |
 | Complex Conditional | 2 |
 | Code Duplication | 2 |
+| Large Method | 9 |
 | Excess Number of Function Arguments | 3 |
 | Overall Function Size | file |
 
@@ -42,15 +43,15 @@ The score must read 2.05. If it does not, this file changed after the task was w
 
 | # | Function | Line | Cyclomatic | Nesting | Bumps | Linkage | OpenMP | Cases | Mutants killed |
 | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
-| 1 | `IntegralRotateImage` | 701 | 72 | 7 | 13 | public | 4 | 58 | 94 of 113 |
-| 2 | `RadonProjection` | 217 | 37 | 5 | 4 | static | 1 | 18 | 69 of 75 |
-| 3 | `RadonTransform` | 322 | 31 | - | 6 | static | 2 | 18 | 47 of 51 |
-| 4 | `YShearImage` | 1361 | - | 4 | 5 | static | 2 | 29 | 37 of 46 |
-| 5 | `XShearImage` | 1146 | - | 4 | 5 | static | 2 | 29 | 35 of 46 |
-| 6 | `GetImageBackgroundColor` | 497 | 14 | - | 2 | static | - | 4 | 30 of 30 |
+| 1 | `IntegralRotateImage` | 701 | 72 | 7 | 13 | public | 4 | 71 | 103 of 120 |
+| 2 | `RadonProjection` | 217 | 37 | 5 | 4 | static | 1 | 18 | 71 of 75 |
+| 3 | `RadonTransform` | 322 | 31 | - | 6 | static | 2 | 18 | 49 of 54 |
+| 4 | `YShearImage` | 1361 | - | 4 | 5 | static | 2 | 29 | 55 of 64 |
+| 5 | `XShearImage` | 1146 | - | 4 | 5 | static | 2 | 29 | 50 of 62 |
+| 6 | `GetImageBackgroundColor` | 497 | 14 | - | 2 | static | - | 4 | 27 of 27 |
 | 7 | `CropToFitImage` | 114 | 9 | - | 2 | static | - | 29 | 31 of 35 |
 | 8 | `ShearImage` | 1581 | 16 | - | - | public | - | 29 | 24 of 27 |
-| 9 | `DeskewImage` | 558 | 12 | - | - | public | - | 18 | 21 of 27 |
+| 9 | `DeskewImage` | 558 | 12 | - | - | public | - | 18 | 25 of 28 |
 | 10 | `ShearRotateImage` | 1714 | 15 | - | - | public | - | 0 | - |
 
 Thresholds for C: cyclomatic complexity under 9, nesting depth under 4. **Cases** is how many oracle cases execute the function; **Mutants killed** counts the sampled mutants on lines the oracle executes. A function with no cases cannot be checked and is listed last: skip it and report it.
@@ -68,7 +69,9 @@ Work **one function at a time, in the order above**, and run the verification in
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 4 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 19 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1102, `remove_void_call`: `AppendImageProfileProperty(rotate_image,"hdrgm","hdrgm:Transform",`
+- 16 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/shear.c): simplify IntegralRotateImage`
 
@@ -78,7 +81,7 @@ Commit message: `refactor(MagickCore/shear.c): simplify IntegralRotateImage`
 - **Recipe E (extract function)** - 4 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 1 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
-- 6 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/shear.c): simplify RadonProjection`
 
@@ -90,7 +93,7 @@ Commit message: `refactor(MagickCore/shear.c): simplify RadonProjection`
 - The oracle missed 2 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 426, `ne_to_eq`: `if (bit != 0)`
   - base line 487, `post_inc_to_post_dec`: `(void) SetMatrixElement(source_matrices,i++,y,&value);`
-- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/shear.c): simplify RadonTransform`
 
@@ -101,9 +104,10 @@ Commit message: `refactor(MagickCore/shear.c): simplify RadonTransform`
 - No recipe in the catalogue reaches *Excess Number of Function Arguments* (7 arguments).
 - **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
-- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
-  - base line 1501, `gt_to_ge`: `if ((size_t) (y_offset+(ssize_t) height+step-i) > image->rows)`
-- 8 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- The oracle missed 2 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1449, `remove_void_call`: `GetPixelInfo(image,&source);`
+  - base line 1450, `remove_void_call`: `GetPixelInfo(image,&destination);`
+- 7 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/shear.c): simplify YShearImage`
 
@@ -116,8 +120,9 @@ Commit message: `refactor(MagickCore/shear.c): simplify YShearImage`
 - No recipe in the catalogue reaches *Excess Number of Function Arguments* (7 arguments).
 - **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
-- The oracle missed 2 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
-  - base line 1243, `gt_to_ge`: `if (step > x_offset)`
+- The oracle missed 3 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1234, `remove_void_call`: `GetPixelInfo(image,&source);`
+  - base line 1235, `remove_void_call`: `GetPixelInfo(image,&destination);`
   - base line 1248, `lt_to_le`: `if ((x_offset+i) < step)`
 - 9 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -143,6 +148,7 @@ Commit message: `refactor(MagickCore/shear.c): simplify CropToFitImage`
 #### Step 8: `ShearImage` (line 1581)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- **Recipe E (extract function)** - a large method; extract its self-contained blocks.
 - Public function: its name and signature must not change.
 - 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -153,10 +159,9 @@ Commit message: `refactor(MagickCore/shear.c): simplify ShearImage`
 #### Step 9: `DeskewImage` (line 558)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- **Recipe E (extract function)** - a large method; extract its self-contained blocks.
 - Public function: its name and signature must not change.
-- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
-  - base line 655, `eq_to_ne`: `if (deskew_image == (Image *) NULL)`
-- 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/shear.c): simplify DeskewImage`
 

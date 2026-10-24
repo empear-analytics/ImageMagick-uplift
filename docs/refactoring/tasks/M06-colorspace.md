@@ -7,7 +7,7 @@
 | Hand-off point | **4.00** leaves the Red band. A small model stops there and hands on |
 | File size | 2900 lines |
 | Functions with findings | 9 |
-| Measured with | `cs-mcp` 1.5.6, `cs` 1.0.46 |
+| Measured with | `cs-mcp` 1.5.12, `cs` not installed |
 
 ## 1. Read these first
 
@@ -34,21 +34,22 @@ The score must read 2.57. If it does not, this file changed after the task was w
 | Complex Method | 5 |
 | Complex Conditional | 3 |
 | Code Duplication | 4 |
+| Large Method | 4 |
 | Excess Number of Function Arguments | 4 |
 
 ## 4. Target functions, highest leverage first
 
 | # | Function | Line | Cyclomatic | Nesting | Bumps | Linkage | OpenMP | Cases | Mutants killed |
 | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
-| 1 | `TransformsRGBImage` | 1828 | 151 | 4 | 19 | static | 14 | 371 | 175 of 198 |
-| 2 | `sRGBTransformImage` | 727 | 142 | 4 | 16 | static | 13 | 744 | 176 of 187 |
-| 3 | `ConvertRGBToGeneric` | 416 | 30 | - | - | public | - | 450 | - |
-| 4 | `ConvertGenericToRGB` | 127 | 30 | - | - | public | - | 218 | - |
-| 5 | `ConvertHSLToRGB` | 312 | 9 | - | - | public | - | 34 | 40 of 41 |
-| 6 | `SetImageColorspace` | 1567 | - | - | - | public | - | 2828 | 6 of 7 |
-| 7 | `SetImageGray` | 1647 | - | - | - | public | - | 20 | 5 of 6 |
-| 8 | `SetImageMonochrome` | 1704 | - | - | - | public | - | 182 | 4 of 5 |
-| 9 | `ConvertRGBToHSL` | 602 | - | - | - | public | - | 81 | 23 of 26 |
+| 1 | `TransformsRGBImage` | 1828 | 151 | 4 | 19 | static | 14 | 424 | 216 of 242 |
+| 2 | `sRGBTransformImage` | 727 | 142 | 4 | 16 | static | 13 | 1205 | 206 of 220 |
+| 3 | `ConvertRGBToGeneric` | 416 | 30 | - | - | public | - | 607 | 31 of 31 |
+| 4 | `ConvertGenericToRGB` | 127 | 30 | - | - | public | - | 267 | 31 of 31 |
+| 5 | `ConvertHSLToRGB` | 312 | 9 | - | - | public | - | 83 | 40 of 41 |
+| 6 | `SetImageColorspace` | 1567 | - | - | - | public | - | 4321 | 6 of 7 |
+| 7 | `SetImageGray` | 1647 | - | - | - | public | - | 26 | 5 of 6 |
+| 8 | `SetImageMonochrome` | 1704 | - | - | - | public | - | 222 | 4 of 5 |
+| 9 | `ConvertRGBToHSL` | 602 | - | - | - | public | - | 152 | 23 of 26 |
 
 Thresholds for C: cyclomatic complexity under 9, nesting depth under 4. **Cases** is how many oracle cases execute the function; **Mutants killed** counts the sampled mutants on lines the oracle executes. A function with no cases cannot be checked and is listed last: skip it and report it.
 
@@ -64,15 +65,15 @@ Work **one function at a time, in the order above**, and run the verification in
 - **Recipe E (extract function)** - 19 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 14 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
-- The oracle missed 18 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+- The oracle missed 22 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 2099, `ne_to_eq`: `if (artifact != (const char *) NULL)`
+  - base line 2130, `remove_void_call`: `GetPixelInfo(image,&zero);`
   - base line 2233, `eq_to_ne`: `if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)`
   - base line 2256, `lt_to_ge`: `for (y=0; y < (ssize_t) image->rows; y++)`
   - base line 2267, `eq_to_ne`: `if (status == MagickFalse)`
   - base line 2276, `lt_to_ge`: `for (x=0; x < (ssize_t) image->columns; x++)`
-  - base line 2428, `gt_to_ge`: `if (reference_black > MaximumLogarithmicColorspace)`
-  - and 12 more (`tools/oracle/mutate.py --function TransformsRGBImage`)
-- 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes; see `tools/oracle/classify.py`).
+  - and 16 more (`tools/oracle/mutate.py --function TransformsRGBImage`)
+- 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/colorspace.c): simplify TransformsRGBImage`
 
@@ -82,21 +83,22 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify TransformsRGBImage`
 - **Recipe E (extract function)** - 16 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 13 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
-- The oracle missed 8 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+- The oracle missed 10 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 767, `ne_to_eq`: `if (artifact != (const char *) NULL)`
+  - base line 800, `remove_void_call`: `GetPixelInfo(image,&zero);`
   - base line 844, `eq_to_ne`: `if (SetImageColorspace(image,colorspace,exception) == MagickFalse)`
   - base line 901, `eq_to_ne`: `if (SetImageColorspace(image,colorspace,exception) == MagickFalse)`
   - base line 1106, `mul_to_div`: `black=pow(10.0,(reference_black-reference_white)*(gamma/density)*0.002*`
   - base line 1165, `eq_to_ne`: `if (SetImageColorspace(image,colorspace,exception) == MagickFalse)`
-  - base line 1227, `eq_to_ne`: `if (SetImageColorspace(image,colorspace,exception) == MagickFalse)`
-  - and 2 more (`tools/oracle/mutate.py --function sRGBTransformImage`)
-- 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes; see `tools/oracle/classify.py`).
+  - and 4 more (`tools/oracle/mutate.py --function sRGBTransformImage`)
+- 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/colorspace.c): simplify sRGBTransformImage`
 
 #### Step 3: `ConvertRGBToGeneric` (line 416)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- **Recipe E (extract function)** - a large method; extract its self-contained blocks.
 - No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Public function: its name and signature must not change.
@@ -106,6 +108,7 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify ConvertRGBToGeneric
 #### Step 4: `ConvertGenericToRGB` (line 127)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- **Recipe E (extract function)** - a large method; extract its self-contained blocks.
 - No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Public function: its name and signature must not change.
@@ -128,7 +131,7 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify ConvertHSLToRGB`
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Public function: its name and signature must not change.
-- 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes; see `tools/oracle/classify.py`).
+- 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/colorspace.c): simplify SetImageColorspace`
 
@@ -136,7 +139,7 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify SetImageColorspace`
 
 - **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Public function: its name and signature must not change.
-- 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes; see `tools/oracle/classify.py`).
+- 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/colorspace.c): simplify SetImageGray`
 
@@ -144,7 +147,7 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify SetImageGray`
 
 - **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Public function: its name and signature must not change.
-- 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes; see `tools/oracle/classify.py`).
+- 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/colorspace.c): simplify SetImageMonochrome`
 
@@ -154,10 +157,9 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify SetImageMonochrome`
 
 - No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Public function: its name and signature must not change.
-- The oracle missed 3 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
-  - base line 628, `lt_to_le`: `if (fabs(max-QuantumScale*red) < MagickEpsilon)`
-  - base line 635, `lt_to_le`: `if (fabs(max-QuantumScale*green) < MagickEpsilon)`
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 640, `le_to_lt`: `if (*lightness <= 0.5)`
+- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/colorspace.c): simplify ConvertRGBToHSL`
 

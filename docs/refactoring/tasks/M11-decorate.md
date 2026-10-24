@@ -7,7 +7,7 @@
 | Hand-off point | **4.00** leaves the Red band. A small model stops there and hands on |
 | File size | 902 lines |
 | Functions with findings | 2 |
-| Measured with | `cs-mcp` 1.5.6, `cs` 1.0.46 |
+| Measured with | `cs-mcp` 1.5.12, `cs` not installed |
 
 ## 1. Read these first
 
@@ -30,13 +30,14 @@ The score must read 5.78. If it does not, this file changed after the task was w
 | Bumpy Road Ahead | 2 |
 | Deep, Nested Complexity | 2 |
 | Complex Method | 2 |
+| Large Method | 2 |
 
 ## 4. Target functions, highest leverage first
 
 | # | Function | Line | Cyclomatic | Nesting | Bumps | Linkage | OpenMP | Cases | Mutants killed |
 | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
 | 1 | `RaiseImage` | 628 | 63 | 4 | 14 | public | 6 | 28 | 114 of 118 |
-| 2 | `FrameImage` | 169 | 67 | 5 | 11 | public | 2 | 90 | 233 of 237 |
+| 2 | `FrameImage` | 169 | 67 | 5 | 11 | public | 2 | 123 | 267 of 270 |
 
 Thresholds for C: cyclomatic complexity under 9, nesting depth under 4. **Cases** is how many oracle cases execute the function; **Mutants killed** counts the sampled mutants on lines the oracle executes. A function with no cases cannot be checked and is listed last: skip it and report it.
 
@@ -64,7 +65,7 @@ Commit message: `refactor(MagickCore/decorate.c): simplify RaiseImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/decorate.c): simplify FrameImage`
 

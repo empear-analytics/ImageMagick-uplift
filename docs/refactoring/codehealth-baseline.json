@@ -1,19 +1,18 @@
 {
- "date": "2026-09-29",
- "cs_mcp_version": "1.5.6",
- "cs_version": "cs version 1.0.46 (3c5dc7a5273e66de39db29c8560d2d7f28f2e09b)",
- "commit": "e8ad8ca02",
+ "date": "2026-10-24",
+ "cs_mcp_version": "1.5.12",
+ "commit": "3a0baebda",
  "only": null,
  "total_candidates": 296,
- "scored": 295,
- "unscorable": 1,
+ "scored": 296,
+ "unscorable": 0,
  "bands": {
-  "red": 102,
+  "red": 103,
   "yellow": 132,
   "green": 38,
   "optimal": 23
  },
- "mean": 5.87,
+ "mean": 5.85,
  "subsystems": {
   "Magick++/lib/": {
    "files": 19,
@@ -46,10 +45,10 @@
    }
   },
   "coders/": {
-   "files": 145,
-   "mean": 6.26,
+   "files": 146,
+   "mean": 6.22,
    "bands": {
-    "red": 40,
+    "red": 41,
     "yellow": 77,
     "green": 23,
     "optimal": 5
@@ -77,6 +76,10 @@
   }
  },
  "scores": [
+  {
+   "path": "coders/png.c",
+   "score": 1.0011997802297097
+  },
   {
    "path": "MagickCore/display.c",
    "score": 1.0175375268249036
@@ -1258,7 +1261,5 @@
    "score": 10.0
   }
  ],
- "unscorable_files": [
-  "coders/png.c"
- ]
+ "unscorable_files": []
 }

@@ -7,7 +7,7 @@
 | Hand-off point | **4.00** leaves the Red band. A small model stops there and hands on |
 | File size | 4988 lines |
 | Functions with findings | 37 |
-| Measured with | `cs-mcp` 1.5.6, `cs` 1.0.46 |
+| Measured with | `cs-mcp` 1.5.12, `cs` not installed |
 
 ## 1. Read these first
 
@@ -35,6 +35,7 @@ The score must read 1.46. If it does not, this file changed after the task was w
 | Complex Method | 31 |
 | Complex Conditional | 3 |
 | Code Duplication | 23 |
+| Large Method | 25 |
 | Excess Number of Function Arguments | 10 |
 | Overall Function Size | file |
 
@@ -42,18 +43,18 @@ The score must read 1.46. If it does not, this file changed after the task was w
 
 | # | Function | Line | Cyclomatic | Nesting | Bumps | Linkage | OpenMP | Cases | Mutants killed |
 | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
-| 1 | `GetSSIMSimularity` | 2076 | 35 | 6 | 6 | static | 2 | 20 | 74 of 77 |
-| 2 | `GetDPCSimilarity` | 452 | 29 | 4 | 7 | static | 3 | 10 | 33 of 37 |
-| 3 | `GetNCCSimilarity` | 1229 | 29 | 4 | 7 | static | 3 | 10 | 33 of 37 |
-| 4 | `GetPHASESimilarity` | 1698 | 37 | 4 | 5 | static | 2 | 11 | 49 of 58 |
-| 5 | `GetMEPPSimilarity` | 933 | 27 | 4 | 5 | static | 2 | 66 | 36 of 42 |
-| 6 | `GetAESimilarity` | 307 | 26 | 4 | 5 | static | 2 | 11 | 37 of 38 |
-| 7 | `GetFUZZSimilarity` | 648 | 25 | 4 | 5 | static | 2 | 10 | 37 of 39 |
-| 8 | `GetMAESimilarity` | 791 | 25 | 4 | 5 | static | 2 | 10 | 35 of 36 |
-| 9 | `GetMSESimilarity` | 1088 | 25 | 4 | 5 | static | 2 | 34 | 35 of 36 |
-| 10 | `GetPASimilarity` | 1426 | 24 | 4 | 4 | static | 2 | 10 | 29 of 36 |
-| 11 | `GetPDCSimilarity` | 1548 | 22 | 4 | 4 | static | 2 | 10 | 31 of 33 |
-| 12 | `SimilarityImage` | 4712 | - | 4 | 7 | public | 2 | 3 | 26 of 33 |
+| 1 | `GetSSIMSimularity` | 2076 | 35 | 6 | 6 | static | 2 | 20 | 76 of 78 |
+| 2 | `GetDPCSimilarity` | 452 | 29 | 4 | 7 | static | 3 | 10 | 34 of 38 |
+| 3 | `GetNCCSimilarity` | 1229 | 29 | 4 | 7 | static | 3 | 12 | 34 of 38 |
+| 4 | `GetPHASESimilarity` | 1698 | 37 | 4 | 5 | static | 2 | 11 | 49 of 59 |
+| 5 | `GetMEPPSimilarity` | 933 | 27 | 4 | 5 | static | 2 | 68 | 37 of 43 |
+| 6 | `GetAESimilarity` | 307 | 26 | 4 | 5 | static | 2 | 11 | 38 of 39 |
+| 7 | `GetFUZZSimilarity` | 648 | 25 | 4 | 5 | static | 2 | 10 | 37 of 40 |
+| 8 | `GetMAESimilarity` | 791 | 25 | 4 | 5 | static | 2 | 10 | 36 of 37 |
+| 9 | `GetMSESimilarity` | 1088 | 25 | 4 | 5 | static | 2 | 37 | 35 of 37 |
+| 10 | `GetPASimilarity` | 1426 | 24 | 4 | 4 | static | 2 | 10 | 31 of 37 |
+| 11 | `GetPDCSimilarity` | 1548 | 22 | 4 | 4 | static | 2 | 10 | 32 of 34 |
+| 12 | `SimilarityImage` | 4712 | - | 4 | 7 | public | 2 | 10 | 27 of 47 |
 
 Thresholds for C: cyclomatic complexity under 9, nesting depth under 4. **Cases** is how many oracle cases execute the function; **Mutants killed** counts the sampled mutants on lines the oracle executes. A function with no cases cannot be checked and is listed last: skip it and report it.
 
@@ -69,7 +70,7 @@ Work **one function at a time, in the order above**, and run the verification in
 - **Recipe E (extract function)** - 6 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
-- 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/compare.c): simplify GetSSIMSimularity`
 
@@ -101,7 +102,8 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetNCCSimilarity`
 - **Recipe E (extract function)** - 5 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
-- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+- The oracle missed 2 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1788, `le_to_lt`: `if ((GetPixelReadMask(image,pm) <= (QuantumRange/2)) ||`
   - base line 1897, `sub_to_add`: `pearson=(fabs(image_sum[j]-reconstruct_sum[j]) < MagickEpsilon) ?`
 - 8 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -137,6 +139,8 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetAESimilarity`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 712, `le_to_lt`: `if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||`
 - 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/compare.c): simplify GetFUZZSimilarity`
@@ -161,6 +165,8 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetMAESimilarity`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1152, `le_to_lt`: `(GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))`
 - 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/compare.c): simplify GetMSESimilarity`
@@ -172,7 +178,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetMSESimilarity`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
-- 7 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 6 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/compare.c): simplify GetPASimilarity`
 
@@ -195,12 +201,15 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetPDCSimilarity`
 - No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- Only 3 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
-- The oracle missed 3 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+- The oracle missed 10 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 4757, `remove_void_call`: `SetGeometry(reconstruct,offset);`
+  - base line 4814, `lt_to_le`: `(image->rows < reconstruct->rows))`
+  - base line 4883, `le_to_gt`: `if (similarity <= channel_info.similarity)`
+  - base line 4883, `le_to_lt`: `if (similarity <= channel_info.similarity)`
   - base line 4892, `ge_to_gt`: `if (similarity >= channel_info.similarity)`
-  - base line 4951, `ne_to_eq`: `if (similarity_threshold != DefaultSimilarityThreshold)`
-  - base line 4954, `lt_to_le`: `if (channel_info.similarity < similarity_info.similarity)`
-- 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+  - base line 4917, `remove_void_call`: `SetPixelChannel(similarity_image,channel,ClampToQuantum((double)`
+  - and 4 more (`tools/oracle/mutate.py --function SimilarityImage`)
+- 10 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/compare.c): simplify SimilarityImage`
 

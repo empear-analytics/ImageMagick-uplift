@@ -7,7 +7,7 @@
 | Hand-off point | **4.00** leaves the Red band. A small model stops there and hands on |
 | File size | 3790 lines |
 | Functions with findings | 21 |
-| Measured with | `cs-mcp` 1.5.6, `cs` 1.0.46 |
+| Measured with | `cs-mcp` 1.5.12, `cs` not installed |
 
 ## 1. Read these first
 
@@ -34,6 +34,7 @@ The score must read 1.55. If it does not, this file changed after the task was w
 | Overall Code Complexity | file |
 | Complex Method | 15 |
 | Complex Conditional | 8 |
+| Large Method | 18 |
 | Excess Number of Function Arguments | 9 |
 | Overall Function Size | file |
 
@@ -41,18 +42,18 @@ The score must read 1.55. If it does not, this file changed after the task was w
 
 | # | Function | Line | Cyclomatic | Nesting | Bumps | Linkage | OpenMP | Cases | Mutants killed |
 | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
-| 1 | `WaveletDenoiseImage` | 3511 | 41 | 4 | 9 | public | 2 | 12 | 77 of 84 |
-| 2 | `MorphImages` | 1156 | 32 | 6 | 6 | public | 1 | 3 | 38 of 41 |
-| 3 | `ColorMatrixImage` | 713 | 32 | 4 | 5 | public | 2 | 39 | 27 of 35 |
-| 4 | `ImplodeImage` | 935 | 29 | 5 | 4 | public | 2 | 27 | 41 of 50 |
-| 5 | `PlasmaImageProxy` | 1402 | - | 4 | 10 | static | - | 6 | 98 of 133 |
-| 6 | `ColorizeImage` | 530 | 30 | 4 | 4 | public | 2 | 26 | 26 of 30 |
-| 7 | `SwirlImage` | 2784 | 25 | 5 | 4 | public | 2 | 14 | 42 of 51 |
-| 8 | `SolarizeImage` | 2335 | 21 | 4 | 4 | public | 2 | 16 | 29 of 32 |
-| 9 | `AddNoiseImage` | 138 | 22 | 4 | 3 | public | 2 | 27 | 18 of 20 |
-| 10 | `SteganoImage` | 2469 | 23 | 4 | 2 | public | - | 2 | 26 of 33 |
-| 11 | `PolaroidImage` | 1683 | - | 4 | 4 | public | - | 3 | 19 of 21 |
-| 12 | `TintImage` | 2999 | 24 | - | 3 | public | 2 | 14 | 35 of 43 |
+| 1 | `WaveletDenoiseImage` | 3511 | 41 | 4 | 9 | public | 2 | 42 | 79 of 86 |
+| 2 | `MorphImages` | 1156 | 32 | 6 | 6 | public | 1 | 3 | 41 of 44 |
+| 3 | `ColorMatrixImage` | 713 | 32 | 4 | 5 | public | 2 | 39 | 29 of 39 |
+| 4 | `ImplodeImage` | 935 | 29 | 5 | 4 | public | 2 | 27 | 42 of 51 |
+| 5 | `PlasmaImageProxy` | 1402 | - | 4 | 10 | static | - | 18 | 98 of 133 |
+| 6 | `ColorizeImage` | 530 | 30 | 4 | 4 | public | 2 | 37 | 27 of 32 |
+| 7 | `SwirlImage` | 2784 | 25 | 5 | 4 | public | 2 | 14 | 44 of 53 |
+| 8 | `SolarizeImage` | 2335 | 21 | 4 | 4 | public | 2 | 16 | 31 of 33 |
+| 9 | `AddNoiseImage` | 138 | 22 | 4 | 3 | public | 2 | 42 | 20 of 23 |
+| 10 | `SteganoImage` | 2469 | 23 | 4 | 2 | public | - | 2 | 28 of 34 |
+| 11 | `PolaroidImage` | 1683 | - | 4 | 4 | public | - | 5 | 18 of 28 |
+| 12 | `TintImage` | 2999 | 24 | - | 3 | public | 2 | 14 | 38 of 47 |
 
 Thresholds for C: cyclomatic complexity under 9, nesting depth under 4. **Cases** is how many oracle cases execute the function; **Mutants killed** counts the sampled mutants on lines the oracle executes. A function with no cases cannot be checked and is listed last: skip it and report it.
 
@@ -92,9 +93,12 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify MorphImages`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+- The oracle missed 4 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 763, `lt_to_le`: `if ((v < 6) && (u < 6))`
+  - base line 763, `lt_to_le`: `if ((v < 6) && (u < 6))`
+  - base line 837, `remove_void_call`: `GetPixelInfo(image,&pixel);`
   - base line 847, `gt_to_le`: `height=color_matrix->height > 6 ? 6UL : color_matrix->height;`
-- 7 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 6 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/visual-effects.c): simplify ColorMatrixImage`
 
@@ -105,7 +109,10 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify ColorMatrixImag
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 9 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- The oracle missed 2 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1071, `remove_void_call`: `SetPixelChannel(implode_image,channel,p[i],q);`
+  - base line 1085, `gt_to_ge`: `if (distance > 0.0)`
+- 7 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/visual-effects.c): simplify ImplodeImage`
 
@@ -117,7 +124,6 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify ImplodeImage`
 - **Recipe E (extract function)** - 10 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - No recipe in the catalogue reaches *Excess Number of Function Arguments* (9 arguments).
-- Only 6 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
 - The oracle missed 3 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 1468, `lt_to_ge`: `if ((fabs(segment->x1-x_mid) < MagickEpsilon) &&`
   - base line 1470, `lt_to_ge`: `(fabs(segment->y1-y_mid) < MagickEpsilon) &&`
@@ -133,6 +139,8 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify PlasmaImageProx
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 586, `remove_void_call`: `GetPixelInfo(colorize_image,&blend_percentage);`
 - 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/visual-effects.c): simplify ColorizeImage`
@@ -144,7 +152,9 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify ColorizeImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 9 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 2916, `remove_void_call`: `SetPixelChannel(swirl_image,channel,p[i],q);`
+- 8 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/visual-effects.c): simplify SwirlImage`
 
@@ -155,7 +165,7 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify SwirlImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/visual-effects.c): simplify SolarizeImage`
 
@@ -168,6 +178,8 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify SolarizeImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 239, `remove_void_call`: `SetPixelChannel(noise_image,channel,p[i],q);`
 - 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/visual-effects.c): simplify AddNoiseImage`
@@ -179,7 +191,7 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify AddNoiseImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Public function: its name and signature must not change.
 - Only 2 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
-- 7 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 6 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/visual-effects.c): simplify SteganoImage`
 
@@ -189,9 +201,15 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify SteganoImage`
 - **Recipe E (extract function)** - 4 nested blocks; each bump is a missing function.
 - No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Public function: its name and signature must not change.
-- Only 3 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
-- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
-  - base line 1808, `div_to_mul`: `polaroid_image=ShadowImage(picture_image,80.0,2.0,quantum/3,quantum/3,`
+- Only 5 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
+- The oracle missed 9 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1724, `eq_to_ne`: `if (caption_image == (Image *) NULL)`
+  - base line 1728, `ne_to_eq`: `if (text != (char *) NULL)`
+  - base line 1750, `add_to_sub`: `((count+1)*(metrics.ascent-metrics.descent)+0.5),exception);`
+  - base line 1750, `sub_to_add`: `((count+1)*(metrics.ascent-metrics.descent)+0.5),exception);`
+  - base line 1751, `eq_to_ne`: `if (status == MagickFalse)`
+  - base line 1785, `add_to_sub`: `MagickTrue,quantum,((ssize_t) image->rows+3*quantum/2),exception);`
+  - and 3 more (`tools/oracle/mutate.py --function PolaroidImage`)
 - 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/visual-effects.c): simplify PolaroidImage`
@@ -202,7 +220,10 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify PolaroidImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 8 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- The oracle missed 2 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 3057, `remove_void_call`: `GetPixelInfo(image,&color_vector);`
+  - base line 3123, `remove_void_call`: `GetPixelInfo(image,&pixel);`
+- 7 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/visual-effects.c): simplify TintImage`
 

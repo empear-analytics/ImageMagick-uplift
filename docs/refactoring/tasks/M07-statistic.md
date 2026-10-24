@@ -7,7 +7,7 @@
 | Hand-off point | **4.00** leaves the Red band. A small model stops there and hands on |
 | File size | 3159 lines |
 | Functions with findings | 19 |
-| Measured with | `cs-mcp` 1.5.6, `cs` 1.0.46 |
+| Measured with | `cs-mcp` 1.5.12, `cs` not installed |
 
 ## 1. Read these first
 
@@ -35,24 +35,25 @@ The score must read 1.92. If it does not, this file changed after the task was w
 | Complex Method | 11 |
 | Complex Conditional | 1 |
 | Code Duplication | 5 |
+| Large Method | 11 |
 | Excess Number of Function Arguments | 3 |
 
 ## 4. Target functions, highest leverage first
 
 | # | Function | Line | Cyclomatic | Nesting | Bumps | Linkage | OpenMP | Cases | Mutants killed |
 | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
-| 1 | `EvaluateImages` | 478 | 68 | 6 | 14 | public | 4 | 46 | 87 of 102 |
-| 2 | `GetImageStatistics` | 2026 | 53 | 6 | 15 | public | - | 328 | 114 of 132 |
-| 3 | `PolynomialImage` | 2421 | 29 | 5 | 6 | public | 2 | 2 | 33 of 43 |
-| 4 | `GetImageMoments` | 1441 | 28 | 4 | 6 | public | - | 27 | 212 of 235 |
-| 5 | `EvaluateImage` | 828 | 18 | 4 | 3 | public | 2 | 207 | 17 of 19 |
-| 6 | `StatisticImage` | 2919 | - | 6 | 4 | public | 2 | 113 | 54 of 59 |
-| 7 | `GetImageRange` | 1841 | 15 | 4 | 2 | public | 2 | 101 | 15 of 21 |
-| 8 | `ApplyEvaluateOperator` | 241 | 45 | - | - | static | - | 243 | 54 of 58 |
-| 9 | `FunctionImage` | 1069 | - | 4 | 3 | public | 2 | 70 | 14 of 16 |
-| 10 | `GetMedianPixel` | 1961 | 14 | - | 3 | static | - | 328 | 22 of 30 |
-| 11 | `GetImagePerceptualHash` | 1728 | 11 | - | 2 | public | - | 27 | 17 of 19 |
-| 12 | `ApplyFunction` | 971 | 21 | - | - | static | - | 70 | 46 of 47 |
+| 1 | `EvaluateImages` | 478 | 68 | 6 | 14 | public | 4 | 46 | 92 of 103 |
+| 2 | `GetImageStatistics` | 2026 | 53 | 6 | 15 | public | - | 416 | 114 of 132 |
+| 3 | `PolynomialImage` | 2421 | 29 | 5 | 6 | public | 2 | 2 | 36 of 43 |
+| 4 | `GetImageMoments` | 1441 | 28 | 4 | 6 | public | - | 32 | 212 of 235 |
+| 5 | `EvaluateImage` | 828 | 18 | 4 | 3 | public | 2 | 212 | 18 of 19 |
+| 6 | `StatisticImage` | 2919 | - | 6 | 4 | public | 2 | 113 | 62 of 66 |
+| 7 | `GetImageRange` | 1841 | 15 | 4 | 2 | public | 2 | 114 | 17 of 21 |
+| 8 | `ApplyEvaluateOperator` | 241 | 45 | - | - | static | - | 248 | 54 of 58 |
+| 9 | `FunctionImage` | 1069 | - | 4 | 3 | public | 2 | 112 | 14 of 16 |
+| 10 | `GetMedianPixel` | 1961 | 14 | - | 3 | static | - | 416 | 21 of 30 |
+| 11 | `GetImagePerceptualHash` | 1728 | 11 | - | 2 | public | - | 32 | 17 of 19 |
+| 12 | `ApplyFunction` | 971 | 21 | - | - | static | - | 112 | 45 of 47 |
 
 Thresholds for C: cyclomatic complexity under 9, nesting depth under 4. **Cases** is how many oracle cases execute the function; **Mutants killed** counts the sampled mutants on lines the oracle executes. A function with no cases cannot be checked and is listed last: skip it and report it.
 
@@ -69,7 +70,7 @@ Work **one function at a time, in the order above**, and run the verification in
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 4 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 15 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 11 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/statistic.c): simplify EvaluateImages`
 
@@ -96,7 +97,7 @@ Commit message: `refactor(MagickCore/statistic.c): simplify GetImageStatistics`
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
 - Only 2 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
-- 10 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 7 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/statistic.c): simplify PolynomialImage`
 
@@ -122,7 +123,7 @@ Commit message: `refactor(MagickCore/statistic.c): simplify GetImageMoments`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/statistic.c): simplify EvaluateImage`
 
@@ -134,7 +135,7 @@ Commit message: `refactor(MagickCore/statistic.c): simplify EvaluateImage`
 - No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/statistic.c): simplify StatisticImage`
 
@@ -145,13 +146,14 @@ Commit message: `refactor(MagickCore/statistic.c): simplify StatisticImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 6 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/statistic.c): simplify GetImageRange`
 
 #### Step 8: `ApplyEvaluateOperator` (line 241)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- **Recipe E (extract function)** - a large method; extract its self-contained blocks.
 - 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/statistic.c): simplify ApplyEvaluateOperator`
@@ -173,8 +175,9 @@ Commit message: `refactor(MagickCore/statistic.c): simplify FunctionImage`
 
 - **Recipe E (extract function)** - 3 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- The oracle missed 4 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+- The oracle missed 5 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 1977, `add_to_sub`: `l = low+1,`
+  - base line 1998, `gt_to_ge`: `do l++; while (pixels[low] > pixels[l]);`
   - base line 2000, `lt_to_le`: `if (h < l)`
   - base line 2005, `le_to_lt`: `if (h <= median)`
   - base line 2007, `ge_to_gt`: `if (h >= median)`
@@ -194,7 +197,10 @@ Commit message: `refactor(MagickCore/statistic.c): simplify GetImagePerceptualHa
 #### Step 12: `ApplyFunction` (line 971)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- **Recipe E (extract function)** - a large method; extract its self-contained blocks.
 - No recipe in the catalogue reaches *Excess Number of Function Arguments* (5 arguments).
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1034, `le_to_lt`: `if (result <= -1.0)`
 - 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/statistic.c): simplify ApplyFunction`

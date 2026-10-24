@@ -7,7 +7,7 @@
 | Hand-off point | **4.00** leaves the Red band. A small model stops there and hands on |
 | File size | 1627 lines |
 | Functions with findings | 11 |
-| Measured with | `cs-mcp` 1.5.6, `cs` 1.0.46 |
+| Measured with | `cs-mcp` 1.5.12, `cs` not installed |
 
 ## 1. Read these first
 
@@ -33,6 +33,7 @@ The score must read 3.08. If it does not, this file changed after the task was w
 | Overall Code Complexity | file |
 | Complex Method | 9 |
 | Complex Conditional | 4 |
+| Large Method | 7 |
 | Excess Number of Function Arguments | 6 |
 | Overall Function Size | file |
 
@@ -40,9 +41,9 @@ The score must read 3.08. If it does not, this file changed after the task was w
 
 | # | Function | Line | Cyclomatic | Nesting | Bumps | Linkage | OpenMP | Cases | Mutants killed |
 | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
-| 1 | `ComplexImages` | 134 | 35 | 4 | 3 | public | 2 | 7 | 32 of 37 |
-| 2 | `ForwardFourierTransformImage` | 913 | 19 | - | 2 | public | 6 | 0 | - |
-| 3 | `InverseFourierTransformImage` | 1504 | 16 | - | - | public | 6 | 0 | - |
+| 1 | `ComplexImages` | 134 | 35 | 4 | 3 | public | 2 | 10 | 52 of 61 |
+| 2 | `ForwardFourierTransformImage` | 913 | 19 | - | 2 | public | 6 | 2 | - |
+| 3 | `InverseFourierTransformImage` | 1504 | 16 | - | - | public | 6 | 1 | - |
 | 4 | `InverseFourier` | 1115 | 34 | - | 8 | not compiled | - | - | - |
 | 5 | `ForwardFourier` | 506 | 30 | - | 6 | not compiled | - | - | - |
 | 6 | `InverseFourierTransform` | 1320 | 20 | 4 | 3 | not compiled | - | - | - |
@@ -67,22 +68,34 @@ Work **one function at a time, in the order above**, and run the verification in
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- Only 7 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
-- The oracle missed 3 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+- The oracle missed 4 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 227, `ne_to_eq`: `(images->next->next->next != (Image *) NULL))`
   - base line 314, `add_to_sub`: `cr=MagickSafeReciprocal(br*br+bi*bi+snr)*(ar*br+ai*bi);`
-  - base line 332, `sub_to_add`: `cr=ar*cos(2.0*MagickPI*(ai-0.5));`
-- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes; see `tools/oracle/classify.py`).
+  - base line 315, `mul_to_div`: `ci=MagickSafeReciprocal(br*br+bi*bi+snr)*(ai*br-ar*bi);`
+  - base line 315, `add_to_sub`: `ci=MagickSafeReciprocal(br*br+bi*bi+snr)*(ai*br-ar*bi);`
+- 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/fourier.c): simplify ComplexImages`
 
 #### Step 2: `ForwardFourierTransformImage` (line 913)
 
-- **No oracle case executes this function. Do not change it.** Report it so cases can be added.
+- **Recipe E (extract function)** - 2 nested blocks; each bump is a missing function.
+- **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- Contains 6 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
+- Public function: its name and signature must not change.
+- Only 2 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
+
+Commit message: `refactor(MagickCore/fourier.c): simplify ForwardFourierTransformImage`
 
 #### Step 3: `InverseFourierTransformImage` (line 1504)
 
-- **No oracle case executes this function. Do not change it.** Report it so cases can be added.
+- **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- **Recipe E (extract function)** - a large method; extract its self-contained blocks.
+- Contains 6 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
+- Public function: its name and signature must not change.
+- Only 1 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
+
+Commit message: `refactor(MagickCore/fourier.c): simplify InverseFourierTransformImage`
 
 #### Step 4: `InverseFourier` (line 1115)
 

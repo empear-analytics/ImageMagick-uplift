@@ -7,7 +7,7 @@
 | Hand-off point | **4.00** leaves the Red band. A small model stops there and hands on |
 | File size | 2649 lines |
 | Functions with findings | 15 |
-| Measured with | `cs-mcp` 1.5.6, `cs` 1.0.46 |
+| Measured with | `cs-mcp` 1.5.12, `cs` not installed |
 
 ## 1. Read these first
 
@@ -34,6 +34,7 @@ The score must read 1.89. If it does not, this file changed after the task was w
 | Overall Code Complexity | file |
 | Complex Method | 13 |
 | Complex Conditional | 4 |
+| Large Method | 14 |
 | Excess Number of Function Arguments | 2 |
 | Overall Function Size | file |
 
@@ -41,18 +42,18 @@ The score must read 1.89. If it does not, this file changed after the task was w
 
 | # | Function | Line | Cyclomatic | Nesting | Bumps | Linkage | OpenMP | Cases | Mutants killed |
 | --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
-| 1 | `OrderedDitherImage` | 1893 | 35 | 4 | 7 | public | 2 | 77 | 60 of 67 |
-| 2 | `ColorThresholdImage` | 1217 | 27 | 4 | 4 | public | 2 | 13 | 21 of 24 |
-| 3 | `BlackThresholdImage` | 927 | 26 | 4 | 4 | public | 2 | 15 | 26 of 28 |
-| 4 | `WhiteThresholdImage` | 2518 | 26 | 4 | 4 | public | 2 | 15 | 25 of 28 |
+| 1 | `OrderedDitherImage` | 1893 | 35 | 4 | 7 | public | 2 | 77 | 61 of 67 |
+| 2 | `ColorThresholdImage` | 1217 | 27 | 4 | 4 | public | 2 | 24 | 23 of 37 |
+| 3 | `BlackThresholdImage` | 927 | 26 | 4 | 4 | public | 2 | 16 | 27 of 29 |
+| 4 | `WhiteThresholdImage` | 2518 | 26 | 4 | 4 | public | 2 | 16 | 27 of 30 |
 | 5 | `PerceptibleImage` | 2092 | 19 | 4 | 4 | public | 2 | 7 | 18 of 23 |
 | 6 | `KapurThreshold` | 392 | 17 | 4 | 4 | static | - | 13 | 38 of 43 |
-| 7 | `ClampImage` | 1087 | 16 | 4 | 4 | public | 2 | 124 | 14 of 19 |
-| 8 | `RandomThresholdImage` | 2231 | 19 | 4 | 3 | public | 2 | 13 | 18 of 23 |
-| 9 | `BilevelImage` | 805 | 18 | 4 | 3 | public | 2 | 160 | 17 of 20 |
-| 10 | `AdaptiveThresholdImage` | 182 | - | 5 | 5 | public | 2 | 12 | 58 of 63 |
-| 11 | `TriangleThreshold` | 570 | 15 | - | 5 | static | - | 15 | 35 of 48 |
-| 12 | `RangeThresholdImage` | 2377 | - | 4 | 3 | public | 2 | 13 | 33 of 42 |
+| 7 | `ClampImage` | 1087 | 16 | 4 | 4 | public | 2 | 128 | 16 of 20 |
+| 8 | `RandomThresholdImage` | 2231 | 19 | 4 | 3 | public | 2 | 13 | 20 of 23 |
+| 9 | `BilevelImage` | 805 | 18 | 4 | 3 | public | 2 | 182 | 18 of 20 |
+| 10 | `AdaptiveThresholdImage` | 182 | - | 5 | 5 | public | 2 | 12 | 62 of 64 |
+| 11 | `TriangleThreshold` | 570 | 15 | - | 5 | static | - | 15 | 39 of 48 |
+| 12 | `RangeThresholdImage` | 2377 | - | 4 | 3 | public | 2 | 13 | 36 of 42 |
 
 Thresholds for C: cyclomatic complexity under 9, nesting depth under 4. **Cases** is how many oracle cases execute the function; **Mutants killed** counts the sampled mutants on lines the oracle executes. A function with no cases cannot be checked and is listed last: skip it and report it.
 
@@ -69,8 +70,6 @@ Work **one function at a time, in the order above**, and run the verification in
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
-  - base line 2013, `lt_to_le`: `if (fabs(levels[n]) < MagickEpsilon)`
 - 6 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify OrderedDitherImage`
@@ -82,6 +81,14 @@ Commit message: `refactor(MagickCore/threshold.c): simplify OrderedDitherImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
+- The oracle missed 11 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1274, `remove_void_call`: `ConvertRGBToHCL(start_color->red,start_color->green,start_color->blue,`
+  - base line 1276, `remove_void_call`: `ConvertRGBToHCL(stop_color->red,stop_color->green,stop_color->blue,`
+  - base line 1282, `remove_void_call`: `ConvertRGBToHSB(start_color->red,start_color->green,start_color->blue,`
+  - base line 1284, `remove_void_call`: `ConvertRGBToHSB(stop_color->red,stop_color->green,stop_color->blue,`
+  - base line 1290, `remove_void_call`: `ConvertRGBToHSL(start_color->red,start_color->green,start_color->blue,`
+  - base line 1292, `remove_void_call`: `ConvertRGBToHSL(stop_color->red,stop_color->green,stop_color->blue,`
+  - and 5 more (`tools/oracle/mutate.py --function ColorThresholdImage`)
 - 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify ColorThresholdImage`
@@ -93,7 +100,9 @@ Commit message: `refactor(MagickCore/threshold.c): simplify ColorThresholdImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 963, `remove_void_call`: `GetPixelInfo(image,&threshold);`
+- 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify BlackThresholdImage`
 
@@ -104,7 +113,9 @@ Commit message: `refactor(MagickCore/threshold.c): simplify BlackThresholdImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 2554, `remove_void_call`: `GetPixelInfo(image,&threshold);`
+- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify WhiteThresholdImage`
 
@@ -118,7 +129,9 @@ Commit message: `refactor(MagickCore/threshold.c): simplify WhiteThresholdImage`
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
 - Only 7 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
-- 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 2130, `ne_to_eq`: `if ((GetPixelChannelTraits(image,BluePixelChannel) & UpdatePixelTrait) != 0)`
+- 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify PerceptibleImage`
 
@@ -138,7 +151,7 @@ Commit message: `refactor(MagickCore/threshold.c): simplify KapurThreshold`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify ClampImage`
 
@@ -149,7 +162,7 @@ Commit message: `refactor(MagickCore/threshold.c): simplify ClampImage`
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify RandomThresholdImage`
 
@@ -162,7 +175,7 @@ Commit message: `refactor(MagickCore/threshold.c): simplify RandomThresholdImage
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 3 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify BilevelImage`
 
@@ -173,7 +186,7 @@ Commit message: `refactor(MagickCore/threshold.c): simplify BilevelImage`
 - No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify AdaptiveThresholdImage`
 
@@ -186,7 +199,7 @@ Commit message: `refactor(MagickCore/threshold.c): simplify AdaptiveThresholdIma
   - base line 638, `add_to_sub`: `segment=inverse_ratio*(a*i+b*histogram[i]+c);`
   - base line 640, `gt_to_ge`: `if ((distance > max_distance) && (segment > 0.0))`
   - base line 651, `gt_to_ge`: `if ((distance > max_distance) && (segment < 0.0))`
-- 9 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify TriangleThreshold`
 
@@ -197,7 +210,7 @@ Commit message: `refactor(MagickCore/threshold.c): simplify TriangleThreshold`
 - No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
-- 9 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+- 6 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/threshold.c): simplify RangeThresholdImage`
 

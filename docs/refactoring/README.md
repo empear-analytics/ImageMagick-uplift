@@ -13,22 +13,26 @@ that demands byte-identical behaviour ([`ORACLE.md`](ORACLE.md)).
 
 ## Baseline
 
-Measured on 2026-09-29 at upstream commit `68168e6e5`, with `cs-mcp` 1.5.6 and `cs`
-1.0.46, across every `.c` and `.cpp` file in the library subsystems. Tests, fuzzers,
-demos, PerlMagick, API examples and the website are excluded.
+Measured on 2026-10-24 at commit `3a0baebda`, with `cs-mcp` 1.5.12, across every `.c`
+and `.cpp` file in the library subsystems. Tests, fuzzers, demos, PerlMagick, API
+examples and the website are excluded. The server no longer reports the version of the
+CLI it uses internally, so no `cs` version is recorded. The library sources are those
+of the previous baseline (2026-09-29, `cs-mcp` 1.5.6); every file scores the same,
+except `coders/png.c`, which that sweep recorded as unscorable because its request was
+dropped, and which scores 1.00.
 
 | Band | Score | Files |
 | --- | --- | ---: |
-| **Red** - severe debt | 1.0 - 3.9 | **102** |
+| **Red** - severe debt | 1.0 - 3.9 | **103** |
 | **Yellow** - problematic debt | 4.0 - 8.9 | 132 |
 | Green | 9.0 - 9.9 | 38 |
 | Optimal | 10.0 | 23 |
-| **Total scored** | | **295** |
+| **Total scored** | | **296** |
 
 | Subsystem | Files | Mean | Red | Yellow | Green | Optimal |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `MagickCore/` | 95 | **4.36** | **51** | 35 | 6 | 3 |
-| `coders/` | 145 | 6.26 | 40 | 77 | 23 | 5 |
+| `coders/` | 146 | 6.22 | 41 | 77 | 23 | 5 |
 | `MagickWand/` | 34 | 6.59 | 11 | 10 | 8 | 5 |
 | `Magick++/lib/` | 19 | 8.89 | 0 | 9 | 0 | 10 |
 | `filters/` | 1 | 8.14 | 0 | 1 | 0 | 0 |
@@ -36,14 +40,9 @@ demos, PerlMagick, API examples and the website are excluded.
 
 **Take the numbers from the JSON, not from this table.**
 [`codehealth-baseline.json`](codehealth-baseline.json) is the committed baseline and is
-never updated. `python3 tools/codehealth_sweep.py` writes `codehealth-current.json`
-beside it, with the date, the commit and the tool versions.
-
-**`cs-mcp` 1.5.12 reproduces the baseline exactly.** A full sweep on 2026-10-24 at
-`7d78ea7e4` gave every one of the 295 files the same score as 1.5.6, so scores from 1.5.12
-compare directly with the baseline and with the task files' "Measured with 1.5.6" lines.
-The server no longer reports the version of the CLI it uses internally, so no `cs`
-version is recorded for it.
+replaced only by a deliberate re-measurement; earlier baselines stay in git history.
+`python3 tools/codehealth_sweep.py` writes `codehealth-current.json` beside it, with the
+date, the commit and the tool versions.
 
 The debt is concentrated in MagickCore: more than half its files are Red, and its worst
 score 1.02-1.14 (`display.c`, `pixel.c`, `xwindow.c`, `fx.c`).
