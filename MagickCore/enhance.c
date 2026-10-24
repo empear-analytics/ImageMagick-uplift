@@ -1518,6 +1518,14 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
   return(status);
 }
 
+static inline MagickBooleanType IsStretchMemoryMissing(const Quantum *black,
+  const Quantum *white,const Quantum *stretch_map,const double *histogram)
+{
+  return(((black == (Quantum *) NULL) || (white == (Quantum *) NULL) ||
+    (stretch_map == (Quantum *) NULL) || (histogram == (double *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1605,8 +1613,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     sizeof(*stretch_map));
   histogram=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
     sizeof(*histogram));
-  if ((black == (Quantum *) NULL) || (white == (Quantum *) NULL) ||
-      (stretch_map == (Quantum *) NULL) || (histogram == (double *) NULL))
+  if (IsStretchMemoryMissing(black,white,stretch_map,histogram) != MagickFalse)
     {
       if (histogram != (double *) NULL)
         histogram=(double *) RelinquishMagickMemory(histogram);
