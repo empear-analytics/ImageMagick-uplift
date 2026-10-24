@@ -703,6 +703,20 @@ static MagickBooleanType Classify(Image *image,short **extrema,
 %      in the zero_crossing array.
 %
 */
+static ssize_t CountCrossingsBetween(const ZeroCrossing *zero_crossing,
+  const ssize_t i,const ssize_t k,const ssize_t limit)
+{
+  ssize_t
+    count,
+    l;
+
+  count=0;
+  for (l=k+1; l < limit; l++)
+    if (zero_crossing[i+1].crossings[l] != 0)
+      count++;
+  return(count);
+}
+
 static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -755,10 +769,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       correct=(-1);
       if (zero_crossing[i+1].crossings[j] != 0)
         {
-          count=0;
-          for (l=k+1; l < center; l++)
-            if (zero_crossing[i+1].crossings[l] != 0)
-              count++;
+          count=CountCrossingsBetween(zero_crossing,i,k,center);
           if (((count % 2) == 0) && (center != k))
             correct=center;
         }
