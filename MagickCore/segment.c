@@ -1535,6 +1535,38 @@ static void ForceCrossingEndpoints(ZeroCrossing *zero_crossing,
   }
 }
 
+static ssize_t FindPeakIndex(const ZeroCrossing *zero_crossing,
+  const ssize_t k,const IntervalTree *node,const MagickBooleanType peak)
+{
+  double
+    value;
+
+  ssize_t
+    index,
+    x;
+
+  index=node->left;
+  value=zero_crossing[k].histogram[index];
+  for (x=node->left; x <= node->right; x++)
+  {
+    if (peak != MagickFalse)
+      {
+        if (zero_crossing[k].histogram[x] > value)
+          {
+            value=zero_crossing[k].histogram[x];
+            index=x;
+          }
+      }
+    else
+      if (zero_crossing[k].histogram[x] < value)
+        {
+          value=zero_crossing[k].histogram[x];
+          index=x;
+        }
+  }
+  return(index);
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
@@ -1543,8 +1575,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     average_tau,
     *derivative,
     *second_derivative,
-    tau,
-    value;
+    tau;
 
   IntervalTree
     **list,
@@ -1665,25 +1696,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     */
     peak=zero_crossing[k].crossings[node->right] == -1 ? MagickTrue :
       MagickFalse;
-    index=node->left;
-    value=zero_crossing[k].histogram[index];
-    for (x=node->left; x <= node->right; x++)
-    {
-      if (peak != MagickFalse)
-        {
-          if (zero_crossing[k].histogram[x] > value)
-            {
-              value=zero_crossing[k].histogram[x];
-              index=x;
-            }
-        }
-      else
-        if (zero_crossing[k].histogram[x] < value)
-          {
-            value=zero_crossing[k].histogram[x];
-            index=x;
-          }
-    }
+    index=FindPeakIndex(zero_crossing,k,node,peak);
     for (x=node->left; x <= node->right; x++)
     {
       if (index == 0)
