@@ -80,6 +80,13 @@
 #include "MagickCore/utility.h"
 #include "MagickCore/version.h"
 
+static inline MagickBooleanType IsCompareRowMissing(const Quantum *p,
+  const Quantum *q,const Quantum *r)
+{
+  return(((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
+    (r == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -229,8 +236,7 @@ MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
     p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
     q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
     r=QueueCacheViewAuthenticPixels(highlight_view,0,y,columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
-        (r == (Quantum *) NULL))
+    if (IsCompareRowMissing(p,q,r) != MagickFalse)
       {
         status=MagickFalse;
         continue;
