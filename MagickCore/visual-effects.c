@@ -580,6 +580,41 @@ static void ColorizePixelChannels(const Image *colorize_image,
   }
 }
 
+static PixelInfo ParseColorizeBlendPercentage(const Image *colorize_image,
+  const char *blend)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  PixelInfo
+    blend_percentage;
+
+  GetPixelInfo(colorize_image,&blend_percentage);
+  flags=ParseGeometry(blend,&geometry_info);
+  blend_percentage.red=geometry_info.rho;
+  blend_percentage.green=geometry_info.rho;
+  blend_percentage.blue=geometry_info.rho;
+  blend_percentage.black=geometry_info.rho;
+  blend_percentage.alpha=(MagickRealType) TransparentAlpha;
+  if ((flags & SigmaValue) != 0)
+    blend_percentage.green=geometry_info.sigma;
+  if ((flags & XiValue) != 0)
+    blend_percentage.blue=geometry_info.xi;
+  if ((flags & PsiValue) != 0)
+    blend_percentage.alpha=geometry_info.psi;
+  if (blend_percentage.colorspace == CMYKColorspace)
+    {
+      if ((flags & PsiValue) != 0)
+        blend_percentage.black=geometry_info.psi;
+      if ((flags & ChiValue) != 0)
+        blend_percentage.alpha=geometry_info.chi;
+    }
+  return(blend_percentage);
+}
+
 MagickExport Image *ColorizeImage(const Image *image,const char *blend,
   const PixelInfo *colorize,ExceptionInfo *exception)
 {
@@ -587,9 +622,6 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
 
   CacheView
     *image_view;
-
-  GeometryInfo
-    geometry_info;
 
   Image
     *colorize_image;
@@ -599,9 +631,6 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
 
   MagickOffsetType
     progress;
-
-  MagickStatusType
-    flags;
 
   PixelInfo
     blend_percentage;
@@ -634,26 +663,7 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
     (void) SetImageAlpha(colorize_image,OpaqueAlpha,exception);
   if (blend == (const char *) NULL)
     return(colorize_image);
-  GetPixelInfo(colorize_image,&blend_percentage);
-  flags=ParseGeometry(blend,&geometry_info);
-  blend_percentage.red=geometry_info.rho;
-  blend_percentage.green=geometry_info.rho;
-  blend_percentage.blue=geometry_info.rho;
-  blend_percentage.black=geometry_info.rho;
-  blend_percentage.alpha=(MagickRealType) TransparentAlpha;
-  if ((flags & SigmaValue) != 0)
-    blend_percentage.green=geometry_info.sigma;
-  if ((flags & XiValue) != 0)
-    blend_percentage.blue=geometry_info.xi;
-  if ((flags & PsiValue) != 0)
-    blend_percentage.alpha=geometry_info.psi;
-  if (blend_percentage.colorspace == CMYKColorspace)
-    {
-      if ((flags & PsiValue) != 0)
-        blend_percentage.black=geometry_info.psi;
-      if ((flags & ChiValue) != 0)
-        blend_percentage.alpha=geometry_info.chi;
-    }
+  blend_percentage=ParseColorizeBlendPercentage(colorize_image,blend);
   /*
     Colorize DirectClass image.
   */
