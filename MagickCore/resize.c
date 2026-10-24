@@ -3380,6 +3380,17 @@ static ContributionInfo **AcquireContributionTLS(const size_t count)
   return(contribution);
 }
 
+static void NormalizeContributions(ContributionInfo *contribution,
+  const ssize_t n,double density)
+{
+  ssize_t
+    i;
+
+  density=MagickSafeReciprocal(density);
+  for (i=0; i < n; i++)
+    contribution[i].weight*=density;
+}
+
 static MagickBooleanType HorizontalFilter(
   const ResizeFilter *magick_restrict resize_filter,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
@@ -3481,15 +3492,10 @@ static MagickBooleanType HorizontalFilter(
       continue;
     if ((density != 0.0) && (density != 1.0))
       {
-        ssize_t
-          i;
-
         /*
           Normalize.
         */
-        density=MagickSafeReciprocal(density);
-        for (i=0; i < n; i++)
-          contribution[i].weight*=density;
+        NormalizeContributions(contribution,n,density);
       }
     p=GetCacheViewVirtualPixels(image_view,contribution[0].pixel,0,(size_t)
       (contribution[n-1].pixel-contribution[0].pixel+1),image->rows,exception);
