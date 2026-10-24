@@ -216,6 +216,38 @@ static inline MagickBooleanType AcquireKernelValues(KernelInfo *kernel)
 /* This was separated so that it could be used as a separate
 ** array input handling function, such as for -color-matrix
 */
+static const char *SetOddSquareKernelSize(KernelInfo *kernel,
+  const char *kernel_string,const char *end)
+{
+  char
+    token[MagickPathExtent];
+
+  const char
+    *p;
+
+  ssize_t
+    i;
+
+  /* ELSE - Old old specification, forming odd-square kernel */
+  /* count up number of values given */
+  p=(const char *) kernel_string;
+  while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
+    p++;  /* ignore "'" chars for convolve filter usage - Cristy */
+  for (i=0; p < end; i++)
+  {
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+    if (*token == ',')
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+  }
+  /* set the size of the kernel - old sized square */
+  kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  p=(const char *) kernel_string;
+  while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
+    p++;  /* ignore "'" chars for convolve filter usage - Cristy */
+  return(p);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -300,24 +332,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
       p++; /* advance beyond the ':' */
     }
   else
-    { /* ELSE - Old old specification, forming odd-square kernel */
-      /* count up number of values given */
-      p=(const char *) kernel_string;
-      while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
-        p++;  /* ignore "'" chars for convolve filter usage - Cristy */
-      for (i=0; p < end; i++)
-      {
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-        if (*token == ',')
-          (void) GetNextToken(p,&p,MagickPathExtent,token);
-      }
-      /* set the size of the kernel - old sized square */
-      kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
-      kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-      p=(const char *) kernel_string;
-      while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
-        p++;  /* ignore "'" chars for convolve filter usage - Cristy */
-    }
+    p=SetOddSquareKernelSize(kernel,kernel_string,end);
 
   /* Read in the kernel values from rest of input string argument */
   if (AcquireKernelValues(kernel) == MagickFalse)
