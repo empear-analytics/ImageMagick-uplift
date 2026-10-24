@@ -45,8 +45,9 @@ would see as changes.
 > This machine is WSL2, not the macOS reference machine on which the task file was
 > measured. Before the first refactoring step: build, run
 > `python3 tools/oracle/oracle.py selfcheck` (it must report 0 nondeterministic), and measure
-> `MagickCore/resize.c` through the CodeScene MCP server. If the score is not 1.39, stop and
-> report the score and the `cs-mcp` version, as the task file says.
+> `MagickCore/resize.c` through the CodeScene MCP server. If the score differs from the
+> baseline in the task file, or `cs-mcp --version` differs from its *Measured with* row, stop
+> and report both, as the task file says.
 >
 > Measure Code Health only through the CodeScene MCP server: its tools, or `tools/ch.py`,
 > which talks to the same server. Never use the `cs` command-line tool. If the server is

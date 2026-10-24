@@ -184,11 +184,19 @@ def function_row(name, info, ev):
                 weight=weight, lo=lo, hi=hi)
 
 
+def _version(argv):
+    """First line of a tool's version output, or 'not installed'. The `cs` command-line
+    tool is only asked for its version here, never used for measurement."""
+    try:
+        out = subprocess.run(argv, capture_output=True, text=True, timeout=60).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return "not installed"
+    return (out.strip().split("\n") or [""])[0].replace("cs version ", "").split(" ")[0] or "unknown"
+
+
 def measured_with():
-    return "| Measured with | `cs-mcp` %s, `cs` %s |" % (
-        subprocess.run(["cs-mcp", "--version"], capture_output=True, text=True).stdout.strip(),
-        subprocess.run(["cs", "version"], capture_output=True, text=True).stdout.split("\n")[0]
-        .replace("cs version ", "").split(" ")[0])
+    return "| Measured with | `cs-mcp` %s, `cs` %s |" % (_version(["cs-mcp", "--version"]),
+                                                       _version(["cs", "version"]))
 
 
 def intro(args, data, file_lines, functions):
