@@ -3193,6 +3193,15 @@ MagickExport MagickBooleanType LevelizeImage(Image *image,
   return(status);
 }
 
+static inline MagickBooleanType IsGrayImageWithColorLevels(const Image *image,
+  const PixelInfo *black_color,const PixelInfo *white_color)
+{
+  return(((IsGrayColorspace(image->colorspace) != MagickFalse) &&
+    ((IsGrayColorspace(black_color->colorspace) == MagickFalse) ||
+     (IsGrayColorspace(white_color->colorspace) == MagickFalse))) ?
+    MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3251,9 +3260,7 @@ MagickExport MagickBooleanType LevelImageColors(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((IsGrayColorspace(image->colorspace) != MagickFalse) &&
-      ((IsGrayColorspace(black_color->colorspace) == MagickFalse) ||
-       (IsGrayColorspace(white_color->colorspace) == MagickFalse)))
+  if (IsGrayImageWithColorLevels(image,black_color,white_color) != MagickFalse)
     (void) SetImageColorspace(image,sRGBColorspace,exception);
   status=MagickTrue;
   if (invert == MagickFalse)
