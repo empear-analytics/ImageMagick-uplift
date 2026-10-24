@@ -826,6 +826,24 @@ static void SetKaiserCoefficients(const Image *image,
     /* normalization */
 }
 
+static void SetCubicBCCoefficients(ResizeFilter *resize_filter,const double B,
+  const double C)
+{
+  const double
+    twoB = B+B;
+
+  /*
+    Convert B,C values into Cubic Coefficients. See CubicBC().
+  */
+  resize_filter->coefficient[0]=1.0-(1.0/3.0)*B;
+  resize_filter->coefficient[1]=-3.0+twoB+C;
+  resize_filter->coefficient[2]=2.0-1.5*B-C;
+  resize_filter->coefficient[3]=(4.0/3.0)*B+4.0*C;
+  resize_filter->coefficient[4]=-8.0*C-twoB;
+  resize_filter->coefficient[5]=B+5.0*C;
+  resize_filter->coefficient[6]=(-1.0/6.0)*B-C;
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1221,21 +1239,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
               B=1.0-2.0*C; /* Calculate B to get a Keys cubic filter. */
             }
         }
-      {
-        const double
-          twoB = B+B;
-
-        /*
-          Convert B,C values into Cubic Coefficients. See CubicBC().
-        */
-        resize_filter->coefficient[0]=1.0-(1.0/3.0)*B;
-        resize_filter->coefficient[1]=-3.0+twoB+C;
-        resize_filter->coefficient[2]=2.0-1.5*B-C;
-        resize_filter->coefficient[3]=(4.0/3.0)*B+4.0*C;
-        resize_filter->coefficient[4]=-8.0*C-twoB;
-        resize_filter->coefficient[5]=B+5.0*C;
-        resize_filter->coefficient[6]=(-1.0/6.0)*B-C;
-      }
+      SetCubicBCCoefficients(resize_filter,B,C);
     }
 
   /*
