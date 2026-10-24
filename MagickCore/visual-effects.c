@@ -2189,6 +2189,22 @@ MagickExport Image *ShadowImage(const Image *image,const double alpha,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetRandomPixelChannels(const Image *image,
+  const Image *random_image,const double value,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(random_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    q[i]=ClampToQuantum((double) QuantumRange*value);
+  }
+}
+
 MagickExport Image *SketchImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2256,18 +2272,8 @@ MagickExport Image *SketchImage(const Image *image,const double radius,
       double
         value;
 
-      ssize_t
-        i;
-
       value=GetPseudoRandomValue(random_info[id]);
-      for (i=0; i < (ssize_t) GetPixelChannels(random_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        q[i]=ClampToQuantum((double) QuantumRange*value);
-      }
+      SetRandomPixelChannels(image,random_image,value,q);
       q+=(ptrdiff_t) GetPixelChannels(random_image);
     }
     if (SyncCacheViewAuthenticPixels(random_view,exception) == MagickFalse)
