@@ -1175,37 +1175,8 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
           &color_correction.green.slope,&color_correction.blue.slope);
       offset=GetXMLTreeChild(sop,"Offset");
       if (offset != (XMLTreeInfo *) NULL)
-        {
-          content=GetXMLTreeContent(offset);
-          p=(const char *) content;
-          for (i=0; (*p != '\0') && (i < 3); i++)
-          {
-            (void) GetNextToken(p,&p,MagickPathExtent,token);
-            if (*token == ',')
-              (void) GetNextToken(p,&p,MagickPathExtent,token);
-            switch (i)
-            {
-              case 0:
-              {
-                color_correction.red.offset=StringToDouble(token,
-                  (char **) NULL);
-                break;
-              }
-              case 1:
-              {
-                color_correction.green.offset=StringToDouble(token,
-                  (char **) NULL);
-                break;
-              }
-              case 2:
-              {
-                color_correction.blue.offset=StringToDouble(token,
-                  (char **) NULL);
-                break;
-              }
-            }
-          }
-        }
+        ParseCDLTriple(offset,&color_correction.red.offset,
+          &color_correction.green.offset,&color_correction.blue.offset);
       power=GetXMLTreeChild(sop,"Power");
       if (power != (XMLTreeInfo *) NULL)
         {
