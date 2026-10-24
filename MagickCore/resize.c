@@ -3000,6 +3000,47 @@ static void CopySamplePixel(const Image *image,const Image *sample_image,
   }
 }
 
+static MagickBooleanType SampleImageRow(const Image *image,
+  const Image *sample_image,CacheView *image_view,const PointInfo sample_offset,
+  const ssize_t y,Quantum *q,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  for (x=0; x < (ssize_t) sample_image->columns; x++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x_offset,
+      y_offset;
+
+    if (GetPixelWriteMask(sample_image,q) <= (QuantumRange/2))
+      {
+        q+=(ptrdiff_t) GetPixelChannels(sample_image);
+        continue;
+      }
+    x_offset=(ssize_t) ((((double) x+sample_offset.x)*image->columns)/
+      sample_image->columns);
+    y_offset=(ssize_t) ((((double) y+sample_offset.y)*image->rows)/
+      sample_image->rows);
+    p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,1,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        break;
+      }
+    CopySamplePixel(image,sample_image,p,q);
+    q+=(ptrdiff_t) GetPixelChannels(sample_image);
+  }
+  return(status);
+}
+
 MagickExport Image *SampleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -3081,9 +3122,6 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=QueueCacheViewAuthenticPixels(sample_view,0,y,sample_image->columns,1,
@@ -3096,33 +3134,9 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
     /*
       Sample each column.
     */
-    for (x=0; x < (ssize_t) sample_image->columns; x++)
-    {
-      const Quantum
-        *magick_restrict p;
-
-      ssize_t
-        x_offset,
-        y_offset;
-
-      if (GetPixelWriteMask(sample_image,q) <= (QuantumRange/2))
-        {
-          q+=(ptrdiff_t) GetPixelChannels(sample_image);
-          continue;
-        }
-      x_offset=(ssize_t) ((((double) x+sample_offset.x)*image->columns)/
-        sample_image->columns);
-      y_offset=(ssize_t) ((((double) y+sample_offset.y)*image->rows)/
-        sample_image->rows);
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,1,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      CopySamplePixel(image,sample_image,p,q);
-      q+=(ptrdiff_t) GetPixelChannels(sample_image);
-    }
+    if (SampleImageRow(image,sample_image,image_view,sample_offset,y,q,
+          exception) == MagickFalse)
+      status=MagickFalse;
     if (SyncCacheViewAuthenticPixels(sample_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
