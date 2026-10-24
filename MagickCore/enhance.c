@@ -3732,10 +3732,17 @@ static inline void ModulateLCHab(const ModulateInfo *modulate_info,
   ConvertLCHabToRGB(luma,chroma,hue,illuminant,red,green,blue);
 }
 
-static inline void ModulateLCHuv(const double percent_luma,
-  const double percent_chroma,const double percent_hue,
-  const IlluminantType illuminant,double *red,double *green,double *blue)
+static inline void ModulateLCHuv(const ModulateInfo *modulate_info,
+  double *red,double *green,double *blue)
 {
+  const double
+    percent_luma = modulate_info->percent_brightness,
+    percent_chroma = modulate_info->percent_saturation,
+    percent_hue = modulate_info->percent_hue;
+
+  const IlluminantType
+    illuminant = modulate_info->illuminant;
+
   double
     hue,
     luma,
@@ -3756,14 +3763,6 @@ static void ModulateColor(const ModulateInfo *modulate_info,double *red,
 {
   const ColorspaceType
     colorspace = modulate_info->colorspace;
-
-  const double
-    percent_hue = modulate_info->percent_hue,
-    percent_saturation = modulate_info->percent_saturation,
-    percent_brightness = modulate_info->percent_brightness;
-
-  const IlluminantType
-    illuminant = modulate_info->illuminant;
 
   switch (colorspace)
   {
@@ -3811,8 +3810,7 @@ static void ModulateColor(const ModulateInfo *modulate_info,double *red,
     }
     case LCHuvColorspace:
     {
-      ModulateLCHuv(percent_brightness,percent_saturation,percent_hue,
-        illuminant,red,green,blue);
+      ModulateLCHuv(modulate_info,red,green,blue);
       break;
     }
   }
