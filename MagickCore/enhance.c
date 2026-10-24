@@ -4121,6 +4121,7 @@ MagickExport MagickBooleanType NegateImage(Image *image,
       for (y=0; y < (ssize_t) image->rows; y++)
       {
         MagickBooleanType
+          proceed,
           sync;
 
         Quantum
@@ -4139,16 +4140,12 @@ MagickExport MagickBooleanType NegateImage(Image *image,
         sync=SyncCacheViewAuthenticPixels(image_view,exception);
         if (sync == MagickFalse)
           status=MagickFalse;
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            MagickBooleanType
-              proceed;
-
-            progress++;
-            proceed=SetImageProgress(image,NegateImageTag,progress,image->rows);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
-          }
+        if (image->progress_monitor == (MagickProgressMonitor) NULL)
+          continue;
+        progress++;
+        proceed=SetImageProgress(image,NegateImageTag,progress,image->rows);
+        if (proceed == MagickFalse)
+          status=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);
       return(MagickTrue);
