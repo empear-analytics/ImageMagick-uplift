@@ -2081,6 +2081,30 @@ static inline MagickBooleanType IsEqualizeMemoryMissing(
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AccumulateEqualizeHistogram(const Image *image,
+  const Quantum *p,double *histogram)
+{
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      double
+        intensity;
+
+      intensity=(double) p[i];
+      if ((image->channel_mask & SyncChannels) != 0)
+        intensity=GetPixelIntensity(image,p);
+      histogram[GetPixelChannels(image)*ScaleQuantumToMap(
+        ClampToQuantum(intensity))+(size_t) i]++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2147,9 +2171,6 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -2158,21 +2179,7 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          intensity;
-
-        intensity=(double) p[i];
-        if ((image->channel_mask & SyncChannels) != 0)
-          intensity=GetPixelIntensity(image,p);
-        histogram[GetPixelChannels(image)*ScaleQuantumToMap(
-          ClampToQuantum(intensity))+(size_t) i]++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateEqualizeHistogram(image,p,histogram);
   }
   image_view=DestroyCacheView(image_view);
   /*
