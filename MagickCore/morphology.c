@@ -4507,6 +4507,35 @@ static double RotateSquareKernelBy90Degrees(KernelInfo *kernel,double angle)
   return(angle);
 }
 
+static double ReflectKernel(KernelInfo *kernel,double angle)
+{
+  /* For a 180 degree rotation - also know as a reflection
+   * This is actually a very very common operation!
+   * Basically all that is needed is a reversal of the kernel data!
+   * And a reflection of the origin
+   */
+  MagickRealType
+    t;
+
+  MagickRealType
+    *k;
+
+  ssize_t
+    i,
+    j;
+
+  k=kernel->values;
+  j=(ssize_t) (kernel->width*kernel->height-1);
+  for (i=0;  i < j;  i++, j--)
+    t=k[i],  k[i]=k[j],  k[j]=t;
+
+  kernel->x = (ssize_t) kernel->width  - kernel->x - 1;
+  kernel->y = (ssize_t) kernel->height - kernel->y - 1;
+  angle = fmod(angle-180.0, 360.0);   /* angle+180 degrees */
+  kernel->angle = fmod(kernel->angle+180.0, 360.0);
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -4578,32 +4607,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
         perror("Unable to rotate a non-square, non-linear kernel 90 degrees");
     }
   if ( 135.0 < angle && angle <= 225.0 )
-    {
-      /* For a 180 degree rotation - also know as a reflection
-       * This is actually a very very common operation!
-       * Basically all that is needed is a reversal of the kernel data!
-       * And a reflection of the origin
-       */
-      MagickRealType
-        t;
-
-      MagickRealType
-        *k;
-
-      ssize_t
-        i,
-        j;
-
-      k=kernel->values;
-      j=(ssize_t) (kernel->width*kernel->height-1);
-      for (i=0;  i < j;  i++, j--)
-        t=k[i],  k[i]=k[j],  k[j]=t;
-
-      kernel->x = (ssize_t) kernel->width  - kernel->x - 1;
-      kernel->y = (ssize_t) kernel->height - kernel->y - 1;
-      angle = fmod(angle-180.0, 360.0);   /* angle+180 degrees */
-      kernel->angle = fmod(kernel->angle+180.0, 360.0);
-    }
+    angle=ReflectKernel(kernel,angle);
   /* At this point angle should at least between -45 (315) and +45 degrees
    * In the future some form of non-orthogonal angled rotates could be
    * performed here, possibly with a linear kernel restriction.
