@@ -271,7 +271,7 @@ leaves `RotateKernelInfo`, `ParseKernelName` and `MorphologyImage`; Bumpy Road l
 | Steps | Recipe | Score |
 | --- | --- | --- |
 | `SameKernelInfo`'s shape test, `AcquireKernelBuiltIn`'s origin test as predicates | P | 1.53 → 1.61 |
-| `AcquireKernelBuiltIn`: 22 cases of the kernel switch into `Acquire*Kernel` builders (a case body ends in `break` before `return(kernel)`, so it becomes `return(Helper(...))`, E step 7) | E | → 1.67 |
+| `AcquireKernelBuiltIn`: 19 cases of the kernel switch into `Acquire*Kernel` builders (a case body ends in `break` before `return(kernel)`, so it becomes `return(Helper(...))`, E step 7) | E | → 1.67 |
 | `AcquireKernelBuiltIn`: the Gaussian case's three value loops, then the case | E | → 1.74 |
 | `RotateKernelInfo`: the 45, transpose, 90 and 180 degree blocks (each returns the angle), then the two dispatch tests | E | → 1.79 |
 | `ParseKernelName`'s defaults switch (takes and returns `GeometryInfo` by value); `ParseKernelArray`'s old-style size branch (returns `p`) | E | → 1.82 |
