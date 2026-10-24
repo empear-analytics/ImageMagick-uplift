@@ -2856,6 +2856,34 @@ static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
 #undef HelperCond
 }
 
+static inline MagickBooleanType IsEagle3XTopLeftCorner(const Quantum *pixels,
+  const size_t channels)
+{
+  return((PixelsEqual(pixels,0,pixels,1,channels) &&
+    PixelsEqual(pixels,0,pixels,3,channels)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEagle3XTopRightCorner(const Quantum *pixels,
+  const size_t channels)
+{
+  return((PixelsEqual(pixels,1,pixels,2,channels) &&
+    PixelsEqual(pixels,2,pixels,5,channels)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEagle3XBottomLeftCorner(const Quantum *pixels,
+  const size_t channels)
+{
+  return((PixelsEqual(pixels,3,pixels,6,channels) &&
+    PixelsEqual(pixels,6,pixels,7,channels)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEagle3XBottomRightCorner(
+  const Quantum *pixels,const size_t channels)
+{
+  return((PixelsEqual(pixels,5,pixels,7,channels) &&
+    PixelsEqual(pixels,7,pixels,8,channels)) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsEagle3XTopEdge(const ssize_t corner_tl,
   const ssize_t corner_tr)
 {
@@ -2891,14 +2919,10 @@ static inline void Eagle3X(const Image *magick_unused(source),
 
   magick_unreferenced(source);
 
-  corner_tl=PixelsEqual(pixels,0,pixels,1,channels) &&
-    PixelsEqual(pixels,0,pixels,3,channels);
-  corner_tr=PixelsEqual(pixels,1,pixels,2,channels) &&
-    PixelsEqual(pixels,2,pixels,5,channels);
-  corner_bl=PixelsEqual(pixels,3,pixels,6,channels) &&
-    PixelsEqual(pixels,6,pixels,7,channels);
-  corner_br=PixelsEqual(pixels,5,pixels,7,channels) &&
-    PixelsEqual(pixels,7,pixels,8,channels);
+  corner_tl=IsEagle3XTopLeftCorner(pixels,channels) != MagickFalse;
+  corner_tr=IsEagle3XTopRightCorner(pixels,channels) != MagickFalse;
+  corner_bl=IsEagle3XBottomLeftCorner(pixels,channels) != MagickFalse;
+  corner_br=IsEagle3XBottomRightCorner(pixels,channels) != MagickFalse;
   CopyPixels(pixels,(ssize_t) (corner_tl ? 0 : 4),result,0,channels);
   if (IsEagle3XTopEdge(corner_tl,corner_tr) != MagickFalse)
     Mix2Pixels(pixels,0,2,result,1,channels);
