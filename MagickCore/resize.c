@@ -2957,14 +2957,10 @@ static inline void Eagle3XB(const Image *magick_unused(source),
 
   magick_unreferenced(source);
 
-  corner_tl=PixelsEqual(pixels,0,pixels,1,channels) &&
-    PixelsEqual(pixels,0,pixels,3,channels);
-  corner_tr=PixelsEqual(pixels,1,pixels,2,channels) &&
-    PixelsEqual(pixels,2,pixels,5,channels);
-  corner_bl=PixelsEqual(pixels,3,pixels,6,channels) &&
-    PixelsEqual(pixels,6,pixels,7,channels);
-  corner_br=PixelsEqual(pixels,5,pixels,7,channels) &&
-    PixelsEqual(pixels,7,pixels,8,channels);
+  corner_tl=IsEagle3XTopLeftCorner(pixels,channels) != MagickFalse;
+  corner_tr=IsEagle3XTopRightCorner(pixels,channels) != MagickFalse;
+  corner_bl=IsEagle3XBottomLeftCorner(pixels,channels) != MagickFalse;
+  corner_br=IsEagle3XBottomRightCorner(pixels,channels) != MagickFalse;
   CopyPixels(pixels,(ssize_t) (corner_tl ? 0 : 4),result,0,channels);
   CopyPixels(pixels,4,result,1,channels);
   CopyPixels(pixels,(ssize_t) (corner_tr ? 1 : 4),result,2,channels);
