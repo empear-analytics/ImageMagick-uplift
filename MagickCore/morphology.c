@@ -1452,6 +1452,17 @@ static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireEdgesKernel(KernelInfo *kernel,
+  const KernelInfoType type,ExceptionInfo *exception)
+{
+  kernel=AcquireKernelInfo("ThinSE:482",exception);
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  ExpandMirrorKernelInfo(kernel); /* mirror expansion of kernels */
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1832,14 +1843,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case PeaksKernel:
         return(AcquireRingKernel(kernel,type,args,nan));
       case EdgesKernel:
-        {
-          kernel=AcquireKernelInfo("ThinSE:482",exception);
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          ExpandMirrorKernelInfo(kernel); /* mirror expansion of kernels */
-          break;
-        }
+        return(AcquireEdgesKernel(kernel,type,exception));
       case CornersKernel:
         {
           kernel=AcquireKernelInfo("ThinSE:87",exception);
