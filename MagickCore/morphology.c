@@ -1877,6 +1877,25 @@ static void SubtractGaussianKernelValues(KernelInfo *kernel,
     kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] -= 1.0;
 }
 
+static void SetLoGKernelValues(KernelInfo *kernel,const double sigma)
+{
+  double
+    A, B, R;
+
+  ssize_t
+    i,
+    u,
+    v;
+
+  A = 1.0/(2.0*sigma*sigma);  /* simplify loop expressions */
+  B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      { R = ((double)(u*u+v*v))*A;
+        kernel->values[i] = (1-R)*exp(-R)*B;
+      }
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1967,8 +1986,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     case LoGKernel:
       { double
           sigma = fabs(args->sigma),
-          sigma2 = fabs(args->xi),
-          A, B, R;
+          sigma2 = fabs(args->xi);
 
         if ( args->rho >= 1.0 )
           kernel->width = CastDoubleToSizeT(args->rho)*2+1;
@@ -2001,14 +2019,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         if ( type == LoGKernel )
           { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
             if ( sigma > MagickEpsilon )
-              { A = 1.0/(2.0*sigma*sigma);  /* simplify loop expressions */
-                B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
-                for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-                  for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-                    { R = ((double)(u*u+v*v))*A;
-                      kernel->values[i] = (1-R)*exp(-R)*B;
-                    }
-              }
+              SetLoGKernelValues(kernel,sigma);
             else /* special case - generate a unity kernel */
               { (void) memset(kernel->values,0, (size_t)
                   kernel->width*kernel->height*sizeof(*kernel->values));
