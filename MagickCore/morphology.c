@@ -1497,6 +1497,39 @@ static KernelInfo *AcquireDiagonalsKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireLineEndsKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  /* Kernels for finding the end of thin lines */
+  switch ( (int) args->rho ) {
+    case 0:
+    default:
+      /* set of kernels to find all end of lines */
+      return(AcquireKernelInfo("LineEnds:1>;LineEnds:2>",exception));
+    case 1:
+      /* kernel for 4-connected line ends - no rotation */
+      kernel=ParseKernelArray("3: 0,0,-  0,1,1  0,0,-");
+      break;
+  case 2:
+      /* kernel to add for 8-connected lines - no rotation */
+      kernel=ParseKernelArray("3: 0,0,0  0,1,0  0,0,1");
+      break;
+  case 3:
+      /* kernel to add for orthogonal line ends - does not find corners */
+      kernel=ParseKernelArray("3: 0,0,0  0,1,1  0,0,0");
+      break;
+  case 4:
+      /* traditional line end - fails on last T end */
+      kernel=ParseKernelArray("3: 0,0,0  0,1,-  0,0,-");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->sigma);
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1890,35 +1923,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case DiagonalsKernel:
         return(AcquireDiagonalsKernel(kernel,type,args));
       case LineEndsKernel:
-        { /* Kernels for finding the end of thin lines */
-          switch ( (int) args->rho ) {
-            case 0:
-            default:
-              /* set of kernels to find all end of lines */
-              return(AcquireKernelInfo("LineEnds:1>;LineEnds:2>",exception));
-            case 1:
-              /* kernel for 4-connected line ends - no rotation */
-              kernel=ParseKernelArray("3: 0,0,-  0,1,1  0,0,-");
-              break;
-          case 2:
-              /* kernel to add for 8-connected lines - no rotation */
-              kernel=ParseKernelArray("3: 0,0,0  0,1,0  0,0,1");
-              break;
-          case 3:
-              /* kernel to add for orthogonal line ends - does not find corners */
-              kernel=ParseKernelArray("3: 0,0,0  0,1,1  0,0,0");
-              break;
-          case 4:
-              /* traditional line end - fails on last T end */
-              kernel=ParseKernelArray("3: 0,0,0  0,1,-  0,0,-");
-              break;
-          }
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          RotateKernelInfo(kernel, args->sigma);
-          break;
-        }
+        return(AcquireLineEndsKernel(kernel,type,args,exception));
       case LineJunctionsKernel:
         { /* kernels for finding the junctions of multiple lines */
           switch ( (int) args->rho ) {
