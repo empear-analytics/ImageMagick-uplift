@@ -2662,6 +2662,13 @@ MagickExport Image *StereoImage(const Image *left_image,
   return(StereoAnaglyphImage(left_image,right_image,0,0,exception));
 }
 
+static inline MagickBooleanType IsStereoRowMissing(const Quantum *p,
+  const Quantum *q,const Quantum *r)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL) ||
+    (r == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   const Image *right_image,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -2726,8 +2733,7 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
       exception);
     q=GetVirtualPixels(right_image,0,y,right_image->columns,1,exception);
     r=QueueAuthenticPixels(stereo_image,0,y,stereo_image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL) ||
-        (r == (Quantum *) NULL))
+    if (IsStereoRowMissing(p,q,r) != MagickFalse)
       break;
     for (x=0; x < (ssize_t) stereo_image->columns; x++)
     {
