@@ -1291,6 +1291,50 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u;
+
+  double
+    scale;
+  if ( type == SquareKernel )
+    {
+      if (args->rho < 1.0)
+        kernel->width = kernel->height = 3;  /* default radius = 1 */
+      else
+        kernel->width = kernel->height = CastDoubleToSizeT(args->rho*2+1);
+      kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+      scale = args->sigma;
+    }
+  else {
+      /* NOTE: user defaults set in "AcquireKernelInfo()" */
+      if ( args->rho < 1.0 || args->sigma < 1.0 )
+        return(DestroyKernelInfo(kernel));    /* invalid args given */
+      kernel->width = CastDoubleToSizeT(args->rho);
+      kernel->height = CastDoubleToSizeT(args->sigma);
+      if (IsKernelOriginOutside(args,kernel) != MagickFalse)
+        return(DestroyKernelInfo(kernel));    /* invalid args given */
+      kernel->x = (ssize_t) args->xi;
+      kernel->y = (ssize_t) args->psi;
+      scale = 1.0;
+    }
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set all kernel values to scale given */
+  u=(ssize_t) (kernel->width*kernel->height);
+  for ( i=0; i < u; i++)
+      kernel->values[i] = scale;
+  kernel->minimum = kernel->maximum = scale;   /* a flat shape */
+  kernel->positive_range = scale*u;
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1621,40 +1665,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       return(AcquireDiamondKernel(kernel,args,nan));
     case SquareKernel:
     case RectangleKernel:
-      { double
-          scale;
-        if ( type == SquareKernel )
-          {
-            if (args->rho < 1.0)
-              kernel->width = kernel->height = 3;  /* default radius = 1 */
-            else
-              kernel->width = kernel->height = CastDoubleToSizeT(args->rho*2+1);
-            kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-            scale = args->sigma;
-          }
-        else {
-            /* NOTE: user defaults set in "AcquireKernelInfo()" */
-            if ( args->rho < 1.0 || args->sigma < 1.0 )
-              return(DestroyKernelInfo(kernel));    /* invalid args given */
-            kernel->width = CastDoubleToSizeT(args->rho);
-            kernel->height = CastDoubleToSizeT(args->sigma);
-            if (IsKernelOriginOutside(args,kernel) != MagickFalse)
-              return(DestroyKernelInfo(kernel));    /* invalid args given */
-            kernel->x = (ssize_t) args->xi;
-            kernel->y = (ssize_t) args->psi;
-            scale = 1.0;
-          }
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        /* set all kernel values to scale given */
-        u=(ssize_t) (kernel->width*kernel->height);
-        for ( i=0; i < u; i++)
-            kernel->values[i] = scale;
-        kernel->minimum = kernel->maximum = scale;   /* a flat shape */
-        kernel->positive_range = scale*u;
-        break;
-      }
+      return(AcquireRectangleKernel(kernel,type,args));
       case OctagonKernel:
         {
           if (args->rho < 1.0)
