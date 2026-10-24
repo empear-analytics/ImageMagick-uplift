@@ -801,6 +801,13 @@ static double Welch(const double x,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsKaiserResizeFilter(
+  const ResizeFilter *resize_filter)
+{
+  return(((resize_filter->filter == Kaiser) ||
+    (resize_filter->window == Kaiser) ) ? MagickTrue : MagickFalse);
+}
+
 static void SetKaiserCoefficients(const Image *image,
   ResizeFilter *resize_filter)
 {
@@ -1152,8 +1159,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   }
 
   /* User Kaiser Alpha Override - no support change */
-  if ((resize_filter->filter == Kaiser) ||
-      (resize_filter->window == Kaiser) ) {
+  if (IsKaiserResizeFilter(resize_filter) != MagickFalse) {
     SetKaiserCoefficients(image,resize_filter);
   }
 
