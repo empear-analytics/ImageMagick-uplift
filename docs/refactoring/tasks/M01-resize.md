@@ -232,3 +232,105 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-24)
+
+**Result: Code Health 1.39 → 2.45, plateau** (`cs-mcp` 1.5.12 throughout, the version in
+*Measured with*; `cs` not installed). 43 refactor commits and one playbook commit, in two
+sessions on two machines:
+
+| Machine | Commits | Score | Oracle catalogue (`selfcheck`) |
+| --- | --- | --- | --- |
+| WSL2 on the Windows desktop | 33, `56eff1c2a`..`4507d52f6` (PR #5, merged) | 1.39 → 2.35 | 15,878 cases, 0 nondeterministic |
+| MacBook (macOS reference) | 10 + Recipe O, `f5fc6a7a5`..`6b3ee7913` | 2.35 → 2.45 | 15,884 cases, 2 nondeterministic (below) |
+
+Preflight on the Mac: `resize.c` at the original base `20cb5c1246` scored 1.39 and the
+branch tip 2.35, both through the MCP server. The readiness gate was run on the Mac with
+`gate.py` over all 33 `resize.c` mutation reports in `build-oracle/work` (ERDC's full and
+capped runs among them) and this checkout's `verdicts.json`: 85% adjusted for the file;
+the per-function verdicts are quoted in each commit. The case map was stale and was
+rebuilt on the Mac (`casemap.py`, 15,884 cases, 4,513 functions reached). PR #5 was merged
+into `main` mid-session, so from the `Fish2X` commit on, `run --function` compared against
+`3e17564a2` (the WSL tip); the whole catalogue was then run against the original
+`20cb5c1246`, covering all of M01 end to end.
+
+**Selfcheck deviation.** `matrix/f2913328b4` and `matrix/e1095950b7` (`-hough-lines` with
+the matrix forced onto disk by `-limit memory 0 -limit map 0`) leave a `magick-XXXX`
+temporary file whose random name lands in the compared outputs, so they can never match.
+Neither executes any `resize.c` function (case map), so no per-function run includes
+them. They are a catalogue defect in `cases.py` (`_matrix_gap_cases`), not a refactoring
+issue, and are reported rather than fixed here.
+
+**Whole catalogue on the Mac**, `oracle.py run --base 20cb5c1246` (all of M01 against the
+original base): 15,884 cases, **3 diverged, none in `resize.c`**; no diverging case executes
+any `resize.c` function.
+
+- `matrix/f2913328b4`, `matrix/e1095950b7`: the two nondeterministic cases above (one of them
+  timed out under load); both passed when rerun alone.
+- `gaps/c5651ffad8` (`driver logcfg: eight log maps in one file`): stdout differs every time,
+  and it is stable against itself. It diverges just the same when the candidate is built
+  from the base's own `resize.c` (byte-identical source), so the cause is the candidate
+  build directory (configured 2026-10-05; the bases were built today, and the same
+  `imdriver.c` compiles to a different object there), not this branch. The case prints the
+  order of eight log maps that tie in `LogInfoCompare`, which `verdicts.json` already
+  records as a qsort tie that differs between builds.
+
+#### Per function
+
+| Function | Recipes | Code Health over its steps | What the review shows |
+| --- | --- | --- | --- |
+| `ScaleImage` (WSL) | E ×8, P ×2 | 1.39 → 1.44 | nesting 7 → 5, cc 98 → 31, bumps 23 → 5; left Complex Conditional |
+| `ScaleScanlineX` (WSL, split from `ScaleImage`) | E | flat | cc 18 → 15 |
+| `AcquireResizeFilter` (WSL) | E ×3, P ×3 | 1.44 → 1.45 | cc 69 → 59, bumps 11 → 10; left Complex Conditional |
+| `AcquireResizeFilter` (Mac) | E | flat 2.35 | cc 59 → 42, 331 → 289 lines: the `filter:verbose` report moved to `ReportResizeFilter`, still inside its `omp single` block |
+| `ReportResizeFilter` (Mac) | E, D | flat 2.35 | cc 18 → under 9 (left Complex Method): both type mappings through `GetWeightingFilterType` |
+| `MagnifyImage` (WSL, Mac) | E (WSL), O (Mac) | 1.45 → 1.46, then flat | WSL: left Deep Nesting. Mac: cc 33 → 18, 212 → 123 lines, bumps 4 → 3 (method `switch` to `SelectMagnifyMethod`, Recipe O) |
+| `SampleImage` (WSL) | E | 1.46 → 1.49 | left Deep Nesting, cc 26 → 22 |
+| `HorizontalFilter`, `VerticalFilter` (WSL) | E ×2 each | 1.49 → 1.68 | the per-pixel kernels split out (`Filter*Pixel`) |
+| `ThumbnailImage` (WSL) | E | flat | `SetThumbnailProperties` split out |
+| `Scale3X` (WSL, Mac) | P (WSL), G (Mac) | 1.68 → 1.78, then flat | Mac: left Bumpy Road (2 bumps) |
+| `Fish2X` (WSL, Mac) | P (WSL), P (Mac) | 1.78 → 1.93; **2.35 → 2.45** | Mac: left Complex Conditional, the file's last; cc 21 → 17 |
+| `CubicSpline`, `url_encode`, `Epbx2X`, `SelectResizeFilterType`, `Eagle2X` (WSL) | E, P | 1.93 → 2.30 | |
+| `ResizeImage` (WSL, Mac) | E (WSL), E and P (Mac) | flat | Mac: 98 → 88 lines, cc 14 → 12, left Complex Conditional |
+| `Eagle3X` (WSL, Mac) | P, P | 2.30 → 2.35, then flat | Mac: cc 13 → 9, one short of leaving Complex Method |
+| `Eagle3XB` (Mac) | D | flat | left Complex Method (cc 9 → 5) |
+
+The file also left *Lines of Code in a Single File* (indication 2) on the Mac's last steps.
+
+#### Why it plateaus at 2.45
+
+Probes on a scratch copy (functions emptied or smells removed, never committed) showed the
+score moves only when a whole category leaves the file. What is left, and why no legal
+recipe removes it:
+
+- **Brain Method** and **Deep, Nested Complexity** (+0.26 and about +0.5 if gone).
+  `InterpolativeResizeImage`'s depth comes from its row and channel loops inside a
+  `#pragma omp parallel for`, and both loops write the shared `status`: the playbook's
+  OpenMP rule forbids extracting them, and shortening the rest (probe: 108 → 93 lines)
+  leaves it a Brain Method. `ScaleImage`'s Y-scaling branch writes six outer variables and
+  is where the gate's unmatched survivors sit (row and span bookkeeping, write masks); so
+  is all of `ScaleScanlineX`.
+- **Code Duplication** (+0.20 if a whole clone group goes). `Filter{Horizontal,Vertical}Pixel`
+  and `{Horizontal,Vertical}Filter` differ in how the source index `k` is computed, an
+  expression rather than a single value, so Recipe D does not apply; the four
+  `IsScale3X*Edge` predicates differ in three indices each, and inlining them back scores
+  lower (2.30).
+- **Overall Code Complexity**: the mean cc; a probe needed about 150 more one-line
+  functions to clear it.
+- **Bumpy Road Ahead**, **Complex Method**, **Large Method** (13, 20 and 11 functions):
+  the rest of each is OpenMP-bound (`SampleImage`, the two filters and their kernels,
+  `MagnifyImage`'s loop), on survivor lines of *careful* functions (`AcquireResizeFilter`'s
+  option parsing, Gaussian, lobes, Jinc and B,C blocks; `ThumbnailImage`; the scanline
+  helpers), or in `LiquidRescaleImage`, which this build does not compile (no LQR delegate).
+- **Excess Number of Function Arguments**: public signatures, and pixel kernels whose
+  arguments are their context.
+
+**Suggested next steps for the owner.** (1) Recipe S: moving the magnify family
+(`MagnifyImage` and its kernels, about 1,180 lines) to its own file scores `resize.c` at
+2.87 in a probe and takes its Duplication with it. (2) Cases that kill the unmatched
+survivors in `AcquireResizeFilter` and `ScaleImage` would release their remaining blocks
+to Recipes E and O. (3) The two nondeterministic matrix cases above.
+
+**Possible bug, reported not fixed:** in `ScaleImage`, a failed read inside the Y-scaling
+`while` loop sets `status` and `break`s out of the `while` only; the row then continues
+with a second read attempt and an export before the outer loop stops.
