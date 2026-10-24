@@ -1467,9 +1467,6 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
     *magick_restrict q;
 
   ssize_t
-    i;
-
-  ssize_t
     x,
     x_mid,
     y,
@@ -1550,15 +1547,7 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
           q=QueueCacheViewAuthenticPixels(image_view,x,y_mid,1,1,exception);
           if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
             return(MagickFalse);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if (traits == UndefinedPixelTrait)
-              continue;
-            q[i]=PlasmaPixel(random_info,((double) u[i]+(double) v[i])/2.0,
-              plasma);
-          }
+          SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
           status=SyncCacheViewAuthenticPixels(image_view,exception);
         }
     }
@@ -1579,15 +1568,7 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
           q=QueueCacheViewAuthenticPixels(image_view,x_mid,y,1,1,exception);
           if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
             return(MagickTrue);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if (traits == UndefinedPixelTrait)
-              continue;
-            q[i]=PlasmaPixel(random_info,((double) u[i]+(double) v[i])/2.0,
-              plasma);
-          }
+          SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
           status=SyncCacheViewAuthenticPixels(image_view,exception);
         }
       if (fabs(segment->y1-segment->y2) >= MagickEpsilon)
@@ -1603,15 +1584,7 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
           q=QueueCacheViewAuthenticPixels(image_view,x_mid,y,1,1,exception);
           if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
             return(MagickTrue);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if (traits == UndefinedPixelTrait)
-              continue;
-            q[i]=PlasmaPixel(random_info,((double) u[i]+(double) v[i])/2.0,
-              plasma);
-          }
+          SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
           status=SyncCacheViewAuthenticPixels(image_view,exception);
         }
     }
@@ -1630,14 +1603,7 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
       q=QueueCacheViewAuthenticPixels(image_view,x_mid,y_mid,1,1,exception);
       if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
         return(MagickTrue);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        q[i]=PlasmaPixel(random_info,((double) u[i]+(double) v[i])/2.0,plasma);
-      }
+      SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
       status=SyncCacheViewAuthenticPixels(image_view,exception);
     }
   if ((fabs(segment->x2-segment->x1) < 3.0) &&
