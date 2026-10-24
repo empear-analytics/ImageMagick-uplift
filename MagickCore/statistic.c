@@ -2108,6 +2108,29 @@ static void ComputeChannelMoments(ChannelStatistics *cs)
     }
 }
 
+static void ResetChannelStatistics(ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
+  {
+    ChannelStatistics *cs = channel_statistics+i;
+    cs->area=0.0;
+    cs->depth=1;
+    cs->maxima=(-MagickMaximumValue);
+    cs->minima=MagickMaximumValue;
+    cs->sum=0.0;
+    cs->sumLD=0.0;
+    cs->mean=0.0;
+    cs->standard_deviation=0.0;
+    cs->variance=0.0;
+    cs->skewness=0.0;
+    cs->kurtosis=0.0;
+    cs->entropy=0.0;
+  }
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2162,22 +2185,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     }
   (void) memset(channel_statistics,0,(MaxPixelChannels+1)*
     sizeof(*channel_statistics));
-  for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
-  {
-    ChannelStatistics *cs = channel_statistics+i;
-    cs->area=0.0;
-    cs->depth=1;
-    cs->maxima=(-MagickMaximumValue);
-    cs->minima=MagickMaximumValue;
-    cs->sum=0.0;
-    cs->sumLD=0.0;
-    cs->mean=0.0;
-    cs->standard_deviation=0.0;
-    cs->variance=0.0;
-    cs->skewness=0.0;
-    cs->kurtosis=0.0;
-    cs->entropy=0.0;
-  }
+  ResetChannelStatistics(channel_statistics);
   (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
     sizeof(*histogram));
   for (y=0; y < (ssize_t) image->rows; y++)
