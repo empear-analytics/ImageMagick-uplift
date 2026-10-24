@@ -1095,12 +1095,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
       g=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
       b=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
       for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-        if ((r >= (double) (cluster->red.left-SafeMargin)) &&
-            (r <= (double) (cluster->red.right+SafeMargin)) &&
-            (g >= (double) (cluster->green.left-SafeMargin)) &&
-            (g <= (double) (cluster->green.right+SafeMargin)) &&
-            (b >= (double) (cluster->blue.left-SafeMargin)) &&
-            (b <= (double) (cluster->blue.right+SafeMargin)))
+        if (IsPixelInCluster(cluster,r,g,b) != MagickFalse)
           {
             /*
               Count this pixel.
