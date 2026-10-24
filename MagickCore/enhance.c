@@ -2033,6 +2033,13 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
   return(enhance_image);
 }
 
+static inline MagickBooleanType IsEqualizeMemoryMissing(
+  const double *equalize_map,const double *histogram,const double *map)
+{
+  return(((equalize_map == (double *) NULL) || (histogram == (double *) NULL) ||
+    (map == (double *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2100,8 +2107,7 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   histogram=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
     sizeof(*histogram));
   map=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*sizeof(*map));
-  if ((equalize_map == (double *) NULL) || (histogram == (double *) NULL) ||
-      (map == (double *) NULL))
+  if (IsEqualizeMemoryMissing(equalize_map,histogram,map) != MagickFalse)
     {
       if (map != (double *) NULL)
         map=(double *) RelinquishMagickMemory(map);
