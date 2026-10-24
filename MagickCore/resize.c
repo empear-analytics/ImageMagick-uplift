@@ -865,6 +865,23 @@ static inline MagickBooleanType IsJincPromotion(const FilterType filter,
     (filter != SincFastFilter)) ? MagickTrue : MagickFalse);
 }
 
+static void SharpenResizeFilter(ResizeFilter *resize_filter,
+  const FilterType filter_type)
+{
+  switch (filter_type)
+  {
+    case LanczosSharpFilter:
+      resize_filter->blur *= 0.9812505644269356;
+      break;
+    case Lanczos2SharpFilter:
+      resize_filter->blur *= 0.9549963639785485;
+      break;
+    /* case LanczosRadius:  blur adjust is done after lobes */
+    default:
+      break;
+  }
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1132,18 +1149,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
         break;
     }
   /* Global Sharpening (regardless of orthogonal/cylindrical) */
-  switch (filter_type)
-  {
-    case LanczosSharpFilter:
-      resize_filter->blur *= 0.9812505644269356;
-      break;
-    case Lanczos2SharpFilter:
-      resize_filter->blur *= 0.9549963639785485;
-      break;
-    /* case LanczosRadius:  blur adjust is done after lobes */
-    default:
-      break;
-  }
+  SharpenResizeFilter(resize_filter,filter_type);
 
   /*
     Expert Option Modifications.
