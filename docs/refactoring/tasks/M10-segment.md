@@ -161,3 +161,49 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 2.30 → 3.47** (`cs-mcp` 1.5.12). Branch `campaign/M10-segment`,
+stacked on `campaign/M09-shear` (PR #15). 11 refactor commits, one recipe and one
+function each:
+- 7 Recipe E: 5 oracle-verified and 2 guard-verified (blocks on `Classify`'s survivor
+  lines);
+- 3 Recipe P: 1 oracle-verified and 2 guard-verified (`GetImageDynamicThreshold` has no
+  case);
+- 1 Recipe D, oracle-verified.
+
+**One category leaves the file:** Complex Conditional. `IsPixelInCluster` serves both of
+`Classify`'s cluster tests and `GetImageDynamicThreshold`'s; `HasObjectAndBackgroundClusters`
+is the other predicate. Brain Method leaves `OptimalTau`.
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| the cluster-membership test, three sites, and the cluster-count test | P | 2.30 → 2.78 |
+| `ConsolidateCrossings`' three crossing counts into one helper | E, D | → 2.81 |
+| `OptimalTau`: forcing the end points, the extremum search, the extrema write | E | → 3.28 |
+| `Classify`: the verbose statistics, the colormap fill, the fuzzy membership | E | → 3.47 |
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**A rule question for the owner.** `GetImageDynamicThreshold` reuses `IsPixelInCluster`.
+At guard level that shows `--calls` +1, not the +2 of a new helper. It is one more call
+to a predicate whose body holds no call, so nothing can have been dropped, but the
+playbook's guard fingerprint does not name the case. Commit `3c2e71137` says so.
+
+**What is left, at 3.47.**
+- Brain Method: `Classify` and `GetImageDynamicThreshold`. Their cluster-allocation loops
+  return (or throw through `ThrowClassifyException`) mid-loop, their pruning loops write
+  the list head and the count together, and their counting loops add to the outer count.
+- Deep Nesting: `InitializeIntervalTree` (its allocation failures return from inside the
+  splitting loop) and `ConsolidateCrossings` (now 4: the three neighbour searches differ
+  by an index offset or a direction, so no single helper covers them).
+- Excess Arguments: `Classify`, `SegmentImage` (public), `OptimalTau`, and the 5-argument
+  `ClassifyFuzzyPixel`.
+
+**Process notes.**
+- The verify script now touches the file before building. Without that, a re-run on an
+  unchanged file did not recompile it, and so could not show its warnings.
+- A function body is now bounded by the next documentation header, not the next
+  column-0 `}`: `Classify` defines a macro inside itself whose last line is a `}`.
