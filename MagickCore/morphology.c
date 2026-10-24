@@ -4806,6 +4806,20 @@ MagickExport void ScaleGeometryKernelInfo (KernelInfo *kernel,
 %                           and/or PercentValue
 %
 */
+static double GetKernelNormalizeScale(const KernelInfo *kernel)
+{
+  double
+    pos_scale;
+
+  if ( fabs(kernel->positive_range + kernel->negative_range) >= MagickEpsilon )
+    /* non-zero-summing kernel (generally positive) */
+    pos_scale = fabs(kernel->positive_range + kernel->negative_range);
+  else
+    /* zero-summing kernel */
+    pos_scale = kernel->positive_range;
+  return(pos_scale);
+}
+
 MagickExport void ScaleKernelInfo(KernelInfo *kernel,
   const double scaling_factor,const GeometryFlags normalize_flags)
 {
@@ -4823,12 +4837,7 @@ MagickExport void ScaleKernelInfo(KernelInfo *kernel,
   /* Normalization of Kernel */
   pos_scale = 1.0;
   if ( (normalize_flags&NormalizeValue) != 0 ) {
-    if ( fabs(kernel->positive_range + kernel->negative_range) >= MagickEpsilon )
-      /* non-zero-summing kernel (generally positive) */
-      pos_scale = fabs(kernel->positive_range + kernel->negative_range);
-    else
-      /* zero-summing kernel */
-      pos_scale = kernel->positive_range;
+    pos_scale = GetKernelNormalizeScale(kernel);
   }
   /* Force kernel into a normalized zero-summing kernel */
   if ( (normalize_flags&CorrelateNormalizeValue) != 0 ) {
