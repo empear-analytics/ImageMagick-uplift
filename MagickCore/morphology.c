@@ -1637,6 +1637,27 @@ static KernelInfo *AcquireRidgesKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireConvexHullKernel(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  KernelInfo
+    *new_kernel;
+  /* first set of 8 kernels */
+  kernel=ParseKernelArray("3: 1,1,-  1,0,-  1,-,0");
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  ExpandRotateKernelInfo(kernel, 90.0);
+  /* append the mirror versions too - no flip function yet */
+  new_kernel=ParseKernelArray("3: 1,1,1  1,0,-  -,-,0");
+  if (new_kernel == (KernelInfo *) NULL)
+    return(DestroyKernelInfo(kernel));
+  new_kernel->type = type;
+  ExpandRotateKernelInfo(new_kernel, 90.0);
+  LastKernelInfo(kernel)->next = new_kernel;
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2036,24 +2057,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case RidgesKernel:
         return(AcquireRidgesKernel(kernel,type,args));
       case ConvexHullKernel:
-        {
-          KernelInfo
-            *new_kernel;
-          /* first set of 8 kernels */
-          kernel=ParseKernelArray("3: 1,1,-  1,0,-  1,-,0");
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          ExpandRotateKernelInfo(kernel, 90.0);
-          /* append the mirror versions too - no flip function yet */
-          new_kernel=ParseKernelArray("3: 1,1,1  1,0,-  -,-,0");
-          if (new_kernel == (KernelInfo *) NULL)
-            return(DestroyKernelInfo(kernel));
-          new_kernel->type = type;
-          ExpandRotateKernelInfo(new_kernel, 90.0);
-          LastKernelInfo(kernel)->next = new_kernel;
-          break;
-        }
+        return(AcquireConvexHullKernel(kernel,type));
       case SkeletonKernel:
         {
           switch ( (int) args->rho ) {
