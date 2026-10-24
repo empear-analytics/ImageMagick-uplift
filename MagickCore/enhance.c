@@ -2936,6 +2936,32 @@ static inline double LevelPixel(const double black_point,
   return(level_pixel);
 }
 
+static void LevelColormap(Image *image,const double black_point,
+  const double white_point,const double gamma)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    /*
+      Level colormap.
+    */
+    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].red=(double) ClampToQuantum(LevelPixel(black_point,
+        white_point,gamma,image->colormap[i].red));
+    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].green=(double) ClampToQuantum(LevelPixel(black_point,
+        white_point,gamma,image->colormap[i].green));
+    if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].blue=(double) ClampToQuantum(LevelPixel(black_point,
+        white_point,gamma,image->colormap[i].blue));
+    if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].alpha=(double) ClampToQuantum(LevelPixel(black_point,
+        white_point,gamma,image->colormap[i].alpha));
+  }
+}
+
 MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
   const double white_point,const double gamma,ExceptionInfo *exception)
 {
@@ -2951,7 +2977,6 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
     progress;
 
   ssize_t
-    i,
     y;
 
   /*
@@ -2962,24 +2987,7 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (image->storage_class == PseudoClass)
-    for (i=0; i < (ssize_t) image->colors; i++)
-    {
-      /*
-        Level colormap.
-      */
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].red=(double) ClampToQuantum(LevelPixel(black_point,
-          white_point,gamma,image->colormap[i].red));
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].green=(double) ClampToQuantum(LevelPixel(black_point,
-          white_point,gamma,image->colormap[i].green));
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].blue=(double) ClampToQuantum(LevelPixel(black_point,
-          white_point,gamma,image->colormap[i].blue));
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].alpha=(double) ClampToQuantum(LevelPixel(black_point,
-          white_point,gamma,image->colormap[i].alpha));
-    }
+    LevelColormap(image,black_point,white_point,gamma);
   /*
     Level image.
   */
