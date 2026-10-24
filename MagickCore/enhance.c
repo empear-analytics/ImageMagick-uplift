@@ -84,6 +84,23 @@
 #include "MagickCore/token.h"
 #include "MagickCore/xml-tree.h"
 #include "MagickCore/xml-tree-private.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _ModulateInfo
+{
+  ColorspaceType
+    colorspace;
+
+  double
+    percent_hue,
+    percent_saturation,
+    percent_brightness;
+
+  IlluminantType
+    illuminant;
+} ModulateInfo;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -3699,11 +3716,20 @@ static inline void ModulateLCHuv(const double percent_luma,
   ConvertLCHuvToRGB(luma,chroma,hue,illuminant,red,green,blue);
 }
 
-static void ModulateColor(const ColorspaceType colorspace,
-  const double percent_hue,const double percent_saturation,
-  const double percent_brightness,const IlluminantType illuminant,double *red,
+static void ModulateColor(const ModulateInfo *modulate_info,double *red,
   double *green,double *blue)
 {
+  const ColorspaceType
+    colorspace = modulate_info->colorspace;
+
+  const double
+    percent_hue = modulate_info->percent_hue,
+    percent_saturation = modulate_info->percent_saturation,
+    percent_brightness = modulate_info->percent_brightness;
+
+  const IlluminantType
+    illuminant = modulate_info->illuminant;
+
   switch (colorspace)
   {
     case HCLColorspace:
@@ -3846,6 +3872,9 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   if (image->storage_class == PseudoClass)
     for (i=0; i < (ssize_t) image->colors; i++)
     {
+      const ModulateInfo modulate_info = { colorspace, percent_hue,
+        percent_saturation, percent_brightness, illuminant };
+
       double
         blue,
         green,
@@ -3857,8 +3886,7 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
       red=(double) image->colormap[i].red;
       green=(double) image->colormap[i].green;
       blue=(double) image->colormap[i].blue;
-      ModulateColor(colorspace,percent_hue,percent_saturation,
-        percent_brightness,illuminant,&red,&green,&blue);
+      ModulateColor(&modulate_info,&red,&green,&blue);
       image->colormap[i].red=red;
       image->colormap[i].green=green;
       image->colormap[i].blue=blue;
@@ -3896,6 +3924,9 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
+      const ModulateInfo modulate_info = { colorspace, percent_hue,
+        percent_saturation, percent_brightness, illuminant };
+
       double
         blue,
         green,
@@ -3904,8 +3935,7 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
       red=(double) GetPixelRed(image,q);
       green=(double) GetPixelGreen(image,q);
       blue=(double) GetPixelBlue(image,q);
-      ModulateColor(colorspace,percent_hue,percent_saturation,
-        percent_brightness,illuminant,&red,&green,&blue);
+      ModulateColor(&modulate_info,&red,&green,&blue);
       SetPixelRed(image,ClampToQuantum(red),q);
       SetPixelGreen(image,ClampToQuantum(green),q);
       SetPixelBlue(image,ClampToQuantum(blue),q);
