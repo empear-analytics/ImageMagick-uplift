@@ -4259,6 +4259,19 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
       scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
 }
 
+static void AccumulateScaleScanline(const Image *image,const PointInfo scale,
+  const double *x_vector,double *y_vector)
+{
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      y_vector[x*(ssize_t) GetPixelChannels(image)+i]+=scale.y*
+        x_vector[x*(ssize_t) GetPixelChannels(image)+i];
+}
+
 static inline MagickBooleanType IsScaleBufferMissing(const double *scanline,
   const double *scale_scanline,const double *x_vector,const double *y_vector)
 {
@@ -4424,10 +4437,7 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
               ImportScaleScanline(image,p,alpha,x_vector);
               number_rows++;
             }
-          for (x=0; x < (ssize_t) image->columns; x++)
-            for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-              y_vector[x*(ssize_t) GetPixelChannels(image)+i]+=scale.y*
-                x_vector[x*(ssize_t) GetPixelChannels(image)+i];
+          AccumulateScaleScanline(image,scale,x_vector,y_vector);
           span.y-=scale.y;
           scale.y=(double) scale_image->rows/(double) image->rows;
           next_row=MagickTrue;
