@@ -3048,6 +3048,40 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static PixelInfo ParseTintColorVector(const Image *image,const char *blend)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  PixelInfo
+    color_vector;
+
+  GetPixelInfo(image,&color_vector);
+  flags=ParseGeometry(blend,&geometry_info);
+  color_vector.red=geometry_info.rho;
+  color_vector.green=geometry_info.rho;
+  color_vector.blue=geometry_info.rho;
+  color_vector.alpha=(MagickRealType) OpaqueAlpha;
+  if ((flags & SigmaValue) != 0)
+    color_vector.green=geometry_info.sigma;
+  if ((flags & XiValue) != 0)
+    color_vector.blue=geometry_info.xi;
+  if ((flags & PsiValue) != 0)
+    color_vector.alpha=geometry_info.psi;
+  if (image->colorspace == CMYKColorspace)
+    {
+      color_vector.black=geometry_info.rho;
+      if ((flags & PsiValue) != 0)
+        color_vector.black=geometry_info.psi;
+      if ((flags & ChiValue) != 0)
+        color_vector.alpha=geometry_info.chi;
+    }
+  return(color_vector);
+}
+
 MagickExport Image *TintImage(const Image *image,const char *blend,
   const PixelInfo *tint,ExceptionInfo *exception)
 {
@@ -3060,9 +3094,6 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
   double
     intensity;
 
-  GeometryInfo
-    geometry_info;
-
   Image
     *tint_image;
 
@@ -3074,9 +3105,6 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
 
   PixelInfo
     color_vector;
-
-  MagickStatusType
-    flags;
 
   ssize_t
     y;
@@ -3106,26 +3134,7 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
   /*
     Determine RGB values of the color.
   */
-  GetPixelInfo(image,&color_vector);
-  flags=ParseGeometry(blend,&geometry_info);
-  color_vector.red=geometry_info.rho;
-  color_vector.green=geometry_info.rho;
-  color_vector.blue=geometry_info.rho;
-  color_vector.alpha=(MagickRealType) OpaqueAlpha;
-  if ((flags & SigmaValue) != 0)
-    color_vector.green=geometry_info.sigma;
-  if ((flags & XiValue) != 0)
-    color_vector.blue=geometry_info.xi;
-  if ((flags & PsiValue) != 0)
-    color_vector.alpha=geometry_info.psi;
-  if (image->colorspace == CMYKColorspace)
-    {
-      color_vector.black=geometry_info.rho;
-      if ((flags & PsiValue) != 0)
-        color_vector.black=geometry_info.psi;
-      if ((flags & ChiValue) != 0)
-        color_vector.alpha=geometry_info.chi;
-    }
+  color_vector=ParseTintColorVector(image,blend);
   intensity=(double) GetPixelInfoIntensity((const Image *) NULL,tint);
   color_vector.red=(double) (color_vector.red*tint->red/100.0-intensity);
   color_vector.green=(double) (color_vector.green*tint->green/100.0-intensity);
