@@ -1728,6 +1728,14 @@ static Image *GetEdgeCorrelationSurface(const Image *image,
   return(surface);
 }
 
+static inline MagickBooleanType IsPhaseRowMissing(const Quantum *p,
+  const Quantum *q,const Quantum *pm,const Quantum *qm)
+{
+  return(((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
+    (pm == (const Quantum *) NULL) || (qm == (const Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType GetPHASESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -1810,8 +1818,7 @@ static MagickBooleanType GetPHASESimilarity(const Image *image,
     qm=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
     p=GetCacheViewVirtualPixels(edge_view,0,y,columns,1,exception);
     q=GetCacheViewVirtualPixels(edge_reconstruct_view,0,y,columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
-        (pm == (const Quantum *) NULL) || (qm == (const Quantum *) NULL))
+    if (IsPhaseRowMissing(p,q,pm,qm) != MagickFalse)
       {
         status=MagickFalse;
         continue;
