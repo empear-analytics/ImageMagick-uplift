@@ -825,6 +825,29 @@ MagickExport Image *EvaluateImages(const Image *images,
   return(image);
 }
 
+static void EvaluatePixel(const Image *image,RandomInfo *random_info,
+  const MagickEvaluateOperator op,const double value,
+  const MagickBooleanType clamp,Quantum *magick_restrict q)
+{
+  double
+    result;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    result=ApplyEvaluateOperator(random_info,q[i],op,value);
+    if (op == MeanEvaluateOperator)
+      result/=2.0;
+    q[i]=clamp != MagickFalse ? ClampPixel(result) : ClampToQuantum(result);
+  }
+}
+
 MagickExport MagickBooleanType EvaluateImage(Image *image,
   const MagickEvaluateOperator op,const double value,ExceptionInfo *exception)
 {
@@ -894,23 +917,7 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      double
-        result;
-
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        result=ApplyEvaluateOperator(random_info[id],q[i],op,value);
-        if (op == MeanEvaluateOperator)
-          result/=2.0;
-        q[i]=clamp != MagickFalse ? ClampPixel(result) : ClampToQuantum(result);
-      }
+      EvaluatePixel(image,random_info[id],op,value,clamp,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
