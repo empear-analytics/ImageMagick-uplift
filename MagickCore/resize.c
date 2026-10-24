@@ -2747,26 +2747,10 @@ static void Scale2X(const Image *magick_unused(source),const Quantum *pixels,
       CopyPixels(pixels,4,result,3,channels);
 }
 
-static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
-  Quantum *result,const size_t channels)
+static inline MagickBooleanType IsEpbx2XBlendable(const Quantum *pixels,
+  const size_t channels)
 {
-#define HelperCond(a,b,c,d,e,f,g) ( \
-  PixelsEqual(pixels,a,pixels,b,channels) && ( \
-    PixelsEqual(pixels,c,pixels,d,channels) || \
-    PixelsEqual(pixels,c,pixels,e,channels) || \
-    PixelsEqual(pixels,a,pixels,f,channels) || \
-    PixelsEqual(pixels,b,pixels,g,channels) \
-    ) \
-  )
-
-  ssize_t
-    i;
-
-  magick_unreferenced(source);
-
-  for (i=0; i < 4; i++)
-    CopyPixels(pixels,4,result,i,channels);
-  if (
+  return((
     !PixelsEqual(pixels,3,pixels,5,channels) &&
     !PixelsEqual(pixels,1,pixels,7,channels) &&
     (
@@ -2787,7 +2771,29 @@ static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
         )
       )
     )
+  ) ? MagickTrue : MagickFalse);
+}
+
+static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
+  Quantum *result,const size_t channels)
+{
+#define HelperCond(a,b,c,d,e,f,g) ( \
+  PixelsEqual(pixels,a,pixels,b,channels) && ( \
+    PixelsEqual(pixels,c,pixels,d,channels) || \
+    PixelsEqual(pixels,c,pixels,e,channels) || \
+    PixelsEqual(pixels,a,pixels,f,channels) || \
+    PixelsEqual(pixels,b,pixels,g,channels) \
+    ) \
   )
+
+  ssize_t
+    i;
+
+  magick_unreferenced(source);
+
+  for (i=0; i < 4; i++)
+    CopyPixels(pixels,4,result,i,channels);
+  if (IsEpbx2XBlendable(pixels,channels) != MagickFalse)
     {
       if (HelperCond(1,3,4,0,8,2,6))
         Mix2Pixels(pixels,1,3,result,0,channels);
