@@ -3523,6 +3523,14 @@ static inline void HatTransform(const float *magick_restrict pixels,
   }
 }
 
+static inline MagickBooleanType IsNonRGBPixelChannel(
+  const PixelChannel pixel_channel)
+{
+  return(((pixel_channel != RedPixelChannel) &&
+    (pixel_channel != GreenPixelChannel) &&
+    (pixel_channel != BluePixelChannel)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -3630,9 +3638,7 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
     if (traits == UndefinedPixelTrait)
       continue;
     pixel_channel=GetPixelChannelChannel(image,channel);
-    if ((pixel_channel != RedPixelChannel) &&
-        (pixel_channel != GreenPixelChannel) &&
-        (pixel_channel != BluePixelChannel))
+    if (IsNonRGBPixelChannel(pixel_channel) != MagickFalse)
       continue;
     /*
       Copy channel from image to wavelet pixel array.
