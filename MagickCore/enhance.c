@@ -3706,10 +3706,17 @@ static inline void ModulateHWB(const ModulateInfo *modulate_info,
   ConvertHWBToRGB(hue,whiteness,blackness,red,green,blue);
 }
 
-static inline void ModulateLCHab(const double percent_luma,
-  const double percent_chroma,const double percent_hue,
-  const IlluminantType illuminant,double *red,double *green,double *blue)
+static inline void ModulateLCHab(const ModulateInfo *modulate_info,
+  double *red,double *green,double *blue)
 {
+  const double
+    percent_luma = modulate_info->percent_brightness,
+    percent_chroma = modulate_info->percent_saturation,
+    percent_hue = modulate_info->percent_hue;
+
+  const IlluminantType
+    illuminant = modulate_info->illuminant;
+
   double
     hue,
     luma,
@@ -3799,8 +3806,7 @@ static void ModulateColor(const ModulateInfo *modulate_info,double *red,
     case LCHColorspace:
     case LCHabColorspace:
     {
-      ModulateLCHab(percent_brightness,percent_saturation,percent_hue,
-        illuminant,red,green,blue);
+      ModulateLCHab(modulate_info,red,green,blue);
       break;
     }
     case LCHuvColorspace:
