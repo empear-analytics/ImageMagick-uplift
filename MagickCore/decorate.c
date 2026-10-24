@@ -384,9 +384,6 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -411,16 +408,9 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     /*
       Set frame interior pixels.
     */
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SetPixelViaPixelInfo(frame_image,&frame_image->border_color,q);
-      q+=(ptrdiff_t) GetPixelChannels(frame_image);
-    }
-    for (x=0; x < (ssize_t) frame_info->inner_bevel; x++)
-    {
-      SetPixelViaPixelInfo(frame_image,&highlight,q);
-      q+=(ptrdiff_t) GetPixelChannels(frame_image);
-    }
+    q=SetFramePixels(frame_image,&frame_image->border_color,(ssize_t)
+      image->columns,q);
+    q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->inner_bevel,q);
     width=frame_info->width-(size_t) frame_info->x-image->columns-bevel_width;
     q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
     q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
