@@ -541,9 +541,11 @@ static MagickBooleanType MagnifyImageRow(...,Quantum *q,
   invisible to this thread, which does not read `status` in between, and OpenMP gives
   other threads no ordering for this unsynchronised write in the first place: the same
   value is written, by the same iteration, before the same later reads.
-- A block that stops early once `status` is false (a `break` on failure, a test of
-  `status`) is not this recipe: the callee's local `status` would decide it, not the
-  shared one. Skip it.
+- A block that *tests* `status` (`if (status == MagickFalse) break;`), or assigns it
+  anything but `MagickFalse` (`status=InterpolatePixelChannels(...)`), is not this
+  recipe: the callee's local `status` would decide it, not the shared one. Skip it. A
+  `break` of an inner loop straight after `status=MagickFalse;` is fine: it does not
+  depend on the shared value.
 - Variables of the loop body passed by value are copies: step 3 is what makes a write
   to the copy, such as advancing `q`, harmless.
 
@@ -551,8 +553,9 @@ static MagickBooleanType MagnifyImageRow(...,Quantum *q,
 reading: the oracle runs single-threaded and cannot see them.
 
 **Provenance:** 2026-10-24, from `MagnifyImage` (its per-row column loop), with the same
-shape in `resize.c`'s `InterpolativeResizeImage`, `SampleImage` and the two filters, all
-refused by the OpenMP rule of Recipe E. Owner's go-ahead the same day. Added by Claude
+shape in `resize.c`'s `SampleImage`, both refused by the OpenMP rule of Recipe E. (Not
+`InterpolativeResizeImage`, whose block assigns and tests `status`, nor the two filters,
+whose failures `continue` the parallel loop.) Owner's go-ahead the same day. Added by Claude
 Code (Claude Opus 5.5) during task M01, on `magnify.c`.
 
 ---
@@ -768,10 +771,11 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | WORDING | all | Reset to the founding catalogue before any refactoring on `main`: the five founding recipes, the founding wording of rules 1 and 2 and of Recipe E step 4; C, X, A and R, the flat-score section, and what the pilot on `night1-refactoring` taught (practical points, the parallel-region amendment) removed | The comparison with the earlier campaigns needs the same starting point | owner |
 | 2026-10-24 | AMEND | rule 2 | A step that leaves the score flat is kept when the review shows progress on the targeted function and the commit names the finding and the next step | A file score moves only once a function drops below a finding's threshold, so the founding rule reverts correct steps towards it; the earlier campaign relaxed the same rule on its first morning | owner |
 | 2026-10-24 | NEW | O | Extract Function with Out-Parameters: a selection outside OpenMP that sets several locals together moves to a `static void` function taking the written locals by pointer | `MagnifyImage`'s method `switch` (cc 33 to 18, 212 to 123 lines in a probe) and the same shape in `AcquireResizeFilter` and `ScaleImage`, all refused by Recipe E's step 4 | mandate (2026-10-24) |
-| 2026-10-24 | NEW | T | Extract Function Returning the Loop Status: a block inside a parallel loop body whose only outer write is `status=MagickFalse;` moves to a `static MagickBooleanType` function; the caller writes `status` from its result. The OpenMP section names it as the one exception to Recipe E's proviso | `MagnifyImage`'s column loop (probe: bumps 3 to 2, 109 to 94 lines) and the same shape in `resize.c`'s `InterpolativeResizeImage`, `SampleImage` and both filters | owner |
+| 2026-10-24 | NEW | T | Extract Function Returning the Loop Status: a block inside a parallel loop body whose only outer write is `status=MagickFalse;` moves to a `static MagickBooleanType` function; the caller writes `status` from its result. The OpenMP section names it as the one exception to Recipe E's proviso | `MagnifyImage`'s column loop (probe: bumps 3 to 2, 109 to 94 lines) and the same shape in `resize.c`'s `SampleImage` | owner |
 | 2026-10-24 | NEW | M | Merge Duplicate Parameter: a `static` function whose every call passes one identifier to two parameters of the same type loses the second | `magnify.c`'s `PixelsEqual` (5 arguments, 84 calls, all passing one buffer twice) | owner |
 | 2026-10-24 | NEW | B | Bundle Arguments into a Struct: parameters of a `static` function that travel together become one `const` struct pointer; each caller fills a `const` struct from the same argument expressions | `magnify.c`'s pixel kernels, `Hq2XHelper` (11 arguments) and `CopyMagnifiedPixels`; a probe removing the finding raised the file 6.26 to 6.46 | owner |
 | 2026-10-24 | AMEND | E | Step 7: a block that runs to the end of a `void` function may contain `return;`; the new function is `void` and its call is the caller's last statement; macros used only by the block move with it | `Fish2X`'s ladder of early returns (probe: 6.52 to 6.56), refused by the founding wording, which covers only the throw macros' returns | mandate (2026-10-24) |
+| 2026-10-24 | WORDING | T | Provenance corrected (the shape is in `SampleImage` only, not `InterpolativeResizeImage` or the filters); the Careful note now refuses blocks that test or assign `status`, not a `break` of an inner loop after `status=MagickFalse;` | Reading the three loops after the recipe was added | after the fact |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
