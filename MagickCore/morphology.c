@@ -4317,6 +4317,29 @@ exit_cleanup:
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static CompositeOperator GetMorphologyCompose(const Image *image,
+  CompositeOperator compose,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  ssize_t
+    parse;
+
+  artifact = GetImageArtifact(image,"morphology:compose");
+  if ( artifact != (const char *) NULL) {
+    parse=ParseCommandOption(MagickComposeOptions,
+      MagickFalse,artifact);
+    if ( parse < 0 )
+      (void) ThrowMagickException(exception,GetMagickModule(),
+           OptionWarning,"UnrecognizedComposeOperator","'%s' '%s'",
+           "morphology:compose",artifact);
+    else
+      compose=(CompositeOperator)parse;
+  }
+  return(compose);
+}
+
 MagickExport Image *MorphologyImage(const Image *image,
   const MorphologyMethod method,const ssize_t iterations,
   const KernelInfo *kernel,ExceptionInfo *exception)
@@ -4390,22 +4413,7 @@ MagickExport Image *MorphologyImage(const Image *image,
    * Otherwise merge resulting images using compose method given.
    * Default for 'HitAndMiss' is 'Lighten'.
    */
-  {
-    ssize_t
-      parse;
-
-    artifact = GetImageArtifact(image,"morphology:compose");
-    if ( artifact != (const char *) NULL) {
-      parse=ParseCommandOption(MagickComposeOptions,
-        MagickFalse,artifact);
-      if ( parse < 0 )
-        (void) ThrowMagickException(exception,GetMagickModule(),
-             OptionWarning,"UnrecognizedComposeOperator","'%s' '%s'",
-             "morphology:compose",artifact);
-      else
-        compose=(CompositeOperator)parse;
-    }
-  }
+  compose=GetMorphologyCompose(image,compose,exception);
   /* Apply the Morphology */
   morphology_image = MorphologyApply(image,method,iterations,
     curr_kernel,compose,bias,exception);
