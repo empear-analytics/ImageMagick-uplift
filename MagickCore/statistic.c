@@ -2147,6 +2147,17 @@ static double CountHistogramBins(const Image *image,const double *histogram,
   return(number_bins);
 }
 
+static void NormalizeChannelSums(ChannelStatistics *cs)
+{
+  if (cs->area > 0.0)
+    {
+      cs->sum/=cs->area;
+      cs->sum_squared/=cs->area;
+      cs->sum_cubed/=cs->area;
+      cs->sum_fourth_power/=cs->area;
+    }
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2300,13 +2311,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     if ((traits & UpdatePixelTrait) == 0)
       continue;
     cs=channel_statistics+(ssize_t) channel;
-    if (cs->area > 0.0)
-      {
-        cs->sum/=cs->area;
-        cs->sum_squared/=cs->area;
-        cs->sum_cubed/=cs->area;
-        cs->sum_fourth_power/=cs->area;
-      }
+    NormalizeChannelSums(cs);
     /*
       Compute pixel entropy.
     */
