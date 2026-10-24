@@ -952,6 +952,46 @@ static MagickBooleanType GetMAESimilarity(const Image *image,
   return(status);
 }
 
+static void AccumulateMEPPPixel(const Image *image,
+  const Image *reconstruct_image,const Quantum *p,const Quantum *q,
+  double *channel_similarity,double *channel_mean_error,
+  double *channel_maximum_error)
+{
+  double
+    Da,
+    Sa;
+
+  ssize_t
+    i;
+
+  Sa=QuantumScale*(double) GetPixelAlpha(image,p);
+  Da=QuantumScale*(double) GetPixelAlpha(reconstruct_image,q);
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      error;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    if (channel == AlphaPixelChannel)
+      error=QuantumScale*fabs((double) p[i]-(double) GetPixelChannel(
+        reconstruct_image,channel,q));
+    else
+      error=QuantumScale*fabs(Sa*(double) p[i]-Da*(double)
+        GetPixelChannel(reconstruct_image,channel,q));
+    channel_similarity[i]+=error;
+    channel_similarity[CompositePixelChannel]+=error;
+    *channel_mean_error+=error*error;
+    if (error > *channel_maximum_error)
+      *channel_maximum_error=error;
+  }
+}
+
 static MagickBooleanType GetMEPPSimilarity(Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -1012,13 +1052,6 @@ static MagickBooleanType GetMEPPSimilarity(Image *image,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
-      double
-        Da,
-        Sa;
-
-      ssize_t
-        i;
-
       if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
           (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
         {
@@ -1026,32 +1059,8 @@ static MagickBooleanType GetMEPPSimilarity(Image *image,
           q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
           continue;
         }
-      Sa=QuantumScale*(double) GetPixelAlpha(image,p);
-      Da=QuantumScale*(double) GetPixelAlpha(reconstruct_image,q);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          error;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        if (channel == AlphaPixelChannel)
-          error=QuantumScale*fabs((double) p[i]-(double) GetPixelChannel(
-            reconstruct_image,channel,q));
-        else
-          error=QuantumScale*fabs(Sa*(double) p[i]-Da*(double)
-            GetPixelChannel(reconstruct_image,channel,q));
-        channel_similarity[i]+=error;
-        channel_similarity[CompositePixelChannel]+=error;
-        channel_mean_error+=error*error;
-        if (error > channel_maximum_error)
-          channel_maximum_error=error;
-      }
+      AccumulateMEPPPixel(image,reconstruct_image,p,q,channel_similarity,
+        &channel_mean_error,&channel_maximum_error);
       channel_area++;
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
