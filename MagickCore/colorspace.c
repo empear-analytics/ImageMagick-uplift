@@ -724,6 +724,15 @@ MagickExport ColorspaceType GetImageColorspaceType(const Image *image,
 %   o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsTransformMapMissing(
+  const TransformPacket *x_map,const TransformPacket *y_map,
+  const TransformPacket *z_map)
+{
+  return(((x_map == (TransformPacket *) NULL) ||
+    (y_map == (TransformPacket *) NULL) ||
+    (z_map == (TransformPacket *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1240,9 +1249,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     sizeof(*y_map));
   z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
     sizeof(*z_map));
-  if ((x_map == (TransformPacket *) NULL) ||
-      (y_map == (TransformPacket *) NULL) ||
-      (z_map == (TransformPacket *) NULL))
+  if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
     {
       if (x_map != (TransformPacket *) NULL)
         x_map=(TransformPacket *) RelinquishMagickMemory(x_map);
