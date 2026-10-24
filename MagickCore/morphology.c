@@ -1567,6 +1567,76 @@ static KernelInfo *AcquireLineJunctionsKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireRidgesKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  /* Ridges - Ridge finding kernels */
+  KernelInfo
+    *new_kernel;
+  switch ( (int) args->rho ) {
+    case 1:
+    default:
+      kernel=ParseKernelArray("3x1:0,1,0");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ExpandRotateKernelInfo(kernel, 90.0); /* 2 rotated kernels (symmetrical) */
+      break;
+    case 2:
+      kernel=ParseKernelArray("4x1:0,1,1,0");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotated kernels */
+
+      /* Kernels to find a stepped 'thick' line, 4 rotates + mirrors */
+      /* Unfortunately we can not yet rotate a non-square kernel */
+      /* But then we can't flip a non-symmetrical kernel either */
+      new_kernel=ParseKernelArray("4x3+1+1:0,1,1,- -,1,1,- -,1,1,0");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("4x3+2+1:0,1,1,- -,1,1,- -,1,1,0");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("4x3+1+1:-,1,1,0 -,1,1,- 0,1,1,-");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("4x3+2+1:-,1,1,0 -,1,1,- 0,1,1,-");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("3x4+1+1:0,-,- 1,1,1 1,1,1 -,-,0");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("3x4+1+2:0,-,- 1,1,1 1,1,1 -,-,0");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("3x4+1+1:-,-,0 1,1,1 1,1,1 0,-,-");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("3x4+1+2:-,-,0 1,1,1 1,1,1 0,-,-");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      break;
+  }
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1964,72 +2034,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case LineJunctionsKernel:
         return(AcquireLineJunctionsKernel(kernel,type,args,exception));
       case RidgesKernel:
-        { /* Ridges - Ridge finding kernels */
-          KernelInfo
-            *new_kernel;
-          switch ( (int) args->rho ) {
-            case 1:
-            default:
-              kernel=ParseKernelArray("3x1:0,1,0");
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              kernel->type = type;
-              ExpandRotateKernelInfo(kernel, 90.0); /* 2 rotated kernels (symmetrical) */
-              break;
-            case 2:
-              kernel=ParseKernelArray("4x1:0,1,1,0");
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              kernel->type = type;
-              ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotated kernels */
-
-              /* Kernels to find a stepped 'thick' line, 4 rotates + mirrors */
-              /* Unfortunately we can not yet rotate a non-square kernel */
-              /* But then we can't flip a non-symmetrical kernel either */
-              new_kernel=ParseKernelArray("4x3+1+1:0,1,1,- -,1,1,- -,1,1,0");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("4x3+2+1:0,1,1,- -,1,1,- -,1,1,0");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("4x3+1+1:-,1,1,0 -,1,1,- 0,1,1,-");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("4x3+2+1:-,1,1,0 -,1,1,- 0,1,1,-");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("3x4+1+1:0,-,- 1,1,1 1,1,1 -,-,0");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("3x4+1+2:0,-,- 1,1,1 1,1,1 -,-,0");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("3x4+1+1:-,-,0 1,1,1 1,1,1 0,-,-");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("3x4+1+2:-,-,0 1,1,1 1,1,1 0,-,-");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              break;
-          }
-          break;
-        }
+        return(AcquireRidgesKernel(kernel,type,args));
       case ConvexHullKernel:
         {
           KernelInfo
