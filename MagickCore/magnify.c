@@ -150,8 +150,8 @@ static inline void Mix2Pixels(const Quantum *source,
   MixPixels(source,offsets,2,destination,destination_offset,channels);
 }
 
-static inline int PixelsEqual(const Quantum *source1,ssize_t offset1,
-  const Quantum *source2,ssize_t offset2,const size_t channels)
+static inline int PixelsEqual(const Quantum *source,ssize_t offset1,
+  ssize_t offset2,const size_t channels)
 {
   ssize_t
     i;
@@ -159,7 +159,7 @@ static inline int PixelsEqual(const Quantum *source1,ssize_t offset1,
   offset1*=(ssize_t) channels;
   offset2*=(ssize_t) channels;
   for (i=0; i < (ssize_t) channels; i++)
-    if (source1[offset1+i] != source2[offset2+i])
+    if (source[offset1+i] != source[offset2+i])
       return(0);
   return(1);
 }
@@ -167,29 +167,29 @@ static inline int PixelsEqual(const Quantum *source1,ssize_t offset1,
 static inline MagickBooleanType IsEagle2XTopLeft(const Quantum *pixels,
   const size_t channels)
 {
-  return((PixelsEqual(pixels,0,pixels,1,channels) &&
-    PixelsEqual(pixels,1,pixels,3,channels)) ? MagickTrue : MagickFalse);
+  return((PixelsEqual(pixels,0,1,channels) &&
+    PixelsEqual(pixels,1,3,channels)) ? MagickTrue : MagickFalse);
 }
 
 static inline MagickBooleanType IsEagle2XTopRight(const Quantum *pixels,
   const size_t channels)
 {
-  return((PixelsEqual(pixels,1,pixels,2,channels) &&
-    PixelsEqual(pixels,2,pixels,5,channels)) ? MagickTrue : MagickFalse);
+  return((PixelsEqual(pixels,1,2,channels) &&
+    PixelsEqual(pixels,2,5,channels)) ? MagickTrue : MagickFalse);
 }
 
 static inline MagickBooleanType IsEagle2XBottomLeft(const Quantum *pixels,
   const size_t channels)
 {
-  return((PixelsEqual(pixels,3,pixels,6,channels) &&
-    PixelsEqual(pixels,6,pixels,7,channels)) ? MagickTrue : MagickFalse);
+  return((PixelsEqual(pixels,3,6,channels) &&
+    PixelsEqual(pixels,6,7,channels)) ? MagickTrue : MagickFalse);
 }
 
 static inline MagickBooleanType IsEagle2XBottomRight(const Quantum *pixels,
   const size_t channels)
 {
-  return((PixelsEqual(pixels,5,pixels,8,channels) &&
-    PixelsEqual(pixels,8,pixels,7,channels)) ? MagickTrue : MagickFalse);
+  return((PixelsEqual(pixels,5,8,channels) &&
+    PixelsEqual(pixels,8,7,channels)) ? MagickTrue : MagickFalse);
 }
 
 static inline void Eagle2X(const Image *source,const Quantum *pixels,
@@ -262,7 +262,7 @@ static void Hq2XHelper(const unsigned int rule,const Quantum *source,
     }
     case 12:
     {
-      if (PixelsEqual(source,b,source,d,channels))
+      if (PixelsEqual(source,b,d,channels))
         {
           const ssize_t
             offsets[4] = { e, e, d, b };
@@ -275,7 +275,7 @@ static void Hq2XHelper(const unsigned int rule,const Quantum *source,
     }
     case 13:
     {
-      if (PixelsEqual(source,b,source,d,channels))
+      if (PixelsEqual(source,b,d,channels))
         {
           const ssize_t
             offsets[8] = { e, e, d, d, d, b, b, b };
@@ -288,7 +288,7 @@ static void Hq2XHelper(const unsigned int rule,const Quantum *source,
     }
     case 14:
     {
-      if (PixelsEqual(source,b,source,d,channels))
+      if (PixelsEqual(source,b,d,channels))
         {
           const ssize_t
             offsets[16] = { e, e, e, e, e, e, e, e, e, e, e, e, e, e, d, b };
@@ -301,7 +301,7 @@ static void Hq2XHelper(const unsigned int rule,const Quantum *source,
     }
     case 15:
     {
-      if (PixelsEqual(source,b,source,d,channels))
+      if (PixelsEqual(source,b,d,channels))
         {
           const ssize_t
             offsets[4] = { e, e, d, b };
@@ -319,7 +319,7 @@ static void Hq2XHelper(const unsigned int rule,const Quantum *source,
     }
     case 16:
     {
-      if (PixelsEqual(source,b,source,d,channels))
+      if (PixelsEqual(source,b,d,channels))
         {
           const ssize_t
             offsets[8] = { e, e, e, e, e, e, d, b };
@@ -337,7 +337,7 @@ static void Hq2XHelper(const unsigned int rule,const Quantum *source,
     }
     case 17:
     {
-      if (PixelsEqual(source,b,source,d,channels))
+      if (PixelsEqual(source,b,d,channels))
         {
           const ssize_t
             offsets[8] = { e, e, d, d, d, b, b, b };
@@ -355,7 +355,7 @@ static void Hq2XHelper(const unsigned int rule,const Quantum *source,
     }
     case 18:
     {
-      if (PixelsEqual(source,b,source,f,channels))
+      if (PixelsEqual(source,b,f,channels))
         {
           const ssize_t
             offsets[8] = { e, e, e, e, e, b, b, d };
@@ -373,7 +373,7 @@ static void Hq2XHelper(const unsigned int rule,const Quantum *source,
     }
     default:
     {
-      if (PixelsEqual(source,d,source,h,channels))
+      if (PixelsEqual(source,d,h,channels))
         {
           const ssize_t
             offsets[8] = { e, e, e, e, e, d, d, b };
@@ -440,14 +440,14 @@ static inline void Hq2X(const Image *source,const Quantum *pixels,
   const int
     pattern1[] =
     {
-      !PixelsEqual(pixels,4,pixels,8,channels),
-      !PixelsEqual(pixels,4,pixels,7,channels),
-      !PixelsEqual(pixels,4,pixels,6,channels),
-      !PixelsEqual(pixels,4,pixels,5,channels),
-      !PixelsEqual(pixels,4,pixels,3,channels),
-      !PixelsEqual(pixels,4,pixels,2,channels),
-      !PixelsEqual(pixels,4,pixels,1,channels),
-      !PixelsEqual(pixels,4,pixels,0,channels)
+      !PixelsEqual(pixels,4,8,channels),
+      !PixelsEqual(pixels,4,7,channels),
+      !PixelsEqual(pixels,4,6,channels),
+      !PixelsEqual(pixels,4,5,channels),
+      !PixelsEqual(pixels,4,3,channels),
+      !PixelsEqual(pixels,4,2,channels),
+      !PixelsEqual(pixels,4,1,channels),
+      !PixelsEqual(pixels,4,0,channels)
     };
 
 #define Rotated(p) p[2], p[4], p[7], p[1], p[6], p[0], p[3], p[5]
@@ -564,12 +564,12 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
     1,channels);
   CopyPixels(pixels,(ssize_t) (intensities[0] > intensities[3] ? 0 : 3),result,
     2,channels);
-  ae=PixelsEqual(pixels,0,pixels,4,channels);
-  bd=PixelsEqual(pixels,1,pixels,3,channels);
-  ab=PixelsEqual(pixels,0,pixels,1,channels);
-  de=PixelsEqual(pixels,3,pixels,4,channels);
-  ad=PixelsEqual(pixels,0,pixels,3,channels);
-  be=PixelsEqual(pixels,1,pixels,4,channels);
+  ae=PixelsEqual(pixels,0,4,channels);
+  bd=PixelsEqual(pixels,1,3,channels);
+  ab=PixelsEqual(pixels,0,1,channels);
+  de=PixelsEqual(pixels,3,4,channels);
+  ad=PixelsEqual(pixels,0,3,channels);
+  be=PixelsEqual(pixels,1,4,channels);
   if (IsFish2XUniform(ae,bd,ab) != MagickFalse)
     {
       CopyPixels(pixels,0,result,3,channels);
@@ -634,7 +634,7 @@ static void Xbr2X(const Image *magick_unused(source),const Quantum *pixels,
   Quantum *result,const size_t channels)
 {
 #define WeightVar(M,N) const int w_##M##_##N = \
-  PixelsEqual(pixels,M,pixels,N,channels) ? 0 : 1;
+  PixelsEqual(pixels,M,N,channels) ? 0 : 1;
 
   WeightVar(12,11)
   WeightVar(12,7)
@@ -707,8 +707,8 @@ static void Scale2X(const Image *magick_unused(source),const Quantum *pixels,
 {
   magick_unreferenced(source);
 
-  if (PixelsEqual(pixels,1,pixels,7,channels) ||
-      PixelsEqual(pixels,3,pixels,5,channels))
+  if (PixelsEqual(pixels,1,7,channels) ||
+      PixelsEqual(pixels,3,5,channels))
     {
       ssize_t
         i;
@@ -717,19 +717,19 @@ static void Scale2X(const Image *magick_unused(source),const Quantum *pixels,
         CopyPixels(pixels,4,result,i,channels);
       return;
     }
-    if (PixelsEqual(pixels,1,pixels,3,channels))
+    if (PixelsEqual(pixels,1,3,channels))
       CopyPixels(pixels,3,result,0,channels);
     else
       CopyPixels(pixels,4,result,0,channels);
-    if (PixelsEqual(pixels,1,pixels,5,channels))
+    if (PixelsEqual(pixels,1,5,channels))
       CopyPixels(pixels,5,result,1,channels);
     else
       CopyPixels(pixels,4,result,1,channels);
-    if (PixelsEqual(pixels,3,pixels,7,channels))
+    if (PixelsEqual(pixels,3,7,channels))
       CopyPixels(pixels,3,result,2,channels);
     else
       CopyPixels(pixels,4,result,2,channels);
-    if (PixelsEqual(pixels,5,pixels,7,channels))
+    if (PixelsEqual(pixels,5,7,channels))
       CopyPixels(pixels,5,result,3,channels);
     else
       CopyPixels(pixels,4,result,3,channels);
@@ -739,23 +739,23 @@ static inline MagickBooleanType IsEpbx2XBlendable(const Quantum *pixels,
   const size_t channels)
 {
   return((
-    !PixelsEqual(pixels,3,pixels,5,channels) &&
-    !PixelsEqual(pixels,1,pixels,7,channels) &&
+    !PixelsEqual(pixels,3,5,channels) &&
+    !PixelsEqual(pixels,1,7,channels) &&
     (
-      PixelsEqual(pixels,4,pixels,3,channels) ||
-      PixelsEqual(pixels,4,pixels,7,channels) ||
-      PixelsEqual(pixels,4,pixels,5,channels) ||
-      PixelsEqual(pixels,4,pixels,1,channels) ||
+      PixelsEqual(pixels,4,3,channels) ||
+      PixelsEqual(pixels,4,7,channels) ||
+      PixelsEqual(pixels,4,5,channels) ||
+      PixelsEqual(pixels,4,1,channels) ||
       (
         (
-          !PixelsEqual(pixels,0,pixels,8,channels) ||
-           PixelsEqual(pixels,4,pixels,6,channels) ||
-           PixelsEqual(pixels,3,pixels,2,channels)
+          !PixelsEqual(pixels,0,8,channels) ||
+           PixelsEqual(pixels,4,6,channels) ||
+           PixelsEqual(pixels,3,2,channels)
         ) &&
         (
-          !PixelsEqual(pixels,6,pixels,2,channels) ||
-           PixelsEqual(pixels,4,pixels,0,channels) ||
-           PixelsEqual(pixels,4,pixels,8,channels)
+          !PixelsEqual(pixels,6,2,channels) ||
+           PixelsEqual(pixels,4,0,channels) ||
+           PixelsEqual(pixels,4,8,channels)
         )
       )
     )
@@ -766,11 +766,11 @@ static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
   Quantum *result,const size_t channels)
 {
 #define HelperCond(a,b,c,d,e,f,g) ( \
-  PixelsEqual(pixels,a,pixels,b,channels) && ( \
-    PixelsEqual(pixels,c,pixels,d,channels) || \
-    PixelsEqual(pixels,c,pixels,e,channels) || \
-    PixelsEqual(pixels,a,pixels,f,channels) || \
-    PixelsEqual(pixels,b,pixels,g,channels) \
+  PixelsEqual(pixels,a,b,channels) && ( \
+    PixelsEqual(pixels,c,d,channels) || \
+    PixelsEqual(pixels,c,e,channels) || \
+    PixelsEqual(pixels,a,f,channels) || \
+    PixelsEqual(pixels,b,g,channels) \
     ) \
   )
 
@@ -799,29 +799,29 @@ static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
 static inline MagickBooleanType IsEagle3XTopLeftCorner(const Quantum *pixels,
   const size_t channels)
 {
-  return((PixelsEqual(pixels,0,pixels,1,channels) &&
-    PixelsEqual(pixels,0,pixels,3,channels)) ? MagickTrue : MagickFalse);
+  return((PixelsEqual(pixels,0,1,channels) &&
+    PixelsEqual(pixels,0,3,channels)) ? MagickTrue : MagickFalse);
 }
 
 static inline MagickBooleanType IsEagle3XTopRightCorner(const Quantum *pixels,
   const size_t channels)
 {
-  return((PixelsEqual(pixels,1,pixels,2,channels) &&
-    PixelsEqual(pixels,2,pixels,5,channels)) ? MagickTrue : MagickFalse);
+  return((PixelsEqual(pixels,1,2,channels) &&
+    PixelsEqual(pixels,2,5,channels)) ? MagickTrue : MagickFalse);
 }
 
 static inline MagickBooleanType IsEagle3XBottomLeftCorner(const Quantum *pixels,
   const size_t channels)
 {
-  return((PixelsEqual(pixels,3,pixels,6,channels) &&
-    PixelsEqual(pixels,6,pixels,7,channels)) ? MagickTrue : MagickFalse);
+  return((PixelsEqual(pixels,3,6,channels) &&
+    PixelsEqual(pixels,6,7,channels)) ? MagickTrue : MagickFalse);
 }
 
 static inline MagickBooleanType IsEagle3XBottomRightCorner(
   const Quantum *pixels,const size_t channels)
 {
-  return((PixelsEqual(pixels,5,pixels,7,channels) &&
-    PixelsEqual(pixels,7,pixels,8,channels)) ? MagickTrue : MagickFalse);
+  return((PixelsEqual(pixels,5,7,channels) &&
+    PixelsEqual(pixels,7,8,channels)) ? MagickTrue : MagickFalse);
 }
 
 static inline MagickBooleanType IsEagle3XTopEdge(const ssize_t corner_tl,
@@ -917,12 +917,12 @@ static inline MagickBooleanType IsScale3XTopEdge(const Quantum *pixels,
 {
   return((
     (
-      PixelsEqual(pixels,3,pixels,1,channels) &&
-      !PixelsEqual(pixels,4,pixels,2,channels)
+      PixelsEqual(pixels,3,1,channels) &&
+      !PixelsEqual(pixels,4,2,channels)
     ) ||
     (
-      PixelsEqual(pixels,5,pixels,1,channels) &&
-      !PixelsEqual(pixels,4,pixels,0,channels)
+      PixelsEqual(pixels,5,1,channels) &&
+      !PixelsEqual(pixels,4,0,channels)
     )
   ) ? MagickTrue : MagickFalse);
 }
@@ -932,12 +932,12 @@ static inline MagickBooleanType IsScale3XLeftEdge(const Quantum *pixels,
 {
   return((
     (
-      PixelsEqual(pixels,3,pixels,1,channels) &&
-      !PixelsEqual(pixels,4,pixels,6,channels)
+      PixelsEqual(pixels,3,1,channels) &&
+      !PixelsEqual(pixels,4,6,channels)
     ) ||
     (
-      PixelsEqual(pixels,3,pixels,7,channels) &&
-      !PixelsEqual(pixels,4,pixels,0,channels)
+      PixelsEqual(pixels,3,7,channels) &&
+      !PixelsEqual(pixels,4,0,channels)
     )
   ) ? MagickTrue : MagickFalse);
 }
@@ -947,12 +947,12 @@ static inline MagickBooleanType IsScale3XRightEdge(const Quantum *pixels,
 {
   return((
     (
-      PixelsEqual(pixels,5,pixels,1,channels) &&
-      !PixelsEqual(pixels,4,pixels,8,channels)
+      PixelsEqual(pixels,5,1,channels) &&
+      !PixelsEqual(pixels,4,8,channels)
     ) ||
     (
-      PixelsEqual(pixels,5,pixels,7,channels) &&
-      !PixelsEqual(pixels,4,pixels,2,channels)
+      PixelsEqual(pixels,5,7,channels) &&
+      !PixelsEqual(pixels,4,2,channels)
     )
   ) ? MagickTrue : MagickFalse);
 }
@@ -962,12 +962,12 @@ static inline MagickBooleanType IsScale3XBottomEdge(const Quantum *pixels,
 {
   return((
     (
-      PixelsEqual(pixels,3,pixels,7,channels) &&
-      !PixelsEqual(pixels,4,pixels,8,channels)
+      PixelsEqual(pixels,3,7,channels) &&
+      !PixelsEqual(pixels,4,8,channels)
     ) ||
     (
-      PixelsEqual(pixels,5,pixels,7,channels) &&
-      !PixelsEqual(pixels,4,pixels,6,channels)
+      PixelsEqual(pixels,5,7,channels) &&
+      !PixelsEqual(pixels,4,6,channels)
     )
   ) ? MagickTrue : MagickFalse);
 }
@@ -977,8 +977,8 @@ static inline void Scale3X(const Image *magick_unused(source),
 {
   magick_unreferenced(source);
 
-  if (PixelsEqual(pixels,1,pixels,7,channels) ||
-      PixelsEqual(pixels,3,pixels,5,channels))
+  if (PixelsEqual(pixels,1,7,channels) ||
+      PixelsEqual(pixels,3,5,channels))
     {
       ssize_t
         i;
@@ -987,7 +987,7 @@ static inline void Scale3X(const Image *magick_unused(source),
         CopyPixels(pixels,4,result,i,channels);
       return;
     }
-  if (PixelsEqual(pixels,3,pixels,1,channels))
+  if (PixelsEqual(pixels,3,1,channels))
     CopyPixels(pixels,3,result,0,channels);
   else
     CopyPixels(pixels,4,result,0,channels);
@@ -996,7 +996,7 @@ static inline void Scale3X(const Image *magick_unused(source),
     CopyPixels(pixels,1,result,1,channels);
   else
     CopyPixels(pixels,4,result,1,channels);
-  if (PixelsEqual(pixels,5,pixels,1,channels))
+  if (PixelsEqual(pixels,5,1,channels))
     CopyPixels(pixels,5,result,2,channels);
   else
     CopyPixels(pixels,4,result,2,channels);
@@ -1009,7 +1009,7 @@ static inline void Scale3X(const Image *magick_unused(source),
     CopyPixels(pixels,5,result,5,channels);
   else
     CopyPixels(pixels,4,result,5,channels);
-  if (PixelsEqual(pixels,3,pixels,7,channels))
+  if (PixelsEqual(pixels,3,7,channels))
     CopyPixels(pixels,3,result,6,channels);
   else
     CopyPixels(pixels,4,result,6,channels);
@@ -1017,7 +1017,7 @@ static inline void Scale3X(const Image *magick_unused(source),
     CopyPixels(pixels,7,result,7,channels);
   else
     CopyPixels(pixels,4,result,7,channels);
-  if (PixelsEqual(pixels,5,pixels,7,channels))
+  if (PixelsEqual(pixels,5,7,channels))
     CopyPixels(pixels,5,result,8,channels);
   else
     CopyPixels(pixels,4,result,8,channels);
