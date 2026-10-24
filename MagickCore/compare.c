@@ -1351,13 +1351,6 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
-      double
-        Da,
-        Sa;
-
-      ssize_t
-        i;
-
       if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
           (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
         {
@@ -1365,38 +1358,9 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
           q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
           continue;
         }
-      Sa=QuantumScale*(double) GetPixelAlpha(image,p);
-      Da=QuantumScale*(double) GetPixelAlpha(reconstruct_image,q);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          alpha,
-          beta;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        if (channel == AlphaPixelChannel)
-          {
-            alpha=QuantumScale*((double) p[i]-image_statistics[channel].mean);
-            beta=QuantumScale*((double) GetPixelChannel(reconstruct_image,
-              channel,q)-reconstruct_statistics[channel].mean);
-          }
-        else
-          {
-            alpha=QuantumScale*(Sa*(double) p[i]-
-              image_statistics[channel].mean);
-            beta=QuantumScale*(Da*(double) GetPixelChannel(reconstruct_image,channel,
-              q)-reconstruct_statistics[channel].mean);
-          }
-        channel_similarity[i]+=alpha*beta;
-        channel_variance[i]+=alpha*alpha;
-        channel_reconstruct_variance[i]+=beta*beta;
-      }
+      AccumulateCorrelationPixel(image,reconstruct_image,image_statistics,
+        reconstruct_statistics,p,q,channel_similarity,channel_variance,
+        channel_reconstruct_variance);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
     }
