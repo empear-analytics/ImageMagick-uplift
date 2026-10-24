@@ -1335,6 +1335,36 @@ static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireOctagonKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  if (args->rho < 1.0)
+    kernel->width = kernel->height = 5;  /* default radius = 2 */
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      if ( (labs((long) u)+labs((long) v)) <=
+                ((long)kernel->x + (long)(kernel->x/2)) )
+        kernel->positive_range += kernel->values[i] = args->sigma;
+      else
+        kernel->values[i] = nan;
+  kernel->minimum = kernel->maximum = args->sigma;  /* a flat shape */
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1667,26 +1697,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     case RectangleKernel:
       return(AcquireRectangleKernel(kernel,type,args));
       case OctagonKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 5;  /* default radius = 2 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              if ( (labs((long) u)+labs((long) v)) <=
-                        ((long)kernel->x + (long)(kernel->x/2)) )
-                kernel->positive_range += kernel->values[i] = args->sigma;
-              else
-                kernel->values[i] = nan;
-          kernel->minimum = kernel->maximum = args->sigma;  /* a flat shape */
-          break;
-        }
+        return(AcquireOctagonKernel(kernel,args,nan));
       case DiskKernel:
         {
           ssize_t
