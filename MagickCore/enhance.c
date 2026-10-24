@@ -3991,6 +3991,33 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void NegateGrayImageRow(const Image *image,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      j;
+
+    if (IsPixelGray(image,q) == MagickFalse)
+      {
+        q+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,j);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      q[j]=QuantumRange-q[j];
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType NegateImage(Image *image,
   const MagickBooleanType grayscale,ExceptionInfo *exception)
 {
@@ -4048,9 +4075,6 @@ MagickExport MagickBooleanType NegateImage(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
@@ -4060,26 +4084,7 @@ MagickExport MagickBooleanType NegateImage(Image *image,
             status=MagickFalse;
             continue;
           }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          ssize_t
-            j;
-
-          if (IsPixelGray(image,q) == MagickFalse)
-            {
-              q+=(ptrdiff_t) GetPixelChannels(image);
-              continue;
-            }
-          for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,j);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            q[j]=QuantumRange-q[j];
-          }
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        NegateGrayImageRow(image,q);
         sync=SyncCacheViewAuthenticPixels(image_view,exception);
         if (sync == MagickFalse)
           status=MagickFalse;
