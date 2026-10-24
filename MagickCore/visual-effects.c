@@ -1430,6 +1430,24 @@ static inline MagickBooleanType IsPlasmaSegmentAtMidpoint(
     (fabs(segment->y2-y_mid) < MagickEpsilon)) ? MagickTrue : MagickFalse);
 }
 
+static void SetPlasmaPixelChannels(const Image *image,
+  RandomInfo *magick_restrict random_info,const Quantum *magick_restrict u,
+  const Quantum *magick_restrict v,Quantum *magick_restrict q,
+  const double plasma)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    q[i]=PlasmaPixel(random_info,((double) u[i]+(double) v[i])/2.0,plasma);
+  }
+}
+
 static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
   CacheView *u_view,CacheView *v_view,RandomInfo *magick_restrict random_info,
   const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth,
@@ -1517,14 +1535,7 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
       q=QueueCacheViewAuthenticPixels(image_view,x,y_mid,1,1,exception);
       if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
         return(MagickTrue);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        q[i]=PlasmaPixel(random_info,((double) u[i]+(double) v[i])/2.0,plasma);
-      }
+      SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
       status=SyncCacheViewAuthenticPixels(image_view,exception);
       if (fabs(segment->x1-segment->x2) >= MagickEpsilon)
         {
