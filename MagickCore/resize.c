@@ -3968,6 +3968,31 @@ record_resize_transform:
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void CopySamplePixel(const Image *image,const Image *sample_image,
+  const Quantum *p,Quantum *q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(sample_image); i++)
+  {
+    PixelChannel
+      channel;
+
+    PixelTrait
+      image_traits,
+      traits;
+
+    channel=GetPixelChannelChannel(sample_image,i);
+    traits=GetPixelChannelTraits(sample_image,channel);
+    image_traits=GetPixelChannelTraits(image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (image_traits == UndefinedPixelTrait))
+      continue;
+    SetPixelChannel(sample_image,channel,p[i],q);
+  }
+}
+
 MagickExport Image *SampleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -4070,7 +4095,6 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
         *magick_restrict p;
 
       ssize_t
-        i,
         x_offset,
         y_offset;
 
@@ -4089,23 +4113,7 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
           status=MagickFalse;
           break;
         }
-      for (i=0; i < (ssize_t) GetPixelChannels(sample_image); i++)
-      {
-        PixelChannel
-          channel;
-
-        PixelTrait
-          image_traits,
-          traits;
-
-        channel=GetPixelChannelChannel(sample_image,i);
-        traits=GetPixelChannelTraits(sample_image,channel);
-        image_traits=GetPixelChannelTraits(image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (image_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(sample_image,channel,p[i],q);
-      }
+      CopySamplePixel(image,sample_image,p,q);
       q+=(ptrdiff_t) GetPixelChannels(sample_image);
     }
     if (SyncCacheViewAuthenticPixels(sample_view,exception) == MagickFalse)
