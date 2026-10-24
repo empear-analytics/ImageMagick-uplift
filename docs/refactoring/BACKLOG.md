@@ -79,7 +79,7 @@ needs before refactoring:
 | 1.53 | `MagickCore/morphology.c` | 4764 | 81% | 80% | 2.00, in progress (Complex Conditional gone; Brain Method left in `MorphologyPrimitive` and `MorphologyApply`, which need oracle-level evidence first), [M04](tasks/M04-morphology.md) |
 | 1.55 | `MagickCore/visual-effects.c` | 3789 | 86% | 83% | 2.41, in progress (Complex Conditional gone; Recipe B next for the six-argument pixel helpers), [M05](tasks/M05-visual-effects.md) |
 | 1.73 | `MagickCore/geometry.c` | 1831 | 65% | 85% | open |
-| 1.89 | `MagickCore/threshold.c` | 2648 | 87% | 85% | open, [M08](tasks/M08-threshold.md) |
+| 1.89 | `MagickCore/threshold.c` | 2648 | 87% | 85% | 2.08, in progress (Complex Conditional gone; the pixel drivers duplicate each other once thinned), [M08](tasks/M08-threshold.md) |
 | 1.92 | `MagickCore/statistic.c` | 3158 | 97% | 89% | 2.27, in progress (Complex Conditional gone; Recipe B next), [M07](tasks/M07-statistic.md) |
 | 2.16 | `MagickCore/identify.c` | 1705 | 68% | 85% | open |
 | 2.30 | `MagickCore/segment.c` | 1934 | 79% | 86% | open, [M10](tasks/M10-segment.md) |

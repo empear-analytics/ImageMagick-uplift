@@ -230,3 +230,40 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 1.89 → 2.08** (`cs-mcp` 1.5.12). Branch `campaign/M08-threshold`,
+stacked on `campaign/M07-statistic` (PR #13). 6 refactor commits: 5 Recipe P
+(oracle-verified) and 1 Recipe E (guard-verified, because a survivor sits on the moved
+loop's header).
+
+**One category leaves the file:** Complex Conditional. The predicates:
+`IsKapurBufferMissing`, `IsOTSUBufferMissing`, and `IsThresholdMapSeparator` and
+`IsThresholdMapNameCharacter` (the two scans of `OrderedDitherImage`'s map name). Deep
+Nesting leaves `ClampImage` (`ClampPixelChannels`).
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| the four compound tests as predicates | P | 1.89 → 2.04 |
+| `ClampImage`'s channel loop | E | → 2.08 |
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Tried and reverted.** `BilevelImage`'s channel loop (2.08 → 2.04): the thinned
+`BilevelImage` is then reported as a duplicate of the thinned `ClampImage`. The other
+threshold drivers have the same shape (`BlackThresholdImage` and `WhiteThresholdImage`
+differ only in the comparison and the value written), so extracting their loops would
+trade nesting for duplication.
+
+**What is left, at 2.08.**
+- Brain Method: `AdaptiveThresholdImage` and `RangeThresholdImage`. The first's window
+  sums write two per-channel arrays and a pixel pointer (six or seven arguments). The
+  second's ladder of range tests holds unmatched survivors on every rung, and the
+  function is careful (89%).
+- Deep Nesting in the thin pixel drivers, as above.
+- `PerceptibleImage` is not ready (57%).
+
+The next step, as in M05 and M07, is Recipe B; for the duplicated drivers, Recipe D with a
+parameter for the one differing value, where only one value differs.
