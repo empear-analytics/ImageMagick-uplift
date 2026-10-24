@@ -3904,65 +3904,8 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
       red=(double) GetPixelRed(image,q);
       green=(double) GetPixelGreen(image,q);
       blue=(double) GetPixelBlue(image,q);
-      switch (colorspace)
-      {
-        case HCLColorspace:
-        {
-          ModulateHCL(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HCLpColorspace:
-        {
-          ModulateHCLp(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HSBColorspace:
-        {
-          ModulateHSB(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HSIColorspace:
-        {
-          ModulateHSI(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HSLColorspace:
-        default:
-        {
-          ModulateHSL(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HSVColorspace:
-        {
-          ModulateHSV(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HWBColorspace:
-        {
-          ModulateHWB(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case LCHColorspace:
-        case LCHabColorspace:
-        {
-          ModulateLCHab(percent_brightness,percent_saturation,percent_hue,
-            illuminant,&red,&green,&blue);
-          break;
-        }
-        case LCHuvColorspace:
-        {
-          ModulateLCHuv(percent_brightness,percent_saturation,percent_hue,
-            illuminant,&red,&green,&blue);
-          break;
-        }
-      }
+      ModulateColor(colorspace,percent_hue,percent_saturation,
+        percent_brightness,illuminant,&red,&green,&blue);
       SetPixelRed(image,ClampToQuantum(red),q);
       SetPixelGreen(image,ClampToQuantum(green),q);
       SetPixelBlue(image,ClampToQuantum(blue),q);
