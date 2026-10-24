@@ -103,7 +103,7 @@ unreached survivors of the function first (`classify.py ... --kind unmatched`) a
 clear of the lines they sit on, or add a case that kills them.
 
 **Guard-verified.** The function is **not ready**, or no case executes it. It may still
-be refactored, as 3SX refactored a program with no tests at all, but only with the
+be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P**. The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
 Recipes D and S fold code together or move it, the guard cannot follow them, and

@@ -1,8 +1,8 @@
 # Code Health Refactoring Campaign
 
 A structured, measurable campaign to reduce technical debt in ImageMagick, designed so
-that the work can be distributed across many agents. It follows the Street Fighter III:
-3rd Strike campaign, which took every scored file in that codebase to Code Health 10.00.
+that the work can be distributed across many agents. It follows the set-up of an earlier
+campaign on another code base, which took every scored file there to Code Health 10.00.
 
 Every task is scoped to **one file**, bounded by a **catalogue of
 transformations** that grows by proposal ([`PLAYBOOK.md`](PLAYBOOK.md)), judged by an **external metric**
@@ -40,8 +40,7 @@ never updated. `python3 tools/codehealth_sweep.py` writes `codehealth-current.js
 beside it, with the date, the commit and the tool versions.
 
 The debt is concentrated in MagickCore: more than half its files are Red, and its worst
-score 1.02-1.14 (`display.c`, `pixel.c`, `xwindow.c`, `fx.c`). For comparison, 3SX
-started with 19 Red files out of 482.
+score 1.02-1.14 (`display.c`, `pixel.c`, `xwindow.c`, `fx.c`).
 
 ---
 
@@ -146,7 +145,7 @@ releases.
 | Path | Purpose |
 | --- | --- |
 | [`README.md`](README.md) | This charter |
-| [`PLAYBOOK.md`](PLAYBOOK.md) | The closed catalogue of allowed transformations |
+| [`PLAYBOOK.md`](PLAYBOOK.md) | The catalogue of allowed transformations, and how it grows |
 | [`BACKLOG.md`](BACKLOG.md) | Every MagickCore file ranked by protection and Code Health |
 | [`ORACLE.md`](ORACLE.md) | The differential oracle: what it runs, what it compares |
 | [`MUTATION.md`](MUTATION.md) | How well the oracle notices changes, file by file |

@@ -50,7 +50,9 @@ If you were given a task ID, your instructions are in
 You may apply **only** the recipes in the playbook. When findings recur that no recipe
 reaches, you may add a recipe, following the playbook's *Growing the catalogue*; do not
 stretch an existing one. The branch `night1-refactoring` is an earlier pilot and is not
-part of this campaign: do not read it or reuse its changes.
+part of this campaign: do not read it or reuse its changes. Work from this repository only:
+do not look for recipes in other campaigns' playbooks; new recipes come from what you find
+in ImageMagick.
 
 ## Hard prohibitions
 

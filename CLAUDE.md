@@ -34,11 +34,13 @@ which variables a block may write has to be checked by reading, not by a tool.
   The whole catalogue (about 2 minutes warm) runs before a branch is pushed.
 - **Check protection before you start, not after.** A function that no case executes, or
   whose mutants mostly survive, is not protected by a green oracle run. The backlog's
-  readiness column and `docs/refactoring/MUTATION.md` say which files are ready.
+  readiness column and the readiness gate (`tools/oracle/gate.py`, see the playbook's *Two
+  levels of evidence*) say which files and functions are ready. Do not read
+  `docs/refactoring/MUTATION.md` whole (300 kB); search it for the function if you need
+  the details.
 - **A Code Health score of 4.00 is a milestone, not the finish line.** It marks leaving
-  the Red band. Keep applying the closed catalogue until no legal recipe raises the score
-  further, then report where the file plateaued and why. The target is 10.00.
-- **The 3SX campaign is the model.** Its playbook, in the Street Fighter III repository,
-  holds many more recipes, each measured. When a file here plateaus, look there for a
-  recipe that fits before inventing one, and propose it for this catalogue rather than
-  applying it unannounced.
+  the Red band. Keep applying the catalogue, adding recipes as the playbook's *Growing the
+  catalogue* allows, until nothing legal raises the score further; then record where the
+  file plateaued and why. The target is 10.00.
+- **Work from this repository only.** Do not look for recipes in other campaigns' playbooks
+  or branches; new recipes come from what you find in ImageMagick.
