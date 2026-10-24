@@ -1433,6 +1433,28 @@ static void ContrastImageRow(const Image *image,const int sign,Quantum *q)
   }
 }
 
+static void ContrastColormap(Image *image,const int sign)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    double
+      blue,
+      green,
+      red;
+
+    red=(double) image->colormap[i].red;
+    green=(double) image->colormap[i].green;
+    blue=(double) image->colormap[i].blue;
+    Contrast(sign,&red,&green,&blue);
+    image->colormap[i].red=(MagickRealType) red;
+    image->colormap[i].green=(MagickRealType) green;
+    image->colormap[i].blue=(MagickRealType) blue;
+  }
+}
+
 MagickExport MagickBooleanType ContrastImage(Image *image,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
@@ -1451,9 +1473,6 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
     progress;
 
   ssize_t
-    i;
-
-  ssize_t
     y;
 
   assert(image != (Image *) NULL);
@@ -1465,27 +1484,11 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   sign=sharpen != MagickFalse ? 1 : -1;
+  /*
+    Contrast enhance colormap.
+  */
   if (image->storage_class == PseudoClass)
-    {
-      /*
-        Contrast enhance colormap.
-      */
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        double
-          blue,
-          green,
-          red;
-
-        red=(double) image->colormap[i].red;
-        green=(double) image->colormap[i].green;
-        blue=(double) image->colormap[i].blue;
-        Contrast(sign,&red,&green,&blue);
-        image->colormap[i].red=(MagickRealType) red;
-        image->colormap[i].green=(MagickRealType) green;
-        image->colormap[i].blue=(MagickRealType) blue;
-      }
-    }
+    ContrastColormap(image,sign);
   /*
     Contrast enhance image.
   */
