@@ -1010,6 +1010,82 @@ static KernelInfo *AcquireUnityKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  double
+    sigma = fabs(args->sigma),
+    A;
+
+  if ( args->rho < 1.0 )
+    kernel->width = (GetOptimalKernelWidth1D(args->rho,sigma)-1)/2+1;
+  else
+    kernel->width = CastDoubleToSizeT(args->rho);
+  kernel->x = kernel->y = 0;
+  kernel->height = 1;
+  kernel->negative_range = kernel->positive_range = 0.0;
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* A comet blur is half a 1D gaussian curve, so that the object is
+  ** blurred in one direction only.  This may not be quite the right
+  ** curve to use so may change in the future. The function must be
+  ** normalised after generation, which also resolves any clipping.
+  **
+  ** As we are normalizing and not subtracting gaussians,
+  ** there is no need for a divisor in the gaussian formula
+  **
+  ** It is less complex
+  */
+  if ( sigma > MagickEpsilon )
+    {
+#if 1
+#define KernelRank 3
+      v = (ssize_t) kernel->width*KernelRank; /* start/end points */
+      (void) memset(kernel->values,0, (size_t)
+        kernel->width*sizeof(*kernel->values));
+      sigma *= KernelRank;            /* simplify the loop expression */
+      A = 1.0/(2.0*sigma*sigma);
+      /* B = 1.0/(MagickSQ2PI*sigma); */
+      for ( u=0; u < v; u++) {
+        kernel->values[u/KernelRank] +=
+            exp(-((double)(u*u))*A);
+        /*  exp(-((double)(i*i))/2.0*sigma*sigma)/(MagickSQ2PI*sigma); */
+      }
+      for (i=0; i < (ssize_t) kernel->width; i++)
+        kernel->positive_range += kernel->values[i];
+#else
+      A = 1.0/(2.0*sigma*sigma);     /* simplify the loop expression */
+      /* B = 1.0/(MagickSQ2PI*sigma); */
+      for ( i=0; i < (ssize_t) kernel->width; i++)
+        kernel->positive_range +=
+          kernel->values[i] = exp(-((double)(i*i))*A);
+          /* exp(-((double)(i*i))/2.0*sigma*sigma)/(MagickSQ2PI*sigma); */
+#endif
+    }
+  else /* special case - generate a unity kernel */
+    { (void) memset(kernel->values,0, (size_t)
+        kernel->width*kernel->height*sizeof(*kernel->values));
+      kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+      kernel->positive_range = 1.0;
+    }
+
+  kernel->minimum = 0.0;
+  kernel->maximum = kernel->values[0];
+  kernel->negative_range = 0.0;
+
+  ScaleKernelInfo(kernel, 1.0, NormalizeValue); /* Normalize */
+  RotateKernelInfo(kernel, args->xi); /* Rotate by angle */
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1273,71 +1349,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         break;
       }
     case CometKernel:
-      { double
-          sigma = fabs(args->sigma),
-          A;
-
-        if ( args->rho < 1.0 )
-          kernel->width = (GetOptimalKernelWidth1D(args->rho,sigma)-1)/2+1;
-        else
-          kernel->width = CastDoubleToSizeT(args->rho);
-        kernel->x = kernel->y = 0;
-        kernel->height = 1;
-        kernel->negative_range = kernel->positive_range = 0.0;
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        /* A comet blur is half a 1D gaussian curve, so that the object is
-        ** blurred in one direction only.  This may not be quite the right
-        ** curve to use so may change in the future. The function must be
-        ** normalised after generation, which also resolves any clipping.
-        **
-        ** As we are normalizing and not subtracting gaussians,
-        ** there is no need for a divisor in the gaussian formula
-        **
-        ** It is less complex
-        */
-        if ( sigma > MagickEpsilon )
-          {
-#if 1
-#define KernelRank 3
-            v = (ssize_t) kernel->width*KernelRank; /* start/end points */
-            (void) memset(kernel->values,0, (size_t)
-              kernel->width*sizeof(*kernel->values));
-            sigma *= KernelRank;            /* simplify the loop expression */
-            A = 1.0/(2.0*sigma*sigma);
-            /* B = 1.0/(MagickSQ2PI*sigma); */
-            for ( u=0; u < v; u++) {
-              kernel->values[u/KernelRank] +=
-                  exp(-((double)(u*u))*A);
-              /*  exp(-((double)(i*i))/2.0*sigma*sigma)/(MagickSQ2PI*sigma); */
-            }
-            for (i=0; i < (ssize_t) kernel->width; i++)
-              kernel->positive_range += kernel->values[i];
-#else
-            A = 1.0/(2.0*sigma*sigma);     /* simplify the loop expression */
-            /* B = 1.0/(MagickSQ2PI*sigma); */
-            for ( i=0; i < (ssize_t) kernel->width; i++)
-              kernel->positive_range +=
-                kernel->values[i] = exp(-((double)(i*i))*A);
-                /* exp(-((double)(i*i))/2.0*sigma*sigma)/(MagickSQ2PI*sigma); */
-#endif
-          }
-        else /* special case - generate a unity kernel */
-          { (void) memset(kernel->values,0, (size_t)
-              kernel->width*kernel->height*sizeof(*kernel->values));
-            kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-            kernel->positive_range = 1.0;
-          }
-
-        kernel->minimum = 0.0;
-        kernel->maximum = kernel->values[0];
-        kernel->negative_range = 0.0;
-
-        ScaleKernelInfo(kernel, 1.0, NormalizeValue); /* Normalize */
-        RotateKernelInfo(kernel, args->xi); /* Rotate by angle */
-        break;
-      }
+      return(AcquireCometKernel(kernel,args));
     case BinomialKernel:
       {
         const size_t
