@@ -1133,6 +1133,47 @@ static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  switch ( (int) args->rho ) {
+    case 0:
+    default: /* laplacian square filter -- default */
+      kernel=ParseKernelArray("3: -1,-1,-1  -1,8,-1  -1,-1,-1");
+      break;
+    case 1:  /* laplacian diamond filter */
+      kernel=ParseKernelArray("3: 0,-1,0  -1,4,-1  0,-1,0");
+      break;
+    case 2:
+      kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
+      break;
+    case 3:
+      kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  1,-2,1");
+      break;
+    case 5:   /* a 5x5 laplacian */
+      kernel=ParseKernelArray(
+        "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4");
+      break;
+    case 7:   /* a 7x7 laplacian */
+      kernel=ParseKernelArray(
+        "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" );
+      break;
+    case 15:  /* a 5x5 LoG (sigma approx 1.4) */
+      kernel=ParseKernelArray(
+        "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0");
+      break;
+    case 19:  /* a 9x9 LoG (sigma approx 1.4) */
+      /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
+      kernel=ParseKernelArray(
+        "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1404,43 +1445,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       Convolution Kernels - Well Known Named Constant Kernels
     */
     case LaplacianKernel:
-      { switch ( (int) args->rho ) {
-          case 0:
-          default: /* laplacian square filter -- default */
-            kernel=ParseKernelArray("3: -1,-1,-1  -1,8,-1  -1,-1,-1");
-            break;
-          case 1:  /* laplacian diamond filter */
-            kernel=ParseKernelArray("3: 0,-1,0  -1,4,-1  0,-1,0");
-            break;
-          case 2:
-            kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
-            break;
-          case 3:
-            kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  1,-2,1");
-            break;
-          case 5:   /* a 5x5 laplacian */
-            kernel=ParseKernelArray(
-              "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4");
-            break;
-          case 7:   /* a 7x7 laplacian */
-            kernel=ParseKernelArray(
-              "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" );
-            break;
-          case 15:  /* a 5x5 LoG (sigma approx 1.4) */
-            kernel=ParseKernelArray(
-              "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0");
-            break;
-          case 19:  /* a 9x9 LoG (sigma approx 1.4) */
-            /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
-            kernel=ParseKernelArray(
-              "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0");
-            break;
-        }
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        break;
-      }
+      return(AcquireLaplacianKernel(kernel,type,args));
     case SobelKernel:
       { /* Simple Sobel Kernel */
         kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
