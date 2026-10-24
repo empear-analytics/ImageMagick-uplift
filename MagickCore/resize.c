@@ -4302,6 +4302,13 @@ static inline MagickBooleanType IsScaleBufferMissing(const double *scanline,
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsScaleRowPending(const Image *image,
+  const MagickBooleanType next_row,const ssize_t number_rows)
+{
+  return(((next_row != MagickFalse) &&
+    (number_rows < (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -4435,8 +4442,7 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
         */
         while (scale.y < span.y)
         {
-          if ((next_row != MagickFalse) &&
-              (number_rows < (ssize_t) image->rows))
+          if (IsScaleRowPending(image,next_row,number_rows) != MagickFalse)
             {
               /*
                 Read a new scanline.
@@ -4456,7 +4462,7 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
           scale.y=(double) scale_image->rows/(double) image->rows;
           next_row=MagickTrue;
         }
-        if ((next_row != MagickFalse) && (number_rows < (ssize_t) image->rows))
+        if (IsScaleRowPending(image,next_row,number_rows) != MagickFalse)
           {
             /*
               Read a new scanline.
