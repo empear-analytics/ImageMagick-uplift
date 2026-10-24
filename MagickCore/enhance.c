@@ -1604,6 +1604,36 @@ static void AccumulateStretchHistogram(const Image *image,
   }
 }
 
+static void BuildStretchMap(const Image *image,const Quantum *black,
+  const Quantum *white,Quantum *stretch_map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    ssize_t
+      j;
+
+    for (j=0; j <= (ssize_t) MaxMap; j++)
+    {
+      double
+        gamma;
+
+      gamma=MagickSafeReciprocal(white[i]-black[i]);
+      if (j < (ssize_t) black[i])
+        stretch_map[(ssize_t) GetPixelChannels(image)*j+i]=(Quantum) 0;
+      else
+        if (j > (ssize_t) white[i])
+          stretch_map[(ssize_t) GetPixelChannels(image)*j+i]=QuantumRange;
+        else
+          if (black[i] != white[i])
+            stretch_map[(ssize_t) GetPixelChannels(image)*j+i]=
+              ScaleMapToQuantum((double) (MaxMap*gamma*(j-(double) black[i])));
+    }
+  }
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1726,28 +1756,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   */
   (void) memset(stretch_map,0,(MaxMap+1)*GetPixelChannels(image)*
     sizeof(*stretch_map));
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    ssize_t
-      j;
-
-    for (j=0; j <= (ssize_t) MaxMap; j++)
-    {
-      double
-        gamma;
-
-      gamma=MagickSafeReciprocal(white[i]-black[i]);
-      if (j < (ssize_t) black[i])
-        stretch_map[(ssize_t) GetPixelChannels(image)*j+i]=(Quantum) 0;
-      else
-        if (j > (ssize_t) white[i])
-          stretch_map[(ssize_t) GetPixelChannels(image)*j+i]=QuantumRange;
-        else
-          if (black[i] != white[i])
-            stretch_map[(ssize_t) GetPixelChannels(image)*j+i]=
-              ScaleMapToQuantum((double) (MaxMap*gamma*(j-(double) black[i])));
-    }
-  }
+  BuildStretchMap(image,black,white,stretch_map);
   if (image->storage_class == PseudoClass)
     {
       ssize_t
