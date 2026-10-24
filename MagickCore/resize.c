@@ -4272,6 +4272,28 @@ static void AccumulateScaleScanline(const Image *image,const PointInfo scale,
         x_vector[x*(ssize_t) GetPixelChannels(image)+i];
 }
 
+static void BlendScaleScanline(const Image *image,const PointInfo span,
+  const double *x_vector,double *y_vector,double *scanline)
+{
+  double
+    pixel[CompositePixelChannel];
+
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      pixel[i]=y_vector[x*(ssize_t) GetPixelChannels(image)+i]+span.y*
+        x_vector[x*(ssize_t) GetPixelChannels(image)+i];
+      scanline[x*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
+      y_vector[x*(ssize_t) GetPixelChannels(image)+i]=0.0;
+    }
+  }
+}
+
 static inline MagickBooleanType IsScaleBufferMissing(const double *scanline,
   const double *scale_scanline,const double *x_vector,const double *y_vector)
 {
@@ -4291,7 +4313,6 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
 
   double
     alpha,
-    pixel[CompositePixelChannel],
     *scale_scanline,
     *scanline,
     *x_vector,
@@ -4305,15 +4326,11 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     proceed,
     status;
 
-  PixelTrait
-    scale_traits;
-
   PointInfo
     scale,
     span;
 
   ssize_t
-    i,
     n,
     number_rows,
     y;
@@ -4387,9 +4404,6 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       break;
     q=QueueCacheViewAuthenticPixels(scale_view,0,y,scale_image->columns,1,
@@ -4458,16 +4472,7 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
             number_rows++;
             next_row=MagickFalse;
           }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            pixel[i]=y_vector[x*(ssize_t) GetPixelChannels(image)+i]+span.y*
-              x_vector[x*(ssize_t) GetPixelChannels(image)+i];
-            scanline[x*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
-            y_vector[x*(ssize_t) GetPixelChannels(image)+i]=0.0;
-          }
-        }
+        BlendScaleScanline(image,span,x_vector,y_vector,scanline);
         scale.y-=span.y;
         if (scale.y <= 0)
           {
