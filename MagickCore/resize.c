@@ -844,6 +844,13 @@ static void SetCubicBCCoefficients(ResizeFilter *resize_filter,const double B,
   resize_filter->coefficient[6]=(-1.0/6.0)*B-C;
 }
 
+static inline MagickBooleanType IsJincPromotion(const FilterType filter,
+  const FilterType filter_type,const MagickBooleanType cylindrical)
+{
+  return(((cylindrical != MagickFalse) && (filter_type == SincFastFilter) &&
+    (filter != SincFastFilter)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1036,8 +1043,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   window_type=mapping[filter].window;
   resize_filter->blur=1.0;
   /* Promote 1D Windowed Sinc Filters to a 2D Windowed Jinc filters */
-  if ((cylindrical != MagickFalse) && (filter_type == SincFastFilter) &&
-      (filter != SincFastFilter))
+  if (IsJincPromotion(filter,filter_type,cylindrical) != MagickFalse)
     filter_type=JincFilter;  /* 1D Windowed Sinc => 2D Windowed Jinc filters */
 
   /* Expert filter setting override */
