@@ -39,6 +39,12 @@ demos, PerlMagick, API examples and the website are excluded.
 never updated. `python3 tools/codehealth_sweep.py` writes `codehealth-current.json`
 beside it, with the date, the commit and the tool versions.
 
+**`cs-mcp` 1.5.12 reproduces the baseline exactly.** A full sweep on 2026-10-24 at
+`7d78ea7e4` gave every one of the 295 files the same score as 1.5.6, so scores from 1.5.12
+compare directly with the baseline and with the task files' "Measured with 1.5.6" lines.
+The server no longer reports the version of the CLI it uses internally, so no `cs`
+version is recorded for it.
+
 The debt is concentrated in MagickCore: more than half its files are Red, and its worst
 score 1.02-1.14 (`display.c`, `pixel.c`, `xwindow.c`, `fx.c`).
 
