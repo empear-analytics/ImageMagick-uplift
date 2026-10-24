@@ -2357,6 +2357,23 @@ static void SolarizePixelChannels(const Image *image,const double threshold,
   }
 }
 
+static void SolarizeColormap(Image *image,const double threshold)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    if ((double) image->colormap[i].red > threshold)
+      image->colormap[i].red=(double) QuantumRange-image->colormap[i].red;
+    if ((double) image->colormap[i].green > threshold)
+      image->colormap[i].green=(double) QuantumRange-
+        image->colormap[i].green;
+    if ((double) image->colormap[i].blue > threshold)
+      image->colormap[i].blue=(double) QuantumRange-image->colormap[i].blue;
+  }
+}
+
 MagickExport MagickBooleanType SolarizeImage(Image *image,
   const double threshold,ExceptionInfo *exception)
 {
@@ -2382,22 +2399,10 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
     (void) SetImageColorspace(image,sRGBColorspace,exception);
   if (image->storage_class == PseudoClass)
     {
-      ssize_t
-        i;
-
       /*
         Solarize colormap.
       */
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        if ((double) image->colormap[i].red > threshold)
-          image->colormap[i].red=(double) QuantumRange-image->colormap[i].red;
-        if ((double) image->colormap[i].green > threshold)
-          image->colormap[i].green=(double) QuantumRange-
-            image->colormap[i].green;
-        if ((double) image->colormap[i].blue > threshold)
-          image->colormap[i].blue=(double) QuantumRange-image->colormap[i].blue;
-      }
+      SolarizeColormap(image,threshold);
       return(SyncImage(image,exception));
     }
   /*
