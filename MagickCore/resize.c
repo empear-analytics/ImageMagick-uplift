@@ -2832,6 +2832,30 @@ static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
 #undef HelperCond
 }
 
+static inline MagickBooleanType IsEagle3XTopEdge(const ssize_t corner_tl,
+  const ssize_t corner_tr)
+{
+  return((corner_tl && corner_tr) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEagle3XLeftEdge(const ssize_t corner_tl,
+  const ssize_t corner_bl)
+{
+  return((corner_tl && corner_bl) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEagle3XRightEdge(const ssize_t corner_tr,
+  const ssize_t corner_br)
+{
+  return((corner_tr && corner_br) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEagle3XBottomEdge(const ssize_t corner_bl,
+  const ssize_t corner_br)
+{
+  return((corner_bl && corner_br) ? MagickTrue : MagickFalse);
+}
+
 static inline void Eagle3X(const Image *magick_unused(source),
   const Quantum *pixels,Quantum *result,const size_t channels)
 {
@@ -2852,22 +2876,22 @@ static inline void Eagle3X(const Image *magick_unused(source),
   corner_br=PixelsEqual(pixels,5,pixels,7,channels) &&
     PixelsEqual(pixels,7,pixels,8,channels);
   CopyPixels(pixels,(ssize_t) (corner_tl ? 0 : 4),result,0,channels);
-  if (corner_tl && corner_tr)
+  if (IsEagle3XTopEdge(corner_tl,corner_tr) != MagickFalse)
     Mix2Pixels(pixels,0,2,result,1,channels);
   else
     CopyPixels(pixels,4,result,1,channels);
   CopyPixels(pixels,(ssize_t) (corner_tr ? 1 : 4),result,2,channels);
-  if (corner_tl && corner_bl)
+  if (IsEagle3XLeftEdge(corner_tl,corner_bl) != MagickFalse)
     Mix2Pixels(pixels,0,6,result,3,channels);
   else
     CopyPixels(pixels,4,result,3,channels);
   CopyPixels(pixels,4,result,4,channels);
-  if (corner_tr && corner_br)
+  if (IsEagle3XRightEdge(corner_tr,corner_br) != MagickFalse)
     Mix2Pixels(pixels,2,8,result,5,channels);
   else
     CopyPixels(pixels,4,result,5,channels);
   CopyPixels(pixels,(ssize_t) (corner_bl ? 3 : 4),result,6,channels);
-  if (corner_bl && corner_br)
+  if (IsEagle3XBottomEdge(corner_bl,corner_br) != MagickFalse)
     Mix2Pixels(pixels,6,8,result,7,channels);
   else
     CopyPixels(pixels,4,result,7,channels);
