@@ -317,6 +317,36 @@ typedef struct _RangeInfo
     max;
 } RangeInfo;
 
+static ssize_t RedistributeCLAHEExcess(const double clip_limit,
+  const size_t number_bins,size_t *histogram,ssize_t cumulative_excess)
+{
+  size_t
+    *p;
+
+  size_t
+    *q;
+
+  ssize_t
+    step;
+
+  p=histogram;
+  q=histogram+number_bins;
+  while ((cumulative_excess != 0) && (p < q))
+  {
+    step=(ssize_t) number_bins/cumulative_excess;
+    if (step < 1)
+      step=1;
+    for (p=histogram; (p < q) && (cumulative_excess != 0); p+=(ptrdiff_t) step)
+      if ((double) *p < clip_limit)
+        {
+          (*p)++;
+          cumulative_excess--;
+        }
+    p++;
+  }
+  return(cumulative_excess);
+}
+
 static void ClipCLAHEHistogram(const double clip_limit,const size_t number_bins,
   size_t *histogram)
 {
@@ -364,28 +394,9 @@ static void ClipCLAHEHistogram(const double clip_limit,const size_t number_bins,
   */
   do
   {
-    size_t
-      *p;
-
-    size_t
-      *q;
-
     previous_excess=cumulative_excess;
-    p=histogram;
-    q=histogram+number_bins;
-    while ((cumulative_excess != 0) && (p < q))
-    {
-      step=(ssize_t) number_bins/cumulative_excess;
-      if (step < 1)
-        step=1;
-      for (p=histogram; (p < q) && (cumulative_excess != 0); p+=(ptrdiff_t) step)
-        if ((double) *p < clip_limit)
-          {
-            (*p)++;
-            cumulative_excess--;
-          }
-      p++;
-    }
+    cumulative_excess=RedistributeCLAHEExcess(clip_limit,number_bins,
+      histogram,cumulative_excess);
   } while ((cumulative_excess != 0) && (cumulative_excess < previous_excess));
 }
 
