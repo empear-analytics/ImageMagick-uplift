@@ -247,6 +247,26 @@ static double CubicBC(const double x,const ResizeFilter *resize_filter)
   return(0.0);
 }
 
+static double CubicSpline2Lobes(const double x)
+{
+  if (x < 1.0)
+    return(((x-9.0/5.0)*x-1.0/5.0)*x+1.0);
+  if (x < 2.0)
+    return(((-1.0/3.0*(x-1.0)+4.0/5.0)*(x-1.0)-7.0/15.0)*(x-1.0));
+  return(0.0);
+}
+
+static double CubicSpline3Lobes(const double x)
+{
+  if (x < 1.0)
+    return(((13.0/11.0*x-453.0/209.0)*x-3.0/209.0)*x+1.0);
+  if (x < 2.0)
+    return(((-6.0/11.0*(x-1.0)+270.0/209.0)*(x-1.0)-156.0/209.0)*(x-1.0));
+  if (x < 3.0)
+    return(((1.0/11.0*(x-2.0)-45.0/209.0)*(x-2.0)+26.0/209.0)*(x-2.0));
+  return(0.0);
+}
+
 static double CubicSpline(const double x,const ResizeFilter *resize_filter)
 {
   if (resize_filter->support <= 2.0)
@@ -254,24 +274,14 @@ static double CubicSpline(const double x,const ResizeFilter *resize_filter)
       /*
         2-lobe Spline filter.
       */
-      if (x < 1.0)
-        return(((x-9.0/5.0)*x-1.0/5.0)*x+1.0);
-      if (x < 2.0)
-        return(((-1.0/3.0*(x-1.0)+4.0/5.0)*(x-1.0)-7.0/15.0)*(x-1.0));
-      return(0.0);
+      return(CubicSpline2Lobes(x));
     }
   if (resize_filter->support <= 3.0)
     {
       /*
         3-lobe Spline filter.
       */
-      if (x < 1.0)
-        return(((13.0/11.0*x-453.0/209.0)*x-3.0/209.0)*x+1.0);
-      if (x < 2.0)
-        return(((-6.0/11.0*(x-1.0)+270.0/209.0)*(x-1.0)-156.0/209.0)*(x-1.0));
-      if (x < 3.0)
-        return(((1.0/11.0*(x-2.0)-45.0/209.0)*(x-2.0)+26.0/209.0)*(x-2.0));
-      return(0.0);
+      return(CubicSpline3Lobes(x));
     }
   /*
     4-lobe Spline filter.
