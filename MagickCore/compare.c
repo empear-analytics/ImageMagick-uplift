@@ -485,12 +485,19 @@ static MagickBooleanType GetAESimilarity(const Image *image,
   return(status);
 }
 
-static void AccumulateCorrelationPixel(const Image *image,
-  const Image *reconstruct_image,const ChannelStatistics *image_statistics,
-  const ChannelStatistics *reconstruct_statistics,const Quantum *p,
-  const Quantum *q,double *channel_similarity,double *channel_norm,
-  double *channel_reconstruct_norm)
+static void AccumulateCorrelationPixel(const ComparePixels *pixels,
+  const ChannelStatistics *image_statistics,
+  const ChannelStatistics *reconstruct_statistics,double *channel_similarity,
+  double *channel_norm,double *channel_reconstruct_norm)
 {
+  const Image
+    *image = pixels->image,
+    *reconstruct_image = pixels->reconstruct_image;
+
+  const Quantum
+    *p = pixels->p,
+    *q = pixels->q;
+
   double
     Da,
     Sa;
@@ -610,6 +617,8 @@ static MagickBooleanType GetDPCSimilarity(const Image *image,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
+      const ComparePixels pixels = { image, reconstruct_image, p, q };
+
       if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
           (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
         {
@@ -617,8 +626,8 @@ static MagickBooleanType GetDPCSimilarity(const Image *image,
           q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
           continue;
         }
-      AccumulateCorrelationPixel(image,reconstruct_image,image_statistics,
-        reconstruct_statistics,p,q,channel_similarity,channel_norm,
+      AccumulateCorrelationPixel(&pixels,image_statistics,
+        reconstruct_statistics,channel_similarity,channel_norm,
         channel_reconstruct_norm);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
@@ -1416,6 +1425,8 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
+      const ComparePixels pixels = { image, reconstruct_image, p, q };
+
       if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
           (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
         {
@@ -1423,8 +1434,8 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
           q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
           continue;
         }
-      AccumulateCorrelationPixel(image,reconstruct_image,image_statistics,
-        reconstruct_statistics,p,q,channel_similarity,channel_variance,
+      AccumulateCorrelationPixel(&pixels,image_statistics,
+        reconstruct_statistics,channel_similarity,channel_variance,
         channel_reconstruct_variance);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
