@@ -3637,10 +3637,14 @@ static inline void ModulateHSI(const ModulateInfo *modulate_info,
   ConvertHSIToRGB(hue,saturation,intensity,red,green,blue);
 }
 
-static inline void ModulateHSL(const double percent_hue,
-  const double percent_saturation,const double percent_lightness,double *red,
-  double *green,double *blue)
+static inline void ModulateHSL(const ModulateInfo *modulate_info,
+  double *red,double *green,double *blue)
 {
+  const double
+    percent_hue = modulate_info->percent_hue,
+    percent_saturation = modulate_info->percent_saturation,
+    percent_lightness = modulate_info->percent_brightness;
+
   double
     hue,
     lightness,
@@ -3771,8 +3775,7 @@ static void ModulateColor(const ModulateInfo *modulate_info,double *red,
     case HSLColorspace:
     default:
     {
-      ModulateHSL(percent_hue,percent_saturation,percent_brightness,
-        red,green,blue);
+      ModulateHSL(modulate_info,red,green,blue);
       break;
     }
     case HSVColorspace:
