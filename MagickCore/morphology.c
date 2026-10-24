@@ -1802,6 +1802,33 @@ static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireChebyshevKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  if (args->rho < 1.0)
+    kernel->width = kernel->height = 3;  /* default radius = 1 */
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->positive_range += ( kernel->values[i] =
+          args->sigma*MagickMax(fabs((double)u),fabs((double)v)) );
+  kernel->maximum = kernel->values[0];
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2210,23 +2237,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         Distance Measuring Kernels
       */
       case ChebyshevKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 3;  /* default radius = 1 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->positive_range += ( kernel->values[i] =
-                  args->sigma*MagickMax(fabs((double)u),fabs((double)v)) );
-          kernel->maximum = kernel->values[0];
-          break;
-        }
+        return(AcquireChebyshevKernel(kernel,args));
       case ManhattanKernel:
         {
           if (args->rho < 1.0)
