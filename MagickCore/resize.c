@@ -918,11 +918,7 @@ static void ReportResizeFilter(const Image *image,
     typically used.
   */
   filter_type=GetWeightingFilterType(resize_filter->filter,filter_type);
-  if (resize_filter->window == Box)       window_type=BoxFilter;
-  if (resize_filter->window == Sinc)      window_type=SincFilter;
-  if (resize_filter->window == SincFast)  window_type=SincFastFilter;
-  if (resize_filter->window == Jinc)      window_type=JincFilter;
-  if (resize_filter->window == CubicBC)   window_type=CubicFilter;
+  window_type=GetWeightingFilterType(resize_filter->window,window_type);
   /*
     Report Filter Details.
   */
