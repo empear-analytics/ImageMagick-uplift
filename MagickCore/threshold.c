@@ -1906,6 +1906,12 @@ MagickExport MagickBooleanType ListThresholdMaps(FILE *file,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsThresholdMapSeparator(const char *p)
+{
+  return((((isspace((int) ((unsigned char) *p)) != 0) || (*p == ',')) &&
+    (*p != '\0')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1945,8 +1951,7 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   if (threshold_map == (const char *) NULL)
     return(MagickTrue);
   p=(char *) threshold_map;
-  while (((isspace((int) ((unsigned char) *p)) != 0) || (*p == ',')) &&
-         (*p != '\0'))
+  while (IsThresholdMapSeparator(p) != MagickFalse)
     p++;
   threshold_map=p;
   while (((isspace((int) ((unsigned char) *p)) == 0) && (*p != ',')) &&
