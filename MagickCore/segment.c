@@ -778,10 +778,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       */
       if (correct == -1)
         {
-          count=0;
-          for (l=k+1; l < left; l++)
-            if (zero_crossing[i+1].crossings[l] != 0)
-              count++;
+          count=CountCrossingsBetween(zero_crossing,i,k,left);
           if (((count % 2) == 0) && (left != k))
             correct=left;
         }
@@ -790,10 +787,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       */
       if (correct == -1)
         {
-          count=0;
-          for (l=k+1; l < right; l++)
-            if (zero_crossing[i+1].crossings[l] != 0)
-              count++;
+          count=CountCrossingsBetween(zero_crossing,i,k,right);
           if (((count % 2) == 0) && (right != k))
             correct=right;
         }
