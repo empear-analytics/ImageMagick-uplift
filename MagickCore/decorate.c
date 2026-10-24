@@ -166,6 +166,20 @@ MagickExport Image *BorderImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Quantum *SetFramePixels(const Image *image,const PixelInfo *color,
+  const ssize_t count,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < count; x++)
+  {
+    SetPixelViaPixelInfo(image,color,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -329,35 +343,15 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
           }
           for (y=0; y < (frame_info->y-(ssize_t) bevel_width); y++)
           {
-            for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&highlight,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
+            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
             width=frame_image->columns-2*(size_t) frame_info->outer_bevel;
-            for (x=0; x < (ssize_t) width; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&matte,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&shadow,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
+            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
           }
           for (y=0; y < (ssize_t) frame_info->inner_bevel; y++)
           {
-            for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&highlight,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for (x=0; x < (frame_info->x-(ssize_t) bevel_width); x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&matte,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
+            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+            q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
             width=image->columns+((size_t) frame_info->inner_bevel << 1)-
               (size_t) y;
             for (x=0; x < (ssize_t) width; x++)
@@ -375,16 +369,8 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
             }
             width=frame_info->width-(size_t) frame_info->x-
               image->columns-bevel_width;
-            for (x=0; x < (ssize_t) width; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&matte,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&shadow,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
+            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
           }
           (void) SyncCacheViewAuthenticPixels(frame_view,exception);
         }
@@ -419,21 +405,9 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-    {
-      SetPixelViaPixelInfo(frame_image,&highlight,q);
-      q+=(ptrdiff_t) GetPixelChannels(frame_image);
-    }
-    for (x=0; x < (frame_info->x-(ssize_t) bevel_width); x++)
-    {
-      SetPixelViaPixelInfo(frame_image,&matte,q);
-      q+=(ptrdiff_t) GetPixelChannels(frame_image);
-    }
-    for (x=0; x < (ssize_t) frame_info->inner_bevel; x++)
-    {
-      SetPixelViaPixelInfo(frame_image,&shadow,q);
-      q+=(ptrdiff_t) GetPixelChannels(frame_image);
-    }
+    q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+    q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
+    q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->inner_bevel,q);
     /*
       Set frame interior pixels.
     */
@@ -448,16 +422,8 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
       q+=(ptrdiff_t) GetPixelChannels(frame_image);
     }
     width=frame_info->width-(size_t) frame_info->x-image->columns-bevel_width;
-    for (x=0; x < (ssize_t) width; x++)
-    {
-      SetPixelViaPixelInfo(frame_image,&matte,q);
-      q+=(ptrdiff_t) GetPixelChannels(frame_image);
-    }
-    for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-    {
-      SetPixelViaPixelInfo(frame_image,&shadow,q);
-      q+=(ptrdiff_t) GetPixelChannels(frame_image);
-    }
+    q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+    q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
     if (SyncCacheViewAuthenticPixels(frame_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -500,16 +466,8 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
           */
           for (y=frame_info->inner_bevel-1; y >= 0; y--)
           {
-            for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&highlight,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for (x=0; x < (frame_info->x-(ssize_t) bevel_width); x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&matte,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
+            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+            q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
             for (x=0; x < y; x++)
             {
               SetPixelViaPixelInfo(frame_image,&shadow,q);
@@ -525,38 +483,18 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
             }
             width=(size_t) ((ssize_t) frame_info->width-frame_info->x-
               (ssize_t) image->columns-(ssize_t) bevel_width);
-            for (x=0; x < (ssize_t) width; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&matte,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&shadow,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
+            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
           }
           height=(size_t) ((ssize_t) frame_info->height-frame_info->y-(ssize_t)
             image->rows-(ssize_t) bevel_width);
           for (y=0; y < (ssize_t) height; y++)
           {
-            for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&highlight,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
+            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
             width=(size_t) ((ssize_t) frame_image->columns-2*(ssize_t)
               frame_info->outer_bevel);
-            for (x=0; x < (ssize_t) width; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&matte,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for (x=0; x < (ssize_t) frame_info->outer_bevel; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&shadow,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
+            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
           }
           for (y=frame_info->outer_bevel-1; y >= 0; y--)
           {
