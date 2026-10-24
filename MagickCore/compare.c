@@ -692,10 +692,17 @@ static MagickBooleanType GetDPCSimilarity(const Image *image,
   return(status);
 }
 
-static void AccumulateFUZZPixel(const Image *image,
-  const Image *reconstruct_image,const Quantum *p,const Quantum *q,
-  const double fuzz,double *channel_similarity,double *channel_area)
+static void AccumulateFUZZPixel(const ComparePixels *pixels,const double fuzz,
+  double *channel_similarity,double *channel_area)
 {
+  const Image
+    *image = pixels->image,
+    *reconstruct_image = pixels->reconstruct_image;
+
+  const Quantum
+    *p = pixels->p,
+    *q = pixels->q;
+
   double
     Da,
     Sa;
@@ -790,6 +797,8 @@ static MagickBooleanType GetFUZZSimilarity(const Image *image,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
+      const ComparePixels pixels = { image, reconstruct_image, p, q };
+
       if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
           (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
         {
@@ -797,7 +806,7 @@ static MagickBooleanType GetFUZZSimilarity(const Image *image,
           q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
           continue;
         }
-      AccumulateFUZZPixel(image,reconstruct_image,p,q,fuzz,channel_similarity,
+      AccumulateFUZZPixel(&pixels,fuzz,channel_similarity,
         &channel_area);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
