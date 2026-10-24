@@ -1896,6 +1896,71 @@ static void SetLoGKernelValues(KernelInfo *kernel,const double sigma)
       }
 }
 
+static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  double
+    sigma = fabs(args->sigma),
+    sigma2 = fabs(args->xi);
+
+  if ( args->rho >= 1.0 )
+    kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+  else if ( (type != DoGKernel) || (sigma >= sigma2) )
+    kernel->width = GetOptimalKernelWidth2D(args->rho,sigma);
+  else
+    kernel->width = GetOptimalKernelWidth2D(args->rho,sigma2);
+  kernel->height = kernel->width;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* WARNING: The following generates a 'sampled gaussian' kernel.
+   * What we really want is a 'discrete gaussian' kernel.
+   *
+   * How to do this is I don't know, but appears to be basied on the
+   * Error Function 'erf()' (integral of a gaussian)
+   */
+
+  if ( type == GaussianKernel || type == DoGKernel )
+    { /* Calculate a Gaussian,  OR positive half of a DoG */
+      SetGaussianKernelValues(kernel,sigma);
+    }
+
+  if ( type == DoGKernel )
+    { /* Subtract a Negative Gaussian for "Difference of Gaussian" */
+      SubtractGaussianKernelValues(kernel,sigma2);
+    }
+
+  if ( type == LoGKernel )
+    { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
+      if ( sigma > MagickEpsilon )
+        SetLoGKernelValues(kernel,sigma);
+      else /* special case - generate a unity kernel */
+        { (void) memset(kernel->values,0, (size_t)
+            kernel->width*kernel->height*sizeof(*kernel->values));
+          kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+        }
+    }
+
+  /* Note the above kernels may have been 'clipped' by a user defined
+  ** radius, producing a smaller (darker) kernel.  Also for very small
+  ** sigma's (> 0.1) the central value becomes larger than one, and thus
+  ** producing a very bright kernel.
+  **
+  ** Normalization will still be needed.
+  */
+
+  /* Normalize the 2D Gaussian Kernel
+  **
+  ** NB: a CorrelateNormalize performs a normal Normalize if
+  ** there are no negative values.
+  */
+  CalcKernelMetaData(kernel);  /* the other kernel meta-data */
+  ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
+
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1984,67 +2049,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     case GaussianKernel:
     case DoGKernel:
     case LoGKernel:
-      { double
-          sigma = fabs(args->sigma),
-          sigma2 = fabs(args->xi);
-
-        if ( args->rho >= 1.0 )
-          kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-        else if ( (type != DoGKernel) || (sigma >= sigma2) )
-          kernel->width = GetOptimalKernelWidth2D(args->rho,sigma);
-        else
-          kernel->width = GetOptimalKernelWidth2D(args->rho,sigma2);
-        kernel->height = kernel->width;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        /* WARNING: The following generates a 'sampled gaussian' kernel.
-         * What we really want is a 'discrete gaussian' kernel.
-         *
-         * How to do this is I don't know, but appears to be basied on the
-         * Error Function 'erf()' (integral of a gaussian)
-         */
-
-        if ( type == GaussianKernel || type == DoGKernel )
-          { /* Calculate a Gaussian,  OR positive half of a DoG */
-            SetGaussianKernelValues(kernel,sigma);
-          }
-
-        if ( type == DoGKernel )
-          { /* Subtract a Negative Gaussian for "Difference of Gaussian" */
-            SubtractGaussianKernelValues(kernel,sigma2);
-          }
-
-        if ( type == LoGKernel )
-          { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
-            if ( sigma > MagickEpsilon )
-              SetLoGKernelValues(kernel,sigma);
-            else /* special case - generate a unity kernel */
-              { (void) memset(kernel->values,0, (size_t)
-                  kernel->width*kernel->height*sizeof(*kernel->values));
-                kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-              }
-          }
-
-        /* Note the above kernels may have been 'clipped' by a user defined
-        ** radius, producing a smaller (darker) kernel.  Also for very small
-        ** sigma's (> 0.1) the central value becomes larger than one, and thus
-        ** producing a very bright kernel.
-        **
-        ** Normalization will still be needed.
-        */
-
-        /* Normalize the 2D Gaussian Kernel
-        **
-        ** NB: a CorrelateNormalize performs a normal Normalize if
-        ** there are no negative values.
-        */
-        CalcKernelMetaData(kernel);  /* the other kernel meta-data */
-        ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
-
-        break;
-      }
+      return(AcquireGaussianKernel(kernel,type,args));
     case BlurKernel:
       { double
           sigma = fabs(args->sigma),
