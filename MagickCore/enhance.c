@@ -987,6 +987,49 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
   return(status);
 }
 
+static void ParseCDLTriple(XMLTreeInfo *node,double *red,double *green,
+  double *blue)
+{
+  char
+    token[MagickPathExtent];
+
+  const char
+    *content,
+    *p;
+
+  ssize_t
+    i;
+
+  content=GetXMLTreeContent(node);
+  p=(const char *) content;
+  for (i=0; (*p != '\0') && (i < 3); i++)
+  {
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+    if (*token == ',')
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+    switch (i)
+    {
+      case 0:
+      {
+        *red=StringToDouble(token,(char **) NULL);
+        break;
+      }
+      case 1:
+      {
+        *green=StringToDouble(token,
+          (char **) NULL);
+        break;
+      }
+      case 2:
+      {
+        *blue=StringToDouble(token,
+          (char **) NULL);
+        break;
+      }
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1128,36 +1171,8 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
 
       slope=GetXMLTreeChild(sop,"Slope");
       if (slope != (XMLTreeInfo *) NULL)
-        {
-          content=GetXMLTreeContent(slope);
-          p=(const char *) content;
-          for (i=0; (*p != '\0') && (i < 3); i++)
-          {
-            (void) GetNextToken(p,&p,MagickPathExtent,token);
-            if (*token == ',')
-              (void) GetNextToken(p,&p,MagickPathExtent,token);
-            switch (i)
-            {
-              case 0:
-              {
-                color_correction.red.slope=StringToDouble(token,(char **) NULL);
-                break;
-              }
-              case 1:
-              {
-                color_correction.green.slope=StringToDouble(token,
-                  (char **) NULL);
-                break;
-              }
-              case 2:
-              {
-                color_correction.blue.slope=StringToDouble(token,
-                  (char **) NULL);
-                break;
-              }
-            }
-          }
-        }
+        ParseCDLTriple(slope,&color_correction.red.slope,
+          &color_correction.green.slope,&color_correction.blue.slope);
       offset=GetXMLTreeChild(sop,"Offset");
       if (offset != (XMLTreeInfo *) NULL)
         {
