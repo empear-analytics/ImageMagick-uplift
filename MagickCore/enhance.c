@@ -4018,6 +4018,28 @@ static void NegateGrayImageRow(const Image *image,Quantum *q)
   }
 }
 
+static void NegateImageRow(const Image *image,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      j;
+
+    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,j);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      q[j]=QuantumRange-q[j];
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType NegateImage(Image *image,
   const MagickBooleanType grayscale,ExceptionInfo *exception)
 {
@@ -4114,9 +4136,6 @@ MagickExport MagickBooleanType NegateImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -4125,21 +4144,7 @@ MagickExport MagickBooleanType NegateImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[j]=QuantumRange-q[j];
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    NegateImageRow(image,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
