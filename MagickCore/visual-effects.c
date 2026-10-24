@@ -1905,6 +1905,31 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SepiaTonePixel(const Image *image,const Image *sepia_image,
+  const double threshold,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  double
+    intensity,
+    tone;
+
+  intensity=GetPixelIntensity(image,p);
+  tone=intensity > threshold ? (double) QuantumRange : intensity+
+    (double) QuantumRange-threshold;
+  SetPixelRed(sepia_image,ClampToQuantum(tone),q);
+  tone=intensity > (7.0*threshold/6.0) ? (double) QuantumRange :
+    intensity+(double) QuantumRange-7.0*threshold/6.0;
+  SetPixelGreen(sepia_image,ClampToQuantum(tone),q);
+  tone=intensity < (threshold/6.0) ? 0 : intensity-threshold/6.0;
+  SetPixelBlue(sepia_image,ClampToQuantum(tone),q);
+  tone=threshold/7.0;
+  if ((double) GetPixelGreen(image,q) < tone)
+    SetPixelGreen(sepia_image,ClampToQuantum(tone),q);
+  if ((double) GetPixelBlue(image,q) < tone)
+    SetPixelBlue(sepia_image,ClampToQuantum(tone),q);
+  SetPixelAlpha(sepia_image,GetPixelAlpha(image,p),q);
+}
+
 MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -1977,25 +2002,7 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      double
-        intensity,
-        tone;
-
-      intensity=GetPixelIntensity(image,p);
-      tone=intensity > threshold ? (double) QuantumRange : intensity+
-        (double) QuantumRange-threshold;
-      SetPixelRed(sepia_image,ClampToQuantum(tone),q);
-      tone=intensity > (7.0*threshold/6.0) ? (double) QuantumRange :
-        intensity+(double) QuantumRange-7.0*threshold/6.0;
-      SetPixelGreen(sepia_image,ClampToQuantum(tone),q);
-      tone=intensity < (threshold/6.0) ? 0 : intensity-threshold/6.0;
-      SetPixelBlue(sepia_image,ClampToQuantum(tone),q);
-      tone=threshold/7.0;
-      if ((double) GetPixelGreen(image,q) < tone)
-        SetPixelGreen(sepia_image,ClampToQuantum(tone),q);
-      if ((double) GetPixelBlue(image,q) < tone)
-        SetPixelBlue(sepia_image,ClampToQuantum(tone),q);
-      SetPixelAlpha(sepia_image,GetPixelAlpha(image,p),q);
+      SepiaTonePixel(image,sepia_image,threshold,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(sepia_image);
     }
