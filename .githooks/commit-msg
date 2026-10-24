@@ -1,3 +1,12 @@
-#!/bin/sh
-# Refactor commits need Recipe: <code> and Verified: oracle|guard trailers.
-exec python3 "$(git rev-parse --show-toplevel)/tools/check_trailers.py" --message-file "$1"
+#!/usr/bin/env sh
+# Refactor commits need 'Recipe: <code>' and 'Verified: oracle|guard' trailers.
+# The first Python 3.8+ found; on Windows `python3` can be the Microsoft Store stub,
+# so the `py` launcher is tried in between (as in pre-commit).
+repo_root=$(git rev-parse --show-toplevel)
+for py in python3 "py -3" python; do
+  if $py -c 'import sys; sys.exit(sys.version_info < (3, 8))' > /dev/null 2>&1; then
+    exec $py "$repo_root/tools/check_trailers.py" --message-file "$1"
+  fi
+done
+echo "commit-msg: no Python 3.8 or later found for tools/check_trailers.py" >&2
+exit 1

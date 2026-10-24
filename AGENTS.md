@@ -4,7 +4,7 @@ Read this before changing anything. It applies to every agent and every harness.
 
 ## What this repository is
 
-This is a private fork of **ImageMagick** (`mrksbrg/ImageMagick`), used for agentic
+This is a private fork of **ImageMagick** (`empear-analytics/ImageMagick-uplift`), used for agentic
 refactoring research. ImageMagick is a C library (MagickCore, MagickWand), a C++ binding
 (Magick++), roughly 150 image format coders, and the `magick` command-line tool. It is
 used by millions of programs through a published, stable API.
@@ -176,11 +176,11 @@ This checkout is a **fork**, and the two remotes are easy to confuse:
 
 | Remote | Repository | Use |
 | --- | --- | --- |
-| `origin` | `mrksbrg/ImageMagick` | **The target for everything.** |
+| `origin` | `empear-analytics/ImageMagick-uplift` | **The target for everything.** |
 | `upstream` | `ImageMagick/ImageMagick` | The public project. Fetch only. |
 
 > [!WARNING]
-> **Every pull request must target `mrksbrg/ImageMagick`.** Never open one against
+> **Every pull request must target `empear-analytics/ImageMagick-uplift`.** Never open one against
 > `ImageMagick/ImageMagick`.
 
 GitHub's "Compare & pull request" button and `gh pr create` both default the base to the
@@ -188,7 +188,7 @@ GitHub's "Compare & pull request" button and `gh pr create` both default the bas
 Always name it:
 
 ```bash
-gh pr create --repo mrksbrg/ImageMagick --base main
+gh pr create --repo empear-analytics/ImageMagick-uplift --base main
 ```
 
 `upstream` has its push URL set to `DISABLED`, so a push to it fails rather than
