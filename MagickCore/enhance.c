@@ -1580,6 +1580,30 @@ static inline MagickBooleanType IsStretchMemoryMissing(const Quantum *black,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AccumulateStretchHistogram(const Image *image,
+  const Quantum *p,double *histogram)
+{
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      pixel;
+
+    pixel=GetPixelIntensity(image,p);
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      if (image->channel_mask != AllChannels)
+        pixel=(double) p[i];
+      histogram[GetPixelChannels(image)*ScaleQuantumToMap(
+        ClampToQuantum(pixel))+(size_t) i]++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1655,9 +1679,6 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -1666,21 +1687,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        pixel;
-
-      pixel=GetPixelIntensity(image,p);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        if (image->channel_mask != AllChannels)
-          pixel=(double) p[i];
-        histogram[GetPixelChannels(image)*ScaleQuantumToMap(
-          ClampToQuantum(pixel))+(size_t) i]++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateStretchHistogram(image,p,histogram);
   }
   image_view=DestroyCacheView(image_view);
   /*
