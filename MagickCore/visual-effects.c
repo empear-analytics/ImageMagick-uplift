@@ -322,6 +322,20 @@ static Quantum GetPixelMinimumRGB(const Image *image,
   return(quantum);
 }
 
+static Quantum GetPixelMaximumRGB(const Image *image,
+  const Quantum *magick_restrict p)
+{
+  Quantum
+    quantum;
+
+  quantum=GetPixelRed(image,p);
+  if (GetPixelGreen(image,p) > quantum)
+    quantum=GetPixelGreen(image,p);
+  if (GetPixelBlue(image,p) > quantum)
+    quantum=GetPixelBlue(image,p);
+  return(quantum);
+}
+
 MagickExport Image *BlueShiftImage(const Image *image,const double factor,
   ExceptionInfo *exception)
 {
@@ -407,11 +421,7 @@ MagickExport Image *BlueShiftImage(const Image *image,const double factor,
       pixel.red=0.5*((double) GetPixelRed(image,p)+factor*(double) quantum);
       pixel.green=0.5*((double) GetPixelGreen(image,p)+factor*(double) quantum);
       pixel.blue=0.5*((double) GetPixelBlue(image,p)+factor*(double) quantum);
-      quantum=GetPixelRed(image,p);
-      if (GetPixelGreen(image,p) > quantum)
-        quantum=GetPixelGreen(image,p);
-      if (GetPixelBlue(image,p) > quantum)
-        quantum=GetPixelBlue(image,p);
+      quantum=GetPixelMaximumRGB(image,p);
       pixel.red=0.5*(pixel.red+factor*(double) quantum);
       pixel.green=0.5*(pixel.green+factor*(double) quantum);
       pixel.blue=0.5*(pixel.blue+factor*(double) quantum);
