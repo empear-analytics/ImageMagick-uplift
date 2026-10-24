@@ -156,16 +156,14 @@ static inline void MixPixels(const MagnifyPixels *magnify,
   }
 }
 
-static inline void Mix2Pixels(const Quantum *source,
+static inline void Mix2Pixels(const MagnifyPixels *magnify,
   const ssize_t source_offset1,const ssize_t source_offset2,
-  Quantum *destination,const ssize_t destination_offset,const size_t channels)
+  const ssize_t destination_offset)
 {
-  const MagnifyPixels magnify = { source, destination, channels };
-
   const ssize_t
     offsets[2] = { source_offset1, source_offset2 };
 
-  MixPixels(&magnify,offsets,2,destination_offset);
+  MixPixels(magnify,offsets,2,destination_offset);
 }
 
 static inline int PixelsEqual(const Quantum *source,ssize_t offset1,
@@ -556,9 +554,9 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
 #define Line(A,B,C,D) \
   { \
     if (intensities[C] > intensities[A]) \
-      Mix2Pixels(pixels,C,D,result,3,channels); \
+      Mix2Pixels(&magnify,C,D,3); \
     else \
-      Mix2Pixels(pixels,A,B,result,3,channels); \
+      Mix2Pixels(&magnify,A,B,3); \
   }
 
   const MagnifyPixels magnify = { pixels, result, channels };
@@ -619,12 +617,12 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
     }
   if (IsFish2XMainDiagonal(ae,bd,intensities) != MagickFalse)
     {
-      Mix2Pixels(pixels,0,4,result,3,channels);
+      Mix2Pixels(&magnify,0,4,3);
       return;
     }
   if (IsFish2XAntiDiagonal(bd,ae,intensities) != MagickFalse)
     {
-      Mix2Pixels(pixels,1,3,result,3,channels);
+      Mix2Pixels(&magnify,1,3,3);
       return;
     }
   if (ab)
@@ -696,32 +694,28 @@ static void Xbr2X(const Image *magick_unused(source),const Quantum *pixels,
     w_12_16 + w_12_8 + w_6_10 + w_6_2 + (4 * w_11_7) <
     w_11_17 + w_11_5 + w_7_13 + w_7_1 + (4 * w_12_6)
   )
-    Mix2Pixels(pixels,(ssize_t) (w_12_11 <= w_12_7 ? 11 : 7),12,result,0,
-      channels);
+    Mix2Pixels(&magnify,(ssize_t) (w_12_11 <= w_12_7 ? 11 : 7),12,0);
   else
     CopyPixels(&magnify,12,0);
   if (
     w_12_18 + w_12_6 + w_8_14 + w_8_2 + (4 * w_7_13) <
     w_13_17 + w_13_9 + w_11_7 + w_7_3 + (4 * w_12_8)
   )
-    Mix2Pixels(pixels,(ssize_t) (w_12_7 <= w_12_13 ? 7 : 13),12,result,1,
-      channels);
+    Mix2Pixels(&magnify,(ssize_t) (w_12_7 <= w_12_13 ? 7 : 13),12,1);
   else
     CopyPixels(&magnify,12,1);
   if (
     w_12_6 + w_12_18 + w_16_10 + w_16_22 + (4 * w_11_17) <
     w_11_7 + w_11_15 + w_13_17 + w_17_21 + (4 * w_12_16)
   )
-    Mix2Pixels(pixels,(ssize_t) (w_12_11 <= w_12_17 ? 11 : 17),12,result,2,
-      channels);
+    Mix2Pixels(&magnify,(ssize_t) (w_12_11 <= w_12_17 ? 11 : 17),12,2);
   else
     CopyPixels(&magnify,12,2);
   if (
     w_12_8 + w_12_16 + w_18_14 + w_18_22 + (4 * w_13_17) <
     w_11_17 + w_17_23 + w_17_19 + w_7_13 + (4 * w_12_18)
   )
-    Mix2Pixels(pixels,(ssize_t) (w_12_13 <= w_12_17 ? 13 : 17),12,result,3,
-      channels);
+    Mix2Pixels(&magnify,(ssize_t) (w_12_13 <= w_12_17 ? 13 : 17),12,3);
   else
     CopyPixels(&magnify,12,3);
 }
@@ -812,13 +806,13 @@ static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
   if (IsEpbx2XBlendable(pixels,channels) != MagickFalse)
     {
       if (HelperCond(1,3,4,0,8,2,6))
-        Mix2Pixels(pixels,1,3,result,0,channels);
+        Mix2Pixels(&magnify,1,3,0);
       if (HelperCond(5,1,4,2,6,8,0))
-        Mix2Pixels(pixels,5,1,result,1,channels);
+        Mix2Pixels(&magnify,5,1,1);
       if (HelperCond(3,7,4,6,2,0,8))
-        Mix2Pixels(pixels,3,7,result,2,channels);
+        Mix2Pixels(&magnify,3,7,2);
       if (HelperCond(7,5,4,8,0,6,2))
-        Mix2Pixels(pixels,7,5,result,3,channels);
+        Mix2Pixels(&magnify,7,5,3);
     }
 
 #undef HelperCond
@@ -895,22 +889,22 @@ static inline void Eagle3X(const Image *magick_unused(source),
   corner_br=IsEagle3XBottomRightCorner(pixels,channels) != MagickFalse;
   CopyPixels(&magnify,(ssize_t) (corner_tl ? 0 : 4),0);
   if (IsEagle3XTopEdge(corner_tl,corner_tr) != MagickFalse)
-    Mix2Pixels(pixels,0,2,result,1,channels);
+    Mix2Pixels(&magnify,0,2,1);
   else
     CopyPixels(&magnify,4,1);
   CopyPixels(&magnify,(ssize_t) (corner_tr ? 1 : 4),2);
   if (IsEagle3XLeftEdge(corner_tl,corner_bl) != MagickFalse)
-    Mix2Pixels(pixels,0,6,result,3,channels);
+    Mix2Pixels(&magnify,0,6,3);
   else
     CopyPixels(&magnify,4,3);
   CopyPixels(&magnify,4,4);
   if (IsEagle3XRightEdge(corner_tr,corner_br) != MagickFalse)
-    Mix2Pixels(pixels,2,8,result,5,channels);
+    Mix2Pixels(&magnify,2,8,5);
   else
     CopyPixels(&magnify,4,5);
   CopyPixels(&magnify,(ssize_t) (corner_bl ? 3 : 4),6);
   if (IsEagle3XBottomEdge(corner_bl,corner_br) != MagickFalse)
-    Mix2Pixels(pixels,6,8,result,7,channels);
+    Mix2Pixels(&magnify,6,8,7);
   else
     CopyPixels(&magnify,4,7);
   CopyPixels(&magnify,(ssize_t) (corner_br ? 5 : 4),8);
