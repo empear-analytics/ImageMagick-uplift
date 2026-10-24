@@ -4715,6 +4715,14 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
 %
 */
 
+static inline MagickBooleanType IsURIUnreserved(const char *uri)
+{
+  return(((('a' <= *uri) && (*uri <= 'z')) ||
+    (('A' <= *uri) && (*uri <= 'Z')) ||
+    (('0' <= *uri) && (*uri <= '9')) || (strchr("/-_.~",*uri) != 0)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void url_encode(const char *uri,char *encode_uri)
 {
   char
@@ -4724,8 +4732,7 @@ static void url_encode(const char *uri,char *encode_uri)
     *hex = "0123456789ABCDEF";
 
   for (p=encode_uri; *uri != '\0'; uri++)
-    if ((('a' <= *uri) && (*uri <= 'z')) || (('A' <= *uri) && (*uri <= 'Z')) ||
-        (('0' <= *uri) && (*uri <= '9')) || (strchr("/-_.~",*uri) != 0))
+    if (IsURIUnreserved(uri) != MagickFalse)
       *p++=(*uri);
     else
       {
