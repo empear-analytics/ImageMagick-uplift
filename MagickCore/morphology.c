@@ -4536,6 +4536,16 @@ static double ReflectKernel(KernelInfo *kernel,double angle)
   return(angle);
 }
 
+static double AttemptKernelRotationBy45Degrees(KernelInfo *kernel,
+  double angle)
+{
+  if ( kernel->width == 3 && kernel->height == 3 )
+    angle=RotateKernelBy45Degrees(kernel,angle);
+  else
+    perror("Unable to rotate non-3x3 kernel by 45 degrees");
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -4591,12 +4601,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
   }
   /* Attempt rotations by 45 degrees  -- 3x3 kernels only */
   if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
-    {
-      if ( kernel->width == 3 && kernel->height == 3 )
-        angle=RotateKernelBy45Degrees(kernel,angle);
-      else
-        perror("Unable to rotate non-3x3 kernel by 45 degrees");
-    }
+    angle=AttemptKernelRotationBy45Degrees(kernel,angle);
   if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
     {
       if ( kernel->width == 1 || kernel->height == 1 )
