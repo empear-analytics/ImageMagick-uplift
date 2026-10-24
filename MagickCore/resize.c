@@ -4186,6 +4186,15 @@ static void ExportScaleScanline(const Image *image,const Image *scale_image,
   }
 }
 
+static void ResetScalePixel(const Image *image,double *pixel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    pixel[i]=0.0;
+}
+
 static void ScaleScanlineX(const Image *image,const Image *scale_image,
   const double *scanline,double *scale_scanline)
 {
@@ -4204,8 +4213,7 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
     t,
     x;
 
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    pixel[i]=0.0;
+  ResetScalePixel(image,pixel);
   next_column=MagickFalse;
   span.x=1.0;
   t=0;
@@ -4216,8 +4224,7 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
     {
       if (next_column != MagickFalse)
         {
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-            pixel[i]=0.0;
+          ResetScalePixel(image,pixel);
           t++;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
@@ -4237,8 +4244,7 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
       {
         if (next_column != MagickFalse)
           {
-            for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-              pixel[i]=0.0;
+            ResetScalePixel(image,pixel);
             next_column=MagickFalse;
             t++;
           }
