@@ -4259,6 +4259,14 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
       scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
 }
 
+static inline MagickBooleanType IsScaleBufferMissing(const double *scanline,
+  const double *scale_scanline,const double *x_vector,const double *y_vector)
+{
+  return(((scanline == (double *) NULL) || (scale_scanline == (double *) NULL) ||
+    (x_vector == (double *) NULL) || (y_vector == (double *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -4331,8 +4339,8 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     MaxPixelChannels*sizeof(*scale_scanline));
   y_vector=(double *) AcquireQuantumMemory((size_t) image->columns,
     MaxPixelChannels*sizeof(*y_vector));
-  if ((scanline == (double *) NULL) || (scale_scanline == (double *) NULL) ||
-      (x_vector == (double *) NULL) || (y_vector == (double *) NULL))
+  if (IsScaleBufferMissing(scanline,scale_scanline,x_vector,y_vector) !=
+      MagickFalse)
     {
       if ((image->rows != scale_image->rows) && (scanline != (double *) NULL))
         scanline=(double *) RelinquishMagickMemory(scanline);
