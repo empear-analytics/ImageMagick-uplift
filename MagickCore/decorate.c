@@ -563,6 +563,23 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void BlendPixelChannels(const Image *image,const Quantum factor,
+  const Quantum color,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=ClampToQuantum(QuantumScale*((double) q[i]*(double) factor+
+      (double) color*((double) QuantumRange-(double) factor)));
+  }
+}
+
 MagickExport MagickBooleanType RaiseImage(Image *image,
   const RectangleInfo *raise_info,const MagickBooleanType raise,
   ExceptionInfo *exception)
@@ -620,7 +637,6 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
   for (y=0; y < (ssize_t) raise_info->height; y++)
   {
     ssize_t
-      i,
       x;
 
     Quantum
@@ -636,43 +652,17 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
       }
     for (x=0; x < y; x++)
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum(QuantumScale*((double) q[i]*(double)
-          HighlightFactor+(double) foreground*((double) QuantumRange-(double)
-          HighlightFactor)));
-      }
+      BlendPixelChannels(image,HighlightFactor,foreground,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     for ( ; x < ((ssize_t) image->columns-y); x++)
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum(QuantumScale*((double) q[i]*(double)
-          AccentuateFactor+(double) foreground*((double) QuantumRange-(double)
-          AccentuateFactor)));
-      }
+      BlendPixelChannels(image,AccentuateFactor,foreground,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     for ( ; x < (ssize_t) image->columns; x++)
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum(QuantumScale*((double) q[i]*(double) ShadowFactor+
-          (double) background*((double) QuantumRange-(double) ShadowFactor)));
-      }
+      BlendPixelChannels(image,ShadowFactor,background,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -698,7 +688,6 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
   for (y=(ssize_t) raise_info->height; y < (ssize_t) (image->rows-raise_info->height); y++)
   {
     ssize_t
-      i,
       x;
 
     Quantum
@@ -714,31 +703,14 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
       }
     for (x=0; x < (ssize_t) raise_info->width; x++)
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum(QuantumScale*((double) q[i]*(double)
-          HighlightFactor+(double) foreground*((double) QuantumRange-(double)
-          HighlightFactor)));
-      }
+      BlendPixelChannels(image,HighlightFactor,foreground,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     for ( ; x < (ssize_t) (image->columns-raise_info->width); x++)
       q+=(ptrdiff_t) GetPixelChannels(image);
     for ( ; x < (ssize_t) image->columns; x++)
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum(QuantumScale*((double) q[i]*(double) ShadowFactor+
-          (double) background*((double) QuantumRange-(double) ShadowFactor)));
-      }
+      BlendPixelChannels(image,ShadowFactor,background,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -764,7 +736,6 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
   for (y=(ssize_t) (image->rows-raise_info->height); y < (ssize_t) image->rows; y++)
   {
     ssize_t
-      i,
       x;
 
     Quantum
@@ -780,42 +751,17 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
       }
     for (x=0; x < ((ssize_t) image->rows-y); x++)
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum(QuantumScale*((double) q[i]*(double)
-          HighlightFactor+(double) foreground*((double) QuantumRange-
-          (double) HighlightFactor)));
-      }
+      BlendPixelChannels(image,HighlightFactor,foreground,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     for ( ; x < ((ssize_t) image->columns-((ssize_t) image->rows-y)); x++)
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum(QuantumScale*((double) q[i]*(double) TroughFactor+
-          (double) background*((double) QuantumRange-(double) TroughFactor)));
-      }
+      BlendPixelChannels(image,TroughFactor,background,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     for ( ; x < (ssize_t) image->columns; x++)
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum(QuantumScale*((double) q[i]*(double) ShadowFactor+
-          (double) background*((double) QuantumRange-(double) ShadowFactor)));
-      }
+      BlendPixelChannels(image,ShadowFactor,background,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
