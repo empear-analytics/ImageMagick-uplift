@@ -2929,22 +2929,7 @@ MagickExport Image *SwirlImage(const Image *image,double degrees,
       delta.x=scale.x*(double) (x-center.x);
       distance=delta.x*delta.x+delta.y*delta.y;
       if (distance >= (radius*radius))
-        {
-          ssize_t
-            i;
-
-          for (i=0; i < (ssize_t) GetPixelChannels(canvas_image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(canvas_image,i);
-            PixelTrait traits = GetPixelChannelTraits(canvas_image,channel);
-            PixelTrait swirl_traits = GetPixelChannelTraits(swirl_image,
-              channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (swirl_traits == UndefinedPixelTrait))
-              continue;
-            SetPixelChannel(swirl_image,channel,p[i],q);
-          }
-        }
+        CopyPixelChannels(canvas_image,swirl_image,p,q);
       else
         {
           double
