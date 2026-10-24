@@ -1174,6 +1174,123 @@ static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch ( (int) args->rho ) {
+    default:
+    case 0:
+      kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[3] = +(MagickRealType) MagickSQ2;
+      kernel->values[5] = -(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);     /* recalculate meta-data */
+      break;
+    case 2:
+      kernel=ParseKernelArray("3: 1,2,0  2,0,-2  0,-2,-1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[1] = kernel->values[3]= +(MagickRealType) MagickSQ2;
+      kernel->values[5] = kernel->values[7]= -(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);     /* recalculate meta-data */
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 10:
+    {
+      kernel=AcquireKernelInfo("FreiChen:11;FreiChen:12;FreiChen:13;FreiChen:14;FreiChen:15;FreiChen:16;FreiChen:17;FreiChen:18;FreiChen:19",exception);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      break;
+    }
+    case 1:
+    case 11:
+      kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[3] = +(MagickRealType) MagickSQ2;
+      kernel->values[5] = -(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);     /* recalculate meta-data */
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 12:
+      kernel=ParseKernelArray("3: 1,2,1  0,0,0  1,2,1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[1] = +(MagickRealType) MagickSQ2;
+      kernel->values[7] = +(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 13:
+      kernel=ParseKernelArray("3: 2,-1,0  -1,0,1  0,1,-2");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[0] = +(MagickRealType) MagickSQ2;
+      kernel->values[8] = -(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 14:
+      kernel=ParseKernelArray("3: 0,1,-2  -1,0,1  2,-1,0");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[2] = -(MagickRealType) MagickSQ2;
+      kernel->values[6] = +(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 15:
+      kernel=ParseKernelArray("3: 0,-1,0  1,0,1  0,-1,0");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
+      break;
+    case 16:
+      kernel=ParseKernelArray("3: 1,0,-1  0,0,0  -1,0,1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
+      break;
+    case 17:
+      kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  -1,-2,1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
+      break;
+    case 18:
+      kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
+      break;
+    case 19:
+      kernel=ParseKernelArray("3: 1,1,1  1,1,1  1,1,1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/3.0, NoValue);
+      break;
+  }
+  if ( fabs(args->sigma) >= MagickEpsilon )
+    /* Rotate by correctly supplied 'angle' */
+    RotateKernelInfo(kernel, args->sigma);
+  else if ( args->rho > 30.0 || args->rho < -30.0 )
+    /* Rotate by out of bounds 'type' */
+    RotateKernelInfo(kernel, args->rho);
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1495,119 +1612,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       /* Direction is set to be left to right positive */
       /* http://www.math.tau.ac.il/~turkel/notes/edge_detectors.pdf -- RIGHT? */
       /* http://ltswww.epfl.ch/~courstiv/exos_labos/sol3.pdf -- WRONG? */
-      { switch ( (int) args->rho ) {
-          default:
-          case 0:
-            kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[3] = +(MagickRealType) MagickSQ2;
-            kernel->values[5] = -(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);     /* recalculate meta-data */
-            break;
-          case 2:
-            kernel=ParseKernelArray("3: 1,2,0  2,0,-2  0,-2,-1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[1] = kernel->values[3]= +(MagickRealType) MagickSQ2;
-            kernel->values[5] = kernel->values[7]= -(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);     /* recalculate meta-data */
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 10:
-          {
-            kernel=AcquireKernelInfo("FreiChen:11;FreiChen:12;FreiChen:13;FreiChen:14;FreiChen:15;FreiChen:16;FreiChen:17;FreiChen:18;FreiChen:19",exception);
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            break;
-          }
-          case 1:
-          case 11:
-            kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[3] = +(MagickRealType) MagickSQ2;
-            kernel->values[5] = -(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);     /* recalculate meta-data */
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 12:
-            kernel=ParseKernelArray("3: 1,2,1  0,0,0  1,2,1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[1] = +(MagickRealType) MagickSQ2;
-            kernel->values[7] = +(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 13:
-            kernel=ParseKernelArray("3: 2,-1,0  -1,0,1  0,1,-2");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[0] = +(MagickRealType) MagickSQ2;
-            kernel->values[8] = -(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 14:
-            kernel=ParseKernelArray("3: 0,1,-2  -1,0,1  2,-1,0");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[2] = -(MagickRealType) MagickSQ2;
-            kernel->values[6] = +(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 15:
-            kernel=ParseKernelArray("3: 0,-1,0  1,0,1  0,-1,0");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
-            break;
-          case 16:
-            kernel=ParseKernelArray("3: 1,0,-1  0,0,0  -1,0,1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
-            break;
-          case 17:
-            kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  -1,-2,1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
-            break;
-          case 18:
-            kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
-            break;
-          case 19:
-            kernel=ParseKernelArray("3: 1,1,1  1,1,1  1,1,1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/3.0, NoValue);
-            break;
-        }
-        if ( fabs(args->sigma) >= MagickEpsilon )
-          /* Rotate by correctly supplied 'angle' */
-          RotateKernelInfo(kernel, args->sigma);
-        else if ( args->rho > 30.0 || args->rho < -30.0 )
-          /* Rotate by out of bounds 'type' */
-          RotateKernelInfo(kernel, args->rho);
-        break;
-      }
+      return(AcquireFreiChenKernel(kernel,type,args,exception));
 
     /*
       Boolean or Shaped Kernels
