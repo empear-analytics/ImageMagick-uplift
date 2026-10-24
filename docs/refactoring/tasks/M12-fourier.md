@@ -124,7 +124,7 @@ Commit message: `refactor(MagickCore/fourier.c): simplify ComplexImages`
 
 ```bash
 tools/oracle/build.sh cand
-python3 tools/refactor_guard.py MagickCore/fourier.c   # --calls after E, C, X
+python3 tools/refactor_guard.py MagickCore/fourier.c   # --calls after E or S
 python3 tools/oracle/oracle.py run --function <Function>
 python3 tools/ch.py --review MagickCore/fourier.c
 ```

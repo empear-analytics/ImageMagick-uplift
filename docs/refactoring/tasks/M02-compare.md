@@ -78,7 +78,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetSSIMSimularity`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 7 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 3 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -89,7 +89,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetDPCSimilarity`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 7 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 3 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -114,7 +114,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetPHASESimilarity`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 5 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - 6 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -135,7 +135,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetAESimilarity`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 5 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -146,7 +146,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetFUZZSimilarity`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 5 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -159,7 +159,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetMAESimilarity`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 5 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -170,7 +170,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetMSESimilarity`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 4 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - 7 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -181,7 +181,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetPASimilarity`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 4 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -192,7 +192,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify GetPDCSimilarity`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 7 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
 - Only 3 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
@@ -208,7 +208,7 @@ Commit message: `refactor(MagickCore/compare.c): simplify SimilarityImage`
 
 ```bash
 tools/oracle/build.sh cand
-python3 tools/refactor_guard.py MagickCore/compare.c   # --calls after E, C, X
+python3 tools/refactor_guard.py MagickCore/compare.c   # --calls after E or S
 python3 tools/oracle/oracle.py run --function <Function>
 python3 tools/ch.py --review MagickCore/compare.c
 ```

@@ -170,7 +170,7 @@ Commit message: `refactor(MagickCore/threshold.c): simplify BilevelImage`
 
 - **Recipe G (guard clauses)** - nesting is 5, target is under 4.
 - **Recipe E (extract function)** - 5 nested blocks; each bump is a missing function.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
 - 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
@@ -194,7 +194,7 @@ Commit message: `refactor(MagickCore/threshold.c): simplify TriangleThreshold`
 
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 3 nested blocks; each bump is a missing function.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
 - 9 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
@@ -205,7 +205,7 @@ Commit message: `refactor(MagickCore/threshold.c): simplify RangeThresholdImage`
 
 ```bash
 tools/oracle/build.sh cand
-python3 tools/refactor_guard.py MagickCore/threshold.c   # --calls after E, C, X
+python3 tools/refactor_guard.py MagickCore/threshold.c   # --calls after E or S
 python3 tools/oracle/oracle.py run --function <Function>
 python3 tools/ch.py --review MagickCore/threshold.c
 ```

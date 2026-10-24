@@ -116,7 +116,7 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify ImplodeImage`
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 10 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe A (parameter object)** - 9 arguments; the function is `static`, so check that its address is never taken.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (9 arguments).
 - Only 6 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
 - The oracle missed 3 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 1468, `lt_to_ge`: `if ((fabs(segment->x1-x_mid) < MagickEpsilon) &&`
@@ -187,7 +187,7 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify SteganoImage`
 
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 4 nested blocks; each bump is a missing function.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Public function: its name and signature must not change.
 - Only 3 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
 - The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
@@ -210,7 +210,7 @@ Commit message: `refactor(MagickCore/visual-effects.c): simplify TintImage`
 
 ```bash
 tools/oracle/build.sh cand
-python3 tools/refactor_guard.py MagickCore/visual-effects.c   # --calls after E, C, X
+python3 tools/refactor_guard.py MagickCore/visual-effects.c   # --calls after E or S
 python3 tools/oracle/oracle.py run --function <Function>
 python3 tools/ch.py --review MagickCore/visual-effects.c
 ```

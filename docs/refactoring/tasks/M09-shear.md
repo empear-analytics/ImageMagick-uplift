@@ -98,8 +98,8 @@ Commit message: `refactor(MagickCore/shear.c): simplify RadonTransform`
 
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 5 nested blocks; each bump is a missing function.
-- **Recipe A (parameter object)** - 7 arguments; the function is `static`, so check that its address is never taken.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (7 arguments).
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 1501, `gt_to_ge`: `if ((size_t) (y_offset+(ssize_t) height+step-i) > image->rows)`
@@ -113,8 +113,8 @@ Commit message: `refactor(MagickCore/shear.c): simplify YShearImage`
 
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 5 nested blocks; each bump is a missing function.
-- **Recipe A (parameter object)** - 7 arguments; the function is `static`, so check that its address is never taken.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (7 arguments).
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - The oracle missed 2 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 1243, `gt_to_ge`: `if (step > x_offset)`
@@ -135,7 +135,7 @@ Commit message: `refactor(MagickCore/shear.c): simplify GetImageBackgroundColor`
 
 - **Recipe E (extract function)** - 2 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe A (parameter object)** - 7 arguments; the function is `static`, so check that its address is never taken.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (7 arguments).
 - 4 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/shear.c): simplify CropToFitImage`
@@ -168,7 +168,7 @@ Commit message: `refactor(MagickCore/shear.c): simplify DeskewImage`
 
 ```bash
 tools/oracle/build.sh cand
-python3 tools/refactor_guard.py MagickCore/shear.c   # --calls after E, C, X
+python3 tools/refactor_guard.py MagickCore/shear.c   # --calls after E or S
 python3 tools/oracle/oracle.py run --function <Function>
 python3 tools/ch.py --review MagickCore/shear.c
 ```

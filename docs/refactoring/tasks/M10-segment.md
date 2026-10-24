@@ -72,7 +72,7 @@ Commit message: `refactor(MagickCore/segment.c): simplify ConsolidateCrossings`
 - **Recipe G (guard clauses)** - nesting is 5, target is under 4.
 - **Recipe E (extract function)** - 11 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe A (parameter object)** - 6 arguments; the function is `static`, so check that its address is never taken.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (6 arguments).
 - Contains 3 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - The oracle missed 2 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 512, `gt_to_ge`: `if (number_clusters > 256)`
@@ -85,7 +85,7 @@ Commit message: `refactor(MagickCore/segment.c): simplify Classify`
 
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 5 nested blocks; each bump is a missing function.
-- **Recipe A (parameter object)** - 6 arguments; the function is `static`, so check that its address is never taken.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (6 arguments).
 - The oracle missed 3 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 1604, `lt_to_ge`: `for (j=0; j < 255; j++)`
   - base line 1605, `ne_to_eq`: `if (zero_crossing[i].crossings[j] != 0)`
@@ -131,7 +131,7 @@ Commit message: `refactor(MagickCore/segment.c): simplify ScaleSpace`
 #### Step 8: `SegmentImage` (line 1796)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Public function: its name and signature must not change.
 - 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
@@ -147,7 +147,7 @@ Commit message: `refactor(MagickCore/segment.c): simplify SegmentImage`
 
 ```bash
 tools/oracle/build.sh cand
-python3 tools/refactor_guard.py MagickCore/segment.c   # --calls after E, C, X
+python3 tools/refactor_guard.py MagickCore/segment.c   # --calls after E or S
 python3 tools/oracle/oracle.py run --function <Function>
 python3 tools/ch.py --review MagickCore/segment.c
 ```

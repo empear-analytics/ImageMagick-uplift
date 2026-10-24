@@ -4,8 +4,8 @@ A structured, measurable campaign to reduce technical debt in ImageMagick, desig
 that the work can be distributed across many agents. It follows the Street Fighter III:
 3rd Strike campaign, which took every scored file in that codebase to Code Health 10.00.
 
-Every task is scoped to **one file**, bounded by a **closed catalogue of
-transformations** ([`PLAYBOOK.md`](PLAYBOOK.md)), judged by an **external metric**
+Every task is scoped to **one file**, bounded by a **catalogue of
+transformations** that grows by proposal ([`PLAYBOOK.md`](PLAYBOOK.md)), judged by an **external metric**
 (CodeScene Code Health) rather than by taste, and checked by a **differential oracle**
 that demands byte-identical behaviour ([`ORACLE.md`](ORACLE.md)).
 
@@ -71,8 +71,9 @@ protection first and by Code Health second.
 **Phase 0 - the safety net** *(done)*. The oracle, mutation testing of it across every
 compiled MagickCore file, the guard and CodeScene tools, the baseline.
 
-**A preliminary pilot** is kept on the branch `night1-refactoring` (see the
-playbook's *Known plateaus*); it is not part of the campaign's record.
+**A preliminary pilot** is kept on the branch `night1-refactoring`. It ran with a
+different catalogue and is excluded from the campaign: nothing it taught is in the
+playbook, and agents do not read it.
 
 **Phase 1 - pilot on ready MagickCore files.** Start with `resize.c`, then the other
 ready image-processing files in [`BACKLOG.md`](BACKLOG.md). This phase tests whether the

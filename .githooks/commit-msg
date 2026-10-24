@@ -1,0 +1,3 @@
+#!/bin/sh
+# Refactor commits need Recipe: <code> and Verified: oracle|guard trailers.
+exec python3 "$(git rev-parse --show-toplevel)/tools/check_trailers.py" --message-file "$1"

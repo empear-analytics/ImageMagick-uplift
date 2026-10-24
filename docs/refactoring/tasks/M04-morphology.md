@@ -92,7 +92,7 @@ Commit message: `refactor(MagickCore/morphology.c): simplify MorphologyPrimitive
 
 - **Recipe G (guard clauses)** - nesting is 9, target is under 4.
 - **Recipe E (extract function)** - 17 nested blocks; each bump is a missing function.
-- **Recipe A (parameter object)** - 6 arguments; the function is `static`, so check that its address is never taken.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (6 arguments).
 - Contains 4 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 3036, `lt_to_le`: `if ((double) pixels[i] < minimum)`
@@ -117,7 +117,7 @@ Commit message: `refactor(MagickCore/morphology.c): simplify RotateKernelInfo`
 
 - **Recipe G (guard clauses)** - nesting is 6, target is under 4.
 - **Recipe E (extract function)** - 10 nested blocks; each bump is a missing function.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Public function: its name and signature must not change.
 - 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes; see `tools/oracle/classify.py`).
 
@@ -141,7 +141,7 @@ Commit message: `refactor(MagickCore/morphology.c): simplify ParseKernelName`
 
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 4 nested blocks; each bump is a missing function.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Public function: its name and signature must not change.
 - The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 4184, `lt_to_le`: `if ( parse < 0 )`
@@ -183,7 +183,7 @@ Commit message: `refactor(MagickCore/morphology.c): simplify SameKernelInfo`
 
 ```bash
 tools/oracle/build.sh cand
-python3 tools/refactor_guard.py MagickCore/morphology.c   # --calls after E, C, X
+python3 tools/refactor_guard.py MagickCore/morphology.c   # --calls after E or S
 python3 tools/oracle/oracle.py run --function <Function>
 python3 tools/ch.py --review MagickCore/morphology.c
 ```

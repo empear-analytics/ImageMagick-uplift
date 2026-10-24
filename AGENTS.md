@@ -42,13 +42,15 @@ If you were given a task ID, your instructions are in
 [`docs/refactoring/tasks/`](docs/refactoring/tasks/). Read, in order:
 
 1. Your task file, if you have one
-2. [`docs/refactoring/PLAYBOOK.md`](docs/refactoring/PLAYBOOK.md) - the closed catalogue
+2. [`docs/refactoring/PLAYBOOK.md`](docs/refactoring/PLAYBOOK.md) - the catalogue
    of allowed changes
 3. [`docs/refactoring/README.md`](docs/refactoring/README.md) - campaign rules and scope
 4. [`docs/refactoring/BACKLOG.md`](docs/refactoring/BACKLOG.md) - which files are ready
 
-You may apply **only** the recipes in the playbook. Anything not in it is out of scope;
-the catalogue grows when the project owner authorises an addition.
+You may apply **only** the recipes in the playbook. When findings recur that no recipe
+reaches, you may add a recipe, following the playbook's *Growing the catalogue*; do not
+stretch an existing one. The branch `night1-refactoring` is an earlier pilot and is not
+part of this campaign: do not read it or reuse its changes.
 
 ## Hard prohibitions
 
@@ -86,7 +88,7 @@ python3 tools/oracle/gate.py build-oracle/work/mutation-<name>.json --file <file
 ```
 
 - **ready** or **careful**: oracle-verified; the whole playbook applies.
-- **not ready**, or no case executes it: guard-verified; only recipes E, G, P, R and X,
+- **not ready**, or no case executes it: guard-verified; only recipes E, G and P,
   with `refactor_guard.py --calls` reporting `OK`, and every argument of every call you
   add checked against its parameter by reading.
 
@@ -155,7 +157,9 @@ harness has one, or through `tools/ch.py`, which talks to the same server. Do no
 
 - One recipe, one function, one commit.
 - Message format: `refactor(<file>): simplify <function>`, e.g.
-  `refactor(MagickCore/resize.c): simplify ScaleImage`.
+  `refactor(MagickCore/resize.c): simplify ScaleImage`, a body that says what moved, and
+  two trailers: `Recipe: <code>` (a code in the playbook) and `Verified: oracle` or
+  `Verified: guard`. `python3 tools/check_trailers.py` checks them.
 - Never squash several functions into one commit. The campaign relies on being able to
   revert a single step.
 - The CodeScene gate, `tools/codescene_precommit.py`, checks what is staged: no library
@@ -197,7 +201,7 @@ Stop and report, rather than pressing on, whenever:
 - The guard fails, or the oracle diverges, and you do not understand why.
 - A function's control flow is too tangled to transform confidently.
 - The change would touch OpenMP, a public symbol, or code this build does not compile.
-- You want to make a change the playbook does not cover.
+- You want to make a change the playbook does not cover and cannot add as a recipe.
 
 **An unfinished task is an acceptable outcome. A silently changed image library is not.**
 Reporting "I completed 2 of 5 steps and stopped because step 3 was unclear" is a good

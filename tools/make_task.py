@@ -11,7 +11,7 @@ what the ImageMagick campaign knows per function and 3SX did not:
   - how many oracle cases execute the function (casemap.json), so a function
     the oracle cannot see is marked before anyone touches it;
   - what mutation testing found there, from every report in build-oracle/work;
-  - whether the function is public (Recipe A is then forbidden) and whether it
+  - whether the function is public (its signature is then frozen) and whether it
     contains OpenMP regions (the playbook's extraction rule then applies).
 
 Everything is measured at the time of writing, so the task file records the
@@ -108,13 +108,12 @@ def recipes_for(info, public):
         steps.append("**Recipe E (extract function)** - a large method; extract its "
                      "self-contained blocks.")
     if info.get("args", 0) > 4:
-        steps.append("Recipe A does not apply: this function is public, and its signature is "
-                     "the API." if public else
-                     "**Recipe A (parameter object)** - %d arguments; the function is `static`, "
-                     "so check that its address is never taken." % info["args"])
+        steps.append("No recipe in the catalogue reaches *Excess Number of Function Arguments*; "
+                     "the function is public, and its signature is the API." if public else
+                     "No recipe in the catalogue reaches *Excess Number of Function Arguments* "
+                     "(%d arguments)." % info["args"])
     if "Code Duplication" in info["categories"]:
-        steps.append("**Recipe D or C** - duplication: D only if the blocks differ in one value, "
-                     "C for an identical contiguous run.")
+        steps.append("**Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.")
     return steps
 
 
@@ -355,7 +354,7 @@ def closing(rel):
     w = out.append
     w("## 6. Verification after every commit\n")
     w("```bash\ntools/oracle/build.sh cand\npython3 tools/refactor_guard.py %s   # --calls "
-      "after E, C, X\npython3 tools/oracle/oracle.py run --function <Function>\npython3 "
+      "after E or S\npython3 tools/oracle/oracle.py run --function <Function>\npython3 "
       "tools/ch.py --review %s\n```\n" % (rel, rel))
     w("Name the function you refactored in the oracle run, not a helper you extracted from "
       "it. If the guard fails or the oracle diverges, `git checkout -- %s` and stop.\n" % rel)

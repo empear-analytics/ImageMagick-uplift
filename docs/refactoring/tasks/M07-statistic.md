@@ -131,7 +131,7 @@ Commit message: `refactor(MagickCore/statistic.c): simplify EvaluateImage`
 - **Recipe G (guard clauses)** - nesting is 6, target is under 4.
 - **Recipe E (extract function)** - 4 nested blocks; each bump is a missing function.
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
 - 5 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
@@ -162,7 +162,7 @@ Commit message: `refactor(MagickCore/statistic.c): simplify ApplyEvaluateOperato
 
 - **Recipe G (guard clauses)** - nesting is 4, target is under 4.
 - **Recipe E (extract function)** - 3 nested blocks; each bump is a missing function.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Contains 2 OpenMP pragma(s): only blocks inside a loop body that write no variable declared outside it may be extracted. Never move or edit a pragma.
 - Public function: its name and signature must not change.
 - 2 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
@@ -194,7 +194,7 @@ Commit message: `refactor(MagickCore/statistic.c): simplify GetImagePerceptualHa
 #### Step 12: `ApplyFunction` (line 971)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- **Recipe A (parameter object)** - 5 arguments; the function is `static`, so check that its address is never taken.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (5 arguments).
 - 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
 
 Commit message: `refactor(MagickCore/statistic.c): simplify ApplyFunction`
@@ -203,7 +203,7 @@ Commit message: `refactor(MagickCore/statistic.c): simplify ApplyFunction`
 
 ```bash
 tools/oracle/build.sh cand
-python3 tools/refactor_guard.py MagickCore/statistic.c   # --calls after E, C, X
+python3 tools/refactor_guard.py MagickCore/statistic.c   # --calls after E or S
 python3 tools/oracle/oracle.py run --function <Function>
 python3 tools/ch.py --review MagickCore/statistic.c
 ```

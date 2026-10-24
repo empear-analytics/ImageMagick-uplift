@@ -97,8 +97,8 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify sRGBTransformImage`
 #### Step 3: `ConvertRGBToGeneric` (line 416)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- Recipe A does not apply: this function is public, and its signature is the API.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Public function: its name and signature must not change.
 
 Commit message: `refactor(MagickCore/colorspace.c): simplify ConvertRGBToGeneric`
@@ -106,8 +106,8 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify ConvertRGBToGeneric
 #### Step 4: `ConvertGenericToRGB` (line 127)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- Recipe A does not apply: this function is public, and its signature is the API.
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Public function: its name and signature must not change.
 
 Commit message: `refactor(MagickCore/colorspace.c): simplify ConvertGenericToRGB`
@@ -117,7 +117,7 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify ConvertGenericToRGB
 #### Step 5: `ConvertHSLToRGB` (line 312)
 
 - **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Public function: its name and signature must not change.
 - The oracle missed 1 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 328, `le_to_lt`: `if (lightness <= 0.5)`
@@ -134,7 +134,7 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify SetImageColorspace`
 
 #### Step 7: `SetImageGray` (line 1647)
 
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Public function: its name and signature must not change.
 - 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes; see `tools/oracle/classify.py`).
 
@@ -142,7 +142,7 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify SetImageGray`
 
 #### Step 8: `SetImageMonochrome` (line 1704)
 
-- **Recipe D or C** - duplication: D only if the blocks differ in one value, C for an identical contiguous run.
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
 - Public function: its name and signature must not change.
 - 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes; see `tools/oracle/classify.py`).
 
@@ -152,7 +152,7 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify SetImageMonochrome`
 
 #### Step 9: `ConvertRGBToHSL` (line 602)
 
-- Recipe A does not apply: this function is public, and its signature is the API.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments*; the function is public, and its signature is the API.
 - Public function: its name and signature must not change.
 - The oracle missed 3 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
   - base line 628, `lt_to_le`: `if (fabs(max-QuantumScale*red) < MagickEpsilon)`
@@ -165,7 +165,7 @@ Commit message: `refactor(MagickCore/colorspace.c): simplify ConvertRGBToHSL`
 
 ```bash
 tools/oracle/build.sh cand
-python3 tools/refactor_guard.py MagickCore/colorspace.c   # --calls after E, C, X
+python3 tools/refactor_guard.py MagickCore/colorspace.c   # --calls after E or S
 python3 tools/oracle/oracle.py run --function <Function>
 python3 tools/ch.py --review MagickCore/colorspace.c
 ```
