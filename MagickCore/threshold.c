@@ -1912,6 +1912,12 @@ static inline MagickBooleanType IsThresholdMapSeparator(const char *p)
     (*p != '\0')) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsThresholdMapNameCharacter(const char *p)
+{
+  return((((isspace((int) ((unsigned char) *p)) == 0) && (*p != ',')) &&
+    (*p != '\0')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1954,8 +1960,7 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   while (IsThresholdMapSeparator(p) != MagickFalse)
     p++;
   threshold_map=p;
-  while (((isspace((int) ((unsigned char) *p)) == 0) && (*p != ',')) &&
-         (*p != '\0'))
+  while (IsThresholdMapNameCharacter(p) != MagickFalse)
   {
     if ((p-threshold_map) >= (MagickPathExtent-1))
       break;
