@@ -67,6 +67,9 @@ threads. Therefore:
   variables, which become parameters passed by value, is fine; writing through pointers
   the block already uses for pixel data (`p`, `q`) is fine. Moving a statement into a
   callee does not change which thread runs it; changing which variables it writes would.
+- Recipe T is the one exception to that proviso: a block whose only outer write is
+  `status=MagickFalse;` may move into a function that returns the status, which the
+  caller then writes.
 - Code under `#pragma omp critical` or `#pragma omp atomic` stays exactly where it is,
   including the progress-monitor blocks at the end of most loops.
 
@@ -447,6 +450,109 @@ shape in `AcquireResizeFilter` (filter and window parsing, the B and C overrides
 ---
 
 
+## Recipe T - Extract Function Returning the Loop Status
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Large
+Method* or *Complex Method*, and the block that would fix it sits inside the body of a
+`#pragma omp parallel for` loop and writes the loop's shared `status`, as most pixel
+loops do (`status=MagickFalse;` when a cache read fails).
+
+**Not covered by:** Recipe E, whose OpenMP rule refuses a block that writes a variable
+declared outside the loop body, and `status` is one; Recipe O, which refuses every block
+inside an OpenMP region; Recipe G, which removes one level of nesting, not the block.
+
+**How:**
+
+1. The block lies inside one iteration of the parallel loop body and contains no
+   `#pragma omp` line, so no `critical` or `atomic` block moves.
+2. The only variable declared outside the loop body that the block writes is `status`,
+   and only as `status=MagickFalse;`. The block does not read `status`.
+3. Every variable of the loop body that the block writes is declared inside the block,
+   or is not read after it (a row pointer `q` advanced along the row, say).
+4. The block contains no `return`, `goto`, or a `continue` or `break` of the parallel
+   loop itself; a `continue` or `break` of a loop inside the block is fine.
+5. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. It declares a local `status`, set to `MagickTrue` first; every
+   `status=MagickFalse;` in the block stays as it is; the function ends with
+   `return(status);`.
+6. Pass every other variable the block reads by value, pointers included (`q`, the cache
+   views, `exception`), the same pointers the block already used.
+7. Where the block stood, write
+   `if (Helper(...) == MagickFalse) status=MagickFalse;`, and check every argument
+   against its parameter by reading.
+
+**Before:**
+
+```c
+  for (y=0; y < (ssize_t) source_image->rows; y++)
+  {
+    ...
+    for (x=0; x < (ssize_t) source_image->columns; x++)
+    {
+      ...
+      p=GetCacheViewVirtualPixels(image_view,x-width/2,y-width/2,width,width,
+        exception);
+      if (p == (Quantum *) NULL)
+        {
+          status=MagickFalse;
+          continue;
+        }
+      ...
+      q+=(ptrdiff_t) magnification*GetPixelChannels(magnify_image);
+    }
+    if (SyncCacheViewAuthenticPixels(magnify_view,exception) == MagickFalse)
+      status=MagickFalse;
+```
+
+**After:**
+
+```c
+static MagickBooleanType MagnifyImageRow(...,Quantum *q,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  for (x=0; x < (ssize_t) source_image->columns; x++)
+  {
+    ...
+  }
+  return(status);
+}
+...
+    if (MagnifyImageRow(...,q,exception) == MagickFalse)
+      status=MagickFalse;
+    if (SyncCacheViewAuthenticPixels(magnify_view,exception) == MagickFalse)
+      status=MagickFalse;
+```
+
+**Careful:**
+
+- The one thing that changes is *when* the iteration's write to the shared `status`
+  happens: at the end of the block instead of in its middle. Step 2 makes that
+  invisible to this thread, which does not read `status` in between, and OpenMP gives
+  other threads no ordering for this unsynchronised write in the first place: the same
+  value is written, by the same iteration, before the same later reads.
+- A block that stops early once `status` is false (a `break` on failure, a test of
+  `status`) is not this recipe: the callee's local `status` would decide it, not the
+  shared one. Skip it.
+- Variables of the loop body passed by value are copies: step 3 is what makes a write
+  to the copy, such as advancing `q`, harmless.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 4 checked by
+reading: the oracle runs single-threaded and cannot see them.
+
+**Provenance:** 2026-10-24, from `MagnifyImage` (its per-row column loop), with the same
+shape in `resize.c`'s `InterpolativeResizeImage`, `SampleImage` and the two filters, all
+refused by the OpenMP rule of Recipe E. Owner's go-ahead the same day. Added by Claude
+Code (Claude Opus 5.5) during task M01, on `magnify.c`.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -488,6 +594,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | WORDING | all | Reset to the founding catalogue before any refactoring on `main`: the five founding recipes, the founding wording of rules 1 and 2 and of Recipe E step 4; C, X, A and R, the flat-score section, and what the pilot on `night1-refactoring` taught (practical points, the parallel-region amendment) removed | The comparison with the earlier campaigns needs the same starting point | owner |
 | 2026-10-24 | AMEND | rule 2 | A step that leaves the score flat is kept when the review shows progress on the targeted function and the commit names the finding and the next step | A file score moves only once a function drops below a finding's threshold, so the founding rule reverts correct steps towards it; the earlier campaign relaxed the same rule on its first morning | owner |
 | 2026-10-24 | NEW | O | Extract Function with Out-Parameters: a selection outside OpenMP that sets several locals together moves to a `static void` function taking the written locals by pointer | `MagnifyImage`'s method `switch` (cc 33 to 18, 212 to 123 lines in a probe) and the same shape in `AcquireResizeFilter` and `ScaleImage`, all refused by Recipe E's step 4 | mandate (2026-10-24) |
+| 2026-10-24 | NEW | T | Extract Function Returning the Loop Status: a block inside a parallel loop body whose only outer write is `status=MagickFalse;` moves to a `static MagickBooleanType` function; the caller writes `status` from its result. The OpenMP section names it as the one exception to Recipe E's proviso | `MagnifyImage`'s column loop (probe: bumps 3 to 2, 109 to 94 lines) and the same shape in `resize.c`'s `InterpolativeResizeImage`, `SampleImage` and both filters | owner |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
