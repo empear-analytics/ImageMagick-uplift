@@ -1567,6 +1567,23 @@ static ssize_t FindPeakIndex(const ZeroCrossing *zero_crossing,
   return(index);
 }
 
+static void SetNodeExtrema(short *extrema,const IntervalTree *node,
+  ssize_t index,const MagickBooleanType peak)
+{
+  ssize_t
+    x;
+
+  for (x=node->left; x <= node->right; x++)
+  {
+    if (index == 0)
+      index=256;
+    if (peak != MagickFalse)
+      extrema[x]=(short) index;
+    else
+      extrema[x]=(short) (-index);
+  }
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
@@ -1586,8 +1603,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     peak;
 
   ssize_t
-    i,
-    x;
+    i;
 
   size_t
     count,
@@ -1697,15 +1713,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     peak=zero_crossing[k].crossings[node->right] == -1 ? MagickTrue :
       MagickFalse;
     index=FindPeakIndex(zero_crossing,k,node,peak);
-    for (x=node->left; x <= node->right; x++)
-    {
-      if (index == 0)
-        index=256;
-      if (peak != MagickFalse)
-        extrema[x]=(short) index;
-      else
-        extrema[x]=(short) (-index);
-    }
+    SetNodeExtrema(extrema,node,index,peak);
   }
   /*
     Determine the average tau.
