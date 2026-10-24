@@ -625,6 +625,104 @@ during task M01, on `magnify.c`.
 
 ---
 
+## Recipe B - Bundle Arguments into a Struct
+
+**Use when:** CodeScene reports *Excess Number of Function Arguments* on a `static`
+function, and some of its parameters travel together: every call in a caller passes the
+same unchanged values for them (a source buffer, a result buffer and a channel count),
+or together they name one thing (the six neighbour indices of a pixel rule).
+
+**Not covered by:** Recipe M, which needs two parameters that receive one value; Recipes
+E, O and T, which create functions and leave existing signatures alone; Recipe D, which
+merges code, not parameters.
+
+**How:**
+
+1. The function is `static`, declared in this file only, and never used through a
+   function pointer: its signature is the file's own business.
+2. Declare a `typedef struct _Name { ... } Name;` under *Typedef declarations* near the
+   top of the file, one member per parameter in the group, with the parameter's type and
+   name.
+3. Replace the group with one parameter `const Name *name`, and in the body write
+   `name->member` for each use, or declare a `const` local of the old name initialised
+   from the member at the top of the body. Change nothing else.
+4. In each caller, declare a `const Name` local initialised from the exact argument
+   expressions, member by member in declaration order. Each expression must be an
+   identifier or a literal, not a call or anything with a side effect.
+5. Nothing may write an identifier in the struct's initialiser between the declaration
+   and the last call that uses the struct; declare it where that holds (inside the loop
+   iteration, or just before a single call).
+6. A struct declared outside a `#pragma omp` region and read inside it is `const`, and
+   none of its members point to data the region writes through the struct.
+7. At each call, replace the group with `&name`, and check by reading that every member
+   is initialised from the argument it replaces.
+8. Build: a call left with the old arguments does not compile.
+
+**Before:**
+
+```c
+static inline void CopyPixels(const Quantum *source,const ssize_t source_offset,
+  Quantum *destination,const ssize_t destination_offset,const size_t channels)
+{
+  ...
+    destination[(ssize_t) channels*destination_offset+i]=
+      source[source_offset*(ssize_t) channels+i];
+}
+...
+  for (i=0; i < 4; i++)
+    CopyPixels(pixels,4,result,i,channels);
+```
+
+**After:**
+
+```c
+typedef struct _MagnifyPixels
+{
+  const Quantum
+    *source;
+
+  Quantum
+    *destination;
+
+  size_t
+    channels;
+} MagnifyPixels;
+...
+static inline void CopyPixels(const MagnifyPixels *magnify,
+  const ssize_t source_offset,const ssize_t destination_offset)
+{
+  ...
+    magnify->destination[(ssize_t) magnify->channels*destination_offset+i]=
+      magnify->source[source_offset*(ssize_t) magnify->channels+i];
+}
+...
+  const MagnifyPixels
+    magnify = { pixels, result, channels };
+  ...
+  for (i=0; i < 4; i++)
+    CopyPixels(&magnify,4,i);
+```
+
+**Careful:**
+
+- A member keeps the parameter's exact type: `const` included, no `size_t` for a
+  `ssize_t`. The casts in the body stay where they were, on the member now.
+- The struct holds the values the arguments had at its declaration. Step 5 is what makes
+  them the values each call would have passed; a pointer advanced along a row between
+  calls (`q+=...`) cannot be a member.
+- Pointer members point to the same buffers the arguments did, so writes through them
+  land where they always did.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (no call may appear or
+vanish), and steps 4 to 7 checked by reading.
+
+**Provenance:** 2026-10-24, from `magnify.c`'s pixel kernels (`CopyPixels`, `MixPixels`,
+`Mix2Pixels`: 5 or 6 arguments, three of them the same at every call in a kernel),
+`Hq2XHelper` (11 arguments) and `CopyMagnifiedPixels`, with the owner's go-ahead the
+same day. Added by Claude Code (Claude Opus 5.5) during task M01, on `magnify.c`.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -668,6 +766,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | NEW | O | Extract Function with Out-Parameters: a selection outside OpenMP that sets several locals together moves to a `static void` function taking the written locals by pointer | `MagnifyImage`'s method `switch` (cc 33 to 18, 212 to 123 lines in a probe) and the same shape in `AcquireResizeFilter` and `ScaleImage`, all refused by Recipe E's step 4 | mandate (2026-10-24) |
 | 2026-10-24 | NEW | T | Extract Function Returning the Loop Status: a block inside a parallel loop body whose only outer write is `status=MagickFalse;` moves to a `static MagickBooleanType` function; the caller writes `status` from its result. The OpenMP section names it as the one exception to Recipe E's proviso | `MagnifyImage`'s column loop (probe: bumps 3 to 2, 109 to 94 lines) and the same shape in `resize.c`'s `InterpolativeResizeImage`, `SampleImage` and both filters | owner |
 | 2026-10-24 | NEW | M | Merge Duplicate Parameter: a `static` function whose every call passes one identifier to two parameters of the same type loses the second | `magnify.c`'s `PixelsEqual` (5 arguments, 84 calls, all passing one buffer twice) | owner |
+| 2026-10-24 | NEW | B | Bundle Arguments into a Struct: parameters of a `static` function that travel together become one `const` struct pointer; each caller fills a `const` struct from the same argument expressions | `magnify.c`'s pixel kernels, `Hq2XHelper` (11 arguments) and `CopyMagnifiedPixels`; a probe removing the finding raised the file 6.26 to 6.46 | owner |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
