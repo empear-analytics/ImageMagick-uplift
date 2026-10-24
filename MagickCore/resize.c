@@ -2834,6 +2834,66 @@ static inline void Eagle3XB(const Image *magick_unused(source),
   CopyPixels(pixels,(ssize_t) (corner_br ? 5 : 4),result,8,channels);
 }
 
+static inline MagickBooleanType IsScale3XTopEdge(const Quantum *pixels,
+  const size_t channels)
+{
+  return((
+    (
+      PixelsEqual(pixels,3,pixels,1,channels) &&
+      !PixelsEqual(pixels,4,pixels,2,channels)
+    ) ||
+    (
+      PixelsEqual(pixels,5,pixels,1,channels) &&
+      !PixelsEqual(pixels,4,pixels,0,channels)
+    )
+  ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsScale3XLeftEdge(const Quantum *pixels,
+  const size_t channels)
+{
+  return((
+    (
+      PixelsEqual(pixels,3,pixels,1,channels) &&
+      !PixelsEqual(pixels,4,pixels,6,channels)
+    ) ||
+    (
+      PixelsEqual(pixels,3,pixels,7,channels) &&
+      !PixelsEqual(pixels,4,pixels,0,channels)
+    )
+  ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsScale3XRightEdge(const Quantum *pixels,
+  const size_t channels)
+{
+  return((
+    (
+      PixelsEqual(pixels,5,pixels,1,channels) &&
+      !PixelsEqual(pixels,4,pixels,8,channels)
+    ) ||
+    (
+      PixelsEqual(pixels,5,pixels,7,channels) &&
+      !PixelsEqual(pixels,4,pixels,2,channels)
+    )
+  ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsScale3XBottomEdge(const Quantum *pixels,
+  const size_t channels)
+{
+  return((
+    (
+      PixelsEqual(pixels,3,pixels,7,channels) &&
+      !PixelsEqual(pixels,4,pixels,8,channels)
+    ) ||
+    (
+      PixelsEqual(pixels,5,pixels,7,channels) &&
+      !PixelsEqual(pixels,4,pixels,6,channels)
+    )
+  ) ? MagickTrue : MagickFalse);
+}
+
 static inline void Scale3X(const Image *magick_unused(source),
   const Quantum *pixels,Quantum *result,const size_t channels)
 {
@@ -2847,16 +2907,7 @@ static inline void Scale3X(const Image *magick_unused(source),
       else
         CopyPixels(pixels,4,result,0,channels);
 
-      if (
-        (
-          PixelsEqual(pixels,3,pixels,1,channels) &&
-          !PixelsEqual(pixels,4,pixels,2,channels)
-        ) ||
-        (
-          PixelsEqual(pixels,5,pixels,1,channels) &&
-          !PixelsEqual(pixels,4,pixels,0,channels)
-        )
-      )
+      if (IsScale3XTopEdge(pixels,channels) != MagickFalse)
         CopyPixels(pixels,1,result,1,channels);
       else
         CopyPixels(pixels,4,result,1,channels);
@@ -2864,30 +2915,12 @@ static inline void Scale3X(const Image *magick_unused(source),
         CopyPixels(pixels,5,result,2,channels);
       else
         CopyPixels(pixels,4,result,2,channels);
-      if (
-        (
-          PixelsEqual(pixels,3,pixels,1,channels) &&
-          !PixelsEqual(pixels,4,pixels,6,channels)
-        ) ||
-        (
-          PixelsEqual(pixels,3,pixels,7,channels) &&
-          !PixelsEqual(pixels,4,pixels,0,channels)
-        )
-      )
+      if (IsScale3XLeftEdge(pixels,channels) != MagickFalse)
         CopyPixels(pixels,3,result,3,channels);
       else
         CopyPixels(pixels,4,result,3,channels);
       CopyPixels(pixels,4,result,4,channels);
-      if (
-        (
-          PixelsEqual(pixels,5,pixels,1,channels) &&
-          !PixelsEqual(pixels,4,pixels,8,channels)
-        ) ||
-        (
-          PixelsEqual(pixels,5,pixels,7,channels) &&
-          !PixelsEqual(pixels,4,pixels,2,channels)
-        )
-      )
+      if (IsScale3XRightEdge(pixels,channels) != MagickFalse)
         CopyPixels(pixels,5,result,5,channels);
       else
         CopyPixels(pixels,4,result,5,channels);
@@ -2895,16 +2928,7 @@ static inline void Scale3X(const Image *magick_unused(source),
         CopyPixels(pixels,3,result,6,channels);
       else
         CopyPixels(pixels,4,result,6,channels);
-      if (
-        (
-          PixelsEqual(pixels,3,pixels,7,channels) &&
-          !PixelsEqual(pixels,4,pixels,8,channels)
-        ) ||
-        (
-          PixelsEqual(pixels,5,pixels,7,channels) &&
-          !PixelsEqual(pixels,4,pixels,6,channels)
-        )
-      )
+      if (IsScale3XBottomEdge(pixels,channels) != MagickFalse)
         CopyPixels(pixels,7,result,7,channels);
       else
         CopyPixels(pixels,4,result,7,channels);
