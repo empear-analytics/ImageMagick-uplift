@@ -2556,6 +2556,20 @@ static inline MagickBooleanType IsFish2XLeftOdd(const int ab,const int be,
   return((ab && be && !ad) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsFish2XMainDiagonal(const int ae,
+  const int bd,const MagickFloatType *intensities)
+{
+  return((ae && (!bd || intensities[1] > intensities[0])) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsFish2XAntiDiagonal(const int bd,
+  const int ae,const MagickFloatType *intensities)
+{
+  return((bd && (!ae || intensities[0] > intensities[1])) ? MagickTrue :
+    MagickFalse);
+}
+
 static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
   const size_t channels)
 {
@@ -2641,12 +2655,12 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
       Corner(3,0,4,1)
       return;
     }
-  if (ae && (!bd || intensities[1] > intensities[0]))
+  if (IsFish2XMainDiagonal(ae,bd,intensities) != MagickFalse)
     {
       Mix2Pixels(pixels,0,4,result,3,channels);
       return;
     }
-  if (bd && (!ae || intensities[0] > intensities[1]))
+  if (IsFish2XAntiDiagonal(bd,ae,intensities) != MagickFalse)
     {
       Mix2Pixels(pixels,1,3,result,3,channels);
       return;
