@@ -1853,6 +1853,26 @@ MagickExport ChannelPerceptualHash *GetImagePerceptualHash(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AccumulateChannelRange(const Image *image,
+  const Quantum *magick_restrict p,double *channel_maxima,
+  double *channel_minima)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if ((double) p[i] > (*channel_maxima))
+      (*channel_maxima)=(double) p[i];
+    if ((double) p[i] < (*channel_minima))
+      (*channel_minima)=(double) p[i];
+  }
+}
+
 MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
   double *maxima,ExceptionInfo *exception)
 {
@@ -1907,20 +1927,8 @@ MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
     channel_range=range_info;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if ((double) p[i] > channel_range.maxima)
-          channel_range.maxima=(double) p[i];
-        if ((double) p[i] < channel_range.minima)
-          channel_range.minima=(double) p[i];
-      }
+      AccumulateChannelRange(image,p,&channel_range.maxima,
+        &channel_range.minima);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
