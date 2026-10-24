@@ -358,11 +358,103 @@ is worth it.
 
 ---
 
+## Recipe O - Extract Function with Out-Parameters
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*,
+and the block that would fix it is a self-contained selection (a `switch` or an `if`
+chain) that sets several of the caller's local variables together, such as a method
+pointer with its magnification and window width.
+
+**Not covered by:** Recipe E, whose step 4 refuses a block that writes more than one
+outer variable; Recipe P, which moves an expression, not statements; Recipe D, which
+needs two copies of the block.
+
+**How:**
+
+1. The block must lie outside every OpenMP region: not in a parallel loop, not under
+   `#pragma omp single`, `critical` or `atomic`. Inside one, use Recipe E or skip it.
+2. List the caller's variables the block writes. Each must be a plain local of the
+   caller (not a parameter, not a global, not a `static`) whose address is not taken
+   elsewhere, so no two out-parameters can name the same object.
+3. The block must contain no `return`, `goto`, `continue`, or `break` that leaves the
+   block; a `break` that ends a `switch` or loop inside the block is fine.
+4. Cut the block into a new `static void` function directly above the caller. Pass each
+   variable it only reads by value, and each variable it writes as a pointer.
+5. In the body, write `*v` for every use of a written variable `v`, reads included, so
+   a value the block does not overwrite is the caller's value. Change nothing else.
+6. Call it where the block stood, passing `&v` for each written variable, in the order
+   of the parameters. Check every argument against its parameter by reading.
+
+**Before:**
+
+```c
+  scaling_method=Scale2X;
+  magnification=2;
+  width=3;
+  switch (*option)
+  {
+    case 'e':
+    {
+      if (LocaleCompare(option,"eagle2x") == 0)
+        {
+          scaling_method=Eagle2X;
+          magnification=2;
+          width=3;
+          break;
+        }
+      ...
+  }
+  assert((magnification*magnification) <= MaxMagnification);
+```
+
+**After:**
+
+```c
+static void SelectMagnifyMethod(const char *option,
+  void (**scaling_method)(const Image *,const Quantum *,Quantum *,size_t),
+  size_t *magnification,size_t *width)
+{
+  *scaling_method=Scale2X;
+  *magnification=2;
+  *width=3;
+  switch (*option)
+  {
+    ...
+  }
+}
+...
+  SelectMagnifyMethod(option,&scaling_method,&magnification,&width);
+  assert((magnification*magnification) <= MaxMagnification);
+```
+
+**Careful:**
+
+- Every write in the original stays a write in the callee and nothing more: a variable
+  written on only some paths keeps the caller's value on the others, which is why reads
+  go through the pointer too.
+- Keep out-parameters to the few variables the block decides; a block that writes more
+  than four is not a selection, and is skipped.
+- The function must be oracle-verified, with no unmatched or unreached survivor on the
+  block's lines: the guard sees the moved literals but not a write that went missing.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`.
+
+**Provenance:** 2026-10-24, from `MagnifyImage` (its method `switch`), with the same
+shape in `AcquireResizeFilter` (filter and window parsing, the B and C overrides) and
+`ScaleImage` (row bookkeeping), all blocked by Recipe E's step 4. Added by Claude Code
+(Claude Opus 5.5) during task M01.
+
+---
+
 
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
 and you do not add one, record it here: the file, its score, and the smells left.
+
+| File | Score | Smells left, and why no recipe reaches them | Recorded |
+| --- | ---: | --- | --- |
+| `MagickCore/resize.c` | 2.87 | Brain Method and Deep Nesting (`InterpolativeResizeImage`'s loops write the shared `status` inside `omp parallel for`; `ScaleImage`'s bookkeeping writes six variables on survivor lines); Bumpy Road, Complex and Large Method, Excess Arguments (OpenMP-bound, survivor lines, public signatures, LQR not compiled). 2.45 before Recipe S moved the magnify family to `magnify.c` (6.21). See [M01's report](tasks/M01-resize.md) | 2026-10-24, Mac |
 
 ### Tool notes
 
@@ -395,6 +487,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | --- | --- | --- | --- | --- | --- |
 | 2026-10-24 | WORDING | all | Reset to the founding catalogue before any refactoring on `main`: the five founding recipes, the founding wording of rules 1 and 2 and of Recipe E step 4; C, X, A and R, the flat-score section, and what the pilot on `night1-refactoring` taught (practical points, the parallel-region amendment) removed | The comparison with the earlier campaigns needs the same starting point | owner |
 | 2026-10-24 | AMEND | rule 2 | A step that leaves the score flat is kept when the review shows progress on the targeted function and the commit names the finding and the next step | A file score moves only once a function drops below a finding's threshold, so the founding rule reverts correct steps towards it; the earlier campaign relaxed the same rule on its first morning | owner |
+| 2026-10-24 | NEW | O | Extract Function with Out-Parameters: a selection outside OpenMP that sets several locals together moves to a `static void` function taking the written locals by pointer | `MagnifyImage`'s method `switch` (cc 33 to 18, 212 to 123 lines in a probe) and the same shape in `AcquireResizeFilter` and `ScaleImage`, all refused by Recipe E's step 4 | mandate (2026-10-24) |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
