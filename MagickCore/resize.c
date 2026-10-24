@@ -2214,6 +2214,34 @@ static inline int PixelsEqual(const Quantum *source1,ssize_t offset1,
   return(1);
 }
 
+static inline MagickBooleanType IsEagle2XTopLeft(const Quantum *pixels,
+  const size_t channels)
+{
+  return((PixelsEqual(pixels,0,pixels,1,channels) &&
+    PixelsEqual(pixels,1,pixels,3,channels)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEagle2XTopRight(const Quantum *pixels,
+  const size_t channels)
+{
+  return((PixelsEqual(pixels,1,pixels,2,channels) &&
+    PixelsEqual(pixels,2,pixels,5,channels)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEagle2XBottomLeft(const Quantum *pixels,
+  const size_t channels)
+{
+  return((PixelsEqual(pixels,3,pixels,6,channels) &&
+    PixelsEqual(pixels,6,pixels,7,channels)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEagle2XBottomRight(const Quantum *pixels,
+  const size_t channels)
+{
+  return((PixelsEqual(pixels,5,pixels,8,channels) &&
+    PixelsEqual(pixels,8,pixels,7,channels)) ? MagickTrue : MagickFalse);
+}
+
 static inline void Eagle2X(const Image *source,const Quantum *pixels,
   Quantum *result,const size_t channels)
 {
@@ -2223,17 +2251,13 @@ static inline void Eagle2X(const Image *source,const Quantum *pixels,
   (void) source;
   for (i=0; i < 4; i++)
     CopyPixels(pixels,4,result,i,channels);
-  if (PixelsEqual(pixels,0,pixels,1,channels) &&
-      PixelsEqual(pixels,1,pixels,3,channels))
+  if (IsEagle2XTopLeft(pixels,channels) != MagickFalse)
     CopyPixels(pixels,0,result,0,channels);
-  if (PixelsEqual(pixels,1,pixels,2,channels) &&
-      PixelsEqual(pixels,2,pixels,5,channels))
+  if (IsEagle2XTopRight(pixels,channels) != MagickFalse)
     CopyPixels(pixels,2,result,1,channels);
-  if (PixelsEqual(pixels,3,pixels,6,channels) &&
-      PixelsEqual(pixels,6,pixels,7,channels))
+  if (IsEagle2XBottomLeft(pixels,channels) != MagickFalse)
     CopyPixels(pixels,6,result,2,channels);
-  if (PixelsEqual(pixels,5,pixels,8,channels) &&
-      PixelsEqual(pixels,8,pixels,7,channels))
+  if (IsEagle2XBottomRight(pixels,channels) != MagickFalse)
     CopyPixels(pixels,8,result,3,channels);
 }
 
