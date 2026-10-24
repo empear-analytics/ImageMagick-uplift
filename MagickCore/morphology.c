@@ -1365,6 +1365,38 @@ static KernelInfo *AcquireOctagonKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireDiskKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  ssize_t
+    limit = (ssize_t)(args->rho*args->rho);
+
+  if (args->rho < 0.4)           /* default radius approx 4.3 */
+    kernel->width = kernel->height = 9L, limit = 18L;
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(fabs(args->rho))*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      if ((u*u+v*v) <= limit)
+        kernel->positive_range += kernel->values[i] = args->sigma;
+      else
+        kernel->values[i] = nan;
+  kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1699,28 +1731,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case OctagonKernel:
         return(AcquireOctagonKernel(kernel,args,nan));
       case DiskKernel:
-        {
-          ssize_t
-            limit = (ssize_t)(args->rho*args->rho);
-
-          if (args->rho < 0.4)           /* default radius approx 4.3 */
-            kernel->width = kernel->height = 9L, limit = 18L;
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(fabs(args->rho))*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              if ((u*u+v*v) <= limit)
-                kernel->positive_range += kernel->values[i] = args->sigma;
-              else
-                kernel->values[i] = nan;
-          kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
-          break;
-        }
+        return(AcquireDiskKernel(kernel,args,nan));
       case PlusKernel:
         {
           if (args->rho < 1.0)
