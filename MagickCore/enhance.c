@@ -3699,6 +3699,72 @@ static inline void ModulateLCHuv(const double percent_luma,
   ConvertLCHuvToRGB(luma,chroma,hue,illuminant,red,green,blue);
 }
 
+static void ModulateColor(const ColorspaceType colorspace,
+  const double percent_hue,const double percent_saturation,
+  const double percent_brightness,const IlluminantType illuminant,double *red,
+  double *green,double *blue)
+{
+  switch (colorspace)
+  {
+    case HCLColorspace:
+    {
+      ModulateHCL(percent_hue,percent_saturation,percent_brightness,
+        red,green,blue);
+      break;
+    }
+    case HCLpColorspace:
+    {
+      ModulateHCLp(percent_hue,percent_saturation,percent_brightness,
+        red,green,blue);
+      break;
+    }
+    case HSBColorspace:
+    {
+      ModulateHSB(percent_hue,percent_saturation,percent_brightness,
+        red,green,blue);
+      break;
+    }
+    case HSIColorspace:
+    {
+      ModulateHSI(percent_hue,percent_saturation,percent_brightness,
+        red,green,blue);
+      break;
+    }
+    case HSLColorspace:
+    default:
+    {
+      ModulateHSL(percent_hue,percent_saturation,percent_brightness,
+        red,green,blue);
+      break;
+    }
+    case HSVColorspace:
+    {
+      ModulateHSV(percent_hue,percent_saturation,percent_brightness,
+        red,green,blue);
+      break;
+    }
+    case HWBColorspace:
+    {
+      ModulateHWB(percent_hue,percent_saturation,percent_brightness,
+        red,green,blue);
+      break;
+    }
+    case LCHColorspace:
+    case LCHabColorspace:
+    {
+      ModulateLCHab(percent_brightness,percent_saturation,percent_hue,
+        illuminant,red,green,blue);
+      break;
+    }
+    case LCHuvColorspace:
+    {
+      ModulateLCHuv(percent_brightness,percent_saturation,percent_hue,
+        illuminant,red,green,blue);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ExceptionInfo *exception)
 {
@@ -3791,65 +3857,8 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
       red=(double) image->colormap[i].red;
       green=(double) image->colormap[i].green;
       blue=(double) image->colormap[i].blue;
-      switch (colorspace)
-      {
-        case HCLColorspace:
-        {
-          ModulateHCL(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HCLpColorspace:
-        {
-          ModulateHCLp(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HSBColorspace:
-        {
-          ModulateHSB(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HSIColorspace:
-        {
-          ModulateHSI(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HSLColorspace:
-        default:
-        {
-          ModulateHSL(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HSVColorspace:
-        {
-          ModulateHSV(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case HWBColorspace:
-        {
-          ModulateHWB(percent_hue,percent_saturation,percent_brightness,
-            &red,&green,&blue);
-          break;
-        }
-        case LCHColorspace:
-        case LCHabColorspace:
-        {
-          ModulateLCHab(percent_brightness,percent_saturation,percent_hue,
-            illuminant,&red,&green,&blue);
-          break;
-        }
-        case LCHuvColorspace:
-        {
-          ModulateLCHuv(percent_brightness,percent_saturation,percent_hue,
-            illuminant,&red,&green,&blue);
-          break;
-        }
-      }
+      ModulateColor(colorspace,percent_hue,percent_saturation,
+        percent_brightness,illuminant,&red,&green,&blue);
       image->colormap[i].red=red;
       image->colormap[i].green=green;
       image->colormap[i].blue=blue;
