@@ -3064,6 +3064,102 @@ static void CopyMagnifiedPixels(const Image *magnify_image,const Quantum *r,
         r[j*magnification*(ssize_t) channels+i];
 }
 
+static void SelectMagnifyMethod(const char *option,
+  void (**scaling_method)(const Image *,const Quantum *,Quantum *,size_t),
+  size_t *magnification,size_t *width)
+{
+  *scaling_method=Scale2X;
+  *magnification=2;
+  *width=3;
+  switch (*option)
+  {
+    case 'e':
+    {
+      if (LocaleCompare(option,"eagle2x") == 0)
+        {
+          *scaling_method=Eagle2X;
+          *magnification=2;
+          *width=3;
+          break;
+        }
+      if (LocaleCompare(option,"eagle3x") == 0)
+        {
+          *scaling_method=Eagle3X;
+          *magnification=3;
+          *width=3;
+          break;
+        }
+      if (LocaleCompare(option,"eagle3xb") == 0)
+        {
+          *scaling_method=Eagle3XB;
+          *magnification=3;
+          *width=3;
+          break;
+        }
+      if (LocaleCompare(option,"epbx2x") == 0)
+        {
+          *scaling_method=Epbx2X;
+          *magnification=2;
+          *width=3;
+          break;
+        }
+      break;
+    }
+    case 'f':
+    {
+      if (LocaleCompare(option,"fish2x") == 0)
+        {
+          *scaling_method=Fish2X;
+          *magnification=2;
+          *width=3;
+          break;
+        }
+      break;
+    }
+    case 'h':
+    {
+      if (LocaleCompare(option,"hq2x") == 0)
+        {
+          *scaling_method=Hq2X;
+          *magnification=2;
+          *width=3;
+          break;
+        }
+      break;
+    }
+    case 's':
+    {
+      if (LocaleCompare(option,"scale2x") == 0)
+        {
+          *scaling_method=Scale2X;
+          *magnification=2;
+          *width=3;
+          break;
+        }
+      if (LocaleCompare(option,"scale3x") == 0)
+        {
+          *scaling_method=Scale3X;
+          *magnification=3;
+          *width=3;
+          break;
+        }
+      break;
+    }
+    case 'x':
+    {
+      if (LocaleCompare(option,"xbr2x") == 0)
+        {
+          *scaling_method=Xbr2X;
+          *magnification=2;
+          *width=5;
+        }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
 {
 #define MagnifyImageTag  "Magnify/Image"
@@ -3114,96 +3210,7 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
   option=GetImageOption(image->image_info,"magnify:method");
   if (option == (char *) NULL)
     option="scale2x";
-  scaling_method=Scale2X;
-  magnification=2;
-  width=3;
-  switch (*option)
-  {
-    case 'e':
-    {
-      if (LocaleCompare(option,"eagle2x") == 0)
-        {
-          scaling_method=Eagle2X;
-          magnification=2;
-          width=3;
-          break;
-        }
-      if (LocaleCompare(option,"eagle3x") == 0)
-        {
-          scaling_method=Eagle3X;
-          magnification=3;
-          width=3;
-          break;
-        }
-      if (LocaleCompare(option,"eagle3xb") == 0)
-        {
-          scaling_method=Eagle3XB;
-          magnification=3;
-          width=3;
-          break;
-        }
-      if (LocaleCompare(option,"epbx2x") == 0)
-        {
-          scaling_method=Epbx2X;
-          magnification=2;
-          width=3;
-          break;
-        }
-      break;
-    }
-    case 'f':
-    {
-      if (LocaleCompare(option,"fish2x") == 0)
-        {
-          scaling_method=Fish2X;
-          magnification=2;
-          width=3;
-          break;
-        }
-      break;
-    }
-    case 'h':
-    {
-      if (LocaleCompare(option,"hq2x") == 0)
-        {
-          scaling_method=Hq2X;
-          magnification=2;
-          width=3;
-          break;
-        }
-      break;
-    }
-    case 's':
-    {
-      if (LocaleCompare(option,"scale2x") == 0)
-        {
-          scaling_method=Scale2X;
-          magnification=2;
-          width=3;
-          break;
-        }
-      if (LocaleCompare(option,"scale3x") == 0)
-        {
-          scaling_method=Scale3X;
-          magnification=3;
-          width=3;
-          break;
-        }
-      break;
-    }
-    case 'x':
-    {
-      if (LocaleCompare(option,"xbr2x") == 0)
-        {
-          scaling_method=Xbr2X;
-          magnification=2;
-          width=5;
-        }
-      break;
-    }
-    default:
-      break;
-  }
+  SelectMagnifyMethod(option,&scaling_method,&magnification,&width);
   assert((magnification*magnification) <= MaxMagnification);
   /*
     Make a working copy of the source image and convert it to RGB colorspace.
