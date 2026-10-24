@@ -2962,6 +2962,30 @@ static void LevelColormap(Image *image,const double black_point,
   }
 }
 
+static void LevelImageRow(const Image *image,const double black_point,
+  const double white_point,const double gamma,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      j;
+
+    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,j);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      q[j]=ClampToQuantum(LevelPixel(black_point,white_point,gamma,
+        (double) q[j]));
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
   const double white_point,const double gamma,ExceptionInfo *exception)
 {
@@ -3003,9 +3027,6 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -3014,22 +3035,7 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[j]=ClampToQuantum(LevelPixel(black_point,white_point,gamma,
-          (double) q[j]));
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    LevelImageRow(image,black_point,white_point,gamma,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
