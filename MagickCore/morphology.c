@@ -4453,6 +4453,29 @@ static double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
   return(angle);
 }
 
+static double TransposeKernel(KernelInfo *kernel,double angle)
+{
+  /* Do a transpose of a 1 dimensional kernel,
+  ** which results in a fast 90 degree rotation of some type.
+  */
+  ssize_t
+    t;
+  t = (ssize_t) kernel->width;
+  kernel->width = kernel->height;
+  kernel->height = (size_t) t;
+  t = kernel->x;
+  kernel->x = kernel->y;
+  kernel->y = t;
+  if ( kernel->width == 1 ) {
+    angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
+    kernel->angle = fmod(kernel->angle+90.0, 360.0);
+  } else {
+    angle = fmod(angle+90.0, 360.0);   /* angle increased 90 degrees */
+    kernel->angle = fmod(kernel->angle+270.0, 360.0);
+  }
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -4517,25 +4540,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
   if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
     {
       if ( kernel->width == 1 || kernel->height == 1 )
-        { /* Do a transpose of a 1 dimensional kernel,
-          ** which results in a fast 90 degree rotation of some type.
-          */
-          ssize_t
-            t;
-          t = (ssize_t) kernel->width;
-          kernel->width = kernel->height;
-          kernel->height = (size_t) t;
-          t = kernel->x;
-          kernel->x = kernel->y;
-          kernel->y = t;
-          if ( kernel->width == 1 ) {
-            angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
-            kernel->angle = fmod(kernel->angle+90.0, 360.0);
-          } else {
-            angle = fmod(angle+90.0, 360.0);   /* angle increased 90 degrees */
-            kernel->angle = fmod(kernel->angle+270.0, 360.0);
-          }
-        }
+        angle=TransposeKernel(kernel,angle);
       else if ( kernel->width == kernel->height )
         { /* Rotate a square array of values by 90 degrees */
           { ssize_t
