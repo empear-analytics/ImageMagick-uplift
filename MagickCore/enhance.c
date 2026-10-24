@@ -2105,6 +2105,53 @@ static void AccumulateEqualizeHistogram(const Image *image,
   }
 }
 
+static void EqualizeColormap(Image *image,const double *black,
+  const double *white,const double *equalize_map)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) image->colors; j++)
+  {
+    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,
+          RedPixelChannel);
+        if (black[channel] != white[channel])
+          image->colormap[j].red=equalize_map[(ssize_t)
+            GetPixelChannels(image)*ScaleQuantumToMap(
+            ClampToQuantum(image->colormap[j].red))+channel];
+      }
+    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,
+          GreenPixelChannel);
+        if (black[channel] != white[channel])
+          image->colormap[j].green=equalize_map[(ssize_t)
+            GetPixelChannels(image)*ScaleQuantumToMap(
+            ClampToQuantum(image->colormap[j].green))+channel];
+      }
+    if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,
+          BluePixelChannel);
+        if (black[channel] != white[channel])
+          image->colormap[j].blue=equalize_map[(ssize_t)
+            GetPixelChannels(image)*ScaleQuantumToMap(
+            ClampToQuantum(image->colormap[j].blue))+channel];
+      }
+    if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,
+          AlphaPixelChannel);
+        if (black[channel] != white[channel])
+          image->colormap[j].alpha=equalize_map[(ssize_t)
+            GetPixelChannels(image)*ScaleQuantumToMap(
+            ClampToQuantum(image->colormap[j].alpha))+channel];
+      }
+  }
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2219,54 +2266,11 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   }
   histogram=(double *) RelinquishMagickMemory(histogram);
   map=(double *) RelinquishMagickMemory(map);
+  /*
+    Equalize colormap.
+  */
   if (image->storage_class == PseudoClass)
-    {
-      ssize_t
-        j;
-
-      /*
-        Equalize colormap.
-      */
-      for (j=0; j < (ssize_t) image->colors; j++)
-      {
-        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,
-              RedPixelChannel);
-            if (black[channel] != white[channel])
-              image->colormap[j].red=equalize_map[(ssize_t)
-                GetPixelChannels(image)*ScaleQuantumToMap(
-                ClampToQuantum(image->colormap[j].red))+channel];
-          }
-        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,
-              GreenPixelChannel);
-            if (black[channel] != white[channel])
-              image->colormap[j].green=equalize_map[(ssize_t)
-                GetPixelChannels(image)*ScaleQuantumToMap(
-                ClampToQuantum(image->colormap[j].green))+channel];
-          }
-        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,
-              BluePixelChannel);
-            if (black[channel] != white[channel])
-              image->colormap[j].blue=equalize_map[(ssize_t)
-                GetPixelChannels(image)*ScaleQuantumToMap(
-                ClampToQuantum(image->colormap[j].blue))+channel];
-          }
-        if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,
-              AlphaPixelChannel);
-            if (black[channel] != white[channel])
-              image->colormap[j].alpha=equalize_map[(ssize_t)
-                GetPixelChannels(image)*ScaleQuantumToMap(
-                ClampToQuantum(image->colormap[j].alpha))+channel];
-          }
-      }
-    }
+    EqualizeColormap(image,black,white,equalize_map);
   /*
     Equalize image.
   */
