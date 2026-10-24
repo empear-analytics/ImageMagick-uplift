@@ -319,6 +319,15 @@ static void RadonProjection(MatrixInfo *source_matrices,
   }
 }
 
+static inline MagickBooleanType IsPixelBelowThreshold(const Image *image,
+  const Quantum *magick_restrict p,const double threshold)
+{
+  return((((MagickRealType) GetPixelRed(image,p) < threshold) ||
+    ((MagickRealType) GetPixelGreen(image,p) < threshold) ||
+    ((MagickRealType) GetPixelBlue(image,p) < threshold)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RadonTransform(const Image *image,
   const double threshold,size_t *projection,ExceptionInfo *exception)
 {
@@ -409,9 +418,7 @@ static MagickBooleanType RadonTransform(const Image *image,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       byte<<=1;
-      if (((MagickRealType) GetPixelRed(image,p) < threshold) ||
-          ((MagickRealType) GetPixelGreen(image,p) < threshold) ||
-          ((MagickRealType) GetPixelBlue(image,p) < threshold))
+      if (IsPixelBelowThreshold(image,p,threshold) != MagickFalse)
         byte|=0x01;
       bit++;
       if (bit == 8)
@@ -466,9 +473,7 @@ static MagickBooleanType RadonTransform(const Image *image,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       byte<<=1;
-      if (((MagickRealType) GetPixelRed(image,p) < threshold) ||
-          ((MagickRealType) GetPixelGreen(image,p) < threshold) ||
-          ((MagickRealType) GetPixelBlue(image,p) < threshold))
+      if (IsPixelBelowThreshold(image,p,threshold) != MagickFalse)
         byte|=0x01;
       bit++;
       if (bit == 8)
