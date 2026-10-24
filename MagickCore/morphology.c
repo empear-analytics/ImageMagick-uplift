@@ -4893,13 +4893,30 @@ MagickExport void ScaleKernelInfo(KernelInfo *kernel,
 %    o kernel: the Morphology/Convolution kernel
 %
 */
+static void ShowKernelValues(const KernelInfo *k)
+{
+  size_t
+    i, u, v;
+
+  for (i=v=0; v < k->height; v++) {
+    (void) FormatLocaleFile(stderr, "%2lu:", (unsigned long) v );
+    for (u=0; u < k->width; u++, i++)
+      if (IsNaN(k->values[i]))
+        (void) FormatLocaleFile(stderr," %*s", GetMagickPrecision()+3, "nan");
+      else
+        (void) FormatLocaleFile(stderr," %*.*lg", GetMagickPrecision()+3,
+            GetMagickPrecision(), (double) k->values[i]);
+    (void) FormatLocaleFile(stderr,"\n");
+  }
+}
+
 MagickPrivate void ShowKernelInfo(const KernelInfo *kernel)
 {
   const KernelInfo
     *k;
 
   size_t
-    c, i, u, v;
+    c;
 
   for (c=0, k=kernel;  k != (KernelInfo *) NULL;  c++, k=k->next ) {
 
@@ -4926,16 +4943,7 @@ MagickPrivate void ShowKernelInfo(const KernelInfo *kernel)
     else
       (void) FormatLocaleFile(stderr, " (Sum %.*lg)\n",
           GetMagickPrecision(), k->positive_range+k->negative_range);
-    for (i=v=0; v < k->height; v++) {
-      (void) FormatLocaleFile(stderr, "%2lu:", (unsigned long) v );
-      for (u=0; u < k->width; u++, i++)
-        if (IsNaN(k->values[i]))
-          (void) FormatLocaleFile(stderr," %*s", GetMagickPrecision()+3, "nan");
-        else
-          (void) FormatLocaleFile(stderr," %*.*lg", GetMagickPrecision()+3,
-              GetMagickPrecision(), (double) k->values[i]);
-      (void) FormatLocaleFile(stderr,"\n");
-    }
+    ShowKernelValues(k);
   }
 }
 
