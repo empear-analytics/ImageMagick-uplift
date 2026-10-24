@@ -20,6 +20,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from cs_mcp_session import exchange
+
 REPO = Path(__file__).resolve().parent.parent
 # CodeScene does not return a Code Health score for declaration-only headers.
 # Their implementations remain covered when the corresponding source files are staged.
@@ -126,28 +128,14 @@ def file_score_request(path: str) -> list[dict[str, object]]:
     ]
 
 
-def run_score_process(exe: str, payload: str) -> subprocess.CompletedProcess[str]:
-    try:
-        return subprocess.run(
-            [exe],
-            input=payload,
-            capture_output=True,
-            text=True,
-            env={**os.environ, "CS_DISABLE_VERSION_CHECK": "1"},
-            encoding="utf-8",
-            errors="replace",
-            timeout=120,  # ImageMagick files run to 16,000 lines
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise RuntimeError(f"CodeScene score request timed out after {exc.timeout}s") from exc
-
-
 def run_score_request(exe: str, path: str) -> str:
-    payload = "\n".join(json.dumps(item) for item in file_score_request(path)) + "\n"
-    proc = run_score_process(exe, payload)
-    if proc.returncode != 0 and not proc.stdout:
-        raise RuntimeError((proc.stderr or proc.stdout or "CodeScene invocation failed").strip())
-    return proc.stdout or ""
+    requests = [json.dumps(item) for item in file_score_request(path)]
+    session = exchange(exe, requests, {2}, timeout=120)  # ImageMagick files run to 16,000 lines
+    if session.timed_out:
+        raise RuntimeError("CodeScene score request timed out after 120s")
+    if session.returncode != 0 and not session.stdout:
+        raise RuntimeError((session.stderr or "CodeScene invocation failed").strip())
+    return session.stdout
 
 
 def parse_score(stdout: str, path: str) -> float:

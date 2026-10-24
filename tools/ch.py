@@ -21,13 +21,15 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
+
+from cs_mcp_session import exchange
 
 REPO = Path(__file__).resolve().parent.parent
 EXE = os.environ.get("CS_MCP_BINARY_PATH") or shutil.which("cs-mcp") or "/opt/homebrew/bin/cs-mcp"
 SCORE_RE = re.compile(r"Code Health score:\s*([0-9.]+)")
+CHUNK_TIMEOUT = 900  # seconds for one server invocation; a review of a 13,000-line file takes ~90
 
 
 def _requests(tool: str, part: list[str], start: int) -> tuple[list[str], dict[int, str]]:
@@ -77,12 +79,10 @@ def call(tool: str, paths: list[str], chunk: int = 12) -> dict[str, str]:
     out: dict[str, str] = {}
     for start in range(0, len(paths), chunk):
         lines, ids = _requests(tool, paths[start:start + chunk], start)
-        proc = subprocess.run([EXE], input="\n".join(lines) + "\n", capture_output=True,
-                              text=True, encoding="utf-8", errors="replace",
-                              env=dict(os.environ, CS_DISABLE_VERSION_CHECK="1"))
-        if "OutOfMemoryError" in (proc.stderr or ""):
+        session = exchange(EXE, lines, set(ids), CHUNK_TIMEOUT)
+        if "OutOfMemoryError" in session.stderr:
             sys.exit("CodeScene CLI ran out of memory. Retry with a smaller --chunk.")
-        _collect(proc.stdout or "", ids, out)
+        _collect(session.stdout, ids, out)
     return out
 
 

@@ -30,6 +30,8 @@ import sys
 import time
 from pathlib import Path
 
+from cs_mcp_session import exchange
+
 REPO = Path(__file__).resolve().parent.parent
 
 # ImageMagick's own code: the four subsystems plus the filter modules and the
@@ -48,6 +50,7 @@ EXCLUDE_PREFIXES = ()
 SCORE_RE = re.compile(r"Code Health score:\s*([0-9.]+)")
 CHUNK_DEFAULT = 16
 RETRY_CHUNK = 4
+CHUNK_TIMEOUT = 1800  # seconds for one server invocation of --chunk files
 BANDS = ("red", "yellow", "green", "optimal")
 
 
@@ -197,16 +200,11 @@ def read_responses(stdout: str, ids: dict[int, str]) -> dict[int, str]:
 def run_chunk(exe: str, paths: list[str], first_id: int) -> tuple[dict[int, str], dict[int, str]]:
     """Score one chunk. Returns ({request id: response text}, {request id: path})."""
     lines, ids = chunk_requests(paths, first_id)
-    stdin = "\n".join(lines) + "\n"
-
-    env = dict(os.environ, CS_DISABLE_VERSION_CHECK="1")
-    proc = subprocess.run(
-        [exe], input=stdin, capture_output=True, text=True, env=env, encoding="utf-8", errors="replace"
-    )
-    if "OutOfMemoryError" in (proc.stderr or ""):
+    session = exchange(exe, lines, set(ids), CHUNK_TIMEOUT)
+    if "OutOfMemoryError" in session.stderr:
         sys.exit("CodeScene CLI ran out of memory. Retry with a smaller --chunk.")
 
-    out = read_responses(proc.stdout or "", ids)
+    out = read_responses(session.stdout, ids)
     return {rid: out.get(rid, "") for rid in ids}, ids
 
 
