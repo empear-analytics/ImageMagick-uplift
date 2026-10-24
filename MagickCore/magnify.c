@@ -108,6 +108,18 @@ typedef struct _Hq2XNeighbours
     f,
     h;
 } Hq2XNeighbours;
+
+typedef struct _MagnifyRow
+{
+  const Image
+    *magnify_image;
+
+  const Quantum
+    *r;
+
+  size_t
+    magnification;
+} MagnifyRow;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1064,17 +1076,17 @@ static inline void Scale3X(const Image *magick_unused(source),
     CopyPixels(&magnify,4,8);
 }
 
-static void CopyMagnifiedPixels(const Image *magnify_image,const Quantum *r,
-  const size_t channels,const size_t magnification,Quantum *q)
+static void CopyMagnifiedPixels(const MagnifyRow *row,const size_t channels,
+  Quantum *q)
 {
   ssize_t
     i,
     j;
 
-  for (j=0; j < (ssize_t) magnification; j++)
-    for (i=0; i < (ssize_t) (channels*magnification); i++)
-      q[j*(ssize_t) channels*(ssize_t) magnify_image->columns+i]=
-        r[j*magnification*(ssize_t) channels+i];
+  for (j=0; j < (ssize_t) row->magnification; j++)
+    for (i=0; i < (ssize_t) (channels*row->magnification); i++)
+      q[j*(ssize_t) channels*(ssize_t) row->magnify_image->columns+i]=
+        row->r[j*row->magnification*(ssize_t) channels+i];
 }
 
 static void SelectMagnifyMethod(const char *option,
@@ -1218,6 +1230,8 @@ static MagickBooleanType MagnifyImageRow(const Image *source_image,
   ssize_t
     x;
 
+  const MagnifyRow row = { magnify_image, r, magnification };
+
   status=MagickTrue;
   for (x=0; x < (ssize_t) source_image->columns; x++)
   {
@@ -1239,7 +1253,7 @@ static MagickBooleanType MagnifyImageRow(const Image *source_image,
     /*
       Copy the result pixels into the final image.
     */
-    CopyMagnifiedPixels(magnify_image,r,channels,magnification,q);
+    CopyMagnifiedPixels(&row,channels,q);
     q+=(ptrdiff_t) magnification*GetPixelChannels(magnify_image);
   }
   return(status);
