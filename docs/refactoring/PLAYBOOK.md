@@ -730,6 +730,96 @@ same day. Added by Claude Code (Claude Opus 5.5) during task M01, on `magnify.c`
 
 ---
 
+## Recipe K - Extract Accumulating Block with Out-Parameters
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it is a per-pixel accumulation
+inside a parallel loop body that adds into two to four of the iteration's own
+accumulators (`channel_similarity` and `channel_area`, or three sums).
+
+**Not covered by:** Recipe E, whose step 4 refuses a block that writes more than one
+variable; Recipe O, which takes a selection (a `switch` or `if` chain) and only outside
+every OpenMP region; Recipe T, whose block writes the shared `status`, not private
+accumulators.
+
+**How:**
+
+1. The block contains no `#pragma omp` line, no `return`, `goto`, and no `continue` or
+   `break` that leaves it.
+2. Every variable the block writes is declared inside the parallel loop body (so each
+   thread has its own), and there are at most four of them. Writes through pointers the
+   block already uses for pixel data stay as they are. The block writes nothing
+   declared outside the loop body, `status` included.
+3. Variables the block declares and uses alone move with it; one initialised in its
+   declaration moves with its initialiser only if it is declared in the innermost loop
+   that runs the block, so it is reset as often as before.
+4. Cut the block into a new `static void` function directly above the caller. Pass each
+   variable it only reads by value; each array it writes as a pointer (its uses do not
+   change); each scalar it writes as a pointer, written `*v` (or `(*v)++`) at every use,
+   reads included.
+5. Call it where the block stood, passing `&v` for each written scalar and the array
+   for each written array, in parameter order; check every argument by reading.
+
+**Before:**
+
+```c
+    for (x=0; x < (ssize_t) columns; x++)
+    {
+      ...
+      Sa=QuantumScale*(double) GetPixelAlpha(image,p);
+      Da=QuantumScale*(double) GetPixelAlpha(reconstruct_image,q);
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        ...
+        if (MagickSafeSignificantError(error*error,fuzz) != MagickFalse)
+          {
+            channel_similarity[i]+=QuantumScale*error*QuantumScale*error;
+            ...
+            channel_area++;
+          }
+      }
+```
+
+**After:**
+
+```c
+static void AccumulateFUZZPixel(...,double *channel_similarity,
+  double *channel_area)
+{
+  ...
+        if (MagickSafeSignificantError(error*error,fuzz) != MagickFalse)
+          {
+            channel_similarity[i]+=QuantumScale*error*QuantumScale*error;
+            ...
+            (*channel_area)++;
+          }
+}
+...
+      AccumulateFUZZPixel(...,channel_similarity,&channel_area);
+```
+
+**Careful:**
+
+- The variables written are each thread's own, so the parallel loop shares nothing new;
+  the OpenMP section's rule, which forbids passing the address of a variable declared
+  *outside* the loop body, is untouched.
+- `(*v)++` and `*v+=x` are the same operations on the same object as `v++` and `v+=x`:
+  the order of floating-point additions does not change.
+- Keep the written variables few; a block that writes more than four is not one
+  accumulation, and is skipped.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 checked by
+reading.
+
+**Provenance:** 2026-10-24, from `compare.c`'s `GetFUZZSimilarity` (`channel_similarity`
+and `channel_area`), `GetMEPPSimilarity` (mean and maximum error), `GetDPCSimilarity`
+and `GetNCCSimilarity` (three sums each), whose per-pixel blocks Recipe E's step 4
+refused after the single-accumulator siblings (`GetAESimilarity`, `GetMAESimilarity`,
+`GetMSESimilarity`, `GetPASimilarity`, `GetPDCSimilarity`) had taken Recipe E. Added by
+Claude Code (Claude Opus 5.5) during task M02, under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -777,6 +867,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | NEW | B | Bundle Arguments into a Struct: parameters of a `static` function that travel together become one `const` struct pointer; each caller fills a `const` struct from the same argument expressions | `magnify.c`'s pixel kernels, `Hq2XHelper` (11 arguments) and `CopyMagnifiedPixels`; a probe removing the finding raised the file 6.26 to 6.46 | owner |
 | 2026-10-24 | AMEND | E | Step 7: a block that runs to the end of a `void` function may contain `return;`; the new function is `void` and its call is the caller's last statement; macros used only by the block move with it | `Fish2X`'s ladder of early returns (probe: 6.52 to 6.56), refused by the founding wording, which covers only the throw macros' returns | mandate (2026-10-24) |
 | 2026-10-24 | WORDING | T | Provenance corrected (the shape is in `SampleImage` only, not `InterpolativeResizeImage` or the filters); the Careful note now refuses blocks that test or assign `status`, not a `break` of an inner loop after `status=MagickFalse;` | Reading the three loops after the recipe was added | after the fact |
+| 2026-10-24 | NEW | K | Extract Accumulating Block with Out-Parameters: a per-pixel accumulation inside a parallel loop body that writes two to four of the iteration's own variables moves to a `static void` function taking them by pointer | `compare.c`'s FUZZ, MEPP, DPC and NCC similarity loops, refused by Recipe E's step 4; their single-accumulator siblings each gained about 0.02 with Recipe E | mandate (2026-10-24) |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
