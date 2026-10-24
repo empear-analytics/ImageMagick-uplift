@@ -1853,6 +1853,30 @@ static void SetGaussianKernelValues(KernelInfo *kernel,const double sigma)
     }
 }
 
+static void SubtractGaussianKernelValues(KernelInfo *kernel,
+  const double sigma2)
+{
+  double
+    sigma,
+    A, B;
+
+  ssize_t
+    i,
+    u,
+    v;
+
+  if ( sigma2 > MagickEpsilon )
+    { sigma = sigma2;                /* simplify loop expressions */
+      A = 1.0/(2.0*sigma*sigma);
+      B = (double) (1.0/(Magick2PI*sigma*sigma));
+      for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+        for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+          kernel->values[i] -= exp(-((double)(u*u+v*v))*A)*B;
+    }
+  else /* limiting case - a unity (normalized Dirac) kernel */
+    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] -= 1.0;
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1971,16 +1995,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
 
         if ( type == DoGKernel )
           { /* Subtract a Negative Gaussian for "Difference of Gaussian" */
-            if ( sigma2 > MagickEpsilon )
-              { sigma = sigma2;                /* simplify loop expressions */
-                A = 1.0/(2.0*sigma*sigma);
-                B = (double) (1.0/(Magick2PI*sigma*sigma));
-                for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-                  for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-                    kernel->values[i] -= exp(-((double)(u*u+v*v))*A)*B;
-              }
-            else /* limiting case - a unity (normalized Dirac) kernel */
-              kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] -= 1.0;
+            SubtractGaussianKernelValues(kernel,sigma2);
           }
 
         if ( type == LoGKernel )
