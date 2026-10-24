@@ -272,6 +272,10 @@ ReportAlpha(image);
 - Inverting `a < b` gives `a >= b`, never `a > b`. Inverting `x != (T *) NULL` gives
   `x == (T *) NULL`. Write the inverse out; do not wrap the original in `!(...)` unless
   that is clearer, and never both.
+- **Except for floating point.** When either operand is a `double`, `float` or
+  `MagickRealType`, `a < b` and `a >= b` are both false for a NaN, so `a >= b` is not
+  the inverse: write `!(a < b)`. ImageMagick compares doubles against user-supplied
+  limits that can be NaN.
 - Inside an OpenMP loop the early exit is `continue`, and it must not skip a
   `#pragma omp critical` or `atomic` block that the original ran on that path.
 
@@ -876,6 +880,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | WORDING | T | Provenance corrected (the shape is in `SampleImage` only, not `InterpolativeResizeImage` or the filters); the Careful note now refuses blocks that test or assign `status`, not a `break` of an inner loop after `status=MagickFalse;` | Reading the three loops after the recipe was added | after the fact |
 | 2026-10-24 | NEW | K | Extract Accumulating Block with Out-Parameters: a per-pixel accumulation inside a parallel loop body that writes two to four of the iteration's own variables moves to a `static void` function taking them by pointer | `compare.c`'s FUZZ, MEPP, DPC and NCC similarity loops, refused by Recipe E's step 4; their single-accumulator siblings each gained about 0.02 with Recipe E | mandate (2026-10-24) |
 | 2026-10-24 | AMEND | D | Blocks identical up to a consistent renaming of the variables they read or write count as identical; the variables become the helper's arguments; checked by script | M02's `GetNCCSimilarity`, deduplicated onto `GetDPCSimilarity`'s helper under this reading before it was written down; `ColorDecisionListImage`'s three parse blocks | after the fact |
+| 2026-10-24 | AMEND | G | Careful: a comparison with a floating-point operand is inverted as `!(a < b)`, not `a >= b`, which differs for NaN | `ClipCLAHEHistogram`'s `(double) *p < clip_limit`, where the written-out inverse would have run the block for a NaN limit | mandate (2026-10-24) |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
