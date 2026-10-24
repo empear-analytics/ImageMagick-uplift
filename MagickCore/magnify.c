@@ -1132,6 +1132,34 @@ static void SelectMagnifyMethod(const char *option,
   }
 }
 
+static Image *CloneMagnifySourceImage(const Image *image,
+  ExceptionInfo *exception)
+{
+  Image
+    *source_image;
+
+  OffsetInfo
+    offset;
+
+  RectangleInfo
+    rectangle;
+
+  source_image=CloneImage(image,image->columns,image->rows,MagickTrue,
+    exception);
+  if (source_image == (Image *) NULL)
+    return((Image *) NULL);
+  offset.x=0;
+  offset.y=0;
+  rectangle.x=0;
+  rectangle.y=0;
+  rectangle.width=image->columns;
+  rectangle.height=image->rows;
+  (void) CopyImagePixels(source_image,image,&rectangle,&offset,exception);
+  if (IssRGBCompatibleColorspace(source_image->colorspace) == MagickFalse)
+    (void) TransformImageColorspace(source_image,sRGBColorspace,exception);
+  return(source_image);
+}
+
 MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
 {
 #define MagnifyImageTag  "Magnify/Image"
@@ -1153,12 +1181,6 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
 
   MagickOffsetType
     progress;
-
-  OffsetInfo
-    offset;
-
-  RectangleInfo
-    rectangle;
 
   size_t
     magnification,
@@ -1187,19 +1209,9 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
   /*
     Make a working copy of the source image and convert it to RGB colorspace.
   */
-  source_image=CloneImage(image,image->columns,image->rows,MagickTrue,
-    exception);
+  source_image=CloneMagnifySourceImage(image,exception);
   if (source_image == (Image *) NULL)
     return((Image *) NULL);
-  offset.x=0;
-  offset.y=0;
-  rectangle.x=0;
-  rectangle.y=0;
-  rectangle.width=image->columns;
-  rectangle.height=image->rows;
-  (void) CopyImagePixels(source_image,image,&rectangle,&offset,exception);
-  if (IssRGBCompatibleColorspace(source_image->colorspace) == MagickFalse)
-    (void) TransformImageColorspace(source_image,sRGBColorspace,exception);
   magnify_image=CloneImage(source_image,magnification*source_image->columns,
     magnification*source_image->rows,MagickTrue,exception);
   if (magnify_image == (Image *) NULL)
