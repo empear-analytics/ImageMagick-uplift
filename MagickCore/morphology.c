@@ -4546,6 +4546,18 @@ static double AttemptKernelRotationBy45Degrees(KernelInfo *kernel,
   return(angle);
 }
 
+static double AttemptKernelRotationBy90Degrees(KernelInfo *kernel,
+  double angle)
+{
+  if ( kernel->width == 1 || kernel->height == 1 )
+    angle=TransposeKernel(kernel,angle);
+  else if ( kernel->width == kernel->height )
+    angle=RotateSquareKernelBy90Degrees(kernel,angle);
+  else
+    perror("Unable to rotate a non-square, non-linear kernel 90 degrees");
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -4603,14 +4615,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
   if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
     angle=AttemptKernelRotationBy45Degrees(kernel,angle);
   if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
-    {
-      if ( kernel->width == 1 || kernel->height == 1 )
-        angle=TransposeKernel(kernel,angle);
-      else if ( kernel->width == kernel->height )
-        angle=RotateSquareKernelBy90Degrees(kernel,angle);
-      else
-        perror("Unable to rotate a non-square, non-linear kernel 90 degrees");
-    }
+    angle=AttemptKernelRotationBy90Degrees(kernel,angle);
   if ( 135.0 < angle && angle <= 225.0 )
     angle=ReflectKernel(kernel,angle);
   /* At this point angle should at least between -45 (315) and +45 degrees
