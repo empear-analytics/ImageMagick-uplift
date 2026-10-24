@@ -2152,6 +2152,30 @@ static void EqualizeColormap(Image *image,const double *black,
   }
 }
 
+static void EqualizeImageRow(const Image *image,const double *black,
+  const double *white,const double *equalize_map,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      j;
+
+    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,j);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if (((traits & UpdatePixelTrait) == 0) || (black[j] == white[j]))
+        continue;
+      q[j]=ClampToQuantum(equalize_map[GetPixelChannels(image)*
+        ScaleQuantumToMap(q[j])+(size_t) j]);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2285,9 +2309,6 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2296,22 +2317,7 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if (((traits & UpdatePixelTrait) == 0) || (black[j] == white[j]))
-          continue;
-        q[j]=ClampToQuantum(equalize_map[GetPixelChannels(image)*
-          ScaleQuantumToMap(q[j])+(size_t) j]);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    EqualizeImageRow(image,black,white,equalize_map,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
