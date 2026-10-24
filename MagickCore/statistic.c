@@ -2072,6 +2072,42 @@ static void UpdateWelfordMoments(ChannelStatistics *cs,
   cs->M1+=delta_n;
 }
 
+static void ComputeChannelMoments(ChannelStatistics *cs)
+{
+  double
+    adj_area = 1.0;
+
+  cs->mean=0.0;
+  if (cs->area > 0)
+    {
+      cs->mean=(double) (cs->sumLD/(long double) cs->area);
+      if (cs->area > 1.0)
+        adj_area=cs->area/(cs->area-1.0);
+    }
+  cs->sum=(double) cs->sum;
+  if (cs->M2 == 0.0)
+    {
+      cs->standard_deviation=0.0;
+      cs->variance=0.0;
+      cs->skewness=0.0;
+      cs->kurtosis=0.0;
+    }
+  else
+    {
+      if (cs->area > 1.0)
+        cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
+          cs->area-1.0));
+      else
+        cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
+          cs->area));
+      cs->variance=cs->standard_deviation*cs->standard_deviation;
+      cs->skewness=(double) (sqrtl(cs->area)*cs->M3/powl(cs->M2*adj_area,
+        1.5));
+      cs->kurtosis=(double) (cs->area*cs->M4/(cs->M2*cs->M2*adj_area*
+        adj_area)-3.0);
+    }
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2217,43 +2253,12 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     ChannelStatistics
       *cs;
 
-    double
-      adj_area = 1.0;
-
     PixelChannel channel = GetPixelChannelChannel(image,i);
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     if ((traits & UpdatePixelTrait) == 0)
       continue;
     cs=channel_statistics+(ssize_t) channel;
-    cs->mean=0.0;
-    if (cs->area > 0)
-      {
-        cs->mean=(double) (cs->sumLD/(long double) cs->area);
-        if (cs->area > 1.0)
-          adj_area=cs->area/(cs->area-1.0);
-      }
-    cs->sum=(double) cs->sum;
-    if (cs->M2 == 0.0)
-      {
-        cs->standard_deviation=0.0;
-        cs->variance=0.0;
-        cs->skewness=0.0;
-        cs->kurtosis=0.0;
-      }
-    else
-      {
-        if (cs->area > 1.0)
-          cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
-            cs->area-1.0));
-        else
-          cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
-            cs->area));
-        cs->variance=cs->standard_deviation*cs->standard_deviation;
-        cs->skewness=(double) (sqrtl(cs->area)*cs->M3/powl(cs->M2*adj_area,
-          1.5));
-        cs->kurtosis=(double) (cs->area*cs->M4/(cs->M2*cs->M2*adj_area*
-          adj_area)-3.0);
-      }
+    ComputeChannelMoments(cs);
   }
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
