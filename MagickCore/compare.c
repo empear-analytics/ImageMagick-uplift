@@ -2396,38 +2396,13 @@ static MagickBooleanType GetDSSIMSimilarity(const Image *image,
   return(status);
 }
 
-MagickExport MagickBooleanType GetImageDistortion(Image *image,
-  const Image *reconstruct_image,const MetricType metric,double *distortion,
-  ExceptionInfo *exception)
+static MagickBooleanType GetSimilarityForMetric(const Image *image,
+  const Image *reconstruct_image,const MetricType metric,
+  double *channel_similarity,ExceptionInfo *exception)
 {
-#define CompareMetricNotSupportedException  "metric not supported"
-
-  double
-    *channel_similarity;
-
   MagickBooleanType
     status = MagickTrue;
 
-  size_t
-    length;
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(reconstruct_image != (const Image *) NULL);
-  assert(reconstruct_image->signature == MagickCoreSignature);
-  assert(distortion != (double *) NULL);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  /*
-    Get image distortion.
-  */
-  *distortion=0.0;
-  length=MaxPixelChannels+1UL;
-  channel_similarity=(double *) AcquireQuantumMemory(length,
-    sizeof(*channel_similarity));
-  if (channel_similarity == (double *) NULL)
-    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  (void) memset(channel_similarity,0,length*sizeof(*channel_similarity));
   switch (metric)
   {
     case AbsoluteErrorMetric:
@@ -2523,6 +2498,43 @@ MagickExport MagickBooleanType GetImageDistortion(Image *image,
       break;
     }
   }
+  return(status);
+}
+
+MagickExport MagickBooleanType GetImageDistortion(Image *image,
+  const Image *reconstruct_image,const MetricType metric,double *distortion,
+  ExceptionInfo *exception)
+{
+#define CompareMetricNotSupportedException  "metric not supported"
+
+  double
+    *channel_similarity;
+
+  MagickBooleanType
+    status = MagickTrue;
+
+  size_t
+    length;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(reconstruct_image != (const Image *) NULL);
+  assert(reconstruct_image->signature == MagickCoreSignature);
+  assert(distortion != (double *) NULL);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  /*
+    Get image distortion.
+  */
+  *distortion=0.0;
+  length=MaxPixelChannels+1UL;
+  channel_similarity=(double *) AcquireQuantumMemory(length,
+    sizeof(*channel_similarity));
+  if (channel_similarity == (double *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  (void) memset(channel_similarity,0,length*sizeof(*channel_similarity));
+  status=GetSimilarityForMetric(image,reconstruct_image,metric,
+    channel_similarity,exception);
   *distortion=channel_similarity[CompositePixelChannel];
   switch (metric)
   {
