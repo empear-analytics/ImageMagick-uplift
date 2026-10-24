@@ -2441,6 +2441,28 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetPolynomialPixels(const Image *image,
+  const PixelChannels *polynomial_pixel,Quantum *magick_restrict q)
+{
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      q[i]=ClampToQuantum((double) QuantumRange*
+        polynomial_pixel[x].channel[i]);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
@@ -2574,19 +2596,7 @@ MagickExport Image *PolynomialImage(const Image *images,
       image_view=DestroyCacheView(image_view);
       next=GetNextImageInList(next);
     }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum((double) QuantumRange*
-          polynomial_pixel[x].channel[i]);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    SetPolynomialPixels(image,polynomial_pixel,q);
     if (SyncCacheViewAuthenticPixels(polynomial_view,exception) == MagickFalse)
       status=MagickFalse;
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
