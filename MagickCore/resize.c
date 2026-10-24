@@ -2923,6 +2923,19 @@ static inline void Scale3X(const Image *magick_unused(source),
     }
 }
 
+static void CopyMagnifiedPixels(const Image *magnify_image,const Quantum *r,
+  const size_t channels,const size_t magnification,Quantum *q)
+{
+  ssize_t
+    i,
+    j;
+
+  for (j=0; j < (ssize_t) magnification; j++)
+    for (i=0; i < (ssize_t) (channels*magnification); i++)
+      q[j*(ssize_t) channels*(ssize_t) magnify_image->columns+i]=
+        r[j*magnification*(ssize_t) channels+i];
+}
+
 MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
 {
 #define MagnifyImageTag  "Magnify/Image"
@@ -3129,10 +3142,6 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
       size_t
         channels;
 
-      ssize_t
-        i,
-        j;
-
       p=GetCacheViewVirtualPixels(image_view,x-width/2,y-width/2,width,width,
         exception);
       if (p == (Quantum *) NULL)
@@ -3145,10 +3154,7 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
       /*
         Copy the result pixels into the final image.
       */
-      for (j=0; j < (ssize_t) magnification; j++)
-        for (i=0; i < (ssize_t) (channels*magnification); i++)
-          q[j*(ssize_t) channels*(ssize_t) magnify_image->columns+i]=
-            r[j*magnification*(ssize_t) channels+i];
+      CopyMagnifiedPixels(magnify_image,r,channels,magnification,q);
       q+=(ptrdiff_t) magnification*GetPixelChannels(magnify_image);
     }
     if (SyncCacheViewAuthenticPixels(magnify_view,exception) == MagickFalse)
