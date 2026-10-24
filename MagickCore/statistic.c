@@ -2916,6 +2916,12 @@ static void ResetPixelList(PixelList *pixel_list)
   pixel_list->seed=pixel_list->signature++;
 }
 
+static inline MagickBooleanType IsPixelListStatistic(const StatisticType type)
+{
+  return(((type == MedianStatistic) || (type == ModeStatistic) ||
+    (type == NonpeakStatistic)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
@@ -3055,8 +3061,7 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
         {
           for (u=0; u < (ssize_t) MagickMax(width,1); u++)
           {
-            if ((type == MedianStatistic) || (type == ModeStatistic) ||
-                (type == NonpeakStatistic))
+            if (IsPixelListStatistic(type) != MagickFalse)
               {
                 InsertPixelList(pixels[i],pixel_list[id]);
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
