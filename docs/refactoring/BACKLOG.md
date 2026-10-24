@@ -83,7 +83,7 @@ needs before refactoring:
 | 1.92 | `MagickCore/statistic.c` | 3158 | 97% | 89% | open, [M07](tasks/M07-statistic.md) |
 | 2.16 | `MagickCore/identify.c` | 1705 | 68% | 85% | open |
 | 2.30 | `MagickCore/segment.c` | 1934 | 79% | 86% | open, [M10](tasks/M10-segment.md) |
-| 2.57 | `MagickCore/colorspace.c` | 2899 | 90% | 92% | open, [M06](tasks/M06-colorspace.md) |
+| 2.57 | `MagickCore/colorspace.c` | 2899 | 90% | 92% | 2.80, plateau for the current catalogue (Complex Conditional gone; the transforms are case-per-pragma switches), [M06](tasks/M06-colorspace.md) |
 | 3.08 | `MagickCore/fourier.c` | 1626 | 92% | 86% | waits for FFTW (Linux) |
 | 3.28 | `MagickCore/channel.c` | 1394 | 65% | 81% | open |
 | 5.78 | `MagickCore/decorate.c` | 901 | 98% | 94% | open, [M11](tasks/M11-decorate.md) |

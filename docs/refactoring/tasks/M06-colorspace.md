@@ -179,3 +179,44 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 2.57 → 2.80** (`cs-mcp` 1.5.12). Branch `campaign/M06-colorspace`,
+stacked on `campaign/M05-visual-effects` (PR #11). 4 refactor commits, all Recipe P and
+oracle-verified.
+
+**One category leaves the file:** Complex Conditional. The commits:
+- `IsTransformMapMissing(x_map,y_map,z_map)` in `sRGBTransformImage`, then reused in
+  `TransformsRGBImage`, whose test is the same text;
+- `IsLinearGammaColorspace(colorspace)` in `SetImageColorspace`.
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| the transform-map allocation test, in both transforms | P | 2.57 → 2.68 |
+| `SetImageColorspace`'s linear-gamma test | P | → 2.80 |
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Why it stops here.**
+- `sRGBTransformImage` (cc 142) and `TransformsRGBImage` (cc 151) are one `switch
+  (colorspace)` each. Every case contains its own `#pragma omp parallel for`, and the
+  map-building cases run their loops under pragmas too. A case cannot move into a
+  function without moving its pragma, which the OpenMP rules forbid.
+- A probe extracted all seven pixel loops of `sRGBTransformImage` in a scratch copy. The
+  score stayed at 2.80, nesting at 4 and the bumps at 16. Those loops are not where
+  CodeScene's findings come from, so the one such step already made (the CMYK loop,
+  flat) was reverted, not committed.
+- `ConvertRGBToGeneric` and `ConvertGenericToRGB` (Code Duplication, cc 30, nine
+  arguments) are public, and the readiness gate has them not ready (0%).
+- `SetImageGray` and `SetImageMonochrome` share a tail that differs in two places (a cast
+  and the type), so Recipe D does not apply.
+
+This is a plateau for the current catalogue. A recipe that let a case body (with its
+pragma) move as a unit into a function called from the same place would open it. That
+needs the owner's decision on the OpenMP rule, not a new recipe written overnight.
+
+**Process note.** A whole-catalogue run must follow a build of the branch tip. After the
+reverted probe, the candidate build still held the uncommitted loop extraction. That run
+was stopped, the tip rebuilt, and the catalogue run again.
