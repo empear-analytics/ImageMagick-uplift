@@ -234,7 +234,7 @@ For each function: the recipes applied, the score before and after, and the revi
 
 **Result: Code Health 1.46 → 1.77, plateau** (`cs-mcp` 1.5.12). Branch
 `campaign/M02-compare`, stacked on `campaign/M01-magnify` (PR #7) for Recipes T, M and B.
-One playbook commit (**Recipe K**, Extract Accumulating Block with Out-Parameters) and 25
+One playbook commit (**Recipe K**, Extract Accumulating Block with Out-Parameters) and 23
 refactor commits, one recipe and one function each, all oracle-verified.
 
 **What the file is.** Lines 2889-4569 (`#if MAGICKCORE_HDRI_SUPPORT &&
