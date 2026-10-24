@@ -3897,6 +3897,26 @@ static MagickBooleanType VerticalFilter(
   return(status);
 }
 
+static FilterType SelectResizeFilterType(const Image *image,
+  const FilterType filter,const double x_factor,const double y_factor)
+{
+  FilterType
+    filter_type;
+
+  filter_type=LanczosFilter;
+  if (filter != UndefinedFilter)
+    filter_type=filter;
+  else
+    if ((x_factor == 1.0) && (y_factor == 1.0))
+      filter_type=PointFilter;
+    else
+      if ((image->storage_class == PseudoClass) ||
+          (image->alpha_trait != UndefinedPixelTrait) ||
+          ((x_factor*y_factor) > 1.0))
+        filter_type=MitchellFilter;
+  return(filter_type);
+}
+
 MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   const size_t rows,const FilterType filter,ExceptionInfo *exception)
 {
@@ -3942,17 +3962,7 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   */
   x_factor=(double) (columns*MagickSafeReciprocal((double) image->columns));
   y_factor=(double) (rows*MagickSafeReciprocal((double) image->rows));
-  filter_type=LanczosFilter;
-  if (filter != UndefinedFilter)
-    filter_type=filter;
-  else
-    if ((x_factor == 1.0) && (y_factor == 1.0))
-      filter_type=PointFilter;
-    else
-      if ((image->storage_class == PseudoClass) ||
-          (image->alpha_trait != UndefinedPixelTrait) ||
-          ((x_factor*y_factor) > 1.0))
-        filter_type=MitchellFilter;
+  filter_type=SelectResizeFilterType(image,filter,x_factor,y_factor);
   resize_filter=AcquireResizeFilter(image,filter_type,MagickFalse,exception);
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
   resize_image=AccelerateResizeImage(image,columns,rows,resize_filter,
