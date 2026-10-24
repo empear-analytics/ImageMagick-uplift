@@ -335,6 +335,58 @@ static void SetClusterColormap(Image *image,const Cluster *head)
   }
 }
 
+static void ClassifyFuzzyPixel(Image *image,const double *squares,
+  const PixelInfo *pixel,const double weighting_exponent,
+  Quantum *magick_restrict q)
+{
+  const PixelInfo
+    *magick_restrict p;
+
+  double
+    distance_squared,
+    local_minima,
+    numerator,
+    ratio,
+    sum;
+
+  ssize_t
+    j,
+    k;
+
+  /*
+    Compute fuzzy membership.
+  */
+  local_minima=0.0;
+  for (j=0; j < (ssize_t) image->colors; j++)
+  {
+    sum=0.0;
+    p=image->colormap+j;
+    distance_squared=
+      squares[(ssize_t) (pixel->red-ScaleQuantumToChar((const Quantum) p->red))]+
+      squares[(ssize_t) (pixel->green-ScaleQuantumToChar((const Quantum) p->green))]+
+      squares[(ssize_t) (pixel->blue-ScaleQuantumToChar((const Quantum) p->blue))];
+    numerator=distance_squared;
+    for (k=0; k < (ssize_t) image->colors; k++)
+    {
+      p=image->colormap+k;
+      distance_squared=
+        squares[(ssize_t) (pixel->red-ScaleQuantumToChar((const Quantum) p->red))]+
+        squares[(ssize_t) (pixel->green-ScaleQuantumToChar((const Quantum) p->green))]+
+        squares[(ssize_t) (pixel->blue-ScaleQuantumToChar((const Quantum) p->blue))];
+      ratio=numerator/distance_squared;
+      sum+=SegmentPower(ratio);
+    }
+    if ((sum != 0.0) && ((1.0/sum) > local_minima))
+      {
+        /*
+          Classify this pixel.
+        */
+        local_minima=1.0/sum;
+        SetPixelIndex(image,(Quantum) j,q);
+      }
+  }
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const double cluster_threshold,const double weighting_exponent,
   const MagickBooleanType verbose,ExceptionInfo *exception)
@@ -579,9 +631,6 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     Cluster
       *c;
 
-    const PixelInfo
-      *magick_restrict p;
-
     ssize_t
       x;
 
@@ -617,51 +666,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
           }
       }
       if (c == (Cluster *) NULL)
-        {
-          double
-            distance_squared,
-            local_minima,
-            numerator,
-            ratio,
-            sum;
-
-          ssize_t
-            j,
-            k;
-
-          /*
-            Compute fuzzy membership.
-          */
-          local_minima=0.0;
-          for (j=0; j < (ssize_t) image->colors; j++)
-          {
-            sum=0.0;
-            p=image->colormap+j;
-            distance_squared=
-              squares[(ssize_t) (pixel.red-ScaleQuantumToChar((const Quantum) p->red))]+
-              squares[(ssize_t) (pixel.green-ScaleQuantumToChar((const Quantum) p->green))]+
-              squares[(ssize_t) (pixel.blue-ScaleQuantumToChar((const Quantum) p->blue))];
-            numerator=distance_squared;
-            for (k=0; k < (ssize_t) image->colors; k++)
-            {
-              p=image->colormap+k;
-              distance_squared=
-                squares[(ssize_t) (pixel.red-ScaleQuantumToChar((const Quantum) p->red))]+
-                squares[(ssize_t) (pixel.green-ScaleQuantumToChar((const Quantum) p->green))]+
-                squares[(ssize_t) (pixel.blue-ScaleQuantumToChar((const Quantum) p->blue))];
-              ratio=numerator/distance_squared;
-              sum+=SegmentPower(ratio);
-            }
-            if ((sum != 0.0) && ((1.0/sum) > local_minima))
-              {
-                /*
-                  Classify this pixel.
-                */
-                local_minima=1.0/sum;
-                SetPixelIndex(image,(Quantum) j,q);
-              }
-          }
-        }
+        ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
