@@ -553,6 +553,78 @@ Code (Claude Opus 5.5) during task M01, on `magnify.c`.
 
 ---
 
+## Recipe M - Merge Duplicate Parameter
+
+**Use when:** CodeScene reports *Excess Number of Function Arguments* on a `static`
+function and every call passes the same argument to two of its parameters, such as a
+comparison of two pixels that are always taken from one buffer.
+
+**Not covered by:** Recipe E, P, O and T, which move code into a new function and leave
+existing signatures alone; Recipe D, which merges two copies of a block, not two
+parameters; Recipe B, which bundles parameters that carry different values.
+
+**How:**
+
+1. The function is `static` (or `static inline`), declared in this file only, and no
+   pointer to it is taken: a direct call is the only way in.
+2. Two of its parameters, `p1` and `p2`, have the same type, and no write to either
+   appears in the body.
+3. At **every** call, the arguments for `p1` and `p2` are the same identifier, a
+   parameter or local the call does not modify, so both evaluate to one value. Not a
+   function call, not `*p++`, not an expression with side effects.
+4. Remove `p2` from the parameter list and write `p1` for every use of `p2` in the body.
+   Change nothing else.
+5. Remove the matching argument from every call, macros that expand to a call included.
+6. Build: a call left with the old number of arguments does not compile.
+
+**Before:**
+
+```c
+static inline int PixelsEqual(const Quantum *source1,ssize_t offset1,
+  const Quantum *source2,ssize_t offset2,const size_t channels)
+{
+  ...
+    if (source1[offset1+i] != source2[offset2+i])
+  ...
+}
+...
+  if (PixelsEqual(pixels,1,pixels,7,channels) ||
+      PixelsEqual(pixels,3,pixels,5,channels))
+```
+
+**After:**
+
+```c
+static inline int PixelsEqual(const Quantum *source,ssize_t offset1,
+  ssize_t offset2,const size_t channels)
+{
+  ...
+    if (source[offset1+i] != source[offset2+i])
+  ...
+}
+...
+  if (PixelsEqual(pixels,1,7,channels) ||
+      PixelsEqual(pixels,3,5,channels))
+```
+
+**Careful:**
+
+- List every call before you start (`grep -n` the name across the source tree); a single
+  call that passes two different buffers ends the recipe.
+- Two arguments that look alike can differ: `p` and `p` across a loop that advances `p`
+  are the same identifier at the same call, which is what matters, but `p` and `q` that
+  happen to point to the same place today are not.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and step 3 checked by
+reading every call.
+
+**Provenance:** 2026-10-24, from `magnify.c`'s `PixelsEqual`, whose 84 calls all pass one
+buffer twice; part of the owner's go-ahead the same day for removing *Excess Number of
+Function Arguments* from the magnify kernels. Added by Claude Code (Claude Opus 5.5)
+during task M01, on `magnify.c`.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -595,6 +667,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | AMEND | rule 2 | A step that leaves the score flat is kept when the review shows progress on the targeted function and the commit names the finding and the next step | A file score moves only once a function drops below a finding's threshold, so the founding rule reverts correct steps towards it; the earlier campaign relaxed the same rule on its first morning | owner |
 | 2026-10-24 | NEW | O | Extract Function with Out-Parameters: a selection outside OpenMP that sets several locals together moves to a `static void` function taking the written locals by pointer | `MagnifyImage`'s method `switch` (cc 33 to 18, 212 to 123 lines in a probe) and the same shape in `AcquireResizeFilter` and `ScaleImage`, all refused by Recipe E's step 4 | mandate (2026-10-24) |
 | 2026-10-24 | NEW | T | Extract Function Returning the Loop Status: a block inside a parallel loop body whose only outer write is `status=MagickFalse;` moves to a `static MagickBooleanType` function; the caller writes `status` from its result. The OpenMP section names it as the one exception to Recipe E's proviso | `MagnifyImage`'s column loop (probe: bumps 3 to 2, 109 to 94 lines) and the same shape in `resize.c`'s `InterpolativeResizeImage`, `SampleImage` and both filters | owner |
+| 2026-10-24 | NEW | M | Merge Duplicate Parameter: a `static` function whose every call passes one identifier to two parameters of the same type loses the second | `magnify.c`'s `PixelsEqual` (5 arguments, 84 calls, all passing one buffer twice) | owner |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
