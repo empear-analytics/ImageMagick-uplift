@@ -497,6 +497,14 @@ static double KapurThreshold(const Image *image,const double *histogram,
   return(100.0*threshold/MaxIntensity);
 }
 
+static inline MagickBooleanType IsOTSUBufferMissing(const double *myu,
+  const double *omega,const double *probability,const double *sigma)
+{
+  return(((myu == (double *) NULL) || (omega == (double *) NULL) ||
+    (probability == (double *) NULL) || (sigma == (double *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static double OTSUThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
@@ -519,8 +527,7 @@ static double OTSUThreshold(const Image *image,const double *histogram,
   probability=(double *) AcquireQuantumMemory(MaxIntensity+1UL,
     sizeof(*probability));
   sigma=(double *) AcquireQuantumMemory(MaxIntensity+1UL,sizeof(*sigma));
-  if ((myu == (double *) NULL) || (omega == (double *) NULL) ||
-      (probability == (double *) NULL) || (sigma == (double *) NULL))
+  if (IsOTSUBufferMissing(myu,omega,probability,sigma) != MagickFalse)
     {
       if (sigma != (double *) NULL)
         sigma=(double *) RelinquishMagickMemory(sigma);
