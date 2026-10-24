@@ -1658,6 +1658,58 @@ static KernelInfo *AcquireConvexHullKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch ( (int) args->rho ) {
+    case 1:
+    default:
+      /* Traditional Skeleton...
+      ** A cyclically rotated single kernel
+      */
+      kernel=AcquireKernelInfo("ThinSE:482",exception);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ExpandRotateKernelInfo(kernel, 45.0); /* 8 rotations */
+      break;
+    case 2:
+      /* HIPR Variation of the cyclic skeleton
+      ** Corners of the traditional method made more forgiving,
+      ** but the retain the same cyclic order.
+      */
+      kernel=AcquireKernelInfo("ThinSE:482; ThinSE:87x90;",exception);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      if (kernel->next == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      kernel->type = type;
+      kernel->next->type = type;
+      ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotations of the 2 kernels */
+      break;
+    case 3:
+      /* Dan Bloomberg Skeleton, from his paper on 3x3 thinning SE's
+      ** "Connectivity-Preserving Morphological Image Transformations"
+      ** by Dan S. Bloomberg, available on Leptonica, Selected Papers,
+      **   http://www.leptonica.com/papers/conn.pdf
+      */
+      kernel=AcquireKernelInfo("ThinSE:41; ThinSE:42; ThinSE:43",
+        exception);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      if (kernel->next == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      if (kernel->next->next == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      kernel->type = type;
+      kernel->next->type = type;
+      kernel->next->next->type = type;
+      ExpandMirrorKernelInfo(kernel); /* 12 kernels total */
+      break;
+   }
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -2059,55 +2111,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case ConvexHullKernel:
         return(AcquireConvexHullKernel(kernel,type));
       case SkeletonKernel:
-        {
-          switch ( (int) args->rho ) {
-            case 1:
-            default:
-              /* Traditional Skeleton...
-              ** A cyclically rotated single kernel
-              */
-              kernel=AcquireKernelInfo("ThinSE:482",exception);
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              kernel->type = type;
-              ExpandRotateKernelInfo(kernel, 45.0); /* 8 rotations */
-              break;
-            case 2:
-              /* HIPR Variation of the cyclic skeleton
-              ** Corners of the traditional method made more forgiving,
-              ** but the retain the same cyclic order.
-              */
-              kernel=AcquireKernelInfo("ThinSE:482; ThinSE:87x90;",exception);
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              if (kernel->next == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              kernel->type = type;
-              kernel->next->type = type;
-              ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotations of the 2 kernels */
-              break;
-            case 3:
-              /* Dan Bloomberg Skeleton, from his paper on 3x3 thinning SE's
-              ** "Connectivity-Preserving Morphological Image Transformations"
-              ** by Dan S. Bloomberg, available on Leptonica, Selected Papers,
-              **   http://www.leptonica.com/papers/conn.pdf
-              */
-              kernel=AcquireKernelInfo("ThinSE:41; ThinSE:42; ThinSE:43",
-                exception);
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              if (kernel->next == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              if (kernel->next->next == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              kernel->type = type;
-              kernel->next->type = type;
-              kernel->next->next->type = type;
-              ExpandMirrorKernelInfo(kernel); /* 12 kernels total */
-              break;
-           }
-          break;
-        }
+        return(AcquireSkeletonKernel(kernel,type,args,exception));
       case ThinSEKernel:
         { /* Special kernels for general thinning, while preserving connections
           ** "Connectivity-Preserving Morphological Image Transformations"
