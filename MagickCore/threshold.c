@@ -389,6 +389,15 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
 %
 */
 
+static inline MagickBooleanType IsKapurBufferMissing(
+  const double *cumulative_histogram,const double *black_entropy,
+  const double *white_entropy)
+{
+  return(((cumulative_histogram == (double *) NULL) ||
+    (black_entropy == (double *) NULL) || (white_entropy == (double *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static double KapurThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
@@ -418,8 +427,8 @@ static double KapurThreshold(const Image *image,const double *histogram,
     sizeof(*black_entropy));
   white_entropy=(double *) AcquireQuantumMemory(MaxIntensity+1UL,
     sizeof(*white_entropy));
-  if ((cumulative_histogram == (double *) NULL) ||
-      (black_entropy == (double *) NULL) || (white_entropy == (double *) NULL))
+  if (IsKapurBufferMissing(cumulative_histogram,black_entropy,white_entropy) !=
+      MagickFalse)
     {
       if (white_entropy != (double *) NULL)
         white_entropy=(double *) RelinquishMagickMemory(white_entropy);
