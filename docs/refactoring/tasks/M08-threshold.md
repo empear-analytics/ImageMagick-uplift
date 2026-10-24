@@ -234,7 +234,7 @@ For each function: the recipes applied, the score before and after, and the revi
 ### Report (2026-10-25, Mac, overnight)
 
 **Result: Code Health 1.89 → 2.08** (`cs-mcp` 1.5.12). Branch `campaign/M08-threshold`,
-stacked on `campaign/M07-statistic` (PR #13). 6 refactor commits: 5 Recipe P
+stacked on `campaign/M07-statistic` (PR #13). 5 refactor commits: 4 Recipe P
 (oracle-verified) and 1 Recipe E (guard-verified, because a survivor sits on the moved
 loop's header).
 
