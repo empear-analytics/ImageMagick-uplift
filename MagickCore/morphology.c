@@ -4340,6 +4340,24 @@ static CompositeOperator GetMorphologyCompose(const Image *image,
   return(compose);
 }
 
+static double GetConvolveBias(const Image *image,double bias,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  artifact = GetImageArtifact(image,"convolve:bias");
+  if ( artifact != (const char *) NULL) {
+    if (IsGeometry(artifact) == MagickFalse)
+      (void) ThrowMagickException(exception,GetMagickModule(),
+           OptionWarning,"InvalidSetting","'%s' '%s'",
+           "convolve:bias",artifact);
+    else
+      bias=StringToDoubleInterval(artifact,(double) QuantumRange+1.0);
+  }
+  return(bias);
+}
+
 MagickExport Image *MorphologyImage(const Image *image,
   const MorphologyMethod method,const ssize_t iterations,
   const KernelInfo *kernel,ExceptionInfo *exception)
@@ -4375,15 +4393,7 @@ MagickExport Image *MorphologyImage(const Image *image,
    */
   if ( method == ConvolveMorphology || method == CorrelateMorphology ) {
       /* Get the bias value as it will be needed */
-      artifact = GetImageArtifact(image,"convolve:bias");
-      if ( artifact != (const char *) NULL) {
-        if (IsGeometry(artifact) == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-               OptionWarning,"InvalidSetting","'%s' '%s'",
-               "convolve:bias",artifact);
-        else
-          bias=StringToDoubleInterval(artifact,(double) QuantumRange+1.0);
-      }
+      bias=GetConvolveBias(image,bias,exception);
 
       /* Scale kernel according to user wishes */
       artifact = GetImageArtifact(image,"convolve:scale");
