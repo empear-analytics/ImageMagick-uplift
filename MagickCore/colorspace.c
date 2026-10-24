@@ -1571,6 +1571,14 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 %   o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsLinearGammaColorspace(
+  const ColorspaceType colorspace)
+{
+  return(((IsRGBColorspace(colorspace) != MagickFalse) ||
+    (colorspace == XYZColorspace) || (colorspace == xyYColorspace)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageColorspace(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -1600,8 +1608,7 @@ MagickExport MagickBooleanType SetImageColorspace(Image *image,
       type=GrayscaleType;
     }
   else
-    if ((IsRGBColorspace(colorspace) != MagickFalse) ||
-        (colorspace == XYZColorspace) || (colorspace == xyYColorspace))
+    if (IsLinearGammaColorspace(colorspace) != MagickFalse)
       image->gamma=1.000;
     else
       {
