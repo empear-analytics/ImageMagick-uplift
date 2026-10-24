@@ -527,12 +527,34 @@ MagickExport Image *CharcoalImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+#define Colorize(pixel,blend_percentage,colorize)  \
+  ((((double) pixel)*(100.0-(blend_percentage))+(colorize)*(blend_percentage))/100.0)
+
+static void ColorizePixelChannels(const Image *colorize_image,
+  const PixelInfo *blend_percentage,const PixelInfo *colorize,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(colorize_image); i++)
+  {
+    PixelTrait traits = GetPixelChannelTraits(colorize_image,
+      (PixelChannel) i);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    if ((traits & CopyPixelTrait) != 0)
+      continue;
+    SetPixelChannel(colorize_image,(PixelChannel) i,ClampToQuantum(
+      Colorize(q[i],GetPixelInfoChannel(blend_percentage,(PixelChannel) i),
+      GetPixelInfoChannel(colorize,(PixelChannel) i))),q);
+  }
+}
+
 MagickExport Image *ColorizeImage(const Image *image,const char *blend,
   const PixelInfo *colorize,ExceptionInfo *exception)
 {
 #define ColorizeImageTag  "Colorize/Image"
-#define Colorize(pixel,blend_percentage,colorize)  \
-  ((((double) pixel)*(100.0-(blend_percentage))+(colorize)*(blend_percentage))/100.0)
 
   CacheView
     *image_view;
@@ -635,21 +657,7 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
       }
     for (x=0; x < (ssize_t) colorize_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(colorize_image); i++)
-      {
-        PixelTrait traits = GetPixelChannelTraits(colorize_image,
-          (PixelChannel) i);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        if ((traits & CopyPixelTrait) != 0)
-          continue;
-        SetPixelChannel(colorize_image,(PixelChannel) i,ClampToQuantum(
-          Colorize(q[i],GetPixelInfoChannel(&blend_percentage,(PixelChannel) i),
-          GetPixelInfoChannel(colorize,(PixelChannel) i))),q);
-      }
+      ColorizePixelChannels(colorize_image,&blend_percentage,colorize,q);
       q+=(ptrdiff_t) GetPixelChannels(colorize_image);
     }
     sync=SyncCacheViewAuthenticPixels(image_view,exception);
