@@ -3092,6 +3092,33 @@ static PixelInfo ParseTintColorVector(const Image *image,const char *blend)
   return(color_vector);
 }
 
+static void TintPixel(const Image *image,const Image *tint_image,
+  const PixelInfo *color_vector,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  PixelInfo
+    pixel;
+
+  double
+    weight;
+
+  GetPixelInfo(image,&pixel);
+  weight=QuantumScale*(double) GetPixelRed(image,p)-0.5;
+  pixel.red=(MagickRealType) GetPixelRed(image,p)+color_vector->red*
+    (1.0-(4.0*(weight*weight)));
+  weight=QuantumScale*(double) GetPixelGreen(image,p)-0.5;
+  pixel.green=(MagickRealType) GetPixelGreen(image,p)+color_vector->green*
+    (1.0-(4.0*(weight*weight)));
+  weight=QuantumScale*(double) GetPixelBlue(image,p)-0.5;
+  pixel.blue=(MagickRealType) GetPixelBlue(image,p)+color_vector->blue*
+    (1.0-(4.0*(weight*weight)));
+  weight=QuantumScale*(double) GetPixelBlack(image,p)-0.5;
+  pixel.black=(MagickRealType) GetPixelBlack(image,p)+color_vector->black*
+    (1.0-(4.0*(weight*weight)));
+  pixel.alpha=(MagickRealType) GetPixelAlpha(image,p);
+  SetPixelViaPixelInfo(tint_image,&pixel,q);
+}
+
 MagickExport Image *TintImage(const Image *image,const char *blend,
   const PixelInfo *tint,ExceptionInfo *exception)
 {
@@ -3185,27 +3212,7 @@ MagickExport Image *TintImage(const Image *image,const char *blend,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      PixelInfo
-        pixel;
-
-      double
-        weight;
-
-      GetPixelInfo(image,&pixel);
-      weight=QuantumScale*(double) GetPixelRed(image,p)-0.5;
-      pixel.red=(MagickRealType) GetPixelRed(image,p)+color_vector.red*
-        (1.0-(4.0*(weight*weight)));
-      weight=QuantumScale*(double) GetPixelGreen(image,p)-0.5;
-      pixel.green=(MagickRealType) GetPixelGreen(image,p)+color_vector.green*
-        (1.0-(4.0*(weight*weight)));
-      weight=QuantumScale*(double) GetPixelBlue(image,p)-0.5;
-      pixel.blue=(MagickRealType) GetPixelBlue(image,p)+color_vector.blue*
-        (1.0-(4.0*(weight*weight)));
-      weight=QuantumScale*(double) GetPixelBlack(image,p)-0.5;
-      pixel.black=(MagickRealType) GetPixelBlack(image,p)+color_vector.black*
-        (1.0-(4.0*(weight*weight)));
-      pixel.alpha=(MagickRealType) GetPixelAlpha(image,p);
-      SetPixelViaPixelInfo(tint_image,&pixel,q);
+      TintPixel(image,tint_image,&color_vector,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(tint_image);
     }
