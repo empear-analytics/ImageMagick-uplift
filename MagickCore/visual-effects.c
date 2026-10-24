@@ -135,6 +135,33 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AddNoisePixelChannels(const Image *image,
+  const Image *noise_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q,RandomInfo *magick_restrict random_info,
+  const NoiseType noise_type,const double attenuate)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait noise_traits=GetPixelChannelTraits(noise_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (noise_traits == UndefinedPixelTrait))
+      continue;
+    if ((noise_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(noise_image,channel,p[i],q);
+        continue;
+      }
+    SetPixelChannel(noise_image,channel,ClampToQuantum(
+      GenerateDifferentialNoise(random_info,p[i],noise_type,attenuate)),
+      q);
+  }
+}
+
 MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
   const double attenuate,ExceptionInfo *exception)
 {
@@ -223,26 +250,8 @@ MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait noise_traits=GetPixelChannelTraits(noise_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (noise_traits == UndefinedPixelTrait))
-          continue;
-        if ((noise_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(noise_image,channel,p[i],q);
-            continue;
-          }
-        SetPixelChannel(noise_image,channel,ClampToQuantum(
-          GenerateDifferentialNoise(random_info[id],p[i],noise_type,attenuate)),
-          q);
-      }
+      AddNoisePixelChannels(image,noise_image,p,q,random_info[id],noise_type,
+        attenuate);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(noise_image);
     }
