@@ -2334,6 +2334,15 @@ static void ExpandMirrorKernelInfo(KernelInfo *kernel)
   return;
 }
 
+static inline MagickBooleanType IsKernelShapeDifferent(
+  const KernelInfo *kernel1,const KernelInfo *kernel2)
+{
+  return((    kernel1->width != kernel2->width
+       || kernel1->height != kernel2->height
+       || kernel1->x != kernel2->x
+       || kernel1->y != kernel2->y ) ? MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2374,10 +2383,7 @@ static MagickBooleanType SameKernelInfo(const KernelInfo *kernel1,
     i;
 
   /* check size and origin location */
-  if (    kernel1->width != kernel2->width
-       || kernel1->height != kernel2->height
-       || kernel1->x != kernel2->x
-       || kernel1->y != kernel2->y )
+  if (IsKernelShapeDifferent(kernel1,kernel2) != MagickFalse)
     return MagickFalse;
 
   /* check actual kernel values */
