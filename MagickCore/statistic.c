@@ -2046,6 +2046,32 @@ static inline long double MagickSafeReciprocalLD(const long double x)
   return(sign/MagickEpsilon);
 }
 
+static void UpdateWelfordMoments(ChannelStatistics *cs,
+  const Quantum *magick_restrict p,const ssize_t i)
+{
+  /* Calculate running totals for Welford's method.
+  */
+  double
+    n = cs->area,
+    n1 = cs->area-1;
+
+  long double
+    delta,
+    delta_n,
+    delta_n2,
+    term1;
+
+  delta=(double) p[i]-cs->M1;
+  delta_n=delta/n;
+  delta_n2=delta_n*delta_n;
+  term1=delta*delta_n*n1;
+  cs->M4+=term1*delta_n2*(n*n-3.0*n+3.0)+6.0*delta_n2*cs->M2-4.0*
+    delta_n*cs->M3;
+  cs->M3+=term1*delta_n*(n-2.0)-3.0*delta_n*cs->M2;
+  cs->M2+=term1;
+  cs->M1+=delta_n;
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2181,29 +2207,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
         cs->sum_cubed+=(double) p[i]*(double) p[i]*(double) p[i];
         cs->sum_fourth_power+=(double) p[i]*(double) p[i]*(double) p[i]*
           (double) p[i];
-        {
-          /* Calculate running totals for Welford's method.
-          */
-          double
-            n = cs->area,
-            n1 = cs->area-1;
-
-          long double
-            delta,
-            delta_n,
-            delta_n2,
-            term1;
-
-          delta=(double) p[i]-cs->M1;
-          delta_n=delta/n;
-          delta_n2=delta_n*delta_n;
-          term1=delta*delta_n*n1;
-          cs->M4+=term1*delta_n2*(n*n-3.0*n+3.0)+6.0*delta_n2*cs->M2-4.0*
-            delta_n*cs->M3;
-          cs->M3+=term1*delta_n*(n-2.0)-3.0*delta_n*cs->M2;
-          cs->M2+=term1;
-          cs->M1+=delta_n;
-        }
+        UpdateWelfordMoments(cs,p,i);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
