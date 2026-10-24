@@ -308,6 +308,20 @@ MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Quantum GetPixelMinimumRGB(const Image *image,
+  const Quantum *magick_restrict p)
+{
+  Quantum
+    quantum;
+
+  quantum=GetPixelRed(image,p);
+  if (GetPixelGreen(image,p) < quantum)
+    quantum=GetPixelGreen(image,p);
+  if (GetPixelBlue(image,p) < quantum)
+    quantum=GetPixelBlue(image,p);
+  return(quantum);
+}
+
 MagickExport Image *BlueShiftImage(const Image *image,const double factor,
   ExceptionInfo *exception)
 {
@@ -389,11 +403,7 @@ MagickExport Image *BlueShiftImage(const Image *image,const double factor,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      quantum=GetPixelRed(image,p);
-      if (GetPixelGreen(image,p) < quantum)
-        quantum=GetPixelGreen(image,p);
-      if (GetPixelBlue(image,p) < quantum)
-        quantum=GetPixelBlue(image,p);
+      quantum=GetPixelMinimumRGB(image,p);
       pixel.red=0.5*((double) GetPixelRed(image,p)+factor*(double) quantum);
       pixel.green=0.5*((double) GetPixelGreen(image,p)+factor*(double) quantum);
       pixel.blue=0.5*((double) GetPixelBlue(image,p)+factor*(double) quantum);
