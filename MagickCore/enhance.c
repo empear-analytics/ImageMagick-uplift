@@ -3099,13 +3099,37 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+#define LevelizeValue(x) ClampToQuantum(((MagickRealType) gamma_pow((double) \
+  (QuantumScale*((double) x)),gamma))*(white_point-black_point)+black_point)
+
+static void LevelizeImageRow(const Image *image,const double black_point,
+  const double white_point,const double gamma,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      j;
+
+    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,j);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      q[j]=LevelizeValue(q[j]);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType LevelizeImage(Image *image,
   const double black_point,const double white_point,const double gamma,
   ExceptionInfo *exception)
 {
 #define LevelizeImageTag  "Levelize/Image"
-#define LevelizeValue(x) ClampToQuantum(((MagickRealType) gamma_pow((double) \
-  (QuantumScale*((double) x)),gamma))*(white_point-black_point)+black_point)
 
   CacheView
     *image_view;
@@ -3161,9 +3185,6 @@ MagickExport MagickBooleanType LevelizeImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -3172,21 +3193,7 @@ MagickExport MagickBooleanType LevelizeImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[j]=LevelizeValue(q[j]);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    LevelizeImageRow(image,black_point,white_point,gamma,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
