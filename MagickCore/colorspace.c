@@ -2593,9 +2593,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
     sizeof(*y_map));
   z_map=(TransformPacket *) AcquireQuantumMemory((size_t) MaxMap+1UL,
     sizeof(*z_map));
-  if ((x_map == (TransformPacket *) NULL) ||
-      (y_map == (TransformPacket *) NULL) ||
-      (z_map == (TransformPacket *) NULL))
+  if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
     {
       if (z_map != (TransformPacket *) NULL)
         z_map=(TransformPacket *) RelinquishMagickMemory(z_map);
