@@ -1954,6 +1954,39 @@ static MagickBooleanType GetPHASESimilarity(const Image *image,
   return(MagickTrue);
 }
 
+static double AddPHashDifferences(
+  const ChannelPerceptualHash *channel_phash,
+  const ChannelPerceptualHash *reconstruct_phash,const ssize_t i,
+  double difference)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) channel_phash[0].number_colorspaces; j++)
+  {
+    double
+      alpha,
+      beta;
+
+    ssize_t
+      k;
+
+    for (k=0; k < MaximumNumberOfPerceptualHashes; k++)
+    {
+      double
+        error;
+
+      alpha=channel_phash[i].phash[j][k];
+      beta=reconstruct_phash[i].phash[j][k];
+      error=beta-alpha;
+      if (IsNaN(error) != 0)
+        error=0.0;
+      difference+=error*error;
+    }
+  }
+  return(difference);
+}
+
 static MagickBooleanType GetPHASHSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -1986,9 +2019,6 @@ static MagickBooleanType GetPHASHSimilarity(const Image *image,
     double
       difference = 0.0;
 
-    ssize_t
-      j;
-
     PixelChannel channel = GetPixelChannelChannel(image,i);
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
@@ -1996,28 +2026,8 @@ static MagickBooleanType GetPHASHSimilarity(const Image *image,
     if (((traits & UpdatePixelTrait) == 0) ||
         ((reconstruct_traits & UpdatePixelTrait) == 0))
       continue;
-    for (j=0; j < (ssize_t) channel_phash[0].number_colorspaces; j++)
-    {
-      double
-        alpha,
-        beta;
-
-      ssize_t
-        k;
-
-      for (k=0; k < MaximumNumberOfPerceptualHashes; k++)
-      {
-        double
-          error;
-
-        alpha=channel_phash[i].phash[j][k];
-        beta=reconstruct_phash[i].phash[j][k];
-        error=beta-alpha;
-        if (IsNaN(error) != 0)
-          error=0.0;
-        difference+=error*error;
-      }
-    }
+    difference=AddPHashDifferences(channel_phash,reconstruct_phash,i,
+      difference);
     similarity[i]+=difference;
     similarity[CompositePixelChannel]+=difference;
     channels++;
