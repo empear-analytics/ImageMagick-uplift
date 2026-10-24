@@ -933,6 +933,13 @@ static void DerivativeHistogram(const double *histogram,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType HasObjectAndBackgroundClusters(
+  const ssize_t count,const Cluster *head)
+{
+  return(((count > 1) && (head != (Cluster *) NULL) &&
+    (head->next != (Cluster *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1148,8 +1155,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   }
   object=head;
   background=head;
-  if ((count > 1) && (head != (Cluster *) NULL) && 
-      (head->next != (Cluster *) NULL))
+  if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
     {
       object=head->next;
       for (cluster=object; cluster->next != (Cluster *) NULL; )
