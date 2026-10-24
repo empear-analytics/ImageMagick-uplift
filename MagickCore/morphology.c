@@ -1530,6 +1530,43 @@ static KernelInfo *AcquireLineEndsKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireLineJunctionsKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  /* kernels for finding the junctions of multiple lines */
+  switch ( (int) args->rho ) {
+    case 0:
+    default:
+      /* set of kernels to find all line junctions */
+      return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
+    case 1:
+      /* Y Junction */
+      kernel=ParseKernelArray("3: 1,-,1  -,1,-  -,1,-");
+      break;
+    case 2:
+      /* Diagonal T Junctions */
+      kernel=ParseKernelArray("3: 1,-,-  -,1,-  1,-,1");
+      break;
+    case 3:
+      /* Orthogonal T Junctions */
+      kernel=ParseKernelArray("3: -,-,-  1,1,1  -,1,-");
+      break;
+    case 4:
+      /* Diagonal X Junctions */
+      kernel=ParseKernelArray("3: 1,-,1  -,1,-  1,-,1");
+      break;
+    case 5:
+      /* Orthogonal X Junctions - minimal diamond kernel */
+      kernel=ParseKernelArray("3: -,1,-  1,1,1  -,1,-");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->sigma);
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1925,39 +1962,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       case LineEndsKernel:
         return(AcquireLineEndsKernel(kernel,type,args,exception));
       case LineJunctionsKernel:
-        { /* kernels for finding the junctions of multiple lines */
-          switch ( (int) args->rho ) {
-            case 0:
-            default:
-              /* set of kernels to find all line junctions */
-              return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
-            case 1:
-              /* Y Junction */
-              kernel=ParseKernelArray("3: 1,-,1  -,1,-  -,1,-");
-              break;
-            case 2:
-              /* Diagonal T Junctions */
-              kernel=ParseKernelArray("3: 1,-,-  -,1,-  1,-,1");
-              break;
-            case 3:
-              /* Orthogonal T Junctions */
-              kernel=ParseKernelArray("3: -,-,-  1,1,1  -,1,-");
-              break;
-            case 4:
-              /* Diagonal X Junctions */
-              kernel=ParseKernelArray("3: 1,-,1  -,1,-  1,-,1");
-              break;
-            case 5:
-              /* Orthogonal X Junctions - minimal diamond kernel */
-              kernel=ParseKernelArray("3: -,1,-  1,1,1  -,1,-");
-              break;
-          }
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          RotateKernelInfo(kernel, args->sigma);
-          break;
-        }
+        return(AcquireLineJunctionsKernel(kernel,type,args,exception));
       case RidgesKernel:
         { /* Ridges - Ridge finding kernels */
           KernelInfo
