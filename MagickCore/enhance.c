@@ -4318,16 +4318,57 @@ static inline double InverseScaledSigmoidal(const double a,const double b,
 #endif
 }
 
-MagickExport MagickBooleanType SigmoidalContrastImage(Image *image,
-  const MagickBooleanType sharpen,const double contrast,const double midpoint,
-  ExceptionInfo *exception)
-{
-#define SigmoidalContrastImageTag  "SigmoidalContrast/Image"
 #define ScaledSig(x) (ClampToQuantum((double) QuantumRange* \
   ScaledSigmoidal(contrast,QuantumScale*midpoint,QuantumScale*((double) x))) )
 #define InverseScaledSig(x) (ClampToQuantum((double) QuantumRange* \
   InverseScaledSigmoidal(contrast,QuantumScale*midpoint,QuantumScale* \
   ((double) x))) )
+
+static void SigmoidalContrastColormap(Image *image,
+  const MagickBooleanType sharpen,const double contrast,const double midpoint)
+{
+  ssize_t
+    i;
+
+  if( sharpen != MagickFalse )
+    for (i=0; i < (ssize_t) image->colors; i++)
+    {
+      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+        image->colormap[i].red=(MagickRealType) ScaledSig(
+          image->colormap[i].red);
+      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+        image->colormap[i].green=(MagickRealType) ScaledSig(
+          image->colormap[i].green);
+      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+        image->colormap[i].blue=(MagickRealType) ScaledSig(
+          image->colormap[i].blue);
+      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+        image->colormap[i].alpha=(MagickRealType) ScaledSig(
+          image->colormap[i].alpha);
+    }
+  else
+    for (i=0; i < (ssize_t) image->colors; i++)
+    {
+      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+        image->colormap[i].red=(MagickRealType) InverseScaledSig(
+          image->colormap[i].red);
+      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+        image->colormap[i].green=(MagickRealType) InverseScaledSig(
+          image->colormap[i].green);
+      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+        image->colormap[i].blue=(MagickRealType) InverseScaledSig(
+          image->colormap[i].blue);
+      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+        image->colormap[i].alpha=(MagickRealType) InverseScaledSig(
+          image->colormap[i].alpha);
+    }
+}
+
+MagickExport MagickBooleanType SigmoidalContrastImage(Image *image,
+  const MagickBooleanType sharpen,const double contrast,const double midpoint,
+  ExceptionInfo *exception)
+{
+#define SigmoidalContrastImageTag  "SigmoidalContrast/Image"
 
   CacheView
     *image_view;
@@ -4358,43 +4399,7 @@ MagickExport MagickBooleanType SigmoidalContrastImage(Image *image,
     Sigmoidal-contrast enhance colormap.
   */
   if (image->storage_class == PseudoClass)
-    {
-      ssize_t
-        i;
-
-      if( sharpen != MagickFalse )
-        for (i=0; i < (ssize_t) image->colors; i++)
-        {
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            image->colormap[i].red=(MagickRealType) ScaledSig(
-              image->colormap[i].red);
-          if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            image->colormap[i].green=(MagickRealType) ScaledSig(
-              image->colormap[i].green);
-          if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            image->colormap[i].blue=(MagickRealType) ScaledSig(
-              image->colormap[i].blue);
-          if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-            image->colormap[i].alpha=(MagickRealType) ScaledSig(
-              image->colormap[i].alpha);
-        }
-      else
-        for (i=0; i < (ssize_t) image->colors; i++)
-        {
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            image->colormap[i].red=(MagickRealType) InverseScaledSig(
-              image->colormap[i].red);
-          if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            image->colormap[i].green=(MagickRealType) InverseScaledSig(
-              image->colormap[i].green);
-          if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            image->colormap[i].blue=(MagickRealType) InverseScaledSig(
-              image->colormap[i].blue);
-          if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-            image->colormap[i].alpha=(MagickRealType) InverseScaledSig(
-              image->colormap[i].alpha);
-        }
-    }
+    SigmoidalContrastColormap(image,sharpen,contrast,midpoint);
   /*
     Sigmoidal-contrast enhance image.
   */
