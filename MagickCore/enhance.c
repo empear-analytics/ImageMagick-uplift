@@ -2345,6 +2345,30 @@ static inline double gamma_pow(const double value,const double gamma)
   return(value < 0.0 ? value : pow(value,gamma));
 }
 
+static void GammaImageRow(const Image *image,const Quantum *gamma_map,
+  Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      j;
+
+    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,j);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      q[j]=gamma_map[ScaleQuantumToMap(ClampToQuantum((MagickRealType)
+        q[j]))];
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
   ExceptionInfo *exception)
 {
@@ -2420,9 +2444,6 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2431,22 +2452,7 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[j]=gamma_map[ScaleQuantumToMap(ClampToQuantum((MagickRealType)
-          q[j]))];
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    GammaImageRow(image,gamma_map,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
