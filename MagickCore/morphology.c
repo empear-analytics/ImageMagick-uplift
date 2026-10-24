@@ -4424,6 +4424,35 @@ MagickExport Image *MorphologyImage(const Image *image,
 % This function is currently internal to this module only, but can be exported
 % to other modules if needed.
 */
+static double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
+{
+  /* Rotate a 3x3 square by 45 degree angle */
+  double t  = kernel->values[0];
+  kernel->values[0] = kernel->values[3];
+  kernel->values[3] = kernel->values[6];
+  kernel->values[6] = kernel->values[7];
+  kernel->values[7] = kernel->values[8];
+  kernel->values[8] = kernel->values[5];
+  kernel->values[5] = kernel->values[2];
+  kernel->values[2] = kernel->values[1];
+  kernel->values[1] = t;
+  /* rotate non-centered origin */
+  if ( kernel->x != 1 || kernel->y != 1 ) {
+    ssize_t x,y;
+    x = (ssize_t) kernel->x-1;
+    y = (ssize_t) kernel->y-1;
+         if ( x == y  ) x = 0;
+    else if ( x == 0  ) x = -y;
+    else if ( x == -y ) y = 0;
+    else if ( y == 0  ) y = x;
+    kernel->x = (ssize_t) x+1;
+    kernel->y = (ssize_t) y+1;
+  }
+  angle = fmod(angle+315.0, 360.0);  /* angle reduced 45 degrees */
+  kernel->angle = fmod(kernel->angle+45.0, 360.0);
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -4481,31 +4510,7 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
   if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
     {
       if ( kernel->width == 3 && kernel->height == 3 )
-        { /* Rotate a 3x3 square by 45 degree angle */
-          double t  = kernel->values[0];
-          kernel->values[0] = kernel->values[3];
-          kernel->values[3] = kernel->values[6];
-          kernel->values[6] = kernel->values[7];
-          kernel->values[7] = kernel->values[8];
-          kernel->values[8] = kernel->values[5];
-          kernel->values[5] = kernel->values[2];
-          kernel->values[2] = kernel->values[1];
-          kernel->values[1] = t;
-          /* rotate non-centered origin */
-          if ( kernel->x != 1 || kernel->y != 1 ) {
-            ssize_t x,y;
-            x = (ssize_t) kernel->x-1;
-            y = (ssize_t) kernel->y-1;
-                 if ( x == y  ) x = 0;
-            else if ( x == 0  ) x = -y;
-            else if ( x == -y ) y = 0;
-            else if ( y == 0  ) y = x;
-            kernel->x = (ssize_t) x+1;
-            kernel->y = (ssize_t) y+1;
-          }
-          angle = fmod(angle+315.0, 360.0);  /* angle reduced 45 degrees */
-          kernel->angle = fmod(kernel->angle+45.0, 360.0);
-        }
+        angle=RotateKernelBy45Degrees(kernel,angle);
       else
         perror("Unable to rotate non-3x3 kernel by 45 degrees");
     }
