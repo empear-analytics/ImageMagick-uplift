@@ -2482,6 +2482,36 @@ static inline void Hq2X(const Image *source,const Quantum *pixels,
     channels,4,6,3,7,1,5);
 }
 
+static inline MagickBooleanType IsFish2XUniform(const int ae,const int bd,
+  const int ab)
+{
+  return((ae && bd && ab) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsFish2XTopOdd(const int ad,const int de,
+  const int ab)
+{
+  return((ad && de && !ab) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsFish2XTopLeftOdd(const int be,const int de,
+  const int ab)
+{
+  return((be && de && !ab) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsFish2XCentreOdd(const int ad,const int ab,
+  const int be)
+{
+  return((ad && ab && !be) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsFish2XLeftOdd(const int ab,const int be,
+  const int ad)
+{
+  return((ab && be && !ad) ? MagickTrue : MagickFalse);
+}
+
 static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
   const size_t channels)
 {
@@ -2542,27 +2572,27 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
   de=PixelsEqual(pixels,3,pixels,4,channels);
   ad=PixelsEqual(pixels,0,pixels,3,channels);
   be=PixelsEqual(pixels,1,pixels,4,channels);
-  if (ae && bd && ab)
+  if (IsFish2XUniform(ae,bd,ab) != MagickFalse)
     {
       CopyPixels(pixels,0,result,3,channels);
       return;
     }
-  if (ad && de && !ab)
+  if (IsFish2XTopOdd(ad,de,ab) != MagickFalse)
     {
       Corner(1,0,4,3)
       return;
     }
-  if (be && de && !ab)
+  if (IsFish2XTopLeftOdd(be,de,ab) != MagickFalse)
     {
       Corner(0,1,3,4)
       return;
     }
-  if (ad && ab && !be)
+  if (IsFish2XCentreOdd(ad,ab,be) != MagickFalse)
     {
       Corner(4,3,1,0)
       return;
     }
-  if (ab && be && !ad)
+  if (IsFish2XLeftOdd(ab,be,ad) != MagickFalse)
     {
       Corner(3,0,4,1)
       return;
