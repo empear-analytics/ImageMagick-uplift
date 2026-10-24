@@ -262,6 +262,14 @@ gate; every moved block checked by script to be identical apart from indentation
 `GetImageDistortions` and `GetSimilarityMetric` leave Large Method; `CompareImages` leaves
 Complex Conditional.
 
+**Correction.** `GetSimilarityForMetric` was extracted with a `const Image *image`
+parameter, but `GetMEPPSimilarity`, one of the functions it dispatches to, takes
+`Image *` (it writes `image->error`): the compiler warned that the call discards a
+qualifier the original never discarded. `build.sh` writes compiler output to
+`build-oracle/cand/make.log`, which the per-step checks did not read; found while
+working on M03 and fixed in a follow-up commit (the parameter is now `Image *`, the type
+all three callers pass). The per-step check now greps `make.log` for the changed file.
+
 **Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged,
 `gaps/c5651ffad8` (the known log-map order tie).
 

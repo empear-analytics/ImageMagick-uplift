@@ -2484,7 +2484,7 @@ static MagickBooleanType GetDSSIMSimilarity(const Image *image,
   return(status);
 }
 
-static MagickBooleanType GetSimilarityForMetric(const Image *image,
+static MagickBooleanType GetSimilarityForMetric(Image *image,
   const Image *reconstruct_image,const MetricType metric,
   double *channel_similarity,ExceptionInfo *exception)
 {
