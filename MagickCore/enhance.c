@@ -1410,6 +1410,29 @@ static inline void Contrast(const int sign,double *red,double *green,
   ConvertHSBToRGB(hue,saturation,brightness,red,green,blue);
 }
 
+static void ContrastImageRow(const Image *image,const int sign,Quantum *q)
+{
+  double
+    blue,
+    green,
+    red;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    red=(double) GetPixelRed(image,q);
+    green=(double) GetPixelGreen(image,q);
+    blue=(double) GetPixelBlue(image,q);
+    Contrast(sign,&red,&green,&blue);
+    SetPixelRed(image,ClampToQuantum(red),q);
+    SetPixelGreen(image,ClampToQuantum(green),q);
+    SetPixelBlue(image,ClampToQuantum(blue),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType ContrastImage(Image *image,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
@@ -1475,16 +1498,8 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    double
-      blue,
-      green,
-      red;
-
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1494,17 +1509,7 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      red=(double) GetPixelRed(image,q);
-      green=(double) GetPixelGreen(image,q);
-      blue=(double) GetPixelBlue(image,q);
-      Contrast(sign,&red,&green,&blue);
-      SetPixelRed(image,ClampToQuantum(red),q);
-      SetPixelGreen(image,ClampToQuantum(green),q);
-      SetPixelBlue(image,ClampToQuantum(blue),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ContrastImageRow(image,sign,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
