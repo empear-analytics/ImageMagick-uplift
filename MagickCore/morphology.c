@@ -1086,6 +1086,53 @@ static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  const size_t
+    max_order = (sizeof(size_t) > 4) ? 20 : 12;
+
+  size_t
+    order_f;
+
+  if (args->rho < 1.0)
+    kernel->width = kernel->height = 3;  /* default radius = 1 */
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+
+    /* Check if kernel order (width-1) would overflow fact() */
+  if ((kernel->width-1) > max_order)
+    return(DestroyKernelInfo(kernel));
+
+  order_f = fact(kernel->width-1);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set all kernel values within diamond area to scale given */
+  for ( i=0, v=0; v < (ssize_t)kernel->height; v++)
+    {
+      size_t
+        alpha = order_f / ( fact((size_t) v) * fact(kernel->height-(size_t) v-1) );
+
+      for ( u=0; u < (ssize_t)kernel->width; u++, i++)
+        kernel->positive_range += kernel->values[i] = (double)
+          (alpha * order_f / ( fact((size_t) u) * fact(kernel->height-(size_t) u-1) ));
+    }
+  kernel->minimum = 1.0;
+  kernel->maximum = kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width];
+  kernel->negative_range = 0.0;
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1351,43 +1398,7 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
     case CometKernel:
       return(AcquireCometKernel(kernel,args));
     case BinomialKernel:
-      {
-        const size_t
-          max_order = (sizeof(size_t) > 4) ? 20 : 12;
-
-        size_t
-          order_f;
-
-        if (args->rho < 1.0)
-          kernel->width = kernel->height = 3;  /* default radius = 1 */
-        else
-          kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          /* Check if kernel order (width-1) would overflow fact() */
-        if ((kernel->width-1) > max_order)
-          return(DestroyKernelInfo(kernel));
-
-        order_f = fact(kernel->width-1);
-
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        /* set all kernel values within diamond area to scale given */
-        for ( i=0, v=0; v < (ssize_t)kernel->height; v++)
-          {
-            size_t
-              alpha = order_f / ( fact((size_t) v) * fact(kernel->height-(size_t) v-1) );
-
-            for ( u=0; u < (ssize_t)kernel->width; u++, i++)
-              kernel->positive_range += kernel->values[i] = (double)
-                (alpha * order_f / ( fact((size_t) u) * fact(kernel->height-(size_t) u-1) ));
-          }
-        kernel->minimum = 1.0;
-        kernel->maximum = kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width];
-        kernel->negative_range = 0.0;
-        break;
-      }
+      return(AcquireBinomialKernel(kernel,args));
 
     /*
       Convolution Kernels - Well Known Named Constant Kernels
