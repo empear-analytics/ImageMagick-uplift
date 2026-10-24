@@ -3611,6 +3611,80 @@ static MagickBooleanType HorizontalFilter(
   return(status);
 }
 
+static void FilterVerticalPixel(const Image *image,
+  const Image *resize_image,const ContributionInfo *contribution,
+  const ssize_t n,const ssize_t start,const ssize_t stop,const double bisect,
+  const ssize_t x,const Quantum *p,Quantum *q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      alpha,
+      gamma,
+      pixel;
+
+    PixelChannel
+      channel;
+
+    PixelTrait
+      resize_traits,
+      traits;
+
+    ssize_t
+      j,
+      k;
+
+    channel=GetPixelChannelChannel(image,i);
+    traits=GetPixelChannelTraits(image,channel);
+    resize_traits=GetPixelChannelTraits(resize_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (resize_traits == UndefinedPixelTrait))
+      continue;
+    if (((resize_traits & CopyPixelTrait) != 0) ||
+        (GetPixelWriteMask(resize_image,q) <= (QuantumRange/2)))
+      {
+        j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
+          stop-1.0)+0.5);
+        k=(ssize_t) ((contribution[j-start].pixel-contribution[0].pixel)*
+          (ssize_t) image->columns+x);
+        SetPixelChannel(resize_image,channel,p[k*(ssize_t)
+          GetPixelChannels(image)+i],q);
+        continue;
+      }
+    pixel=0.0;
+    if ((resize_traits & BlendPixelTrait) == 0)
+      {
+        /*
+          No alpha blending.
+        */
+        for (j=0; j < n; j++)
+        {
+          k=(ssize_t) ((contribution[j].pixel-contribution[0].pixel)*
+            (ssize_t) image->columns+x);
+          alpha=contribution[j].weight;
+          pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
+        }
+        SetPixelChannel(resize_image,channel,ClampToQuantum(pixel),q);
+        continue;
+      }
+    gamma=0.0;
+    for (j=0; j < n; j++)
+    {
+      k=(ssize_t) ((contribution[j].pixel-contribution[0].pixel)*
+        (ssize_t) image->columns+x);
+      alpha=contribution[j].weight*QuantumScale*(double)
+       GetPixelAlpha(image,p+k*(ssize_t) GetPixelChannels(image));
+      pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
+      gamma+=alpha;
+    }
+    gamma=MagickSafeReciprocal(gamma);
+    SetPixelChannel(resize_image,channel,ClampToQuantum(gamma*pixel),q);
+  }
+}
+
 static MagickBooleanType VerticalFilter(
   const ResizeFilter *magick_restrict resize_filter,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
@@ -3727,73 +3801,8 @@ static MagickBooleanType VerticalFilter(
       }
     for (x=0; x < (ssize_t) resize_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          alpha,
-          gamma,
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          resize_traits,
-          traits;
-
-        ssize_t
-          j,
-          k;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        resize_traits=GetPixelChannelTraits(resize_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (resize_traits == UndefinedPixelTrait))
-          continue;
-        if (((resize_traits & CopyPixelTrait) != 0) ||
-            (GetPixelWriteMask(resize_image,q) <= (QuantumRange/2)))
-          {
-            j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
-              stop-1.0)+0.5);
-            k=(ssize_t) ((contribution[j-start].pixel-contribution[0].pixel)*
-              (ssize_t) image->columns+x);
-            SetPixelChannel(resize_image,channel,p[k*(ssize_t)
-              GetPixelChannels(image)+i],q);
-            continue;
-          }
-        pixel=0.0;
-        if ((resize_traits & BlendPixelTrait) == 0)
-          {
-            /*
-              No alpha blending.
-            */
-            for (j=0; j < n; j++)
-            {
-              k=(ssize_t) ((contribution[j].pixel-contribution[0].pixel)*
-                (ssize_t) image->columns+x);
-              alpha=contribution[j].weight;
-              pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
-            }
-            SetPixelChannel(resize_image,channel,ClampToQuantum(pixel),q);
-            continue;
-          }
-        gamma=0.0;
-        for (j=0; j < n; j++)
-        {
-          k=(ssize_t) ((contribution[j].pixel-contribution[0].pixel)*
-            (ssize_t) image->columns+x);
-          alpha=contribution[j].weight*QuantumScale*(double)
-           GetPixelAlpha(image,p+k*(ssize_t) GetPixelChannels(image));
-          pixel+=alpha*(double) p[k*(ssize_t) GetPixelChannels(image)+i];
-          gamma+=alpha;
-        }
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(resize_image,channel,ClampToQuantum(gamma*pixel),q);
-      }
+      FilterVerticalPixel(image,resize_image,contribution,n,start,stop,bisect,
+        x,p,q);
       q+=(ptrdiff_t) GetPixelChannels(resize_image);
     }
     if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
