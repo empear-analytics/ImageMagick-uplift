@@ -1160,10 +1160,53 @@ static Image *CloneMagnifySourceImage(const Image *image,
   return(source_image);
 }
 
+#define MaxMagnification  9
+
+static MagickBooleanType MagnifyImageRow(const Image *source_image,
+  CacheView *image_view,const Image *magnify_image,const ssize_t y,
+  const size_t width,const size_t magnification,
+  void (*scaling_method)(const Image *,const Quantum *,Quantum *,size_t),
+  Quantum *q,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  Quantum
+    r[MaxMagnification*MaxPixelChannels];  /* result pixels */
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  for (x=0; x < (ssize_t) source_image->columns; x++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    size_t
+      channels;
+
+    p=GetCacheViewVirtualPixels(image_view,x-width/2,y-width/2,width,width,
+      exception);
+    if (p == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    channels=GetPixelChannels(source_image);
+    scaling_method(source_image,p,r,channels);
+    /*
+      Copy the result pixels into the final image.
+    */
+    CopyMagnifiedPixels(magnify_image,r,channels,magnification,q);
+    q+=(ptrdiff_t) magnification*GetPixelChannels(magnify_image);
+  }
+  return(status);
+}
+
 MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
 {
 #define MagnifyImageTag  "Magnify/Image"
-#define MaxMagnification  9
 
   CacheView
     *image_view,
@@ -1233,13 +1276,7 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
   for (y=0; y < (ssize_t) source_image->rows; y++)
   {
     Quantum
-      r[MaxMagnification*MaxPixelChannels];  /* result pixels */
-
-    Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1253,29 +1290,9 @@ MagickExport Image *MagnifyImage(const Image *image,ExceptionInfo *exception)
     /*
       Magnify this row of pixels.
     */
-    for (x=0; x < (ssize_t) source_image->columns; x++)
-    {
-      const Quantum
-        *magick_restrict p;
-
-      size_t
-        channels;
-
-      p=GetCacheViewVirtualPixels(image_view,x-width/2,y-width/2,width,width,
-        exception);
-      if (p == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      channels=GetPixelChannels(source_image);
-      scaling_method(source_image,p,r,channels);
-      /*
-        Copy the result pixels into the final image.
-      */
-      CopyMagnifiedPixels(magnify_image,r,channels,magnification,q);
-      q+=(ptrdiff_t) magnification*GetPixelChannels(magnify_image);
-    }
+    if (MagnifyImageRow(source_image,image_view,magnify_image,y,width,
+          magnification,scaling_method,q,exception) == MagickFalse)
+      status=MagickFalse;
     if (SyncCacheViewAuthenticPixels(magnify_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
