@@ -2131,6 +2131,22 @@ static void ResetChannelStatistics(ChannelStatistics *channel_statistics)
   }
 }
 
+static double CountHistogramBins(const Image *image,const double *histogram,
+  const ssize_t i)
+{
+  double
+    number_bins;
+
+  ssize_t
+    j;
+
+  number_bins=0.0;
+  for (j=0; j <= (ssize_t) MaxMap; j++)
+    if (histogram[(ssize_t) GetPixelChannels(image)*j+i] > 0.0)
+      number_bins++;
+  return(number_bins);
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2294,10 +2310,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     /*
       Compute pixel entropy.
     */
-    number_bins=0.0;
-    for (j=0; j <= (ssize_t) MaxMap; j++)
-      if (histogram[(ssize_t) GetPixelChannels(image)*j+i] > 0.0)
-        number_bins++;
+    number_bins=CountHistogramBins(image,histogram,i);
     area=MagickSafeReciprocalLD(channel_statistics[channel].area);
     number_bins=(double) MagickSafeReciprocalLD((long double) log2(number_bins));
     for (j=0; j <= (ssize_t) MaxMap; j++)
