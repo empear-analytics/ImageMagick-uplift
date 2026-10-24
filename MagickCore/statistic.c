@@ -2463,6 +2463,18 @@ static void SetPolynomialPixels(const Image *image,
   }
 }
 
+static void ClearPolynomialPixels(const Image *image,
+  PixelChannels *polynomial_pixel)
+{
+  ssize_t
+    i,
+    j;
+
+  for (j=0; j < (ssize_t) image->columns; j++)
+    for (i=0; i < MaxPixelChannels; i++)
+      polynomial_pixel[j].channel[i]=0.0;
+}
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
@@ -2554,9 +2566,7 @@ MagickExport Image *PolynomialImage(const Image *images,
         continue;
       }
     polynomial_pixel=polynomial_pixels[id];
-    for (j=0; j < (ssize_t) image->columns; j++)
-      for (i=0; i < MaxPixelChannels; i++)
-        polynomial_pixel[j].channel[i]=0.0;
+    ClearPolynomialPixels(image,polynomial_pixel);
     next=images;
     for (j=0; j < (ssize_t) number_images; j++)
     {
