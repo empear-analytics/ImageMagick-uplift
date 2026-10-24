@@ -93,6 +93,7 @@ $call Make random.c
 $call Make registry.c
 $call Make resample.c
 $call Make resize.c
+$call Make magnify.c
 $call Make resource.c
 $call Make segment.c
 $call Make semaphore.c
