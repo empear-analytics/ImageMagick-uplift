@@ -865,6 +865,47 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ClutImageRow(const Image *image,const PixelInfo *clut_map,
+  Quantum *q)
+{
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  GetPixelInfo(image,&pixel);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PixelTrait
+      traits;
+
+    GetPixelInfoPixel(image,q,&pixel);
+    traits=GetPixelChannelTraits(image,RedPixelChannel);
+    if ((traits & UpdatePixelTrait) != 0)
+      pixel.red=clut_map[ScaleQuantumToMap(ClampToQuantum(
+        pixel.red))].red;
+    traits=GetPixelChannelTraits(image,GreenPixelChannel);
+    if ((traits & UpdatePixelTrait) != 0)
+      pixel.green=clut_map[ScaleQuantumToMap(ClampToQuantum(
+        pixel.green))].green;
+    traits=GetPixelChannelTraits(image,BluePixelChannel);
+    if ((traits & UpdatePixelTrait) != 0)
+      pixel.blue=clut_map[ScaleQuantumToMap(ClampToQuantum(
+        pixel.blue))].blue;
+    traits=GetPixelChannelTraits(image,BlackPixelChannel);
+    if ((traits & UpdatePixelTrait) != 0)
+      pixel.black=clut_map[ScaleQuantumToMap(ClampToQuantum(
+        pixel.black))].black;
+    traits=GetPixelChannelTraits(image,AlphaPixelChannel);
+    if ((traits & UpdatePixelTrait) != 0)
+      pixel.alpha=clut_map[ScaleQuantumToMap(ClampToQuantum(
+        pixel.alpha))].alpha;
+    SetPixelViaPixelInfo(image,&pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
   const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
@@ -927,14 +968,8 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    PixelInfo
-      pixel;
-
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -944,36 +979,7 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
         status=MagickFalse;
         continue;
       }
-    GetPixelInfo(image,&pixel);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PixelTrait
-        traits;
-
-      GetPixelInfoPixel(image,q,&pixel);
-      traits=GetPixelChannelTraits(image,RedPixelChannel);
-      if ((traits & UpdatePixelTrait) != 0)
-        pixel.red=clut_map[ScaleQuantumToMap(ClampToQuantum(
-          pixel.red))].red;
-      traits=GetPixelChannelTraits(image,GreenPixelChannel);
-      if ((traits & UpdatePixelTrait) != 0)
-        pixel.green=clut_map[ScaleQuantumToMap(ClampToQuantum(
-          pixel.green))].green;
-      traits=GetPixelChannelTraits(image,BluePixelChannel);
-      if ((traits & UpdatePixelTrait) != 0)
-        pixel.blue=clut_map[ScaleQuantumToMap(ClampToQuantum(
-          pixel.blue))].blue;
-      traits=GetPixelChannelTraits(image,BlackPixelChannel);
-      if ((traits & UpdatePixelTrait) != 0)
-        pixel.black=clut_map[ScaleQuantumToMap(ClampToQuantum(
-          pixel.black))].black;
-      traits=GetPixelChannelTraits(image,AlphaPixelChannel);
-      if ((traits & UpdatePixelTrait) != 0)
-        pixel.alpha=clut_map[ScaleQuantumToMap(ClampToQuantum(
-          pixel.alpha))].alpha;
-      SetPixelViaPixelInfo(image,&pixel,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ClutImageRow(image,clut_map,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
