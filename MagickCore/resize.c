@@ -4666,23 +4666,54 @@ static void url_encode(const char *uri,char *encode_uri)
   *p='\0';
 }
 
+static void SetThumbnailProperties(const Image *image,Image *thumbnail_image,
+  ExceptionInfo *exception)
+{
+  char
+    encode_uri[3*MagickPathExtent+1] = "/0";
+
+  const char
+    *mime_type;
+
+  struct stat
+    attributes;
+
+  (void) DeleteImageProperty(thumbnail_image,"comment");
+  url_encode(image->filename,encode_uri);
+  if (*image->filename != '/')
+    (void) FormatImageProperty(thumbnail_image,"Thumb::URI","./%s",encode_uri);
+  else
+    (void) FormatImageProperty(thumbnail_image,"Thumb::URI","file://%s",
+      encode_uri);
+  if (GetPathAttributes(image->filename,&attributes) != MagickFalse )
+    (void) FormatImageProperty(thumbnail_image,"Thumb::MTime","%.17g",(double)
+      attributes.st_mtime);
+  (void) FormatImageProperty(thumbnail_image,"Thumb::Size","%.17g",
+    (double) GetBlobSize(image));
+  mime_type=GetImageProperty(image,"mime:type",exception);
+  if (mime_type != (const char *) NULL)
+    (void) SetImageProperty(thumbnail_image,"Thumb::Mimetype",mime_type,
+      exception);
+  (void) SetImageProperty(thumbnail_image,"software",MagickAuthoritativeURL,
+    exception);
+  (void) FormatImageProperty(thumbnail_image,"Thumb::Image::Width","%.17g",
+    (double) image->magick_columns);
+  (void) FormatImageProperty(thumbnail_image,"Thumb::Image::Height","%.17g",
+    (double) image->magick_rows);
+  (void) FormatImageProperty(thumbnail_image,"Thumb::Document::Pages","%.17g",
+    (double) GetImageListLength(image));
+}
+
 MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
 #define SampleFactor  5
 
-  char
-    encode_uri[3*MagickPathExtent+1] = "/0";
-
   const char
-    *name,
-    *mime_type;
+    *name;
 
   Image
     *thumbnail_image;
-
-  struct stat
-    attributes;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -4746,29 +4777,6 @@ MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
      }
     name=GetNextImageProfile(thumbnail_image);
   }
-  (void) DeleteImageProperty(thumbnail_image,"comment");
-  url_encode(image->filename,encode_uri);
-  if (*image->filename != '/')
-    (void) FormatImageProperty(thumbnail_image,"Thumb::URI","./%s",encode_uri);
-  else
-    (void) FormatImageProperty(thumbnail_image,"Thumb::URI","file://%s",
-      encode_uri);
-  if (GetPathAttributes(image->filename,&attributes) != MagickFalse )
-    (void) FormatImageProperty(thumbnail_image,"Thumb::MTime","%.17g",(double)
-      attributes.st_mtime);
-  (void) FormatImageProperty(thumbnail_image,"Thumb::Size","%.17g",
-    (double) GetBlobSize(image));
-  mime_type=GetImageProperty(image,"mime:type",exception);
-  if (mime_type != (const char *) NULL)
-    (void) SetImageProperty(thumbnail_image,"Thumb::Mimetype",mime_type,
-      exception);
-  (void) SetImageProperty(thumbnail_image,"software",MagickAuthoritativeURL,
-    exception);
-  (void) FormatImageProperty(thumbnail_image,"Thumb::Image::Width","%.17g",
-    (double) image->magick_columns);
-  (void) FormatImageProperty(thumbnail_image,"Thumb::Image::Height","%.17g",
-    (double) image->magick_rows);
-  (void) FormatImageProperty(thumbnail_image,"Thumb::Document::Pages","%.17g",
-    (double) GetImageListLength(image));
+  SetThumbnailProperties(image,thumbnail_image,exception);
   return(thumbnail_image);
 }
