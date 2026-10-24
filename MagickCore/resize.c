@@ -3897,6 +3897,14 @@ static MagickBooleanType VerticalFilter(
   return(status);
 }
 
+static inline MagickBooleanType IsMitchellResize(const Image *image,
+  const double x_factor,const double y_factor)
+{
+  return(((image->storage_class == PseudoClass) ||
+    (image->alpha_trait != UndefinedPixelTrait) ||
+    ((x_factor*y_factor) > 1.0)) ? MagickTrue : MagickFalse);
+}
+
 static FilterType SelectResizeFilterType(const Image *image,
   const FilterType filter,const double x_factor,const double y_factor)
 {
@@ -3910,9 +3918,7 @@ static FilterType SelectResizeFilterType(const Image *image,
     if ((x_factor == 1.0) && (y_factor == 1.0))
       filter_type=PointFilter;
     else
-      if ((image->storage_class == PseudoClass) ||
-          (image->alpha_trait != UndefinedPixelTrait) ||
-          ((x_factor*y_factor) > 1.0))
+      if (IsMitchellResize(image,x_factor,y_factor) != MagickFalse)
         filter_type=MitchellFilter;
   return(filter_type);
 }
