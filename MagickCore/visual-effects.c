@@ -1153,6 +1153,31 @@ MagickExport Image *ImplodeImage(const Image *image,const double amount,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void MorphPixelChannels(const Image *morph_image,
+  const Image *morph_images,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q,const double alpha,const double beta)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(morph_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(morph_image,i);
+    PixelTrait traits = GetPixelChannelTraits(morph_image,channel);
+    PixelTrait morph_traits=GetPixelChannelTraits(morph_images,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (morph_traits == UndefinedPixelTrait))
+      continue;
+    if ((morph_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(morph_image,channel,p[i],q);
+        continue;
+      }
+    SetPixelChannel(morph_image,channel,ClampToQuantum(alpha*(double)
+      GetPixelChannel(morph_images,channel,q)+beta*(double) p[i]),q);
+  }
+}
+
 MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   ExceptionInfo *exception)
 {
@@ -1292,25 +1317,7 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
           }
         for (x=0; x < (ssize_t) morph_images->columns; x++)
         {
-          ssize_t
-            i;
-
-          for (i=0; i < (ssize_t) GetPixelChannels(morph_image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(morph_image,i);
-            PixelTrait traits = GetPixelChannelTraits(morph_image,channel);
-            PixelTrait morph_traits=GetPixelChannelTraits(morph_images,channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (morph_traits == UndefinedPixelTrait))
-              continue;
-            if ((morph_traits & CopyPixelTrait) != 0)
-              {
-                SetPixelChannel(morph_image,channel,p[i],q);
-                continue;
-              }
-            SetPixelChannel(morph_image,channel,ClampToQuantum(alpha*(double)
-              GetPixelChannel(morph_images,channel,q)+beta*(double) p[i]),q);
-          }
+          MorphPixelChannels(morph_image,morph_images,p,q,alpha,beta);
           p+=(ptrdiff_t) GetPixelChannels(morph_image);
           q+=(ptrdiff_t) GetPixelChannels(morph_images);
         }
