@@ -801,6 +801,31 @@ static double Welch(const double x,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetKaiserCoefficients(const Image *image,
+  ResizeFilter *resize_filter)
+{
+  const char
+    *artifact;
+
+  double
+    value;
+
+  value=6.5; /* default beta value for Kaiser bessel windowing function */
+  artifact=GetImageArtifact(image,"filter:alpha");  /* FUTURE: depreciate */
+  if (artifact != (const char *) NULL)
+    value=StringToDouble(artifact,(char **) NULL);
+  artifact=GetImageArtifact(image,"filter:kaiser-beta");
+  if (artifact != (const char *) NULL)
+    value=StringToDouble(artifact,(char **) NULL);
+  artifact=GetImageArtifact(image,"filter:kaiser-alpha");
+  if (artifact != (const char *) NULL)
+    value=StringToDouble(artifact,(char **) NULL)*MagickPI;
+  /* Define coefficients for Kaiser Windowing Function */
+  resize_filter->coefficient[0]=value;         /* alpha */
+  resize_filter->coefficient[1]=MagickSafeReciprocal(I0(value));
+    /* normalization */
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1105,20 +1130,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   /* User Kaiser Alpha Override - no support change */
   if ((resize_filter->filter == Kaiser) ||
       (resize_filter->window == Kaiser) ) {
-    value=6.5; /* default beta value for Kaiser bessel windowing function */
-    artifact=GetImageArtifact(image,"filter:alpha");  /* FUTURE: depreciate */
-    if (artifact != (const char *) NULL)
-      value=StringToDouble(artifact,(char **) NULL);
-    artifact=GetImageArtifact(image,"filter:kaiser-beta");
-    if (artifact != (const char *) NULL)
-      value=StringToDouble(artifact,(char **) NULL);
-    artifact=GetImageArtifact(image,"filter:kaiser-alpha");
-    if (artifact != (const char *) NULL)
-      value=StringToDouble(artifact,(char **) NULL)*MagickPI;
-    /* Define coefficients for Kaiser Windowing Function */
-    resize_filter->coefficient[0]=value;         /* alpha */
-    resize_filter->coefficient[1]=MagickSafeReciprocal(I0(value));
-      /* normalization */
+    SetKaiserCoefficients(image,resize_filter);
   }
 
   /* Support Overrides */
