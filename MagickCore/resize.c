@@ -3986,6 +3986,20 @@ static FilterType SelectResizeFilterType(const Image *image,
   return(filter_type);
 }
 
+static void RecordResizeTransform(const Image *image,Image *resize_image,
+  const FilterType filter_type,ExceptionInfo *exception)
+{
+  char
+    transform[MagickPathExtent];
+
+  (void) FormatLocaleString(transform,MagickPathExtent,
+    "resize %.17gx%.17g %.17gx%.17g %d",(double) image->columns,
+    (double) image->rows,(double) resize_image->columns,
+    (double) resize_image->rows,(int) filter_type);
+  AppendImageProfileProperty(resize_image,"hdrgm","hdrgm:Transform",
+    transform,exception);
+}
+
 MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   const size_t rows,const FilterType filter,ExceptionInfo *exception)
 {
@@ -4091,17 +4105,7 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
 record_resize_transform:
 #endif
-  {
-    char
-      transform[MagickPathExtent];
-
-    (void) FormatLocaleString(transform,MagickPathExtent,
-      "resize %.17gx%.17g %.17gx%.17g %d",(double) image->columns,
-      (double) image->rows,(double) resize_image->columns,
-      (double) resize_image->rows,(int) filter_type);
-    AppendImageProfileProperty(resize_image,"hdrgm","hdrgm:Transform",
-      transform,exception);
-  }
+  RecordResizeTransform(image,resize_image,filter_type,exception);
   return(resize_image);
 }
 
