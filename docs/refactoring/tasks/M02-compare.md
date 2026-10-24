@@ -229,3 +229,64 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-24, Mac, overnight)
+
+**Result: Code Health 1.46 → 1.77, plateau** (`cs-mcp` 1.5.12). Branch
+`campaign/M02-compare`, stacked on `campaign/M01-magnify` (PR #7) for Recipes T, M and B.
+One playbook commit (**Recipe K**, Extract Accumulating Block with Out-Parameters) and 25
+refactor commits, one recipe and one function each, all oracle-verified.
+
+**What the file is.** Lines 2889-4569 (`#if MAGICKCORE_HDRI_SUPPORT &&
+MAGICKCORE_FFTW_DELEGATE`) are not compiled here: the `SIM*` helpers and
+`DPCSimilarityImage`, `NCCSimilarityImage`, `PhaseSimilarityImage`, `MSESimilarityImage`,
+`PSNRSimilarityImage`, `RMSESimilarityImage`. They carry Code Duplication, Deep Nesting,
+Bumpy Road, Excess Arguments and one Complex Conditional (`SimilarityImage`'s FFTW
+branch), so none of those categories can leave the file; the score moves function by
+function.
+
+| Steps | Functions | Recipe | Score |
+| --- | --- | --- | --- |
+| per-pixel channel loop of the parallel row loop into `Accumulate*Pixel` | `GetAESimilarity`, `GetMAESimilarity`, `GetMSESimilarity`, `GetPASimilarity`, `GetPDCSimilarity` | E | 1.46 → 1.55 |
+| the same, with two or three of the iteration's own accumulators | `GetFUZZSimilarity`, `GetMEPPSimilarity`, `GetDPCSimilarity` | K | → 1.61 |
+| NCC's block is DPC's, renamed: one `AccumulateCorrelationPixel` | `GetNCCSimilarity` | D | → 1.63 |
+| missing-row tests as predicates | `CompareImages`, `GetPHASESimilarity` | P | → 1.69 |
+| hash-difference loop, running sum in and out | `GetPHASHSimilarity` | E | → 1.72 |
+| the 15-case metric dispatch into `GetSimilarityForMetric`, then its copies | `GetImageDistortion` (E), `GetImageDistortions`, `GetSimilarityMetric` (D) | E, D | → 1.74 |
+| `image`, `reconstruct_image`, `p`, `q` bundled as `const ComparePixels` | the eight `Accumulate*Pixel` helpers | B | → 1.77 |
+
+Every step: build without warnings, `refactor_guard.py` OK, `--calls` OK or the extract
+or deduplicate fingerprint, the oracle on the function's cases (0 diverged), the CodeScene
+gate; every moved block checked by script to be identical apart from indentation (and the
+`(*v)` rewrites Recipe K names). Ten functions leave Deep Nesting; `GetImageDistortion`,
+`GetImageDistortions` and `GetSimilarityMetric` leave Large Method; `CompareImages` leaves
+Complex Conditional.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged,
+`gaps/c5651ffad8` (the known log-map order tie).
+
+**Tried and reverted.** `CompareImages`' three colour lookups into one function with
+three out-parameters (Recipe O): flat, and a 5-argument helper with no next step.
+`GetPHASESimilarity`'s Pearson step into a function (6 values in, 1 out): flat; the
+function stays blocked by its five-array channel loop. A trait predicate across all
+compiled loops (probe): +0.02 for some twenty commits, not taken.
+
+**Why it plateaus at 1.77.**
+
+- `GetSSIMSimularity` (nesting 6, cc 35): its kernel-window block writes five moment
+  arrays, over Recipe K's limit of four; its SSIM step reads all five and two constants
+  (ten arguments).
+- `GetPHASESimilarity` (cc 34): its channel loop writes five sums, the same limit.
+- `CompareImages` (cc 24): the pixel loop needs ten arguments; the colour lookups gained
+  nothing.
+- The `Accumulate*Pixel` helpers are reported as duplicates of each other: they differ in
+  the metric (fuzz test, `fabs`, square, maximum), more than Recipe D allows.
+- `IsImagesEqual` has **no oracle case** (0 of 23 mutants reached): skipped. At the
+  guard-verified level every extraction's `--calls` WARN would stop the commit. A case
+  that calls it (it is public API, used by `magick compare -metric` paths only through
+  other functions) would release it.
+- `SimilarityImage` (Brain Method, the file's only one; public, 256 lines): about fifty
+  of its lines are the uncompiled FFTW branch, its pixel switch sits in the parallel
+  loop next to a `critical` block that stays, and its channel loop would need five
+  arguments for a gain of under 0.02 (probe).
+- The FFTW region, as above.
