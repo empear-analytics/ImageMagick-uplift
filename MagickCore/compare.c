@@ -1165,10 +1165,17 @@ static MagickBooleanType GetMEPPSimilarity(Image *image,
   return(status);
 }
 
-static void AccumulateMSEPixel(const Image *image,
-  const Image *reconstruct_image,const Quantum *p,const Quantum *q,
+static void AccumulateMSEPixel(const ComparePixels *pixels,
   double *channel_similarity)
 {
+  const Image
+    *image = pixels->image,
+    *reconstruct_image = pixels->reconstruct_image;
+
+  const Quantum
+    *p = pixels->p,
+    *q = pixels->q;
+
   double
     Da,
     Sa;
@@ -1257,6 +1264,8 @@ static MagickBooleanType GetMSESimilarity(const Image *image,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
+      const ComparePixels pixels = { image, reconstruct_image, p, q };
+
       if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
           (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
         {
@@ -1264,7 +1273,7 @@ static MagickBooleanType GetMSESimilarity(const Image *image,
           q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
           continue;
         }
-      AccumulateMSEPixel(image,reconstruct_image,p,q,channel_similarity);
+      AccumulateMSEPixel(&pixels,channel_similarity);
       channel_area++;
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
