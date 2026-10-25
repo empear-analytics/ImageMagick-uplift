@@ -6074,7 +6074,8 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
           point_y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
           if ((point_x < MagickEpsilon) && (point_y < MagickEpsilon))
             closed_path=MagickTrue;
-          if (IsRoundStrokeOrPrimitive(draw_info,closed_path,primitive_info,i) != MagickFalse)
+          if (IsRoundStrokeOrPrimitive(draw_info,closed_path,primitive_info,i) !=
+              MagickFalse)
             {
               status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
                 primitive_info,exception);
