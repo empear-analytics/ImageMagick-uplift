@@ -1233,6 +1233,14 @@ static char *ParseEntities(char *xml,char **entities,int state)
   return(p == q ? ConstantString(p) : p);
 }
 
+static inline MagickBooleanType IsCharacterContentSkipped(
+  const XMLTreeInfo *xml_info,const size_t length)
+{
+  return(((xml_info == (XMLTreeInfo *) NULL) ||
+    (xml_info->tag == (char *) NULL) ||
+    (length == 0)) ? MagickTrue : MagickFalse);
+}
+
 static void ParseCharacterContent(XMLTreeRoot *root,char *xml,
   const size_t length,const char state)
 {
@@ -1240,8 +1248,7 @@ static void ParseCharacterContent(XMLTreeRoot *root,char *xml,
     *xml_info;
 
   xml_info=root->node;
-  if ((xml_info == (XMLTreeInfo *) NULL) || (xml_info->tag == (char *) NULL) ||
-      (length == 0))
+  if (IsCharacterContentSkipped(xml_info,length) != MagickFalse)
     return;
   xml[length]='\0';
   xml=ParseEntities(xml,root->entities,state);
