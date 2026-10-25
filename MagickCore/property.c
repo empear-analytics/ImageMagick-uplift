@@ -1852,6 +1852,15 @@ static MagickBooleanType SkipXMPValue(const char *value)
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsNotNamespaceWildcard(
+  const char *xmp_namespace,const size_t xmp_namespace_length)
+{
+  return(((xmp_namespace_length <= 2) ||
+    (*(xmp_namespace+(xmp_namespace_length-2)) != ':') ||
+    (*(xmp_namespace+(xmp_namespace_length-1)) != '*')) ? MagickTrue :
+    MagickFalse);
+}
+
 static void GetXMPProperty(const Image *image,const char *property)
 {
   char
@@ -1921,9 +1930,8 @@ static void GetXMPProperty(const Image *image,const char *property)
               xmp_namespace=ConstantString(GetXMLTreeTag(node));
               (void) SubstituteString(&xmp_namespace,"exif:","xmp:");
               xmp_namespace_length=strlen(xmp_namespace);
-              if ((xmp_namespace_length <= 2) ||
-                  (*(xmp_namespace+(xmp_namespace_length-2)) != ':') ||
-                  (*(xmp_namespace+(xmp_namespace_length-1)) != '*'))
+              if (IsNotNamespaceWildcard(xmp_namespace,xmp_namespace_length) !=
+                  MagickFalse)
                 (void) AddValueToSplayTree((SplayTreeInfo *) image->properties,
                  ConstantString(xmp_namespace),ConstantString(content));
               xmp_namespace=DestroyString(xmp_namespace);
@@ -1936,9 +1944,8 @@ static void GetXMPProperty(const Image *image,const char *property)
                 xmp_namespace=ConstantString(GetXMLTreeTag(node));
                 (void) SubstituteString(&xmp_namespace,"exif:","xmp:");
                 xmp_namespace_length=strlen(xmp_namespace);
-                if ((xmp_namespace_length <= 2) ||
-                    (*(xmp_namespace+(xmp_namespace_length-2)) != ':') ||
-                    (*(xmp_namespace+(xmp_namespace_length-1)) != '*'))
+                if (IsNotNamespaceWildcard(xmp_namespace,
+                    xmp_namespace_length) != MagickFalse)
                   (void) AddValueToSplayTree((SplayTreeInfo *)
                     image->properties,ConstantString(xmp_namespace),
                     ConstantString(content));
