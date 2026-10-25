@@ -1694,6 +1694,49 @@ static inline MagickBooleanType IsInvalid8BimCount(const ssize_t count,
     (count > (ssize_t) length)) ? MagickTrue : MagickFalse);
 }
 
+static void SpliceProfileInto8Bim(Image *image,const StringInfo *profile,
+  const unsigned char *datum,const size_t length,const unsigned char *p,
+  const unsigned char *q,const ssize_t count)
+{
+  size_t
+    extent,
+    offset;
+
+  ssize_t
+    extract_extent;
+
+  StringInfo
+    *extract_profile;
+
+  extract_extent=0;
+  extent=(size_t) ((datum+length)-(p+count));
+  if (profile == (StringInfo *) NULL)
+    {
+      offset=(size_t) (q-datum);
+      extract_profile=AcquireStringInfo(offset+extent);
+      (void) memcpy(extract_profile->datum,datum,offset);
+    }
+  else
+    {
+      offset=(size_t) (p-datum);
+      extract_extent=(ssize_t) profile->length;
+      if ((extract_extent & 0x01) != 0)
+        extract_extent++;
+      extract_profile=AcquireStringInfo(offset+(size_t) extract_extent+
+        extent);
+      (void) memcpy(extract_profile->datum,datum,offset-4);
+      WriteResourceLong(extract_profile->datum+offset-4,(unsigned int)
+        profile->length);
+      (void) memcpy(extract_profile->datum+offset,
+        profile->datum,profile->length);
+    }
+  (void) memcpy(extract_profile->datum+offset+extract_extent,
+    p+count,extent);
+  (void) AddValueToSplayTree((SplayTreeInfo *) image->profiles,
+    ConstantString("8bim"),CloneStringInfo(extract_profile));
+  extract_profile=DestroyStringInfo(extract_profile);
+}
+
 static void WriteTo8BimProfile(Image *image,const char *name,
   const StringInfo *profile)
 {
@@ -1762,43 +1805,7 @@ static void WriteTo8BimProfile(Image *image,const char *name,
       p+=(ptrdiff_t) count;
     else
       {
-        size_t
-          extent,
-          offset;
-
-        ssize_t
-          extract_extent;
-
-        StringInfo
-          *extract_profile;
-
-        extract_extent=0;
-        extent=(size_t) ((datum+length)-(p+count));
-        if (profile == (StringInfo *) NULL)
-          {
-            offset=(size_t) (q-datum);
-            extract_profile=AcquireStringInfo(offset+extent);
-            (void) memcpy(extract_profile->datum,datum,offset);
-          }
-        else
-          {
-            offset=(size_t) (p-datum);
-            extract_extent=(ssize_t) profile->length;
-            if ((extract_extent & 0x01) != 0)
-              extract_extent++;
-            extract_profile=AcquireStringInfo(offset+(size_t) extract_extent+
-              extent);
-            (void) memcpy(extract_profile->datum,datum,offset-4);
-            WriteResourceLong(extract_profile->datum+offset-4,(unsigned int)
-              profile->length);
-            (void) memcpy(extract_profile->datum+offset,
-              profile->datum,profile->length);
-          }
-        (void) memcpy(extract_profile->datum+offset+extract_extent,
-          p+count,extent);
-        (void) AddValueToSplayTree((SplayTreeInfo *) image->profiles,
-          ConstantString("8bim"),CloneStringInfo(extract_profile));
-        extract_profile=DestroyStringInfo(extract_profile);
+        SpliceProfileInto8Bim(image,profile,datum,length,p,q,count);
         break;
       }
   }
