@@ -694,6 +694,71 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
     }
 }
 
+static const char *GetIPTCTagName(const long record)
+{
+  const char
+    *tag;
+
+  switch (record)
+  {
+    case 5: tag="Image Name"; break;
+    case 7: tag="Edit Status"; break;
+    case 10: tag="Priority"; break;
+    case 15: tag="Category"; break;
+    case 20: tag="Supplemental Category"; break;
+    case 22: tag="Fixture Identifier"; break;
+    case 25: tag="Keyword"; break;
+    case 30: tag="Release Date"; break;
+    case 35: tag="Release Time"; break;
+    case 40: tag="Special Instructions"; break;
+    case 45: tag="Reference Service"; break;
+    case 47: tag="Reference Date"; break;
+    case 50: tag="Reference Number"; break;
+    case 55: tag="Created Date"; break;
+    case 60: tag="Created Time"; break;
+    case 65: tag="Originating Program"; break;
+    case 70: tag="Program Version"; break;
+    case 75: tag="Object Cycle"; break;
+    case 80: tag="Byline"; break;
+    case 85: tag="Byline Title"; break;
+    case 90: tag="City"; break;
+    case 92: tag="Sub-Location"; break;
+    case 95: tag="Province State"; break;
+    case 100: tag="Country Code"; break;
+    case 101: tag="Country"; break;
+    case 103: tag="Original Transmission Reference"; break;
+    case 105: tag="Headline"; break;
+    case 110: tag="Credit"; break;
+    case 115: tag="Src"; break;
+    case 116: tag="Copyright String"; break;
+    case 120: tag="Caption"; break;
+    case 121: tag="Local Caption"; break;
+    case 122: tag="Caption Writer"; break;
+    case 200: tag="Custom Field 1"; break;
+    case 201: tag="Custom Field 2"; break;
+    case 202: tag="Custom Field 3"; break;
+    case 203: tag="Custom Field 4"; break;
+    case 204: tag="Custom Field 5"; break;
+    case 205: tag="Custom Field 6"; break;
+    case 206: tag="Custom Field 7"; break;
+    case 207: tag="Custom Field 8"; break;
+    case 208: tag="Custom Field 9"; break;
+    case 209: tag="Custom Field 10"; break;
+    case 210: tag="Custom Field 11"; break;
+    case 211: tag="Custom Field 12"; break;
+    case 212: tag="Custom Field 13"; break;
+    case 213: tag="Custom Field 14"; break;
+    case 214: tag="Custom Field 15"; break;
+    case 215: tag="Custom Field 16"; break;
+    case 216: tag="Custom Field 17"; break;
+    case 217: tag="Custom Field 18"; break;
+    case 218: tag="Custom Field 19"; break;
+    case 219: tag="Custom Field 20"; break;
+    default: tag="unknown"; break;
+  }
+  return(tag);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1576,63 +1641,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
                 continue;
               dataset=GetStringInfoDatum(profile)[i++];
               record=GetStringInfoDatum(profile)[i++];
-              switch (record)
-              {
-                case 5: tag="Image Name"; break;
-                case 7: tag="Edit Status"; break;
-                case 10: tag="Priority"; break;
-                case 15: tag="Category"; break;
-                case 20: tag="Supplemental Category"; break;
-                case 22: tag="Fixture Identifier"; break;
-                case 25: tag="Keyword"; break;
-                case 30: tag="Release Date"; break;
-                case 35: tag="Release Time"; break;
-                case 40: tag="Special Instructions"; break;
-                case 45: tag="Reference Service"; break;
-                case 47: tag="Reference Date"; break;
-                case 50: tag="Reference Number"; break;
-                case 55: tag="Created Date"; break;
-                case 60: tag="Created Time"; break;
-                case 65: tag="Originating Program"; break;
-                case 70: tag="Program Version"; break;
-                case 75: tag="Object Cycle"; break;
-                case 80: tag="Byline"; break;
-                case 85: tag="Byline Title"; break;
-                case 90: tag="City"; break;
-                case 92: tag="Sub-Location"; break;
-                case 95: tag="Province State"; break;
-                case 100: tag="Country Code"; break;
-                case 101: tag="Country"; break;
-                case 103: tag="Original Transmission Reference"; break;
-                case 105: tag="Headline"; break;
-                case 110: tag="Credit"; break;
-                case 115: tag="Src"; break;
-                case 116: tag="Copyright String"; break;
-                case 120: tag="Caption"; break;
-                case 121: tag="Local Caption"; break;
-                case 122: tag="Caption Writer"; break;
-                case 200: tag="Custom Field 1"; break;
-                case 201: tag="Custom Field 2"; break;
-                case 202: tag="Custom Field 3"; break;
-                case 203: tag="Custom Field 4"; break;
-                case 204: tag="Custom Field 5"; break;
-                case 205: tag="Custom Field 6"; break;
-                case 206: tag="Custom Field 7"; break;
-                case 207: tag="Custom Field 8"; break;
-                case 208: tag="Custom Field 9"; break;
-                case 209: tag="Custom Field 10"; break;
-                case 210: tag="Custom Field 11"; break;
-                case 211: tag="Custom Field 12"; break;
-                case 212: tag="Custom Field 13"; break;
-                case 213: tag="Custom Field 14"; break;
-                case 214: tag="Custom Field 15"; break;
-                case 215: tag="Custom Field 16"; break;
-                case 216: tag="Custom Field 17"; break;
-                case 217: tag="Custom Field 18"; break;
-                case 218: tag="Custom Field 19"; break;
-                case 219: tag="Custom Field 20"; break;
-                default: tag="unknown"; break;
-              }
+              tag=GetIPTCTagName(record);
               (void) FormatLocaleFile(file,"      %s[%.17g,%.17g]: ",tag,
                 (double) dataset,(double) record);
               length=(size_t) (GetStringInfoDatum(profile)[i++] << 8);
