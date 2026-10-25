@@ -187,6 +187,15 @@ static MagickBooleanType SetMatrixExtent(
   return(count != (MagickOffsetType) 1 ? MagickFalse : MagickTrue);
 }
 
+static inline MagickBooleanType IsMatrixMemoryAvailable(
+  const MagickBooleanType status,const MatrixInfo *matrix_info)
+{
+  return(((status != MagickFalse) &&
+    (matrix_info->length == (MagickSizeType) ((size_t) matrix_info->length)) &&
+    ((size_t) matrix_info->length <= GetMaxMemoryRequest())) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
   const size_t rows,const size_t stride,ExceptionInfo *exception)
 {
@@ -223,9 +232,7 @@ MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
     }
   matrix_info->type=MemoryCache;
   status=AcquireMagickResource(AreaResource,matrix_info->length);
-  if ((status != MagickFalse) &&
-      (matrix_info->length == (MagickSizeType) ((size_t) matrix_info->length)) &&
-      ((size_t) matrix_info->length <= GetMaxMemoryRequest()))
+  if (IsMatrixMemoryAvailable(status,matrix_info) != MagickFalse)
     {
       status=AcquireMagickResource(MemoryResource,matrix_info->length);
       if (status != MagickFalse)
@@ -713,6 +720,32 @@ MagickPrivate void LeastSquaresAddTerms(double **matrix,double **vectors,
 %  details see http://en.wikipedia.org/wiki/Gauss-Jordan_elimination
 %
 */
+static inline MagickBooleanType IsPivotMemoryMissing(const ssize_t *columns,
+  const ssize_t *rows,const ssize_t *pivots)
+{
+  return(((columns == (ssize_t *) NULL) || (rows == (ssize_t *) NULL) ||
+    (pivots == (ssize_t *) NULL)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsSingularPivot(const ssize_t column,
+  const ssize_t row,const long double max)
+{
+  return(((column == -1) || (row == -1) || (fabsl(max) < LDBL_MIN)) ?
+    MagickTrue : MagickFalse);
+}
+
+static void CopyBackMatrix(double **matrix,long double **hp_matrix,
+  const size_t rank)
+{
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i < (ssize_t) rank; i++)
+    for (j=0; j < (ssize_t) rank; j++)
+      matrix[i][j]=(double)hp_matrix[i][j];
+}
+
 MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   double **vectors,const size_t rank,const size_t number_vectors)
 {
@@ -773,8 +806,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   columns=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*columns));
   rows=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*rows));
   pivots=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*pivots));
-  if ((columns == (ssize_t *) NULL) || (rows == (ssize_t *) NULL) ||
-      (pivots == (ssize_t *) NULL))
+  if (IsPivotMemoryMissing(columns,rows,pivots) != MagickFalse)
     ThrowGaussJordanException();
   (void) memset(columns,0,rank*sizeof(*columns));
   (void) memset(rows,0,rank*sizeof(*rows));
@@ -802,7 +834,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
               row=j;
               column=k;
             }
-    if ((column == -1) || (row == -1) || (fabsl(max) < LDBL_MIN))
+    if (IsSingularPivot(column,row,max) != MagickFalse)
       ThrowGaussJordanException();  /* Singular or nearly singular matrix */
     pivots[column]++;
     if (row != column)
@@ -840,9 +872,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   /*
     Copy back the result to the original matrix.
   */
-  for (i=0; i < (ssize_t) rank; i++)
-    for (j=0; j < (ssize_t) rank; j++)
-      matrix[i][j]=(double)hp_matrix[i][j];
+  CopyBackMatrix(matrix,hp_matrix,rank);
   /*
     Free resources.
   */

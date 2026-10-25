@@ -87,7 +87,7 @@ needs before refactoring:
 | 3.08 | `MagickCore/fourier.c` | 1626 | 92% | 86% | 3.27 on the Mac (`ComplexImages` only, [M12](tasks/M12-fourier.md)); the FFTW-only functions still wait for the Linux machine |
 | 3.28 | `MagickCore/channel.c` | 1394 | 65% | 81% | 4.04, in progress (out of the Red band), [M16](tasks/M16-channel.md) |
 | 5.78 | `MagickCore/decorate.c` | 901 | 98% | 94% | 6.74, in progress (fill and blend loops deduplicated), [M11](tasks/M11-decorate.md) |
-| 5.92 | `MagickCore/matrix.c` | 1146 | 75% | 80% | open |
+| 5.92 | `MagickCore/matrix.c` | 1146 | 75% | 80% | 6.76, in progress (Complex Conditional gone; the rest needs oracle evidence the file lacks), [M17](tasks/M17-matrix.md) |
 | 6.96 | `MagickCore/magick.c` | 1866 | 68% | 81% | open |
 | 8.81 | `MagickCore/semaphore.c` | 482 | 100% | 80% | open |
 | 8.88 | `MagickCore/colormap.c` | 388 | 100% | 89% | 9.36, plateau for the current catalogue, [M13](tasks/M13-colormap.md) |
