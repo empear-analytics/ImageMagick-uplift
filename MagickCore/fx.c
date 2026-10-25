@@ -1992,6 +1992,11 @@ static inline MagickBooleanType IsQualifiedCoordFunction(const ImgAttrE iaQual,
     MagickFalse);
 }
 
+static inline MagickBooleanType IsCoordFunction(const FunctionE fe)
+{
+  return((fe == fU || fe == fV || fe == fS) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2241,7 +2246,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
   if (IsQualifier (pfx)) {
 
-    if (fe == fU || fe == fV || fe == fS) {
+    if (IsCoordFunction(fe) != MagickFalse) {
 
       coordQual = (GetCoordQualifier (pfx, (int) fe) == 1) ? MagickTrue : MagickFalse;
 
