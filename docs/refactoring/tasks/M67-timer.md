@@ -119,3 +119,12 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 8.81, unchanged. No legal step was found.** The only finding is
+Code Duplication over seven functions with three to six statements each, such as
+GetElapsedTime and GetUserTime (which differ only in `elapsed` versus `user`).
+- The shared part is mostly the `assert(time_info…)` prologue, which reports the
+  enclosing function on failure, so it cannot move.
+- The rest are one-line state tests that are too small to pay for a helper.

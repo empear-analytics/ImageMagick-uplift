@@ -161,7 +161,7 @@ needs before refactoring:
 | 7.78 | `MagickCore/cache-view.c` | 1114 | 34% | 30% | plateau 7.78 (D needs cases for GetOneCacheView*), [M64](tasks/M64-cache-view.md) |
 | 7.88 | `MagickCore/magic.c` | 823 | 72% | 66% | 8.45, [M65](tasks/M65-magic.md) |
 | 8.55 | `MagickCore/registry.c` | 537 | 68% | 48% | 8.79, [M66](tasks/M66-registry.md) |
-| 8.81 | `MagickCore/timer.c` | 664 | 89% | 52% | open |
+| 8.81 | `MagickCore/timer.c` | 664 | 89% | 52% | plateau 8.81 (prologue duplication only), [M67](tasks/M67-timer.md) |
 | 9.09 | `MagickCore/artifact.c` | 491 | 80% | 60% | open |
 | 9.28 | `MagickCore/version.c` | 697 | 10% | 50% | open |
 | 10.00 | `MagickCore/client.c` | 163 | 100% | 60% | open |
