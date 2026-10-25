@@ -139,3 +139,29 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 5.03 → 5.35** (`cs-mcp` 1.5.12). Branch `campaign/M34-configure`,
+stacked on `campaign/M33-locale`. 1 refactor commit: `IsIncludeElementOpen` (P, oracle).
+Complex Conditional leaves the file.
+
+**Refused:** `GetIncludePath(filename,token,path)` (probe: 5.35 → 5.23). Its string
+parameters raise String Heavy Function Arguments here, as in log.c (M30).
+
+**Audit made during this task.** The gated JSON records some open survivors with the
+kind "unresolved", which the gate counts as open just like "unmatched". The survivor
+filters used earlier today looked only at "unmatched" and "unreached". Every oracle-level
+claim made today was re-checked against "unresolved" survivors, and none is affected.
+
+Earlier, already merged commits on enhance.c and compare.c were also re-checked. Three
+moved "unresolved" survivor lines verbatim, and their messages say so (`e3fa707e2`,
+`785d8441b`, `66af95547`). Two of the three are in functions that were *careful*
+(EqualizeImage, SigmoidalContrastImage). The careful rule asks to keep clear of survivor
+lines, so those two steps bent it, openly.
+
+**What is left, at 5.35.**
+- `LoadConfigureCache` (10 bumps, Brain Method): the same blocks as in the other loaders.
+  Here they would need string parameters that tip String Heavy.
+- `GetConfigurePaths` (cc 25): mostly preprocessor branches for installed and Windows
+  builds, which the oracle build does not compile.
