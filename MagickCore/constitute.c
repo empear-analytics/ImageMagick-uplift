@@ -626,6 +626,28 @@ static inline MagickBooleanType IsTIFFResolutionFallback(
     MagickFalse);
 }
 
+static void SetResolutionFromStrings(Image *image,const char *resolution_x,
+  const char *resolution_y)
+{
+  GeometryInfo
+    geometry_info;
+
+  geometry_info.rho=image->resolution.x;
+  geometry_info.sigma=1.0;
+  (void) ParseGeometry(resolution_x,&geometry_info);
+  if (geometry_info.sigma != 0)
+    image->resolution.x=geometry_info.rho/geometry_info.sigma;
+  if (strchr(resolution_x,',') != (char *) NULL)
+    image->resolution.x=geometry_info.rho+geometry_info.sigma/1000.0;
+  geometry_info.rho=image->resolution.y;
+  geometry_info.sigma=1.0;
+  (void) ParseGeometry(resolution_y,&geometry_info);
+  if (geometry_info.sigma != 0)
+    image->resolution.y=geometry_info.rho/geometry_info.sigma;
+  if (strchr(resolution_y,',') != (char *) NULL)
+    image->resolution.y=geometry_info.rho+geometry_info.sigma/1000.0;
+}
+
 static void SyncResolutionFromProperties(Image *image,
   ConstituteInfo *constitute_info, ExceptionInfo *exception)
 {
@@ -666,26 +688,10 @@ static void SyncResolutionFromProperties(Image *image,
   if ((resolution_x != (const char *) NULL) &&
       (resolution_y != (const char *) NULL))
     {
-      GeometryInfo
-        geometry_info;
-
       ssize_t
         option_type;
 
-      geometry_info.rho=image->resolution.x;
-      geometry_info.sigma=1.0;
-      (void) ParseGeometry(resolution_x,&geometry_info);
-      if (geometry_info.sigma != 0)
-        image->resolution.x=geometry_info.rho/geometry_info.sigma;
-      if (strchr(resolution_x,',') != (char *) NULL)
-        image->resolution.x=geometry_info.rho+geometry_info.sigma/1000.0;
-      geometry_info.rho=image->resolution.y;
-      geometry_info.sigma=1.0;
-      (void) ParseGeometry(resolution_y,&geometry_info);
-      if (geometry_info.sigma != 0)
-        image->resolution.y=geometry_info.rho/geometry_info.sigma;
-      if (strchr(resolution_y,',') != (char *) NULL)
-        image->resolution.y=geometry_info.rho+geometry_info.sigma/1000.0;
+      SetResolutionFromStrings(image,resolution_x,resolution_y);
       if (resolution_units != (char *) NULL)
         {
           option_type=ParseCommandOption(MagickResolutionOptions,MagickFalse,
