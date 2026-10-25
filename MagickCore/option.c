@@ -2935,6 +2935,12 @@ MagickExport char *GetNextImageOption(const ImageInfo *image_info)
 %    o option: the option.
 %
 */
+static inline MagickBooleanType IsBracketOption(const char *option)
+{
+  return(((*option == '{') || (*option == '}') || (*option == '[') ||
+    (*option == ']')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType IsCommandOption(const char *option)
 {
   char
@@ -2959,8 +2965,7 @@ MagickExport MagickBooleanType IsCommandOption(const char *option)
   if ((pedantic == MagickFalse) && (IsPathAccessible(option) != MagickFalse))
     return(MagickFalse);
   if (strlen(option) == 1)
-    return(((*option == '{') || (*option == '}') || (*option == '[') ||
-      (*option == ']')) ? MagickTrue : MagickFalse);
+    return(IsBracketOption(option));
   option++;
   if (isalpha((int) ((unsigned char) *option)) == 0)
     return(MagickFalse);
