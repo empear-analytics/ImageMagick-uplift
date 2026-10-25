@@ -158,3 +158,16 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): second pass
+
+**Result: Code Health 3.38, unchanged. Tried and reverted.** GravityAdjustGeometry
+(ready, cc 25) is two independent switches, one for the x offset and one for the y
+offset. Moving the x switch into a helper left the score flat (cc 25 → 14). Moving the
+y switch as well dropped the file to 3.23, because the two helpers are near-identical
+and CodeScene reports them as duplicates of each other. They differ in more than one
+value (east/west versus north/south cases, width versus height), so Recipe D does not
+apply, and the flat first step had no legal follow-up.
+
+ParseGeometry and GetGeometry parse with a flag set and a cursor together, as M14
+recorded, so their remaining blocks have two outputs.
