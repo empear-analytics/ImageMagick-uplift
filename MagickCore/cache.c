@@ -2867,6 +2867,25 @@ static inline MagickModulo VirtualPixelModulo(const ssize_t offset,
   return(modulo);
 }
 
+static inline MagickBooleanType IsRegionInsideCache(const CacheInfo *cache_info,
+  const ssize_t x,const ssize_t y,const size_t columns,const size_t rows)
+{
+  return(((x >= 0) &&
+    ((x+(ssize_t) columns-1) < (ssize_t) cache_info->columns) &&
+    (y >= 0) &&
+    ((y+(ssize_t) rows-1) < (ssize_t) cache_info->rows)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsOffsetOutsideCache(
+  const CacheInfo *cache_info,const ssize_t x_offset,const ssize_t y_offset,
+  const MagickSizeType length)
+{
+  return((((x_offset < 0) || (x_offset >= (ssize_t) cache_info->columns)) ||
+    ((y_offset < 0) || (y_offset >= (ssize_t) cache_info->rows)) ||
+    (length == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   const VirtualPixelMethod virtual_pixel_method,const ssize_t x,const ssize_t y,
   const size_t columns,const size_t rows,NexusInfo *nexus_info,
@@ -2936,8 +2955,7 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
     nexus_info->region.width-1L;
   number_pixels=(MagickSizeType) cache_info->columns*cache_info->rows;
   if ((offset >= 0) && (((MagickSizeType) offset+length) < number_pixels))
-    if ((x >= 0) && ((x+(ssize_t) columns-1) < (ssize_t) cache_info->columns) &&
-        (y >= 0) && ((y+(ssize_t) rows-1) < (ssize_t) cache_info->rows))
+    if (IsRegionInsideCache(cache_info,x,y,columns,rows) != MagickFalse)
       {
         MagickBooleanType
           status;
@@ -3064,9 +3082,7 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
       x_offset=x+u;
       length=(MagickSizeType) MagickMin((ssize_t) cache_info->columns-
         x_offset,(ssize_t) columns-u);
-      if (((x_offset < 0) || (x_offset >= (ssize_t) cache_info->columns)) ||
-          ((y_offset < 0) || (y_offset >= (ssize_t) cache_info->rows)) ||
-          (length == 0))
+      if (IsOffsetOutsideCache(cache_info,x_offset,y_offset,length) != MagickFalse)
         {
           MagickModulo
             x_modulo,
