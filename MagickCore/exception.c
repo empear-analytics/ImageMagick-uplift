@@ -991,6 +991,16 @@ MagickExport WarningHandler SetWarningHandler(WarningHandler handler)
 %    o description: the exception description.
 %
 */
+static inline MagickBooleanType IsRepeatedException(const ExceptionInfo *p,
+  const ExceptionType severity,const ExceptionInfo *exception,
+  const char *reason,const char *description)
+{
+  return(((p != (ExceptionInfo *) NULL) && (p->severity == severity) &&
+    (LocaleCompare(exception->reason,reason) == 0) &&
+    (LocaleCompare(exception->description,description) == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
   const ExceptionType severity,const char *reason,const char *description)
 {
@@ -1019,9 +1029,8 @@ MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
         }
     }
   p=(ExceptionInfo *) GetLastValueInLinkedList(exceptions);
-  if ((p != (ExceptionInfo *) NULL) && (p->severity == severity) &&
-      (LocaleCompare(exception->reason,reason) == 0) &&
-      (LocaleCompare(exception->description,description) == 0))
+  if (IsRepeatedException(p,severity,exception,reason,description) !=
+      MagickFalse)
     {
       UnlockSemaphoreInfo(exception->semaphore);
       return(MagickTrue);
