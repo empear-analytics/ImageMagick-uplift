@@ -3665,6 +3665,16 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 %    o texture_image: This image is the texture to layer on the background.
 %
 */
+static inline MagickBooleanType IsTextureComposited(const Image *image,
+  const Image *texture_image)
+{
+  return(((image->compose != CopyCompositeOp) &&
+    ((image->compose != OverCompositeOp) ||
+    (image->alpha_trait != UndefinedPixelTrait) ||
+    (texture_image->alpha_trait != UndefinedPixelTrait))) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
@@ -3698,10 +3708,7 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   (void) SetImageVirtualPixelMethod(texture_image,TileVirtualPixelMethod,
     exception);
   status=MagickTrue;
-  if ((image->compose != CopyCompositeOp) &&
-      ((image->compose != OverCompositeOp) ||
-       (image->alpha_trait != UndefinedPixelTrait) ||
-       (texture_image->alpha_trait != UndefinedPixelTrait)))
+  if (IsTextureComposited(image,texture_image) != MagickFalse)
     {
       /*
         Tile texture onto the image background.
