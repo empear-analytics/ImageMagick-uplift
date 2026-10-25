@@ -830,6 +830,38 @@ static void PrintIPTCProfile(FILE *file,const StringInfo *profile)
   }
 }
 
+static void PrintImageProfiles(FILE *file,Image *image)
+{
+  const char
+    *name;
+
+  ResetImageProfileIterator(image);
+  name=GetNextImageProfile(image);
+  if (name != (char *) NULL)
+    {
+      const StringInfo
+        *profile;
+
+      /*
+        Identify image profiles.
+      */
+      (void) FormatLocaleFile(file,"  Profiles:\n");
+      while (name != (char *) NULL)
+      {
+        profile=GetImageProfile(image,name);
+        if (profile == (StringInfo *) NULL)
+          continue;
+        (void) FormatLocaleFile(file,"    Profile-%s: %.17g bytes\n",name,
+          (double) GetStringInfoLength(profile));
+        if (LocaleCompare(name,"iptc") == 0)
+          PrintIPTCProfile(file,profile);
+        if (image->debug != MagickFalse)
+          PrintStringInfo(file,name,profile);
+        name=GetNextImageProfile(image);
+      }
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -856,7 +888,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const char
     *artifact,
     *locate,
-    *name,
     *property,
     *registry,
     *value;
@@ -1664,31 +1695,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
           points=DestroyString(points);
         }
     }
-  ResetImageProfileIterator(image);
-  name=GetNextImageProfile(image);
-  if (name != (char *) NULL)
-    {
-      const StringInfo
-        *profile;
-
-      /*
-        Identify image profiles.
-      */
-      (void) FormatLocaleFile(file,"  Profiles:\n");
-      while (name != (char *) NULL)
-      {
-        profile=GetImageProfile(image,name);
-        if (profile == (StringInfo *) NULL)
-          continue;
-        (void) FormatLocaleFile(file,"    Profile-%s: %.17g bytes\n",name,
-          (double) GetStringInfoLength(profile));
-        if (LocaleCompare(name,"iptc") == 0)
-          PrintIPTCProfile(file,profile);
-        if (image->debug != MagickFalse)
-          PrintStringInfo(file,name,profile);
-        name=GetNextImageProfile(image);
-      }
-    }
+  PrintImageProfiles(file,image);
   PrintImageProperties(file,image,exception);
   ResetImageArtifactIterator(image);
   artifact=GetNextImageArtifact(image);
