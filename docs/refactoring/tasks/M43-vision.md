@@ -173,3 +173,30 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, late afternoon)
+
+**Result: Code Health 1.62 → 2.06** (`cs-mcp` 1.5.12). Branch `campaign/M43-vision`,
+stacked on `campaign/M42-xml-tree`. 4 refactor commits, all oracle-verified; every
+function in the file is ready or careful. Complex Conditional leaves the file.
+
+**ConnectedComponentsImage.**
+- `IsMetricOutsideRange` replaces the seven identical merge tests of the metric filters
+  in one P step (+0.15). It takes six arguments.
+- Then `IsNeighborOutsideImage`, `IsAreaOutsideRange` and `IsGreaterAdjacentObject`
+  (+0.17).
+- Open survivors sit on some of these lines. The function is ready, which allows every
+  recipe, and the text moves unchanged.
+
+**PerimeterThreshold and CircularityThreshold.** `IsDiagonalPair` by P, then by D for
+the identical test in the other function.
+
+**Code Duplication.** The finding over the six *Threshold functions was there before the
+task and is unchanged. Those functions are near-clones whose loop bodies differ in the
+metric they compute.
+
+**What is left, at 2.06.**
+- `ConnectedComponentsImage` (cc about 220, 46 bumps): one long sequence of stages
+  sharing many locals.
+- The six *Threshold functions: Code Duplication and 4–7 bumps each. Recipe D would
+  need one differing expression per function, which is more than it allows.
