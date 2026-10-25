@@ -319,6 +319,35 @@ MagickExport const TypeInfo *GetTypeInfo(const char *name,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsStyleMismatch(const TypeInfo *p,
+  const StyleType style)
+{
+  return(((style != UndefinedStyle) && (style != AnyStyle) &&
+    (p->style != style)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsStretchMismatch(const TypeInfo *p,
+  const StretchType stretch)
+{
+  return(((stretch != UndefinedStretch) && (stretch != AnyStretch) &&
+    (p->stretch != stretch)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsStyleMatch(const TypeInfo *p,
+  const StyleType style)
+{
+  return(((style == UndefinedStyle) || (style == AnyStyle) ||
+    (p->style == style)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsSlantedStyleMatch(const TypeInfo *p,
+  const StyleType style)
+{
+  return((((style == ItalicStyle) || (style == ObliqueStyle)) &&
+    ((p->style == ItalicStyle) || (p->style == ObliqueStyle))) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   const StyleType style,const StretchType stretch,const size_t weight,
   ExceptionInfo *exception)
@@ -388,13 +417,12 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
           p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
           continue;
         }
-    if ((style != UndefinedStyle) && (style != AnyStyle) && (p->style != style))
+    if (IsStyleMismatch(p,style) != MagickFalse)
       {
         p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
         continue;
       }
-    if ((stretch != UndefinedStretch) && (stretch != AnyStretch) &&
-        (p->stretch != stretch))
+    if (IsStretchMismatch(p,stretch) != MagickFalse)
       {
         p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
         continue;
@@ -440,11 +468,10 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
           continue;
         }
     score=0;
-    if ((style == UndefinedStyle) || (style == AnyStyle) || (p->style == style))
+    if (IsStyleMatch(p,style) != MagickFalse)
       score+=32;
     else
-      if (((style == ItalicStyle) || (style == ObliqueStyle)) &&
-          ((p->style == ItalicStyle) || (p->style == ObliqueStyle)))
+      if (IsSlantedStyleMatch(p,style) != MagickFalse)
         score+=25;
     score+=(size_t) ((16L*(800L-((ssize_t) MagickMax(MagickMin(font_weight,900),
       p->weight)-(ssize_t) MagickMin(MagickMin(font_weight,900),p->weight))))/
