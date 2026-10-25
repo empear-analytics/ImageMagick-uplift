@@ -1165,6 +1165,27 @@ MagickPrivate MagickBooleanType IsMagickConflict(const char *magick)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void PrintMagickNote(FILE *file,const MagickInfo **magick_info,
+  const ssize_t i)
+{
+  ssize_t
+    j;
+
+  char
+    **text;
+
+  text=StringToList(magick_info[i]->note);
+  if (text != (char **) NULL)
+    {
+      for (j=0; text[j] != (char *) NULL; j++)
+      {
+        (void) FormatLocaleFile(file,"             %s\n",text[j]);
+        text[j]=DestroyString(text[j]);
+      }
+      text=(char **) RelinquishMagickMemory(text);
+    }
+}
+
 MagickExport MagickBooleanType ListMagickInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1176,9 +1197,6 @@ MagickExport MagickBooleanType ListMagickInfo(FILE *file,
 
   size_t
     number_formats;
-
-  ssize_t
-    j;
 
   if (file == (FILE *) NULL)
     file=stdout;
@@ -1225,21 +1243,7 @@ MagickExport MagickBooleanType ListMagickInfo(FILE *file,
       (void) FormatLocaleFile(file," (%s)",magick_info[i]->version);
     (void) FormatLocaleFile(file,"\n");
     if (magick_info[i]->note != (char *) NULL)
-      {
-        char
-          **text;
-
-        text=StringToList(magick_info[i]->note);
-        if (text != (char **) NULL)
-          {
-            for (j=0; text[j] != (char *) NULL; j++)
-            {
-              (void) FormatLocaleFile(file,"             %s\n",text[j]);
-              text[j]=DestroyString(text[j]);
-            }
-            text=(char **) RelinquishMagickMemory(text);
-          }
-      }
+      PrintMagickNote(file,magick_info,i);
   }
   (void) FormatLocaleFile(file,"\n* native blob support\n");
   (void) FormatLocaleFile(file,"r read support\n");
