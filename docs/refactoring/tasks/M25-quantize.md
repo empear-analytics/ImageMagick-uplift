@@ -222,10 +222,10 @@ For each function: the recipes applied, the score before and after, and the revi
 ### Report (2026-10-25, Mac, morning)
 
 **Result: Code Health 1.82 → 1.95** (`cs-mcp` 1.5.12). Branch `campaign/M25-quantize`,
-stacked on `campaign/M24-transform`. 10 refactor commits, all oracle-verified, every
+stacked on `campaign/M24-transform`. 9 refactor commits, all oracle-verified, every
 function ready or careful with no survivor on a moved line:
 - 3 Recipe P;
-- 6 Recipe E;
+- 5 Recipe E;
 - 1 Recipe D.
 
 **Predicates:** `IsDitherPositionInImage`, `IsTwoColorGrayQuantize` and

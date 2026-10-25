@@ -207,8 +207,8 @@ For each function: the recipes applied, the score before and after, and the revi
 ### Report (2026-10-25, Mac, morning)
 
 **Result: Code Health 2.58 → 2.97** (`cs-mcp` 1.5.12). Branch `campaign/M27-attribute`,
-stacked on `campaign/M26-effect`. 11 refactor commits, all oracle-verified: 1 P, 7 E,
-3 D. Every function touched is ready in the merged mutation reports. The baseline is
+stacked on `campaign/M26-effect`. 10 refactor commits, all oracle-verified: 1 P, 7 E,
+2 D. Every function touched is ready in the merged mutation reports. The baseline is
 `f8b59598e` (`origin/main` after PR #30).
 
 **GetImageBoundingBox:** `IsEmptyBoundingBox` (+0.15). The second site, in the parallel
