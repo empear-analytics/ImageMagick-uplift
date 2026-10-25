@@ -957,16 +957,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
       /*
         Start at the root and descend the color cube tree.
       */
-      for (count=1; (x+(ssize_t) count) < (ssize_t) image->columns; count++)
-      {
-        PixelInfo
-          packet;
-
-        GetPixelInfoPixel(image,p+count*(ssize_t) GetPixelChannels(image),
-          &packet);
-        if (IsPixelEquivalent(image,p,&packet) == MagickFalse)
-          break;
-      }
+      count=GetPixelRunLength(image,p,x);
       AssociateAlphaPixel(image,cube_info,p,&pixel);
       index=MaxTreeDepth-1;
       bisect=((double) QuantumRange+1.0)/2.0;
