@@ -138,3 +138,18 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 7.56 → 8.32** (`cs-mcp` 1.5.12). Branch `campaign/M62-quantum`,
+stacked on `campaign/M61-signature`. Two guard-level E commits (both functions are
+not ready). The oracle also ran: about 14,500 cases each, 0 diverged.
+- `GetQuantumChannels` (GetQuantumExtent): the channel-count switch, value-returning.
+- `SetQuantumScaleFromRange` (GetQuantumInfo): the scale derivation, 7.58 → 8.32.
+
+**What is left, at 8.32.**
+- GetQuantumType's three alpha-aware blocks differ in two values each.
+- SetQuantumImageType is one `switch`.
+- `GetQuantumChannels` carries the switch's cc 15.
+- The `SetQuantum*` setters are reported as duplicates, but each differs in several
+  statements.
