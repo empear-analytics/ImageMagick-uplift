@@ -152,3 +152,29 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): second pass
+
+**Result: Code Health 3.47 → 3.61** (`cs-mcp` 1.5.12). Branch `campaign/M80-segment-e`,
+stacked on `campaign/M79-identify-e`. Eight E commits:
+- InitializeIntervalTree (ready, oracle): `AppendIntervalNode` and
+  `AcquireRootInterval`, both value-returning.
+- Classify (careful): `CountClusterPixel` and `ClassifyPixelByCluster`, both
+  value-returning. These were taken at guard level, because this file's mutation
+  report predates the M10 edits and its survivor lines now fall on comments.
+  `ClassifyPixelByCluster` sits inside the row loop that OpenMP would parallelise; it
+  writes only row-private state.
+- ZeroCrossHistogram (ready, oracle): `MergeSmallDerivatives`. It leaves Complex Method.
+- OptimalTau (not ready, guard): `GetAverageTau` (flat, named its next step) and
+  `FindTauIndex`.
+
+**What is left, at 3.61.**
+- **Stale mutation report.** segment.c's survivor lines no longer match the code. A
+  fresh mutation run would turn Classify and ConsolidateCrossings back into
+  oracle-level targets.
+- ConsolidateCrossings' three candidate checks (center, left, right) are a Recipe D,
+  waiting for that run.
+- GetImageDynamicThreshold has no case. Its blocks mirror Classify's, so reuse would
+  be D.
+- InitializeIntervalTree keeps depth 5: its allocation-failure branch returns from
+  inside the loops.

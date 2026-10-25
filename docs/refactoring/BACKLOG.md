@@ -82,7 +82,7 @@ needs before refactoring:
 | 1.89 | `MagickCore/threshold.c` | 2648 | 87% | 85% | 2.08, in progress (Complex Conditional gone; the pixel drivers duplicate each other once thinned), [M08](tasks/M08-threshold.md) |
 | 1.92 | `MagickCore/statistic.c` | 3158 | 97% | 89% | 2.27, in progress (Complex Conditional gone; Recipe B next), [M07](tasks/M07-statistic.md) |
 | 2.16 | `MagickCore/identify.c` | 1705 | 68% | 85% | 3.21, in progress (Complex Conditional gone; IdentifyImage 1,143 -> 696 lines), [M15](tasks/M15-identify.md) |
-| 2.30 | `MagickCore/segment.c` | 1934 | 79% | 86% | 3.47, in progress (Complex Conditional gone; Brain Method left in Classify and GetImageDynamicThreshold), [M10](tasks/M10-segment.md) |
+| 2.30 | `MagickCore/segment.c` | 1934 | 79% | 86% | 3.61, in progress (second pass M80) (Complex Conditional gone; Brain Method left in Classify and GetImageDynamicThreshold), [M10](tasks/M10-segment.md) |
 | 2.57 | `MagickCore/colorspace.c` | 2899 | 90% | 92% | 2.80, plateau for the current catalogue (Complex Conditional gone; the transforms are case-per-pragma switches), [M06](tasks/M06-colorspace.md) |
 | 3.08 | `MagickCore/fourier.c` | 1626 | 92% | 86% | 3.27 on the Mac (`ComplexImages` only, [M12](tasks/M12-fourier.md)); the FFTW-only functions still wait for the Linux machine |
 | 3.28 | `MagickCore/channel.c` | 1394 | 65% | 81% | 4.04, in progress (out of the Red band), [M16](tasks/M16-channel.md) |
