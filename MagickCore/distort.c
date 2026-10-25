@@ -392,6 +392,14 @@ static inline MagickBooleanType IsMatrixMemoryMissing(double **matrix,
     (terms   == (double *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsInvalidPolarArgumentCount(
+  const size_t number_arguments,const DistortMethod *method)
+{
+  return(( number_arguments == 3
+          || ( number_arguments > 6 && *method == PolarDistortion )
+          || number_arguments > 8 ) ? MagickTrue : MagickFalse);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const size_t number_arguments,const double *arguments,
   size_t number_values,ExceptionInfo *exception)
@@ -1288,9 +1296,7 @@ static double *GenerateCoefficients(const Image *image,
 
          WARNING: It is possible for  Radius max<min  and/or  Angle from>to
       */
-      if ( number_arguments == 3
-          || ( number_arguments > 6 && *method == PolarDistortion )
-          || number_arguments > 8 ) {
+      if (IsInvalidPolarArgumentCount(number_arguments,method) != MagickFalse) {
           (void) ThrowMagickException(exception,GetMagickModule(),
             OptionError,"InvalidArgument", "%s : number of arguments",
             CommandOptionToMnemonic(MagickDistortOptions, *method) );
