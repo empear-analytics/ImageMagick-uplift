@@ -159,3 +159,19 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): second pass
+
+**Result: Code Health 3.21, unchanged. Tried and reverted.** IdentifyImage (ready,
+cc 150, 696 lines) has a non-verbose summary block whose every path ends in
+`return(ferror(file) ...)`. Moving it under Recipe E step 7 (`PrintImageSummary`,
+5 arguments, its own `buffer`) cut IdentifyImage to cc 134 and 634 lines. But the file
+went 3.21 → 3.20, because the helper brings cc 17, three bumps and an argument-count
+finding of its own.
+
+**CodeScene parser quirk, worth reporting to the CodeScene developers.**
+AccumulateLocationExtrema, the first function in identify.c, is measured from line 41
+(right after the license header) instead of from its signature. The whole `#include`
+block is counted into it, so CodeScene reports it as an 87-line Large Method. The same
+happened with an experimental helper above image.c's AcquireImage (M78). Any file whose
+first function is small is penalised by its include block.
