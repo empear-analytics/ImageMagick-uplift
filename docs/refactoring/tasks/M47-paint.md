@@ -130,3 +130,25 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 3.06 → 3.33** (`cs-mcp` 1.5.12). Branch `campaign/M47-paint`,
+stacked on `campaign/M46-layer`. 2 refactor commits, both in GradientImage (ready),
+both oracle-verified:
+- `IsGradientDefaultDirection` (P). Complex Conditional leaves the file.
+- `SetGradientDirection` (E): the eight-way direction `switch`. GradientImage goes from
+  cc 32 to 20 and from 194 to 117 lines.
+
+**Blocked:** OilPaintImage's histogram search, the block that finds the most frequent
+intensity inside the parallel loop. Its only output is `j`, so it would fit E. But it
+uses `NumberPaintBins`, which is `#define`d inside OilPaintImage's body and also used by
+the caller, so the macro cannot move with the block. This is another case for the
+proposed hoist recipe (M35, M41).
+
+**What is left, at 3.33.**
+- `FloodfillPaintImage` (careful, 9 bumps, 264 lines): the scan-line flood fill, whose
+  stack and segment bookkeeping is shared state.
+- `OilPaintImage`, as above.
+- `TransparentPaintImage` and `TransparentPaintImageChroma`: reported as duplicates.
+  The Chroma variant has no oracle case.
