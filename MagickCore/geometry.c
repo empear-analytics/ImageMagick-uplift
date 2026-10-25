@@ -221,6 +221,20 @@ static inline MagickBooleanType IsGeometryHeightOnly(
     MagickFalse);
 }
 
+static MagickStatusType SetPercentGeometrySize(MagickStatusType flags,
+  size_t *width,size_t *height)
+{
+  if (((flags & SeparatorValue) == 0) && ((flags & HeightValue) == 0))
+    {
+      if ((height != (size_t *) NULL) && (width != (size_t *) NULL))
+        *height=(*width);
+      flags|=HeightValue;
+    }
+  if (IsGeometryHeightOnly(flags,width,height) != MagickFalse)
+    *width=(*height);
+  return(flags);
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -441,16 +455,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
         }
     }
   if ((flags & PercentValue) != 0)
-    {
-      if (((flags & SeparatorValue) == 0) && ((flags & HeightValue) == 0))
-        {
-          if ((height != (size_t *) NULL) && (width != (size_t *) NULL))
-            *height=(*width);
-          flags|=HeightValue;
-        }
-      if (IsGeometryHeightOnly(flags,width,height) != MagickFalse)
-        *width=(*height);
-    }
+    flags=SetPercentGeometrySize(flags,width,height);
 #if 0
   /* Debugging Geometry */
   (void) fprintf(stderr,"GetGeometry...\n");
