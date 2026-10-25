@@ -146,6 +146,30 @@ static MagickBooleanType
 static StringInfo
   *GenerateEntropicChaos(RandomInfo *);
 
+static void SeedFromSecretKey(RandomInfo *random_info)
+{
+  const StringInfo
+    *digest;
+
+  SignatureInfo
+    *signature_info;
+
+  StringInfo
+    *key;
+
+  signature_info=AcquireSignatureInfo();
+  key=AcquireStringInfo(sizeof(random_info->secret_key));
+  SetStringInfoDatum(key,(unsigned char *) &random_info->secret_key);
+  UpdateSignature(signature_info,key);
+  key=DestroyStringInfo(key);
+  FinalizeSignature(signature_info);
+  digest=GetSignatureDigest(signature_info);
+  (void) memcpy(random_info->seed,GetStringInfoDatum(digest),
+    MagickMin((size_t) GetSignatureDigestsize(signature_info),
+    sizeof(random_info->seed)));
+  signature_info=DestroySignatureInfo(signature_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -166,9 +190,6 @@ static StringInfo
 */
 MagickExport RandomInfo *AcquireRandomInfo(void)
 {
-  const StringInfo
-    *digest;
-
   RandomInfo
     *random_info;
 
@@ -233,22 +254,7 @@ MagickExport RandomInfo *AcquireRandomInfo(void)
       key=DestroyStringInfo(key);
     }
   else
-    {
-      SignatureInfo
-        *signature_info;
-
-      signature_info=AcquireSignatureInfo();
-      key=AcquireStringInfo(sizeof(random_info->secret_key));
-      SetStringInfoDatum(key,(unsigned char *) &random_info->secret_key);
-      UpdateSignature(signature_info,key);
-      key=DestroyStringInfo(key);
-      FinalizeSignature(signature_info);
-      digest=GetSignatureDigest(signature_info);
-      (void) memcpy(random_info->seed,GetStringInfoDatum(digest),
-        MagickMin((size_t) GetSignatureDigestsize(signature_info),
-        sizeof(random_info->seed)));
-      signature_info=DestroySignatureInfo(signature_info);
-    }
+    SeedFromSecretKey(random_info);
   return(random_info);
 }
 
