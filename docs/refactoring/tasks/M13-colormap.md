@@ -97,3 +97,31 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 8.88 → 9.36** (`cs-mcp` 1.5.12). Branch `campaign/M13-colormap`,
+stacked on `campaign/M12-fourier` (PR #18). 2 refactor commits, both Recipe E and
+oracle-verified (every function is ready).
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| `CycleColormapImage`'s per-pixel index cycling into `CyclePixelIndex` | E | 8.88 → 8.97 |
+| `AcquireImageColormap`'s gray-ramp initialization into `InitializeGrayColormap` | E | → 9.36 |
+
+`CycleColormapImage` leaves Bumpy Road (cc 11 → 10), and `AcquireImageColormap` leaves
+Large Method.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Tried and reverted.** `CycleColormapImage`'s row (the column loop and the sync) through
+Recipe T, as `CycleColormapRow(image,image_view,displace,q,exception)`: 9.36 → 8.55. The
+function stays a Complex Method at cc 9 (the threshold is below 9), and the helper adds
+Excess Arguments (5).
+
+**What is left, at 9.36.** Complex Method in `SortColormapByIntensity` (cc 13) and
+`CycleColormapImage` (cc 10). Both counts are the public functions' guard tests (logging,
+storage class, allocation), the two parallel loops' status checks and the sync. No legal
+step takes either below 9 without a helper that costs more than it saves. This is a
+plateau for the current catalogue.
