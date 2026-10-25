@@ -1179,21 +1179,9 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
             gamma,
             Sa;
 
-          ssize_t
-            i;
-
           Sa=QuantumScale*(double) GetPixelAlpha(image,q);
           gamma=MagickSafeReciprocal(Sa);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if (channel == AlphaPixelChannel)
-              continue;
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            q[i]=ClampToQuantum(gamma*(double) q[i]);
-          }
+          ScaleColorChannels(image,gamma,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
