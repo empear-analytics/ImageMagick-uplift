@@ -794,6 +794,42 @@ static void PrintIPTCValue(FILE *file,const StringInfo *profile,
     }
 }
 
+static void PrintIPTCProfile(FILE *file,const StringInfo *profile)
+{
+  ssize_t
+    i;
+
+  const char
+    *tag;
+
+  long
+    dataset,
+    record,
+    sentinel;
+
+  size_t
+    length,
+    profile_length;
+
+  profile_length=GetStringInfoLength(profile);
+  for (i=0; i < (ssize_t) profile_length-5; i+=(ssize_t) length)
+  {
+    length=1;
+    sentinel=GetStringInfoDatum(profile)[i++];
+    if (sentinel != 0x1c)
+      continue;
+    dataset=GetStringInfoDatum(profile)[i++];
+    record=GetStringInfoDatum(profile)[i++];
+    tag=GetIPTCTagName(record);
+    (void) FormatLocaleFile(file,"      %s[%.17g,%.17g]: ",tag,
+      (double) dataset,(double) record);
+    length=(size_t) (GetStringInfoDatum(profile)[i++] << 8);
+    length|=GetStringInfoDatum(profile)[i++];
+    length=MagickMin(length,profile_length-(size_t) i);
+    PrintIPTCValue(file,profile,i,length);
+  }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1647,37 +1683,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         (void) FormatLocaleFile(file,"    Profile-%s: %.17g bytes\n",name,
           (double) GetStringInfoLength(profile));
         if (LocaleCompare(name,"iptc") == 0)
-          {
-            const char
-              *tag;
-
-            long
-              dataset,
-              record,
-              sentinel;
-
-            size_t
-              length,
-              profile_length;
-
-            profile_length=GetStringInfoLength(profile);
-            for (i=0; i < (ssize_t) profile_length-5; i+=(ssize_t) length)
-            {
-              length=1;
-              sentinel=GetStringInfoDatum(profile)[i++];
-              if (sentinel != 0x1c)
-                continue;
-              dataset=GetStringInfoDatum(profile)[i++];
-              record=GetStringInfoDatum(profile)[i++];
-              tag=GetIPTCTagName(record);
-              (void) FormatLocaleFile(file,"      %s[%.17g,%.17g]: ",tag,
-                (double) dataset,(double) record);
-              length=(size_t) (GetStringInfoDatum(profile)[i++] << 8);
-              length|=GetStringInfoDatum(profile)[i++];
-              length=MagickMin(length,profile_length-(size_t) i);
-              PrintIPTCValue(file,profile,i,length);
-            }
-          }
+          PrintIPTCProfile(file,profile);
         if (image->debug != MagickFalse)
           PrintStringInfo(file,name,profile);
         name=GetNextImageProfile(image);
