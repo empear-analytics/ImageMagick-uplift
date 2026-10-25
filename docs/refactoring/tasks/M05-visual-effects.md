@@ -243,3 +243,70 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 1.55 → 2.41** (`cs-mcp` 1.5.12). Branch `campaign/M05-visual-effects`,
+stacked on `campaign/M04-morphology` (PR #10). 20 refactor commits, one recipe and one
+function each: 14 Recipe E, 4 Recipe P, 2 Recipe D, all oracle-verified (the readiness
+gate puts every function touched at ready or careful; on careful functions no moved line
+holds an unmatched or unreached survivor).
+
+**One category leaves the file:** Complex Conditional (eight sites: the five missing-pixel
+tests and the midpoint test of `PlasmaImageProxy`, `StereoAnaglyphImage`'s row test,
+`WaveletDenoiseImage`'s RGB test). Brain Method leaves `PlasmaImageProxy` and
+`SketchImage`; Deep Nesting leaves `PlasmaImageProxy`, `ColorizeImage`, `SolarizeImage`,
+`AddNoiseImage` and `SketchImage`, and falls to 4 in `MorphImages`, `ImplodeImage` and
+`SwirlImage`. Overall Function Size is gone.
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| the eight compound tests as predicates (`IsPlasmaPixelMissing` at five sites) | P | 1.55 → 1.76 |
+| `MorphImages`' channel loop; `ImplodeImage`'s copy-unchanged loop as `CopyPixelChannels`, reused by `SwirlImage` | E, D | → 1.79 |
+| `PlasmaImageProxy`'s channel loop once, then at its four other sites | E, D | → 1.97 |
+| channel loops of `ColorizeImage` (its `Colorize()` macro moves with it), `SolarizeImage` (and its colormap), `AddNoiseImage`, `SketchImage` | E | → 2.27 |
+| `BlueShiftImage`'s minimum and maximum of RGB; `SepiaToneImage`'s pixel | E | flat |
+| the blend parsers of `TintImage` and `ColorizeImage` (each returns a `PixelInfo`); `TintImage`'s pixel | E | → 2.41 |
+
+Every step: build, `make.log` free of warnings for the file, the literal guard OK (for D,
+"copies removed, every value still present"), `--calls` moving nothing but the new
+helper (or, for D, the deduplicated loop's calls for the helper's), the oracle on the
+function's cases (0 diverged), the CodeScene gate; every moved block checked by script.
+Two scripts gained guards during the night after near misses that the oracle would
+probably, but not certainly, have caught: one refuses a line range that ends
+mid-statement (an `else` without its statement), one refuses a block that changes `p`,
+`q`, `r`, `u` or `v` (a pixel pointer the helper would receive by value). Neither slip
+reached a commit.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Tried and reverted.**
+- `WaveletDenoiseImage`'s threshold loop (six parameters: 2.41 → 2.36).
+- `SteganoImage`'s bit switch (six parameters: 2.41 → 2.36). After `AddNoisePixelChannels`
+  (seven) and `MorphPixelChannels` (six), a further helper with Excess Arguments costs
+  more than the nesting it removes.
+- `ColorMatrixImage`'s debug log: its helper takes `double ColorMatrix[6][6]`, which adds
+  two literals, and the block holds unreached survivors. Every helper of that function
+  would need the matrix.
+
+**What is left, at 2.41.**
+- Brain Method: `PolaroidImage` (not ready, 63%; its caption block writes the caption
+  image, the height and the text, and its annotate branch needs six arguments).
+- Deep Nesting: `MorphImages`, `ImplodeImage`, `SwirlImage`. The innermost level is the
+  interpolation branch, which writes `status` and `break`s the column loop.
+- `ColorMatrixImage`, `SteganoImage` and `WaveletDenoiseImage`, as above.
+- Excess Arguments: public signatures and the helpers above.
+- Large and Complex Method: in most pixel functions, the row loop's status, sync and
+  progress handling.
+
+This is not a plateau. Recipe B (bundle arguments into a `const` struct) would let the
+six-argument pixel helpers through. It needs oracle-level evidence, which these
+functions have, so it is the next step here.
+
+**Possible bugs, reported, not fixed.**
+- `MorphImages`, single-image branch: when the progress monitor cancels, it assigns
+  `status=MagickFalse` to a variable that is never initialised on that path, and never
+  reads it.
+- `MorphImages`: when `SetImageStorageClass()` fails, it destroys the new frame and
+  returns NULL, but leaks `morph_images`, the list built so far.
