@@ -2312,8 +2312,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           if ((x-x_offset) >= (ssize_t) source_image->columns)
             break;
         }
-      if ((pixels == (Quantum *) NULL) || (x < x_offset) ||
-          ((x-x_offset) >= (ssize_t) source_image->columns))
+      if (IsOutsideSourceColumn(pixels,x,x_offset,source_image) != MagickFalse)
         {
           Quantum
             source[MaxPixelChannels];
