@@ -2676,6 +2676,38 @@ static const OptionInfo *GetOptionInfo(const CommandOption option)
   return((const OptionInfo *) NULL);
 }
 
+static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
+  char *token)
+{
+  char
+    *q;
+
+  const OptionInfo
+    *command_info;
+
+  ssize_t
+    i;
+
+  for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
+    if (LocaleCompare(token,option_info[i].mnemonic) == 0)
+      break;
+  command_info=option_info+i;
+  if ((command_info->mnemonic == (const char *) NULL) && (*token != '\0') &&
+      ((strchr(token+1,'-') != (char *) NULL) ||
+       (strchr(token+1,'_') != (char *) NULL)))
+    {
+      while ((q=strchr(token+1,'-')) != (char *) NULL)
+        (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
+      while ((q=strchr(token+1,'_')) != (char *) NULL)
+        (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
+      for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
+        if (LocaleCompare(token,option_info[i].mnemonic) == 0)
+          break;
+      command_info=option_info+i;
+    }
+  return(command_info);
+}
+
 MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
   const MagickBooleanType list,const char *options)
 {
@@ -2697,9 +2729,6 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
 
   const char
     *p;
-
-  ssize_t
-    i;
 
   ssize_t
     option_types;
@@ -2730,23 +2759,7 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
       *q++=(*p++);
     }
     *q='\0';
-    for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-      if (LocaleCompare(token,option_info[i].mnemonic) == 0)
-        break;
-    command_info=option_info+i;
-    if ((command_info->mnemonic == (const char *) NULL) && (*token != '\0') &&
-        ((strchr(token+1,'-') != (char *) NULL) ||
-         (strchr(token+1,'_') != (char *) NULL)))
-      {
-        while ((q=strchr(token+1,'-')) != (char *) NULL)
-          (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
-        while ((q=strchr(token+1,'_')) != (char *) NULL)
-          (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
-        for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-          if (LocaleCompare(token,option_info[i].mnemonic) == 0)
-            break;
-        command_info=option_info+i;
-      }
+    command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
     if (negate != MagickFalse)
@@ -3268,9 +3281,6 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
     *p;
 
   ssize_t
-    i;
-
-  ssize_t
     option_types;
 
   if ((options == (const char *) NULL) || (*options == '\0'))
@@ -3299,23 +3309,7 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
       *q++=(*p++);
     }
     *q='\0';
-    for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-      if (LocaleCompare(token,option_info[i].mnemonic) == 0)
-        break;
-    command_info=option_info+i;
-    if ((command_info->mnemonic == (const char *) NULL) && (*token != '\0') &&
-        ((strchr(token+1,'-') != (char *) NULL) ||
-         (strchr(token+1,'_') != (char *) NULL)))
-        {
-          while ((q=strchr(token+1,'-')) != (char *) NULL)
-            (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
-          while ((q=strchr(token+1,'_')) != (char *) NULL)
-            (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
-          for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-            if (LocaleCompare(token,option_info[i].mnemonic) == 0)
-              break;
-          command_info=option_info+i;
-        }
+    command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
     if (negate != MagickFalse)
