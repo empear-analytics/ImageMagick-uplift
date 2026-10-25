@@ -937,6 +937,66 @@ static void PrintImageChromaticity(FILE *file,const Image *image)
     image->chromaticity.white_point.z);
 }
 
+static void PrintImageDirectory(FILE *file,const Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *property,
+    *value;
+
+  Image
+    *tile;
+
+  ImageInfo
+    *image_info;
+
+  char
+    *d,
+    *q;
+
+  WarningHandler
+    handler;
+
+  /*
+    Display visual image directory.
+  */
+  image_info=AcquireImageInfo();
+  (void) CloneString(&image_info->size,"64x64");
+  (void) FormatLocaleFile(file,"  Directory:\n");
+  for (d=image->directory; *d != '\0'; d++)
+  {
+    q=d;
+    while (IsDirectoryNameCharacter(q,d,image_info) != MagickFalse)
+      q++;
+    (void) CopyMagickString(image_info->filename,d,(size_t) (q-d+1));
+    d=q;
+    (void) FormatLocaleFile(file,"    %s",image_info->filename);
+    handler=SetWarningHandler((WarningHandler) NULL);
+    tile=StrictReadImage(image_info,exception);
+    (void) SetWarningHandler(handler);
+    if (tile == (Image *) NULL)
+      {
+        (void) FormatLocaleFile(file,"\n");
+        continue;
+      }
+    (void) FormatLocaleFile(file," %.17gx%.17g %s\n",(double)
+      tile->magick_columns,(double) tile->magick_rows,tile->magick);
+    (void) SignatureImage(tile,exception);
+    ResetImagePropertyIterator(tile);
+    property=GetNextImageProperty(tile);
+    while (property != (const char *) NULL)
+    {
+      (void) FormatLocaleFile(file,"  %s:\n",property);
+      value=GetImageProperty(tile,property,exception);
+      if (value != (const char *) NULL)
+        (void) FormatLocaleFile(file,"%s\n",value);
+      property=GetNextImageProperty(tile);
+    }
+    tile=DestroyImage(tile);
+  }
+  image_info=DestroyImageInfo(image_info);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -963,7 +1023,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const char
     *artifact,
     *locate,
-    *property,
     *registry,
     *value;
 
@@ -1593,59 +1652,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   if (image->montage != (char *) NULL)
     (void) FormatLocaleFile(file,"  Montage: %s\n",image->montage);
   if (image->directory != (char *) NULL)
-    {
-      Image
-        *tile;
-
-      ImageInfo
-        *image_info;
-
-      char
-        *d,
-        *q;
-
-      WarningHandler
-        handler;
-
-      /*
-        Display visual image directory.
-      */
-      image_info=AcquireImageInfo();
-      (void) CloneString(&image_info->size,"64x64");
-      (void) FormatLocaleFile(file,"  Directory:\n");
-      for (d=image->directory; *d != '\0'; d++)
-      {
-        q=d;
-        while (IsDirectoryNameCharacter(q,d,image_info) != MagickFalse)
-          q++;
-        (void) CopyMagickString(image_info->filename,d,(size_t) (q-d+1));
-        d=q;
-        (void) FormatLocaleFile(file,"    %s",image_info->filename);
-        handler=SetWarningHandler((WarningHandler) NULL);
-        tile=StrictReadImage(image_info,exception);
-        (void) SetWarningHandler(handler);
-        if (tile == (Image *) NULL)
-          {
-            (void) FormatLocaleFile(file,"\n");
-            continue;
-          }
-        (void) FormatLocaleFile(file," %.17gx%.17g %s\n",(double)
-          tile->magick_columns,(double) tile->magick_rows,tile->magick);
-        (void) SignatureImage(tile,exception);
-        ResetImagePropertyIterator(tile);
-        property=GetNextImageProperty(tile);
-        while (property != (const char *) NULL)
-        {
-          (void) FormatLocaleFile(file,"  %s:\n",property);
-          value=GetImageProperty(tile,property,exception);
-          if (value != (const char *) NULL)
-            (void) FormatLocaleFile(file,"%s\n",value);
-          property=GetNextImageProperty(tile);
-        }
-        tile=DestroyImage(tile);
-      }
-      image_info=DestroyImageInfo(image_info);
-    }
+    PrintImageDirectory(file,image,exception);
   (void) FormatLocaleString(key,MagickPathExtent,"8BIM:1999,2998:#1");
   value=GetImageProperty(image,key,exception);
   if (value != (const char *) NULL)
