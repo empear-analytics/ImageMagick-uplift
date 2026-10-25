@@ -1245,6 +1245,29 @@ static double GetMinimumBoxAngle(PointInfo *bounding_box)
   return(angle);
 }
 
+static void MoveBoxToOrigin(PointInfo *bounding_box)
+{
+  PointInfo
+    point;
+
+  ssize_t
+    i;
+
+  point=bounding_box[0];
+  for (i=1; i < 4; i++)
+  {
+    if (bounding_box[i].x < point.x)
+      point.x=bounding_box[i].x;
+    if (bounding_box[i].y < point.y)
+      point.y=bounding_box[i].y;
+  }
+  for (i=0; i < 4; i++)
+  {
+    bounding_box[i].x-=point.x;
+    bounding_box[i].y-=point.y;
+  }
+}
+
 MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   size_t *number_vertices,ExceptionInfo *exception)
 {
@@ -1408,19 +1431,7 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
       /*
         Find smallest perpendicular distance from edge to origin.
       */
-      point=bounding_box[0];
-      for (i=1; i < 4; i++)
-      {
-        if (bounding_box[i].x < point.x)
-          point.x=bounding_box[i].x;
-        if (bounding_box[i].y < point.y)
-          point.y=bounding_box[i].y;
-      }
-      for (i=0; i < 4; i++)
-      {
-        bounding_box[i].x-=point.x;
-        bounding_box[i].y-=point.y;
-      }
+      MoveBoxToOrigin(bounding_box);
       for (i=0; i < 4; i++)
       {
         double
