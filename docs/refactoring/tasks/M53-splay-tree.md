@@ -197,3 +197,26 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 4.32 → 4.62** (`cs-mcp` 1.5.12). Branch `campaign/M53-splay-tree`,
+stacked on `campaign/M52-resource`. Three E commits:
+- `RelinquishSplayTreeNodes` (DestroySplayTree, guard): the level-by-level node
+  teardown, 4.32 → 4.45. DestroySplayTree drops to a few lines.
+- `GetSuccessorNode` (DeleteNodeByValueFromSplayTree, guard; value-returning).
+- `CompareNodeKey` (Splay, ready, oracle; value-returning).
+
+**Reverted.** Reusing `CompareNodeKey` in GetValueFromSplayTree (ready, Recipe D) left
+both the score (4.62) and the duplication finding unchanged.
+
+**What is left, at 4.62. Most of it is reuse that the gate does not allow yet.**
+- ResetSplayTree holds the same teardown as `RelinquishSplayTreeNodes`, and
+  RemoveNodeByValueFromSplayTree holds the same successor search as
+  `GetSuccessorNode`. Six functions repeat the key comparison on
+  `splay_tree->root->key`. Each reuse is Recipe D, at oracle level. ResetSplayTree,
+  RemoveNodeByValueFromSplayTree and RemoveNodeFromSplayTree have no killed mutants,
+  and AddValueToSplayTree and DestroySplayTree are not ready.
+- Code Duplication across ten small functions, which share the
+  `assert`/`signature`/`LogMagickEvent` prologue (`GetMagickModule()`).
+- `Splay` (6 arguments, recursive), with rotation blocks that each return.

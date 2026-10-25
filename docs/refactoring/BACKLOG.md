@@ -145,7 +145,7 @@ needs before refactoring:
 | 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.13, in progress (Complex Conditional gone; out of the Red band), [M32](tasks/M32-type.md) |
 | 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | 5.13 (guard level; rest is #if-built or Recipe B), [M51](tasks/M51-resample.md) |
 | 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | 4.92 (mostly guard level; the rest needs D at oracle level or two-value D), [M52](tasks/M52-resource.md) |
-| 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | open |
+| 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | 4.62 (reuse of the new helpers needs D at oracle level), [M53](tasks/M53-splay-tree.md) |
 | 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | 4.43, in progress (Complex Conditional gone), [M33](tasks/M33-locale.md) |
 | 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | open |
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | open |
