@@ -613,6 +613,87 @@ static void PrintImageProperties(FILE *file,Image *image,
     }
 }
 
+static void PrintChannelMomentsTable(FILE *file,const Image *image,
+  const ColorspaceType colorspace,ChannelMoments *channel_moments)
+{
+  double
+    scale;
+
+  ssize_t
+    i;
+
+  scale=(double) ((1UL << image->depth)-1);
+  (void) FormatLocaleFile(file,"  Channel Hu moments:\n");
+  switch (colorspace)
+  {
+    case RGBColorspace:
+    case sRGBColorspace:
+    {
+      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelMoments(file,RedPixelChannel,"Red",scale,
+          channel_moments);
+      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelMoments(file,GreenPixelChannel,"Green",scale,
+          channel_moments);
+      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelMoments(file,BluePixelChannel,"Blue",scale,
+          channel_moments);
+      break;
+    }
+    case CMYKColorspace:
+    {
+      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelMoments(file,CyanPixelChannel,"Cyan",scale,
+          channel_moments);
+      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelMoments(file,MagentaPixelChannel,"Magenta",scale,
+          channel_moments);
+      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelMoments(file,YellowPixelChannel,"Yellow",scale,
+          channel_moments);
+      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelMoments(file,BlackPixelChannel,"Black",scale,
+          channel_moments);
+      break;
+    }
+    case GRAYColorspace:
+    {
+      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelMoments(file,GrayPixelChannel,"Gray",scale,
+          channel_moments);
+      break;
+    }
+    default:
+    {
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        char
+          label[MagickPathExtent];
+
+        PixelChannel channel = GetPixelChannelChannel(image,i);
+        PixelTrait traits = GetPixelChannelTraits(image,channel);
+        if ((traits & UpdatePixelTrait) != 0)
+          {
+            (void) FormatLocaleString(label,MagickPathExtent,
+              "Channel %.17g",(double) i);
+            (void) PrintChannelMoments(file,channel,label,scale,
+              channel_moments);
+          }
+      }
+      break;
+    }
+  }
+  if (image->alpha_trait != UndefinedPixelTrait)
+    (void) PrintChannelMoments(file,AlphaPixelChannel,"Alpha",scale,
+      channel_moments);
+  if (colorspace != GRAYColorspace)
+    {
+      (void) FormatLocaleFile(file,"  Image moments:\n");
+      (void) PrintChannelMoments(file,CompositePixelChannel,"Overall",scale,
+        channel_moments);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1050,76 +1131,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     }
   if (channel_moments != (ChannelMoments *) NULL)
     {
-      scale=(double) ((1UL << image->depth)-1);
-      (void) FormatLocaleFile(file,"  Channel Hu moments:\n");
-      switch (colorspace)
-      {
-        case RGBColorspace:
-        case sRGBColorspace:
-        {
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelMoments(file,RedPixelChannel,"Red",scale,
-              channel_moments);
-          if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelMoments(file,GreenPixelChannel,"Green",scale,
-              channel_moments);
-          if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelMoments(file,BluePixelChannel,"Blue",scale,
-              channel_moments);
-          break;
-        }
-        case CMYKColorspace:
-        {
-          if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelMoments(file,CyanPixelChannel,"Cyan",scale,
-              channel_moments);
-          if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelMoments(file,MagentaPixelChannel,"Magenta",scale,
-              channel_moments);
-          if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelMoments(file,YellowPixelChannel,"Yellow",scale,
-              channel_moments);
-          if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelMoments(file,BlackPixelChannel,"Black",scale,
-              channel_moments);
-          break;
-        }
-        case GRAYColorspace:
-        {
-          if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelMoments(file,GrayPixelChannel,"Gray",scale,
-              channel_moments);
-          break;
-        }
-        default:
-        {
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            char
-              label[MagickPathExtent];
-
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) != 0)
-              {
-                (void) FormatLocaleString(label,MagickPathExtent,
-                  "Channel %.17g",(double) i);
-                (void) PrintChannelMoments(file,channel,label,scale,
-                  channel_moments);
-              }
-          }
-          break;
-        }
-      }
-      if (image->alpha_trait != UndefinedPixelTrait)
-        (void) PrintChannelMoments(file,AlphaPixelChannel,"Alpha",scale,
-          channel_moments);
-      if (colorspace != GRAYColorspace)
-        {
-          (void) FormatLocaleFile(file,"  Image moments:\n");
-          (void) PrintChannelMoments(file,CompositePixelChannel,"Overall",scale,
-            channel_moments);
-        }
+      PrintChannelMomentsTable(file,image,colorspace,channel_moments);
       channel_moments=(ChannelMoments *) RelinquishMagickMemory(
         channel_moments);
     }
