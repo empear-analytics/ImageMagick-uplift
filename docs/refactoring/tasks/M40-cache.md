@@ -206,3 +206,33 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, afternoon)
+
+**Result: Code Health 1.45 → 2.16** (`cs-mcp` 1.5.12). Branch `campaign/M40-cache`,
+stacked on `campaign/M39-pixel`. 8 refactor commits (all Recipe P) plus 1 style commit.
+Complex Conditional leaves the file: 13 sites, 13 predicates.
+
+**Evidence.** Every site was clean of open survivors and unique in the file.
+- 7 commits are oracle-verified: ClonePixelCacheRepository, ValidatePixelCacheMorphology,
+  IsOffsetOverflow, QueueAuthenticPixelCacheNexus, GetVirtualPixelCacheNexus,
+  OpenPixelCache and SetPixelCacheNexusPixels. All are ready or careful, and most reach
+  14,000–15,000 cases, all with 0 diverged.
+- 1 is guard-verified: GetCacheNumberThreads, which has no mutant.
+
+**Notes on the predicates:**
+- `IsCacheClonePending` takes `source_info`, a CacheInfo struct, by value, so its field
+  reads keep their text.
+- Two predicates take five arguments: `IsRegionInsideCache` and `IsDirectCacheRegion`.
+
+**Process note.** One call was left on an 82-column line (wrapped by a style commit). An
+attempt to wrap such lines automatically also rewrapped five upstream lines. That commit
+was reset before the push and redone, and the wrap now touches only lines that hold a new
+predicate call.
+
+**What is left, at 2.16.**
+- `OpenPixelCache` (15 bumps): the memory, map and disk branches, each writing several
+  locals and the cache info.
+- `GetVirtualPixelCacheNexus` (Brain Method): its virtual-pixel method `switch`.
+- The read/write pixel and metacontent functions (3 bumps each): parallel copies of one
+  shape for memory and disk.
