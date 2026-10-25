@@ -1645,6 +1645,14 @@ MagickExport void OptimizeImageTransparency(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsDifferentLayerGeometry(const Image *image,
+  const Image *next)
+{
+  return(((image->columns != next->columns) || (image->rows != next->rows) ||
+    (image->page.x != next->page.x) ||
+    (image->page.y != next->page.y)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport void RemoveDuplicateLayers(Image **images,ExceptionInfo *exception)
 {
   RectangleInfo
@@ -1664,8 +1672,7 @@ MagickExport void RemoveDuplicateLayers(Image **images,ExceptionInfo *exception)
   image=GetFirstImageInList(*images);
   for ( ; (next=GetNextImageInList(image)) != (Image *) NULL; image=next)
   {
-    if ((image->columns != next->columns) || (image->rows != next->rows) ||
-        (image->page.x != next->page.x) || (image->page.y != next->page.y))
+    if (IsDifferentLayerGeometry(image,next) != MagickFalse)
       continue;
     bounds=CompareImagesBounds(image,next,CompareAnyLayer,exception);
     if (bounds.x < 0)
