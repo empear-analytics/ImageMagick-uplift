@@ -5516,6 +5516,34 @@ static void LogPrimitiveInfo(const PrimitiveInfo *primitive_info)
   }
 }
 
+static inline MagickBooleanType IsGrayImageWithColor(const Image *image,
+  const DrawInfo *draw_info)
+{
+  return(((IsGrayColorspace(image->colorspace) != MagickFalse) &&
+    ((IsPixelInfoGray(&draw_info->fill) == MagickFalse) ||
+    (IsPixelInfoGray(&draw_info->stroke) == MagickFalse))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsVisibleWideStroke(const double mid,
+  const DrawInfo *draw_info)
+{
+  return(((mid > 1.0) &&
+    ((draw_info->stroke.alpha != (double) TransparentAlpha) ||
+    (draw_info->stroke_pattern != (Image *) NULL))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRoundStrokeOrPrimitive(
+  const DrawInfo *draw_info,const MagickBooleanType closed_path,
+  const PrimitiveInfo *primitive_info,const ssize_t i)
+{
+  return(((((draw_info->linecap == RoundCap) ||
+    (closed_path != MagickFalse)) &&
+    (draw_info->linejoin == RoundJoin)) ||
+    (primitive_info[i].primitive != UndefinedPrimitive)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType DrawPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -5543,9 +5571,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
         draw_info->affine.tx,draw_info->affine.ty);
     }
   status=MagickTrue;
-  if ((IsGrayColorspace(image->colorspace) != MagickFalse) &&
-      ((IsPixelInfoGray(&draw_info->fill) == MagickFalse) ||
-       (IsPixelInfoGray(&draw_info->stroke) == MagickFalse)))
+  if (IsGrayImageWithColor(image,draw_info) != MagickFalse)
     status&=(MagickStatusType) SetImageColorspace(image,sRGBColorspace,
       exception);
   if (draw_info->compliance == SVGCompliance)
@@ -5958,9 +5984,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
           break;
         }
       mid=ExpandAffine(&draw_info->affine)*draw_info->stroke_width/2.0;
-      if ((mid > 1.0) &&
-          ((draw_info->stroke.alpha != (double) TransparentAlpha) ||
-           (draw_info->stroke_pattern != (Image *) NULL)))
+      if (IsVisibleWideStroke(mid,draw_info) != MagickFalse)
         {
           double
             point_x,
@@ -5978,10 +6002,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
           point_y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
           if ((point_x < MagickEpsilon) && (point_y < MagickEpsilon))
             closed_path=MagickTrue;
-          if ((((draw_info->linecap == RoundCap) ||
-                (closed_path != MagickFalse)) &&
-               (draw_info->linejoin == RoundJoin)) ||
-               (primitive_info[i].primitive != UndefinedPrimitive))
+          if (IsRoundStrokeOrPrimitive(draw_info,closed_path,primitive_info,i) != MagickFalse)
             {
               status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
                 primitive_info,exception);
