@@ -2764,6 +2764,17 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
 %
 */
 
+static inline MagickBooleanType IsColorNameMatch(const ColorInfo *value,
+  const PixelInfo *color,const double alpha,const ComplianceType compliance)
+{
+  return((((value->compliance & compliance) != 0) &&
+    ((fabs((double) (value->color.red-color->red)) < MagickEpsilon)) &&
+    (fabs((double) (value->color.green-color->green)) < MagickEpsilon) &&
+    (fabs((double) (value->color.blue-color->blue)) < MagickEpsilon) &&
+    (fabs((double) (value->color.alpha-alpha)) < MagickEpsilon)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType QueryColorname(
   const Image *magick_unused(image),const PixelInfo *color,
   const ComplianceType compliance,char *name,ExceptionInfo *exception)
@@ -2803,11 +2814,7 @@ MagickExport MagickBooleanType QueryColorname(
       *value;
     
     value=(const ColorInfo *) p->value;
-    if (((value->compliance & compliance) != 0) &&
-        ((fabs((double) (value->color.red-color->red)) < MagickEpsilon)) &&
-         (fabs((double) (value->color.green-color->green)) < MagickEpsilon) &&
-         (fabs((double) (value->color.blue-color->blue)) < MagickEpsilon) &&
-         (fabs((double) (value->color.alpha-alpha)) < MagickEpsilon))
+    if (IsColorNameMatch(value,color,alpha,compliance) != MagickFalse)
       {
         (void) CopyMagickString(name,value->name,MagickPathExtent);
         break;
