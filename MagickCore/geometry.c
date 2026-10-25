@@ -985,6 +985,19 @@ static inline MagickBooleanType IsNegativeHeightGeometry(
     MagickFalse);
 }
 
+static void NormalizeSamplingFactor(const MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  /*
+    Normalize sampling factor (e.g. 4:2:2 => 2x1).
+  */
+  if ((flags & SigmaValue) != 0)
+    geometry_info->rho*=MagickSafeReciprocal(geometry_info->sigma);
+  geometry_info->sigma=1.0;
+  if (((flags & XiValue) != 0) && (geometry_info->xi == 0.0))
+    geometry_info->sigma=2.0;
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -1263,16 +1276,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         }
     }
   if (strchr(pedantic_geometry,':') != (char *) NULL)
-    {
-      /*
-        Normalize sampling factor (e.g. 4:2:2 => 2x1).
-      */
-      if ((flags & SigmaValue) != 0)
-        geometry_info->rho*=MagickSafeReciprocal(geometry_info->sigma);
-      geometry_info->sigma=1.0;
-      if (((flags & XiValue) != 0) && (geometry_info->xi == 0.0))
-        geometry_info->sigma=2.0;
-    }
+    NormalizeSamplingFactor(flags,geometry_info);
   if (IsNegativeHeightGeometry(flags) != MagickFalse)
     {
       if ((flags & PsiValue) == 0)
