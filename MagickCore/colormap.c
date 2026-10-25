@@ -185,6 +185,20 @@ MagickExport MagickBooleanType AcquireImageColormap(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void CyclePixelIndex(const Image *image,const ssize_t displace,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    index;
+
+  index=(ssize_t) (GetPixelIndex(image,q)+displace) % (ssize_t)
+    image->colors;
+  if (index < 0)
+    index+=(ssize_t) image->colors;
+  SetPixelIndex(image,(Quantum) index,q);
+  SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
+}
+
 MagickExport MagickBooleanType CycleColormapImage(Image *image,
   const ssize_t displace,ExceptionInfo *exception)
 {
@@ -217,9 +231,6 @@ MagickExport MagickBooleanType CycleColormapImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      index;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -230,12 +241,7 @@ MagickExport MagickBooleanType CycleColormapImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      index=(ssize_t) (GetPixelIndex(image,q)+displace) % (ssize_t)
-        image->colors;
-      if (index < 0)
-        index+=(ssize_t) image->colors;
-      SetPixelIndex(image,(Quantum) index,q);
-      SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
+      CyclePixelIndex(image,displace,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
