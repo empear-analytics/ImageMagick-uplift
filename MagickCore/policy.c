@@ -980,6 +980,23 @@ MagickExport MagickBooleanType IsRightsAuthorized(const PolicyDomain domain,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsNewPolicyPath(const char *path,
+  const PolicyInfo **policy_info,const ssize_t i)
+{
+  return((((path == (const char *) NULL) ||
+    (LocaleCompare(path,policy_info[i]->path) != 0)) &&
+    (policy_info[i]->path != (char *) NULL)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsLimitPolicyDomain(
+  const PolicyInfo **policy_info,const ssize_t i)
+{
+  return(((policy_info[i]->domain == CachePolicyDomain) ||
+    (policy_info[i]->domain == ResourcePolicyDomain) ||
+    (policy_info[i]->domain == SystemPolicyDomain)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1009,17 +1026,13 @@ MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
   {
     if (policy_info[i]->stealth != MagickFalse)
       continue;
-    if (((path == (const char *) NULL) ||
-         (LocaleCompare(path,policy_info[i]->path) != 0)) &&
-         (policy_info[i]->path != (char *) NULL))
+    if (IsNewPolicyPath(path,policy_info,i) != MagickFalse)
       (void) FormatLocaleFile(file,"\nPath: %s\n",policy_info[i]->path);
     path=policy_info[i]->path;
     domain=CommandOptionToMnemonic(MagickPolicyDomainOptions,
       policy_info[i]->domain);
     (void) FormatLocaleFile(file,"  Policy: %s\n",domain);
-    if ((policy_info[i]->domain == CachePolicyDomain) ||
-        (policy_info[i]->domain == ResourcePolicyDomain) ||
-        (policy_info[i]->domain == SystemPolicyDomain))
+    if (IsLimitPolicyDomain(policy_info,i) != MagickFalse)
       {
         if (policy_info[i]->name != (char *) NULL)
           (void) FormatLocaleFile(file,"    name: %s\n",policy_info[i]->name);
