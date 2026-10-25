@@ -126,6 +126,13 @@ MagickExport void ActivateSemaphoreInfo(SemaphoreInfo **semaphore_info)
 %
 */
 
+static inline MagickBooleanType IsAlignedExtentInvalid(const size_t size,
+  const size_t alignment,const size_t extent)
+{
+  return(((size == 0) || (alignment < sizeof(void *)) || (extent < size)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void *AcquireSemaphoreMemory(const size_t count,const size_t quantum)
 {
 #define AlignedExtent(size,alignment) \
@@ -148,7 +155,7 @@ static void *AcquireSemaphoreMemory(const size_t count,const size_t quantum)
   memory=NULL;
   alignment=CACHE_LINE_SIZE;
   extent=AlignedExtent(size,CACHE_LINE_SIZE);
-  if ((size == 0) || (alignment < sizeof(void *)) || (extent < size))
+  if (IsAlignedExtentInvalid(size,alignment,extent) != MagickFalse)
     return((void *) NULL);
 #if defined(MAGICKCORE_HAVE_POSIX_MEMALIGN)
   if (posix_memalign(&memory,alignment,extent) != 0)
