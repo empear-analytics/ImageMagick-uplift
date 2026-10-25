@@ -2676,6 +2676,65 @@ static const OptionInfo *GetOptionInfo(const CommandOption option)
   return((const OptionInfo *) NULL);
 }
 
+static inline MagickBooleanType IsUnknownSeparatedToken(
+  const OptionInfo *command_info,const char *token)
+{
+  return(((command_info->mnemonic == (const char *) NULL) && (*token != '\0') &&
+    ((strchr(token+1,'-') != (char *) NULL) ||
+     (strchr(token+1,'_') != (char *) NULL))) ? MagickTrue : MagickFalse);
+}
+
+static void RemoveTokenCharacter(char *token,const int c)
+{
+  char
+    *q;
+
+  while ((q=strchr(token+1,c)) != (char *) NULL)
+    (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
+}
+
+static const OptionInfo *SearchOptionMnemonic(const OptionInfo *option_info,
+  const char *token)
+{
+  ssize_t
+    i;
+
+  for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
+    if (LocaleCompare(token,option_info[i].mnemonic) == 0)
+      break;
+  return(option_info+i);
+}
+
+static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
+  char *token)
+{
+  const OptionInfo
+    *command_info;
+
+  command_info=SearchOptionMnemonic(option_info,token);
+  if (IsUnknownSeparatedToken(command_info,token) != MagickFalse)
+    {
+      RemoveTokenCharacter(token,'-');
+      RemoveTokenCharacter(token,'_');
+      command_info=SearchOptionMnemonic(option_info,token);
+    }
+  return(command_info);
+}
+
+static inline MagickBooleanType IsTokenSeparator(const char *p,
+  const int sentinel)
+{
+  return((((isspace((int) ((unsigned char) *p)) != 0) || (*p == sentinel)) &&
+    (*p != '\0')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsTokenCharacter(const char *p,
+  const int sentinel)
+{
+  return((((isspace((int) ((unsigned char) *p)) == 0) && (*p != sentinel)) &&
+    (*p != '\0')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
   const MagickBooleanType list,const char *options)
 {
@@ -2699,9 +2758,6 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
     *p;
 
   ssize_t
-    i;
-
-  ssize_t
     option_types;
 
   if ((options == (const char *) NULL) || (*options == '\0'))
@@ -2715,38 +2771,20 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
     sentinel='|';
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
-    while (((isspace((int) ((unsigned char) *p)) != 0) || (*p == sentinel)) &&
-           (*p != '\0'))
+    while (IsTokenSeparator(p,sentinel) != MagickFalse)
       p++;
     negate=(*p == '!') ? MagickTrue : MagickFalse;
     if (negate != MagickFalse)
       p++;
     q=token;
-    while (((isspace((int) ((unsigned char) *p)) == 0) && (*p != sentinel)) &&
-           (*p != '\0'))
+    while (IsTokenCharacter(p,sentinel) != MagickFalse)
     {
       if ((q-token) >= (MagickPathExtent-1))
         break;
       *q++=(*p++);
     }
     *q='\0';
-    for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-      if (LocaleCompare(token,option_info[i].mnemonic) == 0)
-        break;
-    command_info=option_info+i;
-    if ((command_info->mnemonic == (const char *) NULL) && (*token != '\0') &&
-        ((strchr(token+1,'-') != (char *) NULL) ||
-         (strchr(token+1,'_') != (char *) NULL)))
-      {
-        while ((q=strchr(token+1,'-')) != (char *) NULL)
-          (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
-        while ((q=strchr(token+1,'_')) != (char *) NULL)
-          (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
-        for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-          if (LocaleCompare(token,option_info[i].mnemonic) == 0)
-            break;
-        command_info=option_info+i;
-      }
+    command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
     if (negate != MagickFalse)
@@ -2897,6 +2935,12 @@ MagickExport char *GetNextImageOption(const ImageInfo *image_info)
 %    o option: the option.
 %
 */
+static inline MagickBooleanType IsBracketOption(const char *option)
+{
+  return(((*option == '{') || (*option == '}') || (*option == '[') ||
+    (*option == ']')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType IsCommandOption(const char *option)
 {
   char
@@ -2921,8 +2965,7 @@ MagickExport MagickBooleanType IsCommandOption(const char *option)
   if ((pedantic == MagickFalse) && (IsPathAccessible(option) != MagickFalse))
     return(MagickFalse);
   if (strlen(option) == 1)
-    return(((*option == '{') || (*option == '}') || (*option == '[') ||
-      (*option == ']')) ? MagickTrue : MagickFalse);
+    return(IsBracketOption(option));
   option++;
   if (isalpha((int) ((unsigned char) *option)) == 0)
     return(MagickFalse);
@@ -3268,9 +3311,6 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
     *p;
 
   ssize_t
-    i;
-
-  ssize_t
     option_types;
 
   if ((options == (const char *) NULL) || (*options == '\0'))
@@ -3284,38 +3324,20 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
     sentinel='|';
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
-    while (((isspace((int) ((unsigned char) *p)) != 0) || (*p == sentinel)) &&
-           (*p != '\0'))
+    while (IsTokenSeparator(p,sentinel) != MagickFalse)
       p++;
     negate=(*p == '!') ? MagickTrue : MagickFalse;
     if (negate != MagickFalse)
       p++;
     q=token;
-    while (((isspace((int) ((unsigned char) *p)) == 0) && (*p != sentinel)) &&
-           (*p != '\0'))
+    while (IsTokenCharacter(p,sentinel) != MagickFalse)
     {
       if ((q-token) >= (MagickPathExtent-1))
         break;
       *q++=(*p++);
     }
     *q='\0';
-    for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-      if (LocaleCompare(token,option_info[i].mnemonic) == 0)
-        break;
-    command_info=option_info+i;
-    if ((command_info->mnemonic == (const char *) NULL) && (*token != '\0') &&
-        ((strchr(token+1,'-') != (char *) NULL) ||
-         (strchr(token+1,'_') != (char *) NULL)))
-        {
-          while ((q=strchr(token+1,'-')) != (char *) NULL)
-            (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
-          while ((q=strchr(token+1,'_')) != (char *) NULL)
-            (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
-          for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-            if (LocaleCompare(token,option_info[i].mnemonic) == 0)
-              break;
-          command_info=option_info+i;
-        }
+    command_info=FindCommandOptionInfo(option_info,token);
     if (command_info->mnemonic == (const char *) NULL)
       return(-1);
     if (negate != MagickFalse)
@@ -3351,6 +3373,13 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
 %    o channels: One or more channels separated by commas.
 %
 */
+static inline MagickBooleanType IsInvalidPixelChannelNumber(const char *q,
+  const char *token,const ssize_t channel)
+{
+  return(((q == token) || (channel < 0) || (channel >= MaxPixelChannels)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport ssize_t ParsePixelChannelOption(const char *channels)
 {
   char
@@ -3368,7 +3397,7 @@ MagickExport ssize_t ParsePixelChannelOption(const char *channels)
     return(channel);
   q=(char *) token;
   channel=(ssize_t) InterpretLocaleValue(token,&q);
-  if ((q == token) || (channel < 0) || (channel >= MaxPixelChannels))
+  if (IsInvalidPixelChannelNumber(q,token,channel) != MagickFalse)
     return(-1);
   return(channel);
 }
