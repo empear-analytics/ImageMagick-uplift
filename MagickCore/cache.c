@@ -4354,6 +4354,14 @@ MagickExport MagickBooleanType PersistPixelCache(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsOutsideCachePixel(const CacheInfo *cache_info,
+  const ssize_t x,const ssize_t y)
+{
+  return(((cache_info->columns == 0) || (cache_info->rows == 0) || (x < 0) ||
+    (y < 0) || (x >= (ssize_t) cache_info->columns) ||
+    (y >= (ssize_t) cache_info->rows)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate Quantum *QueueAuthenticPixelCacheNexus(Image *image,
   const ssize_t x,const ssize_t y,const size_t columns,const size_t rows,
   const MagickBooleanType clone,NexusInfo *nexus_info,ExceptionInfo *exception)
@@ -4380,9 +4388,7 @@ MagickPrivate Quantum *QueueAuthenticPixelCacheNexus(Image *image,
   if (cache_info == (Cache) NULL)
     return((Quantum *) NULL);
   assert(cache_info->signature == MagickCoreSignature);
-  if ((cache_info->columns == 0) || (cache_info->rows == 0) || (x < 0) ||
-      (y < 0) || (x >= (ssize_t) cache_info->columns) ||
-      (y >= (ssize_t) cache_info->rows))
+  if (IsOutsideCachePixel(cache_info,x,y) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),CacheError,
         "PixelsAreNotAuthentic","`%s'",image->filename);
