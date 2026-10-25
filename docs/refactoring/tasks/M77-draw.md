@@ -197,3 +197,18 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): second pass
+
+**Result: Code Health 1.77, unchanged.** Branch `campaign/M77-draw-e`, stacked on
+`campaign/M76-coder`. Two guard-level E commits, both flat under rule 2:
+`GetDensityResolution` and `GetPolygonBounds` (DrawBoundingRectangles, no case
+executes it). DrawBoundingRectangles leaves Bumpy Road Ahead and goes from cc 27 to 11,
+but the file score does not move.
+
+**Why draw.c does not move.** The score is held by RenderMVGContent (cc 461, 2,038
+lines, 74 bumps), TracePath (cc 167) and TraceStrokePolygon. RenderMVGContent is a
+keyword parser whose cases `break`, `continue`, use `ThrowPointExpectedException` or
+set `status` and several cursors together. Shrinking it needs Recipe B (a parser state
+struct) or a table of keyword handlers, which is owner territory. CloneDrawInfo's
+allocation blocks throw, and grouping its field copies would reorder statements.
