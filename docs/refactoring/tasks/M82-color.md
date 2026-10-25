@@ -199,3 +199,14 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): second pass
+
+**Result: Code Health 3.16, unchanged. Tried and reverted.**
+- LoadColorCache's DOCTYPE scan as a value-returning `SkipDoctypeElement` dropped the
+  file to 3.06, because the helper keeps a depth-4 nest and cc 11. LoadColorCache's
+  depth 6 comes from the include element, which M21 already reduced with
+  `GetIncludePath`.
+- QueryColorCompliance's hex branch ends every path in a `return` (so step 7 would
+  fit), but it contains a `ThrowMagickException`. Its nibble decoder returns from
+  inside its loops.
