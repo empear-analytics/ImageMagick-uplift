@@ -357,6 +357,32 @@ static Image *AddTileFrame(Image *image,const FrameInfo frame_info,
   return(image);
 }
 
+static FrameInfo ParseMontageFrame(const MontageInfo *montage_info,
+  FrameInfo frame_info,const RectangleInfo extract_info)
+{
+  char
+    absolute_geometry[MagickPathExtent];
+
+  MagickStatusType
+    flags;
+
+  frame_info.width=extract_info.width;
+  frame_info.height=extract_info.height;
+  (void) FormatLocaleString(absolute_geometry,MagickPathExtent,"%s!",
+    montage_info->frame);
+  flags=ParseMetaGeometry(absolute_geometry,&frame_info.outer_bevel,
+    &frame_info.inner_bevel,&frame_info.width,&frame_info.height);
+  if ((flags & HeightValue) == 0)
+    frame_info.height=frame_info.width;
+  if ((flags & XiValue) == 0)
+    frame_info.outer_bevel=(ssize_t) frame_info.width/2-1;
+  if ((flags & PsiValue) == 0)
+    frame_info.inner_bevel=frame_info.outer_bevel;
+  frame_info.x=(ssize_t) frame_info.width;
+  frame_info.y=(ssize_t) frame_info.height;
+  return(frame_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -695,23 +721,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   (void) memset(&frame_info,0,sizeof(frame_info));
   if (montage_info->frame != (char *) NULL)
     {
-      char
-        absolute_geometry[MagickPathExtent];
-
-      frame_info.width=extract_info.width;
-      frame_info.height=extract_info.height;
-      (void) FormatLocaleString(absolute_geometry,MagickPathExtent,"%s!",
-        montage_info->frame);
-      flags=ParseMetaGeometry(absolute_geometry,&frame_info.outer_bevel,
-        &frame_info.inner_bevel,&frame_info.width,&frame_info.height);
-      if ((flags & HeightValue) == 0)
-        frame_info.height=frame_info.width;
-      if ((flags & XiValue) == 0)
-        frame_info.outer_bevel=(ssize_t) frame_info.width/2-1;
-      if ((flags & PsiValue) == 0)
-        frame_info.inner_bevel=frame_info.outer_bevel;
-      frame_info.x=(ssize_t) frame_info.width;
-      frame_info.y=(ssize_t) frame_info.height;
+      frame_info=ParseMontageFrame(montage_info,frame_info,extract_info);
       bevel_width=(ssize_t) MagickMax(frame_info.inner_bevel,
         frame_info.outer_bevel);
       border_width=(size_t) MagickMax((ssize_t) frame_info.width,
