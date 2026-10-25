@@ -265,6 +265,17 @@ MagickExport ExceptionInfo *CloneExceptionInfo(ExceptionInfo *exception)
   return(clone_exception);
 }
 
+static void PrintExceptionMessage(const char *reason,const char *description)
+{
+  if (reason == (char *) NULL)
+    return;
+  (void) FormatLocaleFile(stderr,"%s: %s",GetClientName(),reason);
+  if (description != (char *) NULL)
+    (void) FormatLocaleFile(stderr," (%s)",description);
+  (void) FormatLocaleFile(stderr,".\n");
+  (void) fflush(stderr);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -298,13 +309,7 @@ static void DefaultErrorHandler(const ExceptionType magick_unused(severity),
 {
   magick_unreferenced(severity);
 
-  if (reason == (char *) NULL)
-    return;
-  (void) FormatLocaleFile(stderr,"%s: %s",GetClientName(),reason);
-  if (description != (char *) NULL)
-    (void) FormatLocaleFile(stderr," (%s)",description);
-  (void) FormatLocaleFile(stderr,".\n");
-  (void) fflush(stderr);
+  PrintExceptionMessage(reason,description);
 }
 
 /*
@@ -382,13 +387,7 @@ static void DefaultWarningHandler(const ExceptionType magick_unused(severity),
 {
   magick_unreferenced(severity);
 
-  if (reason == (char *) NULL)
-    return;
-  (void) FormatLocaleFile(stderr,"%s: %s",GetClientName(),reason);
-  if (description != (char *) NULL)
-    (void) FormatLocaleFile(stderr," (%s)",description);
-  (void) FormatLocaleFile(stderr,".\n");
-  (void) fflush(stderr);
+  PrintExceptionMessage(reason,description);
 }
 
 /*
