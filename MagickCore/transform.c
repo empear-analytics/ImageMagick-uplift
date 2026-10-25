@@ -357,19 +357,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
     {
       if ((x < extent.x) || (x >= (extent.x+(ssize_t) extent.width)))
         {
-          ssize_t
-            i;
-
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            PixelTrait chop_traits=GetPixelChannelTraits(chop_image,channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (chop_traits == UndefinedPixelTrait))
-              continue;
-            SetPixelChannel(chop_image,channel,p[i],q);
-          }
+          CopyPixelChannelsTo(image,chop_image,p,q);
           q+=(ptrdiff_t) GetPixelChannels(chop_image);
         }
       p+=(ptrdiff_t) GetPixelChannels(image);
