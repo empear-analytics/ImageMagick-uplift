@@ -737,6 +737,15 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
 %
 */
 
+static inline MagickBooleanType IsTwoColorGrayQuantize(
+  const QCubeInfo *cube_info)
+{
+  return(((cube_info->quantize_info->number_colors == 2) &&
+    ((cube_info->quantize_info->colorspace == LinearGRAYColorspace) ||
+     (cube_info->quantize_info->colorspace == GRAYColorspace))) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline void SetAssociatedAlpha(const Image *image,QCubeInfo *cube_info)
 {
   MagickBooleanType
@@ -744,11 +753,28 @@ static inline void SetAssociatedAlpha(const Image *image,QCubeInfo *cube_info)
 
   associate_alpha=image->alpha_trait != UndefinedPixelTrait ? MagickTrue :
     MagickFalse;
-  if ((cube_info->quantize_info->number_colors == 2) &&
-      ((cube_info->quantize_info->colorspace == LinearGRAYColorspace) ||
-       (cube_info->quantize_info->colorspace == GRAYColorspace)))
+  if (IsTwoColorGrayQuantize(cube_info) != MagickFalse)
     associate_alpha=MagickFalse;
   cube_info->associate_alpha=associate_alpha;
+}
+
+static ssize_t GetPixelRunLength(const Image *image,const Quantum *p,
+  const ssize_t x)
+{
+  ssize_t
+    count;
+
+  for (count=1; (x+(ssize_t) count) < (ssize_t) image->columns; count++)
+  {
+    PixelInfo
+      packet;
+
+    GetPixelInfoPixel(image,p+count*(ssize_t) GetPixelChannels(image),
+      &packet);
+    if (IsPixelEquivalent(image,p,&packet) == MagickFalse)
+      break;
+  }
+  return(count);
 }
 
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
@@ -828,16 +854,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
       /*
         Start at the root and descend the color cube tree.
       */
-      for (count=1; (x+(ssize_t) count) < (ssize_t) image->columns; count++)
-      {
-        PixelInfo
-          packet;
-
-        GetPixelInfoPixel(image,p+count*(ssize_t) GetPixelChannels(image),
-          &packet);
-        if (IsPixelEquivalent(image,p,&packet) == MagickFalse)
-          break;
-      }
+      count=GetPixelRunLength(image,p,x);
       AssociateAlphaPixel(image,cube_info,p,&pixel);
       index=MaxTreeDepth-1;
       bisect=((double) QuantumRange+1.0)/2.0;
@@ -940,16 +957,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
       /*
         Start at the root and descend the color cube tree.
       */
-      for (count=1; (x+(ssize_t) count) < (ssize_t) image->columns; count++)
-      {
-        PixelInfo
-          packet;
-
-        GetPixelInfoPixel(image,p+count*(ssize_t) GetPixelChannels(image),
-          &packet);
-        if (IsPixelEquivalent(image,p,&packet) == MagickFalse)
-          break;
-      }
+      count=GetPixelRunLength(image,p,x);
       AssociateAlphaPixel(image,cube_info,p,&pixel);
       index=MaxTreeDepth-1;
       bisect=((double) QuantumRange+1.0)/2.0;
@@ -1717,6 +1725,13 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsDitherPositionInImage(const Image *image,
+  const QCubeInfo *p)
+{
+  return(((p->x >= 0) && (p->x < (ssize_t) image->columns) &&
+    (p->y >= 0) && (p->y < (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RiemersmaDither(Image *image,CacheView *image_view,
   QCubeInfo *cube_info,const unsigned int direction,ExceptionInfo *exception)
 {
@@ -1736,8 +1751,7 @@ static MagickBooleanType RiemersmaDither(Image *image,CacheView *image_view,
     index;
 
   p=cube_info;
-  if ((p->x >= 0) && (p->x < (ssize_t) image->columns) &&
-      (p->y >= 0) && (p->y < (ssize_t) image->rows))
+  if (IsDitherPositionInImage(image,p) != MagickFalse)
     {
       Quantum
         *magick_restrict q;
@@ -2507,13 +2521,73 @@ static inline double KmeansMetric(const Image *magick_restrict image,
   return(metric);
 }
 
+static ssize_t ParseKmeansSeedColors(Image *image,const char *colors,
+  ExceptionInfo *exception)
+{
+  char
+    color[MagickPathExtent];
+
+  const char
+    *p;
+
+  ssize_t
+    n;
+
+  for (n=0, p=colors; n < (ssize_t) image->colors; n++)
+  {
+    const char
+      *q;
+
+    for (q=p; *q != '\0'; q++)
+      if (*q == ';')
+        break;
+    (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
+      MagickPathExtent));
+    (void) QueryColorCompliance(color,AllCompliance,image->colormap+n,
+      exception);
+    if (*q == '\0')
+      {
+        n++;
+        break;
+      }
+    p=q+1;
+  }
+  return(n);
+}
+
+#define RandomColorComponent(info)  \
+  ((double) QuantumRange*GetPseudoRandomValue(info))
+
+static void SeedKmeansRandomColors(Image *image,ssize_t n,
+  ExceptionInfo *exception)
+{
+  RandomInfo
+    *random_info;
+
+  /*
+    Seed clusters from random values.
+  */
+  random_info=AcquireRandomInfo();
+  for ( ; n < (ssize_t) image->colors; n++)
+  {
+    (void) QueryColorCompliance("#000",AllCompliance,image->colormap+n,
+      exception);
+    image->colormap[n].red=RandomColorComponent(random_info);
+    image->colormap[n].green=RandomColorComponent(random_info);
+    image->colormap[n].blue=RandomColorComponent(random_info);
+    if (image->alpha_trait != UndefinedPixelTrait)
+      image->colormap[n].alpha=RandomColorComponent(random_info);
+    if (image->colorspace == CMYKColorspace)
+      image->colormap[n].black=RandomColorComponent(random_info);
+  }
+  random_info=DestroyRandomInfo(random_info);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
 {
 #define KmeansImageTag  "Kmeans/Image"
-#define RandomColorComponent(info)  \
-  ((double) QuantumRange*GetPseudoRandomValue(info))
 
   CacheView
     *image_view;
@@ -2594,60 +2668,15 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     }
   else
     {
-      char
-        color[MagickPathExtent];
-
-      const char
-        *p;
-
       /*
         Seed clusters from color list (e.g. red;green;blue).
       */
       status=AcquireImageColormap(image,number_colors,exception);
       if (status == MagickFalse)
         return(status);
-      for (n=0, p=colors; n < (ssize_t) image->colors; n++)
-      {
-        const char
-          *q;
-
-        for (q=p; *q != '\0'; q++)
-          if (*q == ';')
-            break;
-        (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
-          MagickPathExtent));
-        (void) QueryColorCompliance(color,AllCompliance,image->colormap+n,
-          exception);
-        if (*q == '\0')
-          {
-            n++;
-            break;
-          }
-        p=q+1;
-      }
+      n=ParseKmeansSeedColors(image,colors,exception);
       if (n < (ssize_t) image->colors)
-        {
-          RandomInfo
-            *random_info;
-
-          /*
-            Seed clusters from random values.
-          */
-          random_info=AcquireRandomInfo();
-          for ( ; n < (ssize_t) image->colors; n++)
-          {
-            (void) QueryColorCompliance("#000",AllCompliance,image->colormap+n,
-              exception);
-            image->colormap[n].red=RandomColorComponent(random_info);
-            image->colormap[n].green=RandomColorComponent(random_info);
-            image->colormap[n].blue=RandomColorComponent(random_info);
-            if (image->alpha_trait != UndefinedPixelTrait)
-              image->colormap[n].alpha=RandomColorComponent(random_info);
-            if (image->colorspace == CMYKColorspace)
-              image->colormap[n].black=RandomColorComponent(random_info);
-          }
-          random_info=DestroyRandomInfo(random_info);
-        }
+        SeedKmeansRandomColors(image,n,exception);
     }
   /*
     Iterative refinement.
@@ -2885,6 +2914,13 @@ static inline Quantum PosterizePixel(const Quantum pixel,const size_t levels)
   return(ClampToQuantum((MagickRealType) posterize_pixel));
 }
 
+static inline MagickBooleanType IsPosterizeDitherMap(
+  const DitherMethod dither_method,const size_t levels)
+{
+  return(((dither_method != NoDitherMethod) && (levels > 1) && (levels < 17)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -2908,7 +2944,7 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((dither_method != NoDitherMethod) && (levels > 1) && (levels < 17))
+  if (IsPosterizeDitherMap(dither_method,levels) != MagickFalse)
     for (y=0; y < 1; y++)
     {
       Image 
@@ -3937,6 +3973,38 @@ static int IntensityCompare(const void *x,const void *y)
 }
 #endif
 
+static ssize_t CompactGrayscaleColormap(const Image *image,
+  PixelInfo *colormap,ssize_t *colormap_index)
+{
+  ssize_t
+    i,
+    j;
+
+  j=0;
+  colormap[j]=image->colormap[0];
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    if (IsPixelInfoEquivalent(&colormap[j],&image->colormap[i]) == MagickFalse)
+      {
+        j++;
+        colormap[j]=image->colormap[i];
+      }
+    colormap_index[(ssize_t) image->colormap[i].alpha]=j;
+  }
+  return(j);
+}
+
+static void SortGrayscaleColormap(Image *image)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+    image->colormap[i].alpha=(double) i;
+  qsort((void *) image->colormap,image->colors,sizeof(PixelInfo),
+    IntensityCompare);
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -3954,7 +4022,6 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
 
   ssize_t
     *colormap_index,
-    i,
     j,
     y;
 
@@ -4033,10 +4100,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
       image_view=DestroyCacheView(image_view);
     }
   (void) memset(colormap_index,0,extent*sizeof(*colormap_index));
-  for (i=0; i < (ssize_t) image->colors; i++)
-    image->colormap[i].alpha=(double) i;
-  qsort((void *) image->colormap,image->colors,sizeof(PixelInfo),
-    IntensityCompare);
+  SortGrayscaleColormap(image);
   colormap=(PixelInfo *) AcquireQuantumMemory(image->colors,sizeof(*colormap));
   if (colormap == (PixelInfo *) NULL)
     {
@@ -4044,17 +4108,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
-  j=0;
-  colormap[j]=image->colormap[0];
-  for (i=0; i < (ssize_t) image->colors; i++)
-  {
-    if (IsPixelInfoEquivalent(&colormap[j],&image->colormap[i]) == MagickFalse)
-      {
-        j++;
-        colormap[j]=image->colormap[i];
-      }
-    colormap_index[(ssize_t) image->colormap[i].alpha]=j;
-  }
+  j=CompactGrayscaleColormap(image,colormap,colormap_index);
   image->colors=(size_t) (j+1);
   image->colormap=(PixelInfo *) RelinquishMagickMemory(image->colormap);
   image->colormap=colormap;

@@ -703,6 +703,15 @@ static inline MagickBooleanType AcquireStreamPixels(CacheInfo *cache_info,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsOutsideStreamRegion(const Image *image,
+  const ssize_t x,const ssize_t y,const size_t columns,const size_t rows)
+{
+  return(((x < 0) || (y < 0) ||
+    ((x+(ssize_t) columns) > (ssize_t) image->columns) ||
+    ((y+(ssize_t) rows) > (ssize_t) image->rows) ||
+    (columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
+}
+
 static const Quantum *GetVirtualPixelStream(const Image *image,
   const VirtualPixelMethod magick_unused(virtual_pixel_method),const ssize_t x,
   const ssize_t y,const size_t columns,const size_t rows,
@@ -729,10 +738,7 @@ static const Quantum *GetVirtualPixelStream(const Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((x < 0) || (y < 0) ||
-      ((x+(ssize_t) columns) > (ssize_t) image->columns) ||
-      ((y+(ssize_t) rows) > (ssize_t) image->rows) ||
-      (columns == 0) || (rows == 0))
+  if (IsOutsideStreamRegion(image,x,y,columns,rows) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),StreamError,
         "ImageDoesNotContainTheStreamGeometry","`%s'",image->filename);
@@ -851,6 +857,22 @@ MagickExport MagickBooleanType OpenStream(const ImageInfo *image_info,
 %
 */
 
+static inline MagickBooleanType IsCacheMorphologyChanged(const Image *image,
+  const CacheInfo *cache_info,const PixelChannelMap *p,const PixelChannelMap *q)
+{
+  return(((image->storage_class != cache_info->storage_class) ||
+    (image->colorspace != cache_info->colorspace) ||
+    (image->alpha_trait != cache_info->alpha_trait) ||
+    (image->channels != cache_info->channels) ||
+    (image->columns != cache_info->columns) ||
+    (image->rows != cache_info->rows) ||
+    (image->number_channels != cache_info->number_channels) ||
+    (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) ||
+    (image->metacontent_extent != cache_info->metacontent_extent) ||
+    (cache_info->nexus_info == (NexusInfo **) NULL)) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline MagickBooleanType ValidatePixelCacheMorphology(
   const Image *magick_restrict image)
 {
@@ -867,18 +889,17 @@ static inline MagickBooleanType ValidatePixelCacheMorphology(
   cache_info=(CacheInfo *) image->cache;
   p=image->channel_map;
   q=cache_info->channel_map;
-  if ((image->storage_class != cache_info->storage_class) ||
-      (image->colorspace != cache_info->colorspace) ||
-      (image->alpha_trait != cache_info->alpha_trait) ||
-      (image->channels != cache_info->channels) ||
-      (image->columns != cache_info->columns) ||
-      (image->rows != cache_info->rows) ||
-      (image->number_channels != cache_info->number_channels) ||
-      (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) ||
-      (image->metacontent_extent != cache_info->metacontent_extent) ||
-      (cache_info->nexus_info == (NexusInfo **) NULL))
+  if (IsCacheMorphologyChanged(image,cache_info,p,q) != MagickFalse)
     return(MagickFalse);
   return(MagickTrue);
+}
+
+static inline MagickBooleanType IsOutsideStreamPixel(const Image *image,
+  const ssize_t x,const ssize_t y)
+{
+  return(((image->columns == 0) || (image->rows == 0) || (x < 0) ||
+    (y < 0) || (x >= (ssize_t) image->columns) ||
+    (y >= (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
 }
 
 static Quantum *QueueAuthenticPixelsStream(Image *image,const ssize_t x,
@@ -904,9 +925,7 @@ static Quantum *QueueAuthenticPixelsStream(Image *image,const ssize_t x,
     Validate pixel cache geometry.
   */
   assert(image != (Image *) NULL);
-  if ((image->columns == 0) || (image->rows == 0) || (x < 0) ||
-      (y < 0) || (x >= (ssize_t) image->columns) ||
-      (y >= (ssize_t) image->rows))
+  if (IsOutsideStreamPixel(image,x,y) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),StreamError,
         "ImageDoesNotContainTheStreamGeometry","`%s'",image->filename);

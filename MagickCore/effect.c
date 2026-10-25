@@ -126,6 +126,24 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ssize_t GetAdaptiveKernelIndex(const Image *edge_image,
+  const Quantum *r,const size_t width)
+{
+  ssize_t
+    j;
+
+  j=CastDoubleToSsizeT(ceil((double) width*(1.0-QuantumScale*
+    GetPixelIntensity(edge_image,r))-0.5));
+  if (j < 0)
+    j=0;
+  else
+    if (j > (ssize_t) width)
+      j=(ssize_t) width;
+  if ((j & 0x01) != 0)
+    j--;
+  return(j);
+}
+
 MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -288,15 +306,7 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
         center,
         j;
 
-      j=CastDoubleToSsizeT(ceil((double) width*(1.0-QuantumScale*
-        GetPixelIntensity(edge_image,r))-0.5));
-      if (j < 0)
-        j=0;
-      else
-        if (j > (ssize_t) width)
-          j=(ssize_t) width;
-      if ((j & 0x01) != 0)
-        j--;
+      j=GetAdaptiveKernelIndex(edge_image,r,width);
       p=GetCacheViewVirtualPixels(image_view,x-((ssize_t) width-j)/2L,y-
         ((ssize_t) width-j)/2L,width-(size_t) j,width-(size_t) j,exception);
       if (p == (const Quantum *) NULL)
@@ -607,15 +617,7 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
         center,
         j;
 
-      j=CastDoubleToSsizeT(ceil((double) width*(1.0-QuantumScale*
-        GetPixelIntensity(edge_image,r))-0.5));
-      if (j < 0)
-        j=0;
-      else
-        if (j > (ssize_t) width)
-          j=(ssize_t) width;
-      if ((j & 0x01) != 0)
-        j--;
+      j=GetAdaptiveKernelIndex(edge_image,r,width);
       p=GetCacheViewVirtualPixels(image_view,x-(((ssize_t) width-j)/2L),y-
         (((ssize_t) width-j)/2L),width-(size_t) j,width-(size_t) j,exception);
       if (p == (const Quantum *) NULL)
@@ -1720,17 +1722,28 @@ MagickExport Image *EmbossImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *ConvolveKernelGeometry(const Image *image,const char *geometry,
+  ExceptionInfo *exception)
+{
+  Image
+    *blur_image;
+
+  KernelInfo
+    *kernel_info;
+
+  kernel_info=AcquireKernelInfo(geometry,exception);
+  if (kernel_info == (KernelInfo *) NULL)
+    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+  blur_image=ConvolveImage(image,kernel_info,exception);
+  kernel_info=DestroyKernelInfo(kernel_info);
+  return(blur_image);
+}
+
 MagickExport Image *GaussianBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
   char
     geometry[MagickPathExtent];
-
-  KernelInfo
-    *kernel_info;
-
-  Image
-    *blur_image;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1740,12 +1753,7 @@ MagickExport Image *GaussianBlurImage(const Image *image,const double radius,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   (void) FormatLocaleString(geometry,MagickPathExtent,"gaussian:%.17gx%.17g",
     radius,sigma);
-  kernel_info=AcquireKernelInfo(geometry,exception);
-  if (kernel_info == (KernelInfo *) NULL)
-    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  blur_image=ConvolveImage(image,kernel_info,exception);
-  kernel_info=DestroyKernelInfo(kernel_info);
-  return(blur_image);
+  return(ConvolveKernelGeometry(image,geometry,exception));
 }
 
 /*
@@ -3417,6 +3425,13 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsSelectiveRowMissing(const Quantum *p,
+  const Quantum *l,const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (l == (const Quantum *) NULL) ||
+    (q == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -3576,8 +3591,7 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
       (ssize_t) ((width-1)/2L),luminance_image->columns+width,width,exception);
     q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (l == (const Quantum *) NULL) ||
-        (q == (Quantum *) NULL))
+    if (IsSelectiveRowMissing(p,l,q) != MagickFalse)
       {
         status=MagickFalse;
         continue;

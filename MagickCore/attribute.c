@@ -388,6 +388,13 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
   return(bounds);
 }
 
+static inline MagickBooleanType IsEmptyBoundingBox(const RectangleInfo bounds)
+{
+  return(((bounds.width == 0) || (bounds.height == 0) ||
+    (bounds.x > (ssize_t) bounds.width) ||
+    (bounds.y > (ssize_t) bounds.height)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -550,9 +557,7 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
     }
   }
   image_view=DestroyCacheView(image_view);
-  if ((bounds.width == 0) || (bounds.height == 0) ||
-      (bounds.x > (ssize_t) bounds.width) ||
-      (bounds.y > (ssize_t) bounds.height))
+  if (IsEmptyBoundingBox(bounds) != MagickFalse)
     (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
       "GeometryDoesNotContainImage","`%s'",image->filename);
   else
@@ -889,6 +894,52 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static size_t GetMaximumDepth(const size_t *current_depth,
+  const size_t number_threads)
+{
+  size_t
+    depth;
+
+  ssize_t
+    i;
+
+  depth=current_depth[0];
+  for (i=1; i < (ssize_t) number_threads; i++)
+    if (depth < current_depth[i])
+      depth=current_depth[i];
+  return(depth);
+}
+
+static void RaiseColormapEntryDepth(const Image *image,size_t *current_depth,
+  const int id,const ssize_t i)
+{
+  while (current_depth[id] < MAGICKCORE_QUANTUM_DEPTH)
+  {
+    MagickBooleanType
+      atDepth;
+
+    QuantumAny
+      range;
+
+    atDepth=MagickTrue;
+    range=GetQuantumRange(current_depth[id]);
+    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].red),range) == MagickFalse)
+        atDepth=MagickFalse;
+    if ((atDepth != MagickFalse) &&
+        (GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].green),range) == MagickFalse)
+        atDepth=MagickFalse;
+    if ((atDepth != MagickFalse) &&
+        (GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].blue),range) == MagickFalse)
+        atDepth=MagickFalse;
+    if ((atDepth != MagickFalse))
+      break;
+    current_depth[id]++;
+  }
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -931,36 +982,9 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
         const int
           id = GetOpenMPThreadId();
 
-        while (current_depth[id] < MAGICKCORE_QUANTUM_DEPTH)
-        {
-          MagickBooleanType
-            atDepth;
-
-          QuantumAny
-            range;
-
-          atDepth=MagickTrue;
-          range=GetQuantumRange(current_depth[id]);
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].red),range) == MagickFalse)
-              atDepth=MagickFalse;
-          if ((atDepth != MagickFalse) &&
-              (GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].green),range) == MagickFalse)
-              atDepth=MagickFalse;
-          if ((atDepth != MagickFalse) &&
-              (GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].blue),range) == MagickFalse)
-              atDepth=MagickFalse;
-          if ((atDepth != MagickFalse))
-            break;
-          current_depth[id]++;
-        }
+        RaiseColormapEntryDepth(image,current_depth,id,i);
       }
-      depth=current_depth[0];
-      for (i=1; i < (ssize_t) number_threads; i++)
-        if (depth < current_depth[i])
-          depth=current_depth[i];
+      depth=GetMaximumDepth(current_depth,number_threads);
       current_depth=(size_t *) RelinquishMagickMemory(current_depth);
       return(depth);
     }
@@ -1102,10 +1126,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
-  depth=current_depth[0];
-  for (i=1; i < (ssize_t) number_threads; i++)
-    if (depth < current_depth[i])
-      depth=current_depth[i];
+  depth=GetMaximumDepth(current_depth,number_threads);
   current_depth=(size_t *) RelinquishMagickMemory(current_depth);
   return(depth);
 }
@@ -1199,6 +1220,72 @@ static inline double getFeretDiameter(PointInfo *p,PointInfo *q,PointInfo *v)
   if (distance < MagickEpsilon)
     return(INFINITY);
   return((q->x-p->x)*(v->y-p->y)-(v->x-p->x)*(q->y-p->y))/sqrt(distance);
+}
+
+static double GetMinimumBoxAngle(PointInfo *bounding_box)
+{
+  double
+    angle,
+    distance;
+
+  ssize_t
+    i;
+
+  distance=hypot(bounding_box[0].x,bounding_box[0].y);
+  angle=getAngle(&bounding_box[0],&bounding_box[1]);
+  for (i=1; i < 4; i++)
+  {
+    double d = hypot(bounding_box[i].x,bounding_box[i].y);
+    if (d < distance)
+      {
+        distance=d;
+        angle=getAngle(&bounding_box[i],&bounding_box[(i+1) % 4]);
+      }
+  }
+  return(angle);
+}
+
+static void MoveBoxToOrigin(PointInfo *bounding_box)
+{
+  PointInfo
+    point;
+
+  ssize_t
+    i;
+
+  point=bounding_box[0];
+  for (i=1; i < 4; i++)
+  {
+    if (bounding_box[i].x < point.x)
+      point.x=bounding_box[i].x;
+    if (bounding_box[i].y < point.y)
+      point.y=bounding_box[i].y;
+  }
+  for (i=0; i < 4; i++)
+  {
+    bounding_box[i].x-=point.x;
+    bounding_box[i].y-=point.y;
+  }
+}
+
+static void SetMinimumBoundingBoxProperties(Image *image,
+  const CaliperInfo caliper_info,const PointInfo *vertices)
+{
+  (void) FormatImageProperty(image,"minimum-bounding-box:area","%.*g",
+    GetMagickPrecision(),caliper_info.area);
+  (void) FormatImageProperty(image,"minimum-bounding-box:width","%.*g",
+    GetMagickPrecision(),caliper_info.width);
+  (void) FormatImageProperty(image,"minimum-bounding-box:height","%.*g",
+    GetMagickPrecision(),caliper_info.height);
+  (void) FormatImageProperty(image,"minimum-bounding-box:_p","%.*g,%.*g",
+    GetMagickPrecision(),vertices[caliper_info.p].x,
+    GetMagickPrecision(),vertices[caliper_info.p].y);
+  (void) FormatImageProperty(image,"minimum-bounding-box:_q","%.*g,%.*g",
+    GetMagickPrecision(),vertices[caliper_info.q].x,
+    GetMagickPrecision(),vertices[caliper_info.q].y);
+  (void) FormatImageProperty(image,"minimum-bounding-box:_v","%.*g,%.*g",
+    GetMagickPrecision(),vertices[caliper_info.v].x,
+    GetMagickPrecision(),vertices[caliper_info.v].y);
 }
 
 MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
@@ -1330,35 +1417,11 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   /*
     Export minimum bounding box properties.
   */
-  (void) FormatImageProperty(image,"minimum-bounding-box:area","%.*g",
-    GetMagickPrecision(),caliper_info.area);
-  (void) FormatImageProperty(image,"minimum-bounding-box:width","%.*g",
-    GetMagickPrecision(),caliper_info.width);
-  (void) FormatImageProperty(image,"minimum-bounding-box:height","%.*g",
-    GetMagickPrecision(),caliper_info.height);
-  (void) FormatImageProperty(image,"minimum-bounding-box:_p","%.*g,%.*g",
-    GetMagickPrecision(),vertices[caliper_info.p].x,
-    GetMagickPrecision(),vertices[caliper_info.p].y);
-  (void) FormatImageProperty(image,"minimum-bounding-box:_q","%.*g,%.*g",
-    GetMagickPrecision(),vertices[caliper_info.q].x,
-    GetMagickPrecision(),vertices[caliper_info.q].y);
-  (void) FormatImageProperty(image,"minimum-bounding-box:_v","%.*g,%.*g",
-    GetMagickPrecision(),vertices[caliper_info.v].x,
-    GetMagickPrecision(),vertices[caliper_info.v].y);
+  SetMinimumBoundingBoxProperties(image,caliper_info,vertices);
   /*
     Find smallest angle to origin.
   */
-  distance=hypot(bounding_box[0].x,bounding_box[0].y);
-  angle=getAngle(&bounding_box[0],&bounding_box[1]);
-  for (i=1; i < 4; i++)
-  {
-    double d = hypot(bounding_box[i].x,bounding_box[i].y);
-    if (d < distance)
-      {
-        distance=d;
-        angle=getAngle(&bounding_box[i],&bounding_box[(i+1) % 4]);
-      }
-  }
+  angle=GetMinimumBoxAngle(bounding_box);
   artifact=GetImageArtifact(image,"minimum-bounding-box:orientation");
   if (artifact != (const char *) NULL)
     {
@@ -1374,19 +1437,7 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
       /*
         Find smallest perpendicular distance from edge to origin.
       */
-      point=bounding_box[0];
-      for (i=1; i < 4; i++)
-      {
-        if (bounding_box[i].x < point.x)
-          point.x=bounding_box[i].x;
-        if (bounding_box[i].y < point.y)
-          point.y=bounding_box[i].y;
-      }
-      for (i=0; i < 4; i++)
-      {
-        bounding_box[i].x-=point.x;
-        bounding_box[i].y-=point.y;
-      }
+      MoveBoxToOrigin(bounding_box);
       for (i=0; i < 4; i++)
       {
         double
@@ -2073,6 +2124,23 @@ static MagickBooleanType FloydSteinbergImageDepth(Image *image,
   return(status);
 }
 
+static void SetColormapEntryDepth(Image *image,const ssize_t i,
+  const QuantumAny range)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].red=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
+      ClampPixel(image->colormap[i].red),range),range);
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].green=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
+      ClampPixel(image->colormap[i].green),range),range);
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].blue=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
+      ClampPixel(image->colormap[i].blue),range),range);
+  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].alpha=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
+      ClampPixel(image->colormap[i].alpha),range),range);
+}
+
 MagickExport MagickBooleanType SetImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -2116,18 +2184,7 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
 #endif
       for (i=0; i < (ssize_t) image->colors; i++)
       {
-        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].red=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
-            ClampPixel(image->colormap[i].red),range),range);
-        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].green=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
-            ClampPixel(image->colormap[i].green),range),range);
-        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].blue=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
-            ClampPixel(image->colormap[i].blue),range),range);
-        if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].alpha=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
-            ClampPixel(image->colormap[i].alpha),range),range);
+        SetColormapEntryDepth(image,i,range);
       }
     }
   status=MagickTrue;
@@ -2296,6 +2353,12 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetOpaqueAlphaIfMissing(Image *image,ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -2348,8 +2411,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     {
       if (IsGrayImageType(image->type) == MagickFalse)
         status=TransformImageColorspace(image,GRAYColorspace,exception);
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+      SetOpaqueAlphaIfMissing(image,exception);
       break;
     }
     case PaletteType:
@@ -2373,8 +2435,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
 
       if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
         status=TransformImageColorspace(image,sRGBColorspace,exception);
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+      SetOpaqueAlphaIfMissing(image,exception);
       channel_mask=SetImageChannelMask(image,AlphaChannel);
       (void) BilevelImage(image,(double) QuantumRange/2.0,exception);
       (void) SetImageChannelMask(image,channel_mask);
@@ -2387,8 +2448,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     {
       if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
         status=TransformImageColorspace(image,sRGBColorspace,exception);
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+      SetOpaqueAlphaIfMissing(image,exception);
       quantize_info=AcquireQuantizeInfo(image_info);
       status=QuantizeImage(quantize_info,image,exception);
       quantize_info=DestroyQuantizeInfo(quantize_info);
@@ -2409,8 +2469,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
         status=TransformImageColorspace(image,sRGBColorspace,exception);
       if (image->storage_class != DirectClass)
         status=SetImageStorageClass(image,DirectClass,exception);
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+      SetOpaqueAlphaIfMissing(image,exception);
       break;
     }
     case ColorSeparationType:
