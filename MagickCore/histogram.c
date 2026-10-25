@@ -203,6 +203,23 @@ static inline MagickBooleanType IsPixelInfoColorMatch(
 }
 
 
+static void GrowColorList(HNodeInfo *node_info,const ssize_t i)
+{
+  if (node_info->number_unique == 0)
+    {
+      node_info->extent=1;
+      node_info->list=(PixelInfo *) AcquireQuantumMemory(
+        node_info->extent,sizeof(*node_info->list));
+    }
+  else
+    if (i >= (ssize_t) node_info->extent)
+      {
+        node_info->extent<<=1;
+        node_info->list=(PixelInfo *) ResizeQuantumMemory(
+          node_info->list,node_info->extent,sizeof(*node_info->list));
+      }
+}
+
 static HCubeInfo *ClassifyImageColors(const Image *image,
   ExceptionInfo *exception)
 {
@@ -291,19 +308,7 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
         node_info->list[i].count++;
       else
         {
-          if (node_info->number_unique == 0)
-            {
-              node_info->extent=1;
-              node_info->list=(PixelInfo *) AcquireQuantumMemory(
-                node_info->extent,sizeof(*node_info->list));
-            }
-          else
-            if (i >= (ssize_t) node_info->extent)
-              {
-                node_info->extent<<=1;
-                node_info->list=(PixelInfo *) ResizeQuantumMemory(
-                  node_info->list,node_info->extent,sizeof(*node_info->list));
-              }
+          GrowColorList(node_info,i);
           if (node_info->list == (PixelInfo *) NULL)
             {
               (void) ThrowMagickException(exception,GetMagickModule(),
