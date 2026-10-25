@@ -203,3 +203,42 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 1.99 → 2.65** (`cs-mcp` 1.5.12). Branch `campaign/M24-transform`,
+stacked on `campaign/M23-option` (PR #29). 12 refactor commits, all oracle-verified.
+Every function touched is ready or careful in the merged mutation reports, and no
+survivor sits on a moved line.
+
+**Shared channel loop (+0.37).** The per-pixel channel copy loop appeared eleven times:
+`ChopImage` ×2, `CropImage`, `FlipImage`, `FlopImage`, `SpliceImage` ×4,
+`TransposeImage` and `TransverseImage`. The copies are identical up to whitespace and the
+destination's name.
+- One Recipe E commit (ChopImage's first loop) introduced
+  `CopyPixelChannelsTo(image,destination,p,q)`.
+- Seven Recipe D commits replaced the other ten copies, one function each.
+- Every loop is inside a parallel row loop. The helper writes only through the row's
+  `q`, as the loop did.
+
+**Predicates:** three Recipe P commits (`IsChopOutsideImage`, `IsCropOutsideImage`,
+`IsSingleRegionCrop`). Complex Conditional leaves the file.
+
+**Gravity switch:** one Recipe E commit moved `SpliceImage`'s gravity `switch` into
+`ApplySpliceGravity`. It returns the updated `splice_geometry`. The score stayed flat;
+the commit is kept under rule 2 (cc 47 → 36, 228 → 178 lines).
+
+**Possible bug, reported, not fixed:** in that switch, `WestGravity` adds
+`splice_geometry.width/2` to `y`. Every other vertical offset uses `height`.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**What is left, at 2.65.**
+- The remaining bumps are almost all the parallel row loops' bodies (the column loops
+  and the progress blocks with their `omp atomic`), in every transform. They need Recipe
+  K or T, or a progress helper that cannot carry the pragma.
+- Flip, Flop, Transpose and Transverse are still reported as duplicates. Their row-loop
+  skeletons are alike, but each differs in its pixel addressing.
+- `CopyImageRegion` takes 9 arguments (Recipe B).
+- `ExcerptImage` and `ConsolidateCMYKImages` have no oracle case.
