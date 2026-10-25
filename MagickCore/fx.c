@@ -1138,6 +1138,13 @@ static inline MagickBooleanType IsJumpElement(const ElementT *pel)
     pel->operator_index == rIfNotZeroGoto) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsPixelReferenceElement(const ElementT *pel)
+{
+  return((pel->operator_index == fP || pel->operator_index == fUP ||
+    pel->operator_index == fVP || pel->operator_index == fSP) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
 {
   int i;
@@ -1175,7 +1182,7 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
     const char * str = OprStr (pel->operator_index);
     const char *sRelAbs = "";
 
-    if (pel->operator_index == fP || pel->operator_index == fUP || pel->operator_index == fVP || pel->operator_index == fSP)
+    if (IsPixelReferenceElement(pel) != MagickFalse)
       sRelAbs = pel->is_relative ? "[]" : "{}";
 
     if (pel->type == etColourConstant)
