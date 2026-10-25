@@ -142,7 +142,7 @@ needs before refactoring:
 | 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 3.40, plateau for now (new two-string helpers trigger String Heavy Function Arguments), [M30](tasks/M30-log.md) |
 | 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | open |
 | 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | 3.85, in progress (Complex Conditional: one sizeof site left), [M31](tasks/M31-policy.md) |
-| 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | open |
+| 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.13, in progress (Complex Conditional gone; out of the Red band), [M32](tasks/M32-type.md) |
 | 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | open |
 | 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | open |
 | 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | open |

@@ -143,3 +143,34 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 3.60 → 4.13** (`cs-mcp` 1.5.12); type.c leaves the Red band.
+Branch `campaign/M32-type`, stacked on `campaign/M31-policy`. 5 refactor commits: 4
+oracle-verified and 1 guard-verified.
+
+**GetTypeInfoByFamily** (+0.45): four style and stretch predicates (`IsStyleMismatch`,
+`IsStretchMismatch`, `IsStyleMatch`, `IsSlantedStyleMatch`). None takes a string, and
+no survivor sits on the moved lines.
+
+**LoadTypeCache:** `IsIncludeElementOpen` (P) and `GetIncludePath` (E). Each was
+checked first for the String Heavy Function Arguments finding that blocked them in
+log.c; neither triggers it here.
+
+**ListTypeInfo:** `IsNewTypePath`, the same shape as policy.c's `IsNewPolicyPath`.
+
+**LoadFontConfigFonts:** `IsNonRegularFontStyle`, at guard level because two unreached
+survivors sit on the moved expression.
+
+Complex Conditional leaves the file.
+
+**Not done:** `LoadTypeCache`'s attribute `switch`. It reads `type_info`, `keyword`,
+`token`, `filename` and `font_path`: five parameters, four of them strings.
+
+**What is left, at 4.13.**
+- `LoadTypeCache` (13 bumps, Brain Method): the `switch` above, the DOCTYPE ladder and
+  the include loop.
+- `GetTypeInfoByFamily` (cc reduced but still high): the scoring loop and its fallback
+  chain.
+- `LoadFontConfigFonts`: the per-font loop over fontconfig results.
