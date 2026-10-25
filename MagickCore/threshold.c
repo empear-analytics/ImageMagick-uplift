@@ -389,6 +389,15 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
 %
 */
 
+static inline MagickBooleanType IsKapurBufferMissing(
+  const double *cumulative_histogram,const double *black_entropy,
+  const double *white_entropy)
+{
+  return(((cumulative_histogram == (double *) NULL) ||
+    (black_entropy == (double *) NULL) || (white_entropy == (double *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static double KapurThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
@@ -418,8 +427,8 @@ static double KapurThreshold(const Image *image,const double *histogram,
     sizeof(*black_entropy));
   white_entropy=(double *) AcquireQuantumMemory(MaxIntensity+1UL,
     sizeof(*white_entropy));
-  if ((cumulative_histogram == (double *) NULL) ||
-      (black_entropy == (double *) NULL) || (white_entropy == (double *) NULL))
+  if (IsKapurBufferMissing(cumulative_histogram,black_entropy,white_entropy) !=
+      MagickFalse)
     {
       if (white_entropy != (double *) NULL)
         white_entropy=(double *) RelinquishMagickMemory(white_entropy);
@@ -488,6 +497,14 @@ static double KapurThreshold(const Image *image,const double *histogram,
   return(100.0*threshold/MaxIntensity);
 }
 
+static inline MagickBooleanType IsOTSUBufferMissing(const double *myu,
+  const double *omega,const double *probability,const double *sigma)
+{
+  return(((myu == (double *) NULL) || (omega == (double *) NULL) ||
+    (probability == (double *) NULL) || (sigma == (double *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static double OTSUThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
@@ -510,8 +527,7 @@ static double OTSUThreshold(const Image *image,const double *histogram,
   probability=(double *) AcquireQuantumMemory(MaxIntensity+1UL,
     sizeof(*probability));
   sigma=(double *) AcquireQuantumMemory(MaxIntensity+1UL,sizeof(*sigma));
-  if ((myu == (double *) NULL) || (omega == (double *) NULL) ||
-      (probability == (double *) NULL) || (sigma == (double *) NULL))
+  if (IsOTSUBufferMissing(myu,omega,probability,sigma) != MagickFalse)
     {
       if (sigma != (double *) NULL)
         sigma=(double *) RelinquishMagickMemory(sigma);
@@ -1084,6 +1100,21 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
 %
 */
 
+static void ClampPixelChannels(const Image *image,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=ClampPixel((MagickRealType) q[i]);
+  }
+}
+
 MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
 {
 #define ClampImageTag  "Clamp/Image"
@@ -1151,17 +1182,7 @@ MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampPixel((MagickRealType) q[i]);
-      }
+      ClampPixelChannels(image,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -1890,6 +1911,18 @@ MagickExport MagickBooleanType ListThresholdMaps(FILE *file,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsThresholdMapSeparator(const char *p)
+{
+  return((((isspace((int) ((unsigned char) *p)) != 0) || (*p == ',')) &&
+    (*p != '\0')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsThresholdMapNameCharacter(const char *p)
+{
+  return((((isspace((int) ((unsigned char) *p)) == 0) && (*p != ',')) &&
+    (*p != '\0')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1929,12 +1962,10 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   if (threshold_map == (const char *) NULL)
     return(MagickTrue);
   p=(char *) threshold_map;
-  while (((isspace((int) ((unsigned char) *p)) != 0) || (*p == ',')) &&
-         (*p != '\0'))
+  while (IsThresholdMapSeparator(p) != MagickFalse)
     p++;
   threshold_map=p;
-  while (((isspace((int) ((unsigned char) *p)) == 0) && (*p != ',')) &&
-         (*p != '\0'))
+  while (IsThresholdMapNameCharacter(p) != MagickFalse)
   {
     if ((p-threshold_map) >= (MagickPathExtent-1))
       break;
