@@ -734,6 +734,18 @@ static inline MagickBooleanType IsSingularPivot(const ssize_t column,
     MagickTrue : MagickFalse);
 }
 
+static void CopyBackMatrix(double **matrix,long double **hp_matrix,
+  const size_t rank)
+{
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i < (ssize_t) rank; i++)
+    for (j=0; j < (ssize_t) rank; j++)
+      matrix[i][j]=(double)hp_matrix[i][j];
+}
+
 MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   double **vectors,const size_t rank,const size_t number_vectors)
 {
@@ -860,9 +872,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   /*
     Copy back the result to the original matrix.
   */
-  for (i=0; i < (ssize_t) rank; i++)
-    for (j=0; j < (ssize_t) rank; j++)
-      matrix[i][j]=(double)hp_matrix[i][j];
+  CopyBackMatrix(matrix,hp_matrix,rank);
   /*
     Free resources.
   */
