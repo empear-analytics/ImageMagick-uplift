@@ -134,3 +134,26 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 7.59 → 8.95** (`cs-mcp` 1.5.12). Branch `campaign/M59-linked-list`,
+stacked on `campaign/M58-list`. Five guard-level E commits. The mutation reports hold
+no killed mutant for these functions; 5 cases execute each of them now.
+- `InsertElementAt`, `PrependElement`, `AppendElement` and `InsertFirstElement`
+  (InsertValueInLinkedList). The middle two were flat and named their next step;
+  together they reach 8.95.
+- `UnlinkNextElement` (RemoveElementByValueFromLinkedList, value-returning),
+  7.63 → 8.61. Overall Code Complexity leaves the file.
+
+**Possible upstream bug, reported and not fixed: InsertValueInLinkedList's interior
+insertion.** After the walk, `next->next` points at the old element at `index`. Then
+`next=next->next; element->next=next;` re-links `element` to that same old element. So
+the new node is never linked in and leaks, while `elements` is still incremented. Only
+`index == 0`, `index == elements` and the empty list insert correctly.
+
+**What is left, at 8.95.**
+- RemoveElementFromLinkedList repeats the unlink lines of `UnlinkNextElement`. Reusing
+  the helper there is Recipe D, which needs the oracle level, and no mutant of that
+  function was killed.
+- Code Duplication over five small accessors that share the assert and lock prologue.

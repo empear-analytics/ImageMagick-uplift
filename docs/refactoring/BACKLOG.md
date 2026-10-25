@@ -156,7 +156,7 @@ needs before refactoring:
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |
 | 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | open |
 | 7.56 | `MagickCore/quantum.c` | 1110 | 90% | 69% | open |
-| 7.59 | `MagickCore/linked-list.c` | 1040 | 40% | 69% | open |
+| 7.59 | `MagickCore/linked-list.c` | 1040 | 40% | 69% | 8.95 (interior-insert bug reported), [M59](tasks/M59-linked-list.md) |
 | 7.68 | `MagickCore/random.c` | 996 | 62% | 24% | open |
 | 7.78 | `MagickCore/cache-view.c` | 1114 | 34% | 30% | open |
 | 7.88 | `MagickCore/magic.c` | 823 | 72% | 66% | open |
