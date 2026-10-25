@@ -1269,6 +1269,22 @@ MagickExport MagickBooleanType GetPathAttributes(const char *path,
 %    o component: the selected file path component is returned here.
 %
 */
+static inline MagickBooleanType IsImageFormatPrefix(const char *component,
+  const char *p)
+{
+  return(((p != component) && (*p == ':') && (IsPathDirectory(component) < 0) &&
+    (IsPathAccessible(component) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsCompressionExtension(const char *extension)
+{
+  return(((LocaleCompare(extension,"bz2") == 0) ||
+    (LocaleCompare(extension,"gz") == 0) ||
+    (LocaleCompare(extension,"svgz") == 0) ||
+    (LocaleCompare(extension,"wmz") == 0) ||
+    (LocaleCompare(extension,"Z") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1344,8 +1360,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
         if (*p == '\0')
           break;
       }
-    if ((p != component) && (*p == ':') && (IsPathDirectory(component) < 0) &&
-        (IsPathAccessible(component) == MagickFalse))
+    if (IsImageFormatPrefix(component,p) != MagickFalse)
       {
         /*
           Look for image format specification (e.g. ps3:image).
@@ -1428,11 +1443,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
         Base path sans any compression extension.
       */
       GetPathComponent(path,ExtensionPath,extension);
-      if ((LocaleCompare(extension,"bz2") == 0) ||
-          (LocaleCompare(extension,"gz") == 0) ||
-          (LocaleCompare(extension,"svgz") == 0) ||
-          (LocaleCompare(extension,"wmz") == 0) ||
-          (LocaleCompare(extension,"Z") == 0))
+      if (IsCompressionExtension(extension) != MagickFalse)
         GetPathComponent(path,BasePath,component);
       break;
     }
