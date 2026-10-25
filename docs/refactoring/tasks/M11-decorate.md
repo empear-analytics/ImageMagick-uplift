@@ -85,3 +85,40 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 5.78 → 6.74** (`cs-mcp` 1.5.12). Branch `campaign/M11-decorate`,
+stacked on `campaign/M10-segment` (PR #16). 3 refactor commits, all Recipe D and
+oracle-verified (both functions are ready: `FrameImage` 94%, `RaiseImage` 93%).
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| `FrameImage`: 19 border-fill loops into `SetFramePixels(image,&color,bound,q)`, which returns the advanced q | D | 5.78 → 6.15 |
+| `RaiseImage`: 8 channel-blend loops into `BlendPixelChannels(image,factor,color,q)` | D | → 6.70 |
+| `FrameImage`: 2 more fill loops (the first script misread `frame_info->x` as the loop's `x`, and its colour pattern missed `frame_image->border_color`) | D | → 6.74 |
+
+`RaiseImage` leaves Deep Nesting (cc 63 → 39, bumps 14 → 6). `FrameImage` goes from cc 67
+to 46.
+
+Each loop's colour is a variable, passed as a parameter. Its bound (or, in `RaiseImage`,
+its factor) is the one differing value. Every bound is an `ssize_t` that nothing in the
+loop changes, so evaluating it once at the call compares the same value. Loops followed
+by `for ( ; x < ...)`, which continues from the loop's last `x`, stay as they were; the
+script checks this at every site.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**A formatting note.** Thirteen of the new `SetFramePixels(...)` calls run past 80
+columns. Wrapping them lowers the score (6.74 → 6.69, Large Method counts the extra
+lines), so the gate refuses it, and they stay long.
+
+**What is left, at 6.74.**
+- `FrameImage`: nesting 5 in its bottom and top bevels, where a fill loop leaves `x` for a
+  `for ( ; x < ...)` that picks between two colours per pixel.
+- `RaiseImage`: the same two-colour runs.
+- Large Method in both, from those runs.
+A helper for the two-colour run (fill to `y` in one colour, then up to a bound choosing
+by `x`) would take the image, two colours, `y`, the bound and `q`: six arguments, Recipe
+B territory.
