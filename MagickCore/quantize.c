@@ -1717,6 +1717,13 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsDitherPositionInImage(const Image *image,
+  const QCubeInfo *p)
+{
+  return(((p->x >= 0) && (p->x < (ssize_t) image->columns) &&
+    (p->y >= 0) && (p->y < (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RiemersmaDither(Image *image,CacheView *image_view,
   QCubeInfo *cube_info,const unsigned int direction,ExceptionInfo *exception)
 {
@@ -1736,8 +1743,7 @@ static MagickBooleanType RiemersmaDither(Image *image,CacheView *image_view,
     index;
 
   p=cube_info;
-  if ((p->x >= 0) && (p->x < (ssize_t) image->columns) &&
-      (p->y >= 0) && (p->y < (ssize_t) image->rows))
+  if (IsDitherPositionInImage(image,p) != MagickFalse)
     {
       Quantum
         *magick_restrict q;
