@@ -177,3 +177,48 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 4.00 → 5.54** (`cs-mcp` 1.5.12). Branch `campaign/M23-option`,
+stacked on `campaign/M22-distort` (PR #28). 9 refactor commits:
+- 3 Recipe D, all oracle-verified;
+- 6 Recipe P: 5 oracle-verified, and 1 guard-verified (`ParsePixelChannelOption`, not
+  ready, all five survivors on the moved line).
+
+**The main step** (+0.90): `GetCommandOptionFlags` and `ParseCommandOption` held the
+same 17-line token lookup. It moved once into `FindCommandOptionInfo`. Both functions
+are ready in the merged mutation reports (23 of 23 and 19 of 19 killed), so D could be
+used.
+
+**Inside the new helper:**
+- the strip loops differ only in the character, so they became
+  `RemoveTokenCharacter(token,c)` (D, flat score, bumps 3 → 2);
+- the two identical mnemonic searches became `SearchOptionMnemonic` (D, +0.04);
+- the three-clause test became `IsUnknownSeparatedToken`.
+
+**Predicates:**
+- `IsTokenSeparator` and `IsTokenCharacter` (the scanner loops). They were introduced
+  in `GetCommandOptionFlags` and reused in `ParseCommandOption`; the reuse is
+  oracle-level.
+- `IsInvalidPixelChannelNumber` and `IsBracketOption` (`IsCommandOption` leaves
+  Complex Method).
+
+**Complex Conditional leaves the file.**
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**What is left, at 5.54.**
+- `GetOptionInfo` (cc 69, 75 lines): one `switch` that maps each option list to its
+  table. Every case is a `return`. Only a lookup table would shrink it, and that is not
+  a catalogue recipe.
+- `ParseChannelOption` (cc 24, 87 lines): a letter `switch` that ORs one flag per
+  letter and returns from inside two cases. A table would fix it, but that is the same
+  problem.
+- `GetCommandOptionFlags` and `ParseCommandOption` (cc 14, 2 bumps each) are still
+  twins. They differ in the field they accumulate (`flags` against `type`) and in one
+  early-return value. Recipe D allows one differing value, not a differing member.
+- The image-option accessors' Code Duplication is their shared assert-and-log preamble.
+  It logs the function's own name, the blocker already recorded for the magick
+  accessors.
