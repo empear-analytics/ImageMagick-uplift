@@ -1538,6 +1538,15 @@ static inline MagickBooleanType IsMetaGeometryAspectKept(
     (*height == stasis_height))) ? MagickTrue : MagickFalse);
 }
 
+static void ShrinkGeometryToSize(size_t *width,size_t *height,
+  const size_t stasis_width,const size_t stasis_height)
+{
+  if (stasis_width < *width)
+    *width=stasis_width;
+  if (stasis_height < *height)
+    *height=stasis_height;
+}
+
 MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -1672,12 +1681,7 @@ MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
         1.0));
     }
   if ((flags & GreaterValue) != 0)
-    {
-      if (stasis_width < *width)
-        *width=stasis_width;
-      if (stasis_height < *height)
-        *height=stasis_height;
-    }
+    ShrinkGeometryToSize(width,height,stasis_width,stasis_height);
   if ((flags & LessValue) != 0)
     {
       if (stasis_width > *width)
