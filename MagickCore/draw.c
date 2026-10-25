@@ -849,6 +849,16 @@ static void LogPathInfo(const PathInfo *path_info)
   (void) LogMagickEvent(DrawEvent,GetMagickModule(),"    end vector-path");
 }
 
+static inline MagickBooleanType IsNewSubpathPoint(const PathInfoCode code,
+  const size_t coordinates,const PointInfo q,
+  const PrimitiveInfo *primitive_info,const size_t i)
+{
+  return(((code == MoveToCode) || (coordinates <= 0) ||
+    (fabs(q.x-primitive_info[i].point.x) >= MagickEpsilon) ||
+    (fabs(q.y-primitive_info[i].point.y) >= MagickEpsilon)) ? MagickTrue :
+    MagickFalse);
+}
+
 static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
 {
@@ -919,9 +929,7 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
         closed_subpath=primitive_info[i].closed_subpath;
       }
     coordinates--;
-    if ((code == MoveToCode) || (coordinates <= 0) ||
-        (fabs(q.x-primitive_info[i].point.x) >= MagickEpsilon) ||
-        (fabs(q.y-primitive_info[i].point.y) >= MagickEpsilon))
+    if (IsNewSubpathPoint(code,coordinates,q,primitive_info,i) != MagickFalse)
       {
         /*
           Eliminate duplicate points.
