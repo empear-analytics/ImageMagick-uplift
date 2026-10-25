@@ -1051,6 +1051,24 @@ static void PrintConvexHullAndBoundingBox(FILE *file,Image *image,
     }
 }
 
+static void PrintAlphaColor(FILE *file,const Image *image,
+  const Quantum *p,ExceptionInfo *exception)
+{
+  char
+    tuple[MagickPathExtent];
+
+  PixelInfo
+    pixel;
+
+  GetPixelInfo(image,&pixel);
+  GetPixelInfoPixel(image,p,&pixel);
+  (void) QueryColorname(image,&pixel,SVGCompliance,tuple,
+    exception);
+  (void) FormatLocaleFile(file,"  Alpha: %s ",tuple);
+  GetColorTuple(&pixel,MagickTrue,tuple);
+  (void) FormatLocaleFile(file,"  %s\n",tuple);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1596,21 +1614,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
               break;
           }
           if (found != MagickFalse)
-            {
-              char
-                tuple[MagickPathExtent];
-
-              PixelInfo
-                pixel;
-
-              GetPixelInfo(image,&pixel);
-              GetPixelInfoPixel(image,p,&pixel);
-              (void) QueryColorname(image,&pixel,SVGCompliance,tuple,
-                exception);
-              (void) FormatLocaleFile(file,"  Alpha: %s ",tuple);
-              GetColorTuple(&pixel,MagickTrue,tuple);
-              (void) FormatLocaleFile(file,"  %s\n",tuple);
-            }
+            PrintAlphaColor(file,image,p,exception);
         }
       if (IsHistogramImage(image,exception) != MagickFalse)
         {
