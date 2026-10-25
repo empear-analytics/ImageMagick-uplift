@@ -2693,27 +2693,30 @@ static void RemoveTokenCharacter(char *token,const int c)
     (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
 }
 
-static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
-  char *token)
+static const OptionInfo *SearchOptionMnemonic(const OptionInfo *option_info,
+  const char *token)
 {
-  const OptionInfo
-    *command_info;
-
   ssize_t
     i;
 
   for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
     if (LocaleCompare(token,option_info[i].mnemonic) == 0)
       break;
-  command_info=option_info+i;
+  return(option_info+i);
+}
+
+static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
+  char *token)
+{
+  const OptionInfo
+    *command_info;
+
+  command_info=SearchOptionMnemonic(option_info,token);
   if (IsUnknownSeparatedToken(command_info,token) != MagickFalse)
     {
       RemoveTokenCharacter(token,'-');
       RemoveTokenCharacter(token,'_');
-      for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
-        if (LocaleCompare(token,option_info[i].mnemonic) == 0)
-          break;
-      command_info=option_info+i;
+      command_info=SearchOptionMnemonic(option_info,token);
     }
   return(command_info);
 }
