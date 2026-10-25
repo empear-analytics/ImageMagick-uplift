@@ -1173,6 +1173,19 @@ static inline MagickBooleanType IsIncludeElementOpen(const char *token,
     MagickTrue : MagickFalse);
 }
 
+static void GetIncludePath(const char *filename,const char *token,
+  char *path)
+{
+  GetPathComponent(filename,HeadPath,path);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(path,DirectorySeparator,
+      MagickPathExtent);
+  if (*token == *DirectorySeparator)
+    (void) CopyMagickString(path,token,MagickPathExtent);
+  else
+    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+}
+
 static MagickBooleanType LoadLocaleCache(SplayTreeInfo *cache,const char *xml,
   const char *filename,const char *locale,const size_t depth,ExceptionInfo *exception)
 {
@@ -1306,14 +1319,7 @@ static MagickBooleanType LoadLocaleCache(SplayTreeInfo *cache,const char *xml,
                     *file_xml;
 
                   *path='\0';
-                  GetPathComponent(filename,HeadPath,path);
-                  if (*path != '\0')
-                    (void) ConcatenateMagickString(path,DirectorySeparator,
-                      MagickPathExtent);
-                  if (*token == *DirectorySeparator)
-                    (void) CopyMagickString(path,token,MagickPathExtent);
-                  else
-                    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+                  GetIncludePath(filename,token,path);
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
