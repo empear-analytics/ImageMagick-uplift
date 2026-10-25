@@ -726,10 +726,29 @@ MagickExport MagickBooleanType GetImageAlphaChannel(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+#define GetChannelBit(mask,bit)  (((size_t) (mask) >> (size_t) (bit)) & 0x01)
+
+static void SeparatePixelChannel(const Image *image,
+  const Image *separate_image,const ChannelType channel_type,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (GetChannelBit(channel_type,channel) == 0))
+      continue;
+    SetPixelChannel(separate_image,GrayPixelChannel,p[i],q);
+  }
+}
+
 MagickExport Image *SeparateImage(const Image *image,
   const ChannelType channel_type,ExceptionInfo *exception)
 {
-#define GetChannelBit(mask,bit)  (((size_t) (mask) >> (size_t) (bit)) & 0x01)
 #define SeparateImageTag  "Separate/Image"
 
   CacheView
@@ -802,19 +821,8 @@ MagickExport Image *SeparateImage(const Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
       SetPixelChannel(separate_image,GrayPixelChannel,(Quantum) 0,q);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (GetChannelBit(channel_type,channel) == 0))
-          continue;
-        SetPixelChannel(separate_image,GrayPixelChannel,p[i],q);
-      }
+      SeparatePixelChannel(image,separate_image,channel_type,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(separate_image);
     }
@@ -991,6 +999,69 @@ static inline void FlattenPixelInfo(const Image *image,const PixelInfo *p,
   }
 }
 
+static void ScaleColorChannels(const Image *image,const double gamma,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if (channel == AlphaPixelChannel)
+      continue;
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=ClampToQuantum(gamma*(double) q[i]);
+  }
+}
+
+static void SetTransparentPixelsToBackground(const Image *image,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelAlpha(image,q) == TransparentAlpha)
+      {
+        SetPixelViaPixelInfo(image,&image->background_color,q);
+        SetPixelChannel(image,AlphaPixelChannel,TransparentAlpha,q);
+      }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void FlattenRowOverBackground(const Image *image,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    FlattenPixelInfo(image,&image->background_color,
+      image->background_color.alpha,q,(double) GetPixelAlpha(image,q),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void SetShapeAlphaPixels(const Image *image,PixelInfo pixel,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    pixel.alpha=GetPixelIntensity(image,q);
+    SetPixelViaPixelInfo(image,&pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -1052,20 +1123,8 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
           double
             gamma;
 
-          ssize_t
-            i;
-
           gamma=QuantumScale*(double) GetPixelAlpha(image,q);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if (channel == AlphaPixelChannel)
-              continue;
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            q[i]=ClampToQuantum(gamma*(double) q[i]);
-          }
+          ScaleColorChannels(image,gamma,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -1095,9 +1154,6 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
@@ -1107,15 +1163,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
             status=MagickFalse;
             continue;
           }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          if (GetPixelAlpha(image,q) == TransparentAlpha)
-            {
-              SetPixelViaPixelInfo(image,&image->background_color,q);
-              SetPixelChannel(image,AlphaPixelChannel,TransparentAlpha,q);
-            }
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        SetTransparentPixelsToBackground(image,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
       }
@@ -1173,21 +1221,9 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
             gamma,
             Sa;
 
-          ssize_t
-            i;
-
           Sa=QuantumScale*(double) GetPixelAlpha(image,q);
           gamma=MagickSafeReciprocal(Sa);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if (channel == AlphaPixelChannel)
-              continue;
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            q[i]=ClampToQuantum(gamma*(double) q[i]);
-          }
+          ScaleColorChannels(image,gamma,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -1296,9 +1332,6 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
@@ -1308,12 +1341,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
             status=MagickFalse;
             continue;
           }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          FlattenPixelInfo(image,&image->background_color,
-            image->background_color.alpha,q,(double) GetPixelAlpha(image,q),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        FlattenRowOverBackground(image,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
       }
@@ -1354,9 +1382,6 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
@@ -1367,12 +1392,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
             continue;
           }
         pixel=background;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          pixel.alpha=GetPixelIntensity(image,q);
-          SetPixelViaPixelInfo(image,&pixel,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        SetShapeAlphaPixels(image,pixel,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
       }
