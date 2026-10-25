@@ -204,3 +204,35 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, afternoon)
+
+**Result: Code Health 1.48 → 1.92** (`cs-mcp` 1.5.12). Branch `campaign/M41-property`,
+stacked on `campaign/M40-cache`. 10 refactor commits (8 P, 2 D), all oracle-verified.
+Every function touched is ready or careful, and no open survivor sits on a moved line.
+
+**Predicates:**
+- `IsPointCorner` (TracePSClippath). Its second site is the same test on `first`, so it
+  was folded onto the predicate by D, avoiding a clone predicate.
+- `IsBezierCorner`, `IsInvalid8BIMFieldCount` and `IsUnrequestedResource`.
+- `IsNonEmptyImage` and `IsEscapeEnd`.
+- `IsWildcardProperty`: P in GetImageProperty, then D in SetImageProperty.
+- `IsNotNamespaceWildcard` (both of GetXMPProperty's sites).
+- `IsReadOnlyMProperty` and `IsReadOnlySProperty`. Upstream lists `"min"` twice in the
+  first; the predicate keeps it verbatim. It is redundant, not a bug.
+- Several predicates take strings. property.c gained no String Heavy finding.
+
+**Not done:** GetEXIFProperty's three sites. Their constants (`GPS_LATITUDE`,
+`TAG_EXIF_OFFSET`, `MaxDirectoryStack` and others) are `#define`d inside the function
+body, so a predicate placed above the function cannot use them. The "hoist" recipe
+proposed in M35 for local types would cover local macros as well.
+
+**Oracle under load.** The GetXMPProperty step's two full runs were made while the Mac
+was heavily loaded (load 22–40). They reported 7 and 12 divergences, a different set
+each time. Every one of them matched when rerun alone: 30 s per-case timeouts, not
+behaviour. This is recorded in the commit and in memory.
+
+**What is left, at 1.92.**
+- GetEXIFProperty (the three sites above, plus its Brain Method).
+- GetMagickProperty and GetMagickPropertyLetter: big letter and keyword `switch`es.
+- TracePSClippath and TraceSVGClippath: the path-parsing state machines.

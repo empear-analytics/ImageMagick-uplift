@@ -129,7 +129,7 @@ needs before refactoring:
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
 | 1.45 | `MagickCore/cache.c` | 6108 | 62% | 65% | 2.16, in progress (Complex Conditional gone: 13 predicates), [M40](tasks/M40-cache.md) |
-| 1.48 | `MagickCore/property.c` | 4879 | 41% | 61% | open |
+| 1.48 | `MagickCore/property.c` | 4879 | 41% | 61% | 1.92, in progress (Complex Conditional left only in GetEXIFProperty, blocked by its local macros), [M41](tasks/M41-property.md) |
 | 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | 1.61, blocked (GetImageFeatures' function-local typedef needs a hoisting recipe), [M35](tasks/M35-feature.md) |
 | 1.61 | `MagickCore/xml-tree.c` | 2347 | 35% | 57% | open |
 | 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | open |
