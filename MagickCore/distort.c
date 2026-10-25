@@ -406,6 +406,14 @@ static inline MagickBooleanType IsInvalidPolarRadius(const double *coeff)
            || (coeff[0]-coeff[1]) < MagickEpsilon ) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsInvalidBarrelArgumentCount(
+  const size_t number_arguments)
+{
+  return(( (number_arguments  < 3) || (number_arguments == 7) ||
+           (number_arguments == 9) || (number_arguments > 10) ) ?
+    MagickTrue : MagickFalse);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const size_t number_arguments,const double *arguments,
   size_t number_values,ExceptionInfo *exception)
@@ -1459,8 +1467,7 @@ static double *GenerateCoefficients(const Image *image,
         rscale = 2.0/MagickMin((double) image->columns,(double) image->rows);
 
       /* sanity check  number of args must = 3,4,5,6,8,10 or error */
-      if ( (number_arguments  < 3) || (number_arguments == 7) ||
-           (number_arguments == 9) || (number_arguments > 10) )
+      if (IsInvalidBarrelArgumentCount(number_arguments) != MagickFalse)
         {
           coeff=(double *) RelinquishMagickMemory(coeff);
           (void) ThrowMagickException(exception,GetMagickModule(),
