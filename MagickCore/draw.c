@@ -518,6 +518,21 @@ static void ReversePoints(PointInfo *points,const size_t number_points)
   }
 }
 
+static inline MagickBooleanType IsDirectionChange(const PointInfo *points,
+  const long direction,const long next_direction)
+{
+  return(((points != (PointInfo *) NULL) && (direction != 0) &&
+    (direction != next_direction)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsSubpathStart(const PathInfo *path_info,
+  const ssize_t i)
+{
+  return(((path_info[i].code == MoveToCode) ||
+    (path_info[i].code == OpenCode) ||
+    (path_info[i].code == GhostlineCode)) ? MagickTrue : MagickFalse);
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -586,8 +601,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   polygon_info->number_edges=0;
   for (i=0; path_info[i].code != EndCode; i++)
   {
-    if ((path_info[i].code == MoveToCode) || (path_info[i].code == OpenCode) ||
-        (path_info[i].code == GhostlineCode))
+    if (IsSubpathStart(path_info,i) != MagickFalse)
       {
         /*
           Move to.
@@ -651,8 +665,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
     next_direction=((path_info[i].point.y > point.y) ||
       ((fabs(path_info[i].point.y-point.y) < MagickEpsilon) &&
        (path_info[i].point.x > point.x))) ? 1 : -1;
-    if ((points != (PointInfo *) NULL) && (direction != 0) &&
-        (direction != next_direction))
+    if (IsDirectionChange(points,direction,next_direction) != MagickFalse)
       {
         /*
           New edge.
