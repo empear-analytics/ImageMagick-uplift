@@ -1332,6 +1332,31 @@ MagickExport MagickBooleanType DrawAffineImage(Image *image,
   return(status);
 }
 
+static PointInfo GetDensityResolution(const DrawInfo *clone_info)
+{
+  PointInfo
+    resolution;
+
+  resolution.x=96.0;
+  resolution.y=96.0;
+  if (clone_info->density != (char *) NULL)
+    {
+      GeometryInfo
+        geometry_info;
+
+      MagickStatusType
+        flags;
+
+      flags=ParseGeometry(clone_info->density,&geometry_info);
+      if ((flags & RhoValue) != 0)
+        resolution.x=geometry_info.rho;
+      resolution.y=resolution.x;
+      if ((flags & SigmaValue) != 0)
+        resolution.y=geometry_info.sigma;
+    }
+  return(resolution);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1403,23 +1428,7 @@ static MagickBooleanType DrawBoundingRectangles(Image *image,
       clone_info=DestroyDrawInfo(clone_info);
       return(MagickFalse);
     }
-  resolution.x=96.0;
-  resolution.y=96.0;
-  if (clone_info->density != (char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      flags=ParseGeometry(clone_info->density,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        resolution.x=geometry_info.rho;
-      resolution.y=resolution.x;
-      if ((flags & SigmaValue) != 0)
-        resolution.y=geometry_info.sigma;
-    }
+  resolution=GetDensityResolution(clone_info);
   mid=(resolution.x/96.0)*ExpandAffine(&clone_info->affine)*
     clone_info->stroke_width/2.0;
   bounds.x1=0.0;
