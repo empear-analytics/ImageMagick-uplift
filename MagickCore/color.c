@@ -2033,6 +2033,52 @@ static void GetIncludePath(const char *filename,const char *token,
     (void) ConcatenateMagickString(path,token,MagickPathExtent);
 }
 
+static void SetColorInfoAttribute(ColorInfo *color_info,const char *keyword,
+  const char *token,ExceptionInfo *exception)
+{
+  switch (*keyword)
+  {
+    case 'C':
+    case 'c':
+    {
+      if (LocaleCompare((char *) keyword,"color") == 0)
+        {
+          (void) QueryColorCompliance(token,AllCompliance,&color_info->color,
+            exception);
+          break;
+        }
+      if (LocaleCompare((char *) keyword,"compliance") == 0)
+        {
+          SetColorInfoCompliance(color_info,token);
+          break;
+        }
+      break;
+    }
+    case 'N':
+    case 'n':
+    {
+      if (LocaleCompare((char *) keyword,"name") == 0)
+        {
+          color_info->name=ConstantString(token);
+          break;
+        }
+      break;
+    }
+    case 'S':
+    case 's':
+    {
+      if (LocaleCompare((char *) keyword,"stealth") == 0)
+        {
+          color_info->stealth=IsStringTrue(token);
+          break;
+        }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
   const char *filename,const size_t depth,ExceptionInfo *exception)
 {
@@ -2186,47 +2232,7 @@ static MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
       continue;
     (void) GetNextToken(q,&q,extent,token);
     (void) GetNextToken(q,&q,extent,token);
-    switch (*keyword)
-    {
-      case 'C':
-      case 'c':
-      {
-        if (LocaleCompare((char *) keyword,"color") == 0)
-          {
-            (void) QueryColorCompliance(token,AllCompliance,&color_info->color,
-              exception);
-            break;
-          }
-        if (LocaleCompare((char *) keyword,"compliance") == 0)
-          {
-            SetColorInfoCompliance(color_info,token);
-            break;
-          }
-        break;
-      }
-      case 'N':
-      case 'n':
-      {
-        if (LocaleCompare((char *) keyword,"name") == 0)
-          {
-            color_info->name=ConstantString(token);
-            break;
-          }
-        break;
-      }
-      case 'S':
-      case 's':
-      {
-        if (LocaleCompare((char *) keyword,"stealth") == 0)
-          {
-            color_info->stealth=IsStringTrue(token);
-            break;
-          }
-        break;
-      }
-      default:
-        break;
-    }
+    SetColorInfoAttribute(color_info,keyword,token,exception);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);
