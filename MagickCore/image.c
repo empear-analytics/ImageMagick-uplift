@@ -3461,6 +3461,14 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsInsideRegion(const RectangleInfo *region,
+  const ssize_t x,const ssize_t y)
+{
+  return((((x >= region->x) && (x < (region->x+(ssize_t) region->width))) &&
+    ((y >= region->y) && (y < (region->y+(ssize_t) region->height)))) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageRegionMask(Image *image,
   const PixelMask type,const RectangleInfo *region,ExceptionInfo *exception)
 {
@@ -3554,8 +3562,7 @@ MagickExport MagickBooleanType SetImageRegionMask(Image *image,
         pixel;
 
       pixel=QuantumRange;
-      if (((x >= region->x) && (x < (region->x+(ssize_t) region->width))) &&
-          ((y >= region->y) && (y < (region->y+(ssize_t) region->height))))
+      if (IsInsideRegion(region,x,y) != MagickFalse)
         pixel=(Quantum) 0;
       switch (type)
       {
