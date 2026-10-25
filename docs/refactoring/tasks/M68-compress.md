@@ -105,3 +105,22 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 4.94 → 5.20** (`cs-mcp` 1.5.12). Branch `campaign/M68-compress`,
+stacked on `campaign/M67-timer`. Three oracle-verified commits:
+- `IsHuffmanBufferMissing` (P, HuffmanDecodeImage, careful; no survivor on the line).
+  Complex Conditional leaves the file.
+- `GetPackedRunLength` and `GetLiteralRunLength` (E, PackbitsEncodeImage, ready),
+  both value-returning. PackbitsEncodeImage leaves Bumpy Road Ahead and Deep, Nested
+  Complexity.
+
+**What is left, at 5.20. All of it is blocked by local macros**, the strongest case so
+far for the proposed hoist recipe:
+- HuffmanDecodeImage (depth 7, cc 59) `#define`s `HashSize`, `MBHashA/B`, `MWHashA/B`,
+  `InitializeHashTable` and `InputBit` (which contains a `break`).
+- HuffmanEncodeImage `#define`s `HuffmanOutputCode`.
+- LZWEncodeImage `#define`s `LZWClr`, `LZWEod` and `OutputCode`.
+
+Every remaining block in these three functions uses at least one of these macros.
