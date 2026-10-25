@@ -1232,6 +1232,30 @@ MagickExport Image *ReadInlineImage(const ImageInfo *image_info,
   return(image);
 }
 
+static const MagickInfo *GetWriteMagickInfo(ImageInfo *write_info,
+  const Image *image,ExceptionInfo *exception)
+{
+  const MagickInfo
+    *magick_info;
+
+  ExceptionInfo
+    *sans_exception;
+
+  sans_exception=AcquireExceptionInfo();
+  magick_info=GetMagickInfo(write_info->magick,sans_exception);
+  if (sans_exception->severity == PolicyError)
+    magick_info=GetMagickInfo(write_info->magick,exception);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  if ((write_info->affirm == MagickFalse) &&
+      (magick_info == (const MagickInfo *) NULL))
+    {
+      (void) CopyMagickString(write_info->magick,image->magick,
+        MagickPathExtent);
+      magick_info=GetMagickInfo(write_info->magick,exception);
+    }
+  return(magick_info);
+}
+
 static MagickBooleanType CopyTemporaryImageFile(ImageInfo *write_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -1458,18 +1482,7 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
         }
       else
         {
-          sans_exception=AcquireExceptionInfo();
-          magick_info=GetMagickInfo(write_info->magick,sans_exception);
-          if (sans_exception->severity == PolicyError)
-            magick_info=GetMagickInfo(write_info->magick,exception);
-          sans_exception=DestroyExceptionInfo(sans_exception);
-          if ((write_info->affirm == MagickFalse) &&
-              (magick_info == (const MagickInfo *) NULL))
-            {
-              (void) CopyMagickString(write_info->magick,image->magick,
-                MagickPathExtent);
-              magick_info=GetMagickInfo(write_info->magick,exception);
-            }
+          magick_info=GetWriteMagickInfo(write_info,image,exception);
           encoder=GetImageEncoder(magick_info);
           if (encoder == (EncodeImageHandler *) NULL)
             {
