@@ -154,6 +154,19 @@ static inline char GetClosingQuote(const char *magick_restrict p)
   return(escape);
 }
 
+static inline void StripURLReference(char *magick_restrict token)
+{
+  char
+    *magick_restrict q;
+
+  q=strrchr(token,')');
+  if (q != (char *) NULL)
+    {
+      *q='\0';
+      (void) memmove(token,token+5,(size_t) (q-token-4));
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -335,14 +348,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
   }
   token[i]='\0';
   if (LocaleNCompare(token,"url(#",5) == 0)
-    {
-      q=strrchr(token,')');
-      if (q != (char *) NULL)
-        {
-          *q='\0';
-          (void) memmove(token,token+5,(size_t) (q-token-4));
-        }
-    }
+    StripURLReference(token);
   while (isspace((int) ((unsigned char) *p)) != 0)
     p++;
   if (end != (const char **) NULL)
