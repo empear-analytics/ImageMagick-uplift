@@ -2141,6 +2141,17 @@ MagickExport char **StringToArgv(const char *text,int *argc)
   return(argv);
 }
 
+static const char *SkipValueSeparator(const char *p)
+{
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;  /* skip spaces */
+  if (*p == ',')
+    p++;  /* skip comma */
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;  /* and more spaces */
+  return(p);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2208,12 +2219,7 @@ MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
       return((double *) NULL);  /* no value found */
     p=q;
     i++;  /* increment value count */
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;  /* skip spaces */
-    if (*p == ',')
-      p++;  /* skip comma */
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;  /* and more spaces */
+    p=SkipValueSeparator(p);
   }
   /*
     Allocate floating point argument list.
