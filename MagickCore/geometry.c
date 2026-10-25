@@ -1525,6 +1525,14 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
 %      the given geometry specification.
 %
 */
+static inline MagickBooleanType IsMetaGeometryAspectKept(
+  const MagickStatusType flags,const size_t *width,const size_t *height,
+  const size_t stasis_width,const size_t stasis_height)
+{
+  return((((flags & AspectValue) != 0) || ((*width == stasis_width) &&
+    (*height == stasis_height))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -1607,8 +1615,8 @@ MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
       stasis_width=(*width);
       stasis_height=(*height);
     }
-  if (((flags & AspectValue) != 0) || ((*width == stasis_width) &&
-      (*height == stasis_height)))
+  if (IsMetaGeometryAspectKept(flags,width,height,stasis_width,
+        stasis_height) != MagickFalse)
     {
       if ((flags & RhoValue) == 0)
         *width=stasis_width;
