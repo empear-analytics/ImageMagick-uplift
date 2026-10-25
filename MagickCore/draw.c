@@ -4975,6 +4975,13 @@ static size_t DestroyEdge(PolygonInfo *polygon_info,const ssize_t edge)
   return(polygon_info->number_edges);
 }
 
+static inline MagickBooleanType IsFillAlphaSkipped(const MagickBooleanType fill,
+  const double distance,const double subpath_alpha)
+{
+  return(((fill == MagickFalse) || (distance > 1.0) ||
+    (subpath_alpha >= 1.0)) ? MagickTrue : MagickFalse);
+}
+
 static double GetFillAlpha(PolygonInfo *polygon_info,const double mid,
   const MagickBooleanType fill,const FillRule fill_rule,const ssize_t x,
   const ssize_t y,double *stroke_alpha)
@@ -5092,7 +5099,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,const double mid,
                 }
             }
         }
-      if ((fill == MagickFalse) || (distance > 1.0) || (subpath_alpha >= 1.0))
+      if (IsFillAlphaSkipped(fill,distance,subpath_alpha) != MagickFalse)
         continue;
       if (distance <= 0.0)
         {
