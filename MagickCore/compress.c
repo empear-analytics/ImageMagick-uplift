@@ -1065,6 +1065,24 @@ static int GetPackedRunLength(const unsigned char *magick_restrict pixels,
   return(count);
 }
 
+static int GetLiteralRunLength(const unsigned char *magick_restrict pixels,
+  unsigned char *packbits,const ssize_t i)
+{
+  int
+    count;
+
+  count=0;
+  while ((*(pixels+count) != *(pixels+count+1)) ||
+         (*(pixels+count+1) != *(pixels+count+2)))
+  {
+    packbits[count+1]=pixels[count];
+    count++;
+    if (((ssize_t) count >= (i-3)) || (count >= 127))
+      break;
+  }
+  return(count);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1172,15 +1190,7 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
         /*
           Literal run.
         */
-        count=0;
-        while ((*(pixels+count) != *(pixels+count+1)) ||
-               (*(pixels+count+1) != *(pixels+count+2)))
-        {
-          packbits[count+1]=pixels[count];
-          count++;
-          if (((ssize_t) count >= (i-3)) || (count >= 127))
-            break;
-        }
+        count=GetLiteralRunLength(pixels,packbits,i);
         i-=count;
         *packbits=(unsigned char) (count-1);
         for (j=0; j <= (ssize_t) count; j++)
