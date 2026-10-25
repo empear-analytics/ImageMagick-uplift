@@ -140,3 +140,38 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 3.56 → 3.85** (`cs-mcp` 1.5.12). Branch `campaign/M31-policy`,
+stacked on `campaign/M30-log`. 6 refactor commits, all oracle-verified. Every function
+touched is ready in the merged mutation reports.
+
+**LoadPolicyCache** (bumps 10 → 9):
+- `IsIncludeElementOpen` (P).
+- `GetIncludePath` (E).
+- `SetPolicyInfoAttribute` (E): the whole attribute `switch`, which has no preprocessor
+  branch here.
+- policy.c already carries the String Heavy Function Arguments finding, so the
+  string-taking helpers cost nothing here. In log.c the same helpers cost score (M30).
+
+**ListPolicyInfo:** `IsNewPolicyPath` and `IsLimitPolicyDomain` (P). They take
+`policy_info` and `i` so that the `policy_info[i]` reads keep their text.
+
+**IsRightsAuthorizedByName** (bumps 5 → 3, cc 46 → 39):
+- `IsEffectiveRightsAuthorized` and `IsCanonicalRightsAuthorized` (E).
+- Each takes `status` in and returns it, because the block either leaves it alone or
+  overwrites it.
+
+**Not done:** `IsPathContainsSymlink`'s condition reads `sizeof(component)` of a local
+array, which a helper would see as a pointer.
+
+**Oracle runs:** LoadPolicyCache and IsRightsAuthorizedByName each reach about 15,000
+cases. Every run showed only the known log-map tie and the hough pair, and the pair gave
+0 of 2 in each set of three isolated reruns.
+
+**What is left, at 3.85.**
+- `IsRightsAuthorizedByName`'s path-provisioning and canonical-matching blocks. Each
+  writes three or four locals or needs five arguments.
+- `SetMagickSecurityPolicyValue` (cc 24): no oracle case.
+- `LoadPolicyCache`'s DOCTYPE ladder and include loop.
