@@ -475,6 +475,12 @@ static ssize_t PrintChannelStatistics(FILE *file,const PixelChannel channel,
   return(n);
 }
 
+static inline MagickBooleanType HasPageGeometry(const Image *image)
+{
+  return(((image->page.width != 0) || (image->page.height != 0) ||
+    (image->page.x != 0) || (image->page.y != 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -656,8 +662,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
             image->magick_columns,(double) image->magick_rows);
       (void) FormatLocaleFile(file,"%.17gx%.17g ",(double) image->columns,
         (double) image->rows);
-      if ((image->page.width != 0) || (image->page.height != 0) ||
-          (image->page.x != 0) || (image->page.y != 0))
+      if (HasPageGeometry(image) != MagickFalse)
         (void) FormatLocaleFile(file,"%.17gx%.17g%+.20g%+.20g ",(double)
           image->page.width,(double) image->page.height,(double) image->page.x,
           (double) image->page.y);
@@ -1310,8 +1315,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     MagickPixelIntensityOptions,(ssize_t) image->intensity));
   (void) FormatLocaleFile(file,"  Compose: %s\n",CommandOptionToMnemonic(
     MagickComposeOptions,(ssize_t) image->compose));
-  if ((image->page.width != 0) || (image->page.height != 0) ||
-      (image->page.x != 0) || (image->page.y != 0))
+  if (HasPageGeometry(image) != MagickFalse)
     (void) FormatLocaleFile(file,"  Page geometry: %.17gx%.17g%+.20g%+.20g\n",
       (double) image->page.width,(double) image->page.height,(double)
       image->page.x,(double) image->page.y);
