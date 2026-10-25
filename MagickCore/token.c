@@ -955,6 +955,27 @@ static void StoreToken(TokenInfo *token_info,char *string,
   }
 }
 
+static void HandleWhiteSpace(TokenInfo *token_info,char *token,
+  const size_t max_token_length,int c)
+{
+  switch (token_info->state)
+  {
+    case IN_WHITE:
+    case IN_OZONE:
+      break;
+    case IN_TOKEN:
+    {
+      token_info->state=IN_OZONE;
+      break;
+    }
+    case IN_QUOTE:
+    {
+      StoreToken(token_info,token,max_token_length,c);
+      break;
+    }
+  }
+}
+
 MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
   char *token,const size_t max_token_length,const char *line,const char *white,
   const char *break_set,const char *quote,const char escape,char *breaker,
@@ -1034,22 +1055,7 @@ MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
     i=sindex(c,white);
     if (i >= 0)
       {
-        switch (token_info->state)
-        {
-          case IN_WHITE:
-          case IN_OZONE:
-            break;
-          case IN_TOKEN:
-          {
-            token_info->state=IN_OZONE;
-            break;
-          }
-          case IN_QUOTE:
-          {
-            StoreToken(token_info,token,max_token_length,c);
-            break;
-          }
-        }
+        HandleWhiteSpace(token_info,token,max_token_length,c);
         continue;
       }
     if (c == (int) escape)
