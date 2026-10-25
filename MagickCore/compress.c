@@ -1049,6 +1049,22 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   return(MagickTrue);
 }
 
+static int GetPackedRunLength(const unsigned char *magick_restrict pixels,
+  const ssize_t i)
+{
+  int
+    count;
+
+  count=3;
+  while (((ssize_t) count < i) && (*pixels == *(pixels+count)))
+  {
+    count++;
+    if (count >= 127)
+      break;
+  }
+  return(count);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1146,13 +1162,7 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
             /*
               Packed run.
             */
-            count=3;
-            while (((ssize_t) count < i) && (*pixels == *(pixels+count)))
-            {
-              count++;
-              if (count >= 127)
-                break;
-            }
+            count=GetPackedRunLength(pixels,i);
             i-=count;
             (void) WriteBlobByte(image,(unsigned char) ((256-count)+1));
             (void) WriteBlobByte(image,*pixels);
