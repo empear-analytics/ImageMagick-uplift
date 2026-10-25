@@ -2321,6 +2321,27 @@ static MagickStatusType ParseCSSColor(const char *magick_restrict color,
   return(flags);
 }
 
+static inline MagickBooleanType IsHexColorLength(const size_t n)
+{
+  return(((n == 3) || (n == 6) || (n == 9) || (n == 12) || (n == 24) ||
+    (n == 48)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsInvalidHexAlphaLength(const size_t n)
+{
+  return(((n != 4) && (n != 8) && (n != 16) && (n != 32) && (n != 64)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsHueColorspaceName(const char *colorspace)
+{
+  return(((LocaleCompare(colorspace,"HCL") == 0) ||
+    (LocaleCompare(colorspace,"HSB") == 0) ||
+    (LocaleCompare(colorspace,"HSL") == 0) ||
+    (LocaleCompare(colorspace,"HSV") == 0) ||
+    (LocaleCompare(colorspace,"HWB") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2380,8 +2401,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
       */
       name++;
       for (n=0; isxdigit((int) ((unsigned char) name[n])) != 0; n++) ;
-      if ((n == 3) || (n == 6) || (n == 9) || (n == 12) || (n == 24) ||
-          (n == 48))
+      if (IsHexColorLength(n) != MagickFalse)
         {
           do
           {
@@ -2408,7 +2428,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
         }
       else
         {
-          if ((n != 4) && (n != 8) && (n != 16) && (n != 32) && (n != 64))
+          if (IsInvalidHexAlphaLength(n) != MagickFalse)
             {
               (void) ThrowMagickException(exception,GetMagickModule(),
                 OptionWarning,"UnrecognizedColor","`%s'",name);
@@ -2618,11 +2638,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
             color->alpha=(double) ClampToQuantum((double) QuantumRange*
               geometry_info.sigma);
         }
-      if ((LocaleCompare(colorspace,"HCL") == 0) ||
-          (LocaleCompare(colorspace,"HSB") == 0) ||
-          (LocaleCompare(colorspace,"HSL") == 0) ||
-          (LocaleCompare(colorspace,"HSV") == 0) ||
-          (LocaleCompare(colorspace,"HWB") == 0))
+      if (IsHueColorspaceName(colorspace) != MagickFalse)
         {
           double
             blue,
