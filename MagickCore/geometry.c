@@ -213,6 +213,14 @@ static inline MagickBooleanType IsGeometryHeightSeparator(const int c,
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsGeometryHeightOnly(
+  const MagickStatusType flags,const size_t *width,const size_t *height)
+{
+  return((((flags & SeparatorValue) != 0) && ((flags & WidthValue) == 0) &&
+    (height != (size_t *) NULL) && (width != (size_t *) NULL)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -440,8 +448,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
             *height=(*width);
           flags|=HeightValue;
         }
-      if (((flags & SeparatorValue) != 0) && ((flags & WidthValue) == 0) &&
-          (height != (size_t *) NULL) && (width != (size_t *) NULL))
+      if (IsGeometryHeightOnly(flags,width,height) != MagickFalse)
         *width=(*height);
     }
 #if 0
