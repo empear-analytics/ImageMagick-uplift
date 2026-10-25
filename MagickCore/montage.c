@@ -258,6 +258,42 @@ static Image *AddTileShadow(Image *image,ExceptionInfo *exception)
   return(image);
 }
 
+static Image *AddTileBorder(Image *image,const MontageInfo *montage_info,
+  const size_t border_width,const size_t width,const size_t height,
+  ExceptionInfo *exception)
+{
+  Image
+    *border_image;
+
+  RectangleInfo
+    border_info;
+
+  /*
+    Put a border around the image.
+  */
+  border_info.width=border_width;
+  border_info.height=border_width;
+  if (montage_info->frame != (char *) NULL)
+    {
+      border_info.width=(width-image->columns+1)/2;
+      border_info.height=(height-image->rows+1)/2;
+    }
+  border_image=BorderImage(image,&border_info,image->compose,exception);
+  if (border_image != (Image *) NULL)
+    {
+      image=DestroyImage(image);
+      image=border_image;
+    }
+  if ((montage_info->frame != (char *) NULL) &&
+      (image->compose == DstOutCompositeOp))
+    {
+      (void) SetPixelChannelMask(image,AlphaChannel);
+      (void) NegateImage(image,MagickFalse,exception);
+      (void) SetPixelChannelMask(image,DefaultChannels);
+    }
+  return(image);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -810,37 +846,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
         max_height=image->rows;
       height=concatenate != MagickFalse ? max_height : extract_info.height;
       if (border_width != 0)
-        {
-          Image
-            *border_image;
-
-          RectangleInfo
-            border_info;
-
-          /*
-            Put a border around the image.
-          */
-          border_info.width=border_width;
-          border_info.height=border_width;
-          if (montage_info->frame != (char *) NULL)
-            {
-              border_info.width=(width-image->columns+1)/2;
-              border_info.height=(height-image->rows+1)/2;
-            }
-          border_image=BorderImage(image,&border_info,image->compose,exception);
-          if (border_image != (Image *) NULL)
-            {
-              image=DestroyImage(image);
-              image=border_image;
-            }
-          if ((montage_info->frame != (char *) NULL) &&
-              (image->compose == DstOutCompositeOp))
-            {
-              (void) SetPixelChannelMask(image,AlphaChannel);
-              (void) NegateImage(image,MagickFalse,exception);
-              (void) SetPixelChannelMask(image,DefaultChannels);
-            }
-        }
+        image=AddTileBorder(image,montage_info,border_width,width,height,
+          exception);
       /*
         Gravitate as specified by the tile gravity.
       */
