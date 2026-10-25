@@ -643,6 +643,16 @@ static HNodeInfo *GetHNodeInfo(HCubeInfo *cube_info,const size_t level)
   return(node_info);
 }
 
+static void ExtendColorList(HNodeInfo *node_info,const ssize_t i)
+{
+  if (node_info->list == (PixelInfo *) NULL)
+    node_info->list=(PixelInfo *) AcquireQuantumMemory(1,
+      sizeof(*node_info->list));
+  else
+    node_info->list=(PixelInfo *) ResizeQuantumMemory(node_info->list,
+      (size_t) (i+1),sizeof(*node_info->list));
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -763,12 +773,7 @@ static MagickBooleanType CheckImageColors(const Image *image,
           /*
             Add this unique color to the color list.
           */
-          if (node_info->list == (PixelInfo *) NULL)
-            node_info->list=(PixelInfo *) AcquireQuantumMemory(1,
-              sizeof(*node_info->list));
-          else
-            node_info->list=(PixelInfo *) ResizeQuantumMemory(node_info->list,
-              (size_t) (i+1),sizeof(*node_info->list));
+          ExtendColorList(node_info,i);
           if (node_info->list == (PixelInfo *) NULL)
             {
               (void) ThrowMagickException(exception,GetMagickModule(),
