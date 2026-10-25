@@ -181,6 +181,16 @@ static ssize_t GetFrameStep(const char *artifact)
   return(step);
 }
 
+static ssize_t ClampSceneIndex(ssize_t first,const size_t length)
+{
+  if (first < 0)
+    first+=(ssize_t) length;
+  else
+    if (first > (ssize_t) length)
+      first=(ssize_t) length;
+  return(first);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -264,11 +274,7 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
       p++;
     first=(ssize_t) strtol(p,&p,10);
     offset=first;
-    if (first < 0)
-      first+=(ssize_t) length;
-    else
-      if (first > (ssize_t) length)
-        first=(ssize_t) length;
+    first=ClampSceneIndex(first,length);
     first%=(ssize_t) (length << 1);
     last=first;
     while (isspace((int) ((unsigned char) *p)) != 0)
