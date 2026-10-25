@@ -208,3 +208,36 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, midday)
+
+**Result: Code Health 1.14 → 1.81** (`cs-mcp` 1.5.12). Branch `campaign/M38-fx`, stacked
+on `campaign/M37-draw`. 16 refactor commits, all Recipe P, adding 39 predicates:
+- Oracle-verified: GetFunction (12 predicates), GetOperand, GetImgAttrToken.
+- Guard-verified: the rest. Those functions are not ready, have no case, or have a
+  survivor on the moved line.
+- Complex Conditional drops from 56 sites to 8.
+
+**fx.c's own style.** The file writes `Name (`, uses spaced `if (`, and has character
+literals `'{'` and `'}'`. The predicate tool was extended to handle all three:
+- it skips forward prototypes when it looks for a function;
+- it ignores string and character literals when it matches braces;
+- it accepts `while (` conditions.
+
+**Lesson on readiness (recorded in memory).** gate.py matches its recorded verdicts by
+source position. Run on an *edited* file, some "unobservable" mutants fall back to
+"unmatched" and the verdict changes: GetOperand read as not ready (73%) instead of
+careful (80%). Every readiness figure in these commits comes from the gate run on the
+unedited file. Every earlier task ran the gate at task start, before any edit, so their
+figures are unaffected. Also checked: the order of reports with equal timestamps does
+not change any verdict.
+
+**Not done:**
+- ExecuteRPN's six identical HSL-channel tests and TranslateExpression's two identical
+  user-symbol tests. One predicate per pattern would be reused at guard level, the open
+  owner question. At oracle level it would be fine, but neither function is ready.
+
+**What is left, at 1.81.**
+- `ExecuteRPN` (the RPN interpreter's `switch`, cc and bumps high, not ready).
+- `TranslateExpression` and `GetFunction` (long recursive-descent bodies).
+- The eight repeated sites above.

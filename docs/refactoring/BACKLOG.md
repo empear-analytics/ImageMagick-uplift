@@ -97,7 +97,7 @@ needs before refactoring:
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
 | 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | open |
-| 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | open |
+| 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | 1.81, in progress (Complex Conditional 56 -> 8 sites; the rest are repeats), [M38](tasks/M38-fx.md) |
 | 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | open |
 | 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | open |
 | 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | 1.77, in progress (Complex Conditional gone: 20 sites, 22 predicates), [M37](tasks/M37-draw.md) |
