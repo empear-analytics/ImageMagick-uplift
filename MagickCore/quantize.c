@@ -2898,6 +2898,13 @@ static inline Quantum PosterizePixel(const Quantum pixel,const size_t levels)
   return(ClampToQuantum((MagickRealType) posterize_pixel));
 }
 
+static inline MagickBooleanType IsPosterizeDitherMap(
+  const DitherMethod dither_method,const size_t levels)
+{
+  return(((dither_method != NoDitherMethod) && (levels > 1) && (levels < 17)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -2921,7 +2928,7 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((dither_method != NoDitherMethod) && (levels > 1) && (levels < 17))
+  if (IsPosterizeDitherMap(dither_method,levels) != MagickFalse)
     for (y=0; y < 1; y++)
     {
       Image 
