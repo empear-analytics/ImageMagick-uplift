@@ -113,3 +113,25 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 4.58 → 5.02** (`cs-mcp` 1.5.12). Branch `campaign/M54-token`,
+stacked on `campaign/M53-splay-tree`. Six refactor commits:
+- **P (oracle).** GetNextToken (careful): `IsEscapedQuote`, `IsSingleCharToken`
+  and `IsTokenDelimiter`, 4.58 → 4.84. Complex Conditional leaves the file.
+- **E (oracle).** GetNextToken: `GetClosingQuote` (value-returning) and
+  `StripURLReference`. GetNextToken goes from cc 63 to 46.
+- **E (guard).** `MatchCharacterClass` (GlobExpression_, not ready;
+  value-returning) and `HandleWhiteSpace` (Tokenizer, no killed mutants). The
+  `HandleWhiteSpace` helper sits below the `IN_*` state macros, which are `#define`d
+  just above Tokenizer.
+
+The oracle diverged only on the known log-map tie.
+
+**What is left, at 5.02.**
+- GetNextToken (cc 46): its remaining blocks advance `p` and `i` and fill `token`
+  together.
+- GlobExpression_ (cc 61, depth 5): the `{` alternative scan contains the
+  `!MAGICKCORE_WINDOWS_SUPPORT` escape branch, and the other cases return from inside.
+- Tokenizer: its other state switches return from inside.
