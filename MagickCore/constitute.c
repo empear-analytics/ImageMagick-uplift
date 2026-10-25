@@ -1232,6 +1232,29 @@ MagickExport Image *ReadInlineImage(const ImageInfo *image_info,
   return(image);
 }
 
+static MagickBooleanType CopyTemporaryImageFile(ImageInfo *write_info,
+  Image *image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  /*
+    Copy temporary image file to permanent.
+  */
+  status=OpenBlob(write_info,image,ReadBinaryBlobMode,exception);
+  if (status != MagickFalse)
+    {
+      (void) RelinquishUniqueFileResource(write_info->filename);
+      status=ImageToFile(image,write_info->filename,exception);
+    }
+  if (CloseBlob(image) == MagickFalse)
+    status=MagickFalse;
+  (void) RelinquishUniqueFileResource(image->filename);
+  (void) CopyMagickString(image->filename,write_info->filename,
+    MagickPathExtent);
+  return(status);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1491,22 +1514,7 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
         }
     }
   if (temporary != MagickFalse)
-    {
-      /*
-        Copy temporary image file to permanent.
-      */
-      status=OpenBlob(write_info,image,ReadBinaryBlobMode,exception);
-      if (status != MagickFalse)
-        {
-          (void) RelinquishUniqueFileResource(write_info->filename);
-          status=ImageToFile(image,write_info->filename,exception);
-        }
-      if (CloseBlob(image) == MagickFalse)
-        status=MagickFalse;
-      (void) RelinquishUniqueFileResource(image->filename);
-      (void) CopyMagickString(image->filename,write_info->filename,
-        MagickPathExtent);
-    }
+    status=CopyTemporaryImageFile(write_info,image,exception);
   if ((LocaleCompare(write_info->magick,"info") != 0) &&
       (write_info->verbose != MagickFalse))
     (void) IdentifyImage(image,stdout,MagickFalse,exception);
