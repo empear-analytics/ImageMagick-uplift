@@ -237,6 +237,39 @@ static MagickBooleanType TraceEdges(Image *edge_image,CacheView *edge_view,
   return(MagickTrue);
 }
 
+static CannyInfo SetCannyOrientation(CannyInfo pixel,const double dx,
+  const double dy)
+{
+  if (fabs(dx) > MagickEpsilon)
+    {
+      double
+        slope;
+
+      slope=dy/dx;
+      if (slope < 0.0)
+        {
+          if (slope < -2.41421356237)
+            pixel.orientation=0;
+          else
+            if (slope < -0.414213562373)
+              pixel.orientation=1;
+            else
+              pixel.orientation=2;
+        }
+      else
+        {
+          if (slope > 2.41421356237)
+            pixel.orientation=0;
+          else
+            if (slope > 0.414213562373)
+              pixel.orientation=3;
+            else
+              pixel.orientation=2;
+        }
+    }
+  return(pixel);
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -382,33 +415,7 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
       }
       pixel.magnitude=hypot(dx,dy);
       pixel.orientation=0;
-      if (fabs(dx) > MagickEpsilon)
-        {
-          double
-            slope;
-
-          slope=dy/dx;
-          if (slope < 0.0)
-            {
-              if (slope < -2.41421356237)
-                pixel.orientation=0;
-              else
-                if (slope < -0.414213562373)
-                  pixel.orientation=1;
-                else
-                  pixel.orientation=2;
-            }
-          else
-            {
-              if (slope > 2.41421356237)
-                pixel.orientation=0;
-              else
-                if (slope > 0.414213562373)
-                  pixel.orientation=3;
-                else
-                  pixel.orientation=2;
-            }
-        }
+      pixel=SetCannyOrientation(pixel,dx,dy);
       if (SetMatrixElement(canny_cache,x,y,&pixel) == MagickFalse)
         continue;
       p+=(ptrdiff_t) GetPixelChannels(edge_image);
