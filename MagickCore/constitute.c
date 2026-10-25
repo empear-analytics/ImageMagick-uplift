@@ -648,6 +648,23 @@ static void SetResolutionFromStrings(Image *image,const char *resolution_x,
     image->resolution.y=geometry_info.rho+geometry_info.sigma/1000.0;
 }
 
+static void DeleteResolutionProperties(Image *image,
+  const MagickBooleanType used_tiff)
+{
+  if (used_tiff == MagickFalse)
+    {
+      (void) DeleteImageProperty(image,"exif:XResolution");
+      (void) DeleteImageProperty(image,"exif:YResolution");
+      (void) DeleteImageProperty(image,"exif:ResolutionUnit");
+    }
+  else
+    {
+      (void) DeleteImageProperty(image,"tiff:XResolution");
+      (void) DeleteImageProperty(image,"tiff:YResolution");
+      (void) DeleteImageProperty(image,"tiff:ResolutionUnit");
+    }
+}
+
 static void SyncResolutionFromProperties(Image *image,
   ConstituteInfo *constitute_info, ExceptionInfo *exception)
 {
@@ -699,18 +716,7 @@ static void SyncResolutionFromProperties(Image *image,
           if (option_type >= 0)
             image->units=(ResolutionType) option_type;
         }
-      if (used_tiff == MagickFalse)
-        {
-          (void) DeleteImageProperty(image,"exif:XResolution");
-          (void) DeleteImageProperty(image,"exif:YResolution");
-          (void) DeleteImageProperty(image,"exif:ResolutionUnit");
-        }
-      else
-        {
-          (void) DeleteImageProperty(image,"tiff:XResolution");
-          (void) DeleteImageProperty(image,"tiff:YResolution");
-          (void) DeleteImageProperty(image,"tiff:ResolutionUnit");
-        }
+      DeleteResolutionProperties(image,used_tiff);
     }
 }
 
