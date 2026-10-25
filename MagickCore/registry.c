@@ -160,6 +160,37 @@ MagickExport MagickBooleanType DeleteImageRegistry(const char *key)
   return(DeleteNodeFromSplayTree(registry,key));
 }
 
+static void *GetRegistryValueAsString(const RegistryInfo *registry_info)
+{
+  void
+    *value;
+
+  value=(void *) NULL;
+  switch (registry_info->type)
+  {
+    case ImageRegistryType:
+    {
+      value=(Image *) ConstantString(((Image *)
+        registry_info->value)->filename);
+      break;
+    }
+    case ImageInfoRegistryType:
+    {
+      value=(Image *) ConstantString(((ImageInfo *)
+        registry_info->value)->filename);
+      break;
+    }
+    case StringRegistryType:
+    {
+      value=(void *) ConstantString((char *) registry_info->value);
+      break;
+    }
+    default:
+      break;
+  }
+  return(value);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -221,28 +252,7 @@ MagickExport void *GetImageRegistry(const RegistryType type,const char *key,
     }
     case StringRegistryType:
     {
-      switch (registry_info->type)
-      {
-        case ImageRegistryType:
-        {
-          value=(Image *) ConstantString(((Image *)
-            registry_info->value)->filename);
-          break;
-        }
-        case ImageInfoRegistryType:
-        {
-          value=(Image *) ConstantString(((ImageInfo *)
-            registry_info->value)->filename);
-          break;
-        }
-        case StringRegistryType:
-        {
-          value=(void *) ConstantString((char *) registry_info->value);
-          break;
-        }
-        default:
-          break;
-      }
+      value=GetRegistryValueAsString(registry_info);
       break;
     }
     default:
