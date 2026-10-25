@@ -587,6 +587,32 @@ static void PrintChannelDepths(FILE *file,const Image *image,
     }
 }
 
+static void PrintImageProperties(FILE *file,Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *property,
+    *value;
+
+  ResetImagePropertyIterator(image);
+  property=GetNextImageProperty(image);
+  if (property != (const char *) NULL)
+    {
+      /*
+        Display image properties.
+      */
+      (void) FormatLocaleFile(file,"  Properties:\n");
+      while (property != (const char *) NULL)
+      {
+        (void) FormatLocaleFile(file,"    %s: ",property);
+        value=GetImageProperty(image,property,exception);
+        if (value != (const char *) NULL)
+          (void) FormatLocaleFile(file,"%s\n",value);
+        property=GetNextImageProperty(image);
+      }
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1630,23 +1656,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         name=GetNextImageProfile(image);
       }
     }
-  ResetImagePropertyIterator(image);
-  property=GetNextImageProperty(image);
-  if (property != (const char *) NULL)
-    {
-      /*
-        Display image properties.
-      */
-      (void) FormatLocaleFile(file,"  Properties:\n");
-      while (property != (const char *) NULL)
-      {
-        (void) FormatLocaleFile(file,"    %s: ",property);
-        value=GetImageProperty(image,property,exception);
-        if (value != (const char *) NULL)
-          (void) FormatLocaleFile(file,"%s\n",value);
-        property=GetNextImageProperty(image);
-      }
-    }
+  PrintImageProperties(file,image,exception);
   ResetImageArtifactIterator(image);
   artifact=GetNextImageArtifact(image);
   if (artifact != (const char *) NULL)
