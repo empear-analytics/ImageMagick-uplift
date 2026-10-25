@@ -961,6 +961,14 @@ static MagickBooleanType IsTypeTreeInstantiated(ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsNewTypePath(const char *path,
+  const TypeInfo **type_info,const ssize_t i)
+{
+  return((((path == (const char *) NULL) ||
+    (LocaleCompare(path,type_info[i]->path) != 0)) &&
+    (type_info[i]->path != (char *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
 {
   const char
@@ -992,9 +1000,7 @@ MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
   {
     if (type_info[i]->stealth != MagickFalse)
       continue;
-    if (((path == (const char *) NULL) ||
-         (LocaleCompare(path,type_info[i]->path) != 0)) &&
-         (type_info[i]->path != (char *) NULL))
+    if (IsNewTypePath(path,type_info,i) != MagickFalse)
       (void) FormatLocaleFile(file,"\nPath: %s\n",type_info[i]->path);
     path=type_info[i]->path;
     name="not defined";
