@@ -126,6 +126,24 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ssize_t GetAdaptiveKernelIndex(const Image *edge_image,
+  const Quantum *r,const size_t width)
+{
+  ssize_t
+    j;
+
+  j=CastDoubleToSsizeT(ceil((double) width*(1.0-QuantumScale*
+    GetPixelIntensity(edge_image,r))-0.5));
+  if (j < 0)
+    j=0;
+  else
+    if (j > (ssize_t) width)
+      j=(ssize_t) width;
+  if ((j & 0x01) != 0)
+    j--;
+  return(j);
+}
+
 MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -288,15 +306,7 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
         center,
         j;
 
-      j=CastDoubleToSsizeT(ceil((double) width*(1.0-QuantumScale*
-        GetPixelIntensity(edge_image,r))-0.5));
-      if (j < 0)
-        j=0;
-      else
-        if (j > (ssize_t) width)
-          j=(ssize_t) width;
-      if ((j & 0x01) != 0)
-        j--;
+      j=GetAdaptiveKernelIndex(edge_image,r,width);
       p=GetCacheViewVirtualPixels(image_view,x-((ssize_t) width-j)/2L,y-
         ((ssize_t) width-j)/2L,width-(size_t) j,width-(size_t) j,exception);
       if (p == (const Quantum *) NULL)
