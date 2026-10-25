@@ -1675,6 +1675,13 @@ static inline void WriteResourceLong(unsigned char *p,
   (void) memcpy(p,buffer,4);
 }
 
+static inline MagickBooleanType IsInvalid8BimCount(const ssize_t count,
+  const unsigned char *p,const unsigned char *datum,const size_t length)
+{
+  return(((count < 0) || (p > (datum+length-count)) ||
+    (count > (ssize_t) length)) ? MagickTrue : MagickFalse);
+}
+
 static void WriteTo8BimProfile(Image *image,const char *name,
   const StringInfo *profile)
 {
@@ -1737,7 +1744,7 @@ static void WriteTo8BimProfile(Image *image,const char *name,
     count=(ssize_t) value;
     if ((count & 0x01) != 0)
       count++;
-    if ((count < 0) || (p > (datum+length-count)) || (count > (ssize_t) length))
+    if (IsInvalid8BimCount(count,p,datum,length) != MagickFalse)
       break;
     if (id != profile_id)
       p+=(ptrdiff_t) count;
