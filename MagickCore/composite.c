@@ -913,6 +913,14 @@ static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
   return(status);
 }
 
+static inline MagickBooleanType IsOutsideSourceColumn(const Quantum *pixels,
+  const ssize_t x,const ssize_t x_offset,const Image *source_image)
+{
+  return(((pixels == (Quantum *) NULL) || (x < x_offset) ||
+    ((x-x_offset) >= (ssize_t) source_image->columns)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const MagickBooleanType clip_to_self,
   const ssize_t x_offset,const ssize_t y_offset,ExceptionInfo *exception)
@@ -1038,8 +1046,7 @@ static MagickBooleanType CompositeOverImage(Image *image,
           if ((x-x_offset) >= (ssize_t) source_image->columns)
             break;
         }
-      if ((pixels == (Quantum *) NULL) || (x < x_offset) ||
-          ((x-x_offset) >= (ssize_t) source_image->columns))
+      if (IsOutsideSourceColumn(pixels,x,x_offset,source_image) != MagickFalse)
         {
           Quantum
             source[MaxPixelChannels];
