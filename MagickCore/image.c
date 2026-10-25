@@ -2877,6 +2877,31 @@ static const MagickInfo *SetImageInfoFromExtension(ImageInfo *image_info,
   return(magick_info);
 }
 
+static inline MagickBooleanType IsUndelegatedComponent(
+  const DelegateInfo *delegate_info,const char *component)
+{
+  return(((delegate_info == (const DelegateInfo *) NULL) &&
+    ((*component != '\0') && (IsGlob(component) == MagickFalse))) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUsableMagick(const MagickInfo *magick_info,
+  const DelegateInfo *delegate_info,const char *magic)
+{
+  return((((magick_info != (const MagickInfo *) NULL) ||
+    (delegate_info != (const DelegateInfo *) NULL)) &&
+    (IsMagickConflict(magic) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsExtensionMagickMatch(
+  const MagickInfo *magick_info,const MagicInfo *magic_info)
+{
+  return(((magick_info != (const MagickInfo *) NULL) &&
+    (GetMagickUseExtension(magick_info) != MagickFalse) &&
+    (LocaleCompare(magick_info->magick_module,GetMagicName(
+    magic_info)) == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
@@ -3014,8 +3039,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
           delegate_info=GetDelegateInfo(magic,"*",sans_exception);
           if (delegate_info == (const DelegateInfo *) NULL)
             delegate_info=GetDelegateInfo("*",magic,sans_exception);
-          if ((delegate_info == (const DelegateInfo *) NULL) &&
-              ((*component != '\0') && (IsGlob(component) == MagickFalse)))
+          if (IsUndelegatedComponent(delegate_info,component) != MagickFalse)
             {
               /*
                 Retry in case GetMagickInfo loaded a custom module.
@@ -3024,9 +3048,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
                 sans_exception);
             }
         }
-      if (((magick_info != (const MagickInfo *) NULL) ||
-           (delegate_info != (const DelegateInfo *) NULL)) &&
-          (IsMagickConflict(magic) == MagickFalse))
+      if (IsUsableMagick(magick_info,delegate_info,magic) != MagickFalse)
         {
           char *literal = (char *) GetImageRegistry(StringRegistryType,
             "filename:literal",exception);
@@ -3146,10 +3168,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
           /*
             Try to use magick_info that was determined earlier by the extension
           */
-          if ((magick_info != (const MagickInfo *) NULL) &&
-              (GetMagickUseExtension(magick_info) != MagickFalse) &&
-              (LocaleCompare(magick_info->magick_module,GetMagicName(
-                magic_info)) == 0))
+          if (IsExtensionMagickMatch(magick_info,magic_info) != MagickFalse)
             (void) CopyMagickString(image_info->magick,magick_info->name,
               MagickPathExtent);
           else
