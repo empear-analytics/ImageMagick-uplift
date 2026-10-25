@@ -2323,6 +2323,12 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetOpaqueAlphaIfMissing(Image *image,ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -2375,8 +2381,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     {
       if (IsGrayImageType(image->type) == MagickFalse)
         status=TransformImageColorspace(image,GRAYColorspace,exception);
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+      SetOpaqueAlphaIfMissing(image,exception);
       break;
     }
     case PaletteType:
