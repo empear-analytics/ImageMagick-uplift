@@ -1722,17 +1722,28 @@ MagickExport Image *EmbossImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *ConvolveKernelGeometry(const Image *image,const char *geometry,
+  ExceptionInfo *exception)
+{
+  Image
+    *blur_image;
+
+  KernelInfo
+    *kernel_info;
+
+  kernel_info=AcquireKernelInfo(geometry,exception);
+  if (kernel_info == (KernelInfo *) NULL)
+    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+  blur_image=ConvolveImage(image,kernel_info,exception);
+  kernel_info=DestroyKernelInfo(kernel_info);
+  return(blur_image);
+}
+
 MagickExport Image *GaussianBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
   char
     geometry[MagickPathExtent];
-
-  KernelInfo
-    *kernel_info;
-
-  Image
-    *blur_image;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1742,12 +1753,7 @@ MagickExport Image *GaussianBlurImage(const Image *image,const double radius,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   (void) FormatLocaleString(geometry,MagickPathExtent,"gaussian:%.17gx%.17g",
     radius,sigma);
-  kernel_info=AcquireKernelInfo(geometry,exception);
-  if (kernel_info == (KernelInfo *) NULL)
-    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  blur_image=ConvolveImage(image,kernel_info,exception);
-  kernel_info=DestroyKernelInfo(kernel_info);
-  return(blur_image);
+  return(ConvolveKernelGeometry(image,geometry,exception));
 }
 
 /*
