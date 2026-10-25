@@ -1515,6 +1515,21 @@ static FT_Error FreetypeInit(FT_Memory memory,FT_Library *alibrary)
   return(ft_status);
 }
 
+static inline MagickBooleanType IsUnauthorizedFontFile(
+  const DrawInfo *draw_info)
+{
+  return(((draw_info->font != (char *) NULL) && (*draw_info->font == '@') &&
+    (IsRightsAuthorized(PathPolicyDomain,ReadPolicyRights,draw_info->font) == MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsTextWithoutGlyphs(const DrawInfo *draw_info,
+  const FT_UInt first_glyph_id)
+{
+  return(((draw_info->text == (char *) NULL) || (*draw_info->text == '\0') ||
+    (first_glyph_id == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
   const char *encoding,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -1642,8 +1657,7 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
   /*
     Initialize Truetype library.
   */
-  if ((draw_info->font != (char *) NULL) && (*draw_info->font == '@') &&
-      (IsRightsAuthorized(PathPolicyDomain,ReadPolicyRights,draw_info->font) == MagickFalse))
+  if (IsUnauthorizedFontFile(draw_info) != MagickFalse)
     ThrowPolicyException(draw_info->font,MagickFalse);
   memory=FreetypeAcquireMemoryManager();
   if (memory == (FT_Memory) NULL)
@@ -1822,8 +1836,7 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
     (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
   first_glyph_id=0;
   FT_Get_First_Char(face,&first_glyph_id);
-  if ((draw_info->text == (char *) NULL) || (*draw_info->text == '\0') ||
-      (first_glyph_id == 0))
+  if (IsTextWithoutGlyphs(draw_info,first_glyph_id) != MagickFalse)
     {
       (void) FT_Done_Face(face);
       FreetypeDone(memory,library,stream);
