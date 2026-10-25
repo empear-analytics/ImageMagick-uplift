@@ -607,6 +607,14 @@ static inline MagickBooleanType IsInvalid8BIMFieldCount(const ssize_t count)
     MagickFalse);
 }
 
+static inline MagickBooleanType IsUnrequestedResource(const char *resource,
+  const char *macroman_resource,const char *name)
+{
+  return(((resource == (char *) NULL) || (macroman_resource == (char *) NULL) ||
+    ((LocaleCompare(name,resource) != 0) &&
+    (LocaleCompare(name,macroman_resource) != 0))) ? MagickTrue : MagickFalse);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -704,9 +712,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
       macroman_resource=(char *) ConvertMacRomanToUTF8((unsigned char *)
         resource);
     if ((*name != '\0') && (*name != '#'))
-      if ((resource == (char *) NULL) || (macroman_resource == (char *) NULL) ||
-          ((LocaleCompare(name,resource) != 0) &&
-           (LocaleCompare(name,macroman_resource) != 0)))
+      if (IsUnrequestedResource(resource,macroman_resource,name) != MagickFalse)
         {
           /*
             No name match, scroll forward and try next.
