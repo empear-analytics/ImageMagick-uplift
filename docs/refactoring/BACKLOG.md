@@ -146,7 +146,7 @@ needs before refactoring:
 | 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | open |
 | 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | open |
 | 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | open |
-| 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | open |
+| 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | 4.43, in progress (Complex Conditional gone), [M33](tasks/M33-locale.md) |
 | 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | open |
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | open |
 | 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | open |

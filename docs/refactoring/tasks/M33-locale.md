@@ -189,3 +189,23 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 4.38 → 4.43** (`cs-mcp` 1.5.12). Branch `campaign/M33-locale`,
+stacked on `campaign/M32-type`. 2 refactor commits, both oracle-verified (LoadLocaleCache
+is ready, 66 of 66 killed):
+- `IsIncludeElementOpen` (P): Complex Conditional leaves the file.
+- `GetIncludePath` (E).
+
+locale.c already carries String Heavy Function Arguments, so the string parameters cost
+nothing.
+
+**Not done:** `AcquireLocaleInfo` (probe: flat).
+
+**What is left, at 4.43.**
+- `LoadLocaleCache` (13 bumps, Brain Method, 6 arguments). Its bumps are the element
+  blocks (`<locale`, `<message`, subpath), each ending in `continue` to the token loop,
+  and the message-trimming code, which moves the shared cursor `q`.
+- The Code Duplication findings: the `FormatLocale*` and `Locale*Compare` pairs are
+  public wrappers whose bodies differ in the call they make.
