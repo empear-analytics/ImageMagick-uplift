@@ -2812,11 +2812,18 @@ static inline ssize_t EdgeY(const ssize_t y,const size_t rows)
   return(y);
 }
 
+static inline MagickBooleanType IsOffsetSumOverflow(const MagickOffsetType x,
+  const MagickOffsetType y)
+{
+  return((((y > 0) && (x > ((MagickOffsetType) MAGICK_SSIZE_MAX-y))) ||
+    ((y < 0) && (x < ((MagickOffsetType) MAGICK_SSIZE_MIN-y)))) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline MagickBooleanType IsOffsetOverflow(const MagickOffsetType x,
   const MagickOffsetType y)
 {
-  if (((y > 0) && (x > ((MagickOffsetType) MAGICK_SSIZE_MAX-y))) ||
-      ((y < 0) && (x < ((MagickOffsetType) MAGICK_SSIZE_MIN-y))))
+  if (IsOffsetSumOverflow(x,y) != MagickFalse)
     return(MagickFalse);
   return(MagickTrue);
 }
