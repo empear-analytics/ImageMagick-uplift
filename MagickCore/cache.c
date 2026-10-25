@@ -3082,7 +3082,8 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
       x_offset=x+u;
       length=(MagickSizeType) MagickMin((ssize_t) cache_info->columns-
         x_offset,(ssize_t) columns-u);
-      if (IsOffsetOutsideCache(cache_info,x_offset,y_offset,length) != MagickFalse)
+      if (IsOffsetOutsideCache(cache_info,x_offset,y_offset,length) !=
+          MagickFalse)
         {
           MagickModulo
             x_modulo,
