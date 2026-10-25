@@ -1842,6 +1842,29 @@ static void PrintArcFX(const double *coeff,const char *image_gen)
   (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
 }
 
+static void PrintDePolarFX(const double *coeff,const char *image_gen)
+{
+  ssize_t
+    i;
+
+  (void) FormatLocaleFile(stderr,
+    "DePolar Distort, Internal Coefficients\n");
+  for (i=0; i < 8; i++)
+    (void) FormatLocaleFile(stderr,"  c%.17g = %+lf\n",(double) i,
+      coeff[i]);
+  (void) FormatLocaleFile(stderr,"DePolar Distort, FX Equivalent:\n");
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,"  -fx 'aa=(i+.5)*%lf %+lf;\n",
+    coeff[6],+coeff[4]);
+  (void) FormatLocaleFile(stderr,"       rr=(j+.5)*%lf %+lf;\n",
+    coeff[7],+coeff[1]);
+  (void) FormatLocaleFile(stderr,"       xx=rr*sin(aa) %+lf;\n",
+    coeff[2]);
+  (void) FormatLocaleFile(stderr,"       yy=rr*cos(aa) %+lf;\n",
+    coeff[3]);
+  (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -2371,22 +2394,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       }
       case DePolarDistortion:
       {
-        (void) FormatLocaleFile(stderr,
-          "DePolar Distort, Internal Coefficients\n");
-        for (i=0; i < 8; i++)
-          (void) FormatLocaleFile(stderr,"  c%.17g = %+lf\n",(double) i,
-            coeff[i]);
-        (void) FormatLocaleFile(stderr,"DePolar Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,"  -fx 'aa=(i+.5)*%lf %+lf;\n",
-          coeff[6],+coeff[4]);
-        (void) FormatLocaleFile(stderr,"       rr=(j+.5)*%lf %+lf;\n",
-          coeff[7],+coeff[1]);
-        (void) FormatLocaleFile(stderr,"       xx=rr*sin(aa) %+lf;\n",
-          coeff[2]);
-        (void) FormatLocaleFile(stderr,"       yy=rr*cos(aa) %+lf;\n",
-          coeff[3]);
-        (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
+        PrintDePolarFX(coeff,image_gen);
         break;
       }
       case Cylinder2PlaneDistortion:
