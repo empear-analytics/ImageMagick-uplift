@@ -1,0 +1,167 @@
+# M34 - refactor `MagickCore/configure.c`
+
+| Field | Value |
+| --- | --- |
+| Baseline Code Health | **5.03** / 10 |
+| Exit target | **plateau** - no legal recipe raises the score further; record it |
+| Hand-off point | **4.00** leaves the Red band. A small model stops there and hands on |
+| File size | 1361 lines |
+| Functions with findings | 8 |
+| Measured with | `cs-mcp` 1.5.12, `cs` 1.0.46 |
+
+## 1. Read these first
+
+- [`../../../AGENTS.md`](../../../AGENTS.md) - the contract, including the verification sequence.
+- [`../PLAYBOOK.md`](../PLAYBOOK.md) - the only transformations you may apply, and the rules for OpenMP regions and public functions.
+- [`../README.md`](../README.md) - campaign rules and the definition of done.
+
+## 2. Record the baseline before touching anything
+
+```bash
+python3 tools/ch.py --review MagickCore/configure.c
+```
+
+The score must read 5.03. If it does not, this file changed after the task was written: stop and report that instead of proceeding.
+
+## 3. What CodeScene flags here
+
+| Smell | Functions |
+| --- | ---: |
+| Brain Method | 1 |
+| Bumpy Road Ahead | 5 |
+| Deep, Nested Complexity | 1 |
+| Overall Code Complexity | file |
+| Complex Method | 2 |
+| Complex Conditional | 1 |
+| Code Duplication | 2 |
+| Large Method | 2 |
+| Excess Number of Function Arguments | 2 |
+
+## 4. Target functions, highest leverage first
+
+| # | Function | Line | Cyclomatic | Nesting | Bumps | Linkage | OpenMP | Cases | Mutants killed |
+| --- | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | --- |
+| 1 | `LoadConfigureCache` | 1158 | - | 6 | 10 | static | - | 9 | 30 of 41 |
+| 2 | `GetConfigurePaths` | 754 | 25 | - | 2 | public | - | 15883 | 10 of 10 |
+| 3 | `ListConfigureInfo` | 1065 | 12 | - | 2 | public | - | 2 | 14 of 14 |
+| 4 | `GetConfigureOptions` | 661 | - | - | 2 | public | - | 15883 | 7 of 7 |
+| 5 | `GetConfigureInfoList` | 444 | - | - | - | public | - | 9 | 11 of 12 |
+| 6 | `AddConfigureKey` | 126 | - | - | - | static | - | 9 | 2 of 2 |
+| 7 | `GetConfigureInfo` | 353 | - | - | 2 | public | - | 0 | - |
+| 8 | `GetConfigureList` | 540 | - | - | - | public | - | 0 | - |
+
+Thresholds for C: cyclomatic complexity under 9, nesting depth under 4. **Cases** is how many oracle cases execute the function; **Mutants killed** counts the sampled mutants on lines the oracle executes. A function with no cases cannot be checked and is listed last: skip it and report it.
+
+## 5. Steps
+
+Work **one function at a time, in the order above**, and run the verification in section 6 after each commit. Re-run the review at the start of each wave: line numbers shift as earlier waves land.
+
+### Wave 1 - start here
+
+#### Step 1: `LoadConfigureCache` (line 1158)
+
+- **Recipe G (guard clauses)** - nesting is 6, target is under 4.
+- **Recipe E (extract function)** - 10 nested blocks; each bump is a missing function.
+- **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (5 arguments).
+- Only 9 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
+- The oracle missed 3 sampled mutant(s) here that are not of a known harmless kind. Take extra care on these lines, and consider closing the gap first:
+  - base line 1209, `eq_to_ne`: `if (*q == quote)`
+  - base line 1240, `ne_to_eq`: `while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))`
+  - base line 1240, `ne_to_eq`: `while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))`
+- 8 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+
+Commit message: `refactor(MagickCore/configure.c): simplify LoadConfigureCache`
+
+#### Step 2: `GetConfigurePaths` (line 754)
+
+- **Recipe E (extract function)** - 2 nested blocks; each bump is a missing function.
+- **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- Public function: its name and signature must not change.
+
+Commit message: `refactor(MagickCore/configure.c): simplify GetConfigurePaths`
+
+#### Step 3: `ListConfigureInfo` (line 1065)
+
+- **Recipe E (extract function)** - 2 nested blocks; each bump is a missing function.
+- **Recipe P (named predicate)** - move compound conditions into named `MagickBooleanType` helpers.
+- Public function: its name and signature must not change.
+- Only 2 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
+
+Commit message: `refactor(MagickCore/configure.c): simplify ListConfigureInfo`
+
+#### Step 4: `GetConfigureOptions` (line 661)
+
+- **Recipe E (extract function)** - 2 nested blocks; each bump is a missing function.
+- Public function: its name and signature must not change.
+
+Commit message: `refactor(MagickCore/configure.c): simplify GetConfigureOptions`
+
+### Wave 2
+
+#### Step 5: `GetConfigureInfoList` (line 444)
+
+- **Recipe D (deduplicate)** - duplication: only if the blocks differ in one value.
+- Public function: its name and signature must not change.
+- Only 9 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
+- 1 further survivor(s) are of kinds the oracle cannot see by design (logging, loop bounds over padding, allocation sizes, or read by hand and found equivalent; see `tools/oracle/classify.py`).
+
+Commit message: `refactor(MagickCore/configure.c): simplify GetConfigureInfoList`
+
+#### Step 6: `AddConfigureKey` (line 126)
+
+- No recipe in the catalogue reaches *Excess Number of Function Arguments* (5 arguments).
+- Only 9 oracle case(s) execute this function, so the oracle sees little of it. Consider adding cases before a structural change.
+
+Commit message: `refactor(MagickCore/configure.c): simplify AddConfigureKey`
+
+#### Step 7: `GetConfigureInfo` (line 353)
+
+- **No oracle case executes this function. Do not change it.** Report it so cases can be added.
+
+#### Step 8: `GetConfigureList` (line 540)
+
+- **No oracle case executes this function. Do not change it.** Report it so cases can be added.
+
+## 6. Verification after every commit
+
+```bash
+tools/oracle/build.sh cand
+python3 tools/refactor_guard.py MagickCore/configure.c   # --calls after E or S
+python3 tools/oracle/oracle.py run --function <Function>
+python3 tools/ch.py --review MagickCore/configure.c
+```
+
+Name the function you refactored in the oracle run, not a helper you extracted from it. If the guard fails or the oracle diverges, `git checkout -- MagickCore/configure.c` and stop.
+
+Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
+
+## 7. Report
+
+For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 5.03 → 5.35** (`cs-mcp` 1.5.12). Branch `campaign/M34-configure`,
+stacked on `campaign/M33-locale`. 1 refactor commit: `IsIncludeElementOpen` (P, oracle).
+Complex Conditional leaves the file.
+
+**Refused:** `GetIncludePath(filename,token,path)` (probe: 5.35 → 5.23). Its string
+parameters raise String Heavy Function Arguments here, as in log.c (M30).
+
+**Audit made during this task.** The gated JSON records some open survivors with the
+kind "unresolved", which the gate counts as open just like "unmatched". The survivor
+filters used earlier today looked only at "unmatched" and "unreached". Every oracle-level
+claim made today was re-checked against "unresolved" survivors, and none is affected.
+
+Earlier, already merged commits on enhance.c and compare.c were also re-checked. Three
+moved "unresolved" survivor lines verbatim, and their messages say so (`e3fa707e2`,
+`785d8441b`, `66af95547`). Two of the three are in functions that were *careful*
+(EqualizeImage, SigmoidalContrastImage). The careful rule asks to keep clear of survivor
+lines, so those two steps bent it, openly.
+
+**What is left, at 5.35.**
+- `LoadConfigureCache` (10 bumps, Brain Method): the same blocks as in the other loaders.
+  Here they would need string parameters that tip String Heavy.
+- `GetConfigurePaths` (cc 25): mostly preprocessor branches for installed and Windows
+  builds, which the oracle build does not compile.

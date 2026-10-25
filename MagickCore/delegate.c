@@ -358,6 +358,18 @@ MagickPrivate void DelegateComponentTerminus(void)
 %
 */
 
+static inline MagickBooleanType IsWindowsDrivePath(const char *token)
+{
+  return(((isalpha((int) *token) != 0) && (token[1] == ':') &&
+    ((token[2] == '\\') || (token[2] == '/'))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsDotRelativePath(const char *token)
+{
+  return(((*token == '.') && ((token[1] == '\\') || (token[1] == '/'))) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsExecutableToken(const char *token)
 {
   size_t
@@ -374,15 +386,14 @@ static inline MagickBooleanType IsExecutableToken(const char *token)
   length=strlen(token);
   if (length >= 3)
     {
-      if ((isalpha((int) *token) != 0) && (token[1] == ':') &&
-          ((token[2] == '\\') || (token[2] == '/')))
+      if (IsWindowsDrivePath(token) != MagickFalse)
         return(MagickTrue);
     }
   if (*token == '/')
     return(MagickTrue);
   if (length >= 2)
     {
-      if ((*token == '.') && ((token[1] == '\\') || (token[1] == '/')))
+      if (IsDotRelativePath(token) != MagickFalse)
         return(MagickTrue);
     }
   if (isalnum((int) *token))
@@ -953,6 +964,12 @@ static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
   return(SanitizeDelegateString(string));
 }
 
+static inline MagickBooleanType IsPropertyEnd(const char *p)
+{
+  return(((*p == '\0') || (*p == '\'') || (*p == '"')) ? MagickTrue :
+    MagickFalse);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -1120,7 +1137,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
     /*
       Doubled Percent - or percent at end of string.
     */
-    if ((*p == '\0') || (*p == '\'') || (*p == '"'))
+    if (IsPropertyEnd(p) != MagickFalse)
       p--;
     if (*p == '%')
       {
@@ -1384,6 +1401,15 @@ static int DelegateInfoCompare(const void *x,const void *y)
 }
 #endif
 
+static inline MagickBooleanType IsListedDelegate(
+  const DelegateInfo *delegate_info,const char *pattern)
+{
+  return(((delegate_info->stealth == MagickFalse) &&
+    (GlobExpression(delegate_info->decode,pattern,MagickFalse) != MagickFalse ||
+     GlobExpression(delegate_info->encode,pattern,MagickFalse) != MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport const DelegateInfo **GetDelegateInfoList(const char *pattern,
   size_t *number_delegates,ExceptionInfo *exception)
 {
@@ -1415,9 +1441,7 @@ MagickExport const DelegateInfo **GetDelegateInfoList(const char *pattern,
       *delegate_info;
 
     delegate_info=(const DelegateInfo *) p->value;
-    if( (delegate_info->stealth == MagickFalse) &&
-        (GlobExpression(delegate_info->decode,pattern,MagickFalse) != MagickFalse ||
-         GlobExpression(delegate_info->encode,pattern,MagickFalse) != MagickFalse))
+    if (IsListedDelegate(delegate_info,pattern) != MagickFalse)
       delegates[i++]=delegate_info;
     p=p->next;
   }
@@ -1742,6 +1766,15 @@ static MagickBooleanType CopyDelegateFile(const char *source,
   return(status);
 }
 
+static inline MagickBooleanType IsTwoStepDelegate(
+  const DelegateInfo *delegate_info,const char *decode,const char *encode)
+{
+  return(((delegate_info->mode != 0) && (((decode != (const char *) NULL) &&
+    (delegate_info->encode != (char *) NULL)) ||
+    ((encode != (const char *) NULL) &&
+    (delegate_info->decode != (char *) NULL)))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -1809,10 +1842,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         }
       image_info->temporary=MagickTrue;
     }
-  if ((delegate_info->mode != 0) && (((decode != (const char *) NULL) &&
-        (delegate_info->encode != (char *) NULL)) ||
-       ((encode != (const char *) NULL) &&
-        (delegate_info->decode != (char *) NULL))))
+  if (IsTwoStepDelegate(delegate_info,decode,encode) != MagickFalse)
     {
       char
         *magick;
@@ -2103,6 +2133,26 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsIncludeElementOpen(const char *token,
+  const char *q)
+{
+  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
+static void GetIncludePath(const char *filename,const char *token,
+  char *path)
+{
+  GetPathComponent(filename,HeadPath,path);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(path,DirectorySeparator,
+      MagickPathExtent);
+  if (*token == *DirectorySeparator)
+    (void) CopyMagickString(path,token,MagickPathExtent);
+  else
+    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+}
+
 static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
   const char *xml,const char *filename,const size_t depth,
   ExceptionInfo *exception)
@@ -2196,7 +2246,7 @@ static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
         /*
           Include element.
         */
-        while (((*token != '/') && (*(token+1) != '>')) && (*q != '\0'))
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
           (void) CopyMagickString(keyword,token,MagickPathExtent);
           (void) GetNextToken(q,&q,extent,token);
@@ -2214,14 +2264,7 @@ static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
                     path[MagickPathExtent],
                     *file_xml;
 
-                  GetPathComponent(filename,HeadPath,path);
-                  if (*path != '\0')
-                    (void) ConcatenateMagickString(path,DirectorySeparator,
-                      MagickPathExtent);
-                  if (*token == *DirectorySeparator)
-                    (void) CopyMagickString(path,token,MagickPathExtent);
-                  else
-                    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+                  GetIncludePath(filename,token,path);
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {

@@ -1767,6 +1767,12 @@ MagickExport MagickBooleanType LogMagickEvent(const LogEventType type,
 %    o handlers: one or more handlers separated by commas.
 %
 */
+static inline MagickBooleanType IsHandlerSeparator(const char *p)
+{
+  return(((*p != '\0') && ((isspace((int) ((unsigned char) *p)) != 0) ||
+    (*p == ','))) ? MagickTrue : MagickFalse);
+}
+
 static LogHandlerType ParseLogHandlers(const char *handlers)
 {
   LogHandlerType
@@ -1784,8 +1790,7 @@ static LogHandlerType ParseLogHandlers(const char *handlers)
   handler_mask=NoHandler;
   for (p=handlers; p != (char *) NULL; p=strchr(p,','))
   {
-    while ((*p != '\0') && ((isspace((int) ((unsigned char) *p)) != 0) ||
-           (*p == ',')))
+    while (IsHandlerSeparator(p) != MagickFalse)
       p++;
     for (i=0; *LogHandlers[i].name != '\0'; i++)
     {

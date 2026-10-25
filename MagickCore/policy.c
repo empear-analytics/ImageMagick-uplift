@@ -784,6 +784,32 @@ static MagickBooleanType IsPolicyCacheInstantiated(ExceptionInfo *exception)
 %
 */
 
+static MagickBooleanType IsEffectiveRightsAuthorized(const PolicyRights rights,
+  const PolicyRights effective_rights,MagickBooleanType status)
+{
+  if (((rights & ReadPolicyRights) != 0) &&
+      ((effective_rights & ReadPolicyRights) == 0))
+    status=MagickFalse;
+  if (((rights & WritePolicyRights) != 0) &&
+      ((effective_rights & WritePolicyRights) == 0))
+    status=MagickFalse;
+  if (((rights & ExecutePolicyRights) != 0) &&
+      ((effective_rights & ExecutePolicyRights) == 0))
+    status=MagickFalse;
+  return(status);
+}
+
+static MagickBooleanType IsCanonicalRightsAuthorized(
+  const PolicyRights canonical_allowed_accumulator,const PolicyRights rights,
+  MagickBooleanType status)
+{
+  PolicyRights canonical_denied_mask = (PolicyRights) ((int)
+    AllPolicyRights & (int) ~canonical_allowed_accumulator);
+  if ((canonical_denied_mask & rights) != 0)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport MagickBooleanType IsRightsAuthorizedByName(
   const PolicyDomain domain,const char *name,const PolicyRights rights,
   const char *pattern)
@@ -923,27 +949,13 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
   */
   status=MagickTrue;
   if (matched_any != MagickFalse)
-    {
-      if (((rights & ReadPolicyRights) != 0) &&
-          ((effective_rights & ReadPolicyRights) == 0))
-        status=MagickFalse;
-      if (((rights & WritePolicyRights) != 0) &&
-          ((effective_rights & WritePolicyRights) == 0))
-        status=MagickFalse;
-      if (((rights & ExecutePolicyRights) != 0) &&
-          ((effective_rights & ExecutePolicyRights) == 0))
-        status=MagickFalse;
-    }
+    status=IsEffectiveRightsAuthorized(rights,effective_rights,status);
   /*
     Enforce sticky canonical denies.
   */
   if (canonical_matched_any != MagickFalse)
-    {
-      PolicyRights canonical_denied_mask = (PolicyRights) ((int)
-        AllPolicyRights & (int) ~canonical_allowed_accumulator);
-      if ((canonical_denied_mask & rights) != 0)
-        status=MagickFalse;
-    }
+    status=IsCanonicalRightsAuthorized(canonical_allowed_accumulator,rights,
+      status);
   if ((GetLogEventMask() & PolicyEvent) != 0)
     (void) LogMagickEvent(PolicyEvent,GetMagickModule(),
       "  authorized: %s",status == MagickFalse ? "false" : "true");
@@ -980,6 +992,23 @@ MagickExport MagickBooleanType IsRightsAuthorized(const PolicyDomain domain,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsNewPolicyPath(const char *path,
+  const PolicyInfo **policy_info,const ssize_t i)
+{
+  return((((path == (const char *) NULL) ||
+    (LocaleCompare(path,policy_info[i]->path) != 0)) &&
+    (policy_info[i]->path != (char *) NULL)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsLimitPolicyDomain(
+  const PolicyInfo **policy_info,const ssize_t i)
+{
+  return(((policy_info[i]->domain == CachePolicyDomain) ||
+    (policy_info[i]->domain == ResourcePolicyDomain) ||
+    (policy_info[i]->domain == SystemPolicyDomain)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -1009,17 +1038,13 @@ MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
   {
     if (policy_info[i]->stealth != MagickFalse)
       continue;
-    if (((path == (const char *) NULL) ||
-         (LocaleCompare(path,policy_info[i]->path) != 0)) &&
-         (policy_info[i]->path != (char *) NULL))
+    if (IsNewPolicyPath(path,policy_info,i) != MagickFalse)
       (void) FormatLocaleFile(file,"\nPath: %s\n",policy_info[i]->path);
     path=policy_info[i]->path;
     domain=CommandOptionToMnemonic(MagickPolicyDomainOptions,
       policy_info[i]->domain);
     (void) FormatLocaleFile(file,"  Policy: %s\n",domain);
-    if ((policy_info[i]->domain == CachePolicyDomain) ||
-        (policy_info[i]->domain == ResourcePolicyDomain) ||
-        (policy_info[i]->domain == SystemPolicyDomain))
+    if (IsLimitPolicyDomain(policy_info,i) != MagickFalse)
       {
         if (policy_info[i]->name != (char *) NULL)
           (void) FormatLocaleFile(file,"    name: %s\n",policy_info[i]->name);
@@ -1099,6 +1124,98 @@ static void *DestroyPolicyElement(void *policy_info)
     }
   p=(PolicyInfo *) RelinquishMagickMemory(p);
   return((void *) NULL);
+}
+
+static inline MagickBooleanType IsIncludeElementOpen(const char *token,
+  const char *q)
+{
+  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
+static void GetIncludePath(const char *filename,const char *token,
+  char *path)
+{
+  GetPathComponent(filename,HeadPath,path);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(path,DirectorySeparator,
+      MagickPathExtent);
+  if (*token == *DirectorySeparator)
+    (void) CopyMagickString(path,token,MagickPathExtent);
+  else
+    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+}
+
+static void SetPolicyInfoAttribute(PolicyInfo *policy_info,const char *keyword,
+  const char *token)
+{
+  switch (*keyword)
+  {
+    case 'D':
+    case 'd':
+    {
+      if (LocaleCompare((char *) keyword,"domain") == 0)
+        {
+          policy_info->domain=(PolicyDomain) ParseCommandOption(
+            MagickPolicyDomainOptions,MagickTrue,token);
+          break;
+        }
+      break;
+    }
+    case 'N':
+    case 'n':
+    {
+      if (LocaleCompare((char *) keyword,"name") == 0)
+        {
+          policy_info->name=AcquirePolicyString(token,1);
+          break;
+        }
+      break;
+    }
+    case 'P':
+    case 'p':
+    {
+      if (LocaleCompare((char *) keyword,"pattern") == 0)
+        {
+          policy_info->pattern=AcquirePolicyString(token,1);
+          break;
+        }
+      break;
+    }
+    case 'R':
+    case 'r':
+    {
+      if (LocaleCompare((char *) keyword,"rights") == 0)
+        {
+          policy_info->rights=(PolicyRights) ParseCommandOption(
+            MagickPolicyRightsOptions,MagickTrue,token);
+          break;
+        }
+      break;
+    }
+    case 'S':
+    case 's':
+    {
+      if (LocaleCompare((char *) keyword,"stealth") == 0)
+        {
+          policy_info->stealth=IsStringTrue(token);
+          break;
+        }
+      break;
+    }
+    case 'V':
+    case 'v':
+    {
+      if (LocaleCompare((char *) keyword,"value") == 0)
+        {
+          policy_info->value=AcquirePolicyString(token,1);
+          break;
+        }
+      break;
+    }
+    default:
+      break;
+  }
 }
 
 static MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,
@@ -1194,7 +1311,7 @@ static MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,
         /*
           Include element.
         */
-        while (((*token != '/') && (*(token+1) != '>')) && (*q != '\0'))
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
           (void) CopyMagickString(keyword,token,MagickPathExtent);
           (void) GetNextToken(q,&q,extent,token);
@@ -1212,14 +1329,7 @@ static MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,
                     path[MagickPathExtent],
                     *file_xml;
 
-                  GetPathComponent(filename,HeadPath,path);
-                  if (*path != '\0')
-                    (void) ConcatenateMagickString(path,DirectorySeparator,
-                      MagickPathExtent);
-                  if (*token == *DirectorySeparator)
-                    (void) CopyMagickString(path,token,MagickPathExtent);
-                  else
-                    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+                  GetIncludePath(filename,token,path);
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
@@ -1262,73 +1372,7 @@ static MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,
       continue;
     (void) GetNextToken(q,&q,extent,token);
     (void) GetNextToken(q,&q,extent,token);
-    switch (*keyword)
-    {
-      case 'D':
-      case 'd':
-      {
-        if (LocaleCompare((char *) keyword,"domain") == 0)
-          {
-            policy_info->domain=(PolicyDomain) ParseCommandOption(
-              MagickPolicyDomainOptions,MagickTrue,token);
-            break;
-          }
-        break;
-      }
-      case 'N':
-      case 'n':
-      {
-        if (LocaleCompare((char *) keyword,"name") == 0)
-          {
-            policy_info->name=AcquirePolicyString(token,1);
-            break;
-          }
-        break;
-      }
-      case 'P':
-      case 'p':
-      {
-        if (LocaleCompare((char *) keyword,"pattern") == 0)
-          {
-            policy_info->pattern=AcquirePolicyString(token,1);
-            break;
-          }
-        break;
-      }
-      case 'R':
-      case 'r':
-      {
-        if (LocaleCompare((char *) keyword,"rights") == 0)
-          {
-            policy_info->rights=(PolicyRights) ParseCommandOption(
-              MagickPolicyRightsOptions,MagickTrue,token);
-            break;
-          }
-        break;
-      }
-      case 'S':
-      case 's':
-      {
-        if (LocaleCompare((char *) keyword,"stealth") == 0)
-          {
-            policy_info->stealth=IsStringTrue(token);
-            break;
-          }
-        break;
-      }
-      case 'V':
-      case 'v':
-      {
-        if (LocaleCompare((char *) keyword,"value") == 0)
-          {
-            policy_info->value=AcquirePolicyString(token,1);
-            break;
-          }
-        break;
-      }
-      default:
-        break;
-    }
+    SetPolicyInfoAttribute(policy_info,keyword,token);
   }
   token=(char *) RelinquishMagickMemory(token);
   return(status != 0 ? MagickTrue : MagickFalse);

@@ -319,6 +319,35 @@ MagickExport const TypeInfo *GetTypeInfo(const char *name,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsStyleMismatch(const TypeInfo *p,
+  const StyleType style)
+{
+  return(((style != UndefinedStyle) && (style != AnyStyle) &&
+    (p->style != style)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsStretchMismatch(const TypeInfo *p,
+  const StretchType stretch)
+{
+  return(((stretch != UndefinedStretch) && (stretch != AnyStretch) &&
+    (p->stretch != stretch)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsStyleMatch(const TypeInfo *p,
+  const StyleType style)
+{
+  return(((style == UndefinedStyle) || (style == AnyStyle) ||
+    (p->style == style)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsSlantedStyleMatch(const TypeInfo *p,
+  const StyleType style)
+{
+  return((((style == ItalicStyle) || (style == ObliqueStyle)) &&
+    ((p->style == ItalicStyle) || (p->style == ObliqueStyle))) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
   const StyleType style,const StretchType stretch,const size_t weight,
   ExceptionInfo *exception)
@@ -388,13 +417,12 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
           p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
           continue;
         }
-    if ((style != UndefinedStyle) && (style != AnyStyle) && (p->style != style))
+    if (IsStyleMismatch(p,style) != MagickFalse)
       {
         p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
         continue;
       }
-    if ((stretch != UndefinedStretch) && (stretch != AnyStretch) &&
-        (p->stretch != stretch))
+    if (IsStretchMismatch(p,stretch) != MagickFalse)
       {
         p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
         continue;
@@ -440,11 +468,10 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
           continue;
         }
     score=0;
-    if ((style == UndefinedStyle) || (style == AnyStyle) || (p->style == style))
+    if (IsStyleMatch(p,style) != MagickFalse)
       score+=32;
     else
-      if (((style == ItalicStyle) || (style == ObliqueStyle)) &&
-          ((p->style == ItalicStyle) || (p->style == ObliqueStyle)))
+      if (IsSlantedStyleMatch(p,style) != MagickFalse)
         score+=25;
     score+=(size_t) ((16L*(800L-((ssize_t) MagickMax(MagickMin(font_weight,900),
       p->weight)-(ssize_t) MagickMin(MagickMin(font_weight,900),p->weight))))/
@@ -712,6 +739,14 @@ MagickExport char **GetTypeList(const char *pattern,size_t *number_fonts,
 */
 
 #if defined(MAGICKCORE_FONTCONFIG_DELEGATE)
+static inline MagickBooleanType IsNonRegularFontStyle(const FcResult status,
+  const FcChar8 *style)
+{
+  return(((status == FcResultMatch) && (style != (FcChar8 *) NULL) &&
+    (LocaleCompare((const char *) style,"Regular") != 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
   ExceptionInfo *exception)
 {
@@ -815,8 +850,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
         if (family != (FcChar8 *) NULL)
           (void) CopyMagickString(name,(const char *) family,MagickPathExtent);
         status=FcPatternGetString(font_set->fonts[i],FC_STYLE,0,&style);
-        if ((status == FcResultMatch) && (style != (FcChar8 *) NULL) &&
-            (LocaleCompare((const char *) style,"Regular") != 0))
+        if (IsNonRegularFontStyle(status,style) != MagickFalse)
           {
             (void) ConcatenateMagickString(name," ",MagickPathExtent);
             (void) ConcatenateMagickString(name,(const char *) style,
@@ -934,6 +968,14 @@ static MagickBooleanType IsTypeTreeInstantiated(ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsNewTypePath(const char *path,
+  const TypeInfo **type_info,const ssize_t i)
+{
+  return((((path == (const char *) NULL) ||
+    (LocaleCompare(path,type_info[i]->path) != 0)) &&
+    (type_info[i]->path != (char *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
 {
   const char
@@ -965,9 +1007,7 @@ MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
   {
     if (type_info[i]->stealth != MagickFalse)
       continue;
-    if (((path == (const char *) NULL) ||
-         (LocaleCompare(path,type_info[i]->path) != 0)) &&
-         (type_info[i]->path != (char *) NULL))
+    if (IsNewTypePath(path,type_info,i) != MagickFalse)
       (void) FormatLocaleFile(file,"\nPath: %s\n",type_info[i]->path);
     path=type_info[i]->path;
     name="not defined";
@@ -1066,6 +1106,26 @@ static inline MagickBooleanType SetTypeNodePath(const char *filename,
 
   *target=path;
   return(MagickTrue);
+}
+
+static inline MagickBooleanType IsIncludeElementOpen(const char *token,
+  const char *q)
+{
+  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
+static void GetIncludePath(const char *filename,const char *token,
+  char *path)
+{
+  GetPathComponent(filename,HeadPath,path);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(path,DirectorySeparator,
+      MagickPathExtent);
+  if (*token == *DirectorySeparator)
+    (void) CopyMagickString(path,token,MagickPathExtent);
+  else
+    (void) ConcatenateMagickString(path,token,MagickPathExtent);
 }
 
 static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
@@ -1171,7 +1231,7 @@ static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
         /*
           Include element.
         */
-        while (((*token != '/') && (*(token+1) != '>')) && (*q != '\0'))
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
           (void) CopyMagickString(keyword,token,MagickPathExtent);
           (void) GetNextToken(q,&q,extent,token);
@@ -1193,14 +1253,7 @@ static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
                     *sans_exception;
 
                   *path='\0';
-                  GetPathComponent(filename,HeadPath,path);
-                  if (*path != '\0')
-                    (void) ConcatenateMagickString(path,DirectorySeparator,
-                      MagickPathExtent);
-                  if (*token == *DirectorySeparator)
-                    (void) CopyMagickString(path,token,MagickPathExtent);
-                  else
-                    (void) ConcatenateMagickString(path,token,MagickPathExtent);
+                  GetIncludePath(filename,token,path);
                   sans_exception=AcquireExceptionInfo();
                   file_xml=FileToString(path,~0UL,sans_exception);
                   sans_exception=DestroyExceptionInfo(sans_exception);

@@ -115,7 +115,7 @@ needs before refactoring:
 | 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | open |
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
 | 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | open |
-| 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | open |
+| 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 5.35, in progress (Complex Conditional gone; string helpers tip String Heavy), [M34](tasks/M34-configure.md) |
 | 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | open |
 | 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | open |
 | 6.87 | `MagickCore/memory.c` | 1713 | 60% | 71% | open |
@@ -137,16 +137,16 @@ needs before refactoring:
 | 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | open |
 | 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | open |
 | 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | open |
-| 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | open |
+| 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.38, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) |
 | 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | open |
-| 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | open |
+| 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 3.40, plateau for now (new two-string helpers trigger String Heavy Function Arguments), [M30](tasks/M30-log.md) |
 | 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | open |
-| 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | open |
-| 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | open |
+| 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | 3.85, in progress (Complex Conditional: one sizeof site left), [M31](tasks/M31-policy.md) |
+| 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.13, in progress (Complex Conditional gone; out of the Red band), [M32](tasks/M32-type.md) |
 | 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | open |
 | 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | open |
 | 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | open |
-| 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | open |
+| 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | 4.43, in progress (Complex Conditional gone), [M33](tasks/M33-locale.md) |
 | 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | open |
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | open |
 | 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | open |
