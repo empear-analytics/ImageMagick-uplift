@@ -2708,6 +2708,20 @@ static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
   return(command_info);
 }
 
+static inline MagickBooleanType IsTokenSeparator(const char *p,
+  const int sentinel)
+{
+  return((((isspace((int) ((unsigned char) *p)) != 0) || (*p == sentinel)) &&
+    (*p != '\0')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsTokenCharacter(const char *p,
+  const int sentinel)
+{
+  return((((isspace((int) ((unsigned char) *p)) == 0) && (*p != sentinel)) &&
+    (*p != '\0')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
   const MagickBooleanType list,const char *options)
 {
@@ -2744,15 +2758,13 @@ MagickExport ssize_t GetCommandOptionFlags(const CommandOption option,
     sentinel='|';
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
-    while (((isspace((int) ((unsigned char) *p)) != 0) || (*p == sentinel)) &&
-           (*p != '\0'))
+    while (IsTokenSeparator(p,sentinel) != MagickFalse)
       p++;
     negate=(*p == '!') ? MagickTrue : MagickFalse;
     if (negate != MagickFalse)
       p++;
     q=token;
-    while (((isspace((int) ((unsigned char) *p)) == 0) && (*p != sentinel)) &&
-           (*p != '\0'))
+    while (IsTokenCharacter(p,sentinel) != MagickFalse)
     {
       if ((q-token) >= (MagickPathExtent-1))
         break;
