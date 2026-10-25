@@ -119,3 +119,25 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night)
+
+**Result: Code Health 5.10 → 5.87** (`cs-mcp` 1.5.12). Branch `campaign/M73-mime`,
+stacked on `campaign/M72-distribute-cache`. Seven oracle-verified commits (every
+target function is ready):
+- GetMimeInfo: `ReadMimeShortValue` and `ReadMimeLongValue` (E, value-returning), then
+  `MatchMimeValue` (D). The byte, short and long cases end with an identical mask test,
+  now one value-returning helper. GetMimeInfo goes from cc 39 to 26 and from 155 to 98
+  lines.
+- LoadMimeCache: `ParseMimeMagic` and `GetIncludePath` (the same name and shape as in
+  type.c and delegate.c). LoadMimeCache goes from 161 to 101 lines.
+- ListMimeInfo: `PrintMimePathHeader` and `PadMimeType`. ListMimeInfo leaves Bumpy Road
+  Ahead. One upstream dead store (`j=0`) and its declaration were removed with the
+  move, and the commit says so.
+
+**What is left, at 5.87.**
+- GetMimeInfo (5 bumps): the priority and pattern tests `continue` the walk, and the
+  string case `break`s from its inner loop.
+- LoadMimeCache stays a Brain Method: its attribute chain sets one field per attribute,
+  and its include block recurses.
+- GetMimeInfoList and GetMimeList are the usual list-to-array pair.
