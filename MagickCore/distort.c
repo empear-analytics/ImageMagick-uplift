@@ -375,6 +375,16 @@ static inline double MagickRound(double x)
   return(ceil(x));
 }
 
+static inline MagickBooleanType IsAffineFallback(const size_t number_arguments,
+  const size_t cp_size,const DistortMethod *method)
+{
+  return(( number_arguments < 4*cp_size &&
+       (  *method == BilinearForwardDistortion
+       || *method == BilinearReverseDistortion
+       || *method == PerspectiveDistortion
+       ) ) ? MagickTrue : MagickFalse);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const size_t number_arguments,const double *arguments,
   size_t number_values,ExceptionInfo *exception)
@@ -413,11 +423,7 @@ static double *GenerateCoefficients(const Image *image,
   /* If not enough control point pairs are found for specific distortions
      fall back to Affine distortion (allowing 0 to 3 point pairs)
   */
-  if ( number_arguments < 4*cp_size &&
-       (  *method == BilinearForwardDistortion
-       || *method == BilinearReverseDistortion
-       || *method == PerspectiveDistortion
-       ) )
+  if (IsAffineFallback(number_arguments,cp_size,method) != MagickFalse)
     *method = AffineDistortion;
 
   number_coefficients=0;
