@@ -1268,6 +1268,26 @@ static void MoveBoxToOrigin(PointInfo *bounding_box)
   }
 }
 
+static void SetMinimumBoundingBoxProperties(Image *image,
+  const CaliperInfo caliper_info,const PointInfo *vertices)
+{
+  (void) FormatImageProperty(image,"minimum-bounding-box:area","%.*g",
+    GetMagickPrecision(),caliper_info.area);
+  (void) FormatImageProperty(image,"minimum-bounding-box:width","%.*g",
+    GetMagickPrecision(),caliper_info.width);
+  (void) FormatImageProperty(image,"minimum-bounding-box:height","%.*g",
+    GetMagickPrecision(),caliper_info.height);
+  (void) FormatImageProperty(image,"minimum-bounding-box:_p","%.*g,%.*g",
+    GetMagickPrecision(),vertices[caliper_info.p].x,
+    GetMagickPrecision(),vertices[caliper_info.p].y);
+  (void) FormatImageProperty(image,"minimum-bounding-box:_q","%.*g,%.*g",
+    GetMagickPrecision(),vertices[caliper_info.q].x,
+    GetMagickPrecision(),vertices[caliper_info.q].y);
+  (void) FormatImageProperty(image,"minimum-bounding-box:_v","%.*g,%.*g",
+    GetMagickPrecision(),vertices[caliper_info.v].x,
+    GetMagickPrecision(),vertices[caliper_info.v].y);
+}
+
 MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   size_t *number_vertices,ExceptionInfo *exception)
 {
@@ -1397,21 +1417,7 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   /*
     Export minimum bounding box properties.
   */
-  (void) FormatImageProperty(image,"minimum-bounding-box:area","%.*g",
-    GetMagickPrecision(),caliper_info.area);
-  (void) FormatImageProperty(image,"minimum-bounding-box:width","%.*g",
-    GetMagickPrecision(),caliper_info.width);
-  (void) FormatImageProperty(image,"minimum-bounding-box:height","%.*g",
-    GetMagickPrecision(),caliper_info.height);
-  (void) FormatImageProperty(image,"minimum-bounding-box:_p","%.*g,%.*g",
-    GetMagickPrecision(),vertices[caliper_info.p].x,
-    GetMagickPrecision(),vertices[caliper_info.p].y);
-  (void) FormatImageProperty(image,"minimum-bounding-box:_q","%.*g,%.*g",
-    GetMagickPrecision(),vertices[caliper_info.q].x,
-    GetMagickPrecision(),vertices[caliper_info.q].y);
-  (void) FormatImageProperty(image,"minimum-bounding-box:_v","%.*g,%.*g",
-    GetMagickPrecision(),vertices[caliper_info.v].x,
-    GetMagickPrecision(),vertices[caliper_info.v].y);
+  SetMinimumBoundingBoxProperties(image,caliper_info,vertices);
   /*
     Find smallest angle to origin.
   */
