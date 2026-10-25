@@ -175,3 +175,19 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 7.78, unchanged.** The only findings are Code Duplication over 18
+thin wrappers and Excess Number of Function Arguments on the public pixel accessors
+(5–6 arguments, public API).
+
+**Tried and reverted.** GetOneCacheViewAuthenticPixel, GetOneCacheViewVirtualPixel and
+GetOneCacheViewVirtualMethodPixel share an identical background-colour fill. Extracting
+it from the first (`SetPixelToBackgroundColor`) left the score flat and the
+duplication down only from 18 functions to 17. The step that would pay, using the
+helper in the other two, is Recipe D. No case executes those functions (4 mutants
+each, all uncovered), so D is not allowed and the flat step had no legal follow-up.
+
+**What would unlock it:** an oracle case that calls GetOneCacheViewVirtualPixel and
+GetOneCacheViewAuthenticPixel. The C API driver can do that.
