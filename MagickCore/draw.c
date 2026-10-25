@@ -2569,6 +2569,45 @@ static inline MagickBooleanType IsClipMaskChanged(DrawInfo **graphic_context,
     graphic_context[n-1]->clip_mask) != 0)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsMVGFileReference(const DrawInfo *draw_info,
+  const size_t depth)
+{
+  return(((*draw_info->primitive == '@') &&
+    (strlen(draw_info->primitive) > 1) &&
+    (*(draw_info->primitive+1) != '-') && (depth == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsMVGBlockEndMissing(const char *q,
+  const char *p)
+{
+  return(((q == (char *) NULL) || (p == (char *) NULL) ||
+    ((q-4) < p)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsMVGBlockEndInvalid(const char *q,
+  const char *p,const size_t extent)
+{
+  return(((q == (char *) NULL) || (*q == '\0') ||
+    (p == (char *) NULL) || ((q-4) < p) ||
+    ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsMVGBlockEndOutside(const char *q,
+  const char *p,const size_t extent)
+{
+  return(((q == (char *) NULL) || (p == (char *) NULL) ||
+    ((q-4) < p) || ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRenderableClass(DrawInfo **graphic_context,
+  const ssize_t n,const char *mvg_class,const char *p,const char *primitive)
+{
+  return(((graphic_context[n]->render != MagickFalse) &&
+    (mvg_class != (const char *) NULL) && (p > primitive)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -2668,8 +2707,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
       if (status == MagickFalse)
         return(MagickFalse);
     }
-  if ((*draw_info->primitive == '@') && (strlen(draw_info->primitive) > 1) &&
-      (*(draw_info->primitive+1) != '-') && (depth == 0))
+  if (IsMVGFileReference(draw_info,depth) != MagickFalse)
     primitive=FileToString(draw_info->primitive,~0UL,exception);
   else
     primitive=AcquireString(draw_info->primitive);
@@ -2863,8 +2901,8 @@ static MagickBooleanType RenderMVGContent(Image *image,
                 break;
               }
             mvg_class=(const char *) GetValueFromSplayTree(macros,token);
-            if ((graphic_context[n]->render != MagickFalse) &&
-                (mvg_class != (const char *) NULL) && (p > primitive))
+            if (IsRenderableClass(graphic_context,n,mvg_class,p,primitive) !=
+                MagickFalse)
               {
                 char
                   *elements;
@@ -3492,7 +3530,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
                     continue;
                   break;
                 }
-                if ((q == (char *) NULL) || (p == (char *) NULL) || ((q-4) < p))
+                if (IsMVGBlockEndMissing(q,p) != MagickFalse)
                   {
                     status=MagickFalse;
                     break;
@@ -3568,9 +3606,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
                     continue;
                   break;
                 }
-                if ((q == (char *) NULL) || (*q == '\0') ||
-                    (p == (char *) NULL) || ((q-4) < p) ||
-                    ((size_t) (q-p+4+1) > extent))
+                if (IsMVGBlockEndInvalid(q,p,extent) != MagickFalse)
                   {
                     status=MagickFalse;
                     break;
@@ -3691,8 +3727,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
                     continue;
                   break;
                 }
-                if ((q == (char *) NULL) || (p == (char *) NULL) ||
-                    ((q-4) < p) || ((size_t) (q-p+4+1) > extent))
+                if (IsMVGBlockEndOutside(q,p,extent) != MagickFalse)
                   {
                     status=MagickFalse;
                     break;
