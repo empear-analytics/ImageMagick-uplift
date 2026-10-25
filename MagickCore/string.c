@@ -1464,6 +1464,44 @@ MagickExport MagickBooleanType IsStringFalse(const char *value)
   return(MagickFalse);
 }
 
+static void PrintStringInfoHexLine(FILE *file,
+  const StringInfo *string_info,const unsigned char *p,const size_t i)
+{
+  size_t
+    j;
+
+  (void) FormatLocaleFile(file,"0x%08lx: ",(unsigned long) i);
+  for (j = 0; j < MagickMin(string_info->length-i, CharsPerLine); j++)
+  {
+    (void) FormatLocaleFile(file,"%02lx",(unsigned long) (p[i+j]) & 0xff);
+    if (((j+1) % 0x04) == 0)
+      (void) fputc(' ',file);
+  }
+  /*
+    Padding.
+  */
+  for ( ; j < CharsPerLine; j++)
+  {
+    (void) fputc(' ',file);
+    (void) fputc(' ',file);
+    if (((j+1) % 0x04) == 0)
+      (void) fputc(' ',file);
+  }
+  (void) fputc(' ',file);
+  /*
+    ASCII section.
+  */
+  for (j=0; j < MagickMin(string_info->length-i,CharsPerLine); j++)
+  {
+    unsigned char c = p[i+j];
+    if (isprint((int) c) != 0)
+      (void) fputc(c,file);
+    else
+      (void) fputc('-',file);
+  }
+  (void) fputc('\n',file);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1498,8 +1536,7 @@ MagickExport void PrintStringInfo(FILE *file,const char *id,
     *p;
 
   size_t
-    i,
-    j;
+    i;
 
   /*
     Check if string is printable.
@@ -1523,38 +1560,7 @@ MagickExport void PrintStringInfo(FILE *file,const char *id,
     Convert string to a HEX list.
   */
   for (i=0; i < string_info->length; i+=CharsPerLine)
-  {
-    (void) FormatLocaleFile(file,"0x%08lx: ",(unsigned long) i);
-    for (j = 0; j < MagickMin(string_info->length-i, CharsPerLine); j++)
-    {
-      (void) FormatLocaleFile(file,"%02lx",(unsigned long) (p[i+j]) & 0xff);
-      if (((j+1) % 0x04) == 0)
-        (void) fputc(' ',file);
-    }
-    /*
-      Padding.
-    */
-    for ( ; j < CharsPerLine; j++)
-    {
-      (void) fputc(' ',file);
-      (void) fputc(' ',file);
-      if (((j+1) % 0x04) == 0)
-        (void) fputc(' ',file);
-    }
-    (void) fputc(' ',file);
-    /*
-      ASCII section.
-    */
-    for (j=0; j < MagickMin(string_info->length-i,CharsPerLine); j++)
-    {
-      unsigned char c = p[i+j];
-      if (isprint((int) c) != 0)
-        (void) fputc(c,file);
-      else
-        (void) fputc('-',file);
-    }
-    (void) fputc('\n',file);
-  }
+    PrintStringInfoHexLine(file,string_info,p,i);
 }
 
 /*
