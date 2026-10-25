@@ -1663,6 +1663,46 @@ static inline MagickBooleanType IsSkipTag(const char *tag)
   return(MagickFalse);
 }
 
+static inline MagickBooleanType IsXMLNameStart(const char *p,const int c)
+{
+  return(((isalpha((int) ((unsigned char) *p)) != 0) || (*p == '_') ||
+    (*p == ':') || (c < '\0')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsNameStartOutsideIgnore(const char *p,
+  const size_t ignore_depth)
+{
+  return((((isalpha((int) ((unsigned char) *p)) != 0) || (*p == '_')) &&
+    (ignore_depth == 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsOtherDefaultAttribute(char **attribute,
+  const ssize_t j,char **attributes,const ssize_t l)
+{
+  return(((attribute != (char **) NULL) &&
+    (attribute[j] != (char *) NULL) &&
+    (strcmp(attribute[j],attributes[l]) != 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsTagNotClosed(const char *p,const int terminal)
+{
+  return((((*p != '\0') && (*p != '>')) ||
+    ((*p == '\0') && (terminal != '>'))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsTagClosed(const char *p,const int terminal)
+{
+  return(((*p == '>') || ((*p == '\0') && (terminal == '>'))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsUnterminatedSection(const char *p,
+  const int terminal)
+{
+  return(((p == (char *) NULL) || ((*p == '\0') &&
+    (terminal != '>'))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -1736,8 +1776,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
     attributes=(char **) sentinel;
     tag=p;
     c=(*p);
-    if ((isalpha((int) ((unsigned char) *p)) != 0) || (*p == '_') ||
-        (*p == ':') || (c < '\0'))
+    if (IsXMLNameStart(p,c) != MagickFalse)
       {
         /*
           Tag.
@@ -1752,8 +1791,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
         p+=(ptrdiff_t) strcspn(p,XMLWhitespace "/>");
         while (isspace((int) ((unsigned char) *p)) != 0)
           *p++='\0';
-        if (((isalpha((int) ((unsigned char) *p)) != 0) || (*p == '_')) &&
-            (ignore_depth == 0))
+        if (IsNameStartOutsideIgnore(p,ignore_depth) != MagickFalse)
           {
             if ((*p != '\0') && (*p != '/') && (*p != '>'))
               {
@@ -1818,9 +1856,8 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                           return(&root->root);
                         }
                       j=1;
-                      while ((attribute != (char **) NULL) &&
-                             (attribute[j] != (char *) NULL) &&
-                             (strcmp(attribute[j],attributes[l]) != 0))
+                      while (IsOtherDefaultAttribute(attribute,j,attributes,l) !=
+                          MagickFalse)
                         j+=3;
                       attributes[l+1]=ParseEntities(attributes[l+1],
                         root->entities,(attribute != (char **) NULL) &&
@@ -1844,8 +1881,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
               Self closing tag.
             */
             *p++='\0';
-            if (((*p != '\0') && (*p != '>')) ||
-                ((*p == '\0') && (terminal != '>')))
+            if (IsTagNotClosed(p,terminal) != MagickFalse)
               {
                 if (l != 0)
                   (void) DestroyXMLTreeAttributes(attributes);
@@ -1865,7 +1901,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
         else
           {
             c=(*p);
-            if ((*p == '>') || ((*p == '\0') && (terminal == '>')))
+            if (IsTagClosed(p,terminal) != MagickFalse)
               {
                 *p='\0';
                 if ((ignore_depth == 0) && (IsSkipTag(tag) == MagickFalse))
@@ -1999,8 +2035,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                       break;
                     p++;
                   } while ((*p != '\0') && (*p != '>'));
-                  if ((p == (char *) NULL) || ((*p == '\0') &&
-                      (terminal != '>')))
+                  if (IsUnterminatedSection(p,terminal) != MagickFalse)
                     {
                       (void) ThrowMagickException(exception,GetMagickModule(),
                         OptionWarning,"ParseError","unclosed <?");
