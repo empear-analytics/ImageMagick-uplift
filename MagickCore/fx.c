@@ -1326,14 +1326,20 @@ static MagickBooleanType AddElement(FxInfo * pfx,fxFltType val,int oprNum)
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsAddressingOperator(const int oprNum)
+{
+  return((oprNum == rGoto || oprNum == rGotoChk || oprNum == rIfZeroGoto ||
+    oprNum == rIfNotZeroGoto
+    || oprNum == rZerStk) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType AddAddressingElement (FxInfo * pfx, int oprNum, int EleNdx)
 {
   ElementT * pel;
   if (!AddElement (pfx, (fxFltType) 0, oprNum)) return MagickFalse;
   pel = &pfx->Elements[pfx->usedElements-1];
   pel->element_index = EleNdx;
-  if (oprNum == rGoto || oprNum == rGotoChk || oprNum == rIfZeroGoto || oprNum == rIfNotZeroGoto
-   || oprNum == rZerStk)
+  if (IsAddressingOperator(oprNum) != MagickFalse)
   {
     pel->do_push = MagickFalse;
   }
