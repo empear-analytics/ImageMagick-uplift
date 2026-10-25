@@ -2343,6 +2343,21 @@ MagickExport char **StringToList(const char *text)
   return(StringToStrings(text,(size_t *) NULL));
 }
 
+static size_t CountTextLines(const char *text)
+{
+  const char
+    *p;
+
+  size_t
+    lines;
+
+  lines=1;
+  for (p=text; *p != '\0'; p++)
+    if (*p == '\n')
+      lines++;
+  return(lines);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2401,10 +2416,7 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
       /*
         Convert string to an ASCII list.
       */
-      lines=1;
-      for (p=text; *p != '\0'; p++)
-        if (*p == '\n')
-          lines++;
+      lines=CountTextLines(text);
       textlist=(char **) AcquireQuantumMemory((size_t) lines+1UL,
         sizeof(*textlist));
       if (textlist == (char **) NULL)
