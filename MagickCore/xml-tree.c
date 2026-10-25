@@ -577,6 +577,14 @@ MagickExport XMLTreeInfo *DestroyXMLTree(XMLTreeInfo *xml_info)
 %    o extent: Maximum length of the string.
 %
 */
+static inline MagickBooleanType IsUnseekableXMLFile(const int file,
+  const MagickOffsetType offset)
+{
+  return(((file == fileno(stdin)) || (offset < 0) ||
+    (offset != (MagickOffsetType) ((ssize_t) offset))) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickPrivate char *FileToXML(const char *filename,const size_t extent)
 {
   char
@@ -607,8 +615,7 @@ MagickPrivate char *FileToXML(const char *filename,const size_t extent)
     return((char *) NULL);
   offset=(MagickOffsetType) lseek(file,0,SEEK_END);
   count=0;
-  if ((file == fileno(stdin)) || (offset < 0) ||
-      (offset != (MagickOffsetType) ((ssize_t) offset)))
+  if (IsUnseekableXMLFile(file,offset) != MagickFalse)
     {
       size_t
         quantum;
