@@ -90,7 +90,7 @@ needs before refactoring:
 | 5.92 | `MagickCore/matrix.c` | 1146 | 75% | 80% | open |
 | 6.96 | `MagickCore/magick.c` | 1866 | 68% | 81% | open |
 | 8.81 | `MagickCore/semaphore.c` | 482 | 100% | 80% | open |
-| 8.88 | `MagickCore/colormap.c` | 388 | 100% | 89% | open, [M13](tasks/M13-colormap.md) |
+| 8.88 | `MagickCore/colormap.c` | 388 | 100% | 89% | 9.36, plateau for the current catalogue, [M13](tasks/M13-colormap.md) |
 
 ### Check per function first (27 files)
 
