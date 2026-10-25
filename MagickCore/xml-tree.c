@@ -281,6 +281,12 @@ MagickExport XMLTreeInfo *AddChildToXMLTree(XMLTreeInfo *xml_info,
 %
 */
 
+static inline MagickBooleanType IsDisallowedControlChar(const unsigned char *p)
+{
+  return(((*p < 0x20) && (*p != 0x09) && (*p != 0x0a) &&
+    (*p != 0x0d)) ? MagickTrue : MagickFalse);
+}
+
 static char *CanonicalXMLContent(const char *content,
   const MagickBooleanType pedantic)
 {
@@ -301,7 +307,7 @@ static char *CanonicalXMLContent(const char *content,
   if (utf8 == (unsigned char *) NULL)
     return((char *) NULL);
   for (p=utf8; *p != '\0'; p++)
-    if ((*p < 0x20) && (*p != 0x09) && (*p != 0x0a) && (*p != 0x0d))
+    if (IsDisallowedControlChar(p) != MagickFalse)
       break;
   if (*p != '\0')
     {
