@@ -465,8 +465,7 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
     q=GetCacheViewVirtualPixels(beta_view,0,y,alpha_image->columns,1,exception);
     r=GetCacheViewAuthenticPixels(sum_view,0,y,alpha_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
-        (r == (Quantum *) NULL))
+    if (IsBlendRowMissing(p,q,r) != MagickFalse)
       {
         status=MagickFalse;
         continue;
@@ -481,9 +480,7 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
         PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
         PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
         PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (beta_traits == UndefinedPixelTrait) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
+        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
           continue;
         r[i]=ClampToQuantum(attenuate*((double) p[i]+sign*
           (double) GetPixelChannel(beta_image,channel,q)));
