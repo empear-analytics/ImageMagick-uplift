@@ -400,6 +400,12 @@ static inline MagickBooleanType IsInvalidPolarArgumentCount(
           || number_arguments > 8 ) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsInvalidPolarRadius(const double *coeff)
+{
+  return(( coeff[0] < MagickEpsilon || coeff[1] < -MagickEpsilon
+           || (coeff[0]-coeff[1]) < MagickEpsilon ) ? MagickTrue : MagickFalse);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const size_t number_arguments,const double *arguments,
   size_t number_values,ExceptionInfo *exception)
@@ -1355,8 +1361,7 @@ static double *GenerateCoefficients(const Image *image,
         }
       }
       /* IF Rmax <= 0 or Rmin < 0 OR Rmax < Rmin, THEN error */
-      if ( coeff[0] < MagickEpsilon || coeff[1] < -MagickEpsilon
-           || (coeff[0]-coeff[1]) < MagickEpsilon ) {
+      if (IsInvalidPolarRadius(coeff) != MagickFalse) {
         (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
             "InvalidArgument", "%s : Invalid Radius",
             CommandOptionToMnemonic(MagickDistortOptions, *method) );
