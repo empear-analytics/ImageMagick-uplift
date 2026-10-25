@@ -2809,6 +2809,48 @@ static MagickBooleanType ResolveTernaryAddresses (FxInfo * pfx, TernaryT * ptern
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsExpressionContinuing(FxInfo *pfx,
+  const char *strLimit)
+{
+  return((*pfx->pex && (!*strLimit ||
+    (strchr(strLimit,*pfx->pex)==NULL))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUserSymbolAssignment(
+  const MagickBooleanType UserSymbol,const MagickBooleanType Assign,
+  const MagickBooleanType Update,const MagickBooleanType IncrDecr)
+{
+  return((UserSymbol && (Assign || Update) && !IncrDecr) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsExpressionEnd(FxInfo *pfx,
+  const char *strLimit)
+{
+  return(( (!*pfx->pex) || (*strLimit &&
+    (strchr(strLimit,*pfx->pex)!=NULL) ) ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsPendingLimitChar(FxInfo *pfx,
+  const char *chLimit,const char *strLimit)
+{
+  return((*pfx->pex && !*chLimit &&
+    (strchr(strLimit,*pfx->pex)!=NULL)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsOpenGroupOperator(const OperatorE op)
+{
+  return((op == oOpenParen || op == oOpenBracket ||
+    op == oOpenBrace) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsMisplacedAssignment(const OperatorE op,
+  const MagickBooleanType Assign,const MagickBooleanType Update)
+{
+  return(( (op==oAssign && !Assign) || (OprInPlace((int) op) &&
+    !Update) ) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -2862,7 +2904,7 @@ static MagickBooleanType TranslateExpression (
 
   /* Loop through Operator, Operand, Operator, Operand, ...
   */
-  while (*pfx->pex && (!*strLimit || (strchr(strLimit,*pfx->pex)==NULL))) {
+  while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
     if (!GetOperator (pfx, &Assign, &Update, &IncrDecr)) return MagickFalse;
     SkipSpaces (pfx);
     if (NewUserSymbol && !Assign) {
@@ -2886,7 +2928,7 @@ static MagickBooleanType TranslateExpression (
         pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (UserSymbol && (Assign || Update) && !IncrDecr) {
+    if (IsUserSymbolAssignment(UserSymbol,Assign,Update,IncrDecr) != MagickFalse) {
 
       if (!TranslateExpression (pfx, strLimit, chLimit, needPopAll)) return MagickFalse;
       if (!*pfx->pex) break;
@@ -2918,7 +2960,7 @@ static MagickBooleanType TranslateExpression (
 
     UserSymbol = NewUserSymbol = MagickFalse;
 
-    if ( (!*pfx->pex) || (*strLimit && (strchr(strLimit,*pfx->pex)!=NULL) ) )
+    if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
     {
       if (IncrDecr) break;
 
@@ -2973,16 +3015,16 @@ static MagickBooleanType TranslateExpression (
     pel->do_push = MagickTrue;
   }
 
-  if (*pfx->pex && !*chLimit && (strchr(strLimit,*pfx->pex)!=NULL)) {
+  if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
     *chLimit = *pfx->pex;
     pfx->pex++;
   }
   while (pfx->usedOprStack) {
     OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
-    if (op == oOpenParen || op == oOpenBracket || op == oOpenBrace) {
+    if (IsOpenGroupOperator(op) != MagickFalse) {
       break;
     }
-    if ( (op==oAssign && !Assign) || (OprInPlace((int) op) && !Update) ) {
+    if (IsMisplacedAssignment(op,Assign,Update) != MagickFalse) {
       break;
     }
     pfx->usedOprStack--;
