@@ -3361,6 +3361,13 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
 %    o channels: One or more channels separated by commas.
 %
 */
+static inline MagickBooleanType IsInvalidPixelChannelNumber(const char *q,
+  const char *token,const ssize_t channel)
+{
+  return(((q == token) || (channel < 0) || (channel >= MaxPixelChannels)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport ssize_t ParsePixelChannelOption(const char *channels)
 {
   char
@@ -3378,7 +3385,7 @@ MagickExport ssize_t ParsePixelChannelOption(const char *channels)
     return(channel);
   q=(char *) token;
   channel=(ssize_t) InterpretLocaleValue(token,&q);
-  if ((q == token) || (channel < 0) || (channel >= MaxPixelChannels))
+  if (IsInvalidPixelChannelNumber(q,token,channel) != MagickFalse)
     return(-1);
   return(channel);
 }
