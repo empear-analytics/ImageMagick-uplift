@@ -964,6 +964,12 @@ static char *GetMagickPropertyLetter(ImageInfo *image_info,Image *image,
   return(SanitizeDelegateString(string));
 }
 
+static inline MagickBooleanType IsPropertyEnd(const char *p)
+{
+  return(((*p == '\0') || (*p == '\'') || (*p == '"')) ? MagickTrue :
+    MagickFalse);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -1131,7 +1137,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
     /*
       Doubled Percent - or percent at end of string.
     */
-    if ((*p == '\0') || (*p == '\'') || (*p == '"'))
+    if (IsPropertyEnd(p) != MagickFalse)
       p--;
     if (*p == '%')
       {
