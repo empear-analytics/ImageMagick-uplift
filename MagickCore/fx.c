@@ -2317,6 +2317,18 @@ static MagickBooleanType IsStealth (int op)
          );
 }
 
+static inline MagickBooleanType IsLoopOrIfFunction(const FunctionE fe)
+{
+  return((fe == fDo || fe == fFor || fe == fIf || fe == fWhile) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsHslSymbol(const SymbolE se)
+{
+  return((se==sHue || se==sSaturation || se==sLightness) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
   MagickBooleanType * needPopAll)
@@ -2509,7 +2521,7 @@ static MagickBooleanType GetOperand (
           pfx->token, SetShortExp(pfx));
       }
 
-      if (fe == fDo || fe == fFor || fe == fIf || fe == fWhile) {
+      if (IsLoopOrIfFunction(fe) != MagickFalse) {
         *needPopAll = MagickTrue;
       }
 
@@ -2559,7 +2571,7 @@ static MagickBooleanType GetOperand (
         (void) AddElement (pfx, val, (int) se);
         pfx->pex += pfx->lenToken;
 
-        if (se==sHue || se==sSaturation || se==sLightness) pfx->NeedHsl = MagickTrue;
+        if (IsHslSymbol(se) != MagickFalse) pfx->NeedHsl = MagickTrue;
         return MagickTrue;
       }
     }
