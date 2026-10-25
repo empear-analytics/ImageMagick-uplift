@@ -282,11 +282,7 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
     if (*p == '-')
       {
         last=(ssize_t) strtol(p+1,&p,10);
-        if (last < 0)
-          last+=(ssize_t) length;
-        else
-          if (last > (ssize_t) length)
-            last=(ssize_t) length;
+        last=ClampSceneIndex(last,length);
       }
     last%=(ssize_t) (length << 1);
     match=MagickFalse;
