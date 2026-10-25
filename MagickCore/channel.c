@@ -991,6 +991,24 @@ static inline void FlattenPixelInfo(const Image *image,const PixelInfo *p,
   }
 }
 
+static void ScaleColorChannels(const Image *image,const double gamma,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if (channel == AlphaPixelChannel)
+      continue;
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=ClampToQuantum(gamma*(double) q[i]);
+  }
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -1052,20 +1070,8 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
           double
             gamma;
 
-          ssize_t
-            i;
-
           gamma=QuantumScale*(double) GetPixelAlpha(image,q);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if (channel == AlphaPixelChannel)
-              continue;
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            q[i]=ClampToQuantum(gamma*(double) q[i]);
-          }
+          ScaleColorChannels(image,gamma,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
