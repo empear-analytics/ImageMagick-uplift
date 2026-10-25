@@ -156,3 +156,29 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 4.27 → 4.92** (`cs-mcp` 1.5.12). Branch `campaign/M52-resource`,
+stacked on `campaign/M51-resample`. Three refactor commits:
+- **P, oracle.** `IsChangedFileIdentity` (IsFileResourceIdentityValid, careful; its
+  survivor is on the line above). The predicate takes `attributes` by value, so the
+  expression keeps its `.` access character for character. Complex Conditional leaves
+  the file.
+- **E, guard (AcquireMagickResource is not ready).** `LockResourceSemaphore` and
+  `UnlockResourceSemaphore`, the lock and unlock switches (4.38 → 4.46 → 4.92).
+  Overall Function Size leaves the file.
+
+The oracle diverged only on the hough pair, which was clean 3/3 on rerun.
+
+**What is left, at 4.92.**
+- RelinquishMagickResource holds the same lock and unlock switches. Calling the new
+  helpers there is Recipe D, which needs the oracle level, and the function is not
+  ready.
+- ResourceComponentGenesis repeats the environment-limit block ten times. The copies
+  differ in two literals (the resource type and the variable name), so Recipe D does
+  not apply. The block around `sysconf`/`getrlimit` is `#if`-built.
+- AcquireMagickResource, RelinquishMagickResource, GetMagickResource,
+  GetMagickResourceLimit and SetMagickResourceLimit are per-resource switches whose
+  cases write several outputs (`bi`, `limit`, `current`, `status`). Their logging
+  blocks carry `GetMagickModule()`.
