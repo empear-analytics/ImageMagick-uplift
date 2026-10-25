@@ -1705,6 +1705,63 @@ MagickExport Image *ShaveImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static RectangleInfo ApplySpliceGravity(const Image *image,
+  RectangleInfo splice_geometry)
+{
+  switch (image->gravity)
+  {
+    default:
+    case UndefinedGravity:
+    case NorthWestGravity:
+      break;
+    case NorthGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
+      break;
+    }
+    case NorthEastGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width;
+      break;
+    }
+    case WestGravity:
+    {
+      splice_geometry.y+=(ssize_t) splice_geometry.width/2;
+      break;
+    }
+    case CenterGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
+      splice_geometry.y+=(ssize_t) splice_geometry.height/2;
+      break;
+    }
+    case EastGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width;
+      splice_geometry.y+=(ssize_t) splice_geometry.height/2;
+      break;
+    }
+    case SouthWestGravity:
+    {
+      splice_geometry.y+=(ssize_t) splice_geometry.height;
+      break;
+    }
+    case SouthGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
+      splice_geometry.y+=(ssize_t) splice_geometry.height;
+      break;
+    }
+    case SouthEastGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width;
+      splice_geometry.y+=(ssize_t) splice_geometry.height;
+      break;
+    }
+  }
+  return(splice_geometry);
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -1760,57 +1817,7 @@ MagickExport Image *SpliceImage(const Image *image,
   /*
     Respect image geometry.
   */
-  switch (image->gravity)
-  {
-    default:
-    case UndefinedGravity:
-    case NorthWestGravity:
-      break;
-    case NorthGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
-      break;
-    }
-    case NorthEastGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width;
-      break;
-    }
-    case WestGravity:
-    {
-      splice_geometry.y+=(ssize_t) splice_geometry.width/2;
-      break;
-    }
-    case CenterGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
-      splice_geometry.y+=(ssize_t) splice_geometry.height/2;
-      break;
-    }
-    case EastGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width;
-      splice_geometry.y+=(ssize_t) splice_geometry.height/2;
-      break;
-    }
-    case SouthWestGravity:
-    {
-      splice_geometry.y+=(ssize_t) splice_geometry.height;
-      break;
-    }
-    case SouthGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
-      splice_geometry.y+=(ssize_t) splice_geometry.height;
-      break;
-    }
-    case SouthEastGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width;
-      splice_geometry.y+=(ssize_t) splice_geometry.height;
-      break;
-    }
-  }
+  splice_geometry=ApplySpliceGravity(image,splice_geometry);
   /*
     Splice image.
   */
