@@ -1735,6 +1735,13 @@ MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsPageSizeScaled(const MagickStatusType flags)
+{
+  return(((((flags & WidthValue) != 0) || ((flags & HeightValue) != 0)) &&
+    (((flags & PercentValue) != 0) || ((flags & SeparatorValue) == 0))) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickStatusType ParsePageGeometry(const Image *image,
   const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
 {
@@ -1760,8 +1767,7 @@ MagickExport MagickStatusType ParsePageGeometry(const Image *image,
     }
   flags=ParseMetaGeometry(geometry,&region_info->x,&region_info->y,
     &region_info->width,&region_info->height);
-  if ((((flags & WidthValue) != 0) || ((flags & HeightValue) != 0)) &&
-      (((flags & PercentValue) != 0) || ((flags & SeparatorValue) == 0)))
+  if (IsPageSizeScaled(flags) != MagickFalse)
     {
       if ((flags & WidthValue) == 0)
         region_info->width=region_info->height;
