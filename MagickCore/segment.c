@@ -1645,6 +1645,21 @@ static void SetNodeExtrema(short *extrema,const IntervalTree *node,
   }
 }
 
+static double GetAverageTau(IntervalTree **list,const ssize_t number_nodes)
+{
+  double
+    average_tau;
+
+  ssize_t
+    i;
+
+  average_tau=0.0;
+  for (i=0; i < number_nodes; i++)
+    average_tau+=list[i]->tau;
+  average_tau*=MagickSafeReciprocal((double) number_nodes);
+  return(average_tau);
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
@@ -1779,10 +1794,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
   /*
     Determine the average tau.
   */
-  average_tau=0.0;
-  for (i=0; i < number_nodes; i++)
-    average_tau+=list[i]->tau;
-  average_tau*=MagickSafeReciprocal((double) number_nodes);
+  average_tau=GetAverageTau(list,number_nodes);
   /*
     Relinquish resources.
   */
