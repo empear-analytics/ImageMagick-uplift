@@ -737,6 +737,15 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
 %
 */
 
+static inline MagickBooleanType IsTwoColorGrayQuantize(
+  const QCubeInfo *cube_info)
+{
+  return(((cube_info->quantize_info->number_colors == 2) &&
+    ((cube_info->quantize_info->colorspace == LinearGRAYColorspace) ||
+     (cube_info->quantize_info->colorspace == GRAYColorspace))) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline void SetAssociatedAlpha(const Image *image,QCubeInfo *cube_info)
 {
   MagickBooleanType
@@ -744,9 +753,7 @@ static inline void SetAssociatedAlpha(const Image *image,QCubeInfo *cube_info)
 
   associate_alpha=image->alpha_trait != UndefinedPixelTrait ? MagickTrue :
     MagickFalse;
-  if ((cube_info->quantize_info->number_colors == 2) &&
-      ((cube_info->quantize_info->colorspace == LinearGRAYColorspace) ||
-       (cube_info->quantize_info->colorspace == GRAYColorspace)))
+  if (IsTwoColorGrayQuantize(cube_info) != MagickFalse)
     associate_alpha=MagickFalse;
   cube_info->associate_alpha=associate_alpha;
 }
