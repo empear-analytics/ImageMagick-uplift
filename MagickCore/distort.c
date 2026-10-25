@@ -1804,6 +1804,13 @@ MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
 %                    instead
 %
 */
+static inline MagickBooleanType IsArcPageReset(const DistortMethod method,
+  const MagickBooleanType bestfit,const MagickBooleanType viewport_given)
+{
+  return(( method == ArcDistortion && !bestfit && !viewport_given ) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -2964,7 +2971,7 @@ if ( d.x == 0.5 && d.y == 0.5 ) {
   /* Arc does not return an offset unless 'bestfit' is in effect
      And the user has not provided an overriding 'viewport'.
    */
-  if ( method == ArcDistortion && !bestfit && !viewport_given ) {
+  if (IsArcPageReset(method,bestfit,viewport_given) != MagickFalse) {
     distort_image->page.x = 0;
     distort_image->page.y = 0;
   }
