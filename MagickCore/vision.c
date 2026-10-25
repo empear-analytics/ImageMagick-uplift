@@ -350,8 +350,7 @@ static void CircularityThreshold(const Image *component_image,
         else
           if (foreground == 2)
             {
-              if ((((ssize_t) pixels[0] == i) && ((ssize_t) pixels[3] == i)) ||
-                  (((ssize_t) pixels[1] == i) && ((ssize_t) pixels[2] == i)))
+              if (IsDiagonalPair(pixels,i) != MagickFalse)
                 pattern[0]++;  /* diagonal */
               else
                 pattern[2]++;
