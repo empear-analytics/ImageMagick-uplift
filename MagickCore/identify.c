@@ -504,6 +504,89 @@ static inline MagickBooleanType IsDirectoryNameCharacter(const char *q,
     MagickFalse);
 }
 
+static void PrintChannelDepths(FILE *file,const Image *image,
+  const ColorspaceType colorspace,const ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    i;
+
+  (void) FormatLocaleFile(file,"  Channel depth:\n");
+  switch (colorspace)
+  {
+    case RGBColorspace:
+    case sRGBColorspace:
+    {
+      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+        (void) FormatLocaleFile(file,"    Red: %.17g-bit\n",(double)
+          channel_statistics[RedPixelChannel].depth);
+      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+        (void) FormatLocaleFile(file,"    Green: %.17g-bit\n",(double)
+          channel_statistics[GreenPixelChannel].depth);
+      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+        (void) FormatLocaleFile(file,"    Blue: %.17g-bit\n",(double)
+          channel_statistics[BluePixelChannel].depth);
+      break;
+    }
+    case CMYKColorspace:
+    {
+      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
+        (void) FormatLocaleFile(file,"    Cyan: %.17g-bit\n",(double)
+          channel_statistics[CyanPixelChannel].depth);
+      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
+        (void) FormatLocaleFile(file,"    Magenta: %.17g-bit\n",(double)
+          channel_statistics[MagentaPixelChannel].depth);
+      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
+        (void) FormatLocaleFile(file,"    Yellow: %.17g-bit\n",(double)
+          channel_statistics[YellowPixelChannel].depth);
+      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
+        (void) FormatLocaleFile(file,"    Black: %.17g-bit\n",(double)
+          channel_statistics[BlackPixelChannel].depth);
+      break;
+    }
+    case LinearGRAYColorspace:
+    case GRAYColorspace:
+    {
+      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
+        (void) FormatLocaleFile(file,"    Gray: %.17g-bit\n",(double)
+          channel_statistics[GrayPixelChannel].depth);
+      break;
+    }
+    default:
+    {
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,i);
+        PixelTrait traits = GetPixelChannelTraits(image,channel);
+        if ((traits & UpdatePixelTrait) != 0)
+          (void) FormatLocaleFile(file,"    Channel %.17g: %.17g-bit\n",
+            (double) i,(double) channel_statistics[channel].depth);
+      }
+      break;
+    }
+  }
+  if (image->alpha_trait != UndefinedPixelTrait)
+    (void) FormatLocaleFile(file,"    Alpha: %.17g-bit\n",(double)
+      channel_statistics[AlphaPixelChannel].depth);
+  if ((image->channels & ReadMaskChannel) != 0)
+    (void) FormatLocaleFile(file,"    Read mask: %.17g-bit\n",(double)
+      channel_statistics[ReadMaskPixelChannel].depth);
+  if ((image->channels & WriteMaskChannel) != 0)
+    (void) FormatLocaleFile(file,"    Write mask: %.17g-bit\n",(double)
+      channel_statistics[WriteMaskPixelChannel].depth);
+  if ((image->channels & CompositeMaskChannel) != 0)
+    (void) FormatLocaleFile(file,"    Composite mask: %.17g-bit\n",
+      (double) channel_statistics[CompositeMaskPixelChannel].depth);
+  if (image->number_meta_channels != 0)
+    for (i=0; i < (ssize_t) image->number_meta_channels; i++)
+    {
+      PixelChannel
+        channel = (PixelChannel) (MetaPixelChannels+i);
+
+      (void) FormatLocaleFile(file,"    Meta channel[%.17g]: %.17g-bit\n",
+        (double) i,(double) channel_statistics[channel].depth);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -835,81 +918,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       /*
         Detail channel depth and extrema.
       */
-      (void) FormatLocaleFile(file,"  Channel depth:\n");
-      switch (colorspace)
-      {
-        case RGBColorspace:
-        case sRGBColorspace:
-        {
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            (void) FormatLocaleFile(file,"    Red: %.17g-bit\n",(double)
-              channel_statistics[RedPixelChannel].depth);
-          if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            (void) FormatLocaleFile(file,"    Green: %.17g-bit\n",(double)
-              channel_statistics[GreenPixelChannel].depth);
-          if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            (void) FormatLocaleFile(file,"    Blue: %.17g-bit\n",(double)
-              channel_statistics[BluePixelChannel].depth);
-          break;
-        }
-        case CMYKColorspace:
-        {
-          if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-            (void) FormatLocaleFile(file,"    Cyan: %.17g-bit\n",(double)
-              channel_statistics[CyanPixelChannel].depth);
-          if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-            (void) FormatLocaleFile(file,"    Magenta: %.17g-bit\n",(double)
-              channel_statistics[MagentaPixelChannel].depth);
-          if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-            (void) FormatLocaleFile(file,"    Yellow: %.17g-bit\n",(double)
-              channel_statistics[YellowPixelChannel].depth);
-          if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-            (void) FormatLocaleFile(file,"    Black: %.17g-bit\n",(double)
-              channel_statistics[BlackPixelChannel].depth);
-          break;
-        }
-        case LinearGRAYColorspace:
-        case GRAYColorspace:
-        {
-          if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-            (void) FormatLocaleFile(file,"    Gray: %.17g-bit\n",(double)
-              channel_statistics[GrayPixelChannel].depth);
-          break;
-        }
-        default:
-        {
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) != 0)
-              (void) FormatLocaleFile(file,"    Channel %.17g: %.17g-bit\n",
-                (double) i,(double) channel_statistics[channel].depth);
-          }
-          break;
-        }
-      }
-      if (image->alpha_trait != UndefinedPixelTrait)
-        (void) FormatLocaleFile(file,"    Alpha: %.17g-bit\n",(double)
-          channel_statistics[AlphaPixelChannel].depth);
-      if ((image->channels & ReadMaskChannel) != 0)
-        (void) FormatLocaleFile(file,"    Read mask: %.17g-bit\n",(double)
-          channel_statistics[ReadMaskPixelChannel].depth);
-      if ((image->channels & WriteMaskChannel) != 0)
-        (void) FormatLocaleFile(file,"    Write mask: %.17g-bit\n",(double)
-          channel_statistics[WriteMaskPixelChannel].depth);
-      if ((image->channels & CompositeMaskChannel) != 0)
-        (void) FormatLocaleFile(file,"    Composite mask: %.17g-bit\n",
-          (double) channel_statistics[CompositeMaskPixelChannel].depth);
-      if (image->number_meta_channels != 0)
-        for (i=0; i < (ssize_t) image->number_meta_channels; i++)
-        {
-          PixelChannel
-            channel = (PixelChannel) (MetaPixelChannels+i);
-
-          (void) FormatLocaleFile(file,"    Meta channel[%.17g]: %.17g-bit\n",
-            (double) i,(double) channel_statistics[channel].depth);
-        }
+      PrintChannelDepths(file,image,colorspace,channel_statistics);
       scale=1.0;
       if (image->depth <= MAGICKCORE_QUANTUM_DEPTH)
         scale=(double) (QuantumRange/((size_t) QuantumRange >> ((size_t)
