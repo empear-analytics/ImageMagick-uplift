@@ -218,3 +218,45 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 1.82 → 1.95** (`cs-mcp` 1.5.12). Branch `campaign/M25-quantize`,
+stacked on `campaign/M24-transform`. 10 refactor commits, all oracle-verified, every
+function ready or careful with no survivor on a moved line:
+- 3 Recipe P;
+- 6 Recipe E;
+- 1 Recipe D.
+
+**Predicates:** `IsDitherPositionInImage`, `IsTwoColorGrayQuantize` and
+`IsPosterizeDitherMap`. Complex Conditional leaves the file.
+
+**KmeansImage** (bumps 12 → 10, 275 → 235 lines):
+- `ParseKmeansSeedColors` returns the number of colours seeded.
+- `SeedKmeansRandomColors` takes the `RandomColorComponent` macro with it; the block was
+  the macro's only user.
+
+**ClassifyImageColors** (bumps 8 → 6, cc 48 → 44): `GetPixelRunLength`, by E in the first
+row loop and D in the second.
+
+**SetGrayscaleImage** (bumps 5 → 4, cc 26 → 23): `CompactGrayscaleColormap` (+0.02) and
+`SortGrayscaleColormap`.
+
+Five of these commits left the score flat and are kept under rule 2, each naming its
+finding.
+
+**Refused:**
+- The leaf-sum blocks in `ClassifyImageColors`' two row loops. The copies differ in a
+  cast, `(double) OpaqueAlpha` against `(MagickRealType) OpaqueAlpha`. D does not fold
+  a type difference, and E alone was flat.
+- The cases of `Riemersma`. Each makes three dither calls whose three directions differ,
+  and D allows one differing value.
+
+**Whole catalogue:** run before the batch PR.
+
+**What is left, at 1.95.**
+- The parallel row loops in `AssignImageColors`, `FloydSteinbergDither` (not ready),
+  `KmeansImage`'s refinement, `SetGrayscaleImage` (with an `omp critical`) and
+  `PosterizeImage`. They need Recipe K or T.
+- The cube-tree walkers `PruneLevel`, `PruneToCubeDepth` and `Reduce` are reported as
+  duplicates. Each recurses into itself, so the copies differ by the function called.
