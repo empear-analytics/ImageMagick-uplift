@@ -1541,6 +1541,12 @@ static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
   return NO_CHAN_QUAL;
 }
 
+static inline MagickBooleanType IsQualifierRequiredAttr(const ImgAttrE ia)
+{
+  return((ia == aPage || ia == aPrintsize || ia == aRes) ? MagickTrue :
+    MagickFalse);
+}
+
 static ImgAttrE GetImgAttrToken (FxInfo * pfx)
 {
   ImgAttrE ia = aNull;
@@ -1555,7 +1561,7 @@ static ImgAttrE GetImgAttrToken (FxInfo * pfx)
     }
   }
 
-  if (ia == aPage || ia == aPrintsize || ia == aRes) {
+  if (IsQualifierRequiredAttr(ia) != MagickFalse) {
     (void) ThrowMagickException (
       pfx->exception, GetMagickModule(), OptionError,
       "Attribute", "'%s' needs qualifier at '%s'",
