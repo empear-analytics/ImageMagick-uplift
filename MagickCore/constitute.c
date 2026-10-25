@@ -467,6 +467,43 @@ static void SyncDisposeFromConstituteInfo(Image *next,
     next->dispose=(DisposeType) option_type;
 }
 
+static Image *ApplyExtractGeometry(const ImageInfo *read_info,Image *next,
+  ExceptionInfo *exception)
+{
+  RectangleInfo
+    geometry;
+
+  MagickStatusType
+    flags;
+
+  SetGeometry(next,&geometry);
+  flags=ParseAbsoluteGeometry(read_info->extract,&geometry);
+  if ((next->columns != geometry.width) ||
+      (next->rows != geometry.height))
+    {
+      if (((flags & XValue) != 0) || ((flags & YValue) != 0))
+        {
+          Image *crop_image = CropImage(next,&geometry,exception);
+          if (crop_image != (Image *) NULL)
+            ReplaceImageInList(&next,crop_image);
+        }
+      else
+        if (((flags & WidthValue) != 0) || ((flags & HeightValue) != 0))
+          {
+            flags=ParseRegionGeometry(next,read_info->extract,&geometry,
+              exception);
+            if ((geometry.width != 0) && (geometry.height != 0))
+              {
+                Image *resize_image = ResizeImage(next,geometry.width,
+                  geometry.height,next->filter,exception);
+                if (resize_image != (Image *) NULL)
+                  ReplaceImageInList(&next,resize_image);
+              }
+          }
+    }
+  return(next);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -951,39 +988,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       (void) ParseAbsoluteGeometry("0x0+0+0",&next->page);
     if ((read_info->extract != (char *) NULL) &&
         (read_info->stream == (StreamHandler) NULL))
-      {
-        RectangleInfo
-          geometry;
-
-        MagickStatusType
-          flags;
-
-        SetGeometry(next,&geometry);
-        flags=ParseAbsoluteGeometry(read_info->extract,&geometry);
-        if ((next->columns != geometry.width) ||
-            (next->rows != geometry.height))
-          {
-            if (((flags & XValue) != 0) || ((flags & YValue) != 0))
-              {
-                Image *crop_image = CropImage(next,&geometry,exception);
-                if (crop_image != (Image *) NULL)
-                  ReplaceImageInList(&next,crop_image);
-              }
-            else
-              if (((flags & WidthValue) != 0) || ((flags & HeightValue) != 0))
-                {
-                  flags=ParseRegionGeometry(next,read_info->extract,&geometry,
-                    exception);
-                  if ((geometry.width != 0) && (geometry.height != 0))
-                    {
-                      Image *resize_image = ResizeImage(next,geometry.width,
-                        geometry.height,next->filter,exception);
-                      if (resize_image != (Image *) NULL)
-                        ReplaceImageInList(&next,resize_image);
-                    }
-                }
-          }
-      }
+      next=ApplyExtractGeometry(read_info,next,exception);
     profile=GetImageProfile(next,"icc");
     if (profile == (const StringInfo *) NULL)
       profile=GetImageProfile(next,"icm");
