@@ -75,3 +75,11 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night)
+
+**Result: Code Health 9.49, unchanged. No legal step was found.**
+GetImageTotalInkDensity's only nested block is the per-pixel maximum. It contains an
+`#if defined(MAGICKCORE_OPENMP_SUPPORT)` `#pragma omp critical`, and OpenMP is off in
+this build, so the block cannot move (playbook: OpenMP regions and preprocessor
+branches).

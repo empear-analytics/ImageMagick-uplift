@@ -122,7 +122,7 @@ needs before refactoring:
 | 8.22 | `MagickCore/coder.c` | 562 | 38% | 93% | open |
 | 9.09 | `MagickCore/static.c` | 379 | 52% | 82% | open |
 | 9.12 | `MagickCore/gem.c` | 348 | 100% | 70% | plateau 9.12 (local Sigma macros), [M74](tasks/M74-gem.md) |
-| 9.49 | `MagickCore/prepress.c` | 154 | 100% | 71% | open |
+| 9.49 | `MagickCore/prepress.c` | 154 | 100% | 71% | plateau 9.49 (OpenMP critical block), [M75](tasks/M75-prepress.md) |
 
 ### Needs cases before refactoring (39 files)
 
