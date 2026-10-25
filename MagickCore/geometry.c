@@ -938,6 +938,13 @@ static inline MagickBooleanType IsGeometryRhoTerminator(const int c,
     (*q == ',') || (*q == '/') || (*q =='\0')) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsGeometrySigmaSeparator(const int c,
+  const char *p)
+{
+  return(((c == 215) || (*p == 'x') || (*p == 'X') || (*p == ':') ||
+    (*p == ',') || (*p == '/')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -1120,8 +1127,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
     }
   q=p;
   c=(int) ((unsigned char) *p);
-  if ((c == 215) || (*p == 'x') || (*p == 'X') || (*p == ':') || (*p == ',') ||
-      (*p == '/'))
+  if (IsGeometrySigmaSeparator(c,p) != MagickFalse)
     {
       /*
         Parse sigma.
