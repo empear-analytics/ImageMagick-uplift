@@ -888,6 +888,14 @@ static inline MagickBooleanType ValidatePixelCacheMorphology(
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsOutsideStreamPixel(const Image *image,
+  const ssize_t x,const ssize_t y)
+{
+  return(((image->columns == 0) || (image->rows == 0) || (x < 0) ||
+    (y < 0) || (x >= (ssize_t) image->columns) ||
+    (y >= (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
+}
+
 static Quantum *QueueAuthenticPixelsStream(Image *image,const ssize_t x,
   const ssize_t y,const size_t columns,const size_t rows,
   ExceptionInfo *exception)
@@ -911,9 +919,7 @@ static Quantum *QueueAuthenticPixelsStream(Image *image,const ssize_t x,
     Validate pixel cache geometry.
   */
   assert(image != (Image *) NULL);
-  if ((image->columns == 0) || (image->rows == 0) || (x < 0) ||
-      (y < 0) || (x >= (ssize_t) image->columns) ||
-      (y >= (ssize_t) image->rows))
+  if (IsOutsideStreamPixel(image,x,y) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),StreamError,
         "ImageDoesNotContainTheStreamGeometry","`%s'",image->filename);
