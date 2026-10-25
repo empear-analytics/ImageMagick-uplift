@@ -702,6 +702,26 @@ MagickPrivate void ExpandFilename(char *path)
   (void) CopyMagickString(path,expand_path,MagickPathExtent);
 }
 
+static void FormatExpandedPath(char *file_path,const char *magick,
+  const char *filename,const char *subimage)
+{
+  *file_path='\0';
+  if (*magick != '\0')
+    {
+      (void) ConcatenateMagickString(file_path,magick,
+        MagickPathExtent);
+      (void) ConcatenateMagickString(file_path,":",MagickPathExtent);
+    }
+  (void) ConcatenateMagickString(file_path,filename,MagickPathExtent);
+  if (*subimage != '\0')
+    {
+      (void) ConcatenateMagickString(file_path,"[",MagickPathExtent);
+      (void) ConcatenateMagickString(file_path,subimage,
+        MagickPathExtent);
+      (void) ConcatenateMagickString(file_path,"]",MagickPathExtent);
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -966,21 +986,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
           char
             file_path[MagickPathExtent];
 
-          *file_path='\0';
-          if (*magick != '\0')
-            {
-              (void) ConcatenateMagickString(file_path,magick,
-                MagickPathExtent);
-              (void) ConcatenateMagickString(file_path,":",MagickPathExtent);
-            }
-          (void) ConcatenateMagickString(file_path,filename,MagickPathExtent);
-          if (*subimage != '\0')
-            {
-              (void) ConcatenateMagickString(file_path,"[",MagickPathExtent);
-              (void) ConcatenateMagickString(file_path,subimage,
-                MagickPathExtent);
-              (void) ConcatenateMagickString(file_path,"]",MagickPathExtent);
-            }
+          FormatExpandedPath(file_path,magick,filename,subimage);
           if (strlen(file_path) >= (MagickPathExtent-1))
             ThrowFatalException(OptionFatalError,"FilenameTruncated");
           if (destroy != MagickFalse)
