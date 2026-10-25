@@ -894,6 +894,22 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static size_t GetMaximumDepth(const size_t *current_depth,
+  const size_t number_threads)
+{
+  size_t
+    depth;
+
+  ssize_t
+    i;
+
+  depth=current_depth[0];
+  for (i=1; i < (ssize_t) number_threads; i++)
+    if (depth < current_depth[i])
+      depth=current_depth[i];
+  return(depth);
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -962,10 +978,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
           current_depth[id]++;
         }
       }
-      depth=current_depth[0];
-      for (i=1; i < (ssize_t) number_threads; i++)
-        if (depth < current_depth[i])
-          depth=current_depth[i];
+      depth=GetMaximumDepth(current_depth,number_threads);
       current_depth=(size_t *) RelinquishMagickMemory(current_depth);
       return(depth);
     }
