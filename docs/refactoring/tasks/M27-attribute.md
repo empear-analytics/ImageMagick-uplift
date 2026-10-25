@@ -203,3 +203,45 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 2.58 → 2.97** (`cs-mcp` 1.5.12). Branch `campaign/M27-attribute`,
+stacked on `campaign/M26-effect`. 11 refactor commits, all oracle-verified: 1 P, 7 E,
+3 D. Every function touched is ready in the merged mutation reports. The baseline is
+`f8b59598e` (`origin/main` after PR #30).
+
+**GetImageBoundingBox:** `IsEmptyBoundingBox` (+0.15). The second site, in the parallel
+loop, would need five arguments and stays.
+
+**GetImageDepth** (bumps 12 → 8, cc 51 → 37):
+- `GetMaximumDepth`, by E and then D. A third copy sits in the `!MAGICKCORE_HDRI_SUPPORT`
+  branch, which the HDRI oracle build does not compile, and stays untouched.
+- `RaiseColormapEntryDepth`.
+
+**SetImageDepth** (cc 38 → 34): `SetColormapEntryDepth`, the body of a parallel loop over
+colormap entries. Each iteration writes only its own entry.
+
+**SetImageType** (cc 37 → 33): `SetOpaqueAlphaIfMissing`, by E (+0.13) and then D (three
+copies). The ColorSeparationAlpha guard assigns `status` and stays.
+
+**GetImageMinimumBoundingBox** (bumps 6 → 4, cc 25 → 19, 189 → 163 lines):
+- `GetMinimumBoxAngle` and `MoveBoxToOrigin` (+0.07). Each moves a variable that is dead
+  afterwards (`distance`, `point`), because the edge loop reassigns it at `i == 0`
+  before reading it.
+- `SetMinimumBoundingBoxProperties`.
+
+**Flakes:** the hough matrix-on-disk pair diverged once during the SetImageDepth step and
+gave 0 of 2 in three reruns.
+
+**Whole catalogue:** run before the batch PR.
+
+**What is left, at 2.97.**
+- `SetImageType`'s remaining guards (sRGB, gray, CMYK, DirectClass). A probe showed that
+  folding them leaves the score flat and the function still far above the cc threshold.
+- The pixel loops of `GetImageDepth`, `SetImageDepth`, `GetImageBoundingBox` and the
+  identify functions. All are parallel, need Recipe K or T, and some are in the
+  uncompiled `!HDRI` branches.
+- The calipers loop in `GetImageMinimumBoundingBox`. Its inner loops each write two or
+  more of the iteration's locals.
+- `GetEdgeBackgroundCensus` takes 8 arguments (Recipe B).
