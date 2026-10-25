@@ -318,6 +318,20 @@ MagickExport Image *MontageImages(const Image *images,
   return(montage_image);
 }
 
+static void SortImageListByScene(Image **image_list,
+  const size_t number_images)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_images; i++)
+    if (image_list[i]->scene == 0)
+      break;
+  if (i == (ssize_t) number_images)
+    qsort((void *) image_list,(size_t) number_images,sizeof(*image_list),
+      SceneCompare);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -451,12 +465,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   /*
     Sort image list by increasing tile number.
   */
-  for (i=0; i < (ssize_t) number_images; i++)
-    if (image_list[i]->scene == 0)
-      break;
-  if (i == (ssize_t) number_images)
-    qsort((void *) image_list,(size_t) number_images,sizeof(*image_list),
-      SceneCompare);
+  SortImageListByScene(image_list,number_images);
   /*
     Determine tiles per row and column.
   */
