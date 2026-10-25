@@ -2489,6 +2489,40 @@ static void SetGrayColorFromGeometry(PixelInfo *color,
       geometry_info.sigma);
 }
 
+static MagickBooleanType QueryColorFromCSSName(const char *name,
+  const ssize_t i,PixelInfo *color,ExceptionInfo *exception)
+{
+  char
+    *colorname;
+
+  ColorspaceType
+    colorspaceType;
+
+  MagickBooleanType
+    status;
+
+  colorspaceType=color->colorspace;
+  if (i >= (ssize_t) strlen(name))
+    colorname=AcquireString(name);
+  else
+    colorname=AcquireString(name+i+1);
+  (void) SubstituteString(&colorname,"(","");
+  (void) SubstituteString(&colorname,")","");
+  status=MagickFalse;
+  if (LocaleCompare(name,colorname) != 0)
+    status=QueryColorCompliance(colorname,AllCompliance,color,
+      exception);
+  color->colorspace=colorspaceType;
+  if (*colorname == '\0')
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"UnrecognizedColor","`%s'",name);
+      status=MagickFalse;
+    }
+  colorname=DestroyString(colorname);
+  return(status);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2685,37 +2719,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
       else
         flags=ParseCSSColor(name+i+1,&geometry_info);
       if (flags == 0)
-        {
-          char
-            *colorname;
-
-          ColorspaceType
-            colorspaceType;
-
-          MagickBooleanType
-            status;
-
-          colorspaceType=color->colorspace;
-          if (i >= (ssize_t) strlen(name))
-            colorname=AcquireString(name);
-          else
-            colorname=AcquireString(name+i+1);
-          (void) SubstituteString(&colorname,"(","");
-          (void) SubstituteString(&colorname,")","");
-          status=MagickFalse;
-          if (LocaleCompare(name,colorname) != 0)
-            status=QueryColorCompliance(colorname,AllCompliance,color,
-              exception);
-          color->colorspace=colorspaceType;
-          if (*colorname == '\0')
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                OptionWarning,"UnrecognizedColor","`%s'",name);
-              status=MagickFalse;
-            }
-          colorname=DestroyString(colorname);
-          return(status);
-        }
+        return(QueryColorFromCSSName(name,i,color,exception));
       if (color->colorspace == OklchColorspace)
          SetOklchColorFromGeometry(color,geometry_info,flags);
       else
