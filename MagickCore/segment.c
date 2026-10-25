@@ -1965,6 +1965,18 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   return(status);
 }
 
+static void MergeSmallDerivatives(double *second_derivative,
+  const double smooth_threshold)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= 255; i++)
+    if ((second_derivative[i] < smooth_threshold) &&
+        (second_derivative[i] >= -smooth_threshold))
+      second_derivative[i]=0.0;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2007,10 +2019,7 @@ static void ZeroCrossHistogram(double *second_derivative,
   /*
     Merge low numbers to zero to help prevent noise.
   */
-  for (i=0; i <= 255; i++)
-    if ((second_derivative[i] < smooth_threshold) &&
-        (second_derivative[i] >= -smooth_threshold))
-      second_derivative[i]=0.0;
+  MergeSmallDerivatives(second_derivative,smooth_threshold);
   /*
     Mark zero crossings.
   */
