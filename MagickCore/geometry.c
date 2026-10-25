@@ -931,6 +931,13 @@ static inline MagickBooleanType IsGeometryOffsetSeparator(const char *p)
     MagickFalse);
 }
 
+static inline MagickBooleanType IsGeometryRhoTerminator(const int c,
+  const char *q)
+{
+  return(((c == 215) || (*q == 'x') || (*q == 'X') || (*q == ':') ||
+    (*q == ',') || (*q == '/') || (*q =='\0')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -1095,8 +1102,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
   if (LocaleNCompare(p,"0x",2) == 0)
     (void) strtol(p,&q,10);
   c=(int) ((unsigned char) *q);
-  if ((c == 215) || (*q == 'x') || (*q == 'X') || (*q == ':') ||
-      (*q == ',') || (*q == '/') || (*q =='\0'))
+  if (IsGeometryRhoTerminator(c,q) != MagickFalse)
     {
       /*
         Parse rho.
