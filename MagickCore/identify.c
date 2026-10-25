@@ -481,6 +481,13 @@ static inline MagickBooleanType HasPageGeometry(const Image *image)
     (image->page.x != 0) || (image->page.y != 0)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsSingleUnnumberedImage(const Image *image)
+{
+  return(((GetPreviousImageInList(image) == (Image *) NULL) &&
+    (GetNextImageInList(image) == (Image *) NULL) && (image->scene == 0)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -647,9 +654,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       if (*image->magick_filename != '\0')
         if (LocaleCompare(image->magick_filename,image->filename) != 0)
           (void) FormatLocaleFile(file,"%s=>",image->magick_filename);
-       if ((GetPreviousImageInList(image) == (Image *) NULL) &&
-           (GetNextImageInList(image) == (Image *) NULL) &&
-           (image->scene == 0))
+       if (IsSingleUnnumberedImage(image) != MagickFalse)
         (void) FormatLocaleFile(file,"%s ",image->filename);
       else
         (void) FormatLocaleFile(file,"%s[%.17g] ",image->filename,(double)
