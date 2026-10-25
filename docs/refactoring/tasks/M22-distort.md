@@ -178,3 +178,52 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 1.74 → 2.29** (`cs-mcp` 1.5.12). Branch `campaign/M22-distort`,
+stacked on `campaign/M21-color` (PR #27). 14 refactor commits, one function each:
+- 7 Recipe P (1 oracle-verified: `poly_number_terms`, which is ready);
+- 7 Recipe E, all guard-verified. The other functions are not ready in the merged
+  mutation reports: `GenerateCoefficients` 26 of 42, `DistortImage` 23 of 44,
+  `SparseColorImage` 12 of 29.
+
+**Complex Conditional leaves the file** (seven sites), through seven predicates:
+`IsInvalidPolyOrder`, `IsAffineFallback`, `IsMatrixMemoryMissing`,
+`IsInvalidPolarArgumentCount`, `IsInvalidPolarRadius`, `IsInvalidBarrelArgumentCount`
+and `IsArcPageReset`.
+
+**Extractions:**
+- `GenerateCoefficients`: the affine single-control-point branch,
+  `SetAffineSingleCoefficients` (bumps 11 → 9).
+- `DistortImage`: four print-only bodies of the verbose report (`PrintArcFX`,
+  `PrintDePolarFX`, `PrintCylinder2PlaneFX`, `PrintBarrelFX`), 971 → 906 lines. All four
+  left the score flat and are kept under rule 2. None is inside the parallel loop.
+- `SparseColorImage`: its verbose report, `PrintSparseColorFX` (+0.04), and the colour
+  count, `GetSparseColorCount` (+0.09). Bumps 7 → 6, 356 → 288 lines.
+
+**Refused, with the score as the reason:**
+- The Polar and Plane2Cylinder print bodies (−0.04 each): their helpers would be clones of
+  the Arc and Cylinder2Plane helpers.
+- The Polynomial print body (−0.01).
+
+**Not attempted:** the two Bilinear print bodies, which contain `#if 0` code.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**What is left, at 2.29.**
+- `GenerateCoefficients`' case bodies return on every path (Recipe E step 7 applies) but
+  read eight to ten variables each. They need Recipe B to bundle `cp_size`, `cp_x`,
+  `cp_y`, `cp_values`, `number_values` and `arguments`.
+- The ScaleRotateTranslate argument `switch` sets seven locals, and the best-fit bounds
+  `switch` writes `min` and `max` through macros. Both need Recipe O, which requires
+  oracle level.
+- `DistortImage`'s and `SparseColorImage`'s per-pixel `switch` statements run inside
+  their parallel loops and write the iteration's `pixel`. That needs Recipe K, at oracle
+  level.
+- `poly_basis_fn`, `poly_basis_dx` and `poly_basis_str` are three parallel `switch`
+  tables (cc 22 each, reported as duplication). Their bodies differ in every case, so
+  Recipe D does not apply.
+- Raising the readiness of `GenerateCoefficients` and `DistortImage` (more cases that
+  kill their survivors) would open O and K on this file.
