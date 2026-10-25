@@ -243,6 +243,150 @@ static void
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsPixelInCluster(const Cluster *cluster,
+  const double red,const double green,const double blue)
+{
+  return(((red >= (double) (cluster->red.left-SafeMargin)) &&
+    (red <= (double) (cluster->red.right+SafeMargin)) &&
+    (green >= (double) (cluster->green.left-SafeMargin)) &&
+    (green <= (double) (cluster->green.right+SafeMargin)) &&
+    (blue >= (double) (cluster->blue.left-SafeMargin)) &&
+    (blue <= (double) (cluster->blue.right+SafeMargin))) ?
+    MagickTrue : MagickFalse);
+}
+
+static void PrintClusterStatistics(const Cluster *head,
+  const double cluster_threshold,const double weighting_exponent,
+  const size_t number_clusters)
+{
+  const Cluster
+    *cluster;
+
+  /*
+    Print cluster statistics.
+  */
+  (void) FormatLocaleFile(stdout,"Fuzzy C-means Statistics\n");
+  (void) FormatLocaleFile(stdout,"===================\n\n");
+  (void) FormatLocaleFile(stdout,"\tCluster Threshold = %g\n",(double)
+    cluster_threshold);
+  (void) FormatLocaleFile(stdout,"\tWeighting Exponent = %g\n",(double)
+    weighting_exponent);
+  (void) FormatLocaleFile(stdout,"\tTotal Number of Clusters = %.17g\n\n",
+    (double) number_clusters);
+  /*
+    Print the total number of points per cluster.
+  */
+  (void) FormatLocaleFile(stdout,"\n\nNumber of Vectors Per Cluster\n");
+  (void) FormatLocaleFile(stdout,"=============================\n\n");
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
+    (void) FormatLocaleFile(stdout,"Cluster #%.17g = %.17g\n",(double)
+      cluster->id,(double) cluster->count);
+  /*
+    Print the cluster extents.
+  */
+  (void) FormatLocaleFile(stdout,
+    "\n\n\nCluster Extents:        (Vector Size: %d)\n",MaxDimension);
+  (void) FormatLocaleFile(stdout,"================");
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
+  {
+    (void) FormatLocaleFile(stdout,"\n\nCluster #%.17g\n\n",(double)
+      cluster->id);
+    (void) FormatLocaleFile(stdout,
+      "%.17g-%.17g  %.17g-%.17g  %.17g-%.17g\n",(double)
+      cluster->red.left,(double) cluster->red.right,(double)
+      cluster->green.left,(double) cluster->green.right,(double)
+      cluster->blue.left,(double) cluster->blue.right);
+  }
+  /*
+    Print the cluster center values.
+  */
+  (void) FormatLocaleFile(stdout,
+    "\n\n\nCluster Center Values:        (Vector Size: %d)\n",MaxDimension);
+  (void) FormatLocaleFile(stdout,"=====================");
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
+  {
+    (void) FormatLocaleFile(stdout,"\n\nCluster #%.17g\n\n",(double)
+      cluster->id);
+    (void) FormatLocaleFile(stdout,"%g  %g  %g\n",(double)
+      cluster->red.center,(double) cluster->green.center,(double)
+      cluster->blue.center);
+  }
+  (void) FormatLocaleFile(stdout,"\n");
+}
+
+static void SetClusterColormap(Image *image,const Cluster *head)
+{
+  const Cluster
+    *cluster;
+
+  ssize_t
+    i;
+
+  i=0;
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
+  {
+    image->colormap[i].red=(double) ScaleCharToQuantum((unsigned char)
+      (cluster->red.center+0.5));
+    image->colormap[i].green=(double) ScaleCharToQuantum((unsigned char)
+      (cluster->green.center+0.5));
+    image->colormap[i].blue=(double) ScaleCharToQuantum((unsigned char)
+      (cluster->blue.center+0.5));
+    i++;
+  }
+}
+
+static void ClassifyFuzzyPixel(Image *image,const double *squares,
+  const PixelInfo *pixel,const double weighting_exponent,
+  Quantum *magick_restrict q)
+{
+  const PixelInfo
+    *magick_restrict p;
+
+  double
+    distance_squared,
+    local_minima,
+    numerator,
+    ratio,
+    sum;
+
+  ssize_t
+    j,
+    k;
+
+  /*
+    Compute fuzzy membership.
+  */
+  local_minima=0.0;
+  for (j=0; j < (ssize_t) image->colors; j++)
+  {
+    sum=0.0;
+    p=image->colormap+j;
+    distance_squared=
+      squares[(ssize_t) (pixel->red-ScaleQuantumToChar((const Quantum) p->red))]+
+      squares[(ssize_t) (pixel->green-ScaleQuantumToChar((const Quantum) p->green))]+
+      squares[(ssize_t) (pixel->blue-ScaleQuantumToChar((const Quantum) p->blue))];
+    numerator=distance_squared;
+    for (k=0; k < (ssize_t) image->colors; k++)
+    {
+      p=image->colormap+k;
+      distance_squared=
+        squares[(ssize_t) (pixel->red-ScaleQuantumToChar((const Quantum) p->red))]+
+        squares[(ssize_t) (pixel->green-ScaleQuantumToChar((const Quantum) p->green))]+
+        squares[(ssize_t) (pixel->blue-ScaleQuantumToChar((const Quantum) p->blue))];
+      ratio=numerator/distance_squared;
+      sum+=SegmentPower(ratio);
+    }
+    if ((sum != 0.0) && ((1.0/sum) > local_minima))
+      {
+        /*
+          Classify this pixel.
+        */
+        local_minima=1.0/sum;
+        SetPixelIndex(image,(Quantum) j,q);
+      }
+  }
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const double cluster_threshold,const double weighting_exponent,
   const MagickBooleanType verbose,ExceptionInfo *exception)
@@ -389,12 +533,8 @@ static MagickBooleanType Classify(Image *image,short **extrema,
       pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
       pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
       for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-        if ((pixel.red >= (double) (cluster->red.left-SafeMargin)) &&
-            (pixel.red <= (double) (cluster->red.right+SafeMargin)) &&
-            (pixel.green >= (double) (cluster->green.left-SafeMargin)) &&
-            (pixel.green <= (double) (cluster->green.right+SafeMargin)) &&
-            (pixel.blue >= (double) (cluster->blue.left-SafeMargin)) &&
-            (pixel.blue <= (double) (cluster->blue.right+SafeMargin)))
+        if (IsPixelInCluster(cluster,pixel.red,pixel.green,pixel.blue) !=
+            MagickFalse)
           {
             /*
               Count this pixel.
@@ -457,58 +597,8 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   }
   number_clusters=(size_t) count;
   if (verbose != MagickFalse)
-    {
-      /*
-        Print cluster statistics.
-      */
-      (void) FormatLocaleFile(stdout,"Fuzzy C-means Statistics\n");
-      (void) FormatLocaleFile(stdout,"===================\n\n");
-      (void) FormatLocaleFile(stdout,"\tCluster Threshold = %g\n",(double)
-        cluster_threshold);
-      (void) FormatLocaleFile(stdout,"\tWeighting Exponent = %g\n",(double)
-        weighting_exponent);
-      (void) FormatLocaleFile(stdout,"\tTotal Number of Clusters = %.17g\n\n",
-        (double) number_clusters);
-      /*
-        Print the total number of points per cluster.
-      */
-      (void) FormatLocaleFile(stdout,"\n\nNumber of Vectors Per Cluster\n");
-      (void) FormatLocaleFile(stdout,"=============================\n\n");
-      for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-        (void) FormatLocaleFile(stdout,"Cluster #%.17g = %.17g\n",(double)
-          cluster->id,(double) cluster->count);
-      /*
-        Print the cluster extents.
-      */
-      (void) FormatLocaleFile(stdout,
-        "\n\n\nCluster Extents:        (Vector Size: %d)\n",MaxDimension);
-      (void) FormatLocaleFile(stdout,"================");
-      for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-      {
-        (void) FormatLocaleFile(stdout,"\n\nCluster #%.17g\n\n",(double)
-          cluster->id);
-        (void) FormatLocaleFile(stdout,
-          "%.17g-%.17g  %.17g-%.17g  %.17g-%.17g\n",(double)
-          cluster->red.left,(double) cluster->red.right,(double)
-          cluster->green.left,(double) cluster->green.right,(double)
-          cluster->blue.left,(double) cluster->blue.right);
-      }
-      /*
-        Print the cluster center values.
-      */
-      (void) FormatLocaleFile(stdout,
-        "\n\n\nCluster Center Values:        (Vector Size: %d)\n",MaxDimension);
-      (void) FormatLocaleFile(stdout,"=====================");
-      for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-      {
-        (void) FormatLocaleFile(stdout,"\n\nCluster #%.17g\n\n",(double)
-          cluster->id);
-        (void) FormatLocaleFile(stdout,"%g  %g  %g\n",(double)
-          cluster->red.center,(double) cluster->green.center,(double)
-          cluster->blue.center);
-      }
-      (void) FormatLocaleFile(stdout,"\n");
-    }
+    PrintClusterStatistics(head,cluster_threshold,weighting_exponent,
+      number_clusters);
   if (number_clusters > 256)
     ThrowClassifyException(ImageError,"TooManyClusters",image->filename);
   /*
@@ -527,17 +617,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   if (AcquireImageColormap(image,number_clusters,exception) == MagickFalse)
     ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  i=0;
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-  {
-    image->colormap[i].red=(double) ScaleCharToQuantum((unsigned char)
-      (cluster->red.center+0.5));
-    image->colormap[i].green=(double) ScaleCharToQuantum((unsigned char)
-      (cluster->green.center+0.5));
-    image->colormap[i].blue=(double) ScaleCharToQuantum((unsigned char)
-      (cluster->blue.center+0.5));
-    i++;
-  }
+  SetClusterColormap(image,head);
   /*
     Do course grain classes.
   */
@@ -550,9 +630,6 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   {
     Cluster
       *c;
-
-    const PixelInfo
-      *magick_restrict p;
 
     ssize_t
       x;
@@ -579,12 +656,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
       pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,q));
       for (c=head; c != (Cluster *) NULL; c=c->next)
       {
-        if ((pixel.red >= (double) (c->red.left-SafeMargin)) &&
-            (pixel.red <= (double) (c->red.right+SafeMargin)) &&
-            (pixel.green >= (double) (c->green.left-SafeMargin)) &&
-            (pixel.green <= (double) (c->green.right+SafeMargin)) &&
-            (pixel.blue >= (double) (c->blue.left-SafeMargin)) &&
-            (pixel.blue <= (double) (c->blue.right+SafeMargin)))
+        if (IsPixelInCluster(c,pixel.red,pixel.green,pixel.blue) != MagickFalse)
           {
             /*
               Classify this pixel.
@@ -594,51 +666,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
           }
       }
       if (c == (Cluster *) NULL)
-        {
-          double
-            distance_squared,
-            local_minima,
-            numerator,
-            ratio,
-            sum;
-
-          ssize_t
-            j,
-            k;
-
-          /*
-            Compute fuzzy membership.
-          */
-          local_minima=0.0;
-          for (j=0; j < (ssize_t) image->colors; j++)
-          {
-            sum=0.0;
-            p=image->colormap+j;
-            distance_squared=
-              squares[(ssize_t) (pixel.red-ScaleQuantumToChar((const Quantum) p->red))]+
-              squares[(ssize_t) (pixel.green-ScaleQuantumToChar((const Quantum) p->green))]+
-              squares[(ssize_t) (pixel.blue-ScaleQuantumToChar((const Quantum) p->blue))];
-            numerator=distance_squared;
-            for (k=0; k < (ssize_t) image->colors; k++)
-            {
-              p=image->colormap+k;
-              distance_squared=
-                squares[(ssize_t) (pixel.red-ScaleQuantumToChar((const Quantum) p->red))]+
-                squares[(ssize_t) (pixel.green-ScaleQuantumToChar((const Quantum) p->green))]+
-                squares[(ssize_t) (pixel.blue-ScaleQuantumToChar((const Quantum) p->blue))];
-              ratio=numerator/distance_squared;
-              sum+=SegmentPower(ratio);
-            }
-            if ((sum != 0.0) && ((1.0/sum) > local_minima))
-              {
-                /*
-                  Classify this pixel.
-                */
-                local_minima=1.0/sum;
-                SetPixelIndex(image,(Quantum) j,q);
-              }
-          }
-        }
+        ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -700,6 +728,20 @@ static MagickBooleanType Classify(Image *image,short **extrema,
 %      in the zero_crossing array.
 %
 */
+static ssize_t CountCrossingsBetween(const ZeroCrossing *zero_crossing,
+  const ssize_t i,const ssize_t k,const ssize_t limit)
+{
+  ssize_t
+    count,
+    l;
+
+  count=0;
+  for (l=k+1; l < limit; l++)
+    if (zero_crossing[i+1].crossings[l] != 0)
+      count++;
+  return(count);
+}
+
 static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -752,10 +794,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       correct=(-1);
       if (zero_crossing[i+1].crossings[j] != 0)
         {
-          count=0;
-          for (l=k+1; l < center; l++)
-            if (zero_crossing[i+1].crossings[l] != 0)
-              count++;
+          count=CountCrossingsBetween(zero_crossing,i,k,center);
           if (((count % 2) == 0) && (center != k))
             correct=center;
         }
@@ -764,10 +803,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       */
       if (correct == -1)
         {
-          count=0;
-          for (l=k+1; l < left; l++)
-            if (zero_crossing[i+1].crossings[l] != 0)
-              count++;
+          count=CountCrossingsBetween(zero_crossing,i,k,left);
           if (((count % 2) == 0) && (left != k))
             correct=left;
         }
@@ -776,10 +812,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       */
       if (correct == -1)
         {
-          count=0;
-          for (l=k+1; l < right; l++)
-            if (zero_crossing[i+1].crossings[l] != 0)
-              count++;
+          count=CountCrossingsBetween(zero_crossing,i,k,right);
           if (((count % 2) == 0) && (right != k))
             correct=right;
         }
@@ -930,6 +963,13 @@ static void DerivativeHistogram(const double *histogram,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType HasObjectAndBackgroundClusters(
+  const ssize_t count,const Cluster *head)
+{
+  return(((count > 1) && (head != (Cluster *) NULL) &&
+    (head->next != (Cluster *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1092,12 +1132,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
       g=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
       b=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
       for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-        if ((r >= (double) (cluster->red.left-SafeMargin)) &&
-            (r <= (double) (cluster->red.right+SafeMargin)) &&
-            (g >= (double) (cluster->green.left-SafeMargin)) &&
-            (g <= (double) (cluster->green.right+SafeMargin)) &&
-            (b >= (double) (cluster->blue.left-SafeMargin)) &&
-            (b <= (double) (cluster->blue.right+SafeMargin)))
+        if (IsPixelInCluster(cluster,r,g,b) != MagickFalse)
           {
             /*
               Count this pixel.
@@ -1150,8 +1185,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   }
   object=head;
   background=head;
-  if ((count > 1) && (head != (Cluster *) NULL) && 
-      (head->next != (Cluster *) NULL))
+  if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
     {
       object=head->next;
       for (cluster=object; cluster->next != (Cluster *) NULL; )
@@ -1506,6 +1540,75 @@ static void FreeNodes(IntervalTree *node)
   node=(IntervalTree *) RelinquishMagickMemory(node);
 }
 
+static void ForceCrossingEndpoints(ZeroCrossing *zero_crossing,
+  const size_t number_crossings)
+{
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i <= (ssize_t) number_crossings; i++)
+  {
+    for (j=0; j < 255; j++)
+      if (zero_crossing[i].crossings[j] != 0)
+        break;
+    zero_crossing[i].crossings[0]=(-zero_crossing[i].crossings[j]);
+    for (j=255; j > 0; j--)
+      if (zero_crossing[i].crossings[j] != 0)
+        break;
+    zero_crossing[i].crossings[255]=(-zero_crossing[i].crossings[j]);
+  }
+}
+
+static ssize_t FindPeakIndex(const ZeroCrossing *zero_crossing,
+  const ssize_t k,const IntervalTree *node,const MagickBooleanType peak)
+{
+  double
+    value;
+
+  ssize_t
+    index,
+    x;
+
+  index=node->left;
+  value=zero_crossing[k].histogram[index];
+  for (x=node->left; x <= node->right; x++)
+  {
+    if (peak != MagickFalse)
+      {
+        if (zero_crossing[k].histogram[x] > value)
+          {
+            value=zero_crossing[k].histogram[x];
+            index=x;
+          }
+      }
+    else
+      if (zero_crossing[k].histogram[x] < value)
+        {
+          value=zero_crossing[k].histogram[x];
+          index=x;
+        }
+  }
+  return(index);
+}
+
+static void SetNodeExtrema(short *extrema,const IntervalTree *node,
+  ssize_t index,const MagickBooleanType peak)
+{
+  ssize_t
+    x;
+
+  for (x=node->left; x <= node->right; x++)
+  {
+    if (index == 0)
+      index=256;
+    if (peak != MagickFalse)
+      extrema[x]=(short) index;
+    else
+      extrema[x]=(short) (-index);
+  }
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
@@ -1514,8 +1617,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     average_tau,
     *derivative,
     *second_derivative,
-    tau,
-    value;
+    tau;
 
   IntervalTree
     **list,
@@ -1526,8 +1628,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     peak;
 
   ssize_t
-    i,
-    x;
+    i;
 
   size_t
     count,
@@ -1599,17 +1700,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
   /*
     Force endpoints to be included in the interval.
   */
-  for (i=0; i <= (ssize_t) number_crossings; i++)
-  {
-    for (j=0; j < 255; j++)
-      if (zero_crossing[i].crossings[j] != 0)
-        break;
-    zero_crossing[i].crossings[0]=(-zero_crossing[i].crossings[j]);
-    for (j=255; j > 0; j--)
-      if (zero_crossing[i].crossings[j] != 0)
-        break;
-    zero_crossing[i].crossings[255]=(-zero_crossing[i].crossings[j]);
-  }
+  ForceCrossingEndpoints(zero_crossing,number_crossings);
   /*
     Initialize interval tree.
   */
@@ -1646,34 +1737,8 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     */
     peak=zero_crossing[k].crossings[node->right] == -1 ? MagickTrue :
       MagickFalse;
-    index=node->left;
-    value=zero_crossing[k].histogram[index];
-    for (x=node->left; x <= node->right; x++)
-    {
-      if (peak != MagickFalse)
-        {
-          if (zero_crossing[k].histogram[x] > value)
-            {
-              value=zero_crossing[k].histogram[x];
-              index=x;
-            }
-        }
-      else
-        if (zero_crossing[k].histogram[x] < value)
-          {
-            value=zero_crossing[k].histogram[x];
-            index=x;
-          }
-    }
-    for (x=node->left; x <= node->right; x++)
-    {
-      if (index == 0)
-        index=256;
-      if (peak != MagickFalse)
-        extrema[x]=(short) index;
-      else
-        extrema[x]=(short) (-index);
-    }
+    index=FindPeakIndex(zero_crossing,k,node,peak);
+    SetNodeExtrema(extrema,node,index,peak);
   }
   /*
     Determine the average tau.
