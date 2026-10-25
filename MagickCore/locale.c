@@ -1166,6 +1166,13 @@ static void LocaleFatalErrorHandler(
   exit(1);
 }
 
+static inline MagickBooleanType IsIncludeElementOpen(const char *token,
+  const char *q)
+{
+  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType LoadLocaleCache(SplayTreeInfo *cache,const char *xml,
   const char *filename,const char *locale,const size_t depth,ExceptionInfo *exception)
 {
@@ -1274,7 +1281,7 @@ static MagickBooleanType LoadLocaleCache(SplayTreeInfo *cache,const char *xml,
         /*
           Include element.
         */
-        while (((*token != '/') && (*(token+1) != '>')) && (*q != '\0'))
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
           (void) CopyMagickString(keyword,token,MagickLocaleExtent);
           (void) GetNextToken(q,&q,extent,token);
