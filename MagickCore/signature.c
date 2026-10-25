@@ -442,6 +442,21 @@ MagickPrivate void SetSignatureDigest(SignatureInfo *signature_info,
   SetStringInfo(signature_info->digest,digest);
 }
 
+static unsigned char *AppendPixelBytes(unsigned char *q,const float pixel,
+  const SignatureInfo *signature_info)
+{
+  ssize_t
+    j;
+
+  if (signature_info->lsb_first == MagickFalse)
+    for (j=(ssize_t) sizeof(pixel)-1; j >= 0; j--)
+      *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+  else
+    for (j=0; j < (ssize_t) sizeof(pixel); j++)
+      *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+  return(q);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -534,20 +549,12 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
         }
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
-        ssize_t
-          j;
-
         PixelChannel channel = GetPixelChannelChannel(image,i);
         PixelTrait traits = GetPixelChannelTraits(image,channel);
         if ((traits & UpdatePixelTrait) == 0)
           continue;
         pixel=(float) (QuantumScale*(double) p[i]);
-        if (signature_info->lsb_first == MagickFalse)
-          for (j=(ssize_t) sizeof(pixel)-1; j >= 0; j--)
-            *q++=(unsigned char) ((unsigned char *) &pixel)[j];
-        else
-          for (j=0; j < (ssize_t) sizeof(pixel); j++)
-            *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+        q=AppendPixelBytes(q,pixel,signature_info);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
