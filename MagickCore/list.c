@@ -363,6 +363,17 @@ static void DeleteMarkedImages(Image **images,
   }
 }
 
+static void MarkImagesForDeletion(MagickBooleanType *delete_list,
+  const long first,const long last,const size_t length)
+{
+  ssize_t
+    i;
+
+  for (i=(ssize_t) first; i <= (ssize_t) last; i++)
+    if ((i >= 0) && (i < (ssize_t) length))
+      delete_list[i]=MagickTrue;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -468,9 +479,7 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
       }
     if (first > last)
       continue;
-    for (i=(ssize_t) first; i <= (ssize_t) last; i++)
-      if ((i >= 0) && (i < (ssize_t) length))
-        delete_list[i]=MagickTrue;
+    MarkImagesForDeletion(delete_list,first,last,length);
   }
   /*
     Delete images marked for deletion, once only.
