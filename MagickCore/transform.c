@@ -2133,20 +2133,7 @@ MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait transpose_traits=GetPixelChannelTraits(transpose_image,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (transpose_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(transpose_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,transpose_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(transpose_image);
     }
