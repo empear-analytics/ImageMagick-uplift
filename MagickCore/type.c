@@ -739,6 +739,14 @@ MagickExport char **GetTypeList(const char *pattern,size_t *number_fonts,
 */
 
 #if defined(MAGICKCORE_FONTCONFIG_DELEGATE)
+static inline MagickBooleanType IsNonRegularFontStyle(const FcResult status,
+  const FcChar8 *style)
+{
+  return(((status == FcResultMatch) && (style != (FcChar8 *) NULL) &&
+    (LocaleCompare((const char *) style,"Regular") != 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
   ExceptionInfo *exception)
 {
@@ -842,8 +850,7 @@ MagickExport MagickBooleanType LoadFontConfigFonts(SplayTreeInfo *type_cache,
         if (family != (FcChar8 *) NULL)
           (void) CopyMagickString(name,(const char *) family,MagickPathExtent);
         status=FcPatternGetString(font_set->fonts[i],FC_STYLE,0,&style);
-        if ((status == FcResultMatch) && (style != (FcChar8 *) NULL) &&
-            (LocaleCompare((const char *) style,"Regular") != 0))
+        if (IsNonRegularFontStyle(status,style) != MagickFalse)
           {
             (void) ConcatenateMagickString(name," ",MagickPathExtent);
             (void) ConcatenateMagickString(name,(const char *) style,
