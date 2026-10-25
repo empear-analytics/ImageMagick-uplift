@@ -695,6 +695,17 @@ static MagickBooleanType IsMimeCacheInstantiated(ExceptionInfo *exception)
   return(mime_cache != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
 }
 
+static void PrintMimePathHeader(FILE *file,const MimeInfo **mime_info,
+  const ssize_t i)
+{
+  if (mime_info[i]->path != (char *) NULL)
+    (void) FormatLocaleFile(file,"\nPath: %s\n\n",mime_info[i]->path);
+  (void) FormatLocaleFile(file,"Type                   Description\n");
+  (void) FormatLocaleFile(file,
+    "-------------------------------------------------"
+    "------------------------------\n");
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -749,14 +760,7 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
       continue;
     if ((path == (const char *) NULL) ||
         (strcasecmp(path,mime_info[i]->path) != 0))
-      {
-        if (mime_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",mime_info[i]->path);
-        (void) FormatLocaleFile(file,"Type                   Description\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
-      }
+      PrintMimePathHeader(file,mime_info,i);
     path=mime_info[i]->path;
     (void) FormatLocaleFile(file,"%s",mime_info[i]->type);
     if (strlen(mime_info[i]->type) <= 25)
