@@ -191,3 +191,27 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 2.06 → 2.33** (`cs-mcp` 1.5.12). Branch `campaign/M45-annotate`,
+stacked on `campaign/M44-blob`. 4 refactor commits, all Recipe P, adding 6 predicates.
+- Oracle-verified: RenderFreetype (`IsUnauthorizedFontFile`, `IsTextWithoutGlyphs`) and
+  FormatMagickCaption (`IsBreakableSpace`).
+- Guard-verified: RenderFreetype's two stroke tests (`IsRenderedStroke`,
+  `IsVisibleStroke`), which have survivors on their lines, and IsValidPostscriptFontname
+  (`IsPostscriptNameChar`, no case).
+- The first try at `IsPostscriptNameChar` declared its parameter `const char *`. The
+  build warned (the caller's `p` is `const unsigned char *`), so it was reverted and
+  redone with the right type.
+
+**Not done:**
+- `ContainsRaqmParagraphSeparator`: it sits inside `#if defined(MAGICKCORE_RAQM_DELEGATE)`,
+  which this build does not compile, so it is untouchable.
+- RenderFreetype's interword-spacing test: it would need five arguments, including a
+  loop-local cursor.
+
+**What is left, at 2.33.**
+- `RenderFreetype` (the glyph loop: bumpy, nested, with shared FreeType state).
+- `AnnotateImage` (multi-line layout with gravity).
+- `RenderPostscript` (no oracle case: Ghostscript is not in the corpus).
