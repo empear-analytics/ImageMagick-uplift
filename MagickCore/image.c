@@ -4152,6 +4152,22 @@ MagickExport MagickBooleanType SyncImage(Image *image,ExceptionInfo *exception)
   return(status);
 }
 
+static void ParseChromaticityPrimary(const char *option,PrimaryInfo *primary)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  flags=ParseGeometry(option,&geometry_info);
+  if ((flags & RhoValue) != 0)
+    primary->x=geometry_info.rho;
+  primary->y=primary->x;
+  if ((flags & SigmaValue) != 0)
+    primary->y=geometry_info.sigma;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -4272,14 +4288,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickBooleanOptions,MagickFalse,option);
   option=GetImageOption(image_info,"blue-primary");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->chromaticity.blue_primary.x=geometry_info.rho;
-      image->chromaticity.blue_primary.y=image->chromaticity.blue_primary.x;
-      if ((flags & SigmaValue) != 0)
-        image->chromaticity.blue_primary.y=geometry_info.sigma;
-    }
+    ParseChromaticityPrimary(option,&image->chromaticity.blue_primary);
   option=GetImageOption(image_info,"bordercolor");
   if (option != (const char *) NULL)
     (void) QueryColorCompliance(option,AllCompliance,&image->border_color,
@@ -4328,14 +4337,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickFalse,option);
   option=GetImageOption(image_info,"green-primary");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->chromaticity.green_primary.x=geometry_info.rho;
-      image->chromaticity.green_primary.y=image->chromaticity.green_primary.x;
-      if ((flags & SigmaValue) != 0)
-        image->chromaticity.green_primary.y=geometry_info.sigma;
-    }
+    ParseChromaticityPrimary(option,&image->chromaticity.green_primary);
   option=GetImageOption(image_info,"intent");
   if (option != (const char *) NULL)
     image->rendering_intent=(RenderingIntent) ParseCommandOption(
@@ -4378,14 +4380,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
     image->quality=StringToUnsignedLong(option);
   option=GetImageOption(image_info,"red-primary");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->chromaticity.red_primary.x=geometry_info.rho;
-      image->chromaticity.red_primary.y=image->chromaticity.red_primary.x;
-      if ((flags & SigmaValue) != 0)
-        image->chromaticity.red_primary.y=geometry_info.sigma;
-    }
+    ParseChromaticityPrimary(option,&image->chromaticity.red_primary);
   if (image_info->quality != UndefinedCompressionQuality)
     image->quality=image_info->quality;
   option=GetImageOption(image_info,"scene");
@@ -4440,14 +4435,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       exception);
   option=GetImageOption(image_info,"white-point");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->chromaticity.white_point.x=geometry_info.rho;
-      image->chromaticity.white_point.y=image->chromaticity.white_point.x;
-      if ((flags & SigmaValue) != 0)
-        image->chromaticity.white_point.y=geometry_info.sigma;
-    }
+    ParseChromaticityPrimary(option,&image->chromaticity.white_point);
   /*
     Pointer to allow the lookup of pre-image artifact will fallback to a global
     option setting/define.  This saves a lot of duplication of global options
