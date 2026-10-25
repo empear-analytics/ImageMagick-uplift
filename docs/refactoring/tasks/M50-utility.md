@@ -189,3 +189,38 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 3.26 → 3.65** (`cs-mcp` 1.5.12). Branch `campaign/M50-utility`,
+stacked on `campaign/M49-string`. Four refactor commits, all oracle-verified:
+- **P (3 commits).**
+  - `IsCompressedFileExtension` (AppendImageFormat), 3.26 → 3.42.
+  - `IsTextMagick` (ExpandFilenames, careful; no survivor on the line).
+  - `IsImageFormatPrefix` and `IsCompressionExtension` (GetPathComponent).
+
+  Complex Conditional leaves the file. The two compression-extension tests list the same
+  five extensions in different orders (Z first in AppendImageFormat, bz2 first in
+  GetPathComponent). Merging them would reorder `LocaleCompare` calls, so each keeps
+  its own predicate.
+- **E (1 commit).** `FormatExpandedPath` (ExpandFilenames): the magick:file[subimage]
+  composition.
+
+The oracle runs diverged only on known cases: the log-map tie and the hough pair (clean
+3/3 on rerun). `pgroup.sh` now accepts exactly these known cases, and the commit
+message names them.
+
+**Reverted.** GetPathComponent's format-prefix loop as a value-returning helper
+(`StripMagickPrefix`) lowered the score from 3.63 to 3.51, because the helper brings its
+own depth-4 nest.
+
+**What is left, at 3.65.**
+- `GetPathComponent` (cc 46, depth 5): the subimage block writes `subimage_length`,
+  `subimage_offset` and the component, so it has two outputs.
+- `ExpandFilenames` (cc 48, depth 5): the remaining blocks `continue`, or write
+  `count`, `vector` and `destroy` together.
+- `Base64Decode` (careful): its state machine writes `decode[]`, `i` and `state`, and
+  has unmatched survivors inside.
+- `GetPathTemplate`, `ListFiles`, `GetExecutionPath`, `AcquireUniqueSymbolicLink` and
+  `ShredFile`: their blocks interleave `#if` branches for Windows, VMS, OS/2 or POSIX
+  only, which this build does not compile.
