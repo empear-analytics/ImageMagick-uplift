@@ -1025,6 +1025,29 @@ static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
   return(utf8);
 }
 
+static inline MagickBooleanType IsEntityTextChar(const char *xml,
+  const int state)
+{
+  return(((*xml != '\0') && (*xml != '&') && ((*xml != '%') ||
+    (state != '%')) &&
+    (isspace((int) ((unsigned char) *xml)) == 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEntityReference(const char *xml,
+  const int state)
+{
+  return((((*xml == '&') && ((state == '&') || (state == ' ') ||
+    (state == '*'))) || ((state == '%') && (*xml == '%'))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsCollapsibleSpace(const char *xml,
+  const int state)
+{
+  return((((state == ' ') || (state == '*')) &&
+    (isspace((int) ((unsigned char) *xml)) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static char *ParseEntities(char *xml,char **entities,int state)
 {
   char
@@ -1058,8 +1081,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
     }
   for (xml=p; ; )
   {
-    while ((*xml != '\0') && (*xml != '&') && ((*xml != '%') ||
-           (state != '%')) && (isspace((int) ((unsigned char) *xml)) == 0))
+    while (IsEntityTextChar(xml,state) != MagickFalse)
       xml++;
     if (*xml == '\0')
       break;
@@ -1111,8 +1133,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
         (void) memmove(xml,strchr(xml,';')+1,strlen(strchr(xml,';')));
       }
     else
-      if (((*xml == '&') && ((state == '&') || (state == ' ') ||
-          (state == '*'))) || ((state == '%') && (*xml == '%')))
+      if (IsEntityReference(xml,state) != MagickFalse)
         {
           /*
             Find entity in the list.
@@ -1169,8 +1190,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
               }
         }
       else
-        if (((state == ' ') || (state == '*')) &&
-            (isspace((int) ((unsigned char) *xml)) != 0))
+        if (IsCollapsibleSpace(xml,state) != MagickFalse)
           *(xml++)=' ';
         else
           xml++;
