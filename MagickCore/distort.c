@@ -385,6 +385,13 @@ static inline MagickBooleanType IsAffineFallback(const size_t number_arguments,
        ) ) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsMatrixMemoryMissing(double **matrix,
+  double **vectors,const double *terms)
+{
+  return(((matrix  == (double **) NULL) || (vectors == (double **) NULL) ||
+    (terms   == (double *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const size_t number_arguments,const double *arguments,
   size_t number_values,ExceptionInfo *exception)
@@ -1160,8 +1167,7 @@ static double *GenerateCoefficients(const Image *image,
       vectors=(double **) AcquireQuantumMemory(number_values,
         sizeof(*vectors));
       terms=(double *) AcquireQuantumMemory(nterms,sizeof(*terms));
-      if ((matrix  == (double **) NULL) || (vectors == (double **) NULL) ||
-          (terms   == (double *) NULL))
+      if (IsMatrixMemoryMissing(matrix,vectors,terms) != MagickFalse)
       {
         matrix  = RelinquishMagickMatrix(matrix, nterms);
         vectors = (double **) RelinquishMagickMemory(vectors);
