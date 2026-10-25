@@ -150,3 +150,20 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 6.87, unchanged. No legal step was found.** Branch
+`campaign/M60-memory` carries only this task file.
+- AcquireMagickMemory: everything after the first line sits in the
+  `MAGICKCORE_ANONYMOUS_MEMORY_SUPPORT` branch, which this build does not compile.
+- AcquireVirtualMemory (depth 5): the anonymous-policy block holds a `MAP_ANONYMOUS`
+  `#if`, and the file-backed mapping holds a `MAGICKCORE_HAVE_POSIX_FALLOCATE` `#if`
+  whose other branch macOS does not compile. Moving either would carry uncompiled text.
+- CopyMagickMemory: a fall-through `switch` that returns from inside.
+- Code Duplication: GetMaxMemoryRequestFromPolicy and GetMaxProfileSizeFromPolicy
+  differ in the policy name and the minimum (two values). The `*QuantumMemory` and
+  `*MemoryMethods` pairs differ in several statements.
+
+This file waits for a build that compiles the anonymous-memory branch (see the
+playbook's *Preprocessor branches*).
