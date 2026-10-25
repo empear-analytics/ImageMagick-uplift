@@ -1062,6 +1062,23 @@ MagickExport ImageInfo *CloneImageInfo(const ImageInfo *image_info)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsOffsetRegionOutside(const Image *image,
+  const RectangleInfo *geometry,const OffsetInfo *offset)
+{
+  return(((offset->x < 0) || (offset->y < 0) ||
+    ((offset->x+(ssize_t) geometry->width) > (ssize_t) image->columns) ||
+    ((offset->y+(ssize_t) geometry->height) > (ssize_t) image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsChannelNotCopied(const PixelTrait traits,
+  const PixelTrait source_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    ((traits & UpdatePixelTrait) == 0) ||
+    (source_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType CopyImagePixels(Image *image,
   const Image *source_image,const RectangleInfo *geometry,
   const OffsetInfo *offset,ExceptionInfo *exception)
@@ -1087,9 +1104,7 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
   assert(offset != (OffsetInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if ((offset->x < 0) || (offset->y < 0) ||
-      ((offset->x+(ssize_t) geometry->width) > (ssize_t) image->columns) ||
-      ((offset->y+(ssize_t) geometry->height) > (ssize_t) image->rows))
+  if (IsOffsetRegionOutside(image,geometry,offset) != MagickFalse)
     ThrowBinaryException(OptionError,"GeometryDoesNotContainImage",
       image->filename);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
@@ -1140,9 +1155,7 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
         PixelChannel channel = GetPixelChannelChannel(image,i);
         PixelTrait traits = GetPixelChannelTraits(image,channel);
         PixelTrait source_traits=GetPixelChannelTraits(source_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            ((traits & UpdatePixelTrait) == 0) ||
-            (source_traits == UndefinedPixelTrait))
+        if (IsChannelNotCopied(traits,source_traits) != MagickFalse)
           continue;
         SetPixelChannel(image,channel,p[i],q);
       }
@@ -1662,6 +1675,12 @@ MagickExport VirtualPixelMethod GetImageVirtualPixelMethod(const Image *image)
 %
 */
 
+static inline MagickBooleanType IsUnknownFormatSpecifier(const char specifier)
+{
+  return(((specifier != 'd') && (specifier != 'x') && (specifier != 'o')) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
   const char *end)
 {
@@ -1674,7 +1693,7 @@ static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
   /*
     Is this a valid format specifier?
   */
-  if ((specifier != 'd') && (specifier != 'x') && (specifier != 'o'))
+  if (IsUnknownFormatSpecifier(specifier) != MagickFalse)
     return(MagickFalse);
   if ((length == 1) && (*start == specifier))
     return(MagickTrue);
@@ -1695,6 +1714,12 @@ static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
       return(MagickTrue);
     }
   return(MagickFalse);
+}
+
+static inline MagickBooleanType IsIntegerSpecifierAt(const char *cursor)
+{
+  return(((*cursor == 'd') || (*cursor == 'o') || (*cursor == 'x')) ?
+    MagickTrue : MagickFalse);
 }
 
 MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
@@ -1743,7 +1768,7 @@ MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
     specifier_start=cursor;
     while (isdigit((int) ((unsigned char) *cursor)) != 0)
       cursor++;
-    if ((*cursor == 'd') || (*cursor == 'o') || (*cursor == 'x'))
+    if (IsIntegerSpecifierAt(cursor) != MagickFalse)
       {
         const char
           *specifier_end = cursor+1;
@@ -2852,6 +2877,31 @@ static const MagickInfo *SetImageInfoFromExtension(ImageInfo *image_info,
   return(magick_info);
 }
 
+static inline MagickBooleanType IsUndelegatedComponent(
+  const DelegateInfo *delegate_info,const char *component)
+{
+  return(((delegate_info == (const DelegateInfo *) NULL) &&
+    ((*component != '\0') && (IsGlob(component) == MagickFalse))) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUsableMagick(const MagickInfo *magick_info,
+  const DelegateInfo *delegate_info,const char *magic)
+{
+  return((((magick_info != (const MagickInfo *) NULL) ||
+    (delegate_info != (const DelegateInfo *) NULL)) &&
+    (IsMagickConflict(magic) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsExtensionMagickMatch(
+  const MagickInfo *magick_info,const MagicInfo *magic_info)
+{
+  return(((magick_info != (const MagickInfo *) NULL) &&
+    (GetMagickUseExtension(magick_info) != MagickFalse) &&
+    (LocaleCompare(magick_info->magick_module,GetMagicName(
+    magic_info)) == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
@@ -2989,8 +3039,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
           delegate_info=GetDelegateInfo(magic,"*",sans_exception);
           if (delegate_info == (const DelegateInfo *) NULL)
             delegate_info=GetDelegateInfo("*",magic,sans_exception);
-          if ((delegate_info == (const DelegateInfo *) NULL) &&
-              ((*component != '\0') && (IsGlob(component) == MagickFalse)))
+          if (IsUndelegatedComponent(delegate_info,component) != MagickFalse)
             {
               /*
                 Retry in case GetMagickInfo loaded a custom module.
@@ -2999,9 +3048,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
                 sans_exception);
             }
         }
-      if (((magick_info != (const MagickInfo *) NULL) ||
-           (delegate_info != (const DelegateInfo *) NULL)) &&
-          (IsMagickConflict(magic) == MagickFalse))
+      if (IsUsableMagick(magick_info,delegate_info,magic) != MagickFalse)
         {
           char *literal = (char *) GetImageRegistry(StringRegistryType,
             "filename:literal",exception);
@@ -3121,10 +3168,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
           /*
             Try to use magick_info that was determined earlier by the extension
           */
-          if ((magick_info != (const MagickInfo *) NULL) &&
-              (GetMagickUseExtension(magick_info) != MagickFalse) &&
-              (LocaleCompare(magick_info->magick_module,GetMagicName(
-                magic_info)) == 0))
+          if (IsExtensionMagickMatch(magick_info,magic_info) != MagickFalse)
             (void) CopyMagickString(image_info->magick,magick_info->name,
               MagickPathExtent);
           else
@@ -3448,6 +3492,14 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsInsideRegion(const RectangleInfo *region,
+  const ssize_t x,const ssize_t y)
+{
+  return((((x >= region->x) && (x < (region->x+(ssize_t) region->width))) &&
+    ((y >= region->y) && (y < (region->y+(ssize_t) region->height)))) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageRegionMask(Image *image,
   const PixelMask type,const RectangleInfo *region,ExceptionInfo *exception)
 {
@@ -3541,8 +3593,7 @@ MagickExport MagickBooleanType SetImageRegionMask(Image *image,
         pixel;
 
       pixel=QuantumRange;
-      if (((x >= region->x) && (x < (region->x+(ssize_t) region->width))) &&
-          ((y >= region->y) && (y < (region->y+(ssize_t) region->height))))
+      if (IsInsideRegion(region,x,y) != MagickFalse)
         pixel=(Quantum) 0;
       switch (type)
       {
@@ -3646,6 +3697,23 @@ MagickExport VirtualPixelMethod SetImageVirtualPixelMethod(Image *image,
 %
 */
 
+static inline MagickBooleanType IsLeftGapEdge(const Image *left_image,
+  const Quantum *p,const ssize_t x,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(left_image,p) != TransparentAlpha) ||
+    (((ssize_t) left_image->columns-x-1) >= (ssize_t) gap)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsRightGapEdge(const Image *right_image,
+  const Quantum *p,const ssize_t x,const ssize_t i,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
+    ((x+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+}
+
 static ssize_t SmushXGap(const Image *smush_image,const Image *images,
   const ssize_t offset,ExceptionInfo *exception)
 {
@@ -3692,9 +3760,7 @@ static ssize_t SmushXGap(const Image *smush_image,const Image *images,
     for (x=(ssize_t) left_image->columns-1; x > 0; x--)
     {
       p=GetCacheViewVirtualPixels(left_view,x,left_geometry.y+y,1,1,exception);
-      if ((p == (const Quantum *) NULL) ||
-          (GetPixelAlpha(left_image,p) != TransparentAlpha) ||
-          (((ssize_t) left_image->columns-x-1) >= (ssize_t) gap))
+      if (IsLeftGapEdge(left_image,p,x,gap) != MagickFalse)
         break;
     }
     i=(ssize_t) left_image->columns-x-1;
@@ -3702,9 +3768,7 @@ static ssize_t SmushXGap(const Image *smush_image,const Image *images,
     {
       p=GetCacheViewVirtualPixels(right_view,x,right_geometry.y+y,1,1,
         exception);
-      if ((p == (const Quantum *) NULL) ||
-          (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
-          ((x+i) >= (ssize_t) gap))
+      if (IsRightGapEdge(right_image,p,x,i,gap) != MagickFalse)
         break;
     }
     if ((x+i) < (ssize_t) gap)
@@ -3715,6 +3779,23 @@ static ssize_t SmushXGap(const Image *smush_image,const Image *images,
   if (y < (ssize_t) smush_image->rows)
     return(offset);
   return((ssize_t) gap-offset);
+}
+
+static inline MagickBooleanType IsTopGapEdge(const Image *top_image,
+  const Quantum *p,const ssize_t y,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(top_image,p) != TransparentAlpha) ||
+    (((ssize_t) top_image->rows-y-1) >= (ssize_t) gap)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsBottomGapEdge(const Image *bottom_image,
+  const Quantum *p,const ssize_t y,const ssize_t i,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(bottom_image,p) != TransparentAlpha) ||
+    ((y+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
 }
 
 static ssize_t SmushYGap(const Image *smush_image,const Image *images,
@@ -3763,9 +3844,7 @@ static ssize_t SmushYGap(const Image *smush_image,const Image *images,
     for (y=(ssize_t) top_image->rows-1; y > 0; y--)
     {
       p=GetCacheViewVirtualPixels(top_view,top_geometry.x+x,y,1,1,exception);
-      if ((p == (const Quantum *) NULL) ||
-          (GetPixelAlpha(top_image,p) != TransparentAlpha) ||
-          (((ssize_t) top_image->rows-y-1) >= (ssize_t) gap))
+      if (IsTopGapEdge(top_image,p,y,gap) != MagickFalse)
         break;
     }
     i=(ssize_t) top_image->rows-y-1;
@@ -3773,9 +3852,7 @@ static ssize_t SmushYGap(const Image *smush_image,const Image *images,
     {
       p=GetCacheViewVirtualPixels(bottom_view,bottom_geometry.x+x,y,1,1,
         exception);
-      if ((p == (const Quantum *) NULL) ||
-          (GetPixelAlpha(bottom_image,p) != TransparentAlpha) ||
-          ((y+i) >= (ssize_t) gap))
+      if (IsBottomGapEdge(bottom_image,p,y,i,gap) != MagickFalse)
         break;
     }
     if ((y+i) < (ssize_t) gap)
@@ -4116,6 +4193,36 @@ MagickExport MagickBooleanType SyncImagesSettings(ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static void ConvertResolutionUnits(Image *image,const ResolutionType units)
+{
+  if (image->units != units)
+    switch (image->units)
+    {
+      case PixelsPerInchResolution:
+      {
+        if (units == PixelsPerCentimeterResolution)
+          {
+            image->resolution.x/=2.54;
+            image->resolution.y/=2.54;
+          }
+        break;
+      }
+      case PixelsPerCentimeterResolution:
+      {
+        if (units == PixelsPerInchResolution)
+          {
+            image->resolution.x=(double) ((size_t) (100.0*2.54*
+              image->resolution.x+0.5))/100.0;
+            image->resolution.y=(double) ((size_t) (100.0*2.54*
+              image->resolution.y+0.5))/100.0;
+          }
+        break;
+      }
+      default:
+        break;
+    }
+}
+
 MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -4298,32 +4405,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickFalse,option);
   if (units != UndefinedResolution)
     {
-      if (image->units != units)
-        switch (image->units)
-        {
-          case PixelsPerInchResolution:
-          {
-            if (units == PixelsPerCentimeterResolution)
-              {
-                image->resolution.x/=2.54;
-                image->resolution.y/=2.54;
-              }
-            break;
-          }
-          case PixelsPerCentimeterResolution:
-          {
-            if (units == PixelsPerInchResolution)
-              {
-                image->resolution.x=(double) ((size_t) (100.0*2.54*
-                  image->resolution.x+0.5))/100.0;
-                image->resolution.y=(double) ((size_t) (100.0*2.54*
-                  image->resolution.y+0.5))/100.0;
-              }
-            break;
-          }
-          default:
-            break;
-        }
+      ConvertResolutionUnits(image,units);
       image->units=units;
       option=GetImageOption(image_info,"density");
       if (option != (const char *) NULL)

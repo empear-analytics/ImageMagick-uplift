@@ -6,6 +6,14 @@ responses"). Piping every request in and closing stdin at once therefore
 loses any file that takes longer than that to score - MagickWand/magick-image.c
 came back silent in two full sweeps. This keeps stdin open until every
 request id has an answer, or until the deadline passes.
+
+It then holds stdin open for CS_MCP_LINGER seconds more (default 3) before
+closing it. cs-mcp reports each tool call to CodeScene's usage statistics
+asynchronously, and a server that exits the moment it has answered drops that
+report: on 2026-10-25 a one-shot call closed at once was not counted, while
+the same call held open 3 or 10 seconds was (show_mcp_usage_overview,
+code-health-score 29,667 -> 29,668 -> 29,669). Without the pause every
+measurement this repository's tools made went missing from the statistics.
 """
 
 from __future__ import annotations
@@ -15,7 +23,11 @@ import os
 import subprocess
 import tempfile
 import threading
+import time
 from dataclasses import dataclass
+
+
+LINGER = float(os.environ.get("CS_MCP_LINGER", "3"))
 
 
 @dataclass
@@ -44,6 +56,7 @@ def _read_until_answered(proc: subprocess.Popen, waiting: set) -> list[str]:
         lines.append(line)
         waiting.discard(_answered_id(line))
         if not waiting and not proc.stdin.closed:
+            time.sleep(LINGER)  # let cs-mcp send its usage report first
             proc.stdin.close()
     return lines
 

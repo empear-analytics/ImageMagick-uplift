@@ -518,6 +518,21 @@ static void ReversePoints(PointInfo *points,const size_t number_points)
   }
 }
 
+static inline MagickBooleanType IsDirectionChange(const PointInfo *points,
+  const long direction,const long next_direction)
+{
+  return(((points != (PointInfo *) NULL) && (direction != 0) &&
+    (direction != next_direction)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsSubpathStart(const PathInfo *path_info,
+  const ssize_t i)
+{
+  return(((path_info[i].code == MoveToCode) ||
+    (path_info[i].code == OpenCode) ||
+    (path_info[i].code == GhostlineCode)) ? MagickTrue : MagickFalse);
+}
+
 static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   ExceptionInfo *exception)
 {
@@ -586,8 +601,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
   polygon_info->number_edges=0;
   for (i=0; path_info[i].code != EndCode; i++)
   {
-    if ((path_info[i].code == MoveToCode) || (path_info[i].code == OpenCode) ||
-        (path_info[i].code == GhostlineCode))
+    if (IsSubpathStart(path_info,i) != MagickFalse)
       {
         /*
           Move to.
@@ -651,8 +665,7 @@ static PolygonInfo *ConvertPathToPolygon(const PathInfo *path_info,
     next_direction=((path_info[i].point.y > point.y) ||
       ((fabs(path_info[i].point.y-point.y) < MagickEpsilon) &&
        (path_info[i].point.x > point.x))) ? 1 : -1;
-    if ((points != (PointInfo *) NULL) && (direction != 0) &&
-        (direction != next_direction))
+    if (IsDirectionChange(points,direction,next_direction) != MagickFalse)
       {
         /*
           New edge.
@@ -836,6 +849,16 @@ static void LogPathInfo(const PathInfo *path_info)
   (void) LogMagickEvent(DrawEvent,GetMagickModule(),"    end vector-path");
 }
 
+static inline MagickBooleanType IsNewSubpathPoint(const PathInfoCode code,
+  const size_t coordinates,const PointInfo q,
+  const PrimitiveInfo *primitive_info,const size_t i)
+{
+  return(((code == MoveToCode) || (coordinates <= 0) ||
+    (fabs(q.x-primitive_info[i].point.x) >= MagickEpsilon) ||
+    (fabs(q.y-primitive_info[i].point.y) >= MagickEpsilon)) ? MagickTrue :
+    MagickFalse);
+}
+
 static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
 {
@@ -906,9 +929,7 @@ static PathInfo *ConvertPrimitiveToPath(const PrimitiveInfo *primitive_info,
         closed_subpath=primitive_info[i].closed_subpath;
       }
     coordinates--;
-    if ((code == MoveToCode) || (coordinates <= 0) ||
-        (fabs(q.x-primitive_info[i].point.x) >= MagickEpsilon) ||
-        (fabs(q.y-primitive_info[i].point.y) >= MagickEpsilon))
+    if (IsNewSubpathPoint(code,coordinates,q,primitive_info,i) != MagickFalse)
       {
         /*
           Eliminate duplicate points.
@@ -1752,6 +1773,14 @@ static Image *DrawCompositeMask(Image *image,const DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsDashSegmentPending(
+  const MagickStatusType status,const double total_length,
+  const double maximum_length,const ssize_t n,const ssize_t j)
+{
+  return(((status != MagickFalse) && (total_length < maximum_length) &&
+    ((n & 0x01) == 0) && (j > 1)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,Image *image,ExceptionInfo *exception)
 {
@@ -1891,8 +1920,8 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
     dash_polygon[j].coordinates=1;
     j++;
   }
-  if ((status != MagickFalse) && (total_length < maximum_length) &&
-      ((n & 0x01) == 0) && (j > 1))
+  if (IsDashSegmentPending(status,total_length,maximum_length,n,j) !=
+      MagickFalse)
     {
       dash_polygon[j]=primitive_info[i-1];
       dash_polygon[j].closed_subpath=MagickFalse;
@@ -2282,6 +2311,14 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
 %
 */
 
+static inline MagickBooleanType IsMVGInfoMissing(const MVGInfo *mvg_info)
+{
+  return(((mvg_info == (MVGInfo *) NULL) ||
+    (mvg_info->primitive_info == (PrimitiveInfo **) NULL) ||
+    (*mvg_info->primitive_info == (PrimitiveInfo *) NULL) ||
+    (mvg_info->extent == (size_t *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType CheckPrimitiveExtent(MVGInfo *mvg_info,
   const double pad)
 {
@@ -2297,10 +2334,7 @@ static inline MagickBooleanType CheckPrimitiveExtent(MVGInfo *mvg_info,
   ssize_t
     i;
 
-  if ((mvg_info == (MVGInfo *) NULL) ||
-      (mvg_info->primitive_info == (PrimitiveInfo **) NULL) ||
-      (*mvg_info->primitive_info == (PrimitiveInfo *) NULL) ||
-      (mvg_info->extent == (size_t *) NULL))
+  if (IsMVGInfoMissing(mvg_info) != MagickFalse)
     return(MagickFalse);
   proposed_extent=mvg_info->offset+pad+PrimitiveExtentPad+1.0;
   if ((proposed_extent <= 0.0) || (proposed_extent > (double) MAGICK_SIZE_MAX))
@@ -2517,6 +2551,63 @@ static inline MagickBooleanType TracePoint(PrimitiveInfo *primitive_info,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsNonIdentityAffine(const AffineMatrix affine)
+{
+  return(((fabs(affine.sx-1.0) >= MagickEpsilon) ||
+    (fabs(affine.rx) >= MagickEpsilon) || (fabs(affine.ry) >= MagickEpsilon) ||
+    (fabs(affine.sy-1.0) >= MagickEpsilon) ||
+    (fabs(affine.tx) >= MagickEpsilon) ||
+    (fabs(affine.ty) >= MagickEpsilon)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsClipMaskChanged(DrawInfo **graphic_context,
+  const ssize_t n)
+{
+  return(((n != 0) && (graphic_context[n]->compliance != SVGCompliance) &&
+    (graphic_context[n]->clip_mask != (char *) NULL) &&
+    (LocaleCompare(graphic_context[n]->clip_mask,
+    graphic_context[n-1]->clip_mask) != 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsMVGFileReference(const DrawInfo *draw_info,
+  const size_t depth)
+{
+  return(((*draw_info->primitive == '@') &&
+    (strlen(draw_info->primitive) > 1) &&
+    (*(draw_info->primitive+1) != '-') && (depth == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsMVGBlockEndMissing(const char *q,
+  const char *p)
+{
+  return(((q == (char *) NULL) || (p == (char *) NULL) ||
+    ((q-4) < p)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsMVGBlockEndInvalid(const char *q,
+  const char *p,const size_t extent)
+{
+  return(((q == (char *) NULL) || (*q == '\0') ||
+    (p == (char *) NULL) || ((q-4) < p) ||
+    ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsMVGBlockEndOutside(const char *q,
+  const char *p,const size_t extent)
+{
+  return(((q == (char *) NULL) || (p == (char *) NULL) ||
+    ((q-4) < p) || ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRenderableClass(DrawInfo **graphic_context,
+  const ssize_t n,const char *mvg_class,const char *p,const char *primitive)
+{
+  return(((graphic_context[n]->render != MagickFalse) &&
+    (mvg_class != (const char *) NULL) && (p > primitive)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -2616,8 +2707,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
       if (status == MagickFalse)
         return(MagickFalse);
     }
-  if ((*draw_info->primitive == '@') && (strlen(draw_info->primitive) > 1) &&
-      (*(draw_info->primitive+1) != '-') && (depth == 0))
+  if (IsMVGFileReference(draw_info,depth) != MagickFalse)
     primitive=FileToString(draw_info->primitive,~0UL,exception);
   else
     primitive=AcquireString(draw_info->primitive);
@@ -2811,8 +2901,8 @@ static MagickBooleanType RenderMVGContent(Image *image,
                 break;
               }
             mvg_class=(const char *) GetValueFromSplayTree(macros,token);
-            if ((graphic_context[n]->render != MagickFalse) &&
-                (mvg_class != (const char *) NULL) && (p > primitive))
+            if (IsRenderableClass(graphic_context,n,mvg_class,p,primitive) !=
+                MagickFalse)
               {
                 char
                   *elements;
@@ -3440,7 +3530,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
                     continue;
                   break;
                 }
-                if ((q == (char *) NULL) || (p == (char *) NULL) || ((q-4) < p))
+                if (IsMVGBlockEndMissing(q,p) != MagickFalse)
                   {
                     status=MagickFalse;
                     break;
@@ -3516,9 +3606,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
                     continue;
                   break;
                 }
-                if ((q == (char *) NULL) || (*q == '\0') ||
-                    (p == (char *) NULL) || ((q-4) < p) ||
-                    ((size_t) (q-p+4+1) > extent))
+                if (IsMVGBlockEndInvalid(q,p,extent) != MagickFalse)
                   {
                     status=MagickFalse;
                     break;
@@ -3639,8 +3727,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
                     continue;
                   break;
                 }
-                if ((q == (char *) NULL) || (p == (char *) NULL) ||
-                    ((q-4) < p) || ((size_t) (q-p+4+1) > extent))
+                if (IsMVGBlockEndOutside(q,p,extent) != MagickFalse)
                   {
                     status=MagickFalse;
                     break;
@@ -4121,10 +4208,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     }
     if (status == MagickFalse)
       break;
-    if ((fabs(affine.sx-1.0) >= MagickEpsilon) ||
-        (fabs(affine.rx) >= MagickEpsilon) || (fabs(affine.ry) >= MagickEpsilon) ||
-        (fabs(affine.sy-1.0) >= MagickEpsilon) ||
-        (fabs(affine.tx) >= MagickEpsilon) || (fabs(affine.ty) >= MagickEpsilon))
+    if (IsNonIdentityAffine(affine) != MagickFalse)
       {
         graphic_context[n]->affine.sx=current.sx*affine.sx+current.ry*affine.rx;
         graphic_context[n]->affine.rx=current.rx*affine.sx+current.sy*affine.rx;
@@ -4627,10 +4711,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     }
     if (graphic_context[n]->render != MagickFalse)
       {
-        if ((n != 0) && (graphic_context[n]->compliance != SVGCompliance) &&
-            (graphic_context[n]->clip_mask != (char *) NULL) &&
-            (LocaleCompare(graphic_context[n]->clip_mask,
-             graphic_context[n-1]->clip_mask) != 0))
+        if (IsClipMaskChanged(graphic_context,n) != MagickFalse)
           {
             const char
               *clip_path;
@@ -4937,6 +5018,13 @@ static size_t DestroyEdge(PolygonInfo *polygon_info,const ssize_t edge)
   return(polygon_info->number_edges);
 }
 
+static inline MagickBooleanType IsFillAlphaSkipped(const MagickBooleanType fill,
+  const double distance,const double subpath_alpha)
+{
+  return(((fill == MagickFalse) || (distance > 1.0) ||
+    (subpath_alpha >= 1.0)) ? MagickTrue : MagickFalse);
+}
+
 static double GetFillAlpha(PolygonInfo *polygon_info,const double mid,
   const MagickBooleanType fill,const FillRule fill_rule,const ssize_t x,
   const ssize_t y,double *stroke_alpha)
@@ -5054,7 +5142,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,const double mid,
                 }
             }
         }
-      if ((fill == MagickFalse) || (distance > 1.0) || (subpath_alpha >= 1.0))
+      if (IsFillAlphaSkipped(fill,distance,subpath_alpha) != MagickFalse)
         continue;
       if (distance <= 0.0)
         {
@@ -5114,6 +5202,14 @@ static double GetFillAlpha(PolygonInfo *polygon_info,const double mid,
     if (MagickAbsoluteValue(winding_number) != 0)
       return(1.0);
   return(subpath_alpha);
+}
+
+static inline MagickBooleanType IsBoundsOutsideImage(const Image *image,
+  const SegmentInfo bounds)
+{
+  return(((bounds.x1 >= (double) image->columns) ||
+    (bounds.y1 >= (double) image->rows) ||
+    (bounds.x2 <= 0.0) || (bounds.y2 <= 0.0)) ? MagickTrue : MagickFalse);
 }
 
 static MagickBooleanType DrawPolygonPrimitive(Image *image,
@@ -5201,9 +5297,7 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
   bounds.y1-=(mid+1.0);
   bounds.x2+=(mid+1.0);
   bounds.y2+=(mid+1.0);
-  if ((bounds.x1 >= (double) image->columns) ||
-      (bounds.y1 >= (double) image->rows) ||
-      (bounds.x2 <= 0.0) || (bounds.y2 <= 0.0))
+  if (IsBoundsOutsideImage(image,bounds) != MagickFalse)
     {
       polygon_info=DestroyPolygonTLS(polygon_info);
       return(MagickTrue);  /* virtual polygon */
@@ -5480,6 +5574,52 @@ static void LogPrimitiveInfo(const PrimitiveInfo *primitive_info)
   }
 }
 
+static inline MagickBooleanType IsGrayImageWithColor(const Image *image,
+  const DrawInfo *draw_info)
+{
+  return(((IsGrayColorspace(image->colorspace) != MagickFalse) &&
+    ((IsPixelInfoGray(&draw_info->fill) == MagickFalse) ||
+    (IsPixelInfoGray(&draw_info->stroke) == MagickFalse))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsVisibleWideStroke(const double mid,
+  const DrawInfo *draw_info)
+{
+  return(((mid > 1.0) &&
+    ((draw_info->stroke.alpha != (double) TransparentAlpha) ||
+    (draw_info->stroke_pattern != (Image *) NULL))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRoundStrokeOrPrimitive(
+  const DrawInfo *draw_info,const MagickBooleanType closed_path,
+  const PrimitiveInfo *primitive_info,const ssize_t i)
+{
+  return(((((draw_info->linecap == RoundCap) ||
+    (closed_path != MagickFalse)) &&
+    (draw_info->linejoin == RoundJoin)) ||
+    (primitive_info[i].primitive != UndefinedPrimitive)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsCompositeOffset(const ssize_t x1,
+  const ssize_t y1,const Image *composite_image)
+{
+  return((((x1 != 0L) && (x1 != (ssize_t) composite_image->columns)) ||
+    ((y1 != 0L) && (y1 != (ssize_t) composite_image->rows))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsVisibleDashedStroke(const DrawInfo *draw_info,
+  const double scale)
+{
+  return(((draw_info->dash_pattern != (double *) NULL) &&
+    (fabs(draw_info->dash_pattern[0]) >= MagickEpsilon) &&
+    (fabs(scale*draw_info->stroke_width) >= MagickEpsilon) &&
+    (draw_info->stroke.alpha != (double) TransparentAlpha)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType DrawPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -5507,9 +5647,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
         draw_info->affine.tx,draw_info->affine.ty);
     }
   status=MagickTrue;
-  if ((IsGrayColorspace(image->colorspace) != MagickFalse) &&
-      ((IsPixelInfoGray(&draw_info->fill) == MagickFalse) ||
-       (IsPixelInfoGray(&draw_info->stroke) == MagickFalse)))
+  if (IsGrayImageWithColor(image,draw_info) != MagickFalse)
     status&=(MagickStatusType) SetImageColorspace(image,sRGBColorspace,
       exception);
   if (draw_info->compliance == SVGCompliance)
@@ -5809,8 +5947,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
         NULL,(void *) NULL);
       x1=CastDoubleToSsizeT(ceil(primitive_info[1].point.x-0.5));
       y1=CastDoubleToSsizeT(ceil(primitive_info[1].point.y-0.5));
-      if (((x1 != 0L) && (x1 != (ssize_t) composite_image->columns)) ||
-          ((y1 != 0L) && (y1 != (ssize_t) composite_image->rows)))
+      if (IsCompositeOffset(x1,y1,composite_image) != MagickFalse)
         {
           /*
             Resize image.
@@ -5902,10 +6039,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
       if (IsEventLogging() != MagickFalse)
         LogPrimitiveInfo(primitive_info);
       scale=ExpandAffine(&draw_info->affine);
-      if ((draw_info->dash_pattern != (double *) NULL) &&
-          (fabs(draw_info->dash_pattern[0]) >= MagickEpsilon) &&
-          (fabs(scale*draw_info->stroke_width) >= MagickEpsilon) &&
-          (draw_info->stroke.alpha != (double) TransparentAlpha))
+      if (IsVisibleDashedStroke(draw_info,scale) != MagickFalse)
         {
           /*
             Draw dash polygon.
@@ -5922,9 +6056,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
           break;
         }
       mid=ExpandAffine(&draw_info->affine)*draw_info->stroke_width/2.0;
-      if ((mid > 1.0) &&
-          ((draw_info->stroke.alpha != (double) TransparentAlpha) ||
-           (draw_info->stroke_pattern != (Image *) NULL)))
+      if (IsVisibleWideStroke(mid,draw_info) != MagickFalse)
         {
           double
             point_x,
@@ -5942,10 +6074,8 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
           point_y=fabs(primitive_info[i-1].point.y-primitive_info[0].point.y);
           if ((point_x < MagickEpsilon) && (point_y < MagickEpsilon))
             closed_path=MagickTrue;
-          if ((((draw_info->linecap == RoundCap) ||
-                (closed_path != MagickFalse)) &&
-               (draw_info->linejoin == RoundJoin)) ||
-               (primitive_info[i].primitive != UndefinedPrimitive))
+          if (IsRoundStrokeOrPrimitive(draw_info,closed_path,primitive_info,i) !=
+              MagickFalse)
             {
               status&=(MagickStatusType) DrawPolygonPrimitive(image,draw_info,
                 primitive_info,exception);
@@ -7464,6 +7594,14 @@ static MagickBooleanType TraceSquareLinecap(PrimitiveInfo *primitive_info,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsRoundStrokeJoin(const DrawInfo *draw_info,
+  const MagickBooleanType closed_path)
+{
+  return(((draw_info->linejoin == RoundJoin) ||
+    ((draw_info->linejoin == MiterJoin) &&
+    (closed_path != MagickFalse))) ? MagickTrue : MagickFalse);
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -7580,8 +7718,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   offset.y=primitive_info[number_vertices-1].point.y-primitive_info[0].point.y;
   closed_path=(fabs(offset.x) < MagickEpsilon) &&
     (fabs(offset.y) < MagickEpsilon) ? MagickTrue : MagickFalse;
-  if ((draw_info->linejoin == RoundJoin) ||
-      ((draw_info->linejoin == MiterJoin) && (closed_path != MagickFalse)))
+  if (IsRoundStrokeJoin(draw_info,closed_path) != MagickFalse)
     {
       polygon_primitive[number_vertices]=primitive_info[1];
       number_vertices++;

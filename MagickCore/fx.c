@@ -772,9 +772,15 @@ static MagickBooleanType TranslateExpression
 
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe);
 
+static inline MagickBooleanType IsHslOrIntensityChannel(const PixelChannel pc)
+{
+  return((pc==HUE_CHANNEL || pc==SAT_CHANNEL || pc==LIGHT_CHANNEL ||
+    pc==INTENSITY_CHANNEL) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType ChanIsVirtual (PixelChannel pc)
 {
-  if (pc==HUE_CHANNEL || pc==SAT_CHANNEL || pc==LIGHT_CHANNEL || pc==INTENSITY_CHANNEL)
+  if (IsHslOrIntensityChannel(pc) != MagickFalse)
     return MagickTrue;
 
   return MagickFalse;
@@ -1125,6 +1131,20 @@ static const char * OprStr (int oprNum)
   return str;
 }
 
+static inline MagickBooleanType IsJumpElement(const ElementT *pel)
+{
+  return((pel->operator_index == rGoto || pel->operator_index == rGotoChk ||
+    pel->operator_index == rIfZeroGoto ||
+    pel->operator_index == rIfNotZeroGoto) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsPixelReferenceElement(const ElementT *pel)
+{
+  return((pel->operator_index == fP || pel->operator_index == fUP ||
+    pel->operator_index == fVP || pel->operator_index == fSP) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
 {
   int i;
@@ -1148,7 +1168,7 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
   }
   for (i=0; i < pfx->usedElements; i++) {
     ElementT * pel = &pfx->Elements[i];
-    if (pel->operator_index == rGoto || pel->operator_index == rGotoChk || pel->operator_index == rIfZeroGoto || pel->operator_index == rIfNotZeroGoto) {
+    if (IsJumpElement(pel) != MagickFalse) {
       if (pel->element_index >= 0 && pel->element_index < pfx->numElements) {
         ElementT * pelDest = &pfx->Elements[pel->element_index];
         pelDest->number_dest++;
@@ -1162,7 +1182,7 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
     const char * str = OprStr (pel->operator_index);
     const char *sRelAbs = "";
 
-    if (pel->operator_index == fP || pel->operator_index == fUP || pel->operator_index == fVP || pel->operator_index == fSP)
+    if (IsPixelReferenceElement(pel) != MagickFalse)
       sRelAbs = pel->is_relative ? "[]" : "{}";
 
     if (pel->type == etColourConstant)
@@ -1326,14 +1346,20 @@ static MagickBooleanType AddElement(FxInfo * pfx,fxFltType val,int oprNum)
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsAddressingOperator(const int oprNum)
+{
+  return((oprNum == rGoto || oprNum == rGotoChk || oprNum == rIfZeroGoto ||
+    oprNum == rIfNotZeroGoto
+    || oprNum == rZerStk) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType AddAddressingElement (FxInfo * pfx, int oprNum, int EleNdx)
 {
   ElementT * pel;
   if (!AddElement (pfx, (fxFltType) 0, oprNum)) return MagickFalse;
   pel = &pfx->Elements[pfx->usedElements-1];
   pel->element_index = EleNdx;
-  if (oprNum == rGoto || oprNum == rGotoChk || oprNum == rIfZeroGoto || oprNum == rIfNotZeroGoto
-   || oprNum == rZerStk)
+  if (IsAddressingOperator(oprNum) != MagickFalse)
   {
     pel->do_push = MagickFalse;
   }
@@ -1386,6 +1412,12 @@ static MagickBooleanType ExpectChar (FxInfo * pfx, char c)
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsUnqualifiableAttr(const ImgAttrE *pop)
+{
+  return((*pop != aPage && *pop != aPrintsize && *pop != aRes) ? MagickTrue :
+    MagickFalse);
+}
+
 static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
 /* If ".x" or ".y" or ".width" or ".height" increments *pop and returns 1 to 4 .
    Otherwise returns 0.
@@ -1393,7 +1425,7 @@ static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
 {
   int ret=0;
 
-  if (*pop != aPage && *pop != aPrintsize && *pop != aRes) return 0;
+  if (IsUnqualifiableAttr(pop) != MagickFalse) return 0;
 
   if (PeekChar (pfx) != '.') return 0;
 
@@ -1491,11 +1523,16 @@ static MagickBooleanType PopOprOpenParen (FxInfo * pfx, OperatorE op)
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsNotCoordFunction(const int op)
+{
+  return((op != fU && op != fV && op != fS) ? MagickTrue : MagickFalse);
+}
+
 static int GetCoordQualifier (FxInfo * pfx, int op)
 /* Returns -1 if invalid CoordQualifier, +1 if valid and appropriate.
 */
 {
-  if (op != fU && op != fV && op != fS) return -1;
+  if (IsNotCoordFunction(op) != MagickFalse) return -1;
 
   (void) GetToken (pfx);
 
@@ -1508,12 +1545,25 @@ static int GetCoordQualifier (FxInfo * pfx, int op)
   return 1;
 }
 
+static inline MagickBooleanType IsChannelQualifiableOperator(const int op)
+{
+  return((op == fU || op == fV || op == fP ||
+    op == fUP || op == fVP ||
+    op == fS || (op >= (int) FirstImgAttr && op <= aNull)
+    ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAttributeWithVirtualChannel(const int op,
+  const ChannelT *pch)
+{
+  return((op >= (int) FirstImgAttr && op <= (int) ((OperatorE)aNull) &&
+    ChanIsVirtual (pch->pixel_channel)
+    ) ? MagickTrue : MagickFalse);
+}
+
 static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
 {
-  if (op == fU || op == fV || op == fP ||
-      op == fUP || op == fVP ||
-      op == fS || (op >= (int) FirstImgAttr && op <= aNull)
-     )
+  if (IsChannelQualifiableOperator(op) != MagickFalse)
   {
     const ChannelT * pch = &Channels[0];
     (void) GetToken (pfx);
@@ -1521,9 +1571,7 @@ static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
     while (*pch->str) {
       if (LocaleCompare (pch->str, pfx->token)==0) {
 
-        if (op >= (int) FirstImgAttr && op <= (int) ((OperatorE)aNull) &&
-              ChanIsVirtual (pch->pixel_channel)
-           )
+        if (IsAttributeWithVirtualChannel(op,pch) != MagickFalse)
         {
           (void) ThrowMagickException (
             pfx->exception, GetMagickModule(), OptionError,
@@ -1541,6 +1589,12 @@ static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
   return NO_CHAN_QUAL;
 }
 
+static inline MagickBooleanType IsQualifierRequiredAttr(const ImgAttrE ia)
+{
+  return((ia == aPage || ia == aPrintsize || ia == aRes) ? MagickTrue :
+    MagickFalse);
+}
+
 static ImgAttrE GetImgAttrToken (FxInfo * pfx)
 {
   ImgAttrE ia = aNull;
@@ -1555,7 +1609,7 @@ static ImgAttrE GetImgAttrToken (FxInfo * pfx)
     }
   }
 
-  if (ia == aPage || ia == aPrintsize || ia == aRes) {
+  if (IsQualifierRequiredAttr(ia) != MagickFalse) {
     (void) ThrowMagickException (
       pfx->exception, GetMagickModule(), OptionError,
       "Attribute", "'%s' needs qualifier at '%s'",
@@ -1565,10 +1619,16 @@ static ImgAttrE GetImgAttrToken (FxInfo * pfx)
   return ia;
 }
 
+static inline MagickBooleanType IsImageReferenceOperator(const int op)
+{
+  return((op == (OperatorE)fU || op == (OperatorE)fV || op == (OperatorE)fP ||
+    op == (OperatorE)fS) ? MagickTrue : MagickFalse);
+}
+
 static ImgAttrE GetImgAttrQualifier (FxInfo * pfx, int op)
 {
   ImgAttrE ia = aNull;
-  if (op == (OperatorE)fU || op == (OperatorE)fV || op == (OperatorE)fP || op == (OperatorE)fS) {
+  if (IsImageReferenceOperator(op) != MagickFalse) {
     (void) GetToken (pfx);
     if (pfx->lenToken == 0) {
       return aNull;
@@ -1700,6 +1760,12 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
   return 0;
 }
 
+static inline MagickBooleanType IsColourSpaceNamed(const ssize_t type,
+  const MagickBooleanType IsIcc,const MagickBooleanType IsDev)
+{
+  return((type >= 0 || IsIcc || IsDev) ? MagickTrue : MagickFalse);
+}
+
 static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
 /* Finds named colour such as "blue" and colorspace function such as "lab(10,20,30)".
    Returns number of characters to swallow.
@@ -1738,7 +1804,7 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
   */
   if (!QueryColorCompliance (pfx->token, AllCompliance, &colour, dummy_exception) || IsGray) {
     ssize_t type = ParseCommandOption (MagickColorspaceOptions, MagickFalse, ColSp);
-    if (type >= 0 || IsIcc || IsDev) {
+    if (IsColourSpaceNamed(type,IsIcc,IsDev) != MagickFalse) {
       char * q = pfx->pex + pfx->lenToken;
       while (isspace((int) ((unsigned char) *q))) q++;
       if (*q == '(') {
@@ -1841,6 +1907,94 @@ static inline ssize_t GetHexColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, 
   *v2 = QuantumScale*colour.blue;
 
   return (ssize_t) len;
+}
+
+static inline MagickBooleanType IsPadFunction(const FunctionE fe)
+{
+  return((fe == fP || fe == fS|| fe == fIf) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUnexpectedLimit(const char chLimit,
+  const char expChLimit)
+{
+  return((chLimit && chLimit != expChLimit && chLimit != ',' ) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsDefaultArgsFunction(const FunctionE fe)
+{
+  return((fe == fP || fe == fS || fe == fU || fe == fChannel) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsNoArgsFunction(const FunctionE fe,
+  const int FndArgs)
+{
+  return((fe != fS && fe != fV && FndArgs == 0 &&
+    Functions[fe-(int) FirstFunc].number_args == 0) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUnqualifiedPixelFunction(
+  const PixelChannel chQual,const FunctionE fe)
+{
+  return(( chQual == NO_CHAN_QUAL &&
+    (fe == fP || fe == fS || fe == fSP || fe == fU || fe == fUP || fe == fV ||
+    fe == fVP)
+    ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUnqualifiedCoordFunction(
+  const PixelChannel chQual,const FunctionE fe)
+{
+  return((chQual == NO_CHAN_QUAL && (fe == fU || fe == fV ||
+    fe == fS)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAttributeQualified(FxInfo *pfx,
+  const PixelChannel chQual,const ImgAttrE iaQual)
+{
+  return((IsQualifier (pfx) && chQual == NO_CHAN_QUAL &&
+    iaQual != aNull) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUnqualifiedAccess(
+  const MagickBooleanType coordQual,const PixelChannel chQual,
+  const ImgAttrE iaQual)
+{
+  return((!coordQual && chQual == NO_CHAN_QUAL &&
+    iaQual == aNull) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsCompositeOnlyAccess(
+  const MagickBooleanType coordQual,const PixelChannel chQual,
+  const ImgAttrE iaQual)
+{
+  return((!coordQual && chQual == CompositePixelChannel &&
+    iaQual == aNull) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsHslChannelQualifier(const PixelChannel chQual)
+{
+  return((chQual == HUE_CHANNEL || chQual == SAT_CHANNEL ||
+    chQual == LIGHT_CHANNEL) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsPixelAccessFunction(const FunctionE fe)
+{
+  return((fe == fP || fe == fU  || fe == fU0 || fe == fUP ||
+    fe == fV || fe == fVP || fe == fS || fe == fSP) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsQualifiedCoordFunction(const ImgAttrE iaQual,
+  const FunctionE fe)
+{
+  return((iaQual != aNull && (fe == fU || fe == fV || fe == fS)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsCoordFunction(const FunctionE fe)
+{
+  return((fe == fU || fe == fV || fe == fS) ? MagickTrue : MagickFalse);
 }
 
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
@@ -1952,7 +2106,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       }
       /* Maybe don't break because other expressions may be not empty. */
       if (!chLimit) break;
-      if (fe == fP || fe == fS|| fe == fIf) {
+      if (IsPadFunction(fe) != MagickFalse) {
         (void) AddElement (pfx, (fxFltType) 0, oNull);
         FndOne = 1;
       }
@@ -2032,7 +2186,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       break;
     }
   } /* end while args of a function */
-  if (chLimit && chLimit != expChLimit && chLimit != ',' ) {
+  if (IsUnexpectedLimit(chLimit,expChLimit) != MagickFalse) {
     (void) ThrowMagickException (
       pfx->exception, GetMagickModule(), OptionError,
       "For function", "'%s' expected '%c', found '%c' at '%s'",
@@ -2040,7 +2194,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     return MagickFalse;
   }
 
-  if (fe == fP || fe == fS || fe == fU || fe == fChannel) {
+  if (IsDefaultArgsFunction(fe) != MagickFalse) {
     while (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
       (void) AddElement (pfx, (fxFltType) 0, oNull);
       FndArgs++;
@@ -2069,7 +2223,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
     return MagickFalse;
   }
-  if (fe != fS && fe != fV && FndArgs == 0 && Functions[fe-(int) FirstFunc].number_args == 0) {
+  if (IsNoArgsFunction(fe,FndArgs) != MagickFalse) {
     /* This is for "rand()" and similar. */
     chLimit = expChLimit;
     if (!ExpectChar (pfx, ')')) return MagickFalse;
@@ -2092,7 +2246,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
   if (IsQualifier (pfx)) {
 
-    if (fe == fU || fe == fV || fe == fS) {
+    if (IsCoordFunction(fe) != MagickFalse) {
 
       coordQual = (GetCoordQualifier (pfx, (int) fe) == 1) ? MagickTrue : MagickFalse;
 
@@ -2117,18 +2271,16 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       }
     }
 
-    if ( chQual == NO_CHAN_QUAL &&
-         (fe == fP || fe == fS || fe == fSP || fe == fU || fe == fUP || fe == fV || fe == fVP)
-       )
+    if (IsUnqualifiedPixelFunction(chQual,fe) != MagickFalse)
     {
       chQual = GetChannelQualifier (pfx, (int) fe);
     }
 
-    if (chQual == NO_CHAN_QUAL && (fe == fU || fe == fV || fe == fS)) {
+    if (IsUnqualifiedCoordFunction(chQual,fe) != MagickFalse) {
       /* Note: we don't allow "p.mean" etc. */
       iaQual = GetImgAttrQualifier (pfx, (int) fe);
     }
-    if (IsQualifier (pfx) && chQual == NO_CHAN_QUAL && iaQual != aNull) {
+    if (IsAttributeQualified(pfx,chQual,iaQual) != MagickFalse) {
       chQual = GetChannelQualifier (pfx, (int) fe);
     }
     if (coordQual && iaQual != aNull) {
@@ -2138,14 +2290,14 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
         funStr, pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (!coordQual && chQual == NO_CHAN_QUAL && iaQual == aNull) {
+    if (IsUnqualifiedAccess(coordQual,chQual,iaQual) != MagickFalse) {
       (void) ThrowMagickException (
         pfx->exception, GetMagickModule(), OptionError,
         "For function", "'%s', bad qualifier '%s' at '%s'",
         funStr, pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (!coordQual && chQual == CompositePixelChannel && iaQual == aNull) {
+    if (IsCompositeOnlyAccess(coordQual,chQual,iaQual) != MagickFalse) {
       (void) ThrowMagickException (
         pfx->exception, GetMagickModule(), OptionError,
         "For function", "'%s', bad composite qualifier '%s' at '%s'",
@@ -2153,7 +2305,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       return MagickFalse;
     }
 
-    if (chQual == HUE_CHANNEL || chQual == SAT_CHANNEL || chQual == LIGHT_CHANNEL) {
+    if (IsHslChannelQualifier(chQual) != MagickFalse) {
       pfx->NeedHsl = MagickTrue;
 
       if (iaQual >= FirstImgAttr && iaQual < aNull) {
@@ -2205,13 +2357,12 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       }
     }
     (void) AddElement (pfx, (fxFltType) 0, (int) fe);
-    if (fe == fP || fe == fU  || fe == fU0 || fe == fUP ||
-        fe == fV || fe == fVP || fe == fS || fe == fSP)
+    if (IsPixelAccessFunction(fe) != MagickFalse)
     {
       ElementT * pel = &pfx->Elements[pfx->usedElements-1];
       pel->is_relative = (expChLimit == ']' ? MagickTrue : MagickFalse);
       if (chQual >= 0) pel->channel_qual = chQual;
-      if (iaQual != aNull && (fe == fU || fe == fV || fe == fS)) {
+      if (IsQualifiedCoordFunction(iaQual,fe) != MagickFalse) {
         /* Note: we don't allow "p[2,3].mean" or "p.mean" etc. */
         pel->img_attr_qual = iaQual;
       }
@@ -2235,6 +2386,18 @@ static MagickBooleanType IsStealth (int op)
   return (op == fU0 || op == fUP || op == fSP || op == fVP ||
            (op >= FirstCont && op <= rNull) ? MagickTrue : MagickFalse
          );
+}
+
+static inline MagickBooleanType IsLoopOrIfFunction(const FunctionE fe)
+{
+  return((fe == fDo || fe == fFor || fe == fIf || fe == fWhile) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsHslSymbol(const SymbolE se)
+{
+  return((se==sHue || se==sSaturation || se==sLightness) ? MagickTrue :
+    MagickFalse);
 }
 
 static MagickBooleanType GetOperand (
@@ -2429,7 +2592,7 @@ static MagickBooleanType GetOperand (
           pfx->token, SetShortExp(pfx));
       }
 
-      if (fe == fDo || fe == fFor || fe == fIf || fe == fWhile) {
+      if (IsLoopOrIfFunction(fe) != MagickFalse) {
         *needPopAll = MagickTrue;
       }
 
@@ -2479,7 +2642,7 @@ static MagickBooleanType GetOperand (
         (void) AddElement (pfx, val, (int) se);
         pfx->pex += pfx->lenToken;
 
-        if (se==sHue || se==sSaturation || se==sLightness) pfx->NeedHsl = MagickTrue;
+        if (IsHslSymbol(se) != MagickFalse) pfx->NeedHsl = MagickTrue;
         return MagickTrue;
       }
     }
@@ -2598,6 +2761,12 @@ static inline MagickBooleanType ProcessTernaryOpr (FxInfo * pfx, TernaryT * pter
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsOperatorStackBarrier(const OperatorE top)
+{
+  return((top == oOpenParen || top == oAssign ||
+    OprInPlace ((int) top)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType GetOperator (
   FxInfo * pfx,
   MagickBooleanType * Assign, MagickBooleanType * Update, MagickBooleanType * IncrDecr)
@@ -2642,7 +2811,7 @@ static MagickBooleanType GetOperator (
   while (pfx->usedOprStack > 0) {
     OperatorE top = pfx->OperatorStack[pfx->usedOprStack-1];
     int precTop, precNew;
-    if (top == oOpenParen || top == oAssign || OprInPlace ((int) top)) break;
+    if (IsOperatorStackBarrier(top) != MagickFalse) break;
     precTop = Operators[top].precedence;
     precNew = Operators[op].precedence;
     /* Assume left associativity.
@@ -2711,6 +2880,48 @@ static MagickBooleanType ResolveTernaryAddresses (FxInfo * pfx, TernaryT * ptern
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsExpressionContinuing(FxInfo *pfx,
+  const char *strLimit)
+{
+  return((*pfx->pex && (!*strLimit ||
+    (strchr(strLimit,*pfx->pex)==NULL))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUserSymbolAssignment(
+  const MagickBooleanType UserSymbol,const MagickBooleanType Assign,
+  const MagickBooleanType Update,const MagickBooleanType IncrDecr)
+{
+  return((UserSymbol && (Assign || Update) && !IncrDecr) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsExpressionEnd(FxInfo *pfx,
+  const char *strLimit)
+{
+  return(( (!*pfx->pex) || (*strLimit &&
+    (strchr(strLimit,*pfx->pex)!=NULL) ) ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsPendingLimitChar(FxInfo *pfx,
+  const char *chLimit,const char *strLimit)
+{
+  return((*pfx->pex && !*chLimit &&
+    (strchr(strLimit,*pfx->pex)!=NULL)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsOpenGroupOperator(const OperatorE op)
+{
+  return((op == oOpenParen || op == oOpenBracket ||
+    op == oOpenBrace) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsMisplacedAssignment(const OperatorE op,
+  const MagickBooleanType Assign,const MagickBooleanType Update)
+{
+  return(( (op==oAssign && !Assign) || (OprInPlace((int) op) &&
+    !Update) ) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -2764,7 +2975,7 @@ static MagickBooleanType TranslateExpression (
 
   /* Loop through Operator, Operand, Operator, Operand, ...
   */
-  while (*pfx->pex && (!*strLimit || (strchr(strLimit,*pfx->pex)==NULL))) {
+  while (IsExpressionContinuing(pfx,strLimit) != MagickFalse) {
     if (!GetOperator (pfx, &Assign, &Update, &IncrDecr)) return MagickFalse;
     SkipSpaces (pfx);
     if (NewUserSymbol && !Assign) {
@@ -2788,7 +2999,7 @@ static MagickBooleanType TranslateExpression (
         pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (UserSymbol && (Assign || Update) && !IncrDecr) {
+    if (IsUserSymbolAssignment(UserSymbol,Assign,Update,IncrDecr) != MagickFalse) {
 
       if (!TranslateExpression (pfx, strLimit, chLimit, needPopAll)) return MagickFalse;
       if (!*pfx->pex) break;
@@ -2820,7 +3031,7 @@ static MagickBooleanType TranslateExpression (
 
     UserSymbol = NewUserSymbol = MagickFalse;
 
-    if ( (!*pfx->pex) || (*strLimit && (strchr(strLimit,*pfx->pex)!=NULL) ) )
+    if (IsExpressionEnd(pfx,strLimit) != MagickFalse)
     {
       if (IncrDecr) break;
 
@@ -2875,16 +3086,16 @@ static MagickBooleanType TranslateExpression (
     pel->do_push = MagickTrue;
   }
 
-  if (*pfx->pex && !*chLimit && (strchr(strLimit,*pfx->pex)!=NULL)) {
+  if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
     *chLimit = *pfx->pex;
     pfx->pex++;
   }
   while (pfx->usedOprStack) {
     OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
-    if (op == oOpenParen || op == oOpenBracket || op == oOpenBrace) {
+    if (IsOpenGroupOperator(op) != MagickFalse) {
       break;
     }
-    if ( (op==oAssign && !Assign) || (OprInPlace((int) op) && !Update) ) {
+    if (IsMisplacedAssignment(op,Assign,Update) != MagickFalse) {
       break;
     }
     pfx->usedOprStack--;
@@ -4225,6 +4436,12 @@ MagickPrivate MagickBooleanType FxEvaluateChannelExpression (
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsStatisticsPending(const FxInfo *pfx)
+{
+  return((pfx->NeedStats && pfx->runType == rtEntireImage &&
+    !pfx->statistics) ? MagickTrue : MagickFalse);
+}
+
 static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
   MagickBooleanType CalcAllStats, ExceptionInfo *exception)
 {
@@ -4289,7 +4506,7 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
     return NULL;
   }
 
-  if (pfx->NeedStats && pfx->runType == rtEntireImage && !pfx->statistics) {
+  if (IsStatisticsPending(pfx) != MagickFalse) {
     if (!CollectStatistics (pfx)) {
       (void) DestroyRPN (pfx);
       pfx->expression = DestroyString (pfx->expression);
