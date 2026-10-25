@@ -187,6 +187,15 @@ static MagickBooleanType SetMatrixExtent(
   return(count != (MagickOffsetType) 1 ? MagickFalse : MagickTrue);
 }
 
+static inline MagickBooleanType IsMatrixMemoryAvailable(
+  const MagickBooleanType status,const MatrixInfo *matrix_info)
+{
+  return(((status != MagickFalse) &&
+    (matrix_info->length == (MagickSizeType) ((size_t) matrix_info->length)) &&
+    ((size_t) matrix_info->length <= GetMaxMemoryRequest())) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
   const size_t rows,const size_t stride,ExceptionInfo *exception)
 {
@@ -223,9 +232,7 @@ MagickExport MatrixInfo *AcquireMatrixInfo(const size_t columns,
     }
   matrix_info->type=MemoryCache;
   status=AcquireMagickResource(AreaResource,matrix_info->length);
-  if ((status != MagickFalse) &&
-      (matrix_info->length == (MagickSizeType) ((size_t) matrix_info->length)) &&
-      ((size_t) matrix_info->length <= GetMaxMemoryRequest()))
+  if (IsMatrixMemoryAvailable(status,matrix_info) != MagickFalse)
     {
       status=AcquireMagickResource(MemoryResource,matrix_info->length);
       if (status != MagickFalse)
