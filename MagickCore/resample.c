@@ -370,6 +370,15 @@ static void BlendCheckerTileAverage(ResampleFilter *resample_filter)
   resample_filter->average_pixel.alpha /= 2; /* 50% blend */
 }
 
+static void ResetPixelAccumulator(PixelInfo *pixel)
+{
+  pixel->red = pixel->green = pixel->blue = 0.0;
+  if (pixel->colorspace == CMYKColorspace)
+    pixel->black = 0.0;
+  if (pixel->alpha_trait != UndefinedPixelTrait)
+    pixel->alpha = 0.0;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -583,11 +592,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
   hit = 0;
   divisor_c = 0.0;
   divisor_m = 0.0;
-  pixel->red = pixel->green = pixel->blue = 0.0;
-  if (pixel->colorspace == CMYKColorspace)
-    pixel->black = 0.0;
-  if (pixel->alpha_trait != UndefinedPixelTrait)
-    pixel->alpha = 0.0;
+  ResetPixelAccumulator(pixel);
 
   /*
     Determine the parallelogram bounding box fitted to the ellipse
