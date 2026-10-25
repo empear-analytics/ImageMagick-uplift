@@ -3994,6 +3994,17 @@ static ssize_t CompactGrayscaleColormap(const Image *image,
   return(j);
 }
 
+static void SortGrayscaleColormap(Image *image)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+    image->colormap[i].alpha=(double) i;
+  qsort((void *) image->colormap,image->colors,sizeof(PixelInfo),
+    IntensityCompare);
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4011,7 +4022,6 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
 
   ssize_t
     *colormap_index,
-    i,
     j,
     y;
 
@@ -4090,10 +4100,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
       image_view=DestroyCacheView(image_view);
     }
   (void) memset(colormap_index,0,extent*sizeof(*colormap_index));
-  for (i=0; i < (ssize_t) image->colors; i++)
-    image->colormap[i].alpha=(double) i;
-  qsort((void *) image->colormap,image->colors,sizeof(PixelInfo),
-    IntensityCompare);
+  SortGrayscaleColormap(image);
   colormap=(PixelInfo *) AcquireQuantumMemory(image->colors,sizeof(*colormap));
   if (colormap == (PixelInfo *) NULL)
     {
