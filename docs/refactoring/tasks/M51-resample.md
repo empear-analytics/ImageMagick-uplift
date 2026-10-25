@@ -130,3 +130,32 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 4.09 → 5.13** (`cs-mcp` 1.5.12). Branch `campaign/M51-resample`,
+stacked on `campaign/M50-utility`. ResamplePixelColor is *not ready* (25 mutants, 12
+killed, 11 unmatched), so all three commits are guard-verified. The oracle also ran
+on each one: 793 cases, 0 diverged.
+- **P (1 commit, 4.09 → 5.11).** Four predicates for the virtual-pixel limit tests:
+  `IsAreaOutsideImage`, `IsAreaOutsideCorner`, `IsAreaOutsideDitherCorner` and
+  `IsResampleUnweighted`. The originals use upstream's `if ( … )` style, with lines
+  past 80 columns. The predicates are rewrapped at their operators, and their tokens
+  were checked mechanically against the originals. Complex Conditional leaves the
+  file. CodeScene now pairs the two corner predicates as duplicates; they differ in
+  four literals, so Recipe D does not apply.
+- **E (2 commits).** `BlendCheckerTileAverage` was flat at 5.11 and named its next
+  step. `ResetPixelAccumulator` then reached 5.13.
+
+**Reverted.** The virtual-pixel switch as `CountVirtualPixelHits` (value-returning)
+scored 5.11 → 5.09, because the helper carries the switch's cc 25.
+
+**What is left, at 5.13.**
+- `ResamplePixelColor` is still a Brain Method (228 lines). Its whole-image average
+  block leaves the switch with `break`. Its accumulation loop interleaves its braces
+  with `#if FILTER_LUT` and `DEBUG_HIT_MISS`, so it is off limits.
+- `ScaleResampleFilter` and `SetResampleFilter` are built from `#if EWA`, `EWA_CLAMP`,
+  `FILTER_LUT` and `DEBUG_ELLIPSE` branches, most of them uncompiled.
+- `ClampUpAxes` takes 10 arguments (Recipe B).
+- The two `SetResampleFilter*Method` setters share only the assert-and-log prologue,
+  which carries `GetMagickModule()`.
