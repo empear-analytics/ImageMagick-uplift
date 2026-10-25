@@ -4376,6 +4376,12 @@ MagickPrivate MagickBooleanType FxEvaluateChannelExpression (
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsStatisticsPending(const FxInfo *pfx)
+{
+  return((pfx->NeedStats && pfx->runType == rtEntireImage &&
+    !pfx->statistics) ? MagickTrue : MagickFalse);
+}
+
 static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
   MagickBooleanType CalcAllStats, ExceptionInfo *exception)
 {
@@ -4440,7 +4446,7 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
     return NULL;
   }
 
-  if (pfx->NeedStats && pfx->runType == rtEntireImage && !pfx->statistics) {
+  if (IsStatisticsPending(pfx) != MagickFalse) {
     if (!CollectStatistics (pfx)) {
       (void) DestroyRPN (pfx);
       pfx->expression = DestroyString (pfx->expression);
