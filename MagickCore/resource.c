@@ -712,6 +712,15 @@ MagickExport MagickSizeType GetMagickResource(const ResourceType type)
 %    o path: the file resource path.
 %
 */
+static inline MagickBooleanType IsChangedFileIdentity(
+  const struct stat attributes,const struct stat *temporary_attributes)
+{
+  return(((attributes.st_dev != temporary_attributes->st_dev) ||
+    (attributes.st_ino != temporary_attributes->st_ino) ||
+    (attributes.st_mode != temporary_attributes->st_mode)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType IsFileResourceIdentityValid(const char *path)
 {
   const struct stat
@@ -732,9 +741,8 @@ MagickExport MagickBooleanType IsFileResourceIdentityValid(const char *path)
     {
       status=GetPathAttributes(path,&attributes);
       if (status != MagickFalse)
-        if ((attributes.st_dev != temporary_attributes->st_dev) ||
-            (attributes.st_ino != temporary_attributes->st_ino) ||
-            (attributes.st_mode != temporary_attributes->st_mode))
+        if (IsChangedFileIdentity(attributes,temporary_attributes) !=
+            MagickFalse)
           status=MagickFalse;
     }
   UnlockSemaphoreInfo(resource_semaphore[FileResource]);
