@@ -1843,6 +1843,89 @@ static inline ssize_t GetHexColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, 
   return (ssize_t) len;
 }
 
+static inline MagickBooleanType IsPadFunction(const FunctionE fe)
+{
+  return((fe == fP || fe == fS|| fe == fIf) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUnexpectedLimit(const char chLimit,
+  const char expChLimit)
+{
+  return((chLimit && chLimit != expChLimit && chLimit != ',' ) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsDefaultArgsFunction(const FunctionE fe)
+{
+  return((fe == fP || fe == fS || fe == fU || fe == fChannel) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsNoArgsFunction(const FunctionE fe,
+  const int FndArgs)
+{
+  return((fe != fS && fe != fV && FndArgs == 0 &&
+    Functions[fe-(int) FirstFunc].number_args == 0) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUnqualifiedPixelFunction(
+  const PixelChannel chQual,const FunctionE fe)
+{
+  return(( chQual == NO_CHAN_QUAL &&
+    (fe == fP || fe == fS || fe == fSP || fe == fU || fe == fUP || fe == fV ||
+    fe == fVP)
+    ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUnqualifiedCoordFunction(
+  const PixelChannel chQual,const FunctionE fe)
+{
+  return((chQual == NO_CHAN_QUAL && (fe == fU || fe == fV ||
+    fe == fS)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAttributeQualified(FxInfo *pfx,
+  const PixelChannel chQual,const ImgAttrE iaQual)
+{
+  return((IsQualifier (pfx) && chQual == NO_CHAN_QUAL &&
+    iaQual != aNull) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsUnqualifiedAccess(
+  const MagickBooleanType coordQual,const PixelChannel chQual,
+  const ImgAttrE iaQual)
+{
+  return((!coordQual && chQual == NO_CHAN_QUAL &&
+    iaQual == aNull) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsCompositeOnlyAccess(
+  const MagickBooleanType coordQual,const PixelChannel chQual,
+  const ImgAttrE iaQual)
+{
+  return((!coordQual && chQual == CompositePixelChannel &&
+    iaQual == aNull) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsHslChannelQualifier(const PixelChannel chQual)
+{
+  return((chQual == HUE_CHANNEL || chQual == SAT_CHANNEL ||
+    chQual == LIGHT_CHANNEL) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsPixelAccessFunction(const FunctionE fe)
+{
+  return((fe == fP || fe == fU  || fe == fU0 || fe == fUP ||
+    fe == fV || fe == fVP || fe == fS || fe == fSP) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsQualifiedCoordFunction(const ImgAttrE iaQual,
+  const FunctionE fe)
+{
+  return((iaQual != aNull && (fe == fU || fe == fV || fe == fS)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -1952,7 +2035,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       }
       /* Maybe don't break because other expressions may be not empty. */
       if (!chLimit) break;
-      if (fe == fP || fe == fS|| fe == fIf) {
+      if (IsPadFunction(fe) != MagickFalse) {
         (void) AddElement (pfx, (fxFltType) 0, oNull);
         FndOne = 1;
       }
@@ -2032,7 +2115,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       break;
     }
   } /* end while args of a function */
-  if (chLimit && chLimit != expChLimit && chLimit != ',' ) {
+  if (IsUnexpectedLimit(chLimit,expChLimit) != MagickFalse) {
     (void) ThrowMagickException (
       pfx->exception, GetMagickModule(), OptionError,
       "For function", "'%s' expected '%c', found '%c' at '%s'",
@@ -2040,7 +2123,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     return MagickFalse;
   }
 
-  if (fe == fP || fe == fS || fe == fU || fe == fChannel) {
+  if (IsDefaultArgsFunction(fe) != MagickFalse) {
     while (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
       (void) AddElement (pfx, (fxFltType) 0, oNull);
       FndArgs++;
@@ -2069,7 +2152,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
     return MagickFalse;
   }
-  if (fe != fS && fe != fV && FndArgs == 0 && Functions[fe-(int) FirstFunc].number_args == 0) {
+  if (IsNoArgsFunction(fe,FndArgs) != MagickFalse) {
     /* This is for "rand()" and similar. */
     chLimit = expChLimit;
     if (!ExpectChar (pfx, ')')) return MagickFalse;
@@ -2117,18 +2200,16 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       }
     }
 
-    if ( chQual == NO_CHAN_QUAL &&
-         (fe == fP || fe == fS || fe == fSP || fe == fU || fe == fUP || fe == fV || fe == fVP)
-       )
+    if (IsUnqualifiedPixelFunction(chQual,fe) != MagickFalse)
     {
       chQual = GetChannelQualifier (pfx, (int) fe);
     }
 
-    if (chQual == NO_CHAN_QUAL && (fe == fU || fe == fV || fe == fS)) {
+    if (IsUnqualifiedCoordFunction(chQual,fe) != MagickFalse) {
       /* Note: we don't allow "p.mean" etc. */
       iaQual = GetImgAttrQualifier (pfx, (int) fe);
     }
-    if (IsQualifier (pfx) && chQual == NO_CHAN_QUAL && iaQual != aNull) {
+    if (IsAttributeQualified(pfx,chQual,iaQual) != MagickFalse) {
       chQual = GetChannelQualifier (pfx, (int) fe);
     }
     if (coordQual && iaQual != aNull) {
@@ -2138,14 +2219,14 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
         funStr, pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (!coordQual && chQual == NO_CHAN_QUAL && iaQual == aNull) {
+    if (IsUnqualifiedAccess(coordQual,chQual,iaQual) != MagickFalse) {
       (void) ThrowMagickException (
         pfx->exception, GetMagickModule(), OptionError,
         "For function", "'%s', bad qualifier '%s' at '%s'",
         funStr, pfx->token, SetShortExp(pfx));
       return MagickFalse;
     }
-    if (!coordQual && chQual == CompositePixelChannel && iaQual == aNull) {
+    if (IsCompositeOnlyAccess(coordQual,chQual,iaQual) != MagickFalse) {
       (void) ThrowMagickException (
         pfx->exception, GetMagickModule(), OptionError,
         "For function", "'%s', bad composite qualifier '%s' at '%s'",
@@ -2153,7 +2234,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       return MagickFalse;
     }
 
-    if (chQual == HUE_CHANNEL || chQual == SAT_CHANNEL || chQual == LIGHT_CHANNEL) {
+    if (IsHslChannelQualifier(chQual) != MagickFalse) {
       pfx->NeedHsl = MagickTrue;
 
       if (iaQual >= FirstImgAttr && iaQual < aNull) {
@@ -2205,13 +2286,12 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
       }
     }
     (void) AddElement (pfx, (fxFltType) 0, (int) fe);
-    if (fe == fP || fe == fU  || fe == fU0 || fe == fUP ||
-        fe == fV || fe == fVP || fe == fS || fe == fSP)
+    if (IsPixelAccessFunction(fe) != MagickFalse)
     {
       ElementT * pel = &pfx->Elements[pfx->usedElements-1];
       pel->is_relative = (expChLimit == ']' ? MagickTrue : MagickFalse);
       if (chQual >= 0) pel->channel_qual = chQual;
-      if (iaQual != aNull && (fe == fU || fe == fV || fe == fS)) {
+      if (IsQualifiedCoordFunction(iaQual,fe) != MagickFalse) {
         /* Note: we don't allow "p[2,3].mean" or "p.mean" etc. */
         pel->img_attr_qual = iaQual;
       }
