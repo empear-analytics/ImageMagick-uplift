@@ -2221,6 +2221,12 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
 %
 */
 
+static inline MagickBooleanType IsPostscriptNameChar(const unsigned char *p)
+{
+  return(((isalnum(*p) != 0) || (*p == '-') || (*p == '_') ||
+    (*p == '.')) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType IsValidPostscriptFontname(const char *font)
 {
   const unsigned char
@@ -2230,7 +2236,7 @@ static MagickBooleanType IsValidPostscriptFontname(const char *font)
     return(MagickFalse);
   for (p=(const unsigned char *) font; *p != '\0'; p++)
   {
-    if ((isalnum(*p) != 0) || (*p == '-') || (*p == '_') || (*p == '.'))
+    if (IsPostscriptNameChar(p) != MagickFalse)
       continue;
     return(MagickFalse);
   }
