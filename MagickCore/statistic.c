@@ -825,6 +825,29 @@ MagickExport Image *EvaluateImages(const Image *images,
   return(image);
 }
 
+static void EvaluatePixel(const Image *image,RandomInfo *random_info,
+  const MagickEvaluateOperator op,const double value,
+  const MagickBooleanType clamp,Quantum *magick_restrict q)
+{
+  double
+    result;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    result=ApplyEvaluateOperator(random_info,q[i],op,value);
+    if (op == MeanEvaluateOperator)
+      result/=2.0;
+    q[i]=clamp != MagickFalse ? ClampPixel(result) : ClampToQuantum(result);
+  }
+}
+
 MagickExport MagickBooleanType EvaluateImage(Image *image,
   const MagickEvaluateOperator op,const double value,ExceptionInfo *exception)
 {
@@ -894,23 +917,7 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      double
-        result;
-
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        result=ApplyEvaluateOperator(random_info[id],q[i],op,value);
-        if (op == MeanEvaluateOperator)
-          result/=2.0;
-        q[i]=clamp != MagickFalse ? ClampPixel(result) : ClampToQuantum(result);
-      }
+      EvaluatePixel(image,random_info[id],op,value,clamp,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -1066,6 +1073,24 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
   return(ClampToQuantum(result));
 }
 
+static void ApplyFunctionToPixel(const Image *image,
+  const MagickFunction function,const size_t number_parameters,
+  const double *parameters,ExceptionInfo *exception,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=ApplyFunction(q[i],function,number_parameters,parameters,
+      exception);
+  }
+}
+
 MagickExport MagickBooleanType FunctionImage(Image *image,
   const MagickFunction function,const size_t number_parameters,
   const double *parameters,ExceptionInfo *exception)
@@ -1122,18 +1147,8 @@ MagickExport MagickBooleanType FunctionImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ApplyFunction(q[i],function,number_parameters,parameters,
-          exception);
-      }
+      ApplyFunctionToPixel(image,function,number_parameters,parameters,exception,
+        q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -1838,6 +1853,26 @@ MagickExport ChannelPerceptualHash *GetImagePerceptualHash(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AccumulateChannelRange(const Image *image,
+  const Quantum *magick_restrict p,double *channel_maxima,
+  double *channel_minima)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if ((double) p[i] > (*channel_maxima))
+      (*channel_maxima)=(double) p[i];
+    if ((double) p[i] < (*channel_minima))
+      (*channel_minima)=(double) p[i];
+  }
+}
+
 MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
   double *maxima,ExceptionInfo *exception)
 {
@@ -1892,20 +1927,8 @@ MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
     channel_range=range_info;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if ((double) p[i] > channel_range.maxima)
-          channel_range.maxima=(double) p[i];
-        if ((double) p[i] < channel_range.minima)
-          channel_range.minima=(double) p[i];
-      }
+      AccumulateChannelRange(image,p,&channel_range.maxima,
+        &channel_range.minima);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2023,6 +2046,118 @@ static inline long double MagickSafeReciprocalLD(const long double x)
   return(sign/MagickEpsilon);
 }
 
+static void UpdateWelfordMoments(ChannelStatistics *cs,
+  const Quantum *magick_restrict p,const ssize_t i)
+{
+  /* Calculate running totals for Welford's method.
+  */
+  double
+    n = cs->area,
+    n1 = cs->area-1;
+
+  long double
+    delta,
+    delta_n,
+    delta_n2,
+    term1;
+
+  delta=(double) p[i]-cs->M1;
+  delta_n=delta/n;
+  delta_n2=delta_n*delta_n;
+  term1=delta*delta_n*n1;
+  cs->M4+=term1*delta_n2*(n*n-3.0*n+3.0)+6.0*delta_n2*cs->M2-4.0*
+    delta_n*cs->M3;
+  cs->M3+=term1*delta_n*(n-2.0)-3.0*delta_n*cs->M2;
+  cs->M2+=term1;
+  cs->M1+=delta_n;
+}
+
+static void ComputeChannelMoments(ChannelStatistics *cs)
+{
+  double
+    adj_area = 1.0;
+
+  cs->mean=0.0;
+  if (cs->area > 0)
+    {
+      cs->mean=(double) (cs->sumLD/(long double) cs->area);
+      if (cs->area > 1.0)
+        adj_area=cs->area/(cs->area-1.0);
+    }
+  cs->sum=(double) cs->sum;
+  if (cs->M2 == 0.0)
+    {
+      cs->standard_deviation=0.0;
+      cs->variance=0.0;
+      cs->skewness=0.0;
+      cs->kurtosis=0.0;
+    }
+  else
+    {
+      if (cs->area > 1.0)
+        cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
+          cs->area-1.0));
+      else
+        cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
+          cs->area));
+      cs->variance=cs->standard_deviation*cs->standard_deviation;
+      cs->skewness=(double) (sqrtl(cs->area)*cs->M3/powl(cs->M2*adj_area,
+        1.5));
+      cs->kurtosis=(double) (cs->area*cs->M4/(cs->M2*cs->M2*adj_area*
+        adj_area)-3.0);
+    }
+}
+
+static void ResetChannelStatistics(ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
+  {
+    ChannelStatistics *cs = channel_statistics+i;
+    cs->area=0.0;
+    cs->depth=1;
+    cs->maxima=(-MagickMaximumValue);
+    cs->minima=MagickMaximumValue;
+    cs->sum=0.0;
+    cs->sumLD=0.0;
+    cs->mean=0.0;
+    cs->standard_deviation=0.0;
+    cs->variance=0.0;
+    cs->skewness=0.0;
+    cs->kurtosis=0.0;
+    cs->entropy=0.0;
+  }
+}
+
+static double CountHistogramBins(const Image *image,const double *histogram,
+  const ssize_t i)
+{
+  double
+    number_bins;
+
+  ssize_t
+    j;
+
+  number_bins=0.0;
+  for (j=0; j <= (ssize_t) MaxMap; j++)
+    if (histogram[(ssize_t) GetPixelChannels(image)*j+i] > 0.0)
+      number_bins++;
+  return(number_bins);
+}
+
+static void NormalizeChannelSums(ChannelStatistics *cs)
+{
+  if (cs->area > 0.0)
+    {
+      cs->sum/=cs->area;
+      cs->sum_squared/=cs->area;
+      cs->sum_cubed/=cs->area;
+      cs->sum_fourth_power/=cs->area;
+    }
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2077,22 +2212,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     }
   (void) memset(channel_statistics,0,(MaxPixelChannels+1)*
     sizeof(*channel_statistics));
-  for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
-  {
-    ChannelStatistics *cs = channel_statistics+i;
-    cs->area=0.0;
-    cs->depth=1;
-    cs->maxima=(-MagickMaximumValue);
-    cs->minima=MagickMaximumValue;
-    cs->sum=0.0;
-    cs->sumLD=0.0;
-    cs->mean=0.0;
-    cs->standard_deviation=0.0;
-    cs->variance=0.0;
-    cs->skewness=0.0;
-    cs->kurtosis=0.0;
-    cs->entropy=0.0;
-  }
+  ResetChannelStatistics(channel_statistics);
   (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
     sizeof(*histogram));
   for (y=0; y < (ssize_t) image->rows; y++)
@@ -2158,29 +2278,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
         cs->sum_cubed+=(double) p[i]*(double) p[i]*(double) p[i];
         cs->sum_fourth_power+=(double) p[i]*(double) p[i]*(double) p[i]*
           (double) p[i];
-        {
-          /* Calculate running totals for Welford's method.
-          */
-          double
-            n = cs->area,
-            n1 = cs->area-1;
-
-          long double
-            delta,
-            delta_n,
-            delta_n2,
-            term1;
-
-          delta=(double) p[i]-cs->M1;
-          delta_n=delta/n;
-          delta_n2=delta_n*delta_n;
-          term1=delta*delta_n*n1;
-          cs->M4+=term1*delta_n2*(n*n-3.0*n+3.0)+6.0*delta_n2*cs->M2-4.0*
-            delta_n*cs->M3;
-          cs->M3+=term1*delta_n*(n-2.0)-3.0*delta_n*cs->M2;
-          cs->M2+=term1;
-          cs->M1+=delta_n;
-        }
+        UpdateWelfordMoments(cs,p,i);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
@@ -2190,43 +2288,12 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     ChannelStatistics
       *cs;
 
-    double
-      adj_area = 1.0;
-
     PixelChannel channel = GetPixelChannelChannel(image,i);
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     if ((traits & UpdatePixelTrait) == 0)
       continue;
     cs=channel_statistics+(ssize_t) channel;
-    cs->mean=0.0;
-    if (cs->area > 0)
-      {
-        cs->mean=(double) (cs->sumLD/(long double) cs->area);
-        if (cs->area > 1.0)
-          adj_area=cs->area/(cs->area-1.0);
-      }
-    cs->sum=(double) cs->sum;
-    if (cs->M2 == 0.0)
-      {
-        cs->standard_deviation=0.0;
-        cs->variance=0.0;
-        cs->skewness=0.0;
-        cs->kurtosis=0.0;
-      }
-    else
-      {
-        if (cs->area > 1.0)
-          cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
-            cs->area-1.0));
-        else
-          cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
-            cs->area));
-        cs->variance=cs->standard_deviation*cs->standard_deviation;
-        cs->skewness=(double) (sqrtl(cs->area)*cs->M3/powl(cs->M2*adj_area,
-          1.5));
-        cs->kurtosis=(double) (cs->area*cs->M4/(cs->M2*cs->M2*adj_area*
-          adj_area)-3.0);
-      }
+    ComputeChannelMoments(cs);
   }
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
@@ -2244,20 +2311,11 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     if ((traits & UpdatePixelTrait) == 0)
       continue;
     cs=channel_statistics+(ssize_t) channel;
-    if (cs->area > 0.0)
-      {
-        cs->sum/=cs->area;
-        cs->sum_squared/=cs->area;
-        cs->sum_cubed/=cs->area;
-        cs->sum_fourth_power/=cs->area;
-      }
+    NormalizeChannelSums(cs);
     /*
       Compute pixel entropy.
     */
-    number_bins=0.0;
-    for (j=0; j <= (ssize_t) MaxMap; j++)
-      if (histogram[(ssize_t) GetPixelChannels(image)*j+i] > 0.0)
-        number_bins++;
+    number_bins=CountHistogramBins(image,histogram,i);
     area=MagickSafeReciprocalLD(channel_statistics[channel].area);
     number_bins=(double) MagickSafeReciprocalLD((long double) log2(number_bins));
     for (j=0; j <= (ssize_t) MaxMap; j++)
@@ -2418,6 +2476,40 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetPolynomialPixels(const Image *image,
+  const PixelChannels *polynomial_pixel,Quantum *magick_restrict q)
+{
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      q[i]=ClampToQuantum((double) QuantumRange*
+        polynomial_pixel[x].channel[i]);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void ClearPolynomialPixels(const Image *image,
+  PixelChannels *polynomial_pixel)
+{
+  ssize_t
+    i,
+    j;
+
+  for (j=0; j < (ssize_t) image->columns; j++)
+    for (i=0; i < MaxPixelChannels; i++)
+      polynomial_pixel[j].channel[i]=0.0;
+}
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
@@ -2509,9 +2601,7 @@ MagickExport Image *PolynomialImage(const Image *images,
         continue;
       }
     polynomial_pixel=polynomial_pixels[id];
-    for (j=0; j < (ssize_t) image->columns; j++)
-      for (i=0; i < MaxPixelChannels; i++)
-        polynomial_pixel[j].channel[i]=0.0;
+    ClearPolynomialPixels(image,polynomial_pixel);
     next=images;
     for (j=0; j < (ssize_t) number_images; j++)
     {
@@ -2551,19 +2641,7 @@ MagickExport Image *PolynomialImage(const Image *images,
       image_view=DestroyCacheView(image_view);
       next=GetNextImageInList(next);
     }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ClampToQuantum((double) QuantumRange*
-          polynomial_pixel[x].channel[i]);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    SetPolynomialPixels(image,polynomial_pixel,q);
     if (SyncCacheViewAuthenticPixels(polynomial_view,exception) == MagickFalse)
       status=MagickFalse;
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
@@ -2916,6 +2994,12 @@ static void ResetPixelList(PixelList *pixel_list)
   pixel_list->seed=pixel_list->signature++;
 }
 
+static inline MagickBooleanType IsPixelListStatistic(const StatisticType type)
+{
+  return(((type == MedianStatistic) || (type == ModeStatistic) ||
+    (type == NonpeakStatistic)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
@@ -3055,8 +3139,7 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
         {
           for (u=0; u < (ssize_t) MagickMax(width,1); u++)
           {
-            if ((type == MedianStatistic) || (type == ModeStatistic) ||
-                (type == NonpeakStatistic))
+            if (IsPixelListStatistic(type) != MagickFalse)
               {
                 InsertPixelList(pixels[i],pixel_list[id]);
                 pixels+=(ptrdiff_t) GetPixelChannels(image);

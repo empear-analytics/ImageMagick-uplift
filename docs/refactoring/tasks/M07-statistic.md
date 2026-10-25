@@ -221,3 +221,55 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 1.92 → 2.27** (`cs-mcp` 1.5.12). Branch `campaign/M07-statistic`,
+stacked on `campaign/M06-colorspace` (PR #12). 11 refactor commits, one recipe and one
+function each: 9 Recipe E, 1 Recipe K, 1 Recipe P, all oracle-verified. Every function
+touched is ready or careful, and no moved line holds a survivor.
+
+**One category leaves the file:** Complex Conditional (`IsPixelListStatistic`, in
+`StatisticImage`). Brain Method leaves `FunctionImage`. Deep Nesting leaves
+`FunctionImage`, `EvaluateImage` and `GetImageRange`, which also leaves Bumpy Road and
+Large Method.
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| `StatisticImage`'s pixel-list test as a predicate | P | 1.92 → 1.95 |
+| channel loops of `FunctionImage` and `EvaluateImage` | E | → 2.18 |
+| `GetImageRange`'s channel loop, its two range fields as out-parameters (the struct type is local to the function) | K | → 2.23 |
+| `PolynomialImage`'s output and clearing loops | E | → 2.27 |
+| `GetImageStatistics`: the Welford update, the moments finalization, the reset loop, the bin count, the sum normalization | E | flat (cc 53 → 45, LoC 321 → 249) |
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie). From M07 on, the catalogue runs from a script
+that refuses a dirty tree and rebuilds first.
+
+**Tried and reverted.**
+- `GetImageStatistics`' composite averaging, moved byte for byte into a helper. The oracle
+  failed three cases (`-fx standard_deviation`, `-fx 'kurtosis+skewness*0'`,
+  `-auto-gamma`). There the statistics are NaN in both builds, but the float output holds
+  a different NaN bit pattern. The pixels compare equal (AE 0); the bytes do not. Moving
+  the code changed which NaN the compiler propagates, most likely through a different
+  operand order in a commutative add of two NaNs; this was not confirmed. The oracle has
+  no tolerance, so the step is out.
+- **Process failure, now fixed.** That step was committed before the divergence was acted
+  on: the verify script printed the failure but did not exit non-zero, so the commit
+  command chained after it ran. The commit was undone before any push. The script now
+  fails on a divergence, a warning or a guard failure. Every other commit's own oracle
+  line read 0 diverged, and the whole-catalogue runs agree.
+
+**What is left, at 2.27.**
+- Brain Method: `StatisticImage`. Its accumulation writes five accumulators (Recipe K
+  allows four), and its per-statistic switch needs seven inputs.
+- Deep Nesting: `EvaluateImages`, `GetImageStatistics` (its depth check decrements the
+  loop index and `continue`s), `GetImageMoments` (a dozen moment arrays per channel),
+  `PolynomialImage` (the term accumulation needs six arguments) and `StatisticImage`.
+- Code Duplication: the `GetImage*` wrappers (public).
+- Excess Arguments: public signatures.
+
+The next step here, as in M05, is Recipe B for the six- and seven-argument helpers; these
+functions have the oracle-level evidence it needs.
+
+**Possible bug, reported, not fixed.** None found in the code touched.
