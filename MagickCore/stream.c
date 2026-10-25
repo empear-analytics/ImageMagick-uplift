@@ -703,6 +703,15 @@ static inline MagickBooleanType AcquireStreamPixels(CacheInfo *cache_info,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsOutsideStreamRegion(const Image *image,
+  const ssize_t x,const ssize_t y,const size_t columns,const size_t rows)
+{
+  return(((x < 0) || (y < 0) ||
+    ((x+(ssize_t) columns) > (ssize_t) image->columns) ||
+    ((y+(ssize_t) rows) > (ssize_t) image->rows) ||
+    (columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
+}
+
 static const Quantum *GetVirtualPixelStream(const Image *image,
   const VirtualPixelMethod magick_unused(virtual_pixel_method),const ssize_t x,
   const ssize_t y,const size_t columns,const size_t rows,
@@ -729,10 +738,7 @@ static const Quantum *GetVirtualPixelStream(const Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((x < 0) || (y < 0) ||
-      ((x+(ssize_t) columns) > (ssize_t) image->columns) ||
-      ((y+(ssize_t) rows) > (ssize_t) image->rows) ||
-      (columns == 0) || (rows == 0))
+  if (IsOutsideStreamRegion(image,x,y,columns,rows) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),StreamError,
         "ImageDoesNotContainTheStreamGeometry","`%s'",image->filename);
