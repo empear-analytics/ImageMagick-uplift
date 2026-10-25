@@ -1388,6 +1388,20 @@ static void ParseProcessingInstructions(XMLTreeRoot *root,char *xml,
   root->processing_instructions[i][j+1]=(char *) NULL;
 }
 
+static inline MagickBooleanType IsDoctypeTextChar(const char *xml)
+{
+  return(((*xml != '\0') && (*xml != '<') && (*xml != '%')) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsOtherAttributeList(XMLTreeRoot *root,
+  const ssize_t i,const char *n)
+{
+  return(((root->attributes[i] != (char **) NULL) &&
+    (n != (char *) NULL) &&
+    (strcmp(n,root->attributes[i][0]) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -1411,7 +1425,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   (void) memcpy(predefined_entities,sentinel,sizeof(sentinel));
   for (xml[length]='\0'; xml != (char *) NULL; )
   {
-    while ((*xml != '\0') && (*xml != '<') && (*xml != '%'))
+    while (IsDoctypeTextChar(xml) != MagickFalse)
       xml++;
     if (*xml == '\0')
       break;
@@ -1496,9 +1510,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
               continue;
             *xml='\0';
             i=0;
-            while ((root->attributes[i] != (char **) NULL) &&
-                   (n != (char *) NULL) &&
-                   (strcmp(n,root->attributes[i][0]) != 0))
+            while (IsOtherAttributeList(root,i,n) != MagickFalse)
               i++;
             while ((*(n=xml+strspn(xml+1,XMLWhitespace)+1) != '\0') &&
                    (*n != '>'))
