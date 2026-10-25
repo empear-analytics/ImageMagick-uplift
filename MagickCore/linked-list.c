@@ -753,6 +753,21 @@ MagickExport LinkedListInfo *NewLinkedList(const size_t capacity)
   return(list_info);
 }
 
+static ElementInfo *UnlinkNextElement(LinkedListInfo *list_info,
+  ElementInfo *next)
+{
+  ElementInfo
+    *element;
+
+  element=next->next;
+  next->next=element->next;
+  if (element == list_info->tail)
+    list_info->tail=next;
+  if (list_info->next == element)
+    list_info->next=element->next;
+  return(element);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -812,12 +827,7 @@ MagickExport void *RemoveElementByValueFromLinkedList(LinkedListInfo *list_info,
           UnlockSemaphoreInfo(list_info->semaphore);
           return((void *) NULL);
         }
-      element=next->next;
-      next->next=element->next;
-      if (element == list_info->tail)
-        list_info->tail=next;
-      if (list_info->next == element)
-        list_info->next=element->next;
+      element=UnlinkNextElement(list_info,next);
       element=(ElementInfo *) RelinquishMagickMemory(element);
     }
   list_info->elements--;
