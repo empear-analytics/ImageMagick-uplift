@@ -189,6 +189,14 @@ static void
 %      AESInfo *AcquireAESInfo(void)
 %
 */
+static inline MagickBooleanType IsAESInfoIncomplete(const AESInfo *aes_info)
+{
+  return(((aes_info->key == (StringInfo *) NULL) ||
+    (aes_info->encipher_key == (unsigned int *) NULL) ||
+    (aes_info->decipher_key == (unsigned int *) NULL)) ? MagickTrue :
+    MagickFalse);
+}
+
 static AESInfo *AcquireAESInfo(void)
 {
   AESInfo
@@ -202,9 +210,7 @@ static AESInfo *AcquireAESInfo(void)
     *aes_info->encipher_key));
   aes_info->decipher_key=(unsigned int *) AcquireQuantumMemory(60UL,sizeof(
     *aes_info->decipher_key));
-  if ((aes_info->key == (StringInfo *) NULL) ||
-      (aes_info->encipher_key == (unsigned int *) NULL) ||
-      (aes_info->decipher_key == (unsigned int *) NULL))
+  if (IsAESInfoIncomplete(aes_info) != MagickFalse)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
   aes_info->timestamp=GetMagickTime();
   aes_info->signature=MagickCoreSignature;
