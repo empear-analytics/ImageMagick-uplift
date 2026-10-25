@@ -272,6 +272,10 @@ ReportAlpha(image);
 - Inverting `a < b` gives `a >= b`, never `a > b`. Inverting `x != (T *) NULL` gives
   `x == (T *) NULL`. Write the inverse out; do not wrap the original in `!(...)` unless
   that is clearer, and never both.
+- **Except for floating point.** When either operand is a `double`, `float` or
+  `MagickRealType`, `a < b` and `a >= b` are both false for a NaN, so `a >= b` is not
+  the inverse: write `!(a < b)`. ImageMagick compares doubles against user-supplied
+  limits that can be NaN.
 - Inside an OpenMP loop the early exit is `continue`, and it must not skip a
   `#pragma omp critical` or `atomic` block that the original ran on that path.
 
@@ -333,6 +337,12 @@ how subtle behaviour gets broken.
 The per-colorspace and per-channel blocks in `colorspace.c`, `quantum-import.c` and
 `quantum-export.c` often *look* identical and differ in one scale factor or one channel
 index. That is exactly one value, and D applies; two, and it does not.
+
+Variables count as the helper's parameters, not as differences: two blocks that are the
+same text once the variables each reads or writes are renamed consistently (block A's
+`channel_norm` wherever block B has `channel_variance`) are identical, and the helper
+takes those variables as arguments. Check it by script: rename, then compare the text.
+Literals and operators are not renamed; one that differs is a differing value.
 
 **Evidence level:** oracle.
 
@@ -730,6 +740,96 @@ same day. Added by Claude Code (Claude Opus 5.5) during task M01, on `magnify.c`
 
 ---
 
+## Recipe K - Extract Accumulating Block with Out-Parameters
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it is a per-pixel accumulation
+inside a parallel loop body that adds into two to four of the iteration's own
+accumulators (`channel_similarity` and `channel_area`, or three sums).
+
+**Not covered by:** Recipe E, whose step 4 refuses a block that writes more than one
+variable; Recipe O, which takes a selection (a `switch` or `if` chain) and only outside
+every OpenMP region; Recipe T, whose block writes the shared `status`, not private
+accumulators.
+
+**How:**
+
+1. The block contains no `#pragma omp` line, no `return`, `goto`, and no `continue` or
+   `break` that leaves it.
+2. Every variable the block writes is declared inside the parallel loop body (so each
+   thread has its own), and there are at most four of them. Writes through pointers the
+   block already uses for pixel data stay as they are. The block writes nothing
+   declared outside the loop body, `status` included.
+3. Variables the block declares and uses alone move with it; one initialised in its
+   declaration moves with its initialiser only if it is declared in the innermost loop
+   that runs the block, so it is reset as often as before.
+4. Cut the block into a new `static void` function directly above the caller. Pass each
+   variable it only reads by value; each array it writes as a pointer (its uses do not
+   change); each scalar it writes as a pointer, written `*v` (or `(*v)++`) at every use,
+   reads included.
+5. Call it where the block stood, passing `&v` for each written scalar and the array
+   for each written array, in parameter order; check every argument by reading.
+
+**Before:**
+
+```c
+    for (x=0; x < (ssize_t) columns; x++)
+    {
+      ...
+      Sa=QuantumScale*(double) GetPixelAlpha(image,p);
+      Da=QuantumScale*(double) GetPixelAlpha(reconstruct_image,q);
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        ...
+        if (MagickSafeSignificantError(error*error,fuzz) != MagickFalse)
+          {
+            channel_similarity[i]+=QuantumScale*error*QuantumScale*error;
+            ...
+            channel_area++;
+          }
+      }
+```
+
+**After:**
+
+```c
+static void AccumulateFUZZPixel(...,double *channel_similarity,
+  double *channel_area)
+{
+  ...
+        if (MagickSafeSignificantError(error*error,fuzz) != MagickFalse)
+          {
+            channel_similarity[i]+=QuantumScale*error*QuantumScale*error;
+            ...
+            (*channel_area)++;
+          }
+}
+...
+      AccumulateFUZZPixel(...,channel_similarity,&channel_area);
+```
+
+**Careful:**
+
+- The variables written are each thread's own, so the parallel loop shares nothing new;
+  the OpenMP section's rule, which forbids passing the address of a variable declared
+  *outside* the loop body, is untouched.
+- `(*v)++` and `*v+=x` are the same operations on the same object as `v++` and `v+=x`:
+  the order of floating-point additions does not change.
+- Keep the written variables few; a block that writes more than four is not one
+  accumulation, and is skipped.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 checked by
+reading.
+
+**Provenance:** 2026-10-24, from `compare.c`'s `GetFUZZSimilarity` (`channel_similarity`
+and `channel_area`), `GetMEPPSimilarity` (mean and maximum error), `GetDPCSimilarity`
+and `GetNCCSimilarity` (three sums each), whose per-pixel blocks Recipe E's step 4
+refused after the single-accumulator siblings (`GetAESimilarity`, `GetMAESimilarity`,
+`GetMSESimilarity`, `GetPASimilarity`, `GetPDCSimilarity`) had taken Recipe E. Added by
+Claude Code (Claude Opus 5.5) during task M02, under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -739,6 +839,7 @@ and you do not add one, record it here: the file, its score, and the smells left
 | --- | ---: | --- | --- |
 | `MagickCore/resize.c` | 2.89 | Brain Method and Deep Nesting (`InterpolativeResizeImage`'s channel loop assigns and tests the shared `status` inside `omp parallel for`, which even Recipe T refuses; `ScaleImage`'s bookkeeping writes six variables on survivor lines); Bumpy Road, Complex and Large Method (OpenMP-bound: the filters `continue` the parallel loop on failure; survivor lines; LQR not compiled); Excess Arguments (public signatures; the filter kernels' context is computed per iteration, and bundling it costs the filters more than the kernels gain). 2.45 before Recipe S, 2.87 before Recipe T on `SampleImage`. See [M01's report](tasks/M01-resize.md) | 2026-10-24, Mac |
 | `MagickCore/magnify.c` | 6.57 | Complex and Large Method: `Hq2XHelper` is a rule table written as a `switch` (splitting its cases yields clones with 7-8 arguments, 5.16 in a probe); `Fish2XBottomRightPixel`'s ladder shares six flags that only a struct declared after statements could carry; the 3x3 kernels and `IsEpbx2XBlendable` split into clones of each other (5.93 in a probe). Bumpy Road and Large Method in `MagnifyImage`: its last bumps are the parallel loop's `continue` and the atomic progress block. Overall Code Complexity: the mean of the above. From 6.21, with Recipes E, T, M and B. See [M01's report](tasks/M01-resize.md) | 2026-10-24, Mac |
+| `MagickCore/compare.c` | 1.77 | Code Duplication, Deep Nesting, Bumpy Road, Excess Arguments and a Complex Conditional sit in the FFTW-only region (lines 2889-4569, not compiled here), so no category can leave; `GetSSIMSimularity` and `GetPHASESimilarity` write five accumulators per pixel (over Recipe K's four); `CompareImages`' pixel loop needs ten arguments; the `Accumulate*Pixel` helpers differ in more than one value; `IsImagesEqual` has no case. See [M02's report](tasks/M02-compare.md) | 2026-10-24, Mac |
 
 ### Tool notes
 
@@ -777,6 +878,9 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | NEW | B | Bundle Arguments into a Struct: parameters of a `static` function that travel together become one `const` struct pointer; each caller fills a `const` struct from the same argument expressions | `magnify.c`'s pixel kernels, `Hq2XHelper` (11 arguments) and `CopyMagnifiedPixels`; a probe removing the finding raised the file 6.26 to 6.46 | owner |
 | 2026-10-24 | AMEND | E | Step 7: a block that runs to the end of a `void` function may contain `return;`; the new function is `void` and its call is the caller's last statement; macros used only by the block move with it | `Fish2X`'s ladder of early returns (probe: 6.52 to 6.56), refused by the founding wording, which covers only the throw macros' returns | mandate (2026-10-24) |
 | 2026-10-24 | WORDING | T | Provenance corrected (the shape is in `SampleImage` only, not `InterpolativeResizeImage` or the filters); the Careful note now refuses blocks that test or assign `status`, not a `break` of an inner loop after `status=MagickFalse;` | Reading the three loops after the recipe was added | after the fact |
+| 2026-10-24 | NEW | K | Extract Accumulating Block with Out-Parameters: a per-pixel accumulation inside a parallel loop body that writes two to four of the iteration's own variables moves to a `static void` function taking them by pointer | `compare.c`'s FUZZ, MEPP, DPC and NCC similarity loops, refused by Recipe E's step 4; their single-accumulator siblings each gained about 0.02 with Recipe E | mandate (2026-10-24) |
+| 2026-10-24 | AMEND | D | Blocks identical up to a consistent renaming of the variables they read or write count as identical; the variables become the helper's arguments; checked by script | M02's `GetNCCSimilarity`, deduplicated onto `GetDPCSimilarity`'s helper under this reading before it was written down; `ColorDecisionListImage`'s three parse blocks | after the fact |
+| 2026-10-24 | AMEND | G | Careful: a comparison with a floating-point operand is inverted as `!(a < b)`, not `a >= b`, which differs for NaN | `ClipCLAHEHistogram`'s `(double) *p < clip_limit`, where the written-out inverse would have run the block for a NaN limit | mandate (2026-10-24) |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.

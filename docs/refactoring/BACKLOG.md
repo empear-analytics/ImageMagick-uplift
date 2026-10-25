@@ -74,8 +74,8 @@ needs before refactoring:
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
 | 1.39 | `MagickCore/resize.c` | 4704 | 97% | 88% | plateau at 2.89 (Recipe T on `SampleImage`; OpenMP-bound nesting, survivor lines); magnify family split to `magnify.c`, plateau at 6.57 (from 6.21), [M01](tasks/M01-resize.md) |
-| 1.46 | `MagickCore/compare.c` | 4987 | 88% | 86% | open, [M02](tasks/M02-compare.md) |
-| 1.53 | `MagickCore/enhance.c` | 4596 | 78% | 86% | open, [M03](tasks/M03-enhance.md) |
+| 1.46 | `MagickCore/compare.c` | 4987 | 88% | 86% | plateau at 1.77 (FFTW-only region holds most categories; SSIM and PHASE loops write five sums), [M02](tasks/M02-compare.md) |
+| 1.53 | `MagickCore/enhance.c` | 4596 | 78% | 86% | 2.77, in progress (Brain Method, Deep Nesting, Complex Conditional gone; per-function steps left), [M03](tasks/M03-enhance.md) |
 | 1.53 | `MagickCore/morphology.c` | 4764 | 81% | 80% | open, [M04](tasks/M04-morphology.md) |
 | 1.55 | `MagickCore/visual-effects.c` | 3789 | 86% | 83% | open, [M05](tasks/M05-visual-effects.md) |
 | 1.73 | `MagickCore/geometry.c` | 1831 | 65% | 85% | open |

@@ -244,3 +244,52 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-24, Mac, overnight)
+
+**Result: Code Health 1.53 → 2.77** (`cs-mcp` 1.5.12). Branch `campaign/M03-enhance`,
+stacked on `campaign/M02-compare` (PR #8). 41 refactor commits, one recipe and one function
+each, all oracle-verified; two playbook amendments (Recipe D: variables become
+parameters; Recipe G: inverting a floating-point comparison).
+
+**Three categories leave the file:** Complex Conditional (three predicates, Recipe P),
+Brain Method (`LevelImage`, `LevelizeImage`, `SigmoidalContrastImage`) and Deep,
+Nested Complexity (all ten functions).
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| allocation and colorspace tests as predicates (`ContrastStretchImage`, `EqualizeImage`, `LevelImageColors`) | P | 1.53 → 1.67 |
+| colormap loops and parallel column loops of the levelers (`LevelImage`, `LevelizeImage`, `SigmoidalContrastImage`); macros the helpers expand move above them | E | → 2.06 |
+| `NegateImage`'s two column loops and colormap; its last level a guard clause | E, G | → 2.08 |
+| `GammaImage`, `GrayscaleImage` (the intensity switch returns the intensity) | E | → 2.24 |
+| `ModulateImage`'s colorspace switch, twice: one `ModulateColor`; then `const ModulateInfo` for it and the nine `Modulate*` kernels | O, D, B | → 2.41 |
+| `EqualizeImage`, `ContrastStretchImage`: histogram, map, colormap and pixel passes | E | → 2.59 |
+| `ColorDecisionListImage`'s Slope, Offset and Power parsers into one `ParseCDLTriple` | O, D, D | → 2.65 |
+| `ClipCLAHEHistogram`'s redistribution pass, the file's last Deep Nesting | E | → 2.77 |
+| `ClutImage`, `ContrastImage` towards Large Method | E | flat |
+
+Every step: build, `make.log` free of warnings for the file (checked from the
+`ColorDecisionListImage` steps on, after a warning slipped through in M02; see M02's
+report), guard OK, `--calls` OK or the extract/deduplicate fingerprint, the oracle on the
+function's cases (0 diverged), the CodeScene gate; every moved block checked by script.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Tried and reverted.** `LevelizeImage`'s colormap loop into a helper like
+`LevelImage`'s (the two levelers then reported as duplicates, 1.80 → 1.77);
+`SigmoidalContrastImage`'s column loop before its colormap (1.95 → 1.92), and later a
+value helper for its sharpen choice (flat); `ColorDecisionListImage`'s pixel loop (flat,
+no path further while its two struct types are local to it); a guard clause in
+`ClipCLAHEHistogram` (CodeScene counts the guard as nesting).
+
+**What is left, at 2.77.** Code Duplication: the eight `Modulate*` kernels (they differ
+in their two conversion calls), the row helpers (`LevelImageRow`, `GammaImageRow` and
+the others differ in the per-channel expression), `AutoLevelImage`/`NormalizeImage`
+(public). Excess Arguments: public signatures (`LevelImage`, `CLAHEImage`, ...) and the
+CLAHE helpers. Large and Complex Method: `ColorDecisionListImage` (220 lines; its
+`Correction` types are declared inside it, so its logging and map loops cannot be
+moved without first hoisting the types, which no recipe does), `HaldClutImage` (its
+pixel loop assigns and tests `status`), `CLAHEImage`, `EnhanceImage`,
+`WhiteBalanceImage`. This is not yet a plateau: per-function steps of about +0.01 remain;
+they were left for a later pass in favour of the files after it.
