@@ -784,6 +784,21 @@ static MagickBooleanType IsPolicyCacheInstantiated(ExceptionInfo *exception)
 %
 */
 
+static MagickBooleanType IsEffectiveRightsAuthorized(const PolicyRights rights,
+  const PolicyRights effective_rights,MagickBooleanType status)
+{
+  if (((rights & ReadPolicyRights) != 0) &&
+      ((effective_rights & ReadPolicyRights) == 0))
+    status=MagickFalse;
+  if (((rights & WritePolicyRights) != 0) &&
+      ((effective_rights & WritePolicyRights) == 0))
+    status=MagickFalse;
+  if (((rights & ExecutePolicyRights) != 0) &&
+      ((effective_rights & ExecutePolicyRights) == 0))
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport MagickBooleanType IsRightsAuthorizedByName(
   const PolicyDomain domain,const char *name,const PolicyRights rights,
   const char *pattern)
@@ -923,17 +938,7 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
   */
   status=MagickTrue;
   if (matched_any != MagickFalse)
-    {
-      if (((rights & ReadPolicyRights) != 0) &&
-          ((effective_rights & ReadPolicyRights) == 0))
-        status=MagickFalse;
-      if (((rights & WritePolicyRights) != 0) &&
-          ((effective_rights & WritePolicyRights) == 0))
-        status=MagickFalse;
-      if (((rights & ExecutePolicyRights) != 0) &&
-          ((effective_rights & ExecutePolicyRights) == 0))
-        status=MagickFalse;
-    }
+    status=IsEffectiveRightsAuthorized(rights,effective_rights,status);
   /*
     Enforce sticky canonical denies.
   */
