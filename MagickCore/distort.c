@@ -414,6 +414,26 @@ static inline MagickBooleanType IsInvalidBarrelArgumentCount(
     MagickTrue : MagickFalse);
 }
 
+static void SetAffineSingleCoefficients(double *coeff,const double *arguments,
+  const size_t cp_values,const size_t number_values)
+{
+  size_t
+    i;
+
+  if ( cp_values == 0 ) {
+    /* image distortion - translate the image */
+    coeff[0] = 1.0;
+    coeff[2] = arguments[0] - arguments[2];
+    coeff[4] = 1.0;
+    coeff[5] = arguments[1] - arguments[3];
+  }
+  else {
+    /* sparse gradient - use the values directly */
+    for (i=0; i<number_values; i++)
+      coeff[i*3+2] = arguments[cp_values+i];
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const size_t number_arguments,const double *arguments,
   size_t number_values,ExceptionInfo *exception)
@@ -571,18 +591,7 @@ static double *GenerateCoefficients(const Image *image,
       /* handle special cases of not enough arguments */
       if ( number_arguments == cp_size ) {
         /* Only 1 CP Set Given */
-        if ( cp_values == 0 ) {
-          /* image distortion - translate the image */
-          coeff[0] = 1.0;
-          coeff[2] = arguments[0] - arguments[2];
-          coeff[4] = 1.0;
-          coeff[5] = arguments[1] - arguments[3];
-        }
-        else {
-          /* sparse gradient - use the values directly */
-          for (i=0; i<number_values; i++)
-            coeff[i*3+2] = arguments[cp_values+i];
-        }
+        SetAffineSingleCoefficients(coeff,arguments,cp_values,number_values);
       }
       else {
         /* 2 or more points (usually 3) given.
