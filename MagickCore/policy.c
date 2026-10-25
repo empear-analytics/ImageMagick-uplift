@@ -799,6 +799,17 @@ static MagickBooleanType IsEffectiveRightsAuthorized(const PolicyRights rights,
   return(status);
 }
 
+static MagickBooleanType IsCanonicalRightsAuthorized(
+  const PolicyRights canonical_allowed_accumulator,const PolicyRights rights,
+  MagickBooleanType status)
+{
+  PolicyRights canonical_denied_mask = (PolicyRights) ((int)
+    AllPolicyRights & (int) ~canonical_allowed_accumulator);
+  if ((canonical_denied_mask & rights) != 0)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport MagickBooleanType IsRightsAuthorizedByName(
   const PolicyDomain domain,const char *name,const PolicyRights rights,
   const char *pattern)
@@ -943,12 +954,8 @@ MagickExport MagickBooleanType IsRightsAuthorizedByName(
     Enforce sticky canonical denies.
   */
   if (canonical_matched_any != MagickFalse)
-    {
-      PolicyRights canonical_denied_mask = (PolicyRights) ((int)
-        AllPolicyRights & (int) ~canonical_allowed_accumulator);
-      if ((canonical_denied_mask & rights) != 0)
-        status=MagickFalse;
-    }
+    status=IsCanonicalRightsAuthorized(canonical_allowed_accumulator,rights,
+      status);
   if ((GetLogEventMask() & PolicyEvent) != 0)
     (void) LogMagickEvent(PolicyEvent,GetMagickModule(),
       "  authorized: %s",status == MagickFalse ? "false" : "true");
