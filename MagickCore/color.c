@@ -2478,6 +2478,17 @@ static void SetHueColorFromGeometry(PixelInfo *color,
   color->blue=(MagickRealType) blue;
 }
 
+static void SetGrayColorFromGeometry(PixelInfo *color,
+  const GeometryInfo geometry_info,const MagickStatusType flags)
+{
+  color->green=color->red;
+  color->blue=color->red;
+  if (((flags & SigmaValue) != 0) &&
+      (color->alpha_trait != UndefinedPixelTrait))
+    color->alpha=(double) ClampToQuantum((double) QuantumRange*
+      geometry_info.sigma);
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2723,14 +2734,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
           geometry_info.chi);
       if ((LocaleCompare(colorspace,"gray") == 0) ||
           (LocaleCompare(colorspace,"lineargray") == 0))
-        {
-          color->green=color->red;
-          color->blue=color->red;
-          if (((flags & SigmaValue) != 0) &&
-              (color->alpha_trait != UndefinedPixelTrait))
-            color->alpha=(double) ClampToQuantum((double) QuantumRange*
-              geometry_info.sigma);
-        }
+        SetGrayColorFromGeometry(color,geometry_info,flags);
       if (IsHueColorspaceName(colorspace) != MagickFalse)
         SetHueColorFromGeometry(color,geometry_info);
       return(MagickTrue);
