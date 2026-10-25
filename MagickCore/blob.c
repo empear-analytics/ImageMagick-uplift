@@ -617,6 +617,16 @@ static inline void ThrowBlobException(BlobInfo *blob_info)
   blob_info->status=(-1);
 }
 
+static inline MagickBooleanType IsWrittenBlobFailure(const int status,
+  const BlobInfo *blob_info)
+{
+  return(((status != 0) &&
+    ((blob_info->mode == WriteBlobMode) ||
+    (blob_info->mode == WriteBinaryBlobMode) ||
+    (blob_info->mode == AppendBlobMode) ||
+    (blob_info->mode == AppendBinaryBlobMode))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType CloseBlob(Image *image)
 {
   BlobInfo
@@ -637,11 +647,7 @@ MagickExport MagickBooleanType CloseBlob(Image *image)
     return(MagickTrue);
   status=SyncBlob(image);
   /* Some platforms report an error when a read-only stream is flushed. */
-  if ((status != 0) &&
-      ((blob_info->mode == WriteBlobMode) ||
-       (blob_info->mode == WriteBinaryBlobMode) ||
-       (blob_info->mode == AppendBlobMode) ||
-       (blob_info->mode == AppendBinaryBlobMode)))
+  if (IsWrittenBlobFailure(status,blob_info) != MagickFalse)
     ThrowBlobException(blob_info);
   status=blob_info->status;
   switch (blob_info->type)
@@ -1446,6 +1452,14 @@ MagickExport int ErrorBlob(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsUnseekableBlobFile(const int file,
+  const MagickOffsetType offset)
+{
+  return(((file == fileno(stdin)) || (offset < 0) ||
+    (offset != (MagickOffsetType) ((ssize_t) offset))) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport void *FileToBlob(const char *filename,const size_t extent,
   size_t *length,ExceptionInfo *exception)
 {
@@ -1507,8 +1521,7 @@ MagickExport void *FileToBlob(const char *filename,const size_t extent,
     }
   offset=(MagickOffsetType) lseek(file,0,SEEK_END);
   count=0;
-  if ((file == fileno(stdin)) || (offset < 0) ||
-      (offset != (MagickOffsetType) ((ssize_t) offset)))
+  if (IsUnseekableBlobFile(file,offset) != MagickFalse)
     {
       size_t
         quantum;
@@ -3300,6 +3313,35 @@ static inline gzFile gzopen_utf8(const char *path,const char *mode)
 }
 #endif
 
+static inline MagickBooleanType IsStandardStreamName(const char *filename,
+  const ImageInfo *image_info)
+{
+  return(((LocaleCompare(filename,"-") == 0) ||
+    ((*filename == '\0') && (image_info->file == (FILE *) NULL))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsSharedListFilename(const char *filename,
+  const Image *image)
+{
+  return(((LocaleCompare(filename,image->filename) == 0) &&
+    ((GetPreviousImageInList(image) != (Image *) NULL) ||
+    (GetNextImageInList(image) != (Image *) NULL))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsGzipMagick(const unsigned char *magick)
+{
+  return((((int) magick[0] == 0x1F) && ((int) magick[1] == 0x8B) &&
+    ((int) magick[2] == 0x08)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsCompressedSVGExtension(const char *extension)
+{
+  return(((LocaleCompare(extension,"gz") == 0) ||
+    (LocaleCompare(extension,"wmz") == 0) ||
+    (LocaleCompare(extension,"svgz") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -3415,8 +3457,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
     rights=WritePolicyRights;
   if (IsPathAuthorized(rights,filename) == MagickFalse)
     ThrowPolicyException(filename,MagickFalse);
-  if ((LocaleCompare(filename,"-") == 0) ||
-      ((*filename == '\0') && (image_info->file == (FILE *) NULL)))
+  if (IsStandardStreamName(filename,image_info) != MagickFalse)
     {
       blob_info->file_info.file=(*type == 'r') ? stdin : stdout;
 #if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__OS2__)
@@ -3505,9 +3546,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
           */
           (void) InterpretImageFilename(image_info,image,image->filename,(int)
             image->scene,filename,exception);
-          if ((LocaleCompare(filename,image->filename) == 0) &&
-              ((GetPreviousImageInList(image) != (Image *) NULL) ||
-               (GetNextImageInList(image) != (Image *) NULL)))
+          if (IsSharedListFilename(filename,image) != MagickFalse)
             {
               char
                 path[MagickPathExtent];
@@ -3560,8 +3599,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
             (void) LogMagickEvent(BlobEvent,GetMagickModule(),
                "  read %.17g magic header bytes",(double) count);
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
-            if (((int) magick[0] == 0x1F) && ((int) magick[1] == 0x8B) &&
-                ((int) magick[2] == 0x08))
+            if (IsGzipMagick(magick) != MagickFalse)
               {
                 gzFile
                   gzfile = gzopen_utf8(filename,"rb");
@@ -3639,9 +3677,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
       }
     else
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
-      if ((LocaleCompare(extension,"gz") == 0) ||
-          (LocaleCompare(extension,"wmz") == 0) ||
-          (LocaleCompare(extension,"svgz") == 0))
+      if (IsCompressedSVGExtension(extension) != MagickFalse)
         {
           blob_info->file_info.gzfile=gzopen_utf8(filename,"wb");
           if (blob_info->file_info.gzfile != (gzFile) NULL)
@@ -5153,6 +5189,15 @@ MagickExport BlobInfo *ReferenceBlob(BlobInfo *blob)
 %        SEEK_END  Set position to EOF plus offset.
 %
 */
+static inline MagickBooleanType IsBlobOffsetOverflow(
+  const MagickOffsetType offset,const BlobInfo *blob_info)
+{
+  return((((offset > 0) && (blob_info->offset > (MAGICK_SSIZE_MAX-offset))) ||
+    ((offset < 0) &&
+    (blob_info->offset < (MAGICK_SSIZE_MIN-offset)))) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickOffsetType SeekBlob(Image *image,
   const MagickOffsetType offset,const int whence)
 {
@@ -5209,8 +5254,7 @@ MagickExport MagickOffsetType SeekBlob(Image *image,
         }
         case SEEK_CUR:
         {
-          if (((offset > 0) && (blob_info->offset > (MAGICK_SSIZE_MAX-offset))) ||
-              ((offset < 0) && (blob_info->offset < (MAGICK_SSIZE_MIN-offset))))
+          if (IsBlobOffsetOverflow(offset,blob_info) != MagickFalse)
             {
               errno=EOVERFLOW;
               return(-1);
@@ -5623,6 +5667,14 @@ MagickExport void SetCustomStreamWriter(CustomStreamInfo *custom_stream,
 %    o image: the image.
 %
 */
+static inline MagickBooleanType IsWriteBlobMode(const BlobInfo *blob_info)
+{
+  return(((blob_info->mode == WriteBlobMode) ||
+    (blob_info->mode == WriteBinaryBlobMode) ||
+    (blob_info->mode == AppendBlobMode) ||
+    (blob_info->mode == AppendBinaryBlobMode)) ? MagickTrue : MagickFalse);
+}
+
 static int SyncBlob(const Image *image)
 {
   BlobInfo
@@ -5646,10 +5698,7 @@ static int SyncBlob(const Image *image)
       break;
     case StandardStream:
     {
-      if ((blob_info->mode == WriteBlobMode) ||
-          (blob_info->mode == WriteBinaryBlobMode) ||
-          (blob_info->mode == AppendBlobMode) ||
-          (blob_info->mode == AppendBinaryBlobMode))
+      if (IsWriteBlobMode(blob_info) != MagickFalse)
         status=fflush(blob_info->file_info.file);
       break;
     }

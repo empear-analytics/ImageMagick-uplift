@@ -636,6 +636,14 @@ static inline char *ReplaceSpaceWithNewline(char **caption,char *space)
   return(space);
 }
 
+static inline MagickBooleanType IsBreakableSpace(const DrawInfo *draw_info,
+  const int code)
+{
+  return(((draw_info->word_break != BreakWordBreakType) &&
+    (IsUTFSpace(code) != MagickFalse) &&
+    (IsNonBreakingUTFSpace(code) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
   const MagickBooleanType split,TypeMetric *metrics,char **caption,
   ExceptionInfo *exception)
@@ -669,9 +677,7 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
         q=draw_info->text;
         continue;
       }
-    if ((draw_info->word_break != BreakWordBreakType) &&
-        (IsUTFSpace(code) != MagickFalse) &&
-        (IsNonBreakingUTFSpace(code) == MagickFalse))
+    if (IsBreakableSpace(draw_info,code) != MagickFalse)
       {
         if (width > image->columns)
           p=ReplaceSpaceWithNewline(caption,p);
@@ -1515,6 +1521,39 @@ static FT_Error FreetypeInit(FT_Memory memory,FT_Library *alibrary)
   return(ft_status);
 }
 
+static inline MagickBooleanType IsUnauthorizedFontFile(
+  const DrawInfo *draw_info)
+{
+  return(((draw_info->font != (char *) NULL) && (*draw_info->font == '@') &&
+    (IsRightsAuthorized(PathPolicyDomain,ReadPolicyRights,draw_info->font) ==
+    MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsTextWithoutGlyphs(const DrawInfo *draw_info,
+  const FT_UInt first_glyph_id)
+{
+  return(((draw_info->text == (char *) NULL) || (*draw_info->text == '\0') ||
+    (first_glyph_id == 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRenderedStroke(const DrawInfo *draw_info,
+  const MagickBooleanType status)
+{
+  return((((draw_info->stroke.alpha != (MagickRealType) TransparentAlpha) ||
+    (draw_info->stroke_pattern != (Image *) NULL)) &&
+    ((status != MagickFalse) &&
+    (draw_info->render != MagickFalse))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsVisibleStroke(const DrawInfo *draw_info,
+  const MagickBooleanType status)
+{
+  return((((draw_info->stroke.alpha != (MagickRealType) TransparentAlpha) ||
+    (draw_info->stroke_pattern != (Image *) NULL)) &&
+    (status != MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
   const char *encoding,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -1642,8 +1681,7 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
   /*
     Initialize Truetype library.
   */
-  if ((draw_info->font != (char *) NULL) && (*draw_info->font == '@') &&
-      (IsRightsAuthorized(PathPolicyDomain,ReadPolicyRights,draw_info->font) == MagickFalse))
+  if (IsUnauthorizedFontFile(draw_info) != MagickFalse)
     ThrowPolicyException(draw_info->font,MagickFalse);
   memory=FreetypeAcquireMemoryManager();
   if (memory == (FT_Memory) NULL)
@@ -1822,8 +1860,7 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
     (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
   first_glyph_id=0;
   FT_Get_First_Char(face,&first_glyph_id);
-  if ((draw_info->text == (char *) NULL) || (*draw_info->text == '\0') ||
-      (first_glyph_id == 0))
+  if (IsTextWithoutGlyphs(draw_info,first_glyph_id) != MagickFalse)
     {
       (void) FT_Done_Face(face);
       FreetypeDone(memory,library,stream);
@@ -1949,9 +1986,7 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
       metrics->bounds.x2=(double) bounds.xMax;
     if ((bounds.yMax > metrics->bounds.y2) && (bounds.yMax != 0))
       metrics->bounds.y2=(double) bounds.yMax;
-    if (((draw_info->stroke.alpha != (MagickRealType) TransparentAlpha) ||
-         (draw_info->stroke_pattern != (Image *) NULL)) &&
-        ((status != MagickFalse) && (draw_info->render != MagickFalse)))
+    if (IsRenderedStroke(draw_info,status) != MagickFalse)
       {
         /*
           Trace the glyph.
@@ -2096,9 +2131,7 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
             status=MagickFalse;
         }
         image_view=DestroyCacheView(image_view);
-        if (((draw_info->stroke.alpha != (MagickRealType) TransparentAlpha) ||
-             (draw_info->stroke_pattern != (Image *) NULL)) &&
-            (status != MagickFalse))
+        if (IsVisibleStroke(draw_info,status) != MagickFalse)
           {
             /*
               Draw text stroke.
@@ -2202,6 +2235,12 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
 %
 */
 
+static inline MagickBooleanType IsPostscriptNameChar(const unsigned char *p)
+{
+  return(((isalnum(*p) != 0) || (*p == '-') || (*p == '_') ||
+    (*p == '.')) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType IsValidPostscriptFontname(const char *font)
 {
   const unsigned char
@@ -2211,7 +2250,7 @@ static MagickBooleanType IsValidPostscriptFontname(const char *font)
     return(MagickFalse);
   for (p=(const unsigned char *) font; *p != '\0'; p++)
   {
-    if ((isalnum(*p) != 0) || (*p == '-') || (*p == '_') || (*p == '.'))
+    if (IsPostscriptNameChar(p) != MagickFalse)
       continue;
     return(MagickFalse);
   }

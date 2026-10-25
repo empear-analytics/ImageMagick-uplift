@@ -422,6 +422,94 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsGradientDefaultDirection(const Image *image)
+{
+  return(((GetImageArtifact(image,"gradient:angle") == (const char *) NULL) &&
+    (GetImageArtifact(image,"gradient:direction") == (const char *) NULL) &&
+    (GetImageArtifact(image,"gradient:extent") == (const char *) NULL) &&
+    (GetImageArtifact(image,"gradient:vector") ==
+    (const char *) NULL)) ? MagickTrue : MagickFalse);
+}
+
+static void SetGradientDirection(GradientInfo *gradient,const Image *image,
+  const char *artifact)
+{
+  GravityType
+    direction;
+
+  direction=(GravityType) ParseCommandOption(MagickGravityOptions,
+    MagickFalse,artifact);
+  switch (direction)
+  {
+    case NorthWestGravity:
+    {
+      gradient->gradient_vector.x1=(double) image->columns-1;
+      gradient->gradient_vector.y1=(double) image->rows-1;
+      gradient->gradient_vector.x2=0.0;
+      gradient->gradient_vector.y2=0.0;
+      break;
+    }
+    case NorthGravity:
+    {
+      gradient->gradient_vector.x1=0.0;
+      gradient->gradient_vector.y1=(double) image->rows-1;
+      gradient->gradient_vector.x2=0.0;
+      gradient->gradient_vector.y2=0.0;
+      break;
+    }
+    case NorthEastGravity:
+    {
+      gradient->gradient_vector.x1=0.0;
+      gradient->gradient_vector.y1=(double) image->rows-1;
+      gradient->gradient_vector.x2=(double) image->columns-1;
+      gradient->gradient_vector.y2=0.0;
+      break;
+    }
+    case WestGravity:
+    {
+      gradient->gradient_vector.x1=(double) image->columns-1;
+      gradient->gradient_vector.y1=0.0;
+      gradient->gradient_vector.x2=0.0;
+      gradient->gradient_vector.y2=0.0;
+      break;
+    }
+    case EastGravity:
+    {
+      gradient->gradient_vector.x1=0.0;
+      gradient->gradient_vector.y1=0.0;
+      gradient->gradient_vector.x2=(double) image->columns-1;
+      gradient->gradient_vector.y2=0.0;
+      break;
+    }
+    case SouthWestGravity:
+    {
+      gradient->gradient_vector.x1=(double) image->columns-1;
+      gradient->gradient_vector.y1=0.0;
+      gradient->gradient_vector.x2=0.0;
+      gradient->gradient_vector.y2=(double) image->rows-1;
+      break;
+    }
+    case SouthGravity:
+    {
+      gradient->gradient_vector.x1=0.0;
+      gradient->gradient_vector.y1=0.0;
+      gradient->gradient_vector.x2=0.0;
+      gradient->gradient_vector.y2=(double) image->rows-1;
+      break;
+    }
+    case SouthEastGravity:
+    {
+      gradient->gradient_vector.x1=0.0;
+      gradient->gradient_vector.y1=0.0;
+      gradient->gradient_vector.x2=(double) image->columns-1;
+      gradient->gradient_vector.y2=(double) image->rows-1;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport MagickBooleanType GradientImage(Image *image,
   const GradientType type,const SpreadMethod method,const StopInfo *stops,
   const size_t number_stops,ExceptionInfo *exception)
@@ -459,82 +547,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
   gradient->gradient_vector.y2=(double) image->rows-1;
   artifact=GetImageArtifact(image,"gradient:direction");
   if (artifact != (const char *) NULL)
-    {
-      GravityType
-        direction;
-
-      direction=(GravityType) ParseCommandOption(MagickGravityOptions,
-        MagickFalse,artifact);
-      switch (direction)
-      {
-        case NorthWestGravity:
-        {
-          gradient->gradient_vector.x1=(double) image->columns-1;
-          gradient->gradient_vector.y1=(double) image->rows-1;
-          gradient->gradient_vector.x2=0.0;
-          gradient->gradient_vector.y2=0.0;
-          break;
-        }
-        case NorthGravity:
-        {
-          gradient->gradient_vector.x1=0.0;
-          gradient->gradient_vector.y1=(double) image->rows-1;
-          gradient->gradient_vector.x2=0.0;
-          gradient->gradient_vector.y2=0.0;
-          break;
-        }
-        case NorthEastGravity:
-        {
-          gradient->gradient_vector.x1=0.0;
-          gradient->gradient_vector.y1=(double) image->rows-1;
-          gradient->gradient_vector.x2=(double) image->columns-1;
-          gradient->gradient_vector.y2=0.0;
-          break;
-        }
-        case WestGravity:
-        {
-          gradient->gradient_vector.x1=(double) image->columns-1;
-          gradient->gradient_vector.y1=0.0;
-          gradient->gradient_vector.x2=0.0;
-          gradient->gradient_vector.y2=0.0;
-          break;
-        }
-        case EastGravity:
-        {
-          gradient->gradient_vector.x1=0.0;
-          gradient->gradient_vector.y1=0.0;
-          gradient->gradient_vector.x2=(double) image->columns-1;
-          gradient->gradient_vector.y2=0.0;
-          break;
-        }
-        case SouthWestGravity:
-        {
-          gradient->gradient_vector.x1=(double) image->columns-1;
-          gradient->gradient_vector.y1=0.0;
-          gradient->gradient_vector.x2=0.0;
-          gradient->gradient_vector.y2=(double) image->rows-1;
-          break;
-        }
-        case SouthGravity:
-        {
-          gradient->gradient_vector.x1=0.0;
-          gradient->gradient_vector.y1=0.0;
-          gradient->gradient_vector.x2=0.0;
-          gradient->gradient_vector.y2=(double) image->rows-1;
-          break;
-        }
-        case SouthEastGravity:
-        {
-          gradient->gradient_vector.x1=0.0;
-          gradient->gradient_vector.y1=0.0;
-          gradient->gradient_vector.x2=(double) image->columns-1;
-          gradient->gradient_vector.y2=(double) image->rows-1;
-          break;
-        }
-        default:
-          break;
-      }
-    }
+    SetGradientDirection(gradient,image,artifact);
   artifact=GetImageArtifact(image,"gradient:angle");
   if (artifact != (const char *) NULL)
     gradient->angle=StringToDouble(artifact,(char **) NULL);
@@ -543,10 +556,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
     (void) MagickSscanf(artifact,"%lf%*[ ,]%lf%*[ ,]%lf%*[ ,]%lf",
       &gradient->gradient_vector.x1,&gradient->gradient_vector.y1,
       &gradient->gradient_vector.x2,&gradient->gradient_vector.y2);
-  if ((GetImageArtifact(image,"gradient:angle") == (const char *) NULL) &&
-      (GetImageArtifact(image,"gradient:direction") == (const char *) NULL) &&
-      (GetImageArtifact(image,"gradient:extent") == (const char *) NULL) &&
-      (GetImageArtifact(image,"gradient:vector") == (const char *) NULL))
+  if (IsGradientDefaultDirection(image) != MagickFalse)
     if ((type == LinearGradient) && (gradient->gradient_vector.y2 != 0.0))
       gradient->gradient_vector.x2=0.0;
   gradient->center.x=(double) gradient->gradient_vector.x2/2.0;

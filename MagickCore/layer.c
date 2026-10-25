@@ -769,6 +769,14 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
 %
 */
 
+static inline MagickBooleanType IsUnchangedFrameBounds(
+  const RectangleInfo *bounds,const ssize_t i)
+{
+  return(((bounds[i].x == -1) && (bounds[i].y == -1) &&
+    (bounds[i].width == 1) && (bounds[i].height == 1)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport Image *CompareImagesLayers(const Image *image,
   const LayerMethod method,ExceptionInfo *exception)
 {
@@ -861,8 +869,7 @@ MagickExport Image *CompareImagesLayers(const Image *image,
   next=GetNextImageInList(next);
   for ( ; next != (const Image *) NULL; next=GetNextImageInList(next))
   {
-    if ((bounds[i].x == -1) && (bounds[i].y == -1) &&
-        (bounds[i].width == 1) && (bounds[i].height == 1))
+    if (IsUnchangedFrameBounds(bounds,i) != MagickFalse)
       {
         /*
           An empty frame is returned from CompareImageBounds(), which means the
@@ -942,6 +949,23 @@ MagickExport Image *CompareImagesLayers(const Image *image,
 
 #define DEBUG_OPT_FRAME 0
 
+static inline MagickBooleanType IsPartialPageFrame(const Image *curr,
+  const Image *image)
+{
+  return(((curr->page.x != 0) || (curr->page.y != 0) ||
+    (curr->page.width != image->page.width) ||
+    (curr->page.height != image->page.height)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsBetterFrameBounds(
+  const MagickBooleanType try_cleared,const MagickBooleanType cleared,
+  const RectangleInfo try_bounds,const RectangleInfo *bounds,const ssize_t i)
+{
+  return(( (!try_cleared && cleared ) ||
+    try_bounds.width * try_bounds.height
+    <  bounds[i].width * bounds[i].height ) ? MagickTrue : MagickFalse);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -996,9 +1020,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     if ((curr->columns != image->columns) || (curr->rows != image->rows))
       ThrowImageException(OptionError,"ImagesAreNotTheSameSize");
 
-    if ((curr->page.x != 0) || (curr->page.y != 0) ||
-        (curr->page.width != image->page.width) ||
-        (curr->page.height != image->page.height))
+    if (IsPartialPageFrame(curr,image) != MagickFalse)
       ThrowImageException(OptionError,"ImagePagesAreNotCoalesced");
   }
   /*
@@ -1107,9 +1129,8 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
          (double) try_bounds.x,(double) try_bounds.y,
          try_cleared?"  (pixels were cleared)":"");
 #endif
-        if ( (!try_cleared && cleared ) ||
-                try_bounds.width * try_bounds.height
-                    <  bounds[i].width * bounds[i].height )
+        if (IsBetterFrameBounds(try_cleared,cleared,try_bounds,bounds,i) !=
+            MagickFalse)
           {
             cleared=try_cleared;
             bounds[i]=try_bounds;
@@ -1624,6 +1645,14 @@ MagickExport void OptimizeImageTransparency(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsDifferentLayerGeometry(const Image *image,
+  const Image *next)
+{
+  return(((image->columns != next->columns) || (image->rows != next->rows) ||
+    (image->page.x != next->page.x) ||
+    (image->page.y != next->page.y)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport void RemoveDuplicateLayers(Image **images,ExceptionInfo *exception)
 {
   RectangleInfo
@@ -1643,8 +1672,7 @@ MagickExport void RemoveDuplicateLayers(Image **images,ExceptionInfo *exception)
   image=GetFirstImageInList(*images);
   for ( ; (next=GetNextImageInList(image)) != (Image *) NULL; image=next)
   {
-    if ((image->columns != next->columns) || (image->rows != next->rows) ||
-        (image->page.x != next->page.x) || (image->page.y != next->page.y))
+    if (IsDifferentLayerGeometry(image,next) != MagickFalse)
       continue;
     bounds=CompareImagesBounds(image,next,CompareAnyLayer,exception);
     if (bounds.x < 0)

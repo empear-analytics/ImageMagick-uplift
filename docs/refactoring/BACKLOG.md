@@ -110,9 +110,9 @@ needs before refactoring:
 | 2.25 | `MagickCore/color.c` | 2792 | 70% | 77% | 3.16, in progress (Complex Conditional and Code Duplication gone; `QueryColorCompliance` cc 90 → 32), [M21](tasks/M21-color.md) |
 | 2.45 | `MagickCore/stream.c` | 2832 | 78% | 74% | 3.10, in progress (Complex Conditional gone; StreamImagePixels needs a break-to-return recipe), [M28](tasks/M28-stream.md) |
 | 2.58 | `MagickCore/attribute.c` | 2444 | 75% | 73% | 2.97, in progress (Complex Conditional: one site left, in a parallel loop), [M27](tasks/M27-attribute.md) |
-| 3.06 | `MagickCore/paint.c` | 1299 | 85% | 74% | open |
+| 3.06 | `MagickCore/paint.c` | 1299 | 85% | 74% | 3.33, in progress (Complex Conditional gone; OilPaint blocked by a local macro), [M47](tasks/M47-paint.md) |
 | 3.26 | `MagickCore/utility.c` | 2087 | 28% | 73% | open |
-| 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | open |
+| 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | 3.76, in progress (Throw* blocks pinned by __func__; StripMagickString return bug reported), [M49](tasks/M49-string.md) |
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
 | 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | open |
 | 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 5.35, in progress (Complex Conditional gone; string helpers tip String Heavy), [M34](tasks/M34-configure.md) |
@@ -134,13 +134,13 @@ needs before refactoring:
 | 1.61 | `MagickCore/xml-tree.c` | 2347 | 35% | 57% | 2.15, in progress (17 predicates; 4 sites left: 3 with side effects, 1 repeat), [M42](tasks/M42-xml-tree.md) |
 | 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | 2.06, in progress (Complex Conditional gone), [M43](tasks/M43-vision.md) |
 | 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.09, in progress (Complex Conditional gone), [M36](tasks/M36-image.md) |
-| 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | open |
-| 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | open |
+| 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | 2.21, in progress (8 predicates; one POSIX-only site left), [M44](tasks/M44-blob.md) |
+| 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | 2.33, in progress (6 predicates; Raqm-only and one 5-argument site left), [M45](tasks/M45-annotate.md) |
 | 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | open |
 | 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.38, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) |
-| 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | open |
+| 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | 3.77, in progress (Complex Conditional gone; scan loops need Recipe B), [M46](tasks/M46-layer.md) |
 | 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 3.40, plateau for now (new two-string helpers trigger String Heavy Function Arguments), [M30](tasks/M30-log.md) |
-| 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | open |
+| 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | 4.45 (guard level, not ready; ReadImage and WriteImage left), [M48](tasks/M48-constitute.md) |
 | 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | 3.85, in progress (Complex Conditional: one sizeof site left), [M31](tasks/M31-policy.md) |
 | 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.13, in progress (Complex Conditional gone; out of the Red band), [M32](tasks/M32-type.md) |
 | 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | open |

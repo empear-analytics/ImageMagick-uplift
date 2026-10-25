@@ -1279,6 +1279,42 @@ MagickExport const char *GetStringInfoPath(const StringInfo *string_info)
   return(string_info->path);
 }
 
+static double GetSiPrefixExponent(const char *q)
+{
+  double
+    e;
+
+  switch ((int) ((unsigned char) *q))
+  {
+    case 'q': e=(-30.0); break;
+    case 'r': e=(-27.0); break;
+    case 'y': e=(-24.0); break;
+    case 'z': e=(-21.0); break;
+    case 'a': e=(-18.0); break;
+    case 'f': e=(-15.0); break;
+    case 'p': e=(-12.0); break;
+    case 'n': e=(-9.0); break;
+    case 'u': e=(-6.0); break;
+    case 'm': e=(-3.0); break;
+    case 'c': e=(-2.0); break;
+    case 'd': e=(-1.0); break;
+    case 'h': e=2.0; break;
+    case 'k': e=3.0; break;
+    case 'K': e=3.0; break;
+    case 'M': e=6.0; break;
+    case 'G': e=9.0; break;
+    case 'T': e=12.0; break;
+    case 'P': e=15.0; break;
+    case 'E': e=18.0; break;
+    case 'Z': e=21.0; break;
+    case 'Y': e=24.0; break;
+    case 'R': e=27.0; break;
+    case 'Q': e=30.0; break;
+    default: e=0.0; break;
+  }
+  return(e);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1323,34 +1359,7 @@ MagickExport double InterpretSiPrefixValue(const char *magick_restrict string,
           double
             e;
 
-          switch ((int) ((unsigned char) *q))
-          {
-            case 'q': e=(-30.0); break;
-            case 'r': e=(-27.0); break;
-            case 'y': e=(-24.0); break;
-            case 'z': e=(-21.0); break;
-            case 'a': e=(-18.0); break;
-            case 'f': e=(-15.0); break;
-            case 'p': e=(-12.0); break;
-            case 'n': e=(-9.0); break;
-            case 'u': e=(-6.0); break;
-            case 'm': e=(-3.0); break;
-            case 'c': e=(-2.0); break;
-            case 'd': e=(-1.0); break;
-            case 'h': e=2.0; break;
-            case 'k': e=3.0; break;
-            case 'K': e=3.0; break;
-            case 'M': e=6.0; break;
-            case 'G': e=9.0; break;
-            case 'T': e=12.0; break;
-            case 'P': e=15.0; break;
-            case 'E': e=18.0; break;
-            case 'Z': e=21.0; break;
-            case 'Y': e=24.0; break;
-            case 'R': e=27.0; break;
-            case 'Q': e=30.0; break;
-            default: e=0.0; break;
-          }
+          e=GetSiPrefixExponent(q);
           if (e >= MagickEpsilon)
             {
               if (q[1] == 'i')
@@ -1455,6 +1464,44 @@ MagickExport MagickBooleanType IsStringFalse(const char *value)
   return(MagickFalse);
 }
 
+static void PrintStringInfoHexLine(FILE *file,
+  const StringInfo *string_info,const unsigned char *p,const size_t i)
+{
+  size_t
+    j;
+
+  (void) FormatLocaleFile(file,"0x%08lx: ",(unsigned long) i);
+  for (j = 0; j < MagickMin(string_info->length-i, CharsPerLine); j++)
+  {
+    (void) FormatLocaleFile(file,"%02lx",(unsigned long) (p[i+j]) & 0xff);
+    if (((j+1) % 0x04) == 0)
+      (void) fputc(' ',file);
+  }
+  /*
+    Padding.
+  */
+  for ( ; j < CharsPerLine; j++)
+  {
+    (void) fputc(' ',file);
+    (void) fputc(' ',file);
+    if (((j+1) % 0x04) == 0)
+      (void) fputc(' ',file);
+  }
+  (void) fputc(' ',file);
+  /*
+    ASCII section.
+  */
+  for (j=0; j < MagickMin(string_info->length-i,CharsPerLine); j++)
+  {
+    unsigned char c = p[i+j];
+    if (isprint((int) c) != 0)
+      (void) fputc(c,file);
+    else
+      (void) fputc('-',file);
+  }
+  (void) fputc('\n',file);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1489,8 +1536,7 @@ MagickExport void PrintStringInfo(FILE *file,const char *id,
     *p;
 
   size_t
-    i,
-    j;
+    i;
 
   /*
     Check if string is printable.
@@ -1514,38 +1560,7 @@ MagickExport void PrintStringInfo(FILE *file,const char *id,
     Convert string to a HEX list.
   */
   for (i=0; i < string_info->length; i+=CharsPerLine)
-  {
-    (void) FormatLocaleFile(file,"0x%08lx: ",(unsigned long) i);
-    for (j = 0; j < MagickMin(string_info->length-i, CharsPerLine); j++)
-    {
-      (void) FormatLocaleFile(file,"%02lx",(unsigned long) (p[i+j]) & 0xff);
-      if (((j+1) % 0x04) == 0)
-        (void) fputc(' ',file);
-    }
-    /*
-      Padding.
-    */
-    for ( ; j < CharsPerLine; j++)
-    {
-      (void) fputc(' ',file);
-      (void) fputc(' ',file);
-      if (((j+1) % 0x04) == 0)
-        (void) fputc(' ',file);
-    }
-    (void) fputc(' ',file);
-    /*
-      ASCII section.
-    */
-    for (j=0; j < MagickMin(string_info->length-i,CharsPerLine); j++)
-    {
-      unsigned char c = p[i+j];
-      if (isprint((int) c) != 0)
-        (void) fputc(c,file);
-      else
-        (void) fputc('-',file);
-    }
-    (void) fputc('\n',file);
-  }
+    PrintStringInfoHexLine(file,string_info,p,i);
 }
 
 /*
@@ -2004,6 +2019,27 @@ MagickExport char *StringInfoToString(const StringInfo *string_info)
   return(string);
 }
 
+static void CountArgvArguments(const char *text,int *argc)
+{
+  const char
+    *p;
+
+  for (p=text; *p != '\0'; )
+  {
+    while (isspace((int) ((unsigned char) *p)) != 0)
+      p++;
+    if (*p == '\0')
+      break;
+    (*argc)++;
+    if (*p == '"')
+      for (p++; (*p != '"') && (*p != '\0'); p++) ;
+    if (*p == '\'')
+      for (p++; (*p != '\'') && (*p != '\0'); p++) ;
+    while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
+      p++;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2056,20 +2092,7 @@ MagickExport char **StringToArgv(const char *text,int *argc)
   /*
     Determine the number of arguments.
   */
-  for (p=text; *p != '\0'; )
-  {
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == '\0')
-      break;
-    (*argc)++;
-    if (*p == '"')
-      for (p++; (*p != '"') && (*p != '\0'); p++) ;
-    if (*p == '\'')
-      for (p++; (*p != '\'') && (*p != '\0'); p++) ;
-    while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
-      p++;
-  }
+  CountArgvArguments(text,argc);
   (*argc)++;
   argv=(char **) AcquireQuantumMemory((size_t) *argc+1UL,sizeof(*argv));
   if (argv == (char **) NULL)
@@ -2118,6 +2141,17 @@ MagickExport char **StringToArgv(const char *text,int *argc)
   return(argv);
 }
 
+static const char *SkipValueSeparator(const char *p)
+{
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;  /* skip spaces */
+  if (*p == ',')
+    p++;  /* skip comma */
+  while (isspace((int) ((unsigned char) *p)) != 0)
+    p++;  /* and more spaces */
+  return(p);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2185,12 +2219,7 @@ MagickExport double *StringToArrayOfDoubles(const char *string,ssize_t *count,
       return((double *) NULL);  /* no value found */
     p=q;
     i++;  /* increment value count */
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;  /* skip spaces */
-    if (*p == ',')
-      p++;  /* skip comma */
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;  /* and more spaces */
+    p=SkipValueSeparator(p);
   }
   /*
     Allocate floating point argument list.
@@ -2320,6 +2349,21 @@ MagickExport char **StringToList(const char *text)
   return(StringToStrings(text,(size_t *) NULL));
 }
 
+static size_t CountTextLines(const char *text)
+{
+  const char
+    *p;
+
+  size_t
+    lines;
+
+  lines=1;
+  for (p=text; *p != '\0'; p++)
+    if (*p == '\n')
+      lines++;
+  return(lines);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2378,10 +2422,7 @@ MagickExport char **StringToStrings(const char *text,size_t *count)
       /*
         Convert string to an ASCII list.
       */
-      lines=1;
-      for (p=text; *p != '\0'; p++)
-        if (*p == '\n')
-          lines++;
+      lines=CountTextLines(text);
       textlist=(char **) AcquireQuantumMemory((size_t) lines+1UL,
         sizeof(*textlist));
       if (textlist == (char **) NULL)
