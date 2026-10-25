@@ -147,6 +147,14 @@ static int CCObjectInfoCompare(const void *x,const void *y)
   return((int) (q->area-(ssize_t) p->area));
 }
 
+static inline MagickBooleanType IsDiagonalPair(const Quantum *pixels,
+  const ssize_t i)
+{
+  return(((((ssize_t) pixels[0] == i) && ((ssize_t) pixels[3] == i)) ||
+    (((ssize_t) pixels[1] == i) && ((ssize_t) pixels[2] == i))) ? MagickTrue :
+    MagickFalse);
+}
+
 static void PerimeterThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -236,8 +244,7 @@ static void PerimeterThreshold(const Image *component_image,
         else
           if (foreground == 2)
             {
-              if ((((ssize_t) pixels[0] == i) && ((ssize_t) pixels[3] == i)) ||
-                  (((ssize_t) pixels[1] == i) && ((ssize_t) pixels[2] == i)))
+              if (IsDiagonalPair(pixels,i) != MagickFalse)
                 pattern[0]++;  /* diagonal */
               else
                 pattern[2]++;
