@@ -2422,6 +2422,62 @@ static void SetPsiColorFromGeometry(PixelInfo *color,
       }
 }
 
+static void SetHueColorFromGeometry(PixelInfo *color,
+  GeometryInfo geometry_info)
+{
+  double
+    blue,
+    green,
+    red,
+    scale;
+
+  scale=1.0/255.0;
+  geometry_info.sigma*=scale;
+  geometry_info.xi*=scale;
+  red=0.0;
+  green=0.0;
+  blue=0.0;
+  switch (color->colorspace)
+  {
+    case HCLColorspace:
+    {
+      ConvertHCLToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
+        360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
+      break;
+    }
+    case HSBColorspace:
+    {
+      ConvertHSBToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
+        360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
+      break;
+    }
+    case HSLColorspace:
+    {
+      ConvertHSLToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
+        360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
+      break;
+    }
+    case HSVColorspace:
+    {
+      ConvertHSVToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
+        360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
+      break;
+    }
+    case HWBColorspace:
+    {
+      ConvertHWBToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
+        360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
+      break;
+    }
+    default:
+      break;
+  }
+  color->colorspace=sRGBColorspace;
+  color->red=(MagickRealType) red;
+  color->green=(MagickRealType) green;
+  color->blue=(MagickRealType) blue;
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2676,58 +2732,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
               geometry_info.sigma);
         }
       if (IsHueColorspaceName(colorspace) != MagickFalse)
-        {
-          double
-            blue,
-            green,
-            red;
-
-          scale=1.0/255.0;
-          geometry_info.sigma*=scale;
-          geometry_info.xi*=scale;
-          red=0.0;
-          green=0.0;
-          blue=0.0;
-          switch (color->colorspace)
-          {
-            case HCLColorspace:
-            {
-              ConvertHCLToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
-                360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
-              break;
-            }
-            case HSBColorspace:
-            {
-              ConvertHSBToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
-                360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
-              break;
-            }
-            case HSLColorspace:
-            {
-              ConvertHSLToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
-                360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
-              break;
-            }
-            case HSVColorspace:
-            {
-              ConvertHSVToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
-                360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
-              break;
-            }
-            case HWBColorspace:
-            {
-              ConvertHWBToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
-                360.0,geometry_info.sigma,geometry_info.xi,&red,&green,&blue);
-              break;
-            }
-            default:
-              break;
-          }
-          color->colorspace=sRGBColorspace;
-          color->red=(MagickRealType) red;
-          color->green=(MagickRealType) green;
-          color->blue=(MagickRealType) blue;
-        }
+        SetHueColorFromGeometry(color,geometry_info);
       return(MagickTrue);
     }
   /*
