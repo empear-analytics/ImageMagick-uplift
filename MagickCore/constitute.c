@@ -455,6 +455,18 @@ static void SetImageDateProperties(Image *next,ExceptionInfo *exception)
   (void) SetImageProperty(next,"date:create",timestamp,exception);
 }
 
+static void SyncDisposeFromConstituteInfo(Image *next,
+  const ConstituteInfo *constitute_info)
+{
+  ssize_t
+    option_type;
+
+  option_type=ParseCommandOption(MagickDisposeOptions,MagickFalse,
+    constitute_info->dispose);
+  if (option_type >= 0)
+    next->dispose=(DisposeType) option_type;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -983,15 +995,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     if (constitute_info.delay_flags != NoValue)
       SyncDelayFromConstituteInfo(next,&constitute_info);
     if (constitute_info.dispose != (const char *) NULL)
-      {
-        ssize_t
-          option_type;
-
-        option_type=ParseCommandOption(MagickDisposeOptions,MagickFalse,
-          constitute_info.dispose);
-        if (option_type >= 0)
-          next->dispose=(DisposeType) option_type;
-      }
+      SyncDisposeFromConstituteInfo(next,&constitute_info);
     if (read_info->verbose != MagickFalse)
       (void) IdentifyImage(next,stderr,MagickFalse,exception);
     image=next;
