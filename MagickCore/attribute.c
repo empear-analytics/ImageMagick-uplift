@@ -910,6 +910,36 @@ static size_t GetMaximumDepth(const size_t *current_depth,
   return(depth);
 }
 
+static void RaiseColormapEntryDepth(const Image *image,size_t *current_depth,
+  const int id,const ssize_t i)
+{
+  while (current_depth[id] < MAGICKCORE_QUANTUM_DEPTH)
+  {
+    MagickBooleanType
+      atDepth;
+
+    QuantumAny
+      range;
+
+    atDepth=MagickTrue;
+    range=GetQuantumRange(current_depth[id]);
+    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].red),range) == MagickFalse)
+        atDepth=MagickFalse;
+    if ((atDepth != MagickFalse) &&
+        (GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].green),range) == MagickFalse)
+        atDepth=MagickFalse;
+    if ((atDepth != MagickFalse) &&
+        (GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].blue),range) == MagickFalse)
+        atDepth=MagickFalse;
+    if ((atDepth != MagickFalse))
+      break;
+    current_depth[id]++;
+  }
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -952,31 +982,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
         const int
           id = GetOpenMPThreadId();
 
-        while (current_depth[id] < MAGICKCORE_QUANTUM_DEPTH)
-        {
-          MagickBooleanType
-            atDepth;
-
-          QuantumAny
-            range;
-
-          atDepth=MagickTrue;
-          range=GetQuantumRange(current_depth[id]);
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].red),range) == MagickFalse)
-              atDepth=MagickFalse;
-          if ((atDepth != MagickFalse) &&
-              (GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].green),range) == MagickFalse)
-              atDepth=MagickFalse;
-          if ((atDepth != MagickFalse) &&
-              (GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].blue),range) == MagickFalse)
-              atDepth=MagickFalse;
-          if ((atDepth != MagickFalse))
-            break;
-          current_depth[id]++;
-        }
+        RaiseColormapEntryDepth(image,current_depth,id,i);
       }
       depth=GetMaximumDepth(current_depth,number_threads);
       current_depth=(size_t *) RelinquishMagickMemory(current_depth);
