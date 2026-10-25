@@ -325,6 +325,38 @@ static void AnnotateMontageTitle(const ImageInfo *image_info,
   draw_clone_info=DestroyDrawInfo(draw_clone_info);
 }
 
+static Image *AddTileFrame(Image *image,const FrameInfo frame_info,
+  const size_t width,const size_t height,const TypeMetric metrics,
+  ExceptionInfo *exception)
+{
+  FrameInfo
+    frame_clone;
+
+  const char
+    *value;
+
+  Image
+    *frame_image;
+
+  /*
+    Put an ornamental border around this tile.
+  */
+  frame_clone=frame_info;
+  frame_clone.width=width+2*frame_info.width;
+  frame_clone.height=height+2*frame_info.height;
+  value=GetImageProperty(image,"label",exception);
+  if (value != (const char *) NULL)
+    frame_clone.height+=(size_t) ((metrics.ascent-metrics.descent+4)*
+      MultilineCensus(value));
+  frame_image=FrameImage(image,&frame_clone,image->compose,exception);
+  if (frame_image != (Image *) NULL)
+    {
+      image=DestroyImage(image);
+      image=frame_image;
+    }
+  return(image);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -872,28 +904,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
       y=geometry.y+(ssize_t) border_width;
       if ((montage_info->frame != (char *) NULL) && (bevel_width > 0))
         {
-          FrameInfo
-            frame_clone;
-
-          Image
-            *frame_image;
-
-          /*
-            Put an ornamental border around this tile.
-          */
-          frame_clone=frame_info;
-          frame_clone.width=width+2*frame_info.width;
-          frame_clone.height=height+2*frame_info.height;
-          value=GetImageProperty(image,"label",exception);
-          if (value != (const char *) NULL)
-            frame_clone.height+=(size_t) ((metrics.ascent-metrics.descent+4)*
-              MultilineCensus(value));
-          frame_image=FrameImage(image,&frame_clone,image->compose,exception);
-          if (frame_image != (Image *) NULL)
-            {
-              image=DestroyImage(image);
-              image=frame_image;
-            }
+          image=AddTileFrame(image,frame_info,width,height,metrics,exception);
           x=0;
           y=0;
         }
