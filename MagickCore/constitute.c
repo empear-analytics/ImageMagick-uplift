@@ -1571,6 +1571,30 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   return(status);
 }
 
+static void SyncImageSceneNumbers(Image *images)
+{
+  Image
+    *p;
+
+  p=images;
+  for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
+  {
+    if (p->scene >= GetNextImageInList(p)->scene)
+      {
+        ssize_t
+          i;
+
+        /*
+          Generate consistent scene numbers.
+        */
+        i=(ssize_t) images->scene;
+        for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
+          p->scene=(size_t) i++;
+        break;
+      }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1659,23 +1683,7 @@ MagickExport MagickBooleanType WriteImages(const ImageInfo *image_info,
   sans_exception=DestroyExceptionInfo(sans_exception);
   if (*write_info->magick == '\0')
     (void) CopyMagickString(write_info->magick,images->magick,MagickPathExtent);
-  p=images;
-  for ( ; GetNextImageInList(p) != (Image *) NULL; p=GetNextImageInList(p))
-  {
-    if (p->scene >= GetNextImageInList(p)->scene)
-      {
-        ssize_t
-          i;
-
-        /*
-          Generate consistent scene numbers.
-        */
-        i=(ssize_t) images->scene;
-        for (p=images; p != (Image *) NULL; p=GetNextImageInList(p))
-          p->scene=(size_t) i++;
-        break;
-      }
-  }
+  SyncImageSceneNumbers(images);
   /*
     Write images.
   */
