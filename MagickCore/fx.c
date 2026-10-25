@@ -2731,6 +2731,12 @@ static inline MagickBooleanType ProcessTernaryOpr (FxInfo * pfx, TernaryT * pter
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsOperatorStackBarrier(const OperatorE top)
+{
+  return((top == oOpenParen || top == oAssign ||
+    OprInPlace ((int) top)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType GetOperator (
   FxInfo * pfx,
   MagickBooleanType * Assign, MagickBooleanType * Update, MagickBooleanType * IncrDecr)
@@ -2775,7 +2781,7 @@ static MagickBooleanType GetOperator (
   while (pfx->usedOprStack > 0) {
     OperatorE top = pfx->OperatorStack[pfx->usedOprStack-1];
     int precTop, precNew;
-    if (top == oOpenParen || top == oAssign || OprInPlace ((int) top)) break;
+    if (IsOperatorStackBarrier(top) != MagickFalse) break;
     precTop = Operators[top].precedence;
     precNew = Operators[op].precedence;
     /* Assume left associativity.
