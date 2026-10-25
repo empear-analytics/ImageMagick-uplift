@@ -149,3 +149,24 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 3.08 → 3.27** (`cs-mcp` 1.5.12). Branch `campaign/M12-fourier`,
+stacked on `campaign/M11-decorate` (PR #17). 1 refactor commit: Recipe P,
+oracle-verified (`ComplexImages` is ready at 93% by `mutation-fourier-merged.json`).
+`IsComplexRowMissing` takes `ComplexImages`' six row pointers. CodeScene reports it for
+Excess Arguments (6), but the score rises regardless.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Plateau for the current catalogue.**
+- `ForwardFourier`, `InverseFourier`, `ForwardFourierTransform`, `InverseFourierTransform`,
+  `RollFourier`, `ForwardQuadrantSwap` and the `*Channel` functions sit under
+  `MAGICKCORE_FFTW_DELEGATE`, which this build does not compile, so they are
+  untouchable.
+- `ComplexImages`' remaining nesting is the operator `switch`, which sets `cr` and `ci`
+  inside the parallel loop. Recipe O does not apply in an OpenMP region, and a K-style
+  helper would take eight arguments.
+- The two public `*TransformImage` functions are mostly their non-FFTW fallbacks.
