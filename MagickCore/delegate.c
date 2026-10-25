@@ -358,6 +358,18 @@ MagickPrivate void DelegateComponentTerminus(void)
 %
 */
 
+static inline MagickBooleanType IsWindowsDrivePath(const char *token)
+{
+  return(((isalpha((int) *token) != 0) && (token[1] == ':') &&
+    ((token[2] == '\\') || (token[2] == '/'))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsDotRelativePath(const char *token)
+{
+  return(((*token == '.') && ((token[1] == '\\') || (token[1] == '/'))) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsExecutableToken(const char *token)
 {
   size_t
@@ -374,15 +386,14 @@ static inline MagickBooleanType IsExecutableToken(const char *token)
   length=strlen(token);
   if (length >= 3)
     {
-      if ((isalpha((int) *token) != 0) && (token[1] == ':') &&
-          ((token[2] == '\\') || (token[2] == '/')))
+      if (IsWindowsDrivePath(token) != MagickFalse)
         return(MagickTrue);
     }
   if (*token == '/')
     return(MagickTrue);
   if (length >= 2)
     {
-      if ((*token == '.') && ((token[1] == '\\') || (token[1] == '/')))
+      if (IsDotRelativePath(token) != MagickFalse)
         return(MagickTrue);
     }
   if (isalnum((int) *token))
