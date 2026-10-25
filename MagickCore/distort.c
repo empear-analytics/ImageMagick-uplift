@@ -141,11 +141,17 @@ static void InvertPerspectiveCoefficients(const double *coeff,
  * which is to allow the use of a bi-linear (order=1.5) polynomial.
  * All the later polynomials are ordered simply from x^N to y^N
  */
+static inline MagickBooleanType IsInvalidPolyOrder(const double order)
+{
+  return(( order < 1 || order > 5 ||
+       ( order != floor(order) && (order-1.5) > MagickEpsilon) ) ?
+    MagickTrue : MagickFalse);
+}
+
 static size_t poly_number_terms(double order)
 {
  /* Return the number of terms for a 2d polynomial */
-  if ( order < 1 || order > 5 ||
-       ( order != floor(order) && (order-1.5) > MagickEpsilon) )
+  if (IsInvalidPolyOrder(order) != MagickFalse)
     return 0; /* invalid polynomial order */
   return(CastDoubleToSizeT(floor((order+1.0)*(order+2.0)/2.0)));
 }
