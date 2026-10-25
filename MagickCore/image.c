@@ -1062,6 +1062,23 @@ MagickExport ImageInfo *CloneImageInfo(const ImageInfo *image_info)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsOffsetRegionOutside(const Image *image,
+  const RectangleInfo *geometry,const OffsetInfo *offset)
+{
+  return(((offset->x < 0) || (offset->y < 0) ||
+    ((offset->x+(ssize_t) geometry->width) > (ssize_t) image->columns) ||
+    ((offset->y+(ssize_t) geometry->height) > (ssize_t) image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsChannelNotCopied(const PixelTrait traits,
+  const PixelTrait source_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    ((traits & UpdatePixelTrait) == 0) ||
+    (source_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType CopyImagePixels(Image *image,
   const Image *source_image,const RectangleInfo *geometry,
   const OffsetInfo *offset,ExceptionInfo *exception)
@@ -1087,9 +1104,7 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
   assert(offset != (OffsetInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if ((offset->x < 0) || (offset->y < 0) ||
-      ((offset->x+(ssize_t) geometry->width) > (ssize_t) image->columns) ||
-      ((offset->y+(ssize_t) geometry->height) > (ssize_t) image->rows))
+  if (IsOffsetRegionOutside(image,geometry,offset) != MagickFalse)
     ThrowBinaryException(OptionError,"GeometryDoesNotContainImage",
       image->filename);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
@@ -1140,9 +1155,7 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
         PixelChannel channel = GetPixelChannelChannel(image,i);
         PixelTrait traits = GetPixelChannelTraits(image,channel);
         PixelTrait source_traits=GetPixelChannelTraits(source_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            ((traits & UpdatePixelTrait) == 0) ||
-            (source_traits == UndefinedPixelTrait))
+        if (IsChannelNotCopied(traits,source_traits) != MagickFalse)
           continue;
         SetPixelChannel(image,channel,p[i],q);
       }
