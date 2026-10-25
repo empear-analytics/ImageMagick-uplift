@@ -3417,6 +3417,13 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsSelectiveRowMissing(const Quantum *p,
+  const Quantum *l,const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (l == (const Quantum *) NULL) ||
+    (q == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -3576,8 +3583,7 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
       (ssize_t) ((width-1)/2L),luminance_image->columns+width,width,exception);
     q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (l == (const Quantum *) NULL) ||
-        (q == (Quantum *) NULL))
+    if (IsSelectiveRowMissing(p,l,q) != MagickFalse)
       {
         status=MagickFalse;
         continue;
