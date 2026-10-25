@@ -159,7 +159,7 @@ needs before refactoring:
 | 7.59 | `MagickCore/linked-list.c` | 1040 | 40% | 69% | 8.95 (interior-insert bug reported), [M59](tasks/M59-linked-list.md) |
 | 7.68 | `MagickCore/random.c` | 996 | 62% | 24% | 8.06 (entropy gathering is #if-built), [M63](tasks/M63-random.md) |
 | 7.78 | `MagickCore/cache-view.c` | 1114 | 34% | 30% | plateau 7.78 (D needs cases for GetOneCacheView*), [M64](tasks/M64-cache-view.md) |
-| 7.88 | `MagickCore/magic.c` | 823 | 72% | 66% | open |
+| 7.88 | `MagickCore/magic.c` | 823 | 72% | 66% | 8.45, [M65](tasks/M65-magic.md) |
 | 8.55 | `MagickCore/registry.c` | 537 | 68% | 48% | open |
 | 8.81 | `MagickCore/timer.c` | 664 | 89% | 52% | open |
 | 9.09 | `MagickCore/artifact.c` | 491 | 80% | 60% | open |

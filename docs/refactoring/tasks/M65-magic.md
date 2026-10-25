@@ -95,3 +95,16 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 7.88 → 8.45** (`cs-mcp` 1.5.12). Branch `campaign/M65-magic`,
+stacked on `campaign/M64-cache-view`. One oracle-verified E commit: `PrintMagicBytes`
+(ListMagicInfo, ready, 12 of 12 killed). ListMagicInfo leaves Bumpy Road Ahead and
+Deep, Nested Complexity.
+
+**What is left, at 8.45.**
+- GetMagicInfo (cc 12): its two list searches each write both the cursor `p` and
+  `magic_info`, and each `return`s from inside its locking block.
+- GetMagicInfoList and GetMagicList are reported as duplicates. They are the usual
+  list-to-array pair and differ in their element type and copy.
