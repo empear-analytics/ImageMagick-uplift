@@ -390,6 +390,25 @@ static size_t GetMaximumLabelLines(Image **image_list,
   return(number_lines);
 }
 
+static size_t GetMontageDirectoryExtent(Image **image_list,
+  const size_t tiles_per_page,const size_t number_images)
+{
+  size_t
+    extent;
+
+  ssize_t
+    tile;
+
+  tile=0;
+  extent=1;
+  while (tile < MagickMin((ssize_t) tiles_per_page,(ssize_t) number_images))
+  {
+    extent+=strlen(image_list[tile]->filename)+1;
+    tile++;
+  }
+  return(extent);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -673,13 +692,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
       Set montage geometry.
     */
     montage->montage=AcquireString((char *) NULL);
-    tile=0;
-    extent=1;
-    while (tile < MagickMin((ssize_t) tiles_per_page,(ssize_t) number_images))
-    {
-      extent+=strlen(image_list[tile]->filename)+1;
-      tile++;
-    }
+    extent=GetMontageDirectoryExtent(image_list,tiles_per_page,number_images);
     montage->directory=(char *) AcquireQuantumMemory(extent,
       sizeof(*montage->directory));
     if ((montage->montage == (char *) NULL) ||
