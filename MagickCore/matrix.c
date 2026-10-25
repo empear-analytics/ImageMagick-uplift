@@ -727,6 +727,13 @@ static inline MagickBooleanType IsPivotMemoryMissing(const ssize_t *columns,
     (pivots == (ssize_t *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsSingularPivot(const ssize_t column,
+  const ssize_t row,const long double max)
+{
+  return(((column == -1) || (row == -1) || (fabsl(max) < LDBL_MIN)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   double **vectors,const size_t rank,const size_t number_vectors)
 {
@@ -815,7 +822,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
               row=j;
               column=k;
             }
-    if ((column == -1) || (row == -1) || (fabsl(max) < LDBL_MIN))
+    if (IsSingularPivot(column,row,max) != MagickFalse)
       ThrowGaussJordanException();  /* Singular or nearly singular matrix */
     pivots[column]++;
     if (row != column)
