@@ -1383,20 +1383,8 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
     q+=(ptrdiff_t) GetPixelChannels(flop_image)*flop_image->columns;
     for (x=0; x < (ssize_t) flop_image->columns; x++)
     {
-      ssize_t
-        i;
-
       q-=GetPixelChannels(flop_image);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait flop_traits=GetPixelChannelTraits(flop_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (flop_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(flop_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,flop_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(flop_view,exception) == MagickFalse)
