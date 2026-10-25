@@ -1865,6 +1865,25 @@ static void PrintDePolarFX(const double *coeff,const char *image_gen)
   (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
 }
 
+static void PrintCylinder2PlaneFX(const double *coeff,const char *image_gen,
+  const char *lookup)
+{
+  (void) FormatLocaleFile(stderr,
+    "Cylinder to Plane Distort, Internal Coefficients\n");
+  (void) FormatLocaleFile(stderr,"  cylinder_radius = %+lf\n",coeff[1]);
+  (void) FormatLocaleFile(stderr,
+    "Cylinder to Plane Distort, FX Equivalent:\n");
+  (void) FormatLocaleFile(stderr, "%s", image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x%+lf+0.5; jj=j+page.y%+lf+0.5;\n",-coeff[4],
+    -coeff[5]);
+  (void) FormatLocaleFile(stderr,"       aa=atan(ii/%+lf);\n",coeff[1]);
+  (void) FormatLocaleFile(stderr,"       xx=%lf*aa%+lf;\n",
+    coeff[1],coeff[2]);
+  (void) FormatLocaleFile(stderr,"       yy=jj*cos(aa)%+lf;\n",coeff[3]);
+  (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -2399,20 +2418,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       }
       case Cylinder2PlaneDistortion:
       {
-        (void) FormatLocaleFile(stderr,
-          "Cylinder to Plane Distort, Internal Coefficients\n");
-        (void) FormatLocaleFile(stderr,"  cylinder_radius = %+lf\n",coeff[1]);
-        (void) FormatLocaleFile(stderr,
-          "Cylinder to Plane Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr, "%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x%+lf+0.5; jj=j+page.y%+lf+0.5;\n",-coeff[4],
-          -coeff[5]);
-        (void) FormatLocaleFile(stderr,"       aa=atan(ii/%+lf);\n",coeff[1]);
-        (void) FormatLocaleFile(stderr,"       xx=%lf*aa%+lf;\n",
-          coeff[1],coeff[2]);
-        (void) FormatLocaleFile(stderr,"       yy=jj*cos(aa)%+lf;\n",coeff[3]);
-        (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
+        PrintCylinder2PlaneFX(coeff,image_gen,lookup);
         break;
       }
       case Plane2CylinderDistortion:
