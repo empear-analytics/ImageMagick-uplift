@@ -333,6 +333,43 @@ static inline MagickBooleanType IsResampleUnweighted(const ssize_t hit,
     divisor_c <= MagickEpsilon ) ? MagickTrue : MagickFalse);
 }
 
+static void BlendCheckerTileAverage(ResampleFilter *resample_filter)
+{
+  double
+    divisor_c,
+    weight;
+
+  /* CheckerTile is a alpha blend of the image's average pixel
+     color and the current background color */
+
+  /* image's average pixel color */
+  weight = QuantumScale*((double)
+    resample_filter->average_pixel.alpha);
+  resample_filter->average_pixel.red *= weight;
+  resample_filter->average_pixel.green *= weight;
+  resample_filter->average_pixel.blue *= weight;
+  divisor_c = weight;
+
+  /* background color */
+  weight = QuantumScale*((double)
+    resample_filter->image->background_color.alpha);
+  resample_filter->average_pixel.red +=
+          weight*resample_filter->image->background_color.red;
+  resample_filter->average_pixel.green +=
+          weight*resample_filter->image->background_color.green;
+  resample_filter->average_pixel.blue +=
+          weight*resample_filter->image->background_color.blue;
+  resample_filter->average_pixel.alpha +=
+          resample_filter->image->background_color.alpha;
+  divisor_c += weight;
+
+  /* alpha blend */
+  resample_filter->average_pixel.red /= divisor_c;
+  resample_filter->average_pixel.green /= divisor_c;
+  resample_filter->average_pixel.blue /= divisor_c;
+  resample_filter->average_pixel.alpha /= 2; /* 50% blend */
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -532,38 +569,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
           average_image=DestroyImage(average_image);
 
           if ( resample_filter->virtual_pixel == CheckerTileVirtualPixelMethod )
-            {
-              /* CheckerTile is a alpha blend of the image's average pixel
-                 color and the current background color */
-
-              /* image's average pixel color */
-              weight = QuantumScale*((double)
-                resample_filter->average_pixel.alpha);
-              resample_filter->average_pixel.red *= weight;
-              resample_filter->average_pixel.green *= weight;
-              resample_filter->average_pixel.blue *= weight;
-              divisor_c = weight;
-
-              /* background color */
-              weight = QuantumScale*((double)
-                resample_filter->image->background_color.alpha);
-              resample_filter->average_pixel.red +=
-                      weight*resample_filter->image->background_color.red;
-              resample_filter->average_pixel.green +=
-                      weight*resample_filter->image->background_color.green;
-              resample_filter->average_pixel.blue +=
-                      weight*resample_filter->image->background_color.blue;
-              resample_filter->average_pixel.alpha +=
-                      resample_filter->image->background_color.alpha;
-              divisor_c += weight;
-
-              /* alpha blend */
-              resample_filter->average_pixel.red /= divisor_c;
-              resample_filter->average_pixel.green /= divisor_c;
-              resample_filter->average_pixel.blue /= divisor_c;
-              resample_filter->average_pixel.alpha /= 2; /* 50% blend */
-
-            }
+            BlendCheckerTileAverage(resample_filter);
         }
         *pixel=resample_filter->average_pixel;
         break;
