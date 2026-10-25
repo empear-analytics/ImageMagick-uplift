@@ -211,6 +211,21 @@ static Image *BlendConvolveImage(const Image *image,const char *kernel,
   return(convolve_image);
 }
 
+static inline MagickBooleanType IsBlendRowMissing(const Quantum *p,
+  const Quantum *q,const Quantum *r)
+{
+  return(((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
+    (r == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsBlendChannelSkipped(const PixelTrait traits,
+  const PixelTrait other_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    (other_traits == UndefinedPixelTrait) ||
+    ((other_traits & UpdatePixelTrait) == 0)) ? MagickTrue : MagickFalse);
+}
+
 static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
   ExceptionInfo *exception)
 {
@@ -259,8 +274,7 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
     q=GetCacheViewVirtualPixels(dy_view,0,y,dx_image->columns,1,exception);
     r=GetCacheViewAuthenticPixels(magnitude_view,0,y,dx_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
-        (r == (Quantum *) NULL))
+    if (IsBlendRowMissing(p,q,r) != MagickFalse)
       {
         status=MagickFalse;
         continue;
@@ -275,9 +289,7 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
         PixelChannel channel = GetPixelChannelChannel(dx_image,i);
         PixelTrait traits = GetPixelChannelTraits(dx_image,channel);
         PixelTrait dy_traits = GetPixelChannelTraits(dy_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (dy_traits == UndefinedPixelTrait) ||
-            ((dy_traits & UpdatePixelTrait) == 0))
+        if (IsBlendChannelSkipped(traits,dy_traits) != MagickFalse)
           continue;
         r[i]=ClampToQuantum(hypot((double) p[i],(double)
           GetPixelChannel(dy_image,channel,q)));
@@ -295,6 +307,14 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
   if (status == MagickFalse)
     magnitude_image=DestroyImage(magnitude_image);
   return(magnitude_image);
+}
+
+static inline MagickBooleanType IsBlendRowsMissing(const Quantum *p,
+  const Quantum *q,const Quantum *r,const Quantum *s,const Quantum *t)
+{
+  return(((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
+    (r == (const Quantum *) NULL) || (s == (const Quantum *) NULL) ||
+    (t == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
 }
 
 static Image *BlendMaxMagnitudeImage(const Image *alpha_image,
@@ -355,9 +375,7 @@ static Image *BlendMaxMagnitudeImage(const Image *alpha_image,
     s=GetCacheViewVirtualPixels(dy_view,0,y,alpha_image->columns,1,exception);
     t=GetCacheViewAuthenticPixels(magnitude_view,0,y,alpha_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
-        (r == (const Quantum *) NULL) || (s == (const Quantum *) NULL) ||
-        (t == (Quantum *) NULL))
+    if (IsBlendRowsMissing(p,q,r,s,t) != MagickFalse)
       {
         status=MagickFalse;
         continue;
@@ -372,9 +390,7 @@ static Image *BlendMaxMagnitudeImage(const Image *alpha_image,
         PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
         PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
         PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (beta_traits == UndefinedPixelTrait) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
+        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
           continue;
         if (p[i] > GetPixelChannel(beta_image,channel,q))
           t[i]=GetPixelChannel(dx_image,channel,r);
@@ -449,8 +465,7 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
     q=GetCacheViewVirtualPixels(beta_view,0,y,alpha_image->columns,1,exception);
     r=GetCacheViewAuthenticPixels(sum_view,0,y,alpha_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
-        (r == (Quantum *) NULL))
+    if (IsBlendRowMissing(p,q,r) != MagickFalse)
       {
         status=MagickFalse;
         continue;
@@ -465,9 +480,7 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
         PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
         PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
         PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (beta_traits == UndefinedPixelTrait) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
+        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
           continue;
         r[i]=ClampToQuantum(attenuate*((double) p[i]+sign*
           (double) GetPixelChannel(beta_image,channel,q)));
@@ -878,9 +891,7 @@ static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
         PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
         PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
         PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (beta_traits == UndefinedPixelTrait) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
+        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
           continue;
         if (channel == AlphaPixelChannel)
           distance=QuantumScale*((double) p[i]-(double) GetPixelChannel(
@@ -900,6 +911,14 @@ static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
   area=MagickSafeReciprocal(area);
   *residual=sqrt(area*channel_residual/(double) GetImageChannels(alpha_image));
   return(status);
+}
+
+static inline MagickBooleanType IsOutsideSourceColumn(const Quantum *pixels,
+  const ssize_t x,const ssize_t x_offset,const Image *source_image)
+{
+  return(((pixels == (Quantum *) NULL) || (x < x_offset) ||
+    ((x-x_offset) >= (ssize_t) source_image->columns)) ? MagickTrue :
+    MagickFalse);
 }
 
 static MagickBooleanType CompositeOverImage(Image *image,
@@ -1027,8 +1046,7 @@ static MagickBooleanType CompositeOverImage(Image *image,
           if ((x-x_offset) >= (ssize_t) source_image->columns)
             break;
         }
-      if ((pixels == (Quantum *) NULL) || (x < x_offset) ||
-          ((x-x_offset) >= (ssize_t) source_image->columns))
+      if (IsOutsideSourceColumn(pixels,x,x_offset,source_image) != MagickFalse)
         {
           Quantum
             source[MaxPixelChannels];
@@ -2294,8 +2312,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           if ((x-x_offset) >= (ssize_t) source_image->columns)
             break;
         }
-      if ((pixels == (Quantum *) NULL) || (x < x_offset) ||
-          ((x-x_offset) >= (ssize_t) source_image->columns))
+      if (IsOutsideSourceColumn(pixels,x,x_offset,source_image) != MagickFalse)
         {
           Quantum
             source[MaxPixelChannels];
@@ -3648,6 +3665,16 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 %    o texture_image: This image is the texture to layer on the background.
 %
 */
+static inline MagickBooleanType IsTextureComposited(const Image *image,
+  const Image *texture_image)
+{
+  return(((image->compose != CopyCompositeOp) &&
+    ((image->compose != OverCompositeOp) ||
+    (image->alpha_trait != UndefinedPixelTrait) ||
+    (texture_image->alpha_trait != UndefinedPixelTrait))) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
@@ -3681,10 +3708,7 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   (void) SetImageVirtualPixelMethod(texture_image,TileVirtualPixelMethod,
     exception);
   status=MagickTrue;
-  if ((image->compose != CopyCompositeOp) &&
-      ((image->compose != OverCompositeOp) ||
-       (image->alpha_trait != UndefinedPixelTrait) ||
-       (texture_image->alpha_trait != UndefinedPixelTrait)))
+  if (IsTextureComposited(image,texture_image) != MagickFalse)
     {
       /*
         Tile texture onto the image background.

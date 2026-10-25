@@ -101,7 +101,7 @@ needs before refactoring:
 | 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | open |
 | 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | open |
 | 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | open |
-| 1.33 | `MagickCore/composite.c` | 3815 | 86% | 74% | open |
+| 1.33 | `MagickCore/composite.c` | 3815 | 86% | 74% | 1.58, in progress (Complex Conditional gone), [M20](tasks/M20-composite.md) |
 | 1.38 | `MagickCore/effect.c` | 4405 | 89% | 75% | open |
 | 1.74 | `MagickCore/distort.c` | 3466 | 68% | 76% | open |
 | 1.82 | `MagickCore/quantize.c` | 4150 | 85% | 79% | open |
