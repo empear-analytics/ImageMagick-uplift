@@ -862,6 +862,61 @@ static void PrintImageProfiles(FILE *file,Image *image)
     }
 }
 
+static void PrintImageColormap(FILE *file,const Image *image,
+  ExceptionInfo *exception)
+{
+  char
+    color[MagickPathExtent];
+
+  ssize_t
+    i;
+
+  char
+    hex[MagickPathExtent],
+    tuple[MagickPathExtent];
+
+  PixelInfo
+    pixel;
+
+  PixelInfo
+    *magick_restrict c;
+
+  GetPixelInfo(image,&pixel);
+  c=image->colormap;
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    pixel=(*c);
+    (void) CopyMagickString(tuple,"(",MagickPathExtent);
+    ConcatenateColorComponent(&pixel,RedPixelChannel,X11Compliance,
+      tuple);
+    (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+    ConcatenateColorComponent(&pixel,GreenPixelChannel,X11Compliance,
+      tuple);
+    (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+    ConcatenateColorComponent(&pixel,BluePixelChannel,X11Compliance,
+      tuple);
+    if (pixel.colorspace == CMYKColorspace)
+      {
+        (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+        ConcatenateColorComponent(&pixel,BlackPixelChannel,
+          X11Compliance,tuple);
+      }
+    if (pixel.alpha_trait != UndefinedPixelTrait)
+      {
+        (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+        ConcatenateColorComponent(&pixel,AlphaPixelChannel,
+          X11Compliance,tuple);
+      }
+    (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
+    (void) QueryColorname(image,&pixel,SVGCompliance,color,
+      exception);
+    GetColorTuple(&pixel,MagickTrue,hex);
+    (void) FormatLocaleFile(file,"    %g: %s %s %s\n",(double) i,tuple,
+      hex,color);
+    c++;
+  }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1445,52 +1500,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         image->colors);
       (void) FormatLocaleFile(file,"  Colormap:\n");
       if (image->colors <= 1024)
-        {
-          char
-            hex[MagickPathExtent],
-            tuple[MagickPathExtent];
-
-          PixelInfo
-            pixel;
-
-          PixelInfo
-            *magick_restrict c;
-
-          GetPixelInfo(image,&pixel);
-          c=image->colormap;
-          for (i=0; i < (ssize_t) image->colors; i++)
-          {
-            pixel=(*c);
-            (void) CopyMagickString(tuple,"(",MagickPathExtent);
-            ConcatenateColorComponent(&pixel,RedPixelChannel,X11Compliance,
-              tuple);
-            (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-            ConcatenateColorComponent(&pixel,GreenPixelChannel,X11Compliance,
-              tuple);
-            (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-            ConcatenateColorComponent(&pixel,BluePixelChannel,X11Compliance,
-              tuple);
-            if (pixel.colorspace == CMYKColorspace)
-              {
-                (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-                ConcatenateColorComponent(&pixel,BlackPixelChannel,
-                  X11Compliance,tuple);
-              }
-            if (pixel.alpha_trait != UndefinedPixelTrait)
-              {
-                (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-                ConcatenateColorComponent(&pixel,AlphaPixelChannel,
-                  X11Compliance,tuple);
-              }
-            (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
-            (void) QueryColorname(image,&pixel,SVGCompliance,color,
-              exception);
-            GetColorTuple(&pixel,MagickTrue,hex);
-            (void) FormatLocaleFile(file,"    %g: %s %s %s\n",(double) i,tuple,
-              hex,color);
-            c++;
-          }
-        }
+        PrintImageColormap(file,image,exception);
     }
   if (image->error.mean_error_per_pixel != 0.0)
     (void) FormatLocaleFile(file,"  Mean error per pixel: %g\n",
