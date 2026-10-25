@@ -1811,6 +1811,34 @@ static inline MagickBooleanType IsInvalidResourceCount(const unsigned char *p,
     (count <= 0)) ? MagickTrue : MagickFalse);
 }
 
+static const unsigned char *ReadResolutionResource(Image *image,
+  const unsigned char *p)
+{
+  unsigned int
+    resolution;
+
+  unsigned short
+    units;
+
+  p=ReadResourceLong(p,&resolution);
+  image->resolution.x=((double) resolution)/65536.0;
+  p=ReadResourceShort(p,&units)+2;
+  p=ReadResourceLong(p,&resolution)+4;
+  image->resolution.y=((double) resolution)/65536.0;
+  /*
+    Values are always stored as pixels per inch.
+  */
+  if ((ResolutionType) units != PixelsPerCentimeterResolution)
+    image->units=PixelsPerInchResolution;
+  else
+    {
+      image->units=PixelsPerCentimeterResolution;
+      image->resolution.x/=2.54;
+      image->resolution.y/=2.54;
+    }
+  return(p);
+}
+
 static void GetProfilesFromResourceBlock(Image *image,
   const StringInfo *resource_block,ExceptionInfo *exception)
 {
@@ -1857,33 +1885,12 @@ static void GetProfilesFromResourceBlock(Image *image,
     {
       case 0x03ed:
       {
-        unsigned int
-          resolution;
-
-        unsigned short
-          units;
-
         /*
           Resolution.
         */
         if (count < 16)
           break;
-        p=ReadResourceLong(p,&resolution);
-        image->resolution.x=((double) resolution)/65536.0;
-        p=ReadResourceShort(p,&units)+2;
-        p=ReadResourceLong(p,&resolution)+4;
-        image->resolution.y=((double) resolution)/65536.0;
-        /*
-          Values are always stored as pixels per inch.
-        */
-        if ((ResolutionType) units != PixelsPerCentimeterResolution)
-          image->units=PixelsPerInchResolution;
-        else
-          {
-            image->units=PixelsPerCentimeterResolution;
-            image->resolution.x/=2.54;
-            image->resolution.y/=2.54;
-          }
+        p=ReadResolutionResource(image,p);
         break;
       }
       case 0x0404:
