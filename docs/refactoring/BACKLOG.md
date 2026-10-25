@@ -139,7 +139,7 @@ needs before refactoring:
 | 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | open |
 | 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.38, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) |
 | 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | open |
-| 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | open |
+| 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 3.40, plateau for now (new two-string helpers trigger String Heavy Function Arguments), [M30](tasks/M30-log.md) |
 | 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | open |
 | 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | open |
 | 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | open |

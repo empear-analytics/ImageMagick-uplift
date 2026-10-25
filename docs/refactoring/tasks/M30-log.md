@@ -178,3 +178,29 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 3.32 → 3.40** (`cs-mcp` 1.5.12). Branch `campaign/M30-log`, stacked
+on `campaign/M29-delegate`. 1 refactor commit: `IsHandlerSeparator` (P, oracle).
+
+**What blocks the rest: String Heavy Function Arguments.** log.c sits just below the
+threshold of that file-level finding. Any new helper with two string parameters
+pushes the file over it and costs more than it gains:
+- The include-element predicate from color.c and delegate.c, `IsIncludeElementOpen(token,q)`:
+  3.32 → 3.25 even though LoadLogCache's Complex Conditional goes.
+- `GetIncludePath(filename,token,path)` would add a third string parameter.
+- The attribute `switch` as `SetLogInfoAttribute(log_info,keyword,token)`: 3.40 → 3.29.
+
+So the steps that worked in the other config loaders do not transfer here. This also
+gives a constraint for the remaining loaders: check that finding first.
+
+**Whole catalogue:** see the batch PR.
+
+**What is left, at 3.40.**
+- `LoadLogCache` (14 bumps, Brain Method): the DOCTYPE ladder, the include loop and the
+  attribute `switch`, each needing string parameters.
+- `TranslateEvent` (Brain Method): a format-character `switch` writing through the text
+  pointer.
+- `LogMagickEventList` (cc 20, 6 arguments).
+- The log accessors' duplication: lock, check, set and unlock wrappers.
