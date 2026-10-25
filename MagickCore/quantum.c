@@ -277,6 +277,33 @@ static void DestroyQuantumPixels(QuantumInfo *quantum_info)
     quantum_info->pixels);
 }
 
+static size_t GetQuantumChannels(const Image *image,
+  const QuantumType quantum_type)
+{
+  size_t
+    channels;
+
+  channels=1;
+  switch (quantum_type)
+  {
+    case GrayAlphaQuantum: channels=2; break;
+    case IndexAlphaQuantum: channels=2; break;
+    case RGBQuantum: channels=3; break;
+    case BGRQuantum: channels=3; break;
+    case RGBAQuantum: channels=4; break;
+    case RGBOQuantum: channels=4; break;
+    case BGRAQuantum: channels=4; break;
+    case CMYKQuantum: channels=4; break;
+    case CMYKAQuantum: channels=5; break;
+    case MultispectralQuantum: channels=GetImageChannels(image); break;
+    case CbYCrAQuantum: channels=4; break;
+    case CbYCrQuantum: channels=3; break;
+    case CbYCrYQuantum: channels=4; break;
+    default: break;
+  }
+  return(channels);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -313,24 +340,7 @@ MagickExport size_t GetQuantumExtent(const Image *image,
 
   assert(quantum_info != (QuantumInfo *) NULL);
   assert(quantum_info->signature == MagickCoreSignature);
-  channels=1;
-  switch (quantum_type)
-  {
-    case GrayAlphaQuantum: channels=2; break;
-    case IndexAlphaQuantum: channels=2; break;
-    case RGBQuantum: channels=3; break;
-    case BGRQuantum: channels=3; break;
-    case RGBAQuantum: channels=4; break;
-    case RGBOQuantum: channels=4; break;
-    case BGRAQuantum: channels=4; break;
-    case CMYKQuantum: channels=4; break;
-    case CMYKAQuantum: channels=5; break;
-    case MultispectralQuantum: channels=GetImageChannels(image); break;
-    case CbYCrAQuantum: channels=4; break;
-    case CbYCrQuantum: channels=3; break;
-    case CbYCrYQuantum: channels=4; break;
-    default: break;
-  }
+  channels=GetQuantumChannels(image,quantum_type);
   if (quantum_info->pack == MagickFalse)
     return((size_t) (channels*image->columns*((quantum_info->depth+7)/8))+
       (quantum_info->pad*image->columns));
