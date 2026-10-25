@@ -199,3 +199,32 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, afternoon)
+
+**Result: Code Health 1.61 → 2.15** (`cs-mcp` 1.5.12). Branch `campaign/M42-xml-tree`,
+stacked on `campaign/M41-property`. 7 refactor commits (all Recipe P, all guard-verified
+because no function in the file is ready) plus 1 whitespace-only style commit.
+17 predicates.
+
+**The predicates:**
+- ParseEntities: `IsEntityTextChar`, `IsEntityReference`, `IsCollapsibleSpace` (+0.13).
+- `IsDisallowedControlChar`, `IsUnseekableXMLFile`, `IsCharacterContentSkipped` and
+  `IsUnmatchedCloseTag`.
+- ParseInternalDoctype: `IsDoctypeTextChar` and `IsOtherAttributeList`.
+- NewXMLTree: six predicates (+0.22), from `IsXMLNameStart` to `IsUnterminatedSection`.
+
+**Not moved (four sites):**
+- Three conditions assign inside themselves: `*(p+=2)` in NewXMLTree, `(i+=2)` in
+  ConvertUTF16ToUTF8, and `xml=strchr(v=xml+1,*xml)` in ParseInternalDoctype. In a
+  predicate those assignments would land on copies.
+- One repeated pair in NewXMLTree; a shared predicate would be guard-level reuse.
+
+**String Heavy.** The NewXMLTree step added the file-level String Heavy Function
+Arguments finding. The step still raised the score by 0.22, so it stays.
+
+**What is left, at 2.15.**
+- `NewXMLTree` (the parser's main loop, Brain Method).
+- `ParseEntities` and `ParseInternalDoctype` (bumpy parsing loops).
+- The four sites above.
+- Most of the file has no oracle case or is not ready.
