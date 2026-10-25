@@ -952,6 +952,14 @@ static inline MagickBooleanType IsGeometrySigmaParsable(const int c,
     ((*p != '+') && (*p != '-'))) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsNegativeHeightGeometry(
+  const MagickStatusType flags)
+{
+  return((((flags & RhoValue) != 0) && ((flags & SigmaValue) == 0) &&
+    ((flags & XiValue) != 0) && ((flags & XiNegative) != 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -1240,8 +1248,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
       if (((flags & XiValue) != 0) && (geometry_info->xi == 0.0))
         geometry_info->sigma=2.0;
     }
-  if (((flags & RhoValue) != 0) && ((flags & SigmaValue) == 0) &&
-      ((flags & XiValue) != 0) && ((flags & XiNegative) != 0))
+  if (IsNegativeHeightGeometry(flags) != MagickFalse)
     {
       if ((flags & PsiValue) == 0)
         {
