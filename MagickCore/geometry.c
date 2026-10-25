@@ -919,6 +919,12 @@ MagickExport MagickStatusType ParseAffineGeometry(const char *geometry,
 %    o geometry_info:  returns the parsed width/height/x/y in this structure.
 %
 */
+static inline MagickBooleanType IsGeometryOffsetPrefix(const char *p)
+{
+  return(((*p == '+') || (*p == '-') || (*p == ',') || (*p == '/') ||
+    (*p == ':')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -1126,7 +1132,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
     }
   while (isspace((int) ((unsigned char) *p)) != 0)
     p++;
-  if ((*p == '+') || (*p == '-') || (*p == ',') || (*p == '/') || (*p == ':'))
+  if (IsGeometryOffsetPrefix(p) != MagickFalse)
     {
       /*
         Parse xi value.
@@ -1150,8 +1156,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
         }
       while (isspace((int) ((unsigned char) *p)) != 0)
         p++;
-      if ((*p == '+') || (*p == '-') || (*p == ',') || (*p == '/') ||
-          (*p == ':'))
+      if (IsGeometryOffsetPrefix(p) != MagickFalse)
         {
           /*
             Parse psi value.
@@ -1176,8 +1181,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
       }
       while (isspace((int) ((unsigned char) *p)) != 0)
         p++;
-      if ((*p == '+') || (*p == '-') || (*p == ',') || (*p == '/') ||
-          (*p == ':'))
+      if (IsGeometryOffsetPrefix(p) != MagickFalse)
         {
           /*
             Parse chi value.
