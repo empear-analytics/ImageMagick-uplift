@@ -96,7 +96,7 @@ needs before refactoring:
 
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
-| 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | open |
+| 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | 1.10, in progress (fixed-map blocks moved out of 9 of 14 Export/Import functions), [M39](tasks/M39-pixel.md) |
 | 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | 1.81, in progress (Complex Conditional 42 -> 8 sites; the rest are repeats), [M38](tasks/M38-fx.md) |
 | 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | open |
 | 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | open |

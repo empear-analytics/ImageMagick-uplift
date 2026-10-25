@@ -215,3 +215,40 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, afternoon)
+
+**Result: Code Health 1.08 → 1.10** (`cs-mcp` 1.5.12). Branch `campaign/M39-pixel`, from
+`main` after #33. 9 refactor commits, all Recipe E (step 7, value-returning form) and
+all guard-verified. The Export/Import functions are not ready or have no case.
+
+**What was done.** Each Export\<Type\>Pixel and Import\<Type\>Pixel function holds one
+block per fixed channel map (BGR, BGRA, BGRP, I, RGB, RGBA, RGBP and, for ImportChar,
+two more). Every block ends in
+`return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue)`. Each block moved into a
+helper `<Dir><Type><map>Pixels(image,roi,cursor,exception)`, 65 helpers in all, over
+nine functions: the seven Export functions, ImportCharPixel and ImportDoublePixel. In
+each function the bumps drop from 9–11 to 2, and the size roughly halves (200 → 93
+lines for ExportCharPixel). No Code Duplication finding appeared.
+
+**A new tool, `retblock.py`.** The existing block extractor refused these blocks: its
+dead-pointer check reads `p` and `q` in the *next* `if` block, which control can never
+reach from a block that always returns. The new tool extracts a block only if its last
+statement is a `return` and no `break` or `continue` sits at the block's own level.
+
+**Where it stopped.** From ImportFloatPixel on, the same step lowers the file score
+(1.1000 → 1.0987), although the function's own findings drop just as before. In the
+review, the file-level "Lines of Code in a Single File" entry disappears at that point,
+so the file seems to cross a size threshold that CodeScene weighs differently. The
+remaining five Import functions were reverted and are left as they are. Three committed
+steps left the score flat and are kept under rule 2 (ExportLongLong, ExportQuantum,
+ImportDouble).
+
+**What is left, at 1.10.**
+- The five unextracted Import functions (Float, Long, LongLong, Quantum, Short).
+- In all fourteen functions, the generic per-pixel `switch` over `quantum_map[i]`. It
+  carries the nesting and the Brain Method; a helper would need `image`, the map, `i`,
+  `p` and `q`.
+- `InterpolatePixelChannel(s)` and `InterpolatePixelInfo` (16–19 bumps): one big `switch`
+  per interpolation method, with shared locals.
+- The Export/Import dispatchers `ExportImagePixels` and `ImportImagePixels` (cc 36–39).
