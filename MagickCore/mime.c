@@ -216,6 +216,34 @@ static ssize_t ReadMimeShortValue(const MimeInfo *q,const unsigned char *r)
   return(value);
 }
 
+static ssize_t ReadMimeLongValue(const MimeInfo *q,const unsigned char *r)
+{
+  EndianType
+    endian;
+
+  ssize_t
+    value;
+
+  endian=q->endian;
+  if (q->endian == UndefinedEndian)
+    endian=GetHostEndian();
+  if (endian == LSBEndian)
+    {
+      value=(ssize_t) (*r++);
+      value|=((ssize_t) *r++) << 8;
+      value|=((ssize_t) *r++) << 16;
+      value|=((ssize_t) *r++) << 24;
+    }
+  else
+    {
+      value=(ssize_t) (*r++) << 24;
+      value|=((ssize_t) *r++) << 16;
+      value|=((ssize_t) *r++) << 8;
+      value|=((ssize_t) *r++);
+    }
+  return(value);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -255,9 +283,6 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
   ElementInfo
     *element_info,
     *p;
-
-  EndianType
-    endian;
 
   const unsigned char
     *r;
@@ -347,23 +372,7 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
         if ((size_t) (q->offset+4) > length)
           break;
         r=magic+q->offset;
-        endian=q->endian;
-        if (q->endian == UndefinedEndian)
-          endian=GetHostEndian();
-        if (endian == LSBEndian)
-          {
-            value=(ssize_t) (*r++);
-            value|=((ssize_t) *r++) << 8;
-            value|=((ssize_t) *r++) << 16;
-            value|=((ssize_t) *r++) << 24;
-          }
-        else
-          {
-            value=(ssize_t) (*r++) << 24;
-            value|=((ssize_t) *r++) << 16;
-            value|=((ssize_t) *r++) << 8;
-            value|=((ssize_t) *r++);
-          }
+        value=ReadMimeLongValue(q,r);
         if (q->mask == 0)
           {
             if (q->value == value)
