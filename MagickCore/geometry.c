@@ -1556,6 +1556,46 @@ static void EnlargeGeometryToSize(size_t *width,size_t *height,
     *height=stasis_height;
 }
 
+static double GetAspectScaleFactor(const MagickStatusType flags,
+  const size_t *width,const size_t *height,const size_t stasis_width,
+  const size_t stasis_height)
+{
+  double
+    scale_factor;
+
+  if ((stasis_width == 0) || (stasis_height == 0))
+    scale_factor=1.0;
+  else
+    if (((flags & RhoValue) != 0) && (flags & SigmaValue) != 0)
+      {
+        scale_factor=(double) *width/(double) stasis_width;
+        if ((flags & MinimumValue) == 0)
+          {
+            if (scale_factor > ((double) *height/(double) stasis_height))
+              scale_factor=(double) *height/(double) stasis_height;
+          }
+        else
+          if (scale_factor < ((double) *height/(double) stasis_height))
+            scale_factor=(double) *height/(double) stasis_height;
+      }
+    else
+      if ((flags & RhoValue) != 0)
+        {
+          scale_factor=(double) *width/(double) stasis_width;
+          if (((flags & MinimumValue) != 0) &&
+              (scale_factor < ((double) *width/(double) stasis_height)))
+            scale_factor=(double) *width/(double) stasis_height;
+        }
+      else
+        {
+          scale_factor=(double) *height/(double) stasis_height;
+          if (((flags & MinimumValue) != 0) &&
+              (scale_factor < ((double) *height/(double) stasis_width)))
+            scale_factor=(double) *height/(double) stasis_width;
+        }
+  return(scale_factor);
+}
+
 MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -1654,36 +1694,8 @@ MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
       /*
         Respect aspect ratio of the image.
       */
-      if ((stasis_width == 0) || (stasis_height == 0))
-        scale_factor=1.0;
-      else
-        if (((flags & RhoValue) != 0) && (flags & SigmaValue) != 0)
-          {
-            scale_factor=(double) *width/(double) stasis_width;
-            if ((flags & MinimumValue) == 0)
-              {
-                if (scale_factor > ((double) *height/(double) stasis_height))
-                  scale_factor=(double) *height/(double) stasis_height;
-              }
-            else
-              if (scale_factor < ((double) *height/(double) stasis_height))
-                scale_factor=(double) *height/(double) stasis_height;
-          }
-        else
-          if ((flags & RhoValue) != 0)
-            {
-              scale_factor=(double) *width/(double) stasis_width;
-              if (((flags & MinimumValue) != 0) &&
-                  (scale_factor < ((double) *width/(double) stasis_height)))
-                scale_factor=(double) *width/(double) stasis_height;
-            }
-          else
-            {
-              scale_factor=(double) *height/(double) stasis_height;
-              if (((flags & MinimumValue) != 0) &&
-                  (scale_factor < ((double) *height/(double) stasis_width)))
-                scale_factor=(double) *height/(double) stasis_width;
-            }
+      scale_factor=GetAspectScaleFactor(flags,width,height,stasis_width,
+        stasis_height);
       *width=CastDoubleToSizeT(MagickMax(floor(scale_factor*stasis_width+0.5),
         1.0));
       *height=CastDoubleToSizeT(MagickMax(floor(scale_factor*stasis_height+0.5),
