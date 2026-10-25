@@ -522,6 +522,16 @@ static void SyncOrientationFromProperties(Image *image,
     }
 }
 
+static inline MagickBooleanType IsTIFFResolutionFallback(
+  const char *resolution_x,const char *resolution_y,
+  const ConstituteInfo *constitute_info)
+{
+  return(((resolution_x == (const char *) NULL) &&
+    (resolution_y == (const char *) NULL) &&
+    (constitute_info->sync_from_tiff != MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void SyncResolutionFromProperties(Image *image,
   ConstituteInfo *constitute_info, ExceptionInfo *exception)
 {
@@ -546,9 +556,8 @@ static void SyncResolutionFromProperties(Image *image,
         resolution_units=GetImageProperty(image,"exif:ResolutionUnit",
           exception);
     }
-  if ((resolution_x == (const char *) NULL) &&
-      (resolution_y == (const char *) NULL) &&
-      (constitute_info->sync_from_tiff != MagickFalse))
+  if (IsTIFFResolutionFallback(resolution_x,resolution_y,constitute_info) !=
+      MagickFalse)
     {
       resolution_x=GetImageProperty(image,"tiff:XResolution",exception);
       resolution_y=GetImageProperty(image,"tiff:YResolution",exception);
