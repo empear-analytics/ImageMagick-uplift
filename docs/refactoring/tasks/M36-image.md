@@ -207,10 +207,10 @@ For each function: the recipes applied, the score before and after, and the revi
 ### Report (2026-10-25, Mac, late morning)
 
 **Result: Code Health 1.66 → 2.09** (`cs-mcp` 1.5.12). Branch `campaign/M36-image`,
-stacked on `campaign/M35-feature`. 9 refactor commits, all oracle-verified; every
+stacked on `campaign/M35-feature`. 8 refactor commits, all oracle-verified; every
 function in the file is ready.
 
-**Recipe P (8 commits); Complex Conditional leaves the file (twelve sites):**
+**Recipe P (7 commits); Complex Conditional leaves the file (twelve sites):**
 - `IsOffsetRegionOutside`, `IsChannelNotCopied` (CopyImagePixels).
 - `IsInsideRegion` (SetImageRegionMask).
 - `IsUnknownFormatSpecifier` (IsValidFormatSpecifier).

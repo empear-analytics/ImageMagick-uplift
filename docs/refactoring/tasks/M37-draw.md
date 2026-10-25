@@ -204,7 +204,7 @@ For each function: the recipes applied, the score before and after, and the revi
 ### Report (2026-10-25, Mac, late morning)
 
 **Result: Code Health 1.28 → 1.77** (`cs-mcp` 1.5.12). Branch `campaign/M37-draw`,
-stacked on `campaign/M36-image`. 12 refactor commits plus 1 whitespace-only style commit.
+stacked on `campaign/M36-image`. 11 refactor commits plus 1 whitespace-only style commit.
 
 **Recipe P throughout: 22 predicates, and Complex Conditional leaves the file (20 sites).**
 - Each site was checked against every open survivor kind (unmatched, unreached, gap,

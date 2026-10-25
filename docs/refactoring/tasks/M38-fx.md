@@ -212,11 +212,11 @@ For each function: the recipes applied, the score before and after, and the revi
 ### Report (2026-10-25, Mac, midday)
 
 **Result: Code Health 1.14 → 1.81** (`cs-mcp` 1.5.12). Branch `campaign/M38-fx`, stacked
-on `campaign/M37-draw`. 16 refactor commits, all Recipe P, adding 39 predicates:
+on `campaign/M37-draw`. 16 refactor commits, all Recipe P, adding 34 predicates:
 - Oracle-verified: GetFunction (12 predicates), GetOperand, GetImgAttrToken.
 - Guard-verified: the rest. Those functions are not ready, have no case, or have a
   survivor on the moved line.
-- Complex Conditional drops from 56 sites to 8.
+- Complex Conditional drops from 42 sites to 8.
 
 **fx.c's own style.** The file writes `Name (`, uses spaced `if (`, and has character
 literals `'{'` and `'}'`. The predicate tool was extended to handle all three:
