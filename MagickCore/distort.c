@@ -3199,6 +3199,27 @@ static void PrintSparseColorFX(const Image *image,const double *coeff,
   }
 }
 
+static size_t GetSparseColorCount(const Image *image)
+{
+  size_t
+    number_colors;
+
+  number_colors=0;
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    number_colors++;
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    number_colors++;
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    number_colors++;
+  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    number_colors++;
+  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->alpha_trait != UndefinedPixelTrait))
+    number_colors++;
+  return(number_colors);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3225,19 +3246,7 @@ MagickExport Image *SparseColorImage(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
 
   /* Determine number of color values needed per control point */
-  number_colors=0;
-  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-    number_colors++;
-  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-    number_colors++;
-  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-    number_colors++;
-  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-      (image->colorspace == CMYKColorspace))
-    number_colors++;
-  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-      (image->alpha_trait != UndefinedPixelTrait))
-    number_colors++;
+  number_colors=GetSparseColorCount(image);
 
   /*
     Convert input arguments into mapping coefficients, in this case
