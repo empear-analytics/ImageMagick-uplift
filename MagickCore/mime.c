@@ -192,6 +192,30 @@ MagickExport LinkedListInfo *AcquireMimeCache(const char *filename,
   return(cache);
 }
 
+static ssize_t ReadMimeShortValue(const MimeInfo *q,const unsigned char *r)
+{
+  EndianType
+    endian;
+
+  ssize_t
+    value;
+
+  endian=q->endian;
+  if (q->endian == UndefinedEndian)
+    endian=GetHostEndian();
+  if (endian == LSBEndian)
+    {
+      value=(ssize_t) (*r++);
+      value|=(*r++) << 8;
+    }
+  else
+    {
+      value=(ssize_t) (*r++) << 8;
+      value|=(*r++);
+    }
+  return(value);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -305,19 +329,7 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
         if ((size_t) (q->offset+4) > length)
           break;
         r=magic+q->offset;
-        endian=q->endian;
-        if (q->endian == UndefinedEndian)
-          endian=GetHostEndian();
-        if (endian == LSBEndian)
-          {
-            value=(ssize_t) (*r++);
-            value|=(*r++) << 8;
-          }
-        else
-          {
-            value=(ssize_t) (*r++) << 8;
-            value|=(*r++);
-          }
+        value=ReadMimeShortValue(q,r);
         if (q->mask == 0)
           {
             if (q->value == value)
