@@ -89,7 +89,7 @@ needs before refactoring:
 | 5.78 | `MagickCore/decorate.c` | 901 | 98% | 94% | 6.74, in progress (fill and blend loops deduplicated), [M11](tasks/M11-decorate.md) |
 | 5.92 | `MagickCore/matrix.c` | 1146 | 75% | 80% | 6.76, in progress (Complex Conditional gone; the rest needs oracle evidence the file lacks), [M17](tasks/M17-matrix.md) |
 | 6.96 | `MagickCore/magick.c` | 1866 | 68% | 81% | 7.69, in progress (the flag accessors duplicate each other but log their own names), [M18](tasks/M18-magick.md) |
-| 8.81 | `MagickCore/semaphore.c` | 482 | 100% | 80% | open |
+| 8.81 | `MagickCore/semaphore.c` | 482 | 100% | 80% | 9.38, plateau for the current catalogue, [M19](tasks/M19-semaphore.md) |
 | 8.88 | `MagickCore/colormap.c` | 388 | 100% | 89% | 9.36, plateau for the current catalogue, [M13](tasks/M13-colormap.md) |
 
 ### Check per function first (27 files)

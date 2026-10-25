@@ -96,3 +96,19 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 8.81 → 9.38** (`cs-mcp` 1.5.12). Branch `campaign/M19-semaphore`,
+stacked on `campaign/M18-magick` (PR #24). 1 refactor commit, Recipe P, guard-verified.
+`IsAlignedExtentInvalid` takes `AcquireSemaphoreMemory` out of Complex Conditional and
+Complex Method. The function has no mutant in the reports, although every case runs it.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Plateau for the current catalogue.** The remaining Code Duplication is between
+`LockSemaphoreInfo`, `UnlockSemaphoreInfo` and `RelinquishSemaphoreInfo`. They share
+their assertions and preprocessor structure (`MAGICKCORE_DEBUG`, OpenMP, threads,
+Windows), but each calls a different primitive. Most of that text sits in branches this
+build does not compile, so it cannot move.
