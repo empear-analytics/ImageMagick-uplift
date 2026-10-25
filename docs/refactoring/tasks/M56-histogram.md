@@ -170,3 +170,25 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 5.97 → 6.34** (`cs-mcp` 1.5.12). Branch `campaign/M56-histogram`,
+stacked on `campaign/M55-exception`. Five E commits:
+- `GrowColorList` (ClassifyImageColors, careful, oracle).
+- `ExtendColorList` and `SetColorListEntry` (CheckImageColors, not ready, guard). The
+  two functions grow their lists differently (doubling versus i+1), so the helpers
+  stay separate.
+- `FormatColorTuple` (GetNumberColors, not ready, guard), 6.04 → 6.32.
+  GetNumberColors leaves Complex Method and Large Method.
+- `SetUniqueColorPixel` (UniqueColorsToImage, careful, oracle).
+
+**What is left, at 6.34.**
+- ClassifyImageColors and CheckImageColors (depth 5): the tree descent returns or
+  `break`s from inside its allocation check. ClassifyImageColors' colour record would
+  need five arguments.
+- The duplicates (DefineImageHistogram, DestroyColorCube, IsHistogramImage,
+  IsPaletteImage) are short tree walks and predicates whose copies differ in more than
+  one value.
+- MinMaxStretchImage and UniqueColorsToImage take 5 arguments. MinMaxStretchImage's
+  are public API.
