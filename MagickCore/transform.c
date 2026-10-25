@@ -1827,19 +1827,7 @@ MagickExport Image *SpliceImage(const Image *image,
       }
     for (x=0; x < columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait splice_traits=GetPixelChannelTraits(splice_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (splice_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(splice_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,splice_image,p,q);
       SetPixelRed(splice_image,GetPixelRed(image,p),q);
       SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
       SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
@@ -1851,19 +1839,7 @@ MagickExport Image *SpliceImage(const Image *image,
       q+=(ptrdiff_t) GetPixelChannels(splice_image);
     for ( ; x < (ssize_t) splice_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait splice_traits=GetPixelChannelTraits(splice_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (splice_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(splice_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,splice_image,p,q);
       SetPixelRed(splice_image,GetPixelRed(image,p),q);
       SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
       SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
@@ -1918,19 +1894,7 @@ MagickExport Image *SpliceImage(const Image *image,
       }
     for (x=0; x < columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait splice_traits=GetPixelChannelTraits(splice_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (splice_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(splice_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,splice_image,p,q);
       SetPixelRed(splice_image,GetPixelRed(image,p),q);
       SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
       SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
@@ -1942,19 +1906,7 @@ MagickExport Image *SpliceImage(const Image *image,
       q+=(ptrdiff_t) GetPixelChannels(splice_image);
     for ( ; x < (ssize_t) splice_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait splice_traits=GetPixelChannelTraits(splice_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (splice_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(splice_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,splice_image,p,q);
       SetPixelRed(splice_image,GetPixelRed(image,p),q);
       SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
       SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
