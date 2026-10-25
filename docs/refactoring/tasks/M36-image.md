@@ -203,3 +203,42 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, late morning)
+
+**Result: Code Health 1.66 → 2.09** (`cs-mcp` 1.5.12). Branch `campaign/M36-image`,
+stacked on `campaign/M35-feature`. 9 refactor commits, all oracle-verified; every
+function in the file is ready.
+
+**Recipe P (8 commits); Complex Conditional leaves the file (twelve sites):**
+- `IsOffsetRegionOutside`, `IsChannelNotCopied` (CopyImagePixels).
+- `IsInsideRegion` (SetImageRegionMask).
+- `IsUnknownFormatSpecifier` (IsValidFormatSpecifier).
+- `IsIntegerSpecifierAt` (InterpretImageFilename).
+- `IsUndelegatedComponent`, `IsUsableMagick`, `IsExtensionMagickMatch` (SetImageInfo).
+- `IsLeftGapEdge`, `IsRightGapEdge` (SmushXGap).
+- `IsTopGapEdge`, `IsBottomGapEdge` (SmushYGap).
+- The right and bottom predicates take five arguments (Excess Arguments of their own);
+  the file gains regardless.
+- No new predicate raised String Heavy Function Arguments. Each string-taking one was
+  checked.
+
+**Recipe E (1 commit):** `ConvertResolutionUnits`, the units conversion in
+SyncImageSettings (cc 56 → 50).
+
+**Possible bug, reported and not fixed:** a second write-mask `-scale` case,
+`resize/b41fd3fe32` ("rose write-mask -scale 150%"), diverged once in a full parallel
+run. It gave 0 of 1 in six isolated reruns of the same build. With M21's
+`resize/6ee45e9cfa` ("rose half write-mask -scale 50%"), that makes two such cases. The
+oracle build has no OpenMP, so nondeterminism in ScaleImage's write-mask path (for
+example an uninitialised read) is the likely cause. Running these cases under Valgrind
+or MSan would settle it.
+
+**What is left, at 2.09.**
+- `SetImageInfo` (11 bumps, cc 62): its blocks each write several of a dozen locals
+  (`magic`, `component`, `frames`, `magick_info`, `delegate_info` and others).
+- `SyncImageSettings` (cc 50): about thirty option blocks. Four of them parse a primary
+  or white point with the same five lines, but into different struct members, which D
+  does not allow.
+- `AppendImages`, `AcquireImage`, `ResetImagePage` (4–5 bumps).
+- Fifteen accessors reported as duplicates of each other.

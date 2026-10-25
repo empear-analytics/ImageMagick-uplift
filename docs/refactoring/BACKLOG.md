@@ -133,7 +133,7 @@ needs before refactoring:
 | 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | 1.61, blocked (GetImageFeatures' function-local typedef needs a hoisting recipe), [M35](tasks/M35-feature.md) |
 | 1.61 | `MagickCore/xml-tree.c` | 2347 | 35% | 57% | open |
 | 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | open |
-| 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | open |
+| 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.09, in progress (Complex Conditional gone), [M36](tasks/M36-image.md) |
 | 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | open |
 | 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | open |
 | 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | open |
