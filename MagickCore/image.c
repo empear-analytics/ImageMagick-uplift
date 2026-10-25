@@ -1716,6 +1716,12 @@ static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
   return(MagickFalse);
 }
 
+static inline MagickBooleanType IsIntegerSpecifierAt(const char *cursor)
+{
+  return(((*cursor == 'd') || (*cursor == 'o') || (*cursor == 'x')) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
   Image *image,const char *format,int value,char *filename,
   ExceptionInfo *exception)
@@ -1762,7 +1768,7 @@ MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
     specifier_start=cursor;
     while (isdigit((int) ((unsigned char) *cursor)) != 0)
       cursor++;
-    if ((*cursor == 'd') || (*cursor == 'o') || (*cursor == 'x'))
+    if (IsIntegerSpecifierAt(cursor) != MagickFalse)
       {
         const char
           *specifier_end = cursor+1;
