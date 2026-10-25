@@ -3313,6 +3313,35 @@ static inline gzFile gzopen_utf8(const char *path,const char *mode)
 }
 #endif
 
+static inline MagickBooleanType IsStandardStreamName(const char *filename,
+  const ImageInfo *image_info)
+{
+  return(((LocaleCompare(filename,"-") == 0) ||
+    ((*filename == '\0') && (image_info->file == (FILE *) NULL))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsSharedListFilename(const char *filename,
+  const Image *image)
+{
+  return(((LocaleCompare(filename,image->filename) == 0) &&
+    ((GetPreviousImageInList(image) != (Image *) NULL) ||
+    (GetNextImageInList(image) != (Image *) NULL))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsGzipMagick(const unsigned char *magick)
+{
+  return((((int) magick[0] == 0x1F) && ((int) magick[1] == 0x8B) &&
+    ((int) magick[2] == 0x08)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsCompressedSVGExtension(const char *extension)
+{
+  return(((LocaleCompare(extension,"gz") == 0) ||
+    (LocaleCompare(extension,"wmz") == 0) ||
+    (LocaleCompare(extension,"svgz") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -3428,8 +3457,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
     rights=WritePolicyRights;
   if (IsPathAuthorized(rights,filename) == MagickFalse)
     ThrowPolicyException(filename,MagickFalse);
-  if ((LocaleCompare(filename,"-") == 0) ||
-      ((*filename == '\0') && (image_info->file == (FILE *) NULL)))
+  if (IsStandardStreamName(filename,image_info) != MagickFalse)
     {
       blob_info->file_info.file=(*type == 'r') ? stdin : stdout;
 #if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__OS2__)
@@ -3518,9 +3546,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
           */
           (void) InterpretImageFilename(image_info,image,image->filename,(int)
             image->scene,filename,exception);
-          if ((LocaleCompare(filename,image->filename) == 0) &&
-              ((GetPreviousImageInList(image) != (Image *) NULL) ||
-               (GetNextImageInList(image) != (Image *) NULL)))
+          if (IsSharedListFilename(filename,image) != MagickFalse)
             {
               char
                 path[MagickPathExtent];
@@ -3573,8 +3599,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
             (void) LogMagickEvent(BlobEvent,GetMagickModule(),
                "  read %.17g magic header bytes",(double) count);
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
-            if (((int) magick[0] == 0x1F) && ((int) magick[1] == 0x8B) &&
-                ((int) magick[2] == 0x08))
+            if (IsGzipMagick(magick) != MagickFalse)
               {
                 gzFile
                   gzfile = gzopen_utf8(filename,"rb");
@@ -3652,9 +3677,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
       }
     else
 #if defined(MAGICKCORE_ZLIB_DELEGATE)
-      if ((LocaleCompare(extension,"gz") == 0) ||
-          (LocaleCompare(extension,"wmz") == 0) ||
-          (LocaleCompare(extension,"svgz") == 0))
+      if (IsCompressedSVGExtension(extension) != MagickFalse)
         {
           blob_info->file_info.gzfile=gzopen_utf8(filename,"wb");
           if (blob_info->file_info.gzfile != (gzFile) NULL)
