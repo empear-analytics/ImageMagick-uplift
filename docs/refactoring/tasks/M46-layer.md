@@ -177,3 +177,28 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 3.04 → 3.77** (`cs-mcp` 1.5.12). Branch `campaign/M46-layer`,
+stacked on `campaign/M45-annotate`. The branch also carries one style commit for
+annotate.c, wrapping a 93-column line that M45 left in `IsUnauthorizedFontFile`. 3
+refactor commits, all Recipe P and all oracle-verified, adding 4 predicates. Complex
+Conditional leaves the file.
+
+**The predicates:**
+- `IsUnchangedFrameBounds` (CompareImagesLayers).
+- `IsPartialPageFrame` and `IsBetterFrameBounds` (OptimizeLayerFrames, +0.47).
+  `IsBetterFrameBounds` takes five arguments.
+- `IsDifferentLayerGeometry` (RemoveDuplicateLayers).
+
+**Tool change.** The predicate generator now also wraps at `==`, `!=` and commas, after
+the annotate.c line that had no `&&` or `||` to break at.
+
+**What is left, at 3.77 (just below the Red/Yellow line).**
+- `CompareImagesBounds` (8 bumps): four near-identical scan loops. A shared helper
+  would need seven parameters, because the two PixelInfo scratch values carry
+  initialised fields into the loop. That needs Recipe B.
+- `OptimizeLayerFrames` (16 bumps, nesting 6, 378 lines): the disposal-method search,
+  with many shared locals.
+- `MergeImageLayers` and `CoalesceImages`.
