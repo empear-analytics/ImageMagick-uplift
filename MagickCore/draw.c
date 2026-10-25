@@ -2535,6 +2535,24 @@ static inline MagickBooleanType TracePoint(PrimitiveInfo *primitive_info,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsNonIdentityAffine(const AffineMatrix affine)
+{
+  return(((fabs(affine.sx-1.0) >= MagickEpsilon) ||
+    (fabs(affine.rx) >= MagickEpsilon) || (fabs(affine.ry) >= MagickEpsilon) ||
+    (fabs(affine.sy-1.0) >= MagickEpsilon) ||
+    (fabs(affine.tx) >= MagickEpsilon) ||
+    (fabs(affine.ty) >= MagickEpsilon)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsClipMaskChanged(DrawInfo **graphic_context,
+  const ssize_t n)
+{
+  return(((n != 0) && (graphic_context[n]->compliance != SVGCompliance) &&
+    (graphic_context[n]->clip_mask != (char *) NULL) &&
+    (LocaleCompare(graphic_context[n]->clip_mask,
+    graphic_context[n-1]->clip_mask) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RenderMVGContent(Image *image,
   const DrawInfo *draw_info,const size_t depth,ExceptionInfo *exception)
 {
@@ -4139,10 +4157,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     }
     if (status == MagickFalse)
       break;
-    if ((fabs(affine.sx-1.0) >= MagickEpsilon) ||
-        (fabs(affine.rx) >= MagickEpsilon) || (fabs(affine.ry) >= MagickEpsilon) ||
-        (fabs(affine.sy-1.0) >= MagickEpsilon) ||
-        (fabs(affine.tx) >= MagickEpsilon) || (fabs(affine.ty) >= MagickEpsilon))
+    if (IsNonIdentityAffine(affine) != MagickFalse)
       {
         graphic_context[n]->affine.sx=current.sx*affine.sx+current.ry*affine.rx;
         graphic_context[n]->affine.rx=current.rx*affine.sx+current.sy*affine.rx;
@@ -4645,10 +4660,7 @@ static MagickBooleanType RenderMVGContent(Image *image,
     }
     if (graphic_context[n]->render != MagickFalse)
       {
-        if ((n != 0) && (graphic_context[n]->compliance != SVGCompliance) &&
-            (graphic_context[n]->clip_mask != (char *) NULL) &&
-            (LocaleCompare(graphic_context[n]->clip_mask,
-             graphic_context[n-1]->clip_mask) != 0))
+        if (IsClipMaskChanged(graphic_context,n) != MagickFalse)
           {
             const char
               *clip_path;
