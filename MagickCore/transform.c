@@ -2272,21 +2272,8 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
     q+=(ptrdiff_t) GetPixelChannels(transverse_image)*image->columns;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
       q-=GetPixelChannels(transverse_image);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait transverse_traits=GetPixelChannelTraits(transverse_image,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (transverse_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(transverse_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,transverse_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     sync=SyncCacheViewAuthenticPixels(transverse_view,exception);
