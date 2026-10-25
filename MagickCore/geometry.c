@@ -1399,6 +1399,45 @@ static MagickStatusType SetPercentRegion(const Image *image,
   return(flags);
 }
 
+static MagickStatusType SetAspectRatioRegion(const Image *image,
+  const char *geometry,RectangleInfo *region_info,MagickStatusType flags)
+{
+  double
+    geometry_ratio,
+    image_ratio;
+
+  GeometryInfo
+    geometry_info;
+
+  /*
+    Geometry is a relative to image size and aspect ratio.
+  */
+  if (image->gravity != UndefinedGravity)
+    flags|=XValue | YValue;
+  (void) ParseGeometry(geometry,&geometry_info);
+  geometry_ratio=geometry_info.rho;
+  image_ratio=(double) image->columns/image->rows;
+  region_info->width=image->columns;
+  region_info->height=image->rows;
+  if ((flags & MaximumValue) != 0)
+    {
+      if (geometry_ratio < image_ratio)
+        region_info->height=CastDoubleToSizeT((double) image->rows*
+          image_ratio/geometry_ratio+0.5);
+      else
+        region_info->width=CastDoubleToSizeT((double) image->columns*
+          geometry_ratio/image_ratio+0.5);
+    }
+  else
+    if (geometry_ratio >= image_ratio)
+      region_info->height=CastDoubleToSizeT((double) image->rows*
+        image_ratio/geometry_ratio+0.5);
+    else
+      region_info->width=CastDoubleToSizeT((double) image->columns*
+        geometry_ratio/image_ratio+0.5);
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
   const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
 {
@@ -1428,41 +1467,7 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
   if ((flags & PercentValue) != 0)
     flags=SetPercentRegion(image,geometry,region_info,flags);
   if ((flags & AspectRatioValue) != 0)
-    {
-      double
-        geometry_ratio,
-        image_ratio;
-
-      GeometryInfo
-        geometry_info;
-
-      /*
-        Geometry is a relative to image size and aspect ratio.
-      */
-      if (image->gravity != UndefinedGravity)
-        flags|=XValue | YValue;
-      (void) ParseGeometry(geometry,&geometry_info);
-      geometry_ratio=geometry_info.rho;
-      image_ratio=(double) image->columns/image->rows;
-      region_info->width=image->columns;
-      region_info->height=image->rows;
-      if ((flags & MaximumValue) != 0)
-        {
-          if (geometry_ratio < image_ratio)
-            region_info->height=CastDoubleToSizeT((double) image->rows*
-              image_ratio/geometry_ratio+0.5);
-          else
-            region_info->width=CastDoubleToSizeT((double) image->columns*
-              geometry_ratio/image_ratio+0.5);
-        }
-      else
-        if (geometry_ratio >= image_ratio)
-          region_info->height=CastDoubleToSizeT((double) image->rows*
-            image_ratio/geometry_ratio+0.5);
-        else
-          region_info->width=CastDoubleToSizeT((double) image->columns*
-            geometry_ratio/image_ratio+0.5);
-    }
+    flags=SetAspectRatioRegion(image,geometry,region_info,flags);
   /*
     Adjust offset according to gravity setting.
   */
