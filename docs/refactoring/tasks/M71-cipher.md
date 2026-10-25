@@ -129,3 +129,21 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night)
+
+**Result: Code Health 6.28 → 6.90** (`cs-mcp` 1.5.12). Branch `campaign/M71-cipher`,
+stacked on `campaign/M70-quantum-export`. `MAGICKCORE_CIPHER_SUPPORT` is defined in
+this build, so the AES code compiles. The mutation reports hold no data for
+cipher.c, so both commits are guard-level. The oracle also ran: 6 cases execute
+these functions, 0 diverged.
+- `IsAESInfoIncomplete` (P, AcquireAESInfo), 6.28 → 6.87. Complex Conditional leaves
+  the file.
+- `SetAESRounds` (E, SetAESKey, value-returning).
+
+**What is left, at 6.90.**
+- PasskeyEncipherImage and PasskeyDecipherImage are near-twins (Code Duplication,
+  Large Method). Sharing their key, nonce and block loop is Recipe D, which needs
+  mutation data for them first.
+- The duplicates reported after line 1080 are the `#else` stubs, which this build
+  does not compile.

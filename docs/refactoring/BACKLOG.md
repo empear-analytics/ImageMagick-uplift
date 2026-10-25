@@ -152,7 +152,7 @@ needs before refactoring:
 | 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | open |
 | 5.88 | `MagickCore/exception.c` | 1158 | 88% | 66% | 6.16 (severity table needs a lookup recipe; ThrowException repeat-test bug reported), [M55](tasks/M55-exception.md) |
 | 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | 6.40 (rest is prologue duplication and a &list loop), [M58](tasks/M58-list.md) |
-| 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | open |
+| 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | 6.90 (Passkey twins need D with mutation data), [M71](tasks/M71-cipher.md) |
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |
 | 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.49 (TransformSignature needs the hoist recipe), [M61](tasks/M61-signature.md) |
 | 7.56 | `MagickCore/quantum.c` | 1110 | 90% | 69% | 8.32, [M62](tasks/M62-quantum.md) |
