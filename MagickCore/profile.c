@@ -1931,6 +1931,14 @@ static void GetProfilesFromResourceBlock(Image *image,
   }
 }
 
+static inline MagickBooleanType IsExifProfileName(const char *name,
+  const StringInfo *profile)
+{
+  return((((LocaleCompare(name, "exif") == 0) ||
+    (LocaleCompare(name, "app1") == 0)) &&
+    (GetStringInfoLength(profile) > 2)) ? MagickTrue : MagickFalse);
+}
+
 static void PatchCorruptProfile(const char *name,StringInfo *profile)
 {
   unsigned char
@@ -1961,8 +1969,7 @@ static void PatchCorruptProfile(const char *name,StringInfo *profile)
         }
       return;
     }
-  if (((LocaleCompare(name, "exif") == 0) || (LocaleCompare(name, "app1") == 0)) &&
-      (GetStringInfoLength(profile) > 2))
+  if (IsExifProfileName(name,profile) != MagickFalse)
     {
       /*
         Check if profile starts with byte order marker instead of Exif.
