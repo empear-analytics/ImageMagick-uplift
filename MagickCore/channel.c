@@ -726,10 +726,29 @@ MagickExport MagickBooleanType GetImageAlphaChannel(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+#define GetChannelBit(mask,bit)  (((size_t) (mask) >> (size_t) (bit)) & 0x01)
+
+static void SeparatePixelChannel(const Image *image,
+  const Image *separate_image,const ChannelType channel_type,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (GetChannelBit(channel_type,channel) == 0))
+      continue;
+    SetPixelChannel(separate_image,GrayPixelChannel,p[i],q);
+  }
+}
+
 MagickExport Image *SeparateImage(const Image *image,
   const ChannelType channel_type,ExceptionInfo *exception)
 {
-#define GetChannelBit(mask,bit)  (((size_t) (mask) >> (size_t) (bit)) & 0x01)
 #define SeparateImageTag  "Separate/Image"
 
   CacheView
@@ -802,19 +821,8 @@ MagickExport Image *SeparateImage(const Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
       SetPixelChannel(separate_image,GrayPixelChannel,(Quantum) 0,q);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (GetChannelBit(channel_type,channel) == 0))
-          continue;
-        SetPixelChannel(separate_image,GrayPixelChannel,p[i],q);
-      }
+      SeparatePixelChannel(image,separate_image,channel_type,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(separate_image);
     }
