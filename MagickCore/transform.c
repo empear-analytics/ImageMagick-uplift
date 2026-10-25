@@ -207,6 +207,15 @@ static void CopyPixelChannelsTo(const Image *image,const Image *destination,
   }
 }
 
+static inline MagickBooleanType IsChopOutsideImage(const Image *image,
+  const RectangleInfo *chop_info)
+{
+  return((((chop_info->x+(ssize_t) chop_info->width) < 0) ||
+    ((chop_info->y+(ssize_t) chop_info->height) < 0) ||
+    (chop_info->x > (ssize_t) image->columns) ||
+    (chop_info->y > (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
@@ -241,10 +250,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   assert(chop_info != (RectangleInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (((chop_info->x+(ssize_t) chop_info->width) < 0) ||
-      ((chop_info->y+(ssize_t) chop_info->height) < 0) ||
-      (chop_info->x > (ssize_t) image->columns) ||
-      (chop_info->y > (ssize_t) image->rows))
+  if (IsChopOutsideImage(image,chop_info) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   extent=(*chop_info);
   if ((extent.x+(ssize_t) extent.width) > (ssize_t) image->columns)
