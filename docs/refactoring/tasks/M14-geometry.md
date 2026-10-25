@@ -171,3 +171,47 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 1.73 → 3.38** (`cs-mcp` 1.5.12). Branch `campaign/M14-geometry`,
+stacked on `campaign/M13-colormap` (PR #19). 21 refactor commits, one recipe and one
+function each:
+- 11 Recipe P: 10 oracle-verified, and 1 guard-verified (`ParsePageGeometry`'s one
+  unmatched survivor sits on its test);
+- 10 Recipe E, all oracle-verified.
+
+The readiness gate, merging every geometry report, puts `ParseGeometry`, `GetGeometry`,
+`ParseMetaGeometry` and `ParseGravityGeometry` at 100% and `ParsePageGeometry` at 91%.
+`ParseGeometry` alone executes 14,705 cases, so each of its steps took 6–8 minutes of
+oracle time.
+
+**One category leaves the file:** Complex Conditional, fifteen sites. Brain Method leaves
+`ParseMetaGeometry`. Large Method leaves `ParseGravityGeometry`.
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| `ParseGeometry`: offset prefix and separator (three sites each), rho terminator, sigma separator, sigma parsable, negative height | P | 1.73 → 2.46 |
+| `GetGeometry`: width terminator, height separator, height-only; `ParsePageGeometry`; `ParseMetaGeometry` | P | → 2.67 |
+| `GetGeometry`'s percent completion; `ParseMetaGeometry`'s '>' and '<' limits, aspect scale factor and '@' area limit | E | → 3.21 |
+| `ParseGravityGeometry`'s percent and aspect-ratio regions | E | → 3.32 |
+| `ParseGeometry`'s sampling-factor normalization, negative-height shift and percent completion | E | → 3.38 |
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**What is left, at 3.38.**
+- Brain Method: `GetGeometry`. Its flag scan and its width, height, x and y parsers
+  each write both `flags` and the cursor `p`.
+- Complex and Large Method, Bumpy Road and nesting 4: `ParseGeometry` (cc 84). Its rho,
+  sigma, xi, psi and chi parsers each write `flags`, `p`, `q`, `value` and the geometry.
+- Excess Arguments: public signatures, and three five-parameter helpers.
+
+**Possible bug, reported, not fixed.** In `ParseMetaGeometry`'s aspect scale (now
+`GetAspectScaleFactor`), the width-only branch compares the factor with
+`*width/stasis_height`, and the height-only branch with `*height/stasis_width`. Both
+cross width with height, where the two-sided branch does not. It may be intended for the
+`^` (minimum) flag, but it reads like a swap. It is unchanged here.
+
+**Process note.** `make_task.py` wrote the task file at the branch's start. It reached
+the first refactor commit by mistake and was split into its own commit before any push.

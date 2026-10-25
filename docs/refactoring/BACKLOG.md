@@ -78,7 +78,7 @@ needs before refactoring:
 | 1.53 | `MagickCore/enhance.c` | 4596 | 78% | 86% | 2.77, in progress (Brain Method, Deep Nesting, Complex Conditional gone; per-function steps left), [M03](tasks/M03-enhance.md) |
 | 1.53 | `MagickCore/morphology.c` | 4764 | 81% | 80% | 2.00, in progress (Complex Conditional gone; Brain Method left in `MorphologyPrimitive` and `MorphologyApply`, which need oracle-level evidence first), [M04](tasks/M04-morphology.md) |
 | 1.55 | `MagickCore/visual-effects.c` | 3789 | 86% | 83% | 2.41, in progress (Complex Conditional gone; Recipe B next for the six-argument pixel helpers), [M05](tasks/M05-visual-effects.md) |
-| 1.73 | `MagickCore/geometry.c` | 1831 | 65% | 85% | open |
+| 1.73 | `MagickCore/geometry.c` | 1831 | 65% | 85% | 3.38, in progress (Complex Conditional gone; ParseGeometry and GetGeometry parse with flags and cursor together), [M14](tasks/M14-geometry.md) |
 | 1.89 | `MagickCore/threshold.c` | 2648 | 87% | 85% | 2.08, in progress (Complex Conditional gone; the pixel drivers duplicate each other once thinned), [M08](tasks/M08-threshold.md) |
 | 1.92 | `MagickCore/statistic.c` | 3158 | 97% | 89% | 2.27, in progress (Complex Conditional gone; Recipe B next), [M07](tasks/M07-statistic.md) |
 | 2.16 | `MagickCore/identify.c` | 1705 | 68% | 85% | open |
