@@ -601,6 +601,12 @@ static inline signed short ReadPropertyMSBShort(const unsigned char **p,
   return(quantum.signed_value);
 }
 
+static inline MagickBooleanType IsInvalid8BIMFieldCount(const ssize_t count)
+{
+  return(((count != 2) && (count != 3) && (count != 4)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -641,7 +647,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
     return;
   count=(ssize_t) MagickSscanf(key,"8BIM:%ld,%ld:%1024[^\n]\n%1024[^\n]",
     &start,&stop,name,format);
-  if ((count != 2) && (count != 3) && (count != 4))
+  if (IsInvalid8BIMFieldCount(count) != MagickFalse)
     return;
   if (count < 4)
     (void) CopyMagickString(format,"SVG",MagickPathExtent);
