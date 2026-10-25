@@ -7488,6 +7488,14 @@ static MagickBooleanType TraceSquareLinecap(PrimitiveInfo *primitive_info,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsRoundStrokeJoin(const DrawInfo *draw_info,
+  const MagickBooleanType closed_path)
+{
+  return(((draw_info->linejoin == RoundJoin) ||
+    ((draw_info->linejoin == MiterJoin) &&
+    (closed_path != MagickFalse))) ? MagickTrue : MagickFalse);
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -7604,8 +7612,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   offset.y=primitive_info[number_vertices-1].point.y-primitive_info[0].point.y;
   closed_path=(fabs(offset.x) < MagickEpsilon) &&
     (fabs(offset.y) < MagickEpsilon) ? MagickTrue : MagickFalse;
-  if ((draw_info->linejoin == RoundJoin) ||
-      ((draw_info->linejoin == MiterJoin) && (closed_path != MagickFalse)))
+  if (IsRoundStrokeJoin(draw_info,closed_path) != MagickFalse)
     {
       polygon_primitive[number_vertices]=primitive_info[1];
       number_vertices++;
