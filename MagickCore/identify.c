@@ -917,6 +917,26 @@ static void PrintImageColormap(FILE *file,const Image *image,
   }
 }
 
+static void PrintImageChromaticity(FILE *file,const Image *image)
+{
+  /*
+    Display image chromaticity.
+  */
+  (void) FormatLocaleFile(file,"  Chromaticity:\n");
+  (void) FormatLocaleFile(file,"    red primary: (%g,%g,%g)\n",
+    image->chromaticity.red_primary.x,image->chromaticity.red_primary.y,
+    image->chromaticity.red_primary.z);
+  (void) FormatLocaleFile(file,"    green primary: (%g,%g,%g)\n",
+    image->chromaticity.green_primary.x,image->chromaticity.green_primary.y,
+    image->chromaticity.green_primary.z);
+  (void) FormatLocaleFile(file,"    blue primary: (%g,%g,%g)\n",
+    image->chromaticity.blue_primary.x,image->chromaticity.blue_primary.y,
+    image->chromaticity.blue_primary.z);
+  (void) FormatLocaleFile(file,"    white point: (%g,%g,%g)\n",
+    image->chromaticity.white_point.x,image->chromaticity.white_point.y,
+    image->chromaticity.white_point.z);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1517,24 +1537,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   if (image->gamma != 0.0)
     (void) FormatLocaleFile(file,"  Gamma: %g\n",image->gamma);
   if (HasChromaticity(image) != MagickFalse)
-    {
-      /*
-        Display image chromaticity.
-      */
-      (void) FormatLocaleFile(file,"  Chromaticity:\n");
-      (void) FormatLocaleFile(file,"    red primary: (%g,%g,%g)\n",
-        image->chromaticity.red_primary.x,image->chromaticity.red_primary.y,
-        image->chromaticity.red_primary.z);
-      (void) FormatLocaleFile(file,"    green primary: (%g,%g,%g)\n",
-        image->chromaticity.green_primary.x,image->chromaticity.green_primary.y,
-        image->chromaticity.green_primary.z);
-      (void) FormatLocaleFile(file,"    blue primary: (%g,%g,%g)\n",
-        image->chromaticity.blue_primary.x,image->chromaticity.blue_primary.y,
-        image->chromaticity.blue_primary.z);
-      (void) FormatLocaleFile(file,"    white point: (%g,%g,%g)\n",
-        image->chromaticity.white_point.x,image->chromaticity.white_point.y,
-        image->chromaticity.white_point.z);
-    }
+    PrintImageChromaticity(file,image);
   if ((image->extract_info.width*image->extract_info.height) != 0)
     (void) FormatLocaleFile(file,"  Tile geometry: %.17gx%.17g%+.20g%+.20g\n",
       (double) image->extract_info.width,(double) image->extract_info.height,
