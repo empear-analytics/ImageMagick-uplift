@@ -366,6 +366,30 @@ static DrawInfo *AcquireMontageDrawInfo(const ImageInfo *clone_info,
   return(draw_info);
 }
 
+static size_t GetMaximumLabelLines(Image **image_list,
+  const size_t number_images,ExceptionInfo *exception)
+{
+  const char
+    *value;
+
+  size_t
+    number_lines;
+
+  ssize_t
+    i;
+
+  number_lines=0;
+  for (i=0; i < (ssize_t) number_images; i++)
+  {
+    value=GetImageProperty(image_list[i],"label",exception);
+    if (value == (const char *) NULL)
+      continue;
+    if (MultilineCensus(value) > number_lines)
+      number_lines=MultilineCensus(value);
+  }
+  return(number_lines);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -579,15 +603,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   if (montage_info->title != (char *) NULL)
     title_offset=(size_t) (2*(metrics.ascent-metrics.descent)*
       MultilineCensus(title)+2*extract_info.y);
-  number_lines=0;
-  for (i=0; i < (ssize_t) number_images; i++)
-  {
-    value=GetImageProperty(image_list[i],"label",exception);
-    if (value == (const char *) NULL)
-      continue;
-    if (MultilineCensus(value) > number_lines)
-      number_lines=MultilineCensus(value);
-  }
+  number_lines=GetMaximumLabelLines(image_list,number_images,exception);
   /*
     Allocate next structure.
   */
