@@ -653,6 +653,18 @@ static void ExtendColorList(HNodeInfo *node_info,const ssize_t i)
       (size_t) (i+1),sizeof(*node_info->list));
 }
 
+static void SetColorListEntry(const Image *image,const Quantum *p,
+  HNodeInfo *node_info,const ssize_t i)
+{
+  GetPixelInfo(image,&node_info->list[i]);
+  node_info->list[i].red=(double) GetPixelRed(image,p);
+  node_info->list[i].green=(double) GetPixelGreen(image,p);
+  node_info->list[i].blue=(double) GetPixelBlue(image,p);
+  if (image->colorspace == CMYKColorspace)
+    node_info->list[i].black=(double) GetPixelBlack(image,p);
+  node_info->list[i].alpha=(double) GetPixelAlpha(image,p);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -781,13 +793,7 @@ static MagickBooleanType CheckImageColors(const Image *image,
                 image->filename);
               break;
             }
-          GetPixelInfo(image,&node_info->list[i]);
-          node_info->list[i].red=(double) GetPixelRed(image,p);
-          node_info->list[i].green=(double) GetPixelGreen(image,p);
-          node_info->list[i].blue=(double) GetPixelBlue(image,p);
-          if (image->colorspace == CMYKColorspace)
-            node_info->list[i].black=(double) GetPixelBlack(image,p);
-          node_info->list[i].alpha=(double) GetPixelAlpha(image,p);
+          SetColorListEntry(image,p,node_info,i);
           node_info->list[i].count=1;
           node_info->number_unique++;
           cube_info->colors++;
