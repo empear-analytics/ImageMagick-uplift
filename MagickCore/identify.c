@@ -132,6 +132,38 @@
 %
 */
 
+static void AccumulateLocationExtrema(const Image *image,
+  const StatisticType type,const Quantum *magick_restrict p,
+  ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    switch (type)
+    {
+      case MaximumStatistic:
+      default:
+      {
+        if ((double) p[i] > channel_statistics[channel].maxima)
+          channel_statistics[channel].maxima=(double) p[i];
+        break;
+      }
+      case MinimumStatistic:
+      {
+        if ((double) p[i] < channel_statistics[channel].minima)
+          channel_statistics[channel].minima=(double) p[i];
+        break;
+      }
+    }
+  }
+}
+
 static ChannelStatistics *GetLocationStatistics(const Image *image,
   const StatisticType type,ExceptionInfo *exception)
 {
@@ -191,29 +223,7 @@ static ChannelStatistics *GetLocationStatistics(const Image *image,
           p+=(ptrdiff_t) GetPixelChannels(image);
           continue;
         }
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        switch (type)
-        {
-          case MaximumStatistic:
-          default:
-          {
-            if ((double) p[i] > channel_statistics[channel].maxima)
-              channel_statistics[channel].maxima=(double) p[i];
-            break;
-          }
-          case MinimumStatistic:
-          {
-            if ((double) p[i] < channel_statistics[channel].minima)
-              channel_statistics[channel].minima=(double) p[i];
-            break;
-          }
-        }
-      }
+      AccumulateLocationExtrema(image,type,p,channel_statistics);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
