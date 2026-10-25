@@ -4478,8 +4478,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
       return(MagickFalse);
     }
   property_length=strlen(property);
-  if ((property_length > 2) && (*(property+(property_length-2)) == ':') &&
-      (*(property+(property_length-1)) == '*'))
+  if (IsWildcardProperty(property,property_length) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
         "SetReadOnlyProperty","`%s'",property);
