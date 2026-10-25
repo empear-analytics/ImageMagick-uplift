@@ -138,3 +138,31 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 3.28 → 4.04** (`cs-mcp` 1.5.12): channel.c leaves the Red band.
+Branch `campaign/M16-channel`, stacked on `campaign/M15-identify` (PR #21). 6 refactor
+commits, all oracle-verified: 5 Recipe E and 1 Recipe D. `SetImageAlphaChannel` is ready
+(99%); `SeparateImage` is careful (86%), and its survivors are in the progress block.
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| `SetImageAlphaChannel`: the associate case's channel scaling, reused by the disassociate case | E, D | 3.28 → 3.50 |
+| `SetImageAlphaChannel`: the background, remove and shape cases' column loops | E | → 3.82 |
+| `SeparateImage`'s channel loop (its `GetChannelBit()` macro moves with it) | E | → 4.04 |
+
+`SetImageAlphaChannel` goes from nesting 5 to 4, cc 89 to 75 and 361 lines to 315.
+`SeparateImage` leaves Deep Nesting.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**What is left, at 4.04.**
+- `SetImageAlphaChannel`: its per-type `switch`, whose cases each hold a parallel loop,
+  so they cannot move with their pragmas. The off-if-opaque case writes the shared
+  `opaque` flag inside its loop.
+- `ChannelFxImage`: its expression parser `return`s from inside, and writes the
+  operator, cursor and token together.
+- `CombineImages`, careful at 87%: its column loop holds a survivor.
+- `ChannelImage` and `FlattenPixelInfo`: Excess Arguments on existing signatures.
