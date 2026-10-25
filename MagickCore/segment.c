@@ -1660,6 +1660,18 @@ static double GetAverageTau(IntervalTree **list,const ssize_t number_nodes)
   return(average_tau);
 }
 
+static ssize_t FindTauIndex(const ZeroCrossing *zero_crossing,
+  const size_t number_crossings,const IntervalTree *node,ssize_t k)
+{
+  ssize_t
+    j;
+
+  for (j=0; j <= (ssize_t) number_crossings; j++)
+    if (zero_crossing[j].tau == node->tau)
+      k=j;
+  return(k);
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
@@ -1780,9 +1792,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     */
     k=0;
     node=list[i];
-    for (j=0; j <= (ssize_t) number_crossings; j++)
-      if (zero_crossing[j].tau == node->tau)
-        k=j;
+    k=FindTauIndex(zero_crossing,number_crossings,node,k);
     /*
       Find the value of the peak.
     */
