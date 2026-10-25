@@ -100,7 +100,7 @@ needs before refactoring:
 | 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | open |
 | 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | open |
 | 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | open |
-| 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | open |
+| 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | 1.77, in progress (Complex Conditional gone: 20 sites, 22 predicates), [M37](tasks/M37-draw.md) |
 | 1.33 | `MagickCore/composite.c` | 3815 | 86% | 74% | 1.58, in progress (Complex Conditional gone), [M20](tasks/M20-composite.md) |
 | 1.38 | `MagickCore/effect.c` | 4405 | 89% | 75% | 1.40, in progress (Complex Conditional gone; parallel loops need K/T, the adaptive pair B), [M26](tasks/M26-effect.md) |
 | 1.74 | `MagickCore/distort.c` | 3466 | 68% | 76% | 2.29, in progress (Complex Conditional gone; the rest needs Recipe B, O or K), [M22](tasks/M22-distort.md) |

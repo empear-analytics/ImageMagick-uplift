@@ -200,3 +200,40 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, late morning)
+
+**Result: Code Health 1.28 → 1.77** (`cs-mcp` 1.5.12). Branch `campaign/M37-draw`,
+stacked on `campaign/M36-image`. 12 refactor commits plus 1 whitespace-only style commit.
+
+**Recipe P throughout: 22 predicates, and Complex Conditional leaves the file (20 sites).**
+- Each site was checked against every open survivor kind (unmatched, unreached, gap,
+  unresolved) on its exact lines.
+- The 11 clean sites went in **oracle-verified** commits: ConvertPathToPolygon ×2,
+  ConvertPrimitiveToPath, CheckPrimitiveExtent, RenderMVGContent ×2,
+  DrawPolygonPrimitive, DrawPrimitive ×3, TraceStrokePolygon.
+- The 9 sites with a survivor on their lines went in **guard-verified** commits:
+  DrawDashPolygon, GetFillAlpha, DrawPrimitive ×2, RenderMVGContent ×5.
+- Where one function had both kinds, they were split into two commits.
+
+**Two notes on the predicates:**
+- Four predicates take five arguments: `IsNewSubpathPoint`, `IsDashSegmentPending`,
+  `IsRenderableClass`, and the gap ones in image.c. Each carries an Excess Arguments
+  finding; the file gained every time.
+- Several predicates take `char *` parameters. Each was checked: draw.c gains no String
+  Heavy Function Arguments finding.
+
+**Generator.** The predicates were written by a small generator that copies the
+condition verbatim from the source and keeps its own line breaks. One call was left on a
+93-column line; a whitespace-only style commit wrapped it.
+
+**Oracle baseline:** from the ConvertPrimitiveToPath commit on, `8c405c0cc`
+(`origin/main` after the owner merged #31 and #32).
+
+**What is left, at 1.77.**
+- `RenderMVGContent` (74 bumps): a keyword `switch` over the MVG language, whose cases
+  share the parser's state (`q`, `token`, `graphic_context`, `n`, `primitive_type` and
+  more).
+- `DrawPrimitive`, `TracePath`, `TraceStrokePolygon`, `DrawGradientImage`, `GetFillAlpha`
+  (9–12 bumps). Mostly parallel or point-generation loops that write several locals.
+- `DrawBoundingRectangles` and `LogPrimitiveInfo`: no oracle case.
