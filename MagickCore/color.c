@@ -2403,6 +2403,25 @@ static void SetScaledColorFromGeometry(PixelInfo *color,
       geometry_info.xi));
 }
 
+static void SetPsiColorFromGeometry(PixelInfo *color,
+  const GeometryInfo geometry_info,const MagickStatusType flags,
+  const double scale)
+{
+  if (color->colorspace == CMYKColorspace)
+    color->black=(double) ClampToQuantum((MagickRealType) (scale*
+      geometry_info.psi));
+  else
+    if (color->alpha_trait != UndefinedPixelTrait)
+      {
+        if ((flags & AlphaValue) != 0)
+          color->alpha=(double) ClampToQuantum((MagickRealType) (scale*
+            geometry_info.psi));
+        else
+          color->alpha=(double) ClampToQuantum((MagickRealType) (
+            (double) QuantumRange*geometry_info.psi));
+      }
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2641,21 +2660,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
         color->alpha_trait=BlendPixelTrait;
       color->alpha=(double) OpaqueAlpha;
       if ((flags & PsiValue) != 0)
-        {
-          if (color->colorspace == CMYKColorspace)
-            color->black=(double) ClampToQuantum((MagickRealType) (scale*
-              geometry_info.psi));
-          else
-            if (color->alpha_trait != UndefinedPixelTrait)
-              {
-                if ((flags & AlphaValue) != 0)
-                  color->alpha=(double) ClampToQuantum((MagickRealType) (scale*
-                    geometry_info.psi));
-                else
-                  color->alpha=(double) ClampToQuantum((MagickRealType) (
-                    (double) QuantumRange*geometry_info.psi));
-              }
-        }
+        SetPsiColorFromGeometry(color,geometry_info,flags,scale);
       if (((flags & ChiValue) != 0) &&
           (color->alpha_trait != UndefinedPixelTrait))
         color->alpha=(double) ClampToQuantum((double) QuantumRange*
