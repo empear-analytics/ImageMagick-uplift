@@ -2013,6 +2013,27 @@ MagickExport char *StringInfoToString(const StringInfo *string_info)
   return(string);
 }
 
+static void CountArgvArguments(const char *text,int *argc)
+{
+  const char
+    *p;
+
+  for (p=text; *p != '\0'; )
+  {
+    while (isspace((int) ((unsigned char) *p)) != 0)
+      p++;
+    if (*p == '\0')
+      break;
+    (*argc)++;
+    if (*p == '"')
+      for (p++; (*p != '"') && (*p != '\0'); p++) ;
+    if (*p == '\'')
+      for (p++; (*p != '\'') && (*p != '\0'); p++) ;
+    while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
+      p++;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2065,20 +2086,7 @@ MagickExport char **StringToArgv(const char *text,int *argc)
   /*
     Determine the number of arguments.
   */
-  for (p=text; *p != '\0'; )
-  {
-    while (isspace((int) ((unsigned char) *p)) != 0)
-      p++;
-    if (*p == '\0')
-      break;
-    (*argc)++;
-    if (*p == '"')
-      for (p++; (*p != '"') && (*p != '\0'); p++) ;
-    if (*p == '\'')
-      for (p++; (*p != '\'') && (*p != '\0'); p++) ;
-    while ((isspace((int) ((unsigned char) *p)) == 0) && (*p != '\0'))
-      p++;
-  }
+  CountArgvArguments(text,argc);
   (*argc)++;
   argv=(char **) AcquireQuantumMemory((size_t) *argc+1UL,sizeof(*argv));
   if (argv == (char **) NULL)
