@@ -1735,6 +1735,12 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
   return 0;
 }
 
+static inline MagickBooleanType IsColourSpaceNamed(const ssize_t type,
+  const MagickBooleanType IsIcc,const MagickBooleanType IsDev)
+{
+  return((type >= 0 || IsIcc || IsDev) ? MagickTrue : MagickFalse);
+}
+
 static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
 /* Finds named colour such as "blue" and colorspace function such as "lab(10,20,30)".
    Returns number of characters to swallow.
@@ -1773,7 +1779,7 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
   */
   if (!QueryColorCompliance (pfx->token, AllCompliance, &colour, dummy_exception) || IsGray) {
     ssize_t type = ParseCommandOption (MagickColorspaceOptions, MagickFalse, ColSp);
-    if (type >= 0 || IsIcc || IsDev) {
+    if (IsColourSpaceNamed(type,IsIcc,IsDev) != MagickFalse) {
       char * q = pfx->pex + pfx->lenToken;
       while (isspace((int) ((unsigned char) *q))) q++;
       if (*q == '(') {
