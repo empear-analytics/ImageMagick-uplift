@@ -1675,6 +1675,12 @@ MagickExport VirtualPixelMethod GetImageVirtualPixelMethod(const Image *image)
 %
 */
 
+static inline MagickBooleanType IsUnknownFormatSpecifier(const char specifier)
+{
+  return(((specifier != 'd') && (specifier != 'x') && (specifier != 'o')) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
   const char *end)
 {
@@ -1687,7 +1693,7 @@ static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
   /*
     Is this a valid format specifier?
   */
-  if ((specifier != 'd') && (specifier != 'x') && (specifier != 'o'))
+  if (IsUnknownFormatSpecifier(specifier) != MagickFalse)
     return(MagickFalse);
   if ((length == 1) && (*start == specifier))
     return(MagickTrue);
