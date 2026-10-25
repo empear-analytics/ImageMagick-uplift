@@ -203,3 +203,41 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 1.38 → 1.40** (`cs-mcp` 1.5.12). Branch `campaign/M26-effect`,
+stacked on `campaign/M25-quantize`. 4 refactor commits.
+
+**The commits:**
+- `IsSelectiveRowMissing` (P, oracle): Complex Conditional leaves the file.
+- `GetAdaptiveKernelIndex`, the kernel-index clamp inside the parallel row loops: E in
+  `AdaptiveBlurImage` (guard), then D in `AdaptiveSharpenImage` (oracle). Both functions
+  go from cc 44 to 41; the score stays flat (rule 2).
+- `ConvolveKernelGeometry` (E, step 7 in its value-returning form, oracle): the
+  kernel-acquire-convolve tail of `GaussianBlurImage`. The Code Duplication findings on
+  `GaussianBlurImage` and `BlurImage` go away.
+
+**For the owner: two equivalent mutants.** Both kernel-index steps move lines that carry
+mutants of a clamp: `j < 0` turned into `j <= 0`, and `j > width` turned into
+`j >= width`. At the boundary the clamp assigns the value `j` already has, so the
+mutants are equivalent and no case can kill them. The E step was nevertheless kept at
+guard level. The D step, which needs the oracle, relies on that equivalence; its message
+says so.
+
+**Oracle baseline.** From the `ConvolveKernelGeometry` commit on, the oracle's default
+baseline is `f8b59598e`: `origin/main` after the owner merged PRs #7–#30.
+
+**Blocked:** `BlurImage` holds the same tail as `GaussianBlurImage` but cannot call the
+helper. Its `blur_image` is also used in the uncompiled OpenCL branch, so the declaration
+can neither be removed nor be left unused.
+
+**What is left, at 1.40.**
+- Fourteen functions with Bumpy Road. Nearly all their bumps are the bodies of parallel
+  row loops (`AdaptiveBlurImage`, `BilateralBlurImage`, `SelectiveBlurImage`,
+  `KuwaharaImage`, `LocalContrastImage` and others), which need Recipe K or T.
+- The adaptive pair's per-channel loop is shared, but it reads eight variables, so it
+  needs Recipe B.
+- `PreviewImage` (cc 72): its preview `switch` threads about a dozen locals through the
+  tile loop, which is too many even for Recipe O.
+- Six functions with 5–8 arguments (Recipe B).
