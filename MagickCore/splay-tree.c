@@ -1486,6 +1486,19 @@ MagickExport void ResetSplayTreeIterator(SplayTreeInfo *splay_tree)
   UnlockSemaphoreInfo(splay_tree->semaphore);
 }
 
+static int CompareNodeKey(const SplayTreeInfo *splay_tree,const NodeInfo *n,
+  const void *key)
+{
+  int
+    compare;
+
+  if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
+    compare=splay_tree->compare(n->key,key);
+  else
+    compare=(n->key > key) ? 1 : ((n->key < key) ? -1 : 0);
+  return(compare);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1537,10 +1550,7 @@ static NodeInfo *Splay(SplayTreeInfo *splay_tree,const size_t depth,
       else
         return((NodeInfo *) NULL);
     }
-  if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
-    compare=splay_tree->compare(n->key,key);
-  else
-    compare=(n->key > key) ? 1 : ((n->key < key) ? -1 : 0);
+  compare=CompareNodeKey(splay_tree,n,key);
   next=(NodeInfo **) NULL;
   if (compare > 0)
     next=(&n->left);
