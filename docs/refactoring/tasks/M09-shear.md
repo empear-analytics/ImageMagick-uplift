@@ -185,3 +185,27 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 2.05 → 2.13** (`cs-mcp` 1.5.12). Branch `campaign/M09-shear`,
+stacked on `campaign/M08-threshold` (PR #14). 1 refactor commit (Recipe P,
+oracle-verified). `IsPixelBelowThreshold` replaces the two identical tests of
+`RadonTransform`'s bit-packing passes, so Complex Conditional leaves the file.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Why it stops here for now.**
+- `XShearImage` and `YShearImage` (Brain Method, and duplicates of each other) are a
+  per-row `switch (direction)` inside a parallel loop. Each direction's body reads the
+  image, the row pointer, the offset, the width, the step, the area, the background and
+  three per-row `PixelInfo` values: eight arguments or more.
+- `IntegralRotateImage` (nesting 7, careful at 81%) has the same shape per rotation.
+- `RadonProjection` (nesting 5) accumulates into two matrices and their pointers.
+- `ShearRotateImage` and `GetImageBackgroundColor` have no cases.
+
+The next step is Recipe B, bundling a direction's arguments into a `const` struct. The
+duplication between the two shears would then fall to Recipe D only if their bodies
+differed in a single value, and they do not (rows against columns, `x_offset` against
+`y_offset`, and the pointer arithmetic).
