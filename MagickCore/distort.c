@@ -1820,6 +1820,28 @@ static inline MagickBooleanType IsArcPageReset(const DistortMethod method,
     MagickTrue : MagickFalse);
 }
 
+static void PrintArcFX(const double *coeff,const char *image_gen)
+{
+  ssize_t
+    i;
+
+  (void) FormatLocaleFile(stderr,"Arc Distort, Internal Coefficients:\n");
+  for (i=0; i < 5; i++)
+    (void) FormatLocaleFile(stderr,
+      "  c%.17g = %+lf\n",(double) i,coeff[i]);
+  (void) FormatLocaleFile(stderr,"Arc Distort, FX Equivalent:\n");
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,"  -fx 'ii=i+page.x; jj=j+page.y;\n");
+  (void) FormatLocaleFile(stderr,"       xx=(atan2(jj,ii)%+lf)/(2*pi);\n",
+    -coeff[0]);
+  (void) FormatLocaleFile(stderr,"       xx=xx-round(xx);\n");
+  (void) FormatLocaleFile(stderr,"       xx=xx*%lf %+lf;\n",coeff[1],
+    coeff[4]);
+  (void) FormatLocaleFile(stderr,
+    "       yy=(%lf - hypot(ii,jj)) * %lf;\n",coeff[2],coeff[3]);
+  (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -2324,21 +2346,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       }
       case ArcDistortion:
       {
-        (void) FormatLocaleFile(stderr,"Arc Distort, Internal Coefficients:\n");
-        for (i=0; i < 5; i++)
-          (void) FormatLocaleFile(stderr,
-            "  c%.17g = %+lf\n",(double) i,coeff[i]);
-        (void) FormatLocaleFile(stderr,"Arc Distort, FX Equivalent:\n");
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,"  -fx 'ii=i+page.x; jj=j+page.y;\n");
-        (void) FormatLocaleFile(stderr,"       xx=(atan2(jj,ii)%+lf)/(2*pi);\n",
-          -coeff[0]);
-        (void) FormatLocaleFile(stderr,"       xx=xx-round(xx);\n");
-        (void) FormatLocaleFile(stderr,"       xx=xx*%lf %+lf;\n",coeff[1],
-          coeff[4]);
-        (void) FormatLocaleFile(stderr,
-          "       yy=(%lf - hypot(ii,jj)) * %lf;\n",coeff[2],coeff[3]);
-        (void) FormatLocaleFile(stderr,"       v.p{xx-.5,yy-.5}' \\\n");
+        PrintArcFX(coeff,image_gen);
         break;
       }
       case PolarDistortion:
