@@ -1101,6 +1101,13 @@ static void *DestroyPolicyElement(void *policy_info)
   return((void *) NULL);
 }
 
+static inline MagickBooleanType IsIncludeElementOpen(const char *token,
+  const char *q)
+{
+  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,
   const char *policy,const char *filename,const size_t depth,
   ExceptionInfo *exception)
@@ -1194,7 +1201,7 @@ static MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,
         /*
           Include element.
         */
-        while (((*token != '/') && (*(token+1) != '>')) && (*q != '\0'))
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
           (void) CopyMagickString(keyword,token,MagickPathExtent);
           (void) GetNextToken(q,&q,extent,token);
