@@ -67,6 +67,9 @@ threads. Therefore:
   variables, which become parameters passed by value, is fine; writing through pointers
   the block already uses for pixel data (`p`, `q`) is fine. Moving a statement into a
   callee does not change which thread runs it; changing which variables it writes would.
+- Recipe T is the one exception to that proviso: a block whose only outer write is
+  `status=MagickFalse;` may move into a function that returns the status, which the
+  caller then writes.
 - Code under `#pragma omp critical` or `#pragma omp atomic` stays exactly where it is,
   including the progress-monitor blocks at the end of most loops.
 
@@ -166,6 +169,10 @@ blocks of nested logic). Each bump is a missing function.
    expand to a `return` - the new function must return a status the caller checks, and
    the caller must `return` exactly what the macro returned. If you cannot see what the
    macro expands to, skip the block.
+7. A block that runs to the end of a `void` function may contain plain `return;`
+   statements: they become returns of the new `void` function, and its call is the
+   caller's last statement, so both end the caller's work at the same point. Macros
+   used only by the block (`#define` ... `#undef`) move with it.
 
 **Before:**
 
@@ -447,6 +454,282 @@ shape in `AcquireResizeFilter` (filter and window parsing, the B and C overrides
 ---
 
 
+## Recipe T - Extract Function Returning the Loop Status
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Large
+Method* or *Complex Method*, and the block that would fix it sits inside the body of a
+`#pragma omp parallel for` loop and writes the loop's shared `status`, as most pixel
+loops do (`status=MagickFalse;` when a cache read fails).
+
+**Not covered by:** Recipe E, whose OpenMP rule refuses a block that writes a variable
+declared outside the loop body, and `status` is one; Recipe O, which refuses every block
+inside an OpenMP region; Recipe G, which removes one level of nesting, not the block.
+
+**How:**
+
+1. The block lies inside one iteration of the parallel loop body and contains no
+   `#pragma omp` line, so no `critical` or `atomic` block moves.
+2. The only variable declared outside the loop body that the block writes is `status`,
+   and only as `status=MagickFalse;`. The block does not read `status`.
+3. Every variable of the loop body that the block writes is declared inside the block,
+   or is not read after it (a row pointer `q` advanced along the row, say).
+4. The block contains no `return`, `goto`, or a `continue` or `break` of the parallel
+   loop itself; a `continue` or `break` of a loop inside the block is fine.
+5. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. It declares a local `status`, set to `MagickTrue` first; every
+   `status=MagickFalse;` in the block stays as it is; the function ends with
+   `return(status);`.
+6. Pass every other variable the block reads by value, pointers included (`q`, the cache
+   views, `exception`), the same pointers the block already used.
+7. Where the block stood, write
+   `if (Helper(...) == MagickFalse) status=MagickFalse;`, and check every argument
+   against its parameter by reading.
+
+**Before:**
+
+```c
+  for (y=0; y < (ssize_t) source_image->rows; y++)
+  {
+    ...
+    for (x=0; x < (ssize_t) source_image->columns; x++)
+    {
+      ...
+      p=GetCacheViewVirtualPixels(image_view,x-width/2,y-width/2,width,width,
+        exception);
+      if (p == (Quantum *) NULL)
+        {
+          status=MagickFalse;
+          continue;
+        }
+      ...
+      q+=(ptrdiff_t) magnification*GetPixelChannels(magnify_image);
+    }
+    if (SyncCacheViewAuthenticPixels(magnify_view,exception) == MagickFalse)
+      status=MagickFalse;
+```
+
+**After:**
+
+```c
+static MagickBooleanType MagnifyImageRow(...,Quantum *q,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  for (x=0; x < (ssize_t) source_image->columns; x++)
+  {
+    ...
+  }
+  return(status);
+}
+...
+    if (MagnifyImageRow(...,q,exception) == MagickFalse)
+      status=MagickFalse;
+    if (SyncCacheViewAuthenticPixels(magnify_view,exception) == MagickFalse)
+      status=MagickFalse;
+```
+
+**Careful:**
+
+- The one thing that changes is *when* the iteration's write to the shared `status`
+  happens: at the end of the block instead of in its middle. Step 2 makes that
+  invisible to this thread, which does not read `status` in between, and OpenMP gives
+  other threads no ordering for this unsynchronised write in the first place: the same
+  value is written, by the same iteration, before the same later reads.
+- A block that *tests* `status` (`if (status == MagickFalse) break;`), or assigns it
+  anything but `MagickFalse` (`status=InterpolatePixelChannels(...)`), is not this
+  recipe: the callee's local `status` would decide it, not the shared one. Skip it. A
+  `break` of an inner loop straight after `status=MagickFalse;` is fine: it does not
+  depend on the shared value.
+- Variables of the loop body passed by value are copies: step 3 is what makes a write
+  to the copy, such as advancing `q`, harmless.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 4 checked by
+reading: the oracle runs single-threaded and cannot see them.
+
+**Provenance:** 2026-10-24, from `MagnifyImage` (its per-row column loop), with the same
+shape in `resize.c`'s `SampleImage`, both refused by the OpenMP rule of Recipe E. (Not
+`InterpolativeResizeImage`, whose block assigns and tests `status`, nor the two filters,
+whose failures `continue` the parallel loop.) Owner's go-ahead the same day. Added by Claude
+Code (Claude Opus 5.5) during task M01, on `magnify.c`.
+
+---
+
+## Recipe M - Merge Duplicate Parameter
+
+**Use when:** CodeScene reports *Excess Number of Function Arguments* on a `static`
+function and every call passes the same argument to two of its parameters, such as a
+comparison of two pixels that are always taken from one buffer.
+
+**Not covered by:** Recipe E, P, O and T, which move code into a new function and leave
+existing signatures alone; Recipe D, which merges two copies of a block, not two
+parameters; Recipe B, which bundles parameters that carry different values.
+
+**How:**
+
+1. The function is `static` (or `static inline`), declared in this file only, and no
+   pointer to it is taken: a direct call is the only way in.
+2. Two of its parameters, `p1` and `p2`, have the same type, and no write to either
+   appears in the body.
+3. At **every** call, the arguments for `p1` and `p2` are the same identifier, a
+   parameter or local the call does not modify, so both evaluate to one value. Not a
+   function call, not `*p++`, not an expression with side effects.
+4. Remove `p2` from the parameter list and write `p1` for every use of `p2` in the body.
+   Change nothing else.
+5. Remove the matching argument from every call, macros that expand to a call included.
+6. Build: a call left with the old number of arguments does not compile.
+
+**Before:**
+
+```c
+static inline int PixelsEqual(const Quantum *source1,ssize_t offset1,
+  const Quantum *source2,ssize_t offset2,const size_t channels)
+{
+  ...
+    if (source1[offset1+i] != source2[offset2+i])
+  ...
+}
+...
+  if (PixelsEqual(pixels,1,pixels,7,channels) ||
+      PixelsEqual(pixels,3,pixels,5,channels))
+```
+
+**After:**
+
+```c
+static inline int PixelsEqual(const Quantum *source,ssize_t offset1,
+  ssize_t offset2,const size_t channels)
+{
+  ...
+    if (source[offset1+i] != source[offset2+i])
+  ...
+}
+...
+  if (PixelsEqual(pixels,1,7,channels) ||
+      PixelsEqual(pixels,3,5,channels))
+```
+
+**Careful:**
+
+- List every call before you start (`grep -n` the name across the source tree); a single
+  call that passes two different buffers ends the recipe.
+- Two arguments that look alike can differ: `p` and `p` across a loop that advances `p`
+  are the same identifier at the same call, which is what matters, but `p` and `q` that
+  happen to point to the same place today are not.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and step 3 checked by
+reading every call.
+
+**Provenance:** 2026-10-24, from `magnify.c`'s `PixelsEqual`, whose 84 calls all pass one
+buffer twice; part of the owner's go-ahead the same day for removing *Excess Number of
+Function Arguments* from the magnify kernels. Added by Claude Code (Claude Opus 5.5)
+during task M01, on `magnify.c`.
+
+---
+
+## Recipe B - Bundle Arguments into a Struct
+
+**Use when:** CodeScene reports *Excess Number of Function Arguments* on a `static`
+function, and some of its parameters travel together: every call in a caller passes the
+same unchanged values for them (a source buffer, a result buffer and a channel count),
+or together they name one thing (the six neighbour indices of a pixel rule).
+
+**Not covered by:** Recipe M, which needs two parameters that receive one value; Recipes
+E, O and T, which create functions and leave existing signatures alone; Recipe D, which
+merges code, not parameters.
+
+**How:**
+
+1. The function is `static`, declared in this file only, and never used through a
+   function pointer: its signature is the file's own business.
+2. Declare a `typedef struct _Name { ... } Name;` under *Typedef declarations* near the
+   top of the file, one member per parameter in the group, with the parameter's type and
+   name.
+3. Replace the group with one parameter `const Name *name`, and in the body write
+   `name->member` for each use, or declare a `const` local of the old name initialised
+   from the member at the top of the body. Change nothing else.
+4. In each caller, declare a `const Name` local initialised from the exact argument
+   expressions, member by member in declaration order. Each expression must be an
+   identifier or a literal, not a call or anything with a side effect.
+5. Nothing may write an identifier in the struct's initialiser between the declaration
+   and the last call that uses the struct; declare it where that holds (inside the loop
+   iteration, or just before a single call).
+6. A struct declared outside a `#pragma omp` region and read inside it is `const`, and
+   none of its members point to data the region writes through the struct.
+7. At each call, replace the group with `&name`, and check by reading that every member
+   is initialised from the argument it replaces.
+8. Build: a call left with the old arguments does not compile.
+
+**Before:**
+
+```c
+static inline void CopyPixels(const Quantum *source,const ssize_t source_offset,
+  Quantum *destination,const ssize_t destination_offset,const size_t channels)
+{
+  ...
+    destination[(ssize_t) channels*destination_offset+i]=
+      source[source_offset*(ssize_t) channels+i];
+}
+...
+  for (i=0; i < 4; i++)
+    CopyPixels(pixels,4,result,i,channels);
+```
+
+**After:**
+
+```c
+typedef struct _MagnifyPixels
+{
+  const Quantum
+    *source;
+
+  Quantum
+    *destination;
+
+  size_t
+    channels;
+} MagnifyPixels;
+...
+static inline void CopyPixels(const MagnifyPixels *magnify,
+  const ssize_t source_offset,const ssize_t destination_offset)
+{
+  ...
+    magnify->destination[(ssize_t) magnify->channels*destination_offset+i]=
+      magnify->source[source_offset*(ssize_t) magnify->channels+i];
+}
+...
+  const MagnifyPixels
+    magnify = { pixels, result, channels };
+  ...
+  for (i=0; i < 4; i++)
+    CopyPixels(&magnify,4,i);
+```
+
+**Careful:**
+
+- A member keeps the parameter's exact type: `const` included, no `size_t` for a
+  `ssize_t`. The casts in the body stay where they were, on the member now.
+- The struct holds the values the arguments had at its declaration. Step 5 is what makes
+  them the values each call would have passed; a pointer advanced along a row between
+  calls (`q+=...`) cannot be a member.
+- Pointer members point to the same buffers the arguments did, so writes through them
+  land where they always did.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (no call may appear or
+vanish), and steps 4 to 7 checked by reading.
+
+**Provenance:** 2026-10-24, from `magnify.c`'s pixel kernels (`CopyPixels`, `MixPixels`,
+`Mix2Pixels`: 5 or 6 arguments, three of them the same at every call in a kernel),
+`Hq2XHelper` (11 arguments) and `CopyMagnifiedPixels`, with the owner's go-ahead the
+same day. Added by Claude Code (Claude Opus 5.5) during task M01, on `magnify.c`.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -454,7 +737,8 @@ and you do not add one, record it here: the file, its score, and the smells left
 
 | File | Score | Smells left, and why no recipe reaches them | Recorded |
 | --- | ---: | --- | --- |
-| `MagickCore/resize.c` | 2.87 | Brain Method and Deep Nesting (`InterpolativeResizeImage`'s loops write the shared `status` inside `omp parallel for`; `ScaleImage`'s bookkeeping writes six variables on survivor lines); Bumpy Road, Complex and Large Method, Excess Arguments (OpenMP-bound, survivor lines, public signatures, LQR not compiled). 2.45 before Recipe S moved the magnify family to `magnify.c` (6.21). See [M01's report](tasks/M01-resize.md) | 2026-10-24, Mac |
+| `MagickCore/resize.c` | 2.89 | Brain Method and Deep Nesting (`InterpolativeResizeImage`'s channel loop assigns and tests the shared `status` inside `omp parallel for`, which even Recipe T refuses; `ScaleImage`'s bookkeeping writes six variables on survivor lines); Bumpy Road, Complex and Large Method (OpenMP-bound: the filters `continue` the parallel loop on failure; survivor lines; LQR not compiled); Excess Arguments (public signatures; the filter kernels' context is computed per iteration, and bundling it costs the filters more than the kernels gain). 2.45 before Recipe S, 2.87 before Recipe T on `SampleImage`. See [M01's report](tasks/M01-resize.md) | 2026-10-24, Mac |
+| `MagickCore/magnify.c` | 6.57 | Complex and Large Method: `Hq2XHelper` is a rule table written as a `switch` (splitting its cases yields clones with 7-8 arguments, 5.16 in a probe); `Fish2XBottomRightPixel`'s ladder shares six flags that only a struct declared after statements could carry; the 3x3 kernels and `IsEpbx2XBlendable` split into clones of each other (5.93 in a probe). Bumpy Road and Large Method in `MagnifyImage`: its last bumps are the parallel loop's `continue` and the atomic progress block. Overall Code Complexity: the mean of the above. From 6.21, with Recipes E, T, M and B. See [M01's report](tasks/M01-resize.md) | 2026-10-24, Mac |
 
 ### Tool notes
 
@@ -488,6 +772,11 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | WORDING | all | Reset to the founding catalogue before any refactoring on `main`: the five founding recipes, the founding wording of rules 1 and 2 and of Recipe E step 4; C, X, A and R, the flat-score section, and what the pilot on `night1-refactoring` taught (practical points, the parallel-region amendment) removed | The comparison with the earlier campaigns needs the same starting point | owner |
 | 2026-10-24 | AMEND | rule 2 | A step that leaves the score flat is kept when the review shows progress on the targeted function and the commit names the finding and the next step | A file score moves only once a function drops below a finding's threshold, so the founding rule reverts correct steps towards it; the earlier campaign relaxed the same rule on its first morning | owner |
 | 2026-10-24 | NEW | O | Extract Function with Out-Parameters: a selection outside OpenMP that sets several locals together moves to a `static void` function taking the written locals by pointer | `MagnifyImage`'s method `switch` (cc 33 to 18, 212 to 123 lines in a probe) and the same shape in `AcquireResizeFilter` and `ScaleImage`, all refused by Recipe E's step 4 | mandate (2026-10-24) |
+| 2026-10-24 | NEW | T | Extract Function Returning the Loop Status: a block inside a parallel loop body whose only outer write is `status=MagickFalse;` moves to a `static MagickBooleanType` function; the caller writes `status` from its result. The OpenMP section names it as the one exception to Recipe E's proviso | `MagnifyImage`'s column loop (probe: bumps 3 to 2, 109 to 94 lines) and the same shape in `resize.c`'s `SampleImage` | owner |
+| 2026-10-24 | NEW | M | Merge Duplicate Parameter: a `static` function whose every call passes one identifier to two parameters of the same type loses the second | `magnify.c`'s `PixelsEqual` (5 arguments, 84 calls, all passing one buffer twice) | owner |
+| 2026-10-24 | NEW | B | Bundle Arguments into a Struct: parameters of a `static` function that travel together become one `const` struct pointer; each caller fills a `const` struct from the same argument expressions | `magnify.c`'s pixel kernels, `Hq2XHelper` (11 arguments) and `CopyMagnifiedPixels`; a probe removing the finding raised the file 6.26 to 6.46 | owner |
+| 2026-10-24 | AMEND | E | Step 7: a block that runs to the end of a `void` function may contain `return;`; the new function is `void` and its call is the caller's last statement; macros used only by the block move with it | `Fish2X`'s ladder of early returns (probe: 6.52 to 6.56), refused by the founding wording, which covers only the throw macros' returns | mandate (2026-10-24) |
+| 2026-10-24 | WORDING | T | Provenance corrected (the shape is in `SampleImage` only, not `InterpolativeResizeImage` or the filters); the Careful note now refuses blocks that test or assign `status`, not a `break` of an inner loop after `status=MagickFalse;` | Reading the three loops after the recipe was added | after the fact |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.

@@ -292,6 +292,62 @@ configuration, outside this repository, still needs it.** Fresh candidate build 
 warnings; guards over both files `--combined`: OK; `MagnifyImage`'s 49 cases and the
 whole catalogue against `20cb5c1246`: only `gaps/c5651ffad8` diverged, as before.
 
+#### Continuing on `magnify.c`, and Recipes T, M and B (2026-10-24, Mac)
+
+Owner's direction after PR #6: continue on `magnify.c`, then add the recipes the
+plateau called for. Branch `campaign/M01-magnify`, on `main` at `8a4c272f1`.
+
+**`magnify.c` 6.21 → 6.57, plateau; `resize.c` 2.87 → 2.89.** (`cs-mcp` 1.5.12.)
+
+Four playbook commits: **Recipe T** (extract a parallel-loop block whose only outer write
+is `status=MagickFalse;` into a function returning the status; the caller writes
+`status`), **Recipe M** (merge a parameter that every call fills with the same value as
+another), **Recipe B** (bundle parameters that travel together into a `const` struct),
+and an amendment to **Recipe E** (step 7: a block that runs to the end of a `void`
+function may contain `return;`). Then a correction to T: its provenance had named
+`InterpolativeResizeImage` and the filters, which do not have its shape.
+
+| Step | Function | Recipe | Score | Review |
+| --- | --- | --- | --- | --- |
+| 1 | `MagnifyImage` | E | 6.21 → 6.26 | source-image setup to `CloneMagnifySourceImage`; 123 → 109 lines |
+| 2 | `MagnifyImage` | T | → 6.33 | column loop to `MagnifyImageRow`; bumps 3 → 2, 89 lines |
+| 3 | `PixelsEqual` | M | flat | 84 calls all passed one buffer twice; 5 → 4 arguments |
+| 4-6 | `CopyPixels`, `MixPixels`, `Mix2Pixels` | B | flat | `MagnifyPixels` {source, destination, channels}; each leaves Excess Arguments |
+| 7 | `Hq2XHelper` | B | flat | `MagnifyPixels` and `Hq2XNeighbours`; 11 → 4 arguments |
+| 8 | `CopyMagnifiedPixels` | B | → 6.52 | `MagnifyRow`; Excess Number of Function Arguments leaves the file |
+| 9 | `Fish2X` | E (step 7) | → 6.56 | flags and ladder to `Fish2XBottomRightPixel` |
+| 10 | `MagnifyImage` | E | → 6.57 | `magnify:method` lookup to `GetMagnifyMethodOption`; cc 14, 87 lines |
+| 11 | `SampleImage` (`resize.c`) | T | 2.87 → 2.89 | column loop to `SampleImageRow`; leaves Deep Nesting, cc 22 → 19, 115 → 91 lines |
+
+Every step: build without warnings, `refactor_guard.py` OK (931 literals in `magnify.c`,
+866 in `resize.c`), `--calls` OK or the extract fingerprint, the oracle on the functions'
+cases (`MagnifyImage`'s 49 cover all nine methods; `SampleImage` 112), 0 diverged, and
+the CodeScene pre-commit gate. Readiness from the gate over the 33 `resize.c` reports,
+read against the original source in `build-oracle/src/20cb5c1246…` (the reports hold
+absolute paths into the main checkout, whose `resize.c` has since changed; the paths
+were rewritten in a scratch copy).
+
+**Whole catalogue** at `ffb6615d0` against `8a4c272f1` (the merge of PR #6): 15,884
+cases, **1 diverged**, `gaps/c5651ffad8`, the log-map order tie described above; the two
+hough matrix cases passed this time.
+
+**Tried and reverted** (probes, never committed unless noted):
+`Hq2XHelper`'s conditional cases each in a function (5.16: clones, 7-8 arguments);
+`IsEpbx2XBlendable` split with Recipe P (committed to the working tree, 5.93: the new
+predicate is a clone of the `IsScale3X*Edge` group, reverted); row-wise splits of
+`Scale3X` and `Eagle3X` (the row helpers are clones of each other); `Fish2X`'s line
+ladder split further (6 arguments, 6.44); a struct for `FilterHorizontalPixel`'s ten
+arguments (2.88: the eight member assignments cost `HorizontalFilter` more than the
+kernel gains, since C89-style code cannot declare a `const` struct after the values are
+computed).
+
+**Notes.** CodeScene does not flag `MagnifyImageRow`'s nine parameters; it seems not to
+count a function with a function-pointer parameter. Recipe B's one-line declaration
+(`const MagnifyPixels magnify = { ... };`) was needed to keep `Xbr2X` under the Large
+Method threshold; the file already wrote declarations that way. `Hq2XTable` produces
+neither rule 0 nor rule 11, so those two cases of `Hq2XHelper` can never run; they are
+the function's two survivors, and stay.
+
 #### Per function
 
 | Function | Recipes | Code Health over its steps | What the review shows |
