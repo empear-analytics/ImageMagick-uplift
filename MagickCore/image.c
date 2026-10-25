@@ -4193,6 +4193,36 @@ MagickExport MagickBooleanType SyncImagesSettings(ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static void ConvertResolutionUnits(Image *image,const ResolutionType units)
+{
+  if (image->units != units)
+    switch (image->units)
+    {
+      case PixelsPerInchResolution:
+      {
+        if (units == PixelsPerCentimeterResolution)
+          {
+            image->resolution.x/=2.54;
+            image->resolution.y/=2.54;
+          }
+        break;
+      }
+      case PixelsPerCentimeterResolution:
+      {
+        if (units == PixelsPerInchResolution)
+          {
+            image->resolution.x=(double) ((size_t) (100.0*2.54*
+              image->resolution.x+0.5))/100.0;
+            image->resolution.y=(double) ((size_t) (100.0*2.54*
+              image->resolution.y+0.5))/100.0;
+          }
+        break;
+      }
+      default:
+        break;
+    }
+}
+
 MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -4375,32 +4405,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickFalse,option);
   if (units != UndefinedResolution)
     {
-      if (image->units != units)
-        switch (image->units)
-        {
-          case PixelsPerInchResolution:
-          {
-            if (units == PixelsPerCentimeterResolution)
-              {
-                image->resolution.x/=2.54;
-                image->resolution.y/=2.54;
-              }
-            break;
-          }
-          case PixelsPerCentimeterResolution:
-          {
-            if (units == PixelsPerInchResolution)
-              {
-                image->resolution.x=(double) ((size_t) (100.0*2.54*
-                  image->resolution.x+0.5))/100.0;
-                image->resolution.y=(double) ((size_t) (100.0*2.54*
-                  image->resolution.y+0.5))/100.0;
-              }
-            break;
-          }
-          default:
-            break;
-        }
+      ConvertResolutionUnits(image,units);
       image->units=units;
       option=GetImageOption(image_info,"density");
       if (option != (const char *) NULL)
