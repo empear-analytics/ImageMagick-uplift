@@ -1856,8 +1856,8 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                           return(&root->root);
                         }
                       j=1;
-                      while (IsOtherDefaultAttribute(attribute,j,attributes,l) !=
-                          MagickFalse)
+                      while (IsOtherDefaultAttribute(attribute,j,attributes,
+                          l) != MagickFalse)
                         j+=3;
                       attributes[l+1]=ParseEntities(attributes[l+1],
                         root->entities,(attribute != (char **) NULL) &&
