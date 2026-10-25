@@ -1773,6 +1773,14 @@ static Image *DrawCompositeMask(Image *image,const DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsDashSegmentPending(
+  const MagickStatusType status,const double total_length,
+  const double maximum_length,const ssize_t n,const ssize_t j)
+{
+  return(((status != MagickFalse) && (total_length < maximum_length) &&
+    ((n & 0x01) == 0) && (j > 1)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,Image *image,ExceptionInfo *exception)
 {
@@ -1912,8 +1920,8 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
     dash_polygon[j].coordinates=1;
     j++;
   }
-  if ((status != MagickFalse) && (total_length < maximum_length) &&
-      ((n & 0x01) == 0) && (j > 1))
+  if (IsDashSegmentPending(status,total_length,maximum_length,n,j) !=
+      MagickFalse)
     {
       dash_polygon[j]=primitive_info[i-1];
       dash_polygon[j].closed_subpath=MagickFalse;
