@@ -1547,6 +1547,15 @@ static void ShrinkGeometryToSize(size_t *width,size_t *height,
     *height=stasis_height;
 }
 
+static void EnlargeGeometryToSize(size_t *width,size_t *height,
+  const size_t stasis_width,const size_t stasis_height)
+{
+  if (stasis_width > *width)
+    *width=stasis_width;
+  if (stasis_height > *height)
+    *height=stasis_height;
+}
+
 MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -1683,12 +1692,7 @@ MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   if ((flags & GreaterValue) != 0)
     ShrinkGeometryToSize(width,height,stasis_width,stasis_height);
   if ((flags & LessValue) != 0)
-    {
-      if (stasis_width > *width)
-        *width=stasis_width;
-      if (stasis_height > *height)
-        *height=stasis_height;
-    }
+    EnlargeGeometryToSize(width,height,stasis_width,stasis_height);
   if ((flags & AreaValue) != 0)
     {
       double
