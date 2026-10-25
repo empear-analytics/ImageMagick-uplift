@@ -684,6 +684,20 @@ static MagickBooleanType IsMagicListInstantiated(ExceptionInfo *exception)
   return(magic_list != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
 }
 
+static void PrintMagicBytes(FILE *file,const MagicInfo **magic_info,
+  const ssize_t i)
+{
+  ssize_t
+    j;
+
+  for (j=0; magic_info[i]->magic[j] != '\0'; j++)
+    if (isprint((int) (magic_info[i]->magic[j])) != 0)
+      (void) FormatLocaleFile(file,"%c",magic_info[i]->magic[j]);
+    else
+      (void) FormatLocaleFile(file,"\\%03o",(unsigned int)
+        ((unsigned char) magic_info[i]->magic[j]));
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -740,12 +754,7 @@ MagickExport MagickBooleanType ListMagicInfo(FILE *file,
     (void) FormatLocaleFile(file,"%6ld ",(long) magic_info[i]->offset);
     if (magic_info[i]->magic != (unsigned char *) NULL)
       {
-        for (j=0; magic_info[i]->magic[j] != '\0'; j++)
-          if (isprint((int) (magic_info[i]->magic[j])) != 0)
-            (void) FormatLocaleFile(file,"%c",magic_info[i]->magic[j]);
-          else
-            (void) FormatLocaleFile(file,"\\%03o",(unsigned int)
-              ((unsigned char) magic_info[i]->magic[j]));
+        PrintMagicBytes(file,magic_info,i);
       }
     (void) FormatLocaleFile(file,"\n");
   }
