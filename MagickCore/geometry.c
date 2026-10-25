@@ -925,6 +925,12 @@ static inline MagickBooleanType IsGeometryOffsetPrefix(const char *p)
     (*p == ':')) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsGeometryOffsetSeparator(const char *p)
+{
+  return(((*p == ',') || (*p == '/') || (*p == ':')) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -1137,7 +1143,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
       /*
         Parse xi value.
       */
-      if ((*p == ',') || (*p == '/') || (*p == ':') )
+      if (IsGeometryOffsetSeparator(p) != MagickFalse)
         p++;
       while ((*p == '+') || (*p == '-'))
       {
@@ -1161,7 +1167,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
           /*
             Parse psi value.
           */
-          if ((*p == ',') || (*p == '/') || (*p == ':'))
+          if (IsGeometryOffsetSeparator(p) != MagickFalse)
             p++;
           while ((*p == '+') || (*p == '-'))
           {
@@ -1186,7 +1192,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
           /*
             Parse chi value.
           */
-          if ((*p == ',') || (*p == '/') || (*p == ':'))
+          if (IsGeometryOffsetSeparator(p) != MagickFalse)
             p++;
           while ((*p == '+') || (*p == '-'))
           {
