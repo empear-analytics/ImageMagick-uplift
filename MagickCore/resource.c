@@ -157,6 +157,25 @@ static SemaphoreInfo
 static SplayTreeInfo
   *temporary_resources = (SplayTreeInfo *) NULL;
 
+static void LockResourceSemaphore(const ResourceType type)
+{
+  switch (type)
+  {
+    case DiskResource:
+    case FileResource:
+    case MapResource:
+    case MemoryResource:
+    case TimeResource:
+    {
+      if (resource_semaphore[type] == (SemaphoreInfo *) NULL)
+        ActivateSemaphoreInfo(&resource_semaphore[type]);
+      LockSemaphoreInfo(resource_semaphore[type]);
+      break;
+    }
+    default: ;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -205,21 +224,7 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
   current=0;
   bi=MagickFalse;
   status=MagickFalse;
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      if (resource_semaphore[type] == (SemaphoreInfo *) NULL)
-        ActivateSemaphoreInfo(&resource_semaphore[type]);
-      LockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  LockResourceSemaphore(type);
   switch (type)
   {
     case AreaResource:
