@@ -945,6 +945,13 @@ static inline MagickBooleanType IsGeometrySigmaSeparator(const int c,
     (*p == ',') || (*p == '/')) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsGeometrySigmaParsable(const int c,
+  const char *p,const char *q)
+{
+  return((((c != 215) && (*q != 'x') && (*q != 'X') && (*q != ':')) ||
+    ((*p != '+') && (*p != '-'))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -1136,8 +1143,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
       while (isspace((int) ((unsigned char) *p)) != 0)
         p++;
       c=(int) ((unsigned char) *q);
-      if (((c != 215) && (*q != 'x') && (*q != 'X') && (*q != ':')) ||
-          ((*p != '+') && (*p != '-')))
+      if (IsGeometrySigmaParsable(c,p,q) != MagickFalse)
         {
           q=p;
           value=StringToDouble(p,&p);
