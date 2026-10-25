@@ -116,3 +116,15 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night)
+
+**Result: Code Health 8.22 → 8.28** (`cs-mcp` 1.5.12). Branch `campaign/M76-coder`,
+stacked on `campaign/M75-prepress`. One oracle-verified E: `PrintCoderPathHeader`
+(ListCoderInfo, ready, 13 of 13 killed), the twin of mime.c's `PrintMimePathHeader`.
+ListCoderInfo leaves Bumpy Road Ahead.
+
+**What is left, at 8.28.** Code Duplication pairs: CoderComponentGenesis and
+Terminus, CoderInfoCompare and CoderCompare (which compare different types), and
+GetCoderInfoList and GetCoderList. Each pair differs in more than one value.
+ListCoderInfo is at cc 10.
