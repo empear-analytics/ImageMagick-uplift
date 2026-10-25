@@ -3697,6 +3697,23 @@ MagickExport VirtualPixelMethod SetImageVirtualPixelMethod(Image *image,
 %
 */
 
+static inline MagickBooleanType IsLeftGapEdge(const Image *left_image,
+  const Quantum *p,const ssize_t x,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(left_image,p) != TransparentAlpha) ||
+    (((ssize_t) left_image->columns-x-1) >= (ssize_t) gap)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsRightGapEdge(const Image *right_image,
+  const Quantum *p,const ssize_t x,const ssize_t i,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
+    ((x+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+}
+
 static ssize_t SmushXGap(const Image *smush_image,const Image *images,
   const ssize_t offset,ExceptionInfo *exception)
 {
@@ -3743,9 +3760,7 @@ static ssize_t SmushXGap(const Image *smush_image,const Image *images,
     for (x=(ssize_t) left_image->columns-1; x > 0; x--)
     {
       p=GetCacheViewVirtualPixels(left_view,x,left_geometry.y+y,1,1,exception);
-      if ((p == (const Quantum *) NULL) ||
-          (GetPixelAlpha(left_image,p) != TransparentAlpha) ||
-          (((ssize_t) left_image->columns-x-1) >= (ssize_t) gap))
+      if (IsLeftGapEdge(left_image,p,x,gap) != MagickFalse)
         break;
     }
     i=(ssize_t) left_image->columns-x-1;
@@ -3753,9 +3768,7 @@ static ssize_t SmushXGap(const Image *smush_image,const Image *images,
     {
       p=GetCacheViewVirtualPixels(right_view,x,right_geometry.y+y,1,1,
         exception);
-      if ((p == (const Quantum *) NULL) ||
-          (GetPixelAlpha(right_image,p) != TransparentAlpha) ||
-          ((x+i) >= (ssize_t) gap))
+      if (IsRightGapEdge(right_image,p,x,i,gap) != MagickFalse)
         break;
     }
     if ((x+i) < (ssize_t) gap)
