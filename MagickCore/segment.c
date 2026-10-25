@@ -387,6 +387,29 @@ static void ClassifyFuzzyPixel(Image *image,const double *squares,
   }
 }
 
+static ssize_t CountClusterPixel(Cluster *head,const PixelInfo pixel,
+  ssize_t count)
+{
+  Cluster
+    *cluster;
+
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
+    if (IsPixelInCluster(cluster,pixel.red,pixel.green,pixel.blue) !=
+        MagickFalse)
+      {
+        /*
+          Count this pixel.
+        */
+        count++;
+        cluster->red.center+=pixel.red;
+        cluster->green.center+=pixel.green;
+        cluster->blue.center+=pixel.blue;
+        cluster->count++;
+        break;
+      }
+  return(count);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const double cluster_threshold,const double weighting_exponent,
   const MagickBooleanType verbose,ExceptionInfo *exception)
@@ -532,20 +555,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
       pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,p));
       pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
       pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
-      for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-        if (IsPixelInCluster(cluster,pixel.red,pixel.green,pixel.blue) !=
-            MagickFalse)
-          {
-            /*
-              Count this pixel.
-            */
-            count++;
-            cluster->red.center+=pixel.red;
-            cluster->green.center+=pixel.green;
-            cluster->blue.center+=pixel.blue;
-            cluster->count++;
-            break;
-          }
+      count=CountClusterPixel(head,pixel,count);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
