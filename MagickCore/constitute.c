@@ -1247,6 +1247,25 @@ MagickExport Image *ReadInlineImage(const ImageInfo *image_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsSingleImageDelegateCopy(const char *option,
+  const ImageInfo *write_info,const Image *image)
+{
+  return(((IsStringTrue(option) != MagickFalse) &&
+    (write_info->page == (char *) NULL) &&
+    (GetPreviousImageInList(image) == (Image *) NULL) &&
+    (GetNextImageInList(image) == (Image *) NULL) &&
+    (IsTaintImage(image) == MagickFalse) ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsDirectDelegate(
+  const DelegateInfo *delegate_info,const Image *image)
+{
+  return(((delegate_info != (const DelegateInfo *) NULL) &&
+    (GetDelegateMode(delegate_info) == 0) &&
+    (IsPathAccessible(image->magick_filename) != MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -1321,16 +1340,10 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
   SyncImageProfiles(image);
   DisassociateImageStream(image);
   option=GetImageOption(image_info,"delegate:bimodal");
-  if ((IsStringTrue(option) != MagickFalse) &&
-      (write_info->page == (char *) NULL) &&
-      (GetPreviousImageInList(image) == (Image *) NULL) &&
-      (GetNextImageInList(image) == (Image *) NULL) &&
-      (IsTaintImage(image) == MagickFalse) )
+  if (IsSingleImageDelegateCopy(option,write_info,image) != MagickFalse)
     {
       delegate_info=GetDelegateInfo(image->magick,write_info->magick,exception);
-      if ((delegate_info != (const DelegateInfo *) NULL) &&
-          (GetDelegateMode(delegate_info) == 0) &&
-          (IsPathAccessible(image->magick_filename) != MagickFalse))
+      if (IsDirectDelegate(delegate_info,image) != MagickFalse)
         {
           /*
             Process image with bi-modal delegate.
