@@ -1884,6 +1884,41 @@ static void PrintCylinder2PlaneFX(const double *coeff,const char *image_gen,
   (void) FormatLocaleFile(stderr,"       %s' \\\n", lookup);
 }
 
+static void PrintBarrelFX(const Image *image,const double *coeff,
+  const DistortMethod method,const char *image_gen)
+{
+  double
+    xc,
+    yc;
+
+  /*
+    NOTE: This does the barrel roll in pixel coords not image coords
+    The internal distortion must do it in image coordinates,
+    so that is what the center coeff (8,9) is given in.
+  */
+  xc=((double)image->columns-1.0)/2.0+image->page.x;
+  yc=((double)image->rows-1.0)/2.0+image->page.y;
+  (void) FormatLocaleFile(stderr, "Barrel%s Distort, FX Equivalent:\n",
+    method == BarrelDistortion ? "" : "Inv");
+  (void) FormatLocaleFile(stderr, "%s", image_gen);
+  if ( fabs(coeff[8]-xc-0.5) < 0.1 && fabs(coeff[9]-yc-0.5) < 0.1 )
+    (void) FormatLocaleFile(stderr,"  -fx 'xc=(w-1)/2;  yc=(h-1)/2;\n");
+  else
+    (void) FormatLocaleFile(stderr,"  -fx 'xc=%lf;  yc=%lf;\n",coeff[8]-
+      0.5,coeff[9]-0.5);
+  (void) FormatLocaleFile(stderr,
+    "       ii=i-xc;  jj=j-yc;  rr=hypot(ii,jj);\n");
+  (void) FormatLocaleFile(stderr,
+    "       ii=ii%s(%lf*rr*rr*rr %+lf*rr*rr %+lf*rr %+lf);\n",
+    method == BarrelDistortion ? "*" : "/",coeff[0],coeff[1],coeff[2],
+    coeff[3]);
+  (void) FormatLocaleFile(stderr,
+    "       jj=jj%s(%lf*rr*rr*rr %+lf*rr*rr %+lf*rr %+lf);\n",
+    method == BarrelDistortion ? "*" : "/",coeff[4],coeff[5],coeff[6],
+    coeff[7]);
+  (void) FormatLocaleFile(stderr,"       p{ii+xc,jj+yc}' \\\n");
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -2442,36 +2477,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       case BarrelDistortion:
       case BarrelInverseDistortion:
       {
-        double
-          xc,
-          yc;
-
-        /*
-          NOTE: This does the barrel roll in pixel coords not image coords
-          The internal distortion must do it in image coordinates,
-          so that is what the center coeff (8,9) is given in.
-        */
-        xc=((double)image->columns-1.0)/2.0+image->page.x;
-        yc=((double)image->rows-1.0)/2.0+image->page.y;
-        (void) FormatLocaleFile(stderr, "Barrel%s Distort, FX Equivalent:\n",
-          method == BarrelDistortion ? "" : "Inv");
-        (void) FormatLocaleFile(stderr, "%s", image_gen);
-        if ( fabs(coeff[8]-xc-0.5) < 0.1 && fabs(coeff[9]-yc-0.5) < 0.1 )
-          (void) FormatLocaleFile(stderr,"  -fx 'xc=(w-1)/2;  yc=(h-1)/2;\n");
-        else
-          (void) FormatLocaleFile(stderr,"  -fx 'xc=%lf;  yc=%lf;\n",coeff[8]-
-            0.5,coeff[9]-0.5);
-        (void) FormatLocaleFile(stderr,
-          "       ii=i-xc;  jj=j-yc;  rr=hypot(ii,jj);\n");
-        (void) FormatLocaleFile(stderr,
-          "       ii=ii%s(%lf*rr*rr*rr %+lf*rr*rr %+lf*rr %+lf);\n",
-          method == BarrelDistortion ? "*" : "/",coeff[0],coeff[1],coeff[2],
-          coeff[3]);
-        (void) FormatLocaleFile(stderr,
-          "       jj=jj%s(%lf*rr*rr*rr %+lf*rr*rr %+lf*rr %+lf);\n",
-          method == BarrelDistortion ? "*" : "/",coeff[4],coeff[5],coeff[6],
-          coeff[7]);
-        (void) FormatLocaleFile(stderr,"       p{ii+xc,jj+yc}' \\\n");
+        PrintBarrelFX(image,coeff,method,image_gen);
         break;
       }
       default:
