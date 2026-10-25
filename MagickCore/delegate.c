@@ -1742,6 +1742,15 @@ static MagickBooleanType CopyDelegateFile(const char *source,
   return(status);
 }
 
+static inline MagickBooleanType IsTwoStepDelegate(
+  const DelegateInfo *delegate_info,const char *decode,const char *encode)
+{
+  return(((delegate_info->mode != 0) && (((decode != (const char *) NULL) &&
+    (delegate_info->encode != (char *) NULL)) ||
+    ((encode != (const char *) NULL) &&
+    (delegate_info->decode != (char *) NULL)))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -1809,10 +1818,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         }
       image_info->temporary=MagickTrue;
     }
-  if ((delegate_info->mode != 0) && (((decode != (const char *) NULL) &&
-        (delegate_info->encode != (char *) NULL)) ||
-       ((encode != (const char *) NULL) &&
-        (delegate_info->decode != (char *) NULL))))
+  if (IsTwoStepDelegate(delegate_info,decode,encode) != MagickFalse)
     {
       char
         *magick;
