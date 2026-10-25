@@ -840,6 +840,19 @@ static void ParseMimeMagic(MimeInfo *mime_info,const char *attribute)
       (char **) NULL,0);
 }
 
+static void GetIncludePath(const char *filename,const char *attribute,
+  char *path)
+{
+  GetPathComponent(filename,HeadPath,path);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(path,DirectorySeparator,
+      MagickPathExtent);
+  if (*attribute == *DirectorySeparator)
+    (void) CopyMagickString(path,attribute,MagickPathExtent);
+  else
+    (void) ConcatenateMagickString(path,attribute,MagickPathExtent);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -916,14 +929,7 @@ static MagickBooleanType LoadMimeCache(LinkedListInfo *cache,const char *xml,
               path[MagickPathExtent],
               *file_xml;
 
-            GetPathComponent(filename,HeadPath,path);
-            if (*path != '\0')
-              (void) ConcatenateMagickString(path,DirectorySeparator,
-                MagickPathExtent);
-            if (*attribute == *DirectorySeparator)
-              (void) CopyMagickString(path,attribute,MagickPathExtent);
-            else
-              (void) ConcatenateMagickString(path,attribute,MagickPathExtent);
+            GetIncludePath(filename,attribute,path);
             file_xml=FileToXML(path,~0UL);
             if (file_xml != (char *) NULL)
               {
