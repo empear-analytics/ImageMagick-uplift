@@ -2094,6 +2094,23 @@ static MagickBooleanType FloydSteinbergImageDepth(Image *image,
   return(status);
 }
 
+static void SetColormapEntryDepth(Image *image,const ssize_t i,
+  const QuantumAny range)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].red=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
+      ClampPixel(image->colormap[i].red),range),range);
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].green=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
+      ClampPixel(image->colormap[i].green),range),range);
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].blue=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
+      ClampPixel(image->colormap[i].blue),range),range);
+  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].alpha=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
+      ClampPixel(image->colormap[i].alpha),range),range);
+}
+
 MagickExport MagickBooleanType SetImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -2137,18 +2154,7 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
 #endif
       for (i=0; i < (ssize_t) image->colors; i++)
       {
-        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].red=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
-            ClampPixel(image->colormap[i].red),range),range);
-        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].green=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
-            ClampPixel(image->colormap[i].green),range),range);
-        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].blue=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
-            ClampPixel(image->colormap[i].blue),range),range);
-        if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].alpha=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
-            ClampPixel(image->colormap[i].alpha),range),range);
+        SetColormapEntryDepth(image,i,range);
       }
     }
   status=MagickTrue;
