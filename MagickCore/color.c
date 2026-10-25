@@ -2079,6 +2079,19 @@ static void SetColorInfoAttribute(ColorInfo *color_info,const char *keyword,
   }
 }
 
+static ColorInfo *AcquireColorInfo(const char *filename)
+{
+  ColorInfo
+    *color_info;
+
+  color_info=(ColorInfo *) AcquireCriticalMemory(sizeof(*color_info));
+  (void) memset(color_info,0,sizeof(*color_info));
+  color_info->path=ConstantString(filename);
+  color_info->exempt=MagickFalse;
+  color_info->signature=MagickCoreSignature;
+  return(color_info);
+}
+
 static MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
   const char *filename,const size_t depth,ExceptionInfo *exception)
 {
@@ -2207,11 +2220,7 @@ static MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
         /*
           Color element.
         */
-        color_info=(ColorInfo *) AcquireCriticalMemory(sizeof(*color_info));
-        (void) memset(color_info,0,sizeof(*color_info));
-        color_info->path=ConstantString(filename);
-        color_info->exempt=MagickFalse;
-        color_info->signature=MagickCoreSignature;
+        color_info=AcquireColorInfo(filename);
         continue;
       }
     if (color_info == (ColorInfo *) NULL)
