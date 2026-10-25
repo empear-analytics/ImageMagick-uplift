@@ -1026,6 +1026,20 @@ static void SetTransparentPixelsToBackground(const Image *image,
   }
 }
 
+static void FlattenRowOverBackground(const Image *image,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    FlattenPixelInfo(image,&image->background_color,
+      image->background_color.alpha,q,(double) GetPixelAlpha(image,q),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -1296,9 +1310,6 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
@@ -1308,12 +1319,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
             status=MagickFalse;
             continue;
           }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          FlattenPixelInfo(image,&image->background_color,
-            image->background_color.alpha,q,(double) GetPixelAlpha(image,q),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        FlattenRowOverBackground(image,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
       }
