@@ -698,6 +698,14 @@ static MagickBooleanType ClonePixelCacheOnDisk(
 }
 
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
+static inline MagickBooleanType IsNonMemoryCachePair(const CacheInfo *source,
+  const CacheInfo *destination)
+{
+  return((((source->type != MemoryCache) && (source->type != MapCache)) ||
+    ((destination->type != MemoryCache) &&
+    (destination->type != MapCache))) ? MagickTrue : MagickFalse);
+}
+
 static inline int GetCacheNumberThreads(const CacheInfo *source,
   const CacheInfo *destination,const size_t chunk,const int factor)
 {
@@ -715,8 +723,7 @@ static inline int GetCacheNumberThreads(const CacheInfo *source,
   /*
     Limit threads for non-memory or non-map cache sources/destinations.
   */
-  if (((source->type != MemoryCache) && (source->type != MapCache)) ||
-      ((destination->type != MemoryCache) && (destination->type != MapCache)))
+  if (IsNonMemoryCachePair(source,destination) != MagickFalse)
     number_threads=MagickMin(number_threads,4);
   return((int) number_threads);
 }
