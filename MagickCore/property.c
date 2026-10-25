@@ -2154,6 +2154,14 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
   return(path);
 }
 
+static inline MagickBooleanType IsBezierCorner(const PointInfo *last,
+  const PointInfo *point)
+{
+  return((((last+1)->x == (last+2)->x) && ((last+1)->y == (last+2)->y) &&
+    (point->x == (point+1)->x) && (point->y == (point+1)->y)) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline void TraceBezierCurve(char *message,PointInfo *last,
   PointInfo *point)
 {
@@ -2161,8 +2169,7 @@ static inline void TraceBezierCurve(char *message,PointInfo *last,
     Handle special cases when Bezier curves are used to describe
     corners and straight lines.
   */
-  if (((last+1)->x == (last+2)->x) && ((last+1)->y == (last+2)->y) &&
-      (point->x == (point+1)->x) && (point->y == (point+1)->y))
+  if (IsBezierCorner(last,point) != MagickFalse)
     (void) FormatLocaleString(message,MagickPathExtent,
       "L %g %g\n",point[1].x,point[1].y);
   else
