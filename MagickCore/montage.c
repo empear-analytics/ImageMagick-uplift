@@ -294,6 +294,37 @@ static Image *AddTileBorder(Image *image,const MontageInfo *montage_info,
   return(image);
 }
 
+static void AnnotateMontageTitle(const ImageInfo *image_info,
+  const DrawInfo *draw_info,Image **image_list,Image *montage,
+  const RectangleInfo extract_info,const char *title,ExceptionInfo *exception)
+{
+  DrawInfo
+    *draw_clone_info;
+
+  char
+    tile_geometry[MagickPathExtent];
+
+  TypeMetric
+    tile_metrics;
+
+  /*
+    Annotate composite image with title.
+  */
+  draw_clone_info=CloneDrawInfo(image_info,draw_info);
+  draw_clone_info->gravity=CenterGravity;
+  draw_clone_info->pointsize*=2.0;
+  (void) GetTypeMetrics(image_list[0],draw_clone_info,&tile_metrics,
+    exception);
+  (void) FormatLocaleString(tile_geometry,MagickPathExtent,
+    "%.17gx%.17g%+.20g%+.20g",(double) montage->columns,(double)
+    (tile_metrics.ascent-tile_metrics.descent),0.0,
+    (double) extract_info.y+4);
+  (void) CloneString(&draw_clone_info->geometry,tile_geometry);
+  (void) CloneString(&draw_clone_info->text,title);
+  (void) AnnotateImage(montage,draw_clone_info,exception);
+  draw_clone_info=DestroyDrawInfo(draw_clone_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -793,30 +824,8 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     if (texture != (Image *) NULL)
       (void) TextureImage(montage,texture,exception);
     if (montage_info->title != (char *) NULL)
-      {
-        DrawInfo
-          *draw_clone_info;
-
-        TypeMetric
-          tile_metrics;
-
-        /*
-          Annotate composite image with title.
-        */
-        draw_clone_info=CloneDrawInfo(image_info,draw_info);
-        draw_clone_info->gravity=CenterGravity;
-        draw_clone_info->pointsize*=2.0;
-        (void) GetTypeMetrics(image_list[0],draw_clone_info,&tile_metrics,
-          exception);
-        (void) FormatLocaleString(tile_geometry,MagickPathExtent,
-          "%.17gx%.17g%+.20g%+.20g",(double) montage->columns,(double)
-          (tile_metrics.ascent-tile_metrics.descent),0.0,
-          (double) extract_info.y+4);
-        (void) CloneString(&draw_clone_info->geometry,tile_geometry);
-        (void) CloneString(&draw_clone_info->text,title);
-        (void) AnnotateImage(montage,draw_clone_info,exception);
-        draw_clone_info=DestroyDrawInfo(draw_clone_info);
-      }
+      AnnotateMontageTitle(image_info,draw_info,image_list,montage,
+        extract_info,title,exception);
     (void) SetImageProgressMonitor(montage,progress_monitor,
       montage->client_data);
     /*
