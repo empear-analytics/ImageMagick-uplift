@@ -195,7 +195,7 @@ For each function: the recipes applied, the score before and after, and the revi
 ### Report (2026-10-25, Mac, evening)
 
 **Result: Code Health 3.49 → 3.76** (`cs-mcp` 1.5.12). Branch `campaign/M49-string`,
-stacked on `campaign/M48-constitute`. Six E commits, all oracle-verified (the target
+stacked on `campaign/M48-constitute`. Five E commits, all oracle-verified (the target
 functions are ready or careful, and no open survivor sits in a moved block):
 - `GetSiPrefixExponent` (InterpretSiPrefixValue): the 25-case SI prefix switch,
   value-returning. InterpretSiPrefixValue goes from cc 34 to 9.
