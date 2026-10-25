@@ -1754,6 +1754,22 @@ static MagickBooleanType GetDynamicThrottlePolicy(void)
   return(dynamic_throttle);
 }
 
+static inline MagickBooleanType IsCacheMorphologyChanged(const Image *image,
+  const CacheInfo *cache_info,const PixelChannelMap *p,const PixelChannelMap *q)
+{
+  return(((image->storage_class != cache_info->storage_class) ||
+    (image->colorspace != cache_info->colorspace) ||
+    (image->alpha_trait != cache_info->alpha_trait) ||
+    (image->channels != cache_info->channels) ||
+    (image->columns != cache_info->columns) ||
+    (image->rows != cache_info->rows) ||
+    (image->number_channels != cache_info->number_channels) ||
+    (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) ||
+    (image->metacontent_extent != cache_info->metacontent_extent) ||
+    (cache_info->nexus_info == (NexusInfo **) NULL)) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline MagickBooleanType ValidatePixelCacheMorphology(
   const Image *magick_restrict image)
 {
@@ -1770,16 +1786,7 @@ static inline MagickBooleanType ValidatePixelCacheMorphology(
   cache_info=(CacheInfo *) image->cache;
   p=image->channel_map;
   q=cache_info->channel_map;
-  if ((image->storage_class != cache_info->storage_class) ||
-      (image->colorspace != cache_info->colorspace) ||
-      (image->alpha_trait != cache_info->alpha_trait) ||
-      (image->channels != cache_info->channels) ||
-      (image->columns != cache_info->columns) ||
-      (image->rows != cache_info->rows) ||
-      (image->number_channels != cache_info->number_channels) ||
-      (memcmp(p,q,image->number_channels*sizeof(*p)) != 0) ||
-      (image->metacontent_extent != cache_info->metacontent_extent) ||
-      (cache_info->nexus_info == (NexusInfo **) NULL))
+  if (IsCacheMorphologyChanged(image,cache_info,p,q) != MagickFalse)
     return(MagickFalse);
   return(MagickTrue);
 }
