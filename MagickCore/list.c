@@ -344,6 +344,25 @@ MagickExport void DeleteImageFromList(Image **images)
     (void) DestroyImage(image);
 }
 
+static void DeleteMarkedImages(Image **images,
+  const MagickBooleanType *delete_list,const size_t length)
+{
+  Image
+    *image;
+
+  ssize_t
+    i;
+
+  image=(*images);
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    *images=image;
+    image=GetNextImageInList(image);
+    if (delete_list[i] != MagickFalse)
+      DeleteImageFromList(images);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -386,9 +405,6 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
   char
     *p;
 
-  Image
-    *image;
-
   long
     first,
     last;
@@ -420,7 +436,6 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
         ResourceLimitError,"MemoryAllocationFailed","`%s'",(*images)->filename);
       return;
     }
-  image=(*images);
   for (i=0; i < (ssize_t) length; i++)
     delete_list[i]=MagickFalse;
   /*
@@ -460,14 +475,7 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
   /*
     Delete images marked for deletion, once only.
   */
-  image=(*images);
-  for (i=0; i < (ssize_t) length; i++)
-  {
-    *images=image;
-    image=GetNextImageInList(image);
-    if (delete_list[i] != MagickFalse)
-      DeleteImageFromList(images);
-  }
+  DeleteMarkedImages(images,delete_list,length);
   (void) RelinquishMagickMemory(delete_list);
   *images=GetFirstImageInList(*images);
 }
