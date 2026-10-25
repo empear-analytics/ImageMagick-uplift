@@ -108,7 +108,7 @@ needs before refactoring:
 | 1.99 | `MagickCore/transform.c` | 2599 | 78% | 77% | 2.65, in progress (Complex Conditional gone; one channel-loop helper for eleven copies), [M24](tasks/M24-transform.md) |
 | 2.05 | `MagickCore/shear.c` | 1830 | 82% | 80% | 2.13, in progress (Complex Conditional gone; the shears need Recipe B), [M09](tasks/M09-shear.md) |
 | 2.25 | `MagickCore/color.c` | 2792 | 70% | 77% | 3.16, in progress (Complex Conditional and Code Duplication gone; `QueryColorCompliance` cc 90 → 32), [M21](tasks/M21-color.md) |
-| 2.45 | `MagickCore/stream.c` | 2832 | 78% | 74% | open |
+| 2.45 | `MagickCore/stream.c` | 2832 | 78% | 74% | 3.10, in progress (Complex Conditional gone; StreamImagePixels needs a break-to-return recipe), [M28](tasks/M28-stream.md) |
 | 2.58 | `MagickCore/attribute.c` | 2444 | 75% | 73% | 2.97, in progress (Complex Conditional: one site left, in a parallel loop), [M27](tasks/M27-attribute.md) |
 | 3.06 | `MagickCore/paint.c` | 1299 | 85% | 74% | open |
 | 3.26 | `MagickCore/utility.c` | 2087 | 28% | 73% | open |

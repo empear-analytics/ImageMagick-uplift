@@ -174,3 +174,38 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 2.45 → 3.10** (`cs-mcp` 1.5.12). Branch `campaign/M28-stream`,
+stacked on `campaign/M27-attribute`. 3 refactor commits, all Recipe P and guard-verified,
+because none of the functions is ready.
+
+**Predicates; Complex Conditional leaves the file:**
+- `IsCacheMorphologyChanged` (+0.25): ten clauses, `memcmp` included.
+- `IsOutsideStreamPixel` (+0.15).
+- `IsOutsideStreamRegion` (+0.25). It takes five arguments and so carries an Excess
+  Number of Function Arguments finding, but the file still gains.
+
+**StreamImagePixels (cc 289, 57 bumps, 1,330 lines) stays.** It is one `switch` over eight
+storage types, each with a chain of `if (map == "BGR") { ...; break; }` blocks.
+- The bumps are those `if` blocks, and they leave through `break`. A helper could only
+  take them by turning `break` into `return`, which needs a new recipe.
+- Moving only the copy loops inside them leaves the score and the bump count unchanged.
+  A probe confirmed this (3.10 → 3.10, bumps 57 → 57).
+- Moving whole case bodies would give eight ~150-line helpers that differ only in the
+  Scale function and the type of `q`. That is the clone pattern that has cost score
+  elsewhere.
+- `pixel.c`'s `ExportImagePixels` has the same structure. A recipe for it would serve
+  both files.
+
+**Flakes:** the hough matrix-on-disk pair diverged once (during the
+`IsCacheMorphologyChanged` step) and gave 0 of 2 in three reruns.
+
+**Whole catalogue:** see the batch PR.
+
+**What is left, at 3.10.**
+- `StreamImagePixels`, as above.
+- The stream accessors' duplication: thin wrappers with the same assert-and-log
+  preamble.
+- Five functions with 5–7 arguments (Recipe B).
