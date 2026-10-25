@@ -792,6 +792,14 @@ static inline ssize_t PixelRoundOffset(double x)
   return(CastDoubleToSsizeT(ceil(x)));
 }
 
+static inline MagickBooleanType IsSingleRegionCrop(
+  const RectangleInfo geometry,const MagickStatusType flags)
+{
+  return((((geometry.width == 0) && (geometry.height == 0)) ||
+    ((flags & XValue) != 0) || ((flags & YValue) != 0)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *CropImageToTiles(const Image *image,
   const char *crop_geometry,ExceptionInfo *exception)
 {
@@ -899,8 +907,7 @@ MagickExport Image *CropImageToTiles(const Image *image,
       ClearMagickException(exception);
       return(crop_image);
     }
-  if (((geometry.width == 0) && (geometry.height == 0)) ||
-      ((flags & XValue) != 0) || ((flags & YValue) != 0))
+  if (IsSingleRegionCrop(geometry,flags) != MagickFalse)
     {
       /*
         Crop a single region at +X+Y.
