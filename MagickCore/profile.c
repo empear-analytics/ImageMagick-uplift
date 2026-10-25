@@ -2023,6 +2023,14 @@ static MagickBooleanType ValidateXMPProfile(Image *image,
 #endif
 }
 
+static inline MagickBooleanType IsExifInApp1(const size_t length,
+  const char *key,const StringInfo *profile)
+{
+  return(((length > 4) && (LocaleCompare(key,"app1") == 0) &&
+    (LocaleNCompare((const char *) GetStringInfoDatum(profile),"exif",4) ==
+    0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
   StringInfo *profile,const MagickBooleanType recursive,
   ExceptionInfo *exception)
@@ -2068,8 +2076,7 @@ static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
    * profile instead. The PatchCorruptProfile method already ensures that the
    * profile starts with exif instead of MM or II.
    */
-  if ((length > 4) && (LocaleCompare(key,"app1") == 0) && 
-      (LocaleNCompare((const char *) GetStringInfoDatum(profile),"exif",4) == 0))
+  if (IsExifInApp1(length,key,profile) != MagickFalse)
     (void) CopyMagickString(key,"exif",MagickPathExtent);
   else
     LocaleLower(key);
