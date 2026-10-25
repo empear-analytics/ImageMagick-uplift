@@ -1392,6 +1392,22 @@ static IntervalTree *AppendIntervalNode(const IntervalTree *head,
   return(node);
 }
 
+static IntervalTree *AcquireRootInterval(void)
+{
+  IntervalTree
+    *root;
+
+  root=(IntervalTree *) AcquireCriticalMemory(sizeof(*root));
+  root->child=(IntervalTree *) NULL;
+  root->sibling=(IntervalTree *) NULL;
+  root->tau=0.0;
+  root->left=0;
+  root->right=255;
+  root->mean_stability=0.0;
+  root->stability=0.0;
+  return(root);
+}
+
 static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -1420,14 +1436,7 @@ static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
   /*
     The root is the entire histogram.
   */
-  root=(IntervalTree *) AcquireCriticalMemory(sizeof(*root));
-  root->child=(IntervalTree *) NULL;
-  root->sibling=(IntervalTree *) NULL;
-  root->tau=0.0;
-  root->left=0;
-  root->right=255;
-  root->mean_stability=0.0;
-  root->stability=0.0;
+  root=AcquireRootInterval();
   (void) memset(list,0,(size_t) TreeLength*sizeof(*list));
   for (i=(-1); i < (ssize_t) number_crossings; i++)
   {
