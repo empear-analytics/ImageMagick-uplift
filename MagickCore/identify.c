@@ -759,6 +759,41 @@ static const char *GetIPTCTagName(const long record)
   return(tag);
 }
 
+static void PrintIPTCValue(FILE *file,const StringInfo *profile,
+  const ssize_t i,const size_t length)
+{
+  char
+    *attribute,
+    **attribute_list;
+
+  ssize_t
+    j;
+
+  attribute=(char *) NULL;
+  if (~length >= (MagickPathExtent-1))
+    attribute=(char *) AcquireQuantumMemory(length+MagickPathExtent,
+      sizeof(*attribute));
+  if (attribute != (char *) NULL)
+    {
+      (void) CopyMagickString(attribute,(char *)
+        GetStringInfoDatum(profile)+i,length+1);
+      attribute_list=StringToList(attribute);
+      if (attribute_list != (char **) NULL)
+        {
+          for (j=0; attribute_list[j] != (char *) NULL; j++)
+          {
+            (void) fputs(attribute_list[j],file);
+            (void) fputs("\n",file);
+            attribute_list[j]=(char *) RelinquishMagickMemory(
+              attribute_list[j]);
+          }
+          attribute_list=(char **) RelinquishMagickMemory(
+            attribute_list);
+        }
+      attribute=DestroyString(attribute);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1613,10 +1648,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
           (double) GetStringInfoLength(profile));
         if (LocaleCompare(name,"iptc") == 0)
           {
-            char
-              *attribute,
-              **attribute_list;
-
             const char
               *tag;
 
@@ -1624,9 +1655,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
               dataset,
               record,
               sentinel;
-
-            ssize_t
-              j;
 
             size_t
               length,
@@ -1647,29 +1675,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
               length=(size_t) (GetStringInfoDatum(profile)[i++] << 8);
               length|=GetStringInfoDatum(profile)[i++];
               length=MagickMin(length,profile_length-(size_t) i);
-              attribute=(char *) NULL;
-              if (~length >= (MagickPathExtent-1))
-                attribute=(char *) AcquireQuantumMemory(length+MagickPathExtent,
-                  sizeof(*attribute));
-              if (attribute != (char *) NULL)
-                {
-                  (void) CopyMagickString(attribute,(char *)
-                    GetStringInfoDatum(profile)+i,length+1);
-                  attribute_list=StringToList(attribute);
-                  if (attribute_list != (char **) NULL)
-                    {
-                      for (j=0; attribute_list[j] != (char *) NULL; j++)
-                      {
-                        (void) fputs(attribute_list[j],file);
-                        (void) fputs("\n",file);
-                        attribute_list[j]=(char *) RelinquishMagickMemory(
-                          attribute_list[j]);
-                      }
-                      attribute_list=(char **) RelinquishMagickMemory(
-                        attribute_list);
-                    }
-                  attribute=DestroyString(attribute);
-                }
+              PrintIPTCValue(file,profile,i,length);
             }
           }
         if (image->debug != MagickFalse)
