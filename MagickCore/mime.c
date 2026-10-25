@@ -244,6 +244,22 @@ static ssize_t ReadMimeLongValue(const MimeInfo *q,const unsigned char *r)
   return(value);
 }
 
+static ElementInfo *MatchMimeValue(const MimeInfo *q,const ssize_t value,
+  ElementInfo *p,ElementInfo *element_info)
+{
+  if (q->mask == 0)
+    {
+      if (q->value == value)
+        element_info=p;
+    }
+  else
+    {
+      if ((q->value & q->mask) == value)
+        element_info=p;
+    }
+  return(element_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -337,16 +353,7 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
           break;
         r=magic+q->offset;
         value=(ssize_t) (*r++);
-        if (q->mask == 0)
-          {
-            if (q->value == value)
-              element_info=p;
-          }
-        else
-          {
-            if ((q->value & q->mask) == value)
-              element_info=p;
-          }
+        element_info=MatchMimeValue(q,value,p,element_info);
         break;
       }
       case ShortData:
@@ -355,16 +362,7 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
           break;
         r=magic+q->offset;
         value=ReadMimeShortValue(q,r);
-        if (q->mask == 0)
-          {
-            if (q->value == value)
-              element_info=p;
-          }
-        else
-          {
-            if ((q->value & q->mask) == value)
-              element_info=p;
-          }
+        element_info=MatchMimeValue(q,value,p,element_info);
         break;
       }
       case LongData:
@@ -373,16 +371,7 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
           break;
         r=magic+q->offset;
         value=ReadMimeLongValue(q,r);
-        if (q->mask == 0)
-          {
-            if (q->value == value)
-              element_info=p;
-          }
-        else
-          {
-            if ((q->value & q->mask) == value)
-              element_info=p;
-          }
+        element_info=MatchMimeValue(q,value,p,element_info);
         break;
       }
       case StringData:
