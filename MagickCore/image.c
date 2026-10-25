@@ -3781,6 +3781,23 @@ static ssize_t SmushXGap(const Image *smush_image,const Image *images,
   return((ssize_t) gap-offset);
 }
 
+static inline MagickBooleanType IsTopGapEdge(const Image *top_image,
+  const Quantum *p,const ssize_t y,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(top_image,p) != TransparentAlpha) ||
+    (((ssize_t) top_image->rows-y-1) >= (ssize_t) gap)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsBottomGapEdge(const Image *bottom_image,
+  const Quantum *p,const ssize_t y,const ssize_t i,const size_t gap)
+{
+  return(((p == (const Quantum *) NULL) ||
+    (GetPixelAlpha(bottom_image,p) != TransparentAlpha) ||
+    ((y+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+}
+
 static ssize_t SmushYGap(const Image *smush_image,const Image *images,
   const ssize_t offset,ExceptionInfo *exception)
 {
@@ -3827,9 +3844,7 @@ static ssize_t SmushYGap(const Image *smush_image,const Image *images,
     for (y=(ssize_t) top_image->rows-1; y > 0; y--)
     {
       p=GetCacheViewVirtualPixels(top_view,top_geometry.x+x,y,1,1,exception);
-      if ((p == (const Quantum *) NULL) ||
-          (GetPixelAlpha(top_image,p) != TransparentAlpha) ||
-          (((ssize_t) top_image->rows-y-1) >= (ssize_t) gap))
+      if (IsTopGapEdge(top_image,p,y,gap) != MagickFalse)
         break;
     }
     i=(ssize_t) top_image->rows-y-1;
@@ -3837,9 +3852,7 @@ static ssize_t SmushYGap(const Image *smush_image,const Image *images,
     {
       p=GetCacheViewVirtualPixels(bottom_view,bottom_geometry.x+x,y,1,1,
         exception);
-      if ((p == (const Quantum *) NULL) ||
-          (GetPixelAlpha(bottom_image,p) != TransparentAlpha) ||
-          ((y+i) >= (ssize_t) gap))
+      if (IsBottomGapEdge(bottom_image,p,y,i,gap) != MagickFalse)
         break;
     }
     if ((y+i) < (ssize_t) gap)
