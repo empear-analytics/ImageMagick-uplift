@@ -189,6 +189,33 @@ MagickExport Image *AutoOrientImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void CopyPixelChannelsTo(const Image *image,const Image *destination,
+  const Quantum *p,Quantum *q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait destination_traits=GetPixelChannelTraits(destination,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (destination_traits == UndefinedPixelTrait))
+      continue;
+    SetPixelChannel(destination,channel,p[i],q);
+  }
+}
+
+static inline MagickBooleanType IsChopOutsideImage(const Image *image,
+  const RectangleInfo *chop_info)
+{
+  return((((chop_info->x+(ssize_t) chop_info->width) < 0) ||
+    ((chop_info->y+(ssize_t) chop_info->height) < 0) ||
+    (chop_info->x > (ssize_t) image->columns) ||
+    (chop_info->y > (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
@@ -223,10 +250,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   assert(chop_info != (RectangleInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (((chop_info->x+(ssize_t) chop_info->width) < 0) ||
-      ((chop_info->y+(ssize_t) chop_info->height) < 0) ||
-      (chop_info->x > (ssize_t) image->columns) ||
-      (chop_info->y > (ssize_t) image->rows))
+  if (IsChopOutsideImage(image,chop_info) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   extent=(*chop_info);
   if ((extent.x+(ssize_t) extent.width) > (ssize_t) image->columns)
@@ -285,19 +309,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
     {
       if ((x < extent.x) || (x >= (extent.x+(ssize_t) extent.width)))
         {
-          ssize_t
-            i;
-
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            PixelTrait chop_traits=GetPixelChannelTraits(chop_image,channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (chop_traits == UndefinedPixelTrait))
-              continue;
-            SetPixelChannel(chop_image,channel,p[i],q);
-          }
+          CopyPixelChannelsTo(image,chop_image,p,q);
           q+=(ptrdiff_t) GetPixelChannels(chop_image);
         }
       p+=(ptrdiff_t) GetPixelChannels(image);
@@ -351,19 +363,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
     {
       if ((x < extent.x) || (x >= (extent.x+(ssize_t) extent.width)))
         {
-          ssize_t
-            i;
-
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            PixelTrait chop_traits=GetPixelChannelTraits(chop_image,channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (chop_traits == UndefinedPixelTrait))
-              continue;
-            SetPixelChannel(chop_image,channel,p[i],q);
-          }
+          CopyPixelChannelsTo(image,chop_image,p,q);
           q+=(ptrdiff_t) GetPixelChannels(chop_image);
         }
       p+=(ptrdiff_t) GetPixelChannels(image);
@@ -539,6 +539,16 @@ MagickExport Image *ConsolidateCMYKImages(const Image *images,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsCropOutsideImage(const Image *image,
+  const RectangleInfo bounding_box,const RectangleInfo page)
+{
+  return(((((double) bounding_box.x-page.x) >= (double) page.width) ||
+    (((double) bounding_box.y-page.y) >= (double) page.height) ||
+    (((double) page.x-bounding_box.x) > (double) image->columns) ||
+    (((double) page.y-bounding_box.y) > (double) image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -588,10 +598,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
     page.width=bounding_box.width;
   if (page.height == 0)
     page.height=bounding_box.height;
-  if ((((double) bounding_box.x-page.x) >= (double) page.width) ||
-      (((double) bounding_box.y-page.y) >= (double) page.height) ||
-      (((double) page.x-bounding_box.x) > (double) image->columns) ||
-      (((double) page.y-bounding_box.y) > (double) image->rows))
+  if (IsCropOutsideImage(image,bounding_box,page) != MagickFalse)
     {
       /*
         Crop is not within virtual canvas, return 1 pixel transparent image.
@@ -707,19 +714,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
       }
     for (x=0; x < (ssize_t) crop_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait crop_traits=GetPixelChannelTraits(crop_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (crop_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(crop_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,crop_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(crop_image);
     }
@@ -795,6 +790,14 @@ static inline ssize_t PixelRoundOffset(double x)
   if ((x-floor(x)) < (ceil(x)-x))
     return(CastDoubleToSsizeT(floor(x)));
   return(CastDoubleToSsizeT(ceil(x)));
+}
+
+static inline MagickBooleanType IsSingleRegionCrop(
+  const RectangleInfo geometry,const MagickStatusType flags)
+{
+  return((((geometry.width == 0) && (geometry.height == 0)) ||
+    ((flags & XValue) != 0) || ((flags & YValue) != 0)) ?
+    MagickTrue : MagickFalse);
 }
 
 MagickExport Image *CropImageToTiles(const Image *image,
@@ -904,8 +907,7 @@ MagickExport Image *CropImageToTiles(const Image *image,
       ClearMagickException(exception);
       return(crop_image);
     }
-  if (((geometry.width == 0) && (geometry.height == 0)) ||
-      ((flags & XValue) != 0) || ((flags & YValue) != 0))
+  if (IsSingleRegionCrop(geometry,flags) != MagickFalse)
     {
       /*
         Crop a single region at +X+Y.
@@ -1267,19 +1269,7 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
       }
     for (x=0; x < (ssize_t) flip_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait flip_traits = GetPixelChannelTraits(flip_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (flip_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(flip_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,flip_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(flip_image);
     }
@@ -1413,20 +1403,8 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
     q+=(ptrdiff_t) GetPixelChannels(flop_image)*flop_image->columns;
     for (x=0; x < (ssize_t) flop_image->columns; x++)
     {
-      ssize_t
-        i;
-
       q-=GetPixelChannels(flop_image);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait flop_traits=GetPixelChannelTraits(flop_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (flop_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(flop_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,flop_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(flop_view,exception) == MagickFalse)
@@ -1727,6 +1705,63 @@ MagickExport Image *ShaveImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static RectangleInfo ApplySpliceGravity(const Image *image,
+  RectangleInfo splice_geometry)
+{
+  switch (image->gravity)
+  {
+    default:
+    case UndefinedGravity:
+    case NorthWestGravity:
+      break;
+    case NorthGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
+      break;
+    }
+    case NorthEastGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width;
+      break;
+    }
+    case WestGravity:
+    {
+      splice_geometry.y+=(ssize_t) splice_geometry.width/2;
+      break;
+    }
+    case CenterGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
+      splice_geometry.y+=(ssize_t) splice_geometry.height/2;
+      break;
+    }
+    case EastGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width;
+      splice_geometry.y+=(ssize_t) splice_geometry.height/2;
+      break;
+    }
+    case SouthWestGravity:
+    {
+      splice_geometry.y+=(ssize_t) splice_geometry.height;
+      break;
+    }
+    case SouthGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
+      splice_geometry.y+=(ssize_t) splice_geometry.height;
+      break;
+    }
+    case SouthEastGravity:
+    {
+      splice_geometry.x+=(ssize_t) splice_geometry.width;
+      splice_geometry.y+=(ssize_t) splice_geometry.height;
+      break;
+    }
+  }
+  return(splice_geometry);
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -1782,57 +1817,7 @@ MagickExport Image *SpliceImage(const Image *image,
   /*
     Respect image geometry.
   */
-  switch (image->gravity)
-  {
-    default:
-    case UndefinedGravity:
-    case NorthWestGravity:
-      break;
-    case NorthGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
-      break;
-    }
-    case NorthEastGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width;
-      break;
-    }
-    case WestGravity:
-    {
-      splice_geometry.y+=(ssize_t) splice_geometry.width/2;
-      break;
-    }
-    case CenterGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
-      splice_geometry.y+=(ssize_t) splice_geometry.height/2;
-      break;
-    }
-    case EastGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width;
-      splice_geometry.y+=(ssize_t) splice_geometry.height/2;
-      break;
-    }
-    case SouthWestGravity:
-    {
-      splice_geometry.y+=(ssize_t) splice_geometry.height;
-      break;
-    }
-    case SouthGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
-      splice_geometry.y+=(ssize_t) splice_geometry.height;
-      break;
-    }
-    case SouthEastGravity:
-    {
-      splice_geometry.x+=(ssize_t) splice_geometry.width;
-      splice_geometry.y+=(ssize_t) splice_geometry.height;
-      break;
-    }
-  }
+  splice_geometry=ApplySpliceGravity(image,splice_geometry);
   /*
     Splice image.
   */
@@ -1869,19 +1854,7 @@ MagickExport Image *SpliceImage(const Image *image,
       }
     for (x=0; x < columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait splice_traits=GetPixelChannelTraits(splice_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (splice_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(splice_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,splice_image,p,q);
       SetPixelRed(splice_image,GetPixelRed(image,p),q);
       SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
       SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
@@ -1893,19 +1866,7 @@ MagickExport Image *SpliceImage(const Image *image,
       q+=(ptrdiff_t) GetPixelChannels(splice_image);
     for ( ; x < (ssize_t) splice_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait splice_traits=GetPixelChannelTraits(splice_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (splice_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(splice_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,splice_image,p,q);
       SetPixelRed(splice_image,GetPixelRed(image,p),q);
       SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
       SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
@@ -1960,19 +1921,7 @@ MagickExport Image *SpliceImage(const Image *image,
       }
     for (x=0; x < columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait splice_traits=GetPixelChannelTraits(splice_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (splice_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(splice_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,splice_image,p,q);
       SetPixelRed(splice_image,GetPixelRed(image,p),q);
       SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
       SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
@@ -1984,19 +1933,7 @@ MagickExport Image *SpliceImage(const Image *image,
       q+=(ptrdiff_t) GetPixelChannels(splice_image);
     for ( ; x < (ssize_t) splice_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait splice_traits=GetPixelChannelTraits(splice_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (splice_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(splice_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,splice_image,p,q);
       SetPixelRed(splice_image,GetPixelRed(image,p),q);
       SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
       SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
@@ -2223,20 +2160,7 @@ MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait transpose_traits=GetPixelChannelTraits(transpose_image,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (transpose_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(transpose_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,transpose_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(transpose_image);
     }
@@ -2375,21 +2299,8 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
     q+=(ptrdiff_t) GetPixelChannels(transverse_image)*image->columns;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
       q-=GetPixelChannels(transverse_image);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait transverse_traits=GetPixelChannelTraits(transverse_image,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (transverse_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(transverse_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,transverse_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     sync=SyncCacheViewAuthenticPixels(transverse_view,exception);
