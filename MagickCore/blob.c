@@ -1452,6 +1452,14 @@ MagickExport int ErrorBlob(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsUnseekableBlobFile(const int file,
+  const MagickOffsetType offset)
+{
+  return(((file == fileno(stdin)) || (offset < 0) ||
+    (offset != (MagickOffsetType) ((ssize_t) offset))) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport void *FileToBlob(const char *filename,const size_t extent,
   size_t *length,ExceptionInfo *exception)
 {
@@ -1513,8 +1521,7 @@ MagickExport void *FileToBlob(const char *filename,const size_t extent,
     }
   offset=(MagickOffsetType) lseek(file,0,SEEK_END);
   count=0;
-  if ((file == fileno(stdin)) || (offset < 0) ||
-      (offset != (MagickOffsetType) ((ssize_t) offset)))
+  if (IsUnseekableBlobFile(file,offset) != MagickFalse)
     {
       size_t
         quantum;
