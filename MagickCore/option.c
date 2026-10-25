@@ -3306,15 +3306,13 @@ MagickExport ssize_t ParseCommandOption(const CommandOption option,
     sentinel='|';
   for (p=options; p != (char *) NULL; p=strchr(p,sentinel))
   {
-    while (((isspace((int) ((unsigned char) *p)) != 0) || (*p == sentinel)) &&
-           (*p != '\0'))
+    while (IsTokenSeparator(p,sentinel) != MagickFalse)
       p++;
     negate=(*p == '!') ? MagickTrue : MagickFalse;
     if (negate != MagickFalse)
       p++;
     q=token;
-    while (((isspace((int) ((unsigned char) *p)) == 0) && (*p != sentinel)) &&
-           (*p != '\0'))
+    while (IsTokenCharacter(p,sentinel) != MagickFalse)
     {
       if ((q-token) >= (MagickPathExtent-1))
         break;
