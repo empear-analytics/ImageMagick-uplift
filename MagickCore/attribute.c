@@ -388,6 +388,13 @@ static RectangleInfo GetEdgeBoundingBox(const Image *image,
   return(bounds);
 }
 
+static inline MagickBooleanType IsEmptyBoundingBox(const RectangleInfo bounds)
+{
+  return(((bounds.width == 0) || (bounds.height == 0) ||
+    (bounds.x > (ssize_t) bounds.width) ||
+    (bounds.y > (ssize_t) bounds.height)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -550,9 +557,7 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
     }
   }
   image_view=DestroyCacheView(image_view);
-  if ((bounds.width == 0) || (bounds.height == 0) ||
-      (bounds.x > (ssize_t) bounds.width) ||
-      (bounds.y > (ssize_t) bounds.height))
+  if (IsEmptyBoundingBox(bounds) != MagickFalse)
     (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
       "GeometryDoesNotContainImage","`%s'",image->filename);
   else
