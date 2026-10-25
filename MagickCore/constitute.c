@@ -1011,6 +1011,34 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   return(GetFirstImageInList(image));
 }
 
+static Image *ReadSceneImages(const ImageInfo *image_info,
+  ImageInfo *read_info,char *read_filename,ExceptionInfo *exception)
+{
+  Image
+    *image,
+    *images;
+
+  ssize_t
+    extent,
+    scene;
+
+  (void) CopyMagickString(read_filename,read_info->filename,
+    MagickPathExtent);
+  images=NewImageList();
+  extent=(ssize_t) (read_info->scene+read_info->number_scenes);
+  scene=(ssize_t) read_info->scene;
+  for ( ; scene < (ssize_t) extent; scene++)
+  {
+    (void) InterpretImageFilename(image_info,(Image *) NULL,
+      read_filename,(int) scene,read_info->filename,exception);
+    image=ReadImage(read_info,exception);
+    if (image == (Image *) NULL)
+      continue;
+    AppendImageToList(&images,image);
+  }
+  return(images);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1071,10 +1099,6 @@ MagickExport Image *ReadImages(ImageInfo *image_info,const char *filename,
       ExceptionInfo
         *sans;
 
-      ssize_t
-        extent,
-        scene;
-
       /*
         Images of the form image-%d.png[1-5].
       */
@@ -1083,20 +1107,8 @@ MagickExport Image *ReadImages(ImageInfo *image_info,const char *filename,
       sans=DestroyExceptionInfo(sans);
       if (read_info->number_scenes != 0)
         {
-          (void) CopyMagickString(read_filename,read_info->filename,
-            MagickPathExtent);
-          images=NewImageList();
-          extent=(ssize_t) (read_info->scene+read_info->number_scenes);
-          scene=(ssize_t) read_info->scene;
-          for ( ; scene < (ssize_t) extent; scene++)
-          {
-            (void) InterpretImageFilename(image_info,(Image *) NULL,
-              read_filename,(int) scene,read_info->filename,exception);
-            image=ReadImage(read_info,exception);
-            if (image == (Image *) NULL)
-              continue;
-            AppendImageToList(&images,image);
-          }
+          images=ReadSceneImages(image_info,read_info,read_filename,
+            exception);
           read_info=DestroyImageInfo(read_info);
           return(images);
         }
