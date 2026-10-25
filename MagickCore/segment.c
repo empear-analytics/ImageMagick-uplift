@@ -410,6 +410,26 @@ static ssize_t CountClusterPixel(Cluster *head,const PixelInfo pixel,
   return(count);
 }
 
+static Cluster *ClassifyPixelByCluster(const Image *image,Cluster *head,
+  const PixelInfo pixel,Quantum *magick_restrict q)
+{
+  Cluster
+    *c;
+
+  for (c=head; c != (Cluster *) NULL; c=c->next)
+  {
+    if (IsPixelInCluster(c,pixel.red,pixel.green,pixel.blue) != MagickFalse)
+      {
+        /*
+          Classify this pixel.
+        */
+        SetPixelIndex(image,(Quantum) c->id,q);
+        break;
+      }
+  }
+  return(c);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const double cluster_threshold,const double weighting_exponent,
   const MagickBooleanType verbose,ExceptionInfo *exception)
@@ -664,17 +684,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
       pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,q));
       pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,q));
       pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,q));
-      for (c=head; c != (Cluster *) NULL; c=c->next)
-      {
-        if (IsPixelInCluster(c,pixel.red,pixel.green,pixel.blue) != MagickFalse)
-          {
-            /*
-              Classify this pixel.
-            */
-            SetPixelIndex(image,(Quantum) c->id,q);
-            break;
-          }
-      }
+      c=ClassifyPixelByCluster(image,head,pixel,q);
       if (c == (Cluster *) NULL)
         ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
