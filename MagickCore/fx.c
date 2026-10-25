@@ -1545,12 +1545,25 @@ static int GetCoordQualifier (FxInfo * pfx, int op)
   return 1;
 }
 
+static inline MagickBooleanType IsChannelQualifiableOperator(const int op)
+{
+  return((op == fU || op == fV || op == fP ||
+    op == fUP || op == fVP ||
+    op == fS || (op >= (int) FirstImgAttr && op <= aNull)
+    ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAttributeWithVirtualChannel(const int op,
+  const ChannelT *pch)
+{
+  return((op >= (int) FirstImgAttr && op <= (int) ((OperatorE)aNull) &&
+    ChanIsVirtual (pch->pixel_channel)
+    ) ? MagickTrue : MagickFalse);
+}
+
 static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
 {
-  if (op == fU || op == fV || op == fP ||
-      op == fUP || op == fVP ||
-      op == fS || (op >= (int) FirstImgAttr && op <= aNull)
-     )
+  if (IsChannelQualifiableOperator(op) != MagickFalse)
   {
     const ChannelT * pch = &Channels[0];
     (void) GetToken (pfx);
@@ -1558,9 +1571,7 @@ static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
     while (*pch->str) {
       if (LocaleCompare (pch->str, pfx->token)==0) {
 
-        if (op >= (int) FirstImgAttr && op <= (int) ((OperatorE)aNull) &&
-              ChanIsVirtual (pch->pixel_channel)
-           )
+        if (IsAttributeWithVirtualChannel(op,pch) != MagickFalse)
         {
           (void) ThrowMagickException (
             pfx->exception, GetMagickModule(), OptionError,
