@@ -2939,6 +2939,53 @@ static inline MagickBooleanType IsExtensionMagickMatch(
     magic_info)) == 0)) ? MagickTrue : MagickFalse);
 }
 
+static const MagickInfo *SetUserSpecifiedFormat(ImageInfo *image_info,
+  char *magic,char *component,ExceptionInfo *sans_exception,
+  ExceptionInfo *exception)
+{
+  const DelegateInfo
+    *delegate_info;
+
+  const MagickInfo
+    *magick_info;
+
+  /*
+    User specified image format.
+  */
+  LocaleUpper(magic);
+  magick_info=GetMagickInfo(magic,sans_exception);
+  delegate_info=(const DelegateInfo *) NULL;
+  if (magick_info == (const MagickInfo *) NULL)
+    {
+      delegate_info=GetDelegateInfo(magic,"*",sans_exception);
+      if (delegate_info == (const DelegateInfo *) NULL)
+        delegate_info=GetDelegateInfo("*",magic,sans_exception);
+      if (IsUndelegatedComponent(delegate_info,component) != MagickFalse)
+        {
+          /*
+            Retry in case GetMagickInfo loaded a custom module.
+          */
+          magick_info=SetImageInfoFromExtension(image_info,component,magic,
+            sans_exception);
+        }
+    }
+  if (IsUsableMagick(magick_info,delegate_info,magic) != MagickFalse)
+    {
+      char *literal = (char *) GetImageRegistry(StringRegistryType,
+        "filename:literal",exception);
+      image_info->affirm=MagickTrue;
+      (void) CopyMagickString(image_info->magick,magic,MagickPathExtent);
+      GetPathComponent(image_info->filename,CanonicalPath,component);
+      if (IsStringTrue(literal) != MagickFalse)
+        GetPathComponent(image_info->filename,SubcanonicalPath,component);
+      (void) CopyMagickString(image_info->filename,component,
+        MagickPathExtent);
+      if (literal != (char *) NULL)
+        literal=DestroyString(literal);
+    }
+  return(magick_info);
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
@@ -3029,45 +3076,8 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
       (void) CopyMagickString(image_info->filename,component,MagickPathExtent);
     }
   else
-    {
-      const DelegateInfo
-        *delegate_info;
-
-      /*
-        User specified image format.
-      */
-      LocaleUpper(magic);
-      magick_info=GetMagickInfo(magic,sans_exception);
-      delegate_info=(const DelegateInfo *) NULL;
-      if (magick_info == (const MagickInfo *) NULL)
-        {
-          delegate_info=GetDelegateInfo(magic,"*",sans_exception);
-          if (delegate_info == (const DelegateInfo *) NULL)
-            delegate_info=GetDelegateInfo("*",magic,sans_exception);
-          if (IsUndelegatedComponent(delegate_info,component) != MagickFalse)
-            {
-              /*
-                Retry in case GetMagickInfo loaded a custom module.
-              */
-              magick_info=SetImageInfoFromExtension(image_info,component,magic,
-                sans_exception);
-            }
-        }
-      if (IsUsableMagick(magick_info,delegate_info,magic) != MagickFalse)
-        {
-          char *literal = (char *) GetImageRegistry(StringRegistryType,
-            "filename:literal",exception);
-          image_info->affirm=MagickTrue;
-          (void) CopyMagickString(image_info->magick,magic,MagickPathExtent);
-          GetPathComponent(image_info->filename,CanonicalPath,component);
-          if (IsStringTrue(literal) != MagickFalse)
-            GetPathComponent(image_info->filename,SubcanonicalPath,component);
-          (void) CopyMagickString(image_info->filename,component,
-            MagickPathExtent);
-          if (literal != (char *) NULL)
-            literal=DestroyString(literal);
-        }
-    }
+    magick_info=SetUserSpecifiedFormat(image_info,magic,component,
+      sans_exception,exception);
   sans_exception=DestroyExceptionInfo(sans_exception);
   if ((magick_info == (const MagickInfo *) NULL) ||
       (GetMagickEndianSupport(magick_info) == MagickFalse))
