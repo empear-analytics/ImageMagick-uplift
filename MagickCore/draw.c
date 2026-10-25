@@ -5567,6 +5567,24 @@ static inline MagickBooleanType IsRoundStrokeOrPrimitive(
     MagickFalse);
 }
 
+static inline MagickBooleanType IsCompositeOffset(const ssize_t x1,
+  const ssize_t y1,const Image *composite_image)
+{
+  return((((x1 != 0L) && (x1 != (ssize_t) composite_image->columns)) ||
+    ((y1 != 0L) && (y1 != (ssize_t) composite_image->rows))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsVisibleDashedStroke(const DrawInfo *draw_info,
+  const double scale)
+{
+  return(((draw_info->dash_pattern != (double *) NULL) &&
+    (fabs(draw_info->dash_pattern[0]) >= MagickEpsilon) &&
+    (fabs(scale*draw_info->stroke_width) >= MagickEpsilon) &&
+    (draw_info->stroke.alpha != (double) TransparentAlpha)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType DrawPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -5894,8 +5912,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
         NULL,(void *) NULL);
       x1=CastDoubleToSsizeT(ceil(primitive_info[1].point.x-0.5));
       y1=CastDoubleToSsizeT(ceil(primitive_info[1].point.y-0.5));
-      if (((x1 != 0L) && (x1 != (ssize_t) composite_image->columns)) ||
-          ((y1 != 0L) && (y1 != (ssize_t) composite_image->rows)))
+      if (IsCompositeOffset(x1,y1,composite_image) != MagickFalse)
         {
           /*
             Resize image.
@@ -5987,10 +6004,7 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
       if (IsEventLogging() != MagickFalse)
         LogPrimitiveInfo(primitive_info);
       scale=ExpandAffine(&draw_info->affine);
-      if ((draw_info->dash_pattern != (double *) NULL) &&
-          (fabs(draw_info->dash_pattern[0]) >= MagickEpsilon) &&
-          (fabs(scale*draw_info->stroke_width) >= MagickEpsilon) &&
-          (draw_info->stroke.alpha != (double) TransparentAlpha))
+      if (IsVisibleDashedStroke(draw_info,scale) != MagickFalse)
         {
           /*
             Draw dash polygon.
