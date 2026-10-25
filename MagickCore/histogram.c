@@ -1145,6 +1145,17 @@ MagickExport size_t GetNumberColors(const Image *image,FILE *file,
   return(number_colors);
 }
 
+static void SetUniqueColorPixel(const Image *unique_image,const PixelInfo *p,
+  Quantum *magick_restrict q)
+{
+  SetPixelRed(unique_image,ClampToQuantum(p->red),q);
+  SetPixelGreen(unique_image,ClampToQuantum(p->green),q);
+  SetPixelBlue(unique_image,ClampToQuantum(p->blue),q);
+  SetPixelAlpha(unique_image,ClampToQuantum(p->alpha),q);
+  if (unique_image->colorspace == CMYKColorspace)
+    SetPixelBlack(unique_image,ClampToQuantum(p->black),q);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1208,12 +1219,7 @@ static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
           exception);
         if (q == (Quantum *) NULL)
           continue;
-        SetPixelRed(unique_image,ClampToQuantum(p->red),q);
-        SetPixelGreen(unique_image,ClampToQuantum(p->green),q);
-        SetPixelBlue(unique_image,ClampToQuantum(p->blue),q);
-        SetPixelAlpha(unique_image,ClampToQuantum(p->alpha),q);
-        if (unique_image->colorspace == CMYKColorspace)
-          SetPixelBlack(unique_image,ClampToQuantum(p->black),q);
+        SetUniqueColorPixel(unique_image,p,q);
         if (SyncCacheViewAuthenticPixels(unique_view,exception) == MagickFalse)
           break;
         cube_info->x++;
