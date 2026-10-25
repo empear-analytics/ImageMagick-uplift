@@ -107,7 +107,7 @@ needs before refactoring:
 | 1.82 | `MagickCore/quantize.c` | 4150 | 85% | 79% | open |
 | 1.99 | `MagickCore/transform.c` | 2599 | 78% | 77% | open |
 | 2.05 | `MagickCore/shear.c` | 1830 | 82% | 80% | 2.13, in progress (Complex Conditional gone; the shears need Recipe B), [M09](tasks/M09-shear.md) |
-| 2.25 | `MagickCore/color.c` | 2792 | 70% | 77% | open |
+| 2.25 | `MagickCore/color.c` | 2792 | 70% | 77% | 3.16, in progress (Complex Conditional and Code Duplication gone; `QueryColorCompliance` cc 90 → 32), [M21](tasks/M21-color.md) |
 | 2.45 | `MagickCore/stream.c` | 2832 | 78% | 74% | open |
 | 2.58 | `MagickCore/attribute.c` | 2444 | 75% | 73% | open |
 | 3.06 | `MagickCore/paint.c` | 1299 | 85% | 74% | open |

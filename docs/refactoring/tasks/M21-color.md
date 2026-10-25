@@ -210,3 +210,85 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 2.25 → 3.16** (`cs-mcp` 1.5.12). Branch `campaign/M21-color`,
+stacked on `campaign/M20-composite` (PR #26). 16 refactor commits and one playbook
+commit, one function per commit:
+
+| Function | Commits | Recipes | Evidence |
+| --- | ---: | --- | --- |
+| `QueryColorCompliance` | 9 | 1 P (three predicates), 8 E | guard |
+| `ConcatenateColorComponent` | 1 | P (two predicates) | guard |
+| `QueryColorname` | 1 | P | oracle |
+| `LoadColorCache` | 5 | 1 P, 4 E | guard |
+
+**Gone from the file:** Complex Conditional (all seven sites) and Code Duplication. The
+four duplication findings (`GetColorInfoList`, `GetColorList`, `IsEquivalentAlpha`,
+`IsEquivalentIntensity`) stopped being reported during the campaign. None of those
+functions was touched, so CodeScene's clone detection must have re-weighed the file.
+
+**QueryColorCompliance: cc 90 → 32, 13 bumps → 3, 342 → 136 lines.**
+- Predicates: `IsHexColorLength`, `IsInvalidHexAlphaLength`, `IsHueColorspaceName`.
+- Branches of the colour-component chain: `SetOklchColorFromGeometry`,
+  `SetLabColorFromGeometry`, `SetScaledColorFromGeometry`.
+- `SetPsiColorFromGeometry`, `SetGrayColorFromGeometry`, `SetHueColorFromGeometry`.
+  The hue block's writes to `scale` and `geometry_info` are dead, because a `return`
+  follows directly.
+- Two value-returning blocks: the colour-name fallback (`QueryColorFromCSSName`) and the
+  whole `rgb(...)` form (`QueryColorFunction`).
+
+**Playbook amendment** (its own commit, before its first use): Recipe E step 7 now also
+covers a block of a value-returning function whose every path ends in `return(<expr>);`.
+The block becomes `return(<call>);`.
+
+**LoadColorCache: bumps 11 → 9, 189 → 129 lines.**
+- `IsIncludeElementOpen`.
+- `SetColorInfoCompliance`, `GetIncludePath` (+0.15 on its own) and
+  `SetColorInfoAttribute` (the whole attribute `switch`).
+- `AcquireColorInfo` left the score flat (kept under rule 2: Large Method 133 → 129).
+- The include condition appears verbatim in six other config loaders (configure,
+  delegate, locale, log, policy, type). Their tasks can reuse the same steps.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Flakes seen during the task** (neither caused by a change):
+- `resize/6ee45e9cfa` ("rose half write-mask -scale 50%") diverged in 6 of 12 runs after
+  one build, 0 of 20 after a rebuild of the same source, and 0 of 12 at the previous
+  commit. The baseline is deterministic on it. It looks like an environment flake on the
+  Mac and is worth watching.
+- The two hough "matrix on disk" cases (`matrix/f2913328b4`, `matrix/e1095950b7`, temp
+  names) diverged once. They gave 0 of 2 in three reruns of the same build.
+
+**Process note: readiness from one report.** During the task I first ran the readiness
+gate on a single color.c report (`mutation-erdc-sdl-color.json`, 47 mutants), not on
+every report merged (147 mutants). The task file's own table already used the merged
+figures. Several commit messages therefore stated wrong mutant counts:
+- `QueryColorCompliance` was given as "not ready, 7 mutants, 1 killed" (merged:
+  *careful*, 37 of 43).
+- `ConcatenateColorComponent` was described as having no mutant (merged: *careful*, 7 of
+  9, with an unmatched survivor on the moved percentage test).
+- `QueryColorname` was given as "ready, 3 of 3" (merged: *careful*, 7 of 8; the survivor
+  is outside the moved expression, so oracle level holds).
+- `LoadColorCache`'s counts were also wrong.
+
+Every message was corrected before the push (message-only rewrite, tree unchanged). No
+evidence level changed: every guard-level claim stands on the guard, and the one
+oracle-level claim satisfies the careful verdict. The gate now always runs over every
+report.
+
+**What is left, at 3.16.**
+- `QueryColorCompliance`'s hex branch (cc 21 if extracted). Moving it costs 0.01: the
+  helper keeps four findings, and its two digit loops each write the pixel and the
+  cursor, so E cannot split them.
+- The `device-` and `icc-color` blocks in `QueryColorFunction` write three locals. That
+  needs Recipe O, which needs the oracle level the function does not have.
+- `LoadColorCache`'s DOCTYPE skip loop. Moving it costs 0.04: the if-else ladder takes
+  its nesting into the helper.
+- Its include loop writes `q`, `keyword`, `token` and `status`.
+- `IsEquivalentImage`, `ListColorInfo`, `GetColorInfoList` and `GetColorList`: no
+  oracle case executes them.
+- The 5-argument functions are public, or (`LoadColorCache`) recursive with every
+  argument live.
