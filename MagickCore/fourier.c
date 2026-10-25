@@ -131,6 +131,16 @@ typedef struct _FourierInfo
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsComplexRowMissing(const Quantum *Ar,
+  const Quantum *Ai,const Quantum *Br,const Quantum *Bi,const Quantum *Cr,
+  const Quantum *Ci)
+{
+  return(((Ar == (const Quantum *) NULL) || (Ai == (const Quantum *) NULL) ||
+    (Br == (const Quantum *) NULL) || (Bi == (const Quantum *) NULL) ||
+    (Cr == (Quantum *) NULL) || (Ci == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -272,9 +282,7 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     Bi=GetCacheViewVirtualPixels(Bi_view,0,y,columns,1,exception);
     Cr=QueueCacheViewAuthenticPixels(Cr_view,0,y,columns,1,exception);
     Ci=QueueCacheViewAuthenticPixels(Ci_view,0,y,columns,1,exception);
-    if ((Ar == (const Quantum *) NULL) || (Ai == (const Quantum *) NULL) || 
-        (Br == (const Quantum *) NULL) || (Bi == (const Quantum *) NULL) ||
-        (Cr == (Quantum *) NULL) || (Ci == (Quantum *) NULL))
+    if (IsComplexRowMissing(Ar,Ai,Br,Bi,Cr,Ci) != MagickFalse)
       {
         status=MagickFalse;
         continue;
