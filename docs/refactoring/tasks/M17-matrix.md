@@ -125,3 +125,37 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 5.92 → 6.76** (`cs-mcp` 1.5.12). Branch `campaign/M17-matrix`,
+stacked on `campaign/M16-channel` (PR #22). 4 refactor commits, all guard-verified: 3
+Recipe P and 1 Recipe E. The mutation reports hold 14 mutants for the whole file and none
+for `GaussJordanElimination`, so the oracle's cases (126 for `AcquireMatrixInfo`, 202 for
+`GaussJordanElimination`) ran on every step but have no measured power there.
+
+**One category leaves the file:** Complex Conditional. The predicates are
+`IsMatrixMemoryAvailable`, `IsPivotMemoryMissing` and `IsSingularPivot`. Then
+`GaussJordanElimination`'s copy-back moves into `CopyBackMatrix`.
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| the three compound tests as predicates | P | 5.92 → 6.73 |
+| `GaussJordanElimination`'s copy-back | E | → 6.76 |
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**What is left, at 6.76.**
+- `GaussJordanElimination` (nesting 5): its row swap and unscramble loops expand
+  swap macros that the function defines inside itself and uses in both places, and its
+  elimination loop needs five arguments.
+- `MatrixToImage`: its range loop and its scale selection each set two variables
+  together (Recipe O, which needs oracle-level evidence the function lacks), and its
+  pixel loop needs six arguments.
+- `AcquireMatrixInfo`'s memory and disk paths `return` from inside.
+- The duplicated `ReadMatrixElements` and `WriteMatrixElements` have no case.
+
+**Possible bug, reported, not fixed.** In `MatrixToImage`'s pixel loop, a failed
+`GetMatrixElement()` takes `continue` before `q` is advanced, so later values land one
+pixel early.
