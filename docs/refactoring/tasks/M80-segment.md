@@ -156,7 +156,7 @@ For each function: the recipes applied, the score before and after, and the revi
 ### Report (2026-10-26, Mac, night): second pass
 
 **Result: Code Health 3.47 → 3.61** (`cs-mcp` 1.5.12). Branch `campaign/M80-segment-e`,
-stacked on `campaign/M79-identify-e`. Eight E commits:
+stacked on `campaign/M79-identify-e`. Seven E commits:
 - InitializeIntervalTree (ready, oracle): `AppendIntervalNode` and
   `AcquireRootInterval`, both value-returning.
 - Classify (careful): `CountClusterPixel` and `ClassifyPixelByCluster`, both
