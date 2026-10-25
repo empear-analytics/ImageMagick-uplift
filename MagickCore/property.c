@@ -1948,6 +1948,14 @@ static void GetXMPProperty(const Image *image,const char *property)
   xmp=DestroyXMLTree(xmp);
 }
 
+static inline MagickBooleanType IsPointCorner(const PointInfo *last,
+  const PointInfo *point)
+{
+  return(((last[1].x == last[2].x) && (last[1].y == last[2].y) &&
+    (point[0].x == point[1].x) && (point[0].y == point[1].y)) ? MagickTrue :
+    MagickFalse);
+}
+
 static char *TracePSClippath(const unsigned char *blob,size_t length)
 {
   char
@@ -2070,8 +2078,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
               Handle special cases when Bezier curves are used to describe
               corners and straight lines.
             */
-            if ((last[1].x == last[2].x) && (last[1].y == last[2].y) &&
-                (point[0].x == point[1].x) && (point[0].y == point[1].y))
+            if (IsPointCorner(last,point) != MagickFalse)
               (void) FormatLocaleString(message,MagickPathExtent,
                 "  %g %g l\n",point[1].x,point[1].y);
             else
