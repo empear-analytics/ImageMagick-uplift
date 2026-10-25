@@ -250,3 +250,80 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 1.53 → 2.00** (`cs-mcp` 1.5.12). Branch `campaign/M04-morphology`,
+stacked on `campaign/M03-enhance` (PR #9). 37 refactor commits, one recipe and one
+function each: 35 Recipe E, 2 Recipe P; 2 oracle-verified (`SameKernelInfo`,
+`ParseKernelArray`), 35 guard-verified, because the readiness gate puts most of the file's
+large functions below 75% (`AcquireKernelBuiltIn` 63%, `MorphologyPrimitiveDirect` 56%,
+`RotateKernelInfo` 56%, `MorphologyApply` 65%, `ParseKernelName` 70%,
+`ScaleKernelInfo` 64%), and `MorphologyImage`'s blocks sit on survivors. One playbook
+change (the guard-level fingerprint for E and P, wording only).
+
+**One category leaves the file:** Complex Conditional (`SameKernelInfo`,
+`AcquireKernelBuiltIn`, Recipe P). Brain Method leaves `MorphologyImage`; Deep Nesting
+leaves `AcquireKernelBuiltIn`, `RotateKernelInfo` and `ShowKernelInfo`; Large Method
+leaves `RotateKernelInfo`, `ParseKernelName` and `MorphologyImage`; Bumpy Road leaves
+`RotateKernelInfo`, `ParseKernelName`, `ScaleKernelInfo` and `ShowKernelInfo`.
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| `SameKernelInfo`'s shape test, `AcquireKernelBuiltIn`'s origin test as predicates | P | 1.53 → 1.61 |
+| `AcquireKernelBuiltIn`: 19 cases of the kernel switch into `Acquire*Kernel` builders (a case body ends in `break` before `return(kernel)`, so it becomes `return(Helper(...))`, E step 7) | E | → 1.67 |
+| `AcquireKernelBuiltIn`: the Gaussian case's three value loops, then the case | E | → 1.74 |
+| `RotateKernelInfo`: the 45, transpose, 90 and 180 degree blocks (each returns the angle), then the two dispatch tests | E | → 1.79 |
+| `ParseKernelName`'s defaults switch (takes and returns `GeometryInfo` by value); `ParseKernelArray`'s old-style size branch (returns `p`) | E | → 1.82 |
+| `MorphologyImage`'s compose and bias lookups | E | → 1.95 |
+| `ShowKernelInfo`'s value printer; `ScaleKernelInfo`'s normalizing scale | E | → 2.00 |
+
+Every step: build, `make.log` free of warnings for the file, the literal guard OK and
+`--calls` moving nothing but `+2` for the new helper, the oracle on the function's cases
+(0 diverged), the CodeScene gate; every moved block checked by script (text identical
+apart from whitespace). The case extractions ran from a driver script that reverted any
+step that lowered the score.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Tried and reverted.**
+- The Gaussian case whole, before its loops were split out (the helper had nesting 4,
+  cc 18 and 71 lines: 1.61 → 1.58).
+- The LoG block with its unity-kernel `else` (a duplicate of `SetGaussianKernelValues`:
+  1.67 → 1.66). Recipe D would merge them, but D needs oracle-level evidence, which
+  `AcquireKernelBuiltIn` lacks; only the `then` branch moved.
+- The Blur case (its helper is a Bumpy Road: −0.01).
+- The Plus, Cross, Corners, Manhattan, Octagonal and Euclidean cases (each a near-clone
+  of an extracted one: 1.65 → 1.60 or 1.58); they stay in the switch.
+
+**Not done, and why.**
+- `MorphologyPrimitive` (careful, 85%): its unmatched survivors sit across the
+  per-method switch. The vertical-kernel accumulation, which is clear of them, would
+  need a helper of nine parameters (six inputs and, under Recipe K, three
+  out-parameters), which CodeScene flags as Excess Arguments. Its `changes[id]++` writes a per-thread
+  slot of an array declared outside the parallel loop, which the OpenMP rule forbids a
+  helper to receive.
+- `MorphologyPrimitiveDirect` (sequential, not ready): the Distance and Voronoi bodies
+  differ by an operator (`<=` / `<`), and each value loop writes `pixel`, `k` and
+  `pixels`; a single-value helper needs eight arguments.
+- `MorphologyApply` (not ready): its blocks set several locals together (Recipe O,
+  oracle-level), jump to `error_cleanup`, or need six or more arguments for the verbose
+  output.
+- The remaining Complex Method findings are switches (`SetKernelArgumentDefaults`,
+  `AcquireFreiChenKernel`, `AcquireThinSEKernel`, `RotateKernelInfo`'s type switch) or
+  the dispatcher that is left of `AcquireKernelBuiltIn` (cc 115, 315 lines; Blur and the
+  clone cases).
+
+**What is left, at 2.00.** Brain Method (`MorphologyPrimitive`, `MorphologyApply`),
+Deep Nesting and Bumpy Road in the three morphology loops, Complex and Large Method as
+above, Excess Arguments on `MorphologyImage` (public), `MorphologyApply` (`MagickPrivate`,
+declared in `morphology-private.h` and renamed in `methods.h`) and `MorphologyPrimitive`
+(static; bundling its arguments, Recipe B, needs oracle-level evidence). This
+is not a plateau in the playbook's sense: the next gains need oracle-level evidence for
+`MorphologyPrimitive`, `MorphologyPrimitiveDirect` and `MorphologyApply` (cases that kill
+their unmatched survivors), after which Recipes O, K and D apply.
+
+**Possible bug, reported, not fixed.** `ScaleKernelInfo`'s swap for a negative scaling
+factor ends `t = kernel->maximum; kernel->maximum = kernel->minimum; kernel->minimum = 1;`:
+the last assignment looks as if it should be `= t`. Unchanged here.

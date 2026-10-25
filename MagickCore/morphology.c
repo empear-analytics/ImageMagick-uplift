@@ -216,6 +216,38 @@ static inline MagickBooleanType AcquireKernelValues(KernelInfo *kernel)
 /* This was separated so that it could be used as a separate
 ** array input handling function, such as for -color-matrix
 */
+static const char *SetOddSquareKernelSize(KernelInfo *kernel,
+  const char *kernel_string,const char *end)
+{
+  char
+    token[MagickPathExtent];
+
+  const char
+    *p;
+
+  ssize_t
+    i;
+
+  /* ELSE - Old old specification, forming odd-square kernel */
+  /* count up number of values given */
+  p=(const char *) kernel_string;
+  while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
+    p++;  /* ignore "'" chars for convolve filter usage - Cristy */
+  for (i=0; p < end; i++)
+  {
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+    if (*token == ',')
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+  }
+  /* set the size of the kernel - old sized square */
+  kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  p=(const char *) kernel_string;
+  while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
+    p++;  /* ignore "'" chars for convolve filter usage - Cristy */
+  return(p);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -300,24 +332,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
       p++; /* advance beyond the ':' */
     }
   else
-    { /* ELSE - Old old specification, forming odd-square kernel */
-      /* count up number of values given */
-      p=(const char *) kernel_string;
-      while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
-        p++;  /* ignore "'" chars for convolve filter usage - Cristy */
-      for (i=0; p < end; i++)
-      {
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-        if (*token == ',')
-          (void) GetNextToken(p,&p,MagickPathExtent,token);
-      }
-      /* set the size of the kernel - old sized square */
-      kernel->width = kernel->height=CastDoubleToSizeT(sqrt((double) i+1.0));
-      kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-      p=(const char *) kernel_string;
-      while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == '\''))
-        p++;  /* ignore "'" chars for convolve filter usage - Cristy */
-    }
+    p=SetOddSquareKernelSize(kernel,kernel_string,end);
 
   /* Read in the kernel values from rest of input string argument */
   if (AcquireKernelValues(kernel) == MagickFalse)
@@ -377,6 +392,58 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   return(kernel);
 }
 
+static GeometryInfo SetKernelArgumentDefaults(const ssize_t type,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  switch( type ) {
+    /* Shape Kernel Defaults */
+    case UnityKernel:
+      if ( (flags & WidthValue) == 0 )
+        args.rho = 1.0;    /* Default scale = 1.0, zero is valid */
+      break;
+    case SquareKernel:
+    case DiamondKernel:
+    case OctagonKernel:
+    case DiskKernel:
+    case PlusKernel:
+    case CrossKernel:
+      if ( (flags & HeightValue) == 0 )
+        args.sigma = 1.0;    /* Default scale = 1.0, zero is valid */
+      break;
+    case RingKernel:
+      if ( (flags & XValue) == 0 )
+        args.xi = 1.0;       /* Default scale = 1.0, zero is valid */
+      break;
+    case RectangleKernel:    /* Rectangle - set size defaults */
+      if ( (flags & WidthValue) == 0 ) /* if no width then */
+        args.rho = args.sigma;         /* then  width = height */
+      if ( args.rho < 1.0 )            /* if width too small */
+          args.rho = 3;                /* then  width = 3 */
+      if ( args.sigma < 1.0 )          /* if height too small */
+        args.sigma = args.rho;         /* then  height = width */
+      if ( (flags & XValue) == 0 )     /* center offset if not defined */
+        args.xi = (double)(((ssize_t)args.rho-1)/2);
+      if ( (flags & YValue) == 0 )
+        args.psi = (double)(((ssize_t)args.sigma-1)/2);
+      break;
+    /* Distance Kernel Defaults */
+    case ChebyshevKernel:
+    case ManhattanKernel:
+    case OctagonalKernel:
+    case EuclideanKernel:
+      if ( (flags & HeightValue) == 0 )           /* no distance scale */
+        args.sigma = 100.0;                       /* default distance scaling */
+      else if ( (flags & AspectValue ) != 0 )     /* '!' flag */
+        args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
+      else if ( (flags & PercentValue ) != 0 )    /* '%' flag */
+        args.sigma *= (double) QuantumRange/100.0;         /* percentage of color range */
+      break;
+    default:
+      break;
+  }
+  return(args);
+}
+
 static KernelInfo *ParseKernelName(const char *kernel_string,
   ExceptionInfo *exception)
 {
@@ -430,52 +497,7 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
 #endif
 
   /* special handling of missing values in input string */
-  switch( type ) {
-    /* Shape Kernel Defaults */
-    case UnityKernel:
-      if ( (flags & WidthValue) == 0 )
-        args.rho = 1.0;    /* Default scale = 1.0, zero is valid */
-      break;
-    case SquareKernel:
-    case DiamondKernel:
-    case OctagonKernel:
-    case DiskKernel:
-    case PlusKernel:
-    case CrossKernel:
-      if ( (flags & HeightValue) == 0 )
-        args.sigma = 1.0;    /* Default scale = 1.0, zero is valid */
-      break;
-    case RingKernel:
-      if ( (flags & XValue) == 0 )
-        args.xi = 1.0;       /* Default scale = 1.0, zero is valid */
-      break;
-    case RectangleKernel:    /* Rectangle - set size defaults */
-      if ( (flags & WidthValue) == 0 ) /* if no width then */
-        args.rho = args.sigma;         /* then  width = height */
-      if ( args.rho < 1.0 )            /* if width too small */
-          args.rho = 3;                /* then  width = 3 */
-      if ( args.sigma < 1.0 )          /* if height too small */
-        args.sigma = args.rho;         /* then  height = width */
-      if ( (flags & XValue) == 0 )     /* center offset if not defined */
-        args.xi = (double)(((ssize_t)args.rho-1)/2);
-      if ( (flags & YValue) == 0 )
-        args.psi = (double)(((ssize_t)args.sigma-1)/2);
-      break;
-    /* Distance Kernel Defaults */
-    case ChebyshevKernel:
-    case ManhattanKernel:
-    case OctagonalKernel:
-    case EuclideanKernel:
-      if ( (flags & HeightValue) == 0 )           /* no distance scale */
-        args.sigma = 100.0;                       /* default distance scaling */
-      else if ( (flags & AspectValue ) != 0 )     /* '!' flag */
-        args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
-      else if ( (flags & PercentValue ) != 0 )    /* '%' flag */
-        args.sigma *= (double) QuantumRange/100.0;         /* percentage of color range */
-      break;
-    default:
-      break;
-  }
+  args=SetKernelArgumentDefaults(type,flags,args);
 
   kernel = AcquireKernelBuiltIn((KernelInfoType)type, &args, exception);
   if ( kernel == (KernelInfo *) NULL )
@@ -959,6 +981,1008 @@ MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
 %
 */
 
+static inline MagickBooleanType IsKernelOriginOutside(const GeometryInfo *args,
+  const KernelInfo *kernel)
+{
+  return(((args->xi < 0.0) || (args->xi  >= (double) kernel->width) ||
+    (args->psi < 0.0) || (args->psi >= (double) kernel->height)) ?
+    MagickTrue : MagickFalse);
+}
+
+static KernelInfo *AcquireDiamondKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  if (args->rho < 1.0)
+    kernel->width = kernel->height = 3;  /* default radius = 1 */
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set all kernel values within diamond area to scale given */
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      if ( (labs((long) u)+labs((long) v)) <= (long) kernel->x)
+        kernel->positive_range += kernel->values[i] = args->sigma;
+      else
+        kernel->values[i] = nan;
+  kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
+  return(kernel);
+}
+
+static KernelInfo *AcquireUnityKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  kernel->height = kernel->width = (size_t) 1;
+  kernel->x = kernel->y = (ssize_t) 0;
+  kernel->values=(MagickRealType *) MagickAssumeAligned(
+    AcquireAlignedMemory(1,sizeof(*kernel->values)));
+  if (kernel->values == (MagickRealType *) NULL)
+    return(DestroyKernelInfo(kernel));
+  kernel->maximum = kernel->values[0] = args->rho;
+  return(kernel);
+}
+
+static KernelInfo *AcquireCometKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  double
+    sigma = fabs(args->sigma),
+    A;
+
+  if ( args->rho < 1.0 )
+    kernel->width = (GetOptimalKernelWidth1D(args->rho,sigma)-1)/2+1;
+  else
+    kernel->width = CastDoubleToSizeT(args->rho);
+  kernel->x = kernel->y = 0;
+  kernel->height = 1;
+  kernel->negative_range = kernel->positive_range = 0.0;
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* A comet blur is half a 1D gaussian curve, so that the object is
+  ** blurred in one direction only.  This may not be quite the right
+  ** curve to use so may change in the future. The function must be
+  ** normalised after generation, which also resolves any clipping.
+  **
+  ** As we are normalizing and not subtracting gaussians,
+  ** there is no need for a divisor in the gaussian formula
+  **
+  ** It is less complex
+  */
+  if ( sigma > MagickEpsilon )
+    {
+#if 1
+#define KernelRank 3
+      v = (ssize_t) kernel->width*KernelRank; /* start/end points */
+      (void) memset(kernel->values,0, (size_t)
+        kernel->width*sizeof(*kernel->values));
+      sigma *= KernelRank;            /* simplify the loop expression */
+      A = 1.0/(2.0*sigma*sigma);
+      /* B = 1.0/(MagickSQ2PI*sigma); */
+      for ( u=0; u < v; u++) {
+        kernel->values[u/KernelRank] +=
+            exp(-((double)(u*u))*A);
+        /*  exp(-((double)(i*i))/2.0*sigma*sigma)/(MagickSQ2PI*sigma); */
+      }
+      for (i=0; i < (ssize_t) kernel->width; i++)
+        kernel->positive_range += kernel->values[i];
+#else
+      A = 1.0/(2.0*sigma*sigma);     /* simplify the loop expression */
+      /* B = 1.0/(MagickSQ2PI*sigma); */
+      for ( i=0; i < (ssize_t) kernel->width; i++)
+        kernel->positive_range +=
+          kernel->values[i] = exp(-((double)(i*i))*A);
+          /* exp(-((double)(i*i))/2.0*sigma*sigma)/(MagickSQ2PI*sigma); */
+#endif
+    }
+  else /* special case - generate a unity kernel */
+    { (void) memset(kernel->values,0, (size_t)
+        kernel->width*kernel->height*sizeof(*kernel->values));
+      kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+      kernel->positive_range = 1.0;
+    }
+
+  kernel->minimum = 0.0;
+  kernel->maximum = kernel->values[0];
+  kernel->negative_range = 0.0;
+
+  ScaleKernelInfo(kernel, 1.0, NormalizeValue); /* Normalize */
+  RotateKernelInfo(kernel, args->xi); /* Rotate by angle */
+  return(kernel);
+}
+
+static KernelInfo *AcquireBinomialKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  const size_t
+    max_order = (sizeof(size_t) > 4) ? 20 : 12;
+
+  size_t
+    order_f;
+
+  if (args->rho < 1.0)
+    kernel->width = kernel->height = 3;  /* default radius = 1 */
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+
+    /* Check if kernel order (width-1) would overflow fact() */
+  if ((kernel->width-1) > max_order)
+    return(DestroyKernelInfo(kernel));
+
+  order_f = fact(kernel->width-1);
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set all kernel values within diamond area to scale given */
+  for ( i=0, v=0; v < (ssize_t)kernel->height; v++)
+    {
+      size_t
+        alpha = order_f / ( fact((size_t) v) * fact(kernel->height-(size_t) v-1) );
+
+      for ( u=0; u < (ssize_t)kernel->width; u++, i++)
+        kernel->positive_range += kernel->values[i] = (double)
+          (alpha * order_f / ( fact((size_t) u) * fact(kernel->height-(size_t) u-1) ));
+    }
+  kernel->minimum = 1.0;
+  kernel->maximum = kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width];
+  kernel->negative_range = 0.0;
+  return(kernel);
+}
+
+static KernelInfo *AcquireLaplacianKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  switch ( (int) args->rho ) {
+    case 0:
+    default: /* laplacian square filter -- default */
+      kernel=ParseKernelArray("3: -1,-1,-1  -1,8,-1  -1,-1,-1");
+      break;
+    case 1:  /* laplacian diamond filter */
+      kernel=ParseKernelArray("3: 0,-1,0  -1,4,-1  0,-1,0");
+      break;
+    case 2:
+      kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
+      break;
+    case 3:
+      kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  1,-2,1");
+      break;
+    case 5:   /* a 5x5 laplacian */
+      kernel=ParseKernelArray(
+        "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4");
+      break;
+    case 7:   /* a 7x7 laplacian */
+      kernel=ParseKernelArray(
+        "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" );
+      break;
+    case 15:  /* a 5x5 LoG (sigma approx 1.4) */
+      kernel=ParseKernelArray(
+        "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0");
+      break;
+    case 19:  /* a 9x9 LoG (sigma approx 1.4) */
+      /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
+      kernel=ParseKernelArray(
+        "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  return(kernel);
+}
+
+static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch ( (int) args->rho ) {
+    default:
+    case 0:
+      kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[3] = +(MagickRealType) MagickSQ2;
+      kernel->values[5] = -(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);     /* recalculate meta-data */
+      break;
+    case 2:
+      kernel=ParseKernelArray("3: 1,2,0  2,0,-2  0,-2,-1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[1] = kernel->values[3]= +(MagickRealType) MagickSQ2;
+      kernel->values[5] = kernel->values[7]= -(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);     /* recalculate meta-data */
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 10:
+    {
+      kernel=AcquireKernelInfo("FreiChen:11;FreiChen:12;FreiChen:13;FreiChen:14;FreiChen:15;FreiChen:16;FreiChen:17;FreiChen:18;FreiChen:19",exception);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      break;
+    }
+    case 1:
+    case 11:
+      kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[3] = +(MagickRealType) MagickSQ2;
+      kernel->values[5] = -(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);     /* recalculate meta-data */
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 12:
+      kernel=ParseKernelArray("3: 1,2,1  0,0,0  1,2,1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[1] = +(MagickRealType) MagickSQ2;
+      kernel->values[7] = +(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 13:
+      kernel=ParseKernelArray("3: 2,-1,0  -1,0,1  0,1,-2");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[0] = +(MagickRealType) MagickSQ2;
+      kernel->values[8] = -(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 14:
+      kernel=ParseKernelArray("3: 0,1,-2  -1,0,1  2,-1,0");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      kernel->values[2] = -(MagickRealType) MagickSQ2;
+      kernel->values[6] = +(MagickRealType) MagickSQ2;
+      CalcKernelMetaData(kernel);
+      ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
+      break;
+    case 15:
+      kernel=ParseKernelArray("3: 0,-1,0  1,0,1  0,-1,0");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
+      break;
+    case 16:
+      kernel=ParseKernelArray("3: 1,0,-1  0,0,0  -1,0,1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
+      break;
+    case 17:
+      kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  -1,-2,1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
+      break;
+    case 18:
+      kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
+      break;
+    case 19:
+      kernel=ParseKernelArray("3: 1,1,1  1,1,1  1,1,1");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ScaleKernelInfo(kernel, 1.0/3.0, NoValue);
+      break;
+  }
+  if ( fabs(args->sigma) >= MagickEpsilon )
+    /* Rotate by correctly supplied 'angle' */
+    RotateKernelInfo(kernel, args->sigma);
+  else if ( args->rho > 30.0 || args->rho < -30.0 )
+    /* Rotate by out of bounds 'type' */
+    RotateKernelInfo(kernel, args->rho);
+  return(kernel);
+}
+
+static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u;
+
+  double
+    scale;
+  if ( type == SquareKernel )
+    {
+      if (args->rho < 1.0)
+        kernel->width = kernel->height = 3;  /* default radius = 1 */
+      else
+        kernel->width = kernel->height = CastDoubleToSizeT(args->rho*2+1);
+      kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+      scale = args->sigma;
+    }
+  else {
+      /* NOTE: user defaults set in "AcquireKernelInfo()" */
+      if ( args->rho < 1.0 || args->sigma < 1.0 )
+        return(DestroyKernelInfo(kernel));    /* invalid args given */
+      kernel->width = CastDoubleToSizeT(args->rho);
+      kernel->height = CastDoubleToSizeT(args->sigma);
+      if (IsKernelOriginOutside(args,kernel) != MagickFalse)
+        return(DestroyKernelInfo(kernel));    /* invalid args given */
+      kernel->x = (ssize_t) args->xi;
+      kernel->y = (ssize_t) args->psi;
+      scale = 1.0;
+    }
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set all kernel values to scale given */
+  u=(ssize_t) (kernel->width*kernel->height);
+  for ( i=0; i < u; i++)
+      kernel->values[i] = scale;
+  kernel->minimum = kernel->maximum = scale;   /* a flat shape */
+  kernel->positive_range = scale*u;
+  return(kernel);
+}
+
+static KernelInfo *AcquireOctagonKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  if (args->rho < 1.0)
+    kernel->width = kernel->height = 5;  /* default radius = 2 */
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      if ( (labs((long) u)+labs((long) v)) <=
+                ((long)kernel->x + (long)(kernel->x/2)) )
+        kernel->positive_range += kernel->values[i] = args->sigma;
+      else
+        kernel->values[i] = nan;
+  kernel->minimum = kernel->maximum = args->sigma;  /* a flat shape */
+  return(kernel);
+}
+
+static KernelInfo *AcquireDiskKernel(KernelInfo *kernel,
+  const GeometryInfo *args,const double nan)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  ssize_t
+    limit = (ssize_t)(args->rho*args->rho);
+
+  if (args->rho < 0.4)           /* default radius approx 4.3 */
+    kernel->width = kernel->height = 9L, limit = 18L;
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(fabs(args->rho))*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      if ((u*u+v*v) <= limit)
+        kernel->positive_range += kernel->values[i] = args->sigma;
+      else
+        kernel->values[i] = nan;
+  kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
+  return(kernel);
+}
+
+static KernelInfo *AcquireRingKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,const double nan)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  ssize_t
+    limit1,
+    limit2,
+    scale;
+
+  if (args->rho < args->sigma)
+    {
+      kernel->width = CastDoubleToSizeT(args->sigma)*2+1;
+      limit1 = (ssize_t)(args->rho*args->rho);
+      limit2 = (ssize_t)(args->sigma*args->sigma);
+    }
+  else
+    {
+      kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+      limit1 = (ssize_t)(args->sigma*args->sigma);
+      limit2 = (ssize_t)(args->rho*args->rho);
+    }
+  if ( limit2 <= 0 )
+    kernel->width = 7L, limit1 = 7L, limit2 = 11L;
+
+  kernel->height = kernel->width;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* set a ring of points of 'scale' ( 0.0 for PeaksKernel ) */
+  scale = (ssize_t) (( type == PeaksKernel) ? 0.0 : args->xi);
+  for ( i=0, v= -kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      { ssize_t radius=u*u+v*v;
+        if (limit1 < radius && radius <= limit2)
+          kernel->positive_range += kernel->values[i] = (double) scale;
+        else
+          kernel->values[i] = nan;
+      }
+  kernel->minimum = kernel->maximum = (double) scale;
+  if ( type == PeaksKernel ) {
+    /* set the central point in the middle */
+    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    kernel->positive_range = 1.0;
+    kernel->maximum = 1.0;
+  }
+  return(kernel);
+}
+
+static KernelInfo *AcquireEdgesKernel(KernelInfo *kernel,
+  const KernelInfoType type,ExceptionInfo *exception)
+{
+  kernel=AcquireKernelInfo("ThinSE:482",exception);
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  ExpandMirrorKernelInfo(kernel); /* mirror expansion of kernels */
+  return(kernel);
+}
+
+static KernelInfo *AcquireDiagonalsKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  switch ( (int) args->rho ) {
+    case 0:
+    default:
+      { KernelInfo
+          *new_kernel;
+        kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
+        if (kernel == (KernelInfo *) NULL)
+          return(kernel);
+        kernel->type = type;
+        new_kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
+        if (new_kernel == (KernelInfo *) NULL)
+          return(DestroyKernelInfo(kernel));
+        new_kernel->type = type;
+        LastKernelInfo(kernel)->next = new_kernel;
+        ExpandMirrorKernelInfo(kernel);
+        return(kernel);
+      }
+    case 1:
+      kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
+      break;
+    case 2:
+      kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->sigma);
+  return(kernel);
+}
+
+static KernelInfo *AcquireLineEndsKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  /* Kernels for finding the end of thin lines */
+  switch ( (int) args->rho ) {
+    case 0:
+    default:
+      /* set of kernels to find all end of lines */
+      return(AcquireKernelInfo("LineEnds:1>;LineEnds:2>",exception));
+    case 1:
+      /* kernel for 4-connected line ends - no rotation */
+      kernel=ParseKernelArray("3: 0,0,-  0,1,1  0,0,-");
+      break;
+  case 2:
+      /* kernel to add for 8-connected lines - no rotation */
+      kernel=ParseKernelArray("3: 0,0,0  0,1,0  0,0,1");
+      break;
+  case 3:
+      /* kernel to add for orthogonal line ends - does not find corners */
+      kernel=ParseKernelArray("3: 0,0,0  0,1,1  0,0,0");
+      break;
+  case 4:
+      /* traditional line end - fails on last T end */
+      kernel=ParseKernelArray("3: 0,0,0  0,1,-  0,0,-");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->sigma);
+  return(kernel);
+}
+
+static KernelInfo *AcquireLineJunctionsKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  /* kernels for finding the junctions of multiple lines */
+  switch ( (int) args->rho ) {
+    case 0:
+    default:
+      /* set of kernels to find all line junctions */
+      return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
+    case 1:
+      /* Y Junction */
+      kernel=ParseKernelArray("3: 1,-,1  -,1,-  -,1,-");
+      break;
+    case 2:
+      /* Diagonal T Junctions */
+      kernel=ParseKernelArray("3: 1,-,-  -,1,-  1,-,1");
+      break;
+    case 3:
+      /* Orthogonal T Junctions */
+      kernel=ParseKernelArray("3: -,-,-  1,1,1  -,1,-");
+      break;
+    case 4:
+      /* Diagonal X Junctions */
+      kernel=ParseKernelArray("3: 1,-,1  -,1,-  1,-,1");
+      break;
+    case 5:
+      /* Orthogonal X Junctions - minimal diamond kernel */
+      kernel=ParseKernelArray("3: -,1,-  1,1,1  -,1,-");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->sigma);
+  return(kernel);
+}
+
+static KernelInfo *AcquireRidgesKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  /* Ridges - Ridge finding kernels */
+  KernelInfo
+    *new_kernel;
+  switch ( (int) args->rho ) {
+    case 1:
+    default:
+      kernel=ParseKernelArray("3x1:0,1,0");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ExpandRotateKernelInfo(kernel, 90.0); /* 2 rotated kernels (symmetrical) */
+      break;
+    case 2:
+      kernel=ParseKernelArray("4x1:0,1,1,0");
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotated kernels */
+
+      /* Kernels to find a stepped 'thick' line, 4 rotates + mirrors */
+      /* Unfortunately we can not yet rotate a non-square kernel */
+      /* But then we can't flip a non-symmetrical kernel either */
+      new_kernel=ParseKernelArray("4x3+1+1:0,1,1,- -,1,1,- -,1,1,0");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("4x3+2+1:0,1,1,- -,1,1,- -,1,1,0");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("4x3+1+1:-,1,1,0 -,1,1,- 0,1,1,-");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("4x3+2+1:-,1,1,0 -,1,1,- 0,1,1,-");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("3x4+1+1:0,-,- 1,1,1 1,1,1 -,-,0");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("3x4+1+2:0,-,- 1,1,1 1,1,1 -,-,0");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("3x4+1+1:-,-,0 1,1,1 1,1,1 0,-,-");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      new_kernel=ParseKernelArray("3x4+1+2:-,-,0 1,1,1 1,1,1 0,-,-");
+      if (new_kernel == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      new_kernel->type = type;
+      LastKernelInfo(kernel)->next = new_kernel;
+      break;
+  }
+  return(kernel);
+}
+
+static KernelInfo *AcquireConvexHullKernel(KernelInfo *kernel,
+  const KernelInfoType type)
+{
+  KernelInfo
+    *new_kernel;
+  /* first set of 8 kernels */
+  kernel=ParseKernelArray("3: 1,1,-  1,0,-  1,-,0");
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  ExpandRotateKernelInfo(kernel, 90.0);
+  /* append the mirror versions too - no flip function yet */
+  new_kernel=ParseKernelArray("3: 1,1,1  1,0,-  -,-,0");
+  if (new_kernel == (KernelInfo *) NULL)
+    return(DestroyKernelInfo(kernel));
+  new_kernel->type = type;
+  ExpandRotateKernelInfo(new_kernel, 90.0);
+  LastKernelInfo(kernel)->next = new_kernel;
+  return(kernel);
+}
+
+static KernelInfo *AcquireSkeletonKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args,ExceptionInfo *exception)
+{
+  switch ( (int) args->rho ) {
+    case 1:
+    default:
+      /* Traditional Skeleton...
+      ** A cyclically rotated single kernel
+      */
+      kernel=AcquireKernelInfo("ThinSE:482",exception);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      kernel->type = type;
+      ExpandRotateKernelInfo(kernel, 45.0); /* 8 rotations */
+      break;
+    case 2:
+      /* HIPR Variation of the cyclic skeleton
+      ** Corners of the traditional method made more forgiving,
+      ** but the retain the same cyclic order.
+      */
+      kernel=AcquireKernelInfo("ThinSE:482; ThinSE:87x90;",exception);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      if (kernel->next == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      kernel->type = type;
+      kernel->next->type = type;
+      ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotations of the 2 kernels */
+      break;
+    case 3:
+      /* Dan Bloomberg Skeleton, from his paper on 3x3 thinning SE's
+      ** "Connectivity-Preserving Morphological Image Transformations"
+      ** by Dan S. Bloomberg, available on Leptonica, Selected Papers,
+      **   http://www.leptonica.com/papers/conn.pdf
+      */
+      kernel=AcquireKernelInfo("ThinSE:41; ThinSE:42; ThinSE:43",
+        exception);
+      if (kernel == (KernelInfo *) NULL)
+        return(kernel);
+      if (kernel->next == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      if (kernel->next->next == (KernelInfo *) NULL)
+        return(DestroyKernelInfo(kernel));
+      kernel->type = type;
+      kernel->next->type = type;
+      kernel->next->next->type = type;
+      ExpandMirrorKernelInfo(kernel); /* 12 kernels total */
+      break;
+   }
+  return(kernel);
+}
+
+static KernelInfo *AcquireThinSEKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  /* Special kernels for general thinning, while preserving connections
+  ** "Connectivity-Preserving Morphological Image Transformations"
+  ** by Dan S. Bloomberg, available on Leptonica, Selected Papers,
+  **   http://www.leptonica.com/papers/conn.pdf
+  ** And
+  **   http://tpgit.github.com/Leptonica/ccthin_8c_source.html
+  **
+  ** Note kernels do not specify the origin pixel, allowing them
+  ** to be used for both thickening and thinning operations.
+  */
+  switch ( (int) args->rho ) {
+    /* SE for 4-connected thinning */
+    case 41: /* SE_4_1 */
+      kernel=ParseKernelArray("3: -,-,1  0,-,1  -,-,1");
+      break;
+    case 42: /* SE_4_2 */
+      kernel=ParseKernelArray("3: -,-,1  0,-,1  -,0,-");
+      break;
+    case 43: /* SE_4_3 */
+      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,-,1");
+      break;
+    case 44: /* SE_4_4 */
+      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,-");
+      break;
+    case 45: /* SE_4_5 */
+      kernel=ParseKernelArray("3: -,0,1  0,-,1  -,0,-");
+      break;
+    case 46: /* SE_4_6 */
+      kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,1");
+      break;
+    case 47: /* SE_4_7 */
+      kernel=ParseKernelArray("3: -,1,1  0,-,1  -,0,-");
+      break;
+    case 48: /* SE_4_8 */
+      kernel=ParseKernelArray("3: -,-,1  0,-,1  0,-,1");
+      break;
+    case 49: /* SE_4_9 */
+      kernel=ParseKernelArray("3: 0,-,1  0,-,1  -,-,1");
+      break;
+    /* SE for 8-connected thinning - negatives of the above */
+    case 81: /* SE_8_0 */
+      kernel=ParseKernelArray("3: -,1,-  0,-,1  -,1,-");
+      break;
+    case 82: /* SE_8_2 */
+      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,-,-");
+      break;
+    case 83: /* SE_8_3 */
+      kernel=ParseKernelArray("3: 0,-,-  0,-,1  -,1,-");
+      break;
+    case 84: /* SE_8_4 */
+      kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,-");
+      break;
+    case 85: /* SE_8_5 */
+      kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,-");
+      break;
+    case 86: /* SE_8_6 */
+      kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,1");
+      break;
+    case 87: /* SE_8_7 */
+      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,0,-");
+      break;
+    case 88: /* SE_8_8 */
+      kernel=ParseKernelArray("3: -,1,-  0,-,1  0,1,-");
+      break;
+    case 89: /* SE_8_9 */
+      kernel=ParseKernelArray("3: 0,1,-  0,-,1  -,1,-");
+      break;
+    /* Special combined SE kernels */
+    case 423: /* SE_4_2 , SE_4_3 Combined Kernel */
+      kernel=ParseKernelArray("3: -,-,1  0,-,-  -,0,-");
+      break;
+    case 823: /* SE_8_2 , SE_8_3 Combined Kernel */
+      kernel=ParseKernelArray("3: -,1,-  -,-,1  0,-,-");
+      break;
+    case 481: /* SE_48_1 - General Connected Corner Kernel */
+      kernel=ParseKernelArray("3: -,1,1  0,-,1  0,0,-");
+      break;
+    default:
+    case 482: /* SE_48_2 - General Edge Kernel */
+      kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,1");
+      break;
+  }
+  if (kernel == (KernelInfo *) NULL)
+    return(kernel);
+  kernel->type = type;
+  RotateKernelInfo(kernel, args->sigma);
+  return(kernel);
+}
+
+static KernelInfo *AcquireChebyshevKernel(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    u,
+    v;
+
+  if (args->rho < 1.0)
+    kernel->width = kernel->height = 3;  /* default radius = 1 */
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      kernel->positive_range += ( kernel->values[i] =
+          args->sigma*MagickMax(fabs((double)u),fabs((double)v)) );
+  kernel->maximum = kernel->values[0];
+  return(kernel);
+}
+
+static void SetGaussianKernelValues(KernelInfo *kernel,const double sigma)
+{
+  double
+    A, B;
+
+  ssize_t
+    i,
+    u,
+    v;
+
+  if ( sigma > MagickEpsilon )
+    { A = 1.0/(2.0*sigma*sigma);  /* simplify loop expressions */
+      B = (double) (1.0/(Magick2PI*sigma*sigma));
+      for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+        for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+            kernel->values[i] = exp(-((double)(u*u+v*v))*A)*B;
+    }
+  else /* limiting case - a unity (normalized Dirac) kernel */
+    { (void) memset(kernel->values,0, (size_t)
+        kernel->width*kernel->height*sizeof(*kernel->values));
+      kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    }
+}
+
+static void SubtractGaussianKernelValues(KernelInfo *kernel,
+  const double sigma2)
+{
+  double
+    sigma,
+    A, B;
+
+  ssize_t
+    i,
+    u,
+    v;
+
+  if ( sigma2 > MagickEpsilon )
+    { sigma = sigma2;                /* simplify loop expressions */
+      A = 1.0/(2.0*sigma*sigma);
+      B = (double) (1.0/(Magick2PI*sigma*sigma));
+      for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+        for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+          kernel->values[i] -= exp(-((double)(u*u+v*v))*A)*B;
+    }
+  else /* limiting case - a unity (normalized Dirac) kernel */
+    kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] -= 1.0;
+}
+
+static void SetLoGKernelValues(KernelInfo *kernel,const double sigma)
+{
+  double
+    A, B, R;
+
+  ssize_t
+    i,
+    u,
+    v;
+
+  A = 1.0/(2.0*sigma*sigma);  /* simplify loop expressions */
+  B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
+  for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+      { R = ((double)(u*u+v*v))*A;
+        kernel->values[i] = (1-R)*exp(-R)*B;
+      }
+}
+
+static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
+  const KernelInfoType type,const GeometryInfo *args)
+{
+  double
+    sigma = fabs(args->sigma),
+    sigma2 = fabs(args->xi);
+
+  if ( args->rho >= 1.0 )
+    kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+  else if ( (type != DoGKernel) || (sigma >= sigma2) )
+    kernel->width = GetOptimalKernelWidth2D(args->rho,sigma);
+  else
+    kernel->width = GetOptimalKernelWidth2D(args->rho,sigma2);
+  kernel->height = kernel->width;
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  if (AcquireKernelValues(kernel) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
+
+  /* WARNING: The following generates a 'sampled gaussian' kernel.
+   * What we really want is a 'discrete gaussian' kernel.
+   *
+   * How to do this is I don't know, but appears to be basied on the
+   * Error Function 'erf()' (integral of a gaussian)
+   */
+
+  if ( type == GaussianKernel || type == DoGKernel )
+    { /* Calculate a Gaussian,  OR positive half of a DoG */
+      SetGaussianKernelValues(kernel,sigma);
+    }
+
+  if ( type == DoGKernel )
+    { /* Subtract a Negative Gaussian for "Difference of Gaussian" */
+      SubtractGaussianKernelValues(kernel,sigma2);
+    }
+
+  if ( type == LoGKernel )
+    { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
+      if ( sigma > MagickEpsilon )
+        SetLoGKernelValues(kernel,sigma);
+      else /* special case - generate a unity kernel */
+        { (void) memset(kernel->values,0, (size_t)
+            kernel->width*kernel->height*sizeof(*kernel->values));
+          kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+        }
+    }
+
+  /* Note the above kernels may have been 'clipped' by a user defined
+  ** radius, producing a smaller (darker) kernel.  Also for very small
+  ** sigma's (> 0.1) the central value becomes larger than one, and thus
+  ** producing a very bright kernel.
+  **
+  ** Normalization will still be needed.
+  */
+
+  /* Normalize the 2D Gaussian Kernel
+  **
+  ** NB: a CorrelateNormalize performs a normal Normalize if
+  ** there are no negative values.
+  */
+  CalcKernelMetaData(kernel);  /* the other kernel meta-data */
+  ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
+
+  return(kernel);
+}
+
 MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
   const GeometryInfo *args,ExceptionInfo *exception)
 {
@@ -1043,109 +2067,11 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       Convolution Kernels
     */
     case UnityKernel:
-      {
-        kernel->height = kernel->width = (size_t) 1;
-        kernel->x = kernel->y = (ssize_t) 0;
-        kernel->values=(MagickRealType *) MagickAssumeAligned(
-          AcquireAlignedMemory(1,sizeof(*kernel->values)));
-        if (kernel->values == (MagickRealType *) NULL)
-          return(DestroyKernelInfo(kernel));
-        kernel->maximum = kernel->values[0] = args->rho;
-        break;
-      }
-      break;
+      return(AcquireUnityKernel(kernel,args));
     case GaussianKernel:
     case DoGKernel:
     case LoGKernel:
-      { double
-          sigma = fabs(args->sigma),
-          sigma2 = fabs(args->xi),
-          A, B, R;
-
-        if ( args->rho >= 1.0 )
-          kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-        else if ( (type != DoGKernel) || (sigma >= sigma2) )
-          kernel->width = GetOptimalKernelWidth2D(args->rho,sigma);
-        else
-          kernel->width = GetOptimalKernelWidth2D(args->rho,sigma2);
-        kernel->height = kernel->width;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        /* WARNING: The following generates a 'sampled gaussian' kernel.
-         * What we really want is a 'discrete gaussian' kernel.
-         *
-         * How to do this is I don't know, but appears to be basied on the
-         * Error Function 'erf()' (integral of a gaussian)
-         */
-
-        if ( type == GaussianKernel || type == DoGKernel )
-          { /* Calculate a Gaussian,  OR positive half of a DoG */
-            if ( sigma > MagickEpsilon )
-              { A = 1.0/(2.0*sigma*sigma);  /* simplify loop expressions */
-                B = (double) (1.0/(Magick2PI*sigma*sigma));
-                for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-                  for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-                      kernel->values[i] = exp(-((double)(u*u+v*v))*A)*B;
-              }
-            else /* limiting case - a unity (normalized Dirac) kernel */
-              { (void) memset(kernel->values,0, (size_t)
-                  kernel->width*kernel->height*sizeof(*kernel->values));
-                kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-              }
-          }
-
-        if ( type == DoGKernel )
-          { /* Subtract a Negative Gaussian for "Difference of Gaussian" */
-            if ( sigma2 > MagickEpsilon )
-              { sigma = sigma2;                /* simplify loop expressions */
-                A = 1.0/(2.0*sigma*sigma);
-                B = (double) (1.0/(Magick2PI*sigma*sigma));
-                for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-                  for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-                    kernel->values[i] -= exp(-((double)(u*u+v*v))*A)*B;
-              }
-            else /* limiting case - a unity (normalized Dirac) kernel */
-              kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] -= 1.0;
-          }
-
-        if ( type == LoGKernel )
-          { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
-            if ( sigma > MagickEpsilon )
-              { A = 1.0/(2.0*sigma*sigma);  /* simplify loop expressions */
-                B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
-                for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-                  for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-                    { R = ((double)(u*u+v*v))*A;
-                      kernel->values[i] = (1-R)*exp(-R)*B;
-                    }
-              }
-            else /* special case - generate a unity kernel */
-              { (void) memset(kernel->values,0, (size_t)
-                  kernel->width*kernel->height*sizeof(*kernel->values));
-                kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-              }
-          }
-
-        /* Note the above kernels may have been 'clipped' by a user defined
-        ** radius, producing a smaller (darker) kernel.  Also for very small
-        ** sigma's (> 0.1) the central value becomes larger than one, and thus
-        ** producing a very bright kernel.
-        **
-        ** Normalization will still be needed.
-        */
-
-        /* Normalize the 2D Gaussian Kernel
-        **
-        ** NB: a CorrelateNormalize performs a normal Normalize if
-        ** there are no negative values.
-        */
-        CalcKernelMetaData(kernel);  /* the other kernel meta-data */
-        ScaleKernelInfo(kernel, 1.0, CorrelateNormalizeValue);
-
-        break;
-      }
+      return(AcquireGaussianKernel(kernel,type,args));
     case BlurKernel:
       { double
           sigma = fabs(args->sigma),
@@ -1232,151 +2158,15 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
         break;
       }
     case CometKernel:
-      { double
-          sigma = fabs(args->sigma),
-          A;
-
-        if ( args->rho < 1.0 )
-          kernel->width = (GetOptimalKernelWidth1D(args->rho,sigma)-1)/2+1;
-        else
-          kernel->width = CastDoubleToSizeT(args->rho);
-        kernel->x = kernel->y = 0;
-        kernel->height = 1;
-        kernel->negative_range = kernel->positive_range = 0.0;
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        /* A comet blur is half a 1D gaussian curve, so that the object is
-        ** blurred in one direction only.  This may not be quite the right
-        ** curve to use so may change in the future. The function must be
-        ** normalised after generation, which also resolves any clipping.
-        **
-        ** As we are normalizing and not subtracting gaussians,
-        ** there is no need for a divisor in the gaussian formula
-        **
-        ** It is less complex
-        */
-        if ( sigma > MagickEpsilon )
-          {
-#if 1
-#define KernelRank 3
-            v = (ssize_t) kernel->width*KernelRank; /* start/end points */
-            (void) memset(kernel->values,0, (size_t)
-              kernel->width*sizeof(*kernel->values));
-            sigma *= KernelRank;            /* simplify the loop expression */
-            A = 1.0/(2.0*sigma*sigma);
-            /* B = 1.0/(MagickSQ2PI*sigma); */
-            for ( u=0; u < v; u++) {
-              kernel->values[u/KernelRank] +=
-                  exp(-((double)(u*u))*A);
-              /*  exp(-((double)(i*i))/2.0*sigma*sigma)/(MagickSQ2PI*sigma); */
-            }
-            for (i=0; i < (ssize_t) kernel->width; i++)
-              kernel->positive_range += kernel->values[i];
-#else
-            A = 1.0/(2.0*sigma*sigma);     /* simplify the loop expression */
-            /* B = 1.0/(MagickSQ2PI*sigma); */
-            for ( i=0; i < (ssize_t) kernel->width; i++)
-              kernel->positive_range +=
-                kernel->values[i] = exp(-((double)(i*i))*A);
-                /* exp(-((double)(i*i))/2.0*sigma*sigma)/(MagickSQ2PI*sigma); */
-#endif
-          }
-        else /* special case - generate a unity kernel */
-          { (void) memset(kernel->values,0, (size_t)
-              kernel->width*kernel->height*sizeof(*kernel->values));
-            kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-            kernel->positive_range = 1.0;
-          }
-
-        kernel->minimum = 0.0;
-        kernel->maximum = kernel->values[0];
-        kernel->negative_range = 0.0;
-
-        ScaleKernelInfo(kernel, 1.0, NormalizeValue); /* Normalize */
-        RotateKernelInfo(kernel, args->xi); /* Rotate by angle */
-        break;
-      }
+      return(AcquireCometKernel(kernel,args));
     case BinomialKernel:
-      {
-        const size_t
-          max_order = (sizeof(size_t) > 4) ? 20 : 12;
-
-        size_t
-          order_f;
-
-        if (args->rho < 1.0)
-          kernel->width = kernel->height = 3;  /* default radius = 1 */
-        else
-          kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          /* Check if kernel order (width-1) would overflow fact() */
-        if ((kernel->width-1) > max_order)
-          return(DestroyKernelInfo(kernel));
-
-        order_f = fact(kernel->width-1);
-
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        /* set all kernel values within diamond area to scale given */
-        for ( i=0, v=0; v < (ssize_t)kernel->height; v++)
-          {
-            size_t
-              alpha = order_f / ( fact((size_t) v) * fact(kernel->height-(size_t) v-1) );
-
-            for ( u=0; u < (ssize_t)kernel->width; u++, i++)
-              kernel->positive_range += kernel->values[i] = (double)
-                (alpha * order_f / ( fact((size_t) u) * fact(kernel->height-(size_t) u-1) ));
-          }
-        kernel->minimum = 1.0;
-        kernel->maximum = kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width];
-        kernel->negative_range = 0.0;
-        break;
-      }
+      return(AcquireBinomialKernel(kernel,args));
 
     /*
       Convolution Kernels - Well Known Named Constant Kernels
     */
     case LaplacianKernel:
-      { switch ( (int) args->rho ) {
-          case 0:
-          default: /* laplacian square filter -- default */
-            kernel=ParseKernelArray("3: -1,-1,-1  -1,8,-1  -1,-1,-1");
-            break;
-          case 1:  /* laplacian diamond filter */
-            kernel=ParseKernelArray("3: 0,-1,0  -1,4,-1  0,-1,0");
-            break;
-          case 2:
-            kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
-            break;
-          case 3:
-            kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  1,-2,1");
-            break;
-          case 5:   /* a 5x5 laplacian */
-            kernel=ParseKernelArray(
-              "5: -4,-1,0,-1,-4  -1,2,3,2,-1  0,3,4,3,0  -1,2,3,2,-1  -4,-1,0,-1,-4");
-            break;
-          case 7:   /* a 7x7 laplacian */
-            kernel=ParseKernelArray(
-              "7:-10,-5,-2,-1,-2,-5,-10 -5,0,3,4,3,0,-5 -2,3,6,7,6,3,-2 -1,4,7,8,7,4,-1 -2,3,6,7,6,3,-2 -5,0,3,4,3,0,-5 -10,-5,-2,-1,-2,-5,-10" );
-            break;
-          case 15:  /* a 5x5 LoG (sigma approx 1.4) */
-            kernel=ParseKernelArray(
-              "5: 0,0,-1,0,0  0,-1,-2,-1,0  -1,-2,16,-2,-1  0,-1,-2,-1,0  0,0,-1,0,0");
-            break;
-          case 19:  /* a 9x9 LoG (sigma approx 1.4) */
-            /* http://www.cscjournals.org/csc/manuscript/Journals/IJIP/volume3/Issue1/IJIP-15.pdf */
-            kernel=ParseKernelArray(
-              "9: 0,-1,-1,-2,-2,-2,-1,-1,0  -1,-2,-4,-5,-5,-5,-4,-2,-1  -1,-4,-5,-3,-0,-3,-5,-4,-1  -2,-5,-3,12,24,12,-3,-5,-2  -2,-5,-0,24,40,24,-0,-5,-2  -2,-5,-3,12,24,12,-3,-5,-2  -1,-4,-5,-3,-0,-3,-5,-4,-1  -1,-2,-4,-5,-5,-5,-4,-2,-1  0,-1,-1,-2,-2,-2,-1,-1,0");
-            break;
-        }
-        if (kernel == (KernelInfo *) NULL)
-          return(kernel);
-        kernel->type = type;
-        break;
-      }
+      return(AcquireLaplacianKernel(kernel,type,args));
     case SobelKernel:
       { /* Simple Sobel Kernel */
         kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
@@ -1426,225 +2216,20 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       /* Direction is set to be left to right positive */
       /* http://www.math.tau.ac.il/~turkel/notes/edge_detectors.pdf -- RIGHT? */
       /* http://ltswww.epfl.ch/~courstiv/exos_labos/sol3.pdf -- WRONG? */
-      { switch ( (int) args->rho ) {
-          default:
-          case 0:
-            kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[3] = +(MagickRealType) MagickSQ2;
-            kernel->values[5] = -(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);     /* recalculate meta-data */
-            break;
-          case 2:
-            kernel=ParseKernelArray("3: 1,2,0  2,0,-2  0,-2,-1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[1] = kernel->values[3]= +(MagickRealType) MagickSQ2;
-            kernel->values[5] = kernel->values[7]= -(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);     /* recalculate meta-data */
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 10:
-          {
-            kernel=AcquireKernelInfo("FreiChen:11;FreiChen:12;FreiChen:13;FreiChen:14;FreiChen:15;FreiChen:16;FreiChen:17;FreiChen:18;FreiChen:19",exception);
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            break;
-          }
-          case 1:
-          case 11:
-            kernel=ParseKernelArray("3: 1,0,-1  2,0,-2  1,0,-1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[3] = +(MagickRealType) MagickSQ2;
-            kernel->values[5] = -(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);     /* recalculate meta-data */
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 12:
-            kernel=ParseKernelArray("3: 1,2,1  0,0,0  1,2,1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[1] = +(MagickRealType) MagickSQ2;
-            kernel->values[7] = +(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 13:
-            kernel=ParseKernelArray("3: 2,-1,0  -1,0,1  0,1,-2");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[0] = +(MagickRealType) MagickSQ2;
-            kernel->values[8] = -(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 14:
-            kernel=ParseKernelArray("3: 0,1,-2  -1,0,1  2,-1,0");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            kernel->values[2] = -(MagickRealType) MagickSQ2;
-            kernel->values[6] = +(MagickRealType) MagickSQ2;
-            CalcKernelMetaData(kernel);
-            ScaleKernelInfo(kernel, (double) (1.0/2.0*MagickSQ2), NoValue);
-            break;
-          case 15:
-            kernel=ParseKernelArray("3: 0,-1,0  1,0,1  0,-1,0");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
-            break;
-          case 16:
-            kernel=ParseKernelArray("3: 1,0,-1  0,0,0  -1,0,1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/2.0, NoValue);
-            break;
-          case 17:
-            kernel=ParseKernelArray("3: 1,-2,1  -2,4,-2  -1,-2,1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
-            break;
-          case 18:
-            kernel=ParseKernelArray("3: -2,1,-2  1,4,1  -2,1,-2");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/6.0, NoValue);
-            break;
-          case 19:
-            kernel=ParseKernelArray("3: 1,1,1  1,1,1  1,1,1");
-            if (kernel == (KernelInfo *) NULL)
-              return(kernel);
-            kernel->type = type;
-            ScaleKernelInfo(kernel, 1.0/3.0, NoValue);
-            break;
-        }
-        if ( fabs(args->sigma) >= MagickEpsilon )
-          /* Rotate by correctly supplied 'angle' */
-          RotateKernelInfo(kernel, args->sigma);
-        else if ( args->rho > 30.0 || args->rho < -30.0 )
-          /* Rotate by out of bounds 'type' */
-          RotateKernelInfo(kernel, args->rho);
-        break;
-      }
+      return(AcquireFreiChenKernel(kernel,type,args,exception));
 
     /*
       Boolean or Shaped Kernels
     */
     case DiamondKernel:
-      {
-        if (args->rho < 1.0)
-          kernel->width = kernel->height = 3;  /* default radius = 1 */
-        else
-          kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-        kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        /* set all kernel values within diamond area to scale given */
-        for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-            if ( (labs((long) u)+labs((long) v)) <= (long) kernel->x)
-              kernel->positive_range += kernel->values[i] = args->sigma;
-            else
-              kernel->values[i] = nan;
-        kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
-        break;
-      }
+      return(AcquireDiamondKernel(kernel,args,nan));
     case SquareKernel:
     case RectangleKernel:
-      { double
-          scale;
-        if ( type == SquareKernel )
-          {
-            if (args->rho < 1.0)
-              kernel->width = kernel->height = 3;  /* default radius = 1 */
-            else
-              kernel->width = kernel->height = CastDoubleToSizeT(args->rho*2+1);
-            kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-            scale = args->sigma;
-          }
-        else {
-            /* NOTE: user defaults set in "AcquireKernelInfo()" */
-            if ( args->rho < 1.0 || args->sigma < 1.0 )
-              return(DestroyKernelInfo(kernel));    /* invalid args given */
-            kernel->width = CastDoubleToSizeT(args->rho);
-            kernel->height = CastDoubleToSizeT(args->sigma);
-            if ((args->xi < 0.0) || (args->xi  >= (double) kernel->width) ||
-                (args->psi < 0.0) || (args->psi >= (double) kernel->height))
-              return(DestroyKernelInfo(kernel));    /* invalid args given */
-            kernel->x = (ssize_t) args->xi;
-            kernel->y = (ssize_t) args->psi;
-            scale = 1.0;
-          }
-        if (AcquireKernelValues(kernel) == MagickFalse)
-          return(DestroyKernelInfo(kernel));
-
-        /* set all kernel values to scale given */
-        u=(ssize_t) (kernel->width*kernel->height);
-        for ( i=0; i < u; i++)
-            kernel->values[i] = scale;
-        kernel->minimum = kernel->maximum = scale;   /* a flat shape */
-        kernel->positive_range = scale*u;
-        break;
-      }
+      return(AcquireRectangleKernel(kernel,type,args));
       case OctagonKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 5;  /* default radius = 2 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              if ( (labs((long) u)+labs((long) v)) <=
-                        ((long)kernel->x + (long)(kernel->x/2)) )
-                kernel->positive_range += kernel->values[i] = args->sigma;
-              else
-                kernel->values[i] = nan;
-          kernel->minimum = kernel->maximum = args->sigma;  /* a flat shape */
-          break;
-        }
+        return(AcquireOctagonKernel(kernel,args,nan));
       case DiskKernel:
-        {
-          ssize_t
-            limit = (ssize_t)(args->rho*args->rho);
-
-          if (args->rho < 0.4)           /* default radius approx 4.3 */
-            kernel->width = kernel->height = 9L, limit = 18L;
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(fabs(args->rho))*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              if ((u*u+v*v) <= limit)
-                kernel->positive_range += kernel->values[i] = args->sigma;
-              else
-                kernel->values[i] = nan;
-          kernel->minimum = kernel->maximum = args->sigma;   /* a flat shape */
-          break;
-        }
+        return(AcquireDiskKernel(kernel,args,nan));
       case PlusKernel:
         {
           if (args->rho < 1.0)
@@ -1688,60 +2273,9 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
       */
       case RingKernel:
       case PeaksKernel:
-        {
-          ssize_t
-            limit1,
-            limit2,
-            scale;
-
-          if (args->rho < args->sigma)
-            {
-              kernel->width = CastDoubleToSizeT(args->sigma)*2+1;
-              limit1 = (ssize_t)(args->rho*args->rho);
-              limit2 = (ssize_t)(args->sigma*args->sigma);
-            }
-          else
-            {
-              kernel->width = CastDoubleToSizeT(args->rho)*2+1;
-              limit1 = (ssize_t)(args->sigma*args->sigma);
-              limit2 = (ssize_t)(args->rho*args->rho);
-            }
-          if ( limit2 <= 0 )
-            kernel->width = 7L, limit1 = 7L, limit2 = 11L;
-
-          kernel->height = kernel->width;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          /* set a ring of points of 'scale' ( 0.0 for PeaksKernel ) */
-          scale = (ssize_t) (( type == PeaksKernel) ? 0.0 : args->xi);
-          for ( i=0, v= -kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              { ssize_t radius=u*u+v*v;
-                if (limit1 < radius && radius <= limit2)
-                  kernel->positive_range += kernel->values[i] = (double) scale;
-                else
-                  kernel->values[i] = nan;
-              }
-          kernel->minimum = kernel->maximum = (double) scale;
-          if ( type == PeaksKernel ) {
-            /* set the central point in the middle */
-            kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-            kernel->positive_range = 1.0;
-            kernel->maximum = 1.0;
-          }
-          break;
-        }
+        return(AcquireRingKernel(kernel,type,args,nan));
       case EdgesKernel:
-        {
-          kernel=AcquireKernelInfo("ThinSE:482",exception);
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          ExpandMirrorKernelInfo(kernel); /* mirror expansion of kernels */
-          break;
-        }
+        return(AcquireEdgesKernel(kernel,type,exception));
       case CornersKernel:
         {
           kernel=AcquireKernelInfo("ThinSE:87",exception);
@@ -1752,347 +2286,24 @@ MagickExport KernelInfo *AcquireKernelBuiltIn(const KernelInfoType type,
           break;
         }
       case DiagonalsKernel:
-        {
-          switch ( (int) args->rho ) {
-            case 0:
-            default:
-              { KernelInfo
-                  *new_kernel;
-                kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
-                if (kernel == (KernelInfo *) NULL)
-                  return(kernel);
-                kernel->type = type;
-                new_kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
-                if (new_kernel == (KernelInfo *) NULL)
-                  return(DestroyKernelInfo(kernel));
-                new_kernel->type = type;
-                LastKernelInfo(kernel)->next = new_kernel;
-                ExpandMirrorKernelInfo(kernel);
-                return(kernel);
-              }
-            case 1:
-              kernel=ParseKernelArray("3: 0,0,0  0,-,1  1,1,-");
-              break;
-            case 2:
-              kernel=ParseKernelArray("3: 0,0,1  0,-,1  0,1,-");
-              break;
-          }
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          RotateKernelInfo(kernel, args->sigma);
-          break;
-        }
+        return(AcquireDiagonalsKernel(kernel,type,args));
       case LineEndsKernel:
-        { /* Kernels for finding the end of thin lines */
-          switch ( (int) args->rho ) {
-            case 0:
-            default:
-              /* set of kernels to find all end of lines */
-              return(AcquireKernelInfo("LineEnds:1>;LineEnds:2>",exception));
-            case 1:
-              /* kernel for 4-connected line ends - no rotation */
-              kernel=ParseKernelArray("3: 0,0,-  0,1,1  0,0,-");
-              break;
-          case 2:
-              /* kernel to add for 8-connected lines - no rotation */
-              kernel=ParseKernelArray("3: 0,0,0  0,1,0  0,0,1");
-              break;
-          case 3:
-              /* kernel to add for orthogonal line ends - does not find corners */
-              kernel=ParseKernelArray("3: 0,0,0  0,1,1  0,0,0");
-              break;
-          case 4:
-              /* traditional line end - fails on last T end */
-              kernel=ParseKernelArray("3: 0,0,0  0,1,-  0,0,-");
-              break;
-          }
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          RotateKernelInfo(kernel, args->sigma);
-          break;
-        }
+        return(AcquireLineEndsKernel(kernel,type,args,exception));
       case LineJunctionsKernel:
-        { /* kernels for finding the junctions of multiple lines */
-          switch ( (int) args->rho ) {
-            case 0:
-            default:
-              /* set of kernels to find all line junctions */
-              return(AcquireKernelInfo("LineJunctions:1@;LineJunctions:2>",exception));
-            case 1:
-              /* Y Junction */
-              kernel=ParseKernelArray("3: 1,-,1  -,1,-  -,1,-");
-              break;
-            case 2:
-              /* Diagonal T Junctions */
-              kernel=ParseKernelArray("3: 1,-,-  -,1,-  1,-,1");
-              break;
-            case 3:
-              /* Orthogonal T Junctions */
-              kernel=ParseKernelArray("3: -,-,-  1,1,1  -,1,-");
-              break;
-            case 4:
-              /* Diagonal X Junctions */
-              kernel=ParseKernelArray("3: 1,-,1  -,1,-  1,-,1");
-              break;
-            case 5:
-              /* Orthogonal X Junctions - minimal diamond kernel */
-              kernel=ParseKernelArray("3: -,1,-  1,1,1  -,1,-");
-              break;
-          }
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          RotateKernelInfo(kernel, args->sigma);
-          break;
-        }
+        return(AcquireLineJunctionsKernel(kernel,type,args,exception));
       case RidgesKernel:
-        { /* Ridges - Ridge finding kernels */
-          KernelInfo
-            *new_kernel;
-          switch ( (int) args->rho ) {
-            case 1:
-            default:
-              kernel=ParseKernelArray("3x1:0,1,0");
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              kernel->type = type;
-              ExpandRotateKernelInfo(kernel, 90.0); /* 2 rotated kernels (symmetrical) */
-              break;
-            case 2:
-              kernel=ParseKernelArray("4x1:0,1,1,0");
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              kernel->type = type;
-              ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotated kernels */
-
-              /* Kernels to find a stepped 'thick' line, 4 rotates + mirrors */
-              /* Unfortunately we can not yet rotate a non-square kernel */
-              /* But then we can't flip a non-symmetrical kernel either */
-              new_kernel=ParseKernelArray("4x3+1+1:0,1,1,- -,1,1,- -,1,1,0");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("4x3+2+1:0,1,1,- -,1,1,- -,1,1,0");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("4x3+1+1:-,1,1,0 -,1,1,- 0,1,1,-");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("4x3+2+1:-,1,1,0 -,1,1,- 0,1,1,-");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("3x4+1+1:0,-,- 1,1,1 1,1,1 -,-,0");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("3x4+1+2:0,-,- 1,1,1 1,1,1 -,-,0");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("3x4+1+1:-,-,0 1,1,1 1,1,1 0,-,-");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              new_kernel=ParseKernelArray("3x4+1+2:-,-,0 1,1,1 1,1,1 0,-,-");
-              if (new_kernel == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              new_kernel->type = type;
-              LastKernelInfo(kernel)->next = new_kernel;
-              break;
-          }
-          break;
-        }
+        return(AcquireRidgesKernel(kernel,type,args));
       case ConvexHullKernel:
-        {
-          KernelInfo
-            *new_kernel;
-          /* first set of 8 kernels */
-          kernel=ParseKernelArray("3: 1,1,-  1,0,-  1,-,0");
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          ExpandRotateKernelInfo(kernel, 90.0);
-          /* append the mirror versions too - no flip function yet */
-          new_kernel=ParseKernelArray("3: 1,1,1  1,0,-  -,-,0");
-          if (new_kernel == (KernelInfo *) NULL)
-            return(DestroyKernelInfo(kernel));
-          new_kernel->type = type;
-          ExpandRotateKernelInfo(new_kernel, 90.0);
-          LastKernelInfo(kernel)->next = new_kernel;
-          break;
-        }
+        return(AcquireConvexHullKernel(kernel,type));
       case SkeletonKernel:
-        {
-          switch ( (int) args->rho ) {
-            case 1:
-            default:
-              /* Traditional Skeleton...
-              ** A cyclically rotated single kernel
-              */
-              kernel=AcquireKernelInfo("ThinSE:482",exception);
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              kernel->type = type;
-              ExpandRotateKernelInfo(kernel, 45.0); /* 8 rotations */
-              break;
-            case 2:
-              /* HIPR Variation of the cyclic skeleton
-              ** Corners of the traditional method made more forgiving,
-              ** but the retain the same cyclic order.
-              */
-              kernel=AcquireKernelInfo("ThinSE:482; ThinSE:87x90;",exception);
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              if (kernel->next == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              kernel->type = type;
-              kernel->next->type = type;
-              ExpandRotateKernelInfo(kernel, 90.0); /* 4 rotations of the 2 kernels */
-              break;
-            case 3:
-              /* Dan Bloomberg Skeleton, from his paper on 3x3 thinning SE's
-              ** "Connectivity-Preserving Morphological Image Transformations"
-              ** by Dan S. Bloomberg, available on Leptonica, Selected Papers,
-              **   http://www.leptonica.com/papers/conn.pdf
-              */
-              kernel=AcquireKernelInfo("ThinSE:41; ThinSE:42; ThinSE:43",
-                exception);
-              if (kernel == (KernelInfo *) NULL)
-                return(kernel);
-              if (kernel->next == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              if (kernel->next->next == (KernelInfo *) NULL)
-                return(DestroyKernelInfo(kernel));
-              kernel->type = type;
-              kernel->next->type = type;
-              kernel->next->next->type = type;
-              ExpandMirrorKernelInfo(kernel); /* 12 kernels total */
-              break;
-           }
-          break;
-        }
+        return(AcquireSkeletonKernel(kernel,type,args,exception));
       case ThinSEKernel:
-        { /* Special kernels for general thinning, while preserving connections
-          ** "Connectivity-Preserving Morphological Image Transformations"
-          ** by Dan S. Bloomberg, available on Leptonica, Selected Papers,
-          **   http://www.leptonica.com/papers/conn.pdf
-          ** And
-          **   http://tpgit.github.com/Leptonica/ccthin_8c_source.html
-          **
-          ** Note kernels do not specify the origin pixel, allowing them
-          ** to be used for both thickening and thinning operations.
-          */
-          switch ( (int) args->rho ) {
-            /* SE for 4-connected thinning */
-            case 41: /* SE_4_1 */
-              kernel=ParseKernelArray("3: -,-,1  0,-,1  -,-,1");
-              break;
-            case 42: /* SE_4_2 */
-              kernel=ParseKernelArray("3: -,-,1  0,-,1  -,0,-");
-              break;
-            case 43: /* SE_4_3 */
-              kernel=ParseKernelArray("3: -,0,-  0,-,1  -,-,1");
-              break;
-            case 44: /* SE_4_4 */
-              kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,-");
-              break;
-            case 45: /* SE_4_5 */
-              kernel=ParseKernelArray("3: -,0,1  0,-,1  -,0,-");
-              break;
-            case 46: /* SE_4_6 */
-              kernel=ParseKernelArray("3: -,0,-  0,-,1  -,0,1");
-              break;
-            case 47: /* SE_4_7 */
-              kernel=ParseKernelArray("3: -,1,1  0,-,1  -,0,-");
-              break;
-            case 48: /* SE_4_8 */
-              kernel=ParseKernelArray("3: -,-,1  0,-,1  0,-,1");
-              break;
-            case 49: /* SE_4_9 */
-              kernel=ParseKernelArray("3: 0,-,1  0,-,1  -,-,1");
-              break;
-            /* SE for 8-connected thinning - negatives of the above */
-            case 81: /* SE_8_0 */
-              kernel=ParseKernelArray("3: -,1,-  0,-,1  -,1,-");
-              break;
-            case 82: /* SE_8_2 */
-              kernel=ParseKernelArray("3: -,1,-  0,-,1  0,-,-");
-              break;
-            case 83: /* SE_8_3 */
-              kernel=ParseKernelArray("3: 0,-,-  0,-,1  -,1,-");
-              break;
-            case 84: /* SE_8_4 */
-              kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,-");
-              break;
-            case 85: /* SE_8_5 */
-              kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,-");
-              break;
-            case 86: /* SE_8_6 */
-              kernel=ParseKernelArray("3: 0,-,-  0,-,1  0,-,1");
-              break;
-            case 87: /* SE_8_7 */
-              kernel=ParseKernelArray("3: -,1,-  0,-,1  0,0,-");
-              break;
-            case 88: /* SE_8_8 */
-              kernel=ParseKernelArray("3: -,1,-  0,-,1  0,1,-");
-              break;
-            case 89: /* SE_8_9 */
-              kernel=ParseKernelArray("3: 0,1,-  0,-,1  -,1,-");
-              break;
-            /* Special combined SE kernels */
-            case 423: /* SE_4_2 , SE_4_3 Combined Kernel */
-              kernel=ParseKernelArray("3: -,-,1  0,-,-  -,0,-");
-              break;
-            case 823: /* SE_8_2 , SE_8_3 Combined Kernel */
-              kernel=ParseKernelArray("3: -,1,-  -,-,1  0,-,-");
-              break;
-            case 481: /* SE_48_1 - General Connected Corner Kernel */
-              kernel=ParseKernelArray("3: -,1,1  0,-,1  0,0,-");
-              break;
-            default:
-            case 482: /* SE_48_2 - General Edge Kernel */
-              kernel=ParseKernelArray("3: 0,-,1  0,-,1  0,-,1");
-              break;
-          }
-          if (kernel == (KernelInfo *) NULL)
-            return(kernel);
-          kernel->type = type;
-          RotateKernelInfo(kernel, args->sigma);
-          break;
-        }
+        return(AcquireThinSEKernel(kernel,type,args));
       /*
         Distance Measuring Kernels
       */
       case ChebyshevKernel:
-        {
-          if (args->rho < 1.0)
-            kernel->width = kernel->height = 3;  /* default radius = 1 */
-          else
-            kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
-          kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-
-          if (AcquireKernelValues(kernel) == MagickFalse)
-            return(DestroyKernelInfo(kernel));
-
-          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
-            for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
-              kernel->positive_range += ( kernel->values[i] =
-                  args->sigma*MagickMax(fabs((double)u),fabs((double)v)) );
-          kernel->maximum = kernel->values[0];
-          break;
-        }
+        return(AcquireChebyshevKernel(kernel,args));
       case ManhattanKernel:
         {
           if (args->rho < 1.0)
@@ -2334,6 +2545,15 @@ static void ExpandMirrorKernelInfo(KernelInfo *kernel)
   return;
 }
 
+static inline MagickBooleanType IsKernelShapeDifferent(
+  const KernelInfo *kernel1,const KernelInfo *kernel2)
+{
+  return((    kernel1->width != kernel2->width
+       || kernel1->height != kernel2->height
+       || kernel1->x != kernel2->x
+       || kernel1->y != kernel2->y ) ? MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2374,10 +2594,7 @@ static MagickBooleanType SameKernelInfo(const KernelInfo *kernel1,
     i;
 
   /* check size and origin location */
-  if (    kernel1->width != kernel2->width
-       || kernel1->height != kernel2->height
-       || kernel1->x != kernel2->x
-       || kernel1->y != kernel2->y )
+  if (IsKernelShapeDifferent(kernel1,kernel2) != MagickFalse)
     return MagickFalse;
 
   /* check actual kernel values */
@@ -4100,6 +4317,47 @@ exit_cleanup:
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static CompositeOperator GetMorphologyCompose(const Image *image,
+  CompositeOperator compose,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  ssize_t
+    parse;
+
+  artifact = GetImageArtifact(image,"morphology:compose");
+  if ( artifact != (const char *) NULL) {
+    parse=ParseCommandOption(MagickComposeOptions,
+      MagickFalse,artifact);
+    if ( parse < 0 )
+      (void) ThrowMagickException(exception,GetMagickModule(),
+           OptionWarning,"UnrecognizedComposeOperator","'%s' '%s'",
+           "morphology:compose",artifact);
+    else
+      compose=(CompositeOperator)parse;
+  }
+  return(compose);
+}
+
+static double GetConvolveBias(const Image *image,double bias,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  artifact = GetImageArtifact(image,"convolve:bias");
+  if ( artifact != (const char *) NULL) {
+    if (IsGeometry(artifact) == MagickFalse)
+      (void) ThrowMagickException(exception,GetMagickModule(),
+           OptionWarning,"InvalidSetting","'%s' '%s'",
+           "convolve:bias",artifact);
+    else
+      bias=StringToDoubleInterval(artifact,(double) QuantumRange+1.0);
+  }
+  return(bias);
+}
+
 MagickExport Image *MorphologyImage(const Image *image,
   const MorphologyMethod method,const ssize_t iterations,
   const KernelInfo *kernel,ExceptionInfo *exception)
@@ -4135,15 +4393,7 @@ MagickExport Image *MorphologyImage(const Image *image,
    */
   if ( method == ConvolveMorphology || method == CorrelateMorphology ) {
       /* Get the bias value as it will be needed */
-      artifact = GetImageArtifact(image,"convolve:bias");
-      if ( artifact != (const char *) NULL) {
-        if (IsGeometry(artifact) == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-               OptionWarning,"InvalidSetting","'%s' '%s'",
-               "convolve:bias",artifact);
-        else
-          bias=StringToDoubleInterval(artifact,(double) QuantumRange+1.0);
-      }
+      bias=GetConvolveBias(image,bias,exception);
 
       /* Scale kernel according to user wishes */
       artifact = GetImageArtifact(image,"convolve:scale");
@@ -4173,22 +4423,7 @@ MagickExport Image *MorphologyImage(const Image *image,
    * Otherwise merge resulting images using compose method given.
    * Default for 'HitAndMiss' is 'Lighten'.
    */
-  {
-    ssize_t
-      parse;
-
-    artifact = GetImageArtifact(image,"morphology:compose");
-    if ( artifact != (const char *) NULL) {
-      parse=ParseCommandOption(MagickComposeOptions,
-        MagickFalse,artifact);
-      if ( parse < 0 )
-        (void) ThrowMagickException(exception,GetMagickModule(),
-             OptionWarning,"UnrecognizedComposeOperator","'%s' '%s'",
-             "morphology:compose",artifact);
-      else
-        compose=(CompositeOperator)parse;
-    }
-  }
+  compose=GetMorphologyCompose(image,compose,exception);
   /* Apply the Morphology */
   morphology_image = MorphologyApply(image,method,iterations,
     curr_kernel,compose,bias,exception);
@@ -4229,6 +4464,140 @@ MagickExport Image *MorphologyImage(const Image *image,
 % This function is currently internal to this module only, but can be exported
 % to other modules if needed.
 */
+static double RotateKernelBy45Degrees(KernelInfo *kernel,double angle)
+{
+  /* Rotate a 3x3 square by 45 degree angle */
+  double t  = kernel->values[0];
+  kernel->values[0] = kernel->values[3];
+  kernel->values[3] = kernel->values[6];
+  kernel->values[6] = kernel->values[7];
+  kernel->values[7] = kernel->values[8];
+  kernel->values[8] = kernel->values[5];
+  kernel->values[5] = kernel->values[2];
+  kernel->values[2] = kernel->values[1];
+  kernel->values[1] = t;
+  /* rotate non-centered origin */
+  if ( kernel->x != 1 || kernel->y != 1 ) {
+    ssize_t x,y;
+    x = (ssize_t) kernel->x-1;
+    y = (ssize_t) kernel->y-1;
+         if ( x == y  ) x = 0;
+    else if ( x == 0  ) x = -y;
+    else if ( x == -y ) y = 0;
+    else if ( y == 0  ) y = x;
+    kernel->x = (ssize_t) x+1;
+    kernel->y = (ssize_t) y+1;
+  }
+  angle = fmod(angle+315.0, 360.0);  /* angle reduced 45 degrees */
+  kernel->angle = fmod(kernel->angle+45.0, 360.0);
+  return(angle);
+}
+
+static double TransposeKernel(KernelInfo *kernel,double angle)
+{
+  /* Do a transpose of a 1 dimensional kernel,
+  ** which results in a fast 90 degree rotation of some type.
+  */
+  ssize_t
+    t;
+  t = (ssize_t) kernel->width;
+  kernel->width = kernel->height;
+  kernel->height = (size_t) t;
+  t = kernel->x;
+  kernel->x = kernel->y;
+  kernel->y = t;
+  if ( kernel->width == 1 ) {
+    angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
+    kernel->angle = fmod(kernel->angle+90.0, 360.0);
+  } else {
+    angle = fmod(angle+90.0, 360.0);   /* angle increased 90 degrees */
+    kernel->angle = fmod(kernel->angle+270.0, 360.0);
+  }
+  return(angle);
+}
+
+static double RotateSquareKernelBy90Degrees(KernelInfo *kernel,double angle)
+{
+  /* Rotate a square array of values by 90 degrees */
+  { ssize_t
+      i,j,x,y;
+
+    MagickRealType
+      *k,t;
+
+    k=kernel->values;
+    for( i=0, x=(ssize_t) kernel->width-1;  i<=x;   i++, x--)
+      for( j=0, y=(ssize_t) kernel->height-1;  j<y;   j++, y--)
+        { t                    = k[i+j*(ssize_t) kernel->width];
+          k[i+j*(ssize_t) kernel->width] = k[j+x*(ssize_t) kernel->width];
+          k[j+x*(ssize_t) kernel->width] = k[x+y*(ssize_t) kernel->width];
+          k[x+y*(ssize_t) kernel->width] = k[y+i*(ssize_t) kernel->width];
+          k[y+i*(ssize_t) kernel->width] = t;
+        }
+  }
+  /* rotate the origin - relative to center of array */
+  { ssize_t x,y;
+    x = (ssize_t) (kernel->x*2-(ssize_t) kernel->width+1);
+    y = (ssize_t) (kernel->y*2-(ssize_t) kernel->height+1);
+    kernel->x = (ssize_t) ( -y +(ssize_t) kernel->width-1)/2;
+    kernel->y = (ssize_t) ( +x +(ssize_t) kernel->height-1)/2;
+  }
+  angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
+  kernel->angle = fmod(kernel->angle+90.0, 360.0);
+  return(angle);
+}
+
+static double ReflectKernel(KernelInfo *kernel,double angle)
+{
+  /* For a 180 degree rotation - also know as a reflection
+   * This is actually a very very common operation!
+   * Basically all that is needed is a reversal of the kernel data!
+   * And a reflection of the origin
+   */
+  MagickRealType
+    t;
+
+  MagickRealType
+    *k;
+
+  ssize_t
+    i,
+    j;
+
+  k=kernel->values;
+  j=(ssize_t) (kernel->width*kernel->height-1);
+  for (i=0;  i < j;  i++, j--)
+    t=k[i],  k[i]=k[j],  k[j]=t;
+
+  kernel->x = (ssize_t) kernel->width  - kernel->x - 1;
+  kernel->y = (ssize_t) kernel->height - kernel->y - 1;
+  angle = fmod(angle-180.0, 360.0);   /* angle+180 degrees */
+  kernel->angle = fmod(kernel->angle+180.0, 360.0);
+  return(angle);
+}
+
+static double AttemptKernelRotationBy45Degrees(KernelInfo *kernel,
+  double angle)
+{
+  if ( kernel->width == 3 && kernel->height == 3 )
+    angle=RotateKernelBy45Degrees(kernel,angle);
+  else
+    perror("Unable to rotate non-3x3 kernel by 45 degrees");
+  return(angle);
+}
+
+static double AttemptKernelRotationBy90Degrees(KernelInfo *kernel,
+  double angle)
+{
+  if ( kernel->width == 1 || kernel->height == 1 )
+    angle=TransposeKernel(kernel,angle);
+  else if ( kernel->width == kernel->height )
+    angle=RotateSquareKernelBy90Degrees(kernel,angle);
+  else
+    perror("Unable to rotate a non-square, non-linear kernel 90 degrees");
+  return(angle);
+}
+
 static void RotateKernelInfo(KernelInfo *kernel, double angle)
 {
   /* angle the lower kernels first */
@@ -4284,116 +4653,11 @@ static void RotateKernelInfo(KernelInfo *kernel, double angle)
   }
   /* Attempt rotations by 45 degrees  -- 3x3 kernels only */
   if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
-    {
-      if ( kernel->width == 3 && kernel->height == 3 )
-        { /* Rotate a 3x3 square by 45 degree angle */
-          double t  = kernel->values[0];
-          kernel->values[0] = kernel->values[3];
-          kernel->values[3] = kernel->values[6];
-          kernel->values[6] = kernel->values[7];
-          kernel->values[7] = kernel->values[8];
-          kernel->values[8] = kernel->values[5];
-          kernel->values[5] = kernel->values[2];
-          kernel->values[2] = kernel->values[1];
-          kernel->values[1] = t;
-          /* rotate non-centered origin */
-          if ( kernel->x != 1 || kernel->y != 1 ) {
-            ssize_t x,y;
-            x = (ssize_t) kernel->x-1;
-            y = (ssize_t) kernel->y-1;
-                 if ( x == y  ) x = 0;
-            else if ( x == 0  ) x = -y;
-            else if ( x == -y ) y = 0;
-            else if ( y == 0  ) y = x;
-            kernel->x = (ssize_t) x+1;
-            kernel->y = (ssize_t) y+1;
-          }
-          angle = fmod(angle+315.0, 360.0);  /* angle reduced 45 degrees */
-          kernel->angle = fmod(kernel->angle+45.0, 360.0);
-        }
-      else
-        perror("Unable to rotate non-3x3 kernel by 45 degrees");
-    }
+    angle=AttemptKernelRotationBy45Degrees(kernel,angle);
   if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
-    {
-      if ( kernel->width == 1 || kernel->height == 1 )
-        { /* Do a transpose of a 1 dimensional kernel,
-          ** which results in a fast 90 degree rotation of some type.
-          */
-          ssize_t
-            t;
-          t = (ssize_t) kernel->width;
-          kernel->width = kernel->height;
-          kernel->height = (size_t) t;
-          t = kernel->x;
-          kernel->x = kernel->y;
-          kernel->y = t;
-          if ( kernel->width == 1 ) {
-            angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
-            kernel->angle = fmod(kernel->angle+90.0, 360.0);
-          } else {
-            angle = fmod(angle+90.0, 360.0);   /* angle increased 90 degrees */
-            kernel->angle = fmod(kernel->angle+270.0, 360.0);
-          }
-        }
-      else if ( kernel->width == kernel->height )
-        { /* Rotate a square array of values by 90 degrees */
-          { ssize_t
-              i,j,x,y;
-
-            MagickRealType
-              *k,t;
-
-            k=kernel->values;
-            for( i=0, x=(ssize_t) kernel->width-1;  i<=x;   i++, x--)
-              for( j=0, y=(ssize_t) kernel->height-1;  j<y;   j++, y--)
-                { t                    = k[i+j*(ssize_t) kernel->width];
-                  k[i+j*(ssize_t) kernel->width] = k[j+x*(ssize_t) kernel->width];
-                  k[j+x*(ssize_t) kernel->width] = k[x+y*(ssize_t) kernel->width];
-                  k[x+y*(ssize_t) kernel->width] = k[y+i*(ssize_t) kernel->width];
-                  k[y+i*(ssize_t) kernel->width] = t;
-                }
-          }
-          /* rotate the origin - relative to center of array */
-          { ssize_t x,y;
-            x = (ssize_t) (kernel->x*2-(ssize_t) kernel->width+1);
-            y = (ssize_t) (kernel->y*2-(ssize_t) kernel->height+1);
-            kernel->x = (ssize_t) ( -y +(ssize_t) kernel->width-1)/2;
-            kernel->y = (ssize_t) ( +x +(ssize_t) kernel->height-1)/2;
-          }
-          angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
-          kernel->angle = fmod(kernel->angle+90.0, 360.0);
-        }
-      else
-        perror("Unable to rotate a non-square, non-linear kernel 90 degrees");
-    }
+    angle=AttemptKernelRotationBy90Degrees(kernel,angle);
   if ( 135.0 < angle && angle <= 225.0 )
-    {
-      /* For a 180 degree rotation - also know as a reflection
-       * This is actually a very very common operation!
-       * Basically all that is needed is a reversal of the kernel data!
-       * And a reflection of the origin
-       */
-      MagickRealType
-        t;
-
-      MagickRealType
-        *k;
-
-      ssize_t
-        i,
-        j;
-
-      k=kernel->values;
-      j=(ssize_t) (kernel->width*kernel->height-1);
-      for (i=0;  i < j;  i++, j--)
-        t=k[i],  k[i]=k[j],  k[j]=t;
-
-      kernel->x = (ssize_t) kernel->width  - kernel->x - 1;
-      kernel->y = (ssize_t) kernel->height - kernel->y - 1;
-      angle = fmod(angle-180.0, 360.0);   /* angle+180 degrees */
-      kernel->angle = fmod(kernel->angle+180.0, 360.0);
-    }
+    angle=ReflectKernel(kernel,angle);
   /* At this point angle should at least between -45 (315) and +45 degrees
    * In the future some form of non-orthogonal angled rotates could be
    * performed here, possibly with a linear kernel restriction.
@@ -4542,6 +4806,20 @@ MagickExport void ScaleGeometryKernelInfo (KernelInfo *kernel,
 %                           and/or PercentValue
 %
 */
+static double GetKernelNormalizeScale(const KernelInfo *kernel)
+{
+  double
+    pos_scale;
+
+  if ( fabs(kernel->positive_range + kernel->negative_range) >= MagickEpsilon )
+    /* non-zero-summing kernel (generally positive) */
+    pos_scale = fabs(kernel->positive_range + kernel->negative_range);
+  else
+    /* zero-summing kernel */
+    pos_scale = kernel->positive_range;
+  return(pos_scale);
+}
+
 MagickExport void ScaleKernelInfo(KernelInfo *kernel,
   const double scaling_factor,const GeometryFlags normalize_flags)
 {
@@ -4559,12 +4837,7 @@ MagickExport void ScaleKernelInfo(KernelInfo *kernel,
   /* Normalization of Kernel */
   pos_scale = 1.0;
   if ( (normalize_flags&NormalizeValue) != 0 ) {
-    if ( fabs(kernel->positive_range + kernel->negative_range) >= MagickEpsilon )
-      /* non-zero-summing kernel (generally positive) */
-      pos_scale = fabs(kernel->positive_range + kernel->negative_range);
-    else
-      /* zero-summing kernel */
-      pos_scale = kernel->positive_range;
+    pos_scale = GetKernelNormalizeScale(kernel);
   }
   /* Force kernel into a normalized zero-summing kernel */
   if ( (normalize_flags&CorrelateNormalizeValue) != 0 ) {
@@ -4629,13 +4902,30 @@ MagickExport void ScaleKernelInfo(KernelInfo *kernel,
 %    o kernel: the Morphology/Convolution kernel
 %
 */
+static void ShowKernelValues(const KernelInfo *k)
+{
+  size_t
+    i, u, v;
+
+  for (i=v=0; v < k->height; v++) {
+    (void) FormatLocaleFile(stderr, "%2lu:", (unsigned long) v );
+    for (u=0; u < k->width; u++, i++)
+      if (IsNaN(k->values[i]))
+        (void) FormatLocaleFile(stderr," %*s", GetMagickPrecision()+3, "nan");
+      else
+        (void) FormatLocaleFile(stderr," %*.*lg", GetMagickPrecision()+3,
+            GetMagickPrecision(), (double) k->values[i]);
+    (void) FormatLocaleFile(stderr,"\n");
+  }
+}
+
 MagickPrivate void ShowKernelInfo(const KernelInfo *kernel)
 {
   const KernelInfo
     *k;
 
   size_t
-    c, i, u, v;
+    c;
 
   for (c=0, k=kernel;  k != (KernelInfo *) NULL;  c++, k=k->next ) {
 
@@ -4662,16 +4952,7 @@ MagickPrivate void ShowKernelInfo(const KernelInfo *kernel)
     else
       (void) FormatLocaleFile(stderr, " (Sum %.*lg)\n",
           GetMagickPrecision(), k->positive_range+k->negative_range);
-    for (i=v=0; v < k->height; v++) {
-      (void) FormatLocaleFile(stderr, "%2lu:", (unsigned long) v );
-      for (u=0; u < k->width; u++, i++)
-        if (IsNaN(k->values[i]))
-          (void) FormatLocaleFile(stderr," %*s", GetMagickPrecision()+3, "nan");
-        else
-          (void) FormatLocaleFile(stderr," %*.*lg", GetMagickPrecision()+3,
-              GetMagickPrecision(), (double) k->values[i]);
-      (void) FormatLocaleFile(stderr,"\n");
-    }
+    ShowKernelValues(k);
   }
 }
 
