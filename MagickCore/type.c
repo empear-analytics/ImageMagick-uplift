@@ -1095,6 +1095,13 @@ static inline MagickBooleanType SetTypeNodePath(const char *filename,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsIncludeElementOpen(const char *token,
+  const char *q)
+{
+  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
   const char *filename,const size_t depth,ExceptionInfo *exception)
 {
@@ -1198,7 +1205,7 @@ static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
         /*
           Include element.
         */
-        while (((*token != '/') && (*(token+1) != '>')) && (*q != '\0'))
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
           (void) CopyMagickString(keyword,token,MagickPathExtent);
           (void) GetNextToken(q,&q,extent,token);
