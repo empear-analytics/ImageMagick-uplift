@@ -2676,6 +2676,14 @@ static const OptionInfo *GetOptionInfo(const CommandOption option)
   return((const OptionInfo *) NULL);
 }
 
+static inline MagickBooleanType IsUnknownSeparatedToken(
+  const OptionInfo *command_info,const char *token)
+{
+  return(((command_info->mnemonic == (const char *) NULL) && (*token != '\0') &&
+    ((strchr(token+1,'-') != (char *) NULL) ||
+     (strchr(token+1,'_') != (char *) NULL))) ? MagickTrue : MagickFalse);
+}
+
 static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
   char *token)
 {
@@ -2692,9 +2700,7 @@ static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
     if (LocaleCompare(token,option_info[i].mnemonic) == 0)
       break;
   command_info=option_info+i;
-  if ((command_info->mnemonic == (const char *) NULL) && (*token != '\0') &&
-      ((strchr(token+1,'-') != (char *) NULL) ||
-       (strchr(token+1,'_') != (char *) NULL)))
+  if (IsUnknownSeparatedToken(command_info,token) != MagickFalse)
     {
       while ((q=strchr(token+1,'-')) != (char *) NULL)
         (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
