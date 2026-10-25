@@ -119,3 +119,25 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 7.68 → 8.06** (`cs-mcp` 1.5.12). Branch `campaign/M63-random`,
+stacked on `campaign/M62-quantum`. Two oracle-verified E commits (both functions are
+ready, 20 of 20 killed):
+- `SeedFromSecretKey` (AcquireRandomInfo), 7.68 → 8.00. AcquireRandomInfo leaves
+  Large Method.
+- `RefillRandomReservoir` (SetRandomKey). It sits right above SetRandomKey, because
+  IncrementRandomNonce is defined between the banner and the function. A first
+  placement above the banner did not compile; that commit was undone locally before
+  anything was pushed.
+
+**Process note.** That failed build was committed briefly: the verify step was piped
+through `tail`, so its exit status was lost. The commit was reset at once, and verify
+results are now checked explicitly for `VERIFY FAILED`.
+
+**What is left, at 8.06.**
+- GenerateEntropicChaos (201 lines) consists of `#if` branches for getentropy,
+  sysconf, getrusage, gettimeofday, clock_gettime, times, Windows and the fuzzing
+  build. Most of them are not compiled here.
+- Code Duplication over five small getters that share the assert prologue.
