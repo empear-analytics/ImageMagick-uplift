@@ -729,6 +729,30 @@ static inline int GetCacheNumberThreads(const CacheInfo *source,
 }
 #endif
 
+static inline MagickBooleanType IsSameCacheMorphology(
+  const CacheInfo *cache_info,const CacheInfo *clone_info,const size_t length)
+{
+  return(((cache_info->storage_class == clone_info->storage_class) &&
+    (cache_info->colorspace == clone_info->colorspace) &&
+    (cache_info->alpha_trait == clone_info->alpha_trait) &&
+    (cache_info->channels == clone_info->channels) &&
+    (cache_info->columns == clone_info->columns) &&
+    (cache_info->rows == clone_info->rows) &&
+    (cache_info->number_channels == clone_info->number_channels) &&
+    (memcmp(cache_info->channel_map,clone_info->channel_map,length) == 0) &&
+    (cache_info->metacontent_extent == clone_info->metacontent_extent)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsMemoryCachePair(const CacheInfo *cache_info,
+  const CacheInfo *clone_info)
+{
+  return((((cache_info->type == MemoryCache) ||
+    (cache_info->type == MapCache)) &&
+    ((clone_info->type == MemoryCache) ||
+    (clone_info->type == MapCache))) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ClonePixelCacheRepository(
   CacheInfo *magick_restrict clone_info,CacheInfo *magick_restrict cache_info,
   ExceptionInfo *exception)
@@ -756,22 +780,12 @@ static MagickBooleanType ClonePixelCacheRepository(
   if (cache_info->type == PingCache)
     return(MagickTrue);
   length=cache_info->number_channels*sizeof(*cache_info->channel_map);
-  if ((cache_info->storage_class == clone_info->storage_class) &&
-      (cache_info->colorspace == clone_info->colorspace) &&
-      (cache_info->alpha_trait == clone_info->alpha_trait) &&
-      (cache_info->channels == clone_info->channels) &&
-      (cache_info->columns == clone_info->columns) &&
-      (cache_info->rows == clone_info->rows) &&
-      (cache_info->number_channels == clone_info->number_channels) &&
-      (memcmp(cache_info->channel_map,clone_info->channel_map,length) == 0) &&
-      (cache_info->metacontent_extent == clone_info->metacontent_extent))
+  if (IsSameCacheMorphology(cache_info,clone_info,length) != MagickFalse)
     {
       /*
         Identical pixel cache morphology.
       */
-      if (((cache_info->type == MemoryCache) ||
-           (cache_info->type == MapCache)) &&
-          ((clone_info->type == MemoryCache) || (clone_info->type == MapCache)))
+      if (IsMemoryCachePair(cache_info,clone_info) != MagickFalse)
         {
           (void) memcpy(clone_info->pixels,cache_info->pixels,
             cache_info->number_channels*cache_info->columns*cache_info->rows*
