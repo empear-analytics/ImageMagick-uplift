@@ -1158,6 +1158,21 @@ static inline MagickBooleanType IsSVGCompliant(const PixelInfo *pixel)
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsPercentColorComponent(
+  const ComplianceType compliance,const PixelInfo *pixel)
+{
+  return(((compliance != NoCompliance) &&
+    (IssRGBCompatibleColorspace(pixel->colorspace) != MagickFalse) &&
+    (IsSVGCompliant(pixel) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsLCHColorspace(
+  const ColorspaceType colorspace)
+{
+  return(((colorspace == LCHColorspace) || (colorspace == LCHabColorspace) ||
+    (colorspace == LCHuvColorspace)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   const PixelChannel channel,const ComplianceType compliance,char *tuple)
 {
@@ -1175,9 +1190,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
   scale=QuantumRange;
   if ((compliance != NoCompliance) || (pixel->depth <= 8))
     scale=255.0;
-  if ((compliance != NoCompliance) &&
-      (IssRGBCompatibleColorspace(pixel->colorspace) != MagickFalse) &&
-      (IsSVGCompliant(pixel) == MagickFalse))
+  if (IsPercentColorComponent(compliance,pixel) != MagickFalse)
     scale=100.0;
   switch (channel)
   {
@@ -1216,9 +1229,7 @@ MagickExport void ConcatenateColorComponent(const PixelInfo *pixel,
         scale=100.0f;
       if (pixel->colorspace == LabColorspace)
         color-=QuantumRange/2.0;
-      if ((pixel->colorspace == LCHColorspace) ||
-          (pixel->colorspace == LCHabColorspace) ||
-          (pixel->colorspace == LCHuvColorspace))
+      if (IsLCHColorspace(pixel->colorspace) != MagickFalse)
         color*=360.0/255.0;
       if (pixel->colorspace == XYZColorspace)
         color/=2.55;
