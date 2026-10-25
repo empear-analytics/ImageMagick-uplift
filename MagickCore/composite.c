@@ -211,6 +211,21 @@ static Image *BlendConvolveImage(const Image *image,const char *kernel,
   return(convolve_image);
 }
 
+static inline MagickBooleanType IsBlendRowMissing(const Quantum *p,
+  const Quantum *q,const Quantum *r)
+{
+  return(((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
+    (r == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsBlendChannelSkipped(const PixelTrait traits,
+  const PixelTrait other_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    (other_traits == UndefinedPixelTrait) ||
+    ((other_traits & UpdatePixelTrait) == 0)) ? MagickTrue : MagickFalse);
+}
+
 static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
   ExceptionInfo *exception)
 {
@@ -259,8 +274,7 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
     q=GetCacheViewVirtualPixels(dy_view,0,y,dx_image->columns,1,exception);
     r=GetCacheViewAuthenticPixels(magnitude_view,0,y,dx_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
-        (r == (Quantum *) NULL))
+    if (IsBlendRowMissing(p,q,r) != MagickFalse)
       {
         status=MagickFalse;
         continue;
@@ -275,9 +289,7 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
         PixelChannel channel = GetPixelChannelChannel(dx_image,i);
         PixelTrait traits = GetPixelChannelTraits(dx_image,channel);
         PixelTrait dy_traits = GetPixelChannelTraits(dy_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (dy_traits == UndefinedPixelTrait) ||
-            ((dy_traits & UpdatePixelTrait) == 0))
+        if (IsBlendChannelSkipped(traits,dy_traits) != MagickFalse)
           continue;
         r[i]=ClampToQuantum(hypot((double) p[i],(double)
           GetPixelChannel(dy_image,channel,q)));
