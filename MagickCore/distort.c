@@ -3135,6 +3135,70 @@ MagickExport Image *RotateImage(const Image *image,const double degrees,
 %    o exception: return any errors or warnings in this structure
 %
 */
+static void PrintSparseColorFX(const Image *image,const double *coeff,
+  const SparseColorMethod sparse_method)
+{
+  if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
+
+    switch (sparse_method) {
+      case BarycentricColorInterpolate:
+      {
+        ssize_t x=0;
+        (void) FormatLocaleFile(stderr, "Barycentric Sparse Color:\n");
+        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+          (void) FormatLocaleFile(stderr, "  -channel R -fx '%+lf*i %+lf*j %+lf' \\\n",
+              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+          (void) FormatLocaleFile(stderr, "  -channel G -fx '%+lf*i %+lf*j %+lf' \\\n",
+              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+          (void) FormatLocaleFile(stderr, "  -channel B -fx '%+lf*i %+lf*j %+lf' \\\n",
+              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+        if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+            (image->colorspace == CMYKColorspace))
+          (void) FormatLocaleFile(stderr, "  -channel K -fx '%+lf*i %+lf*j %+lf' \\\n",
+              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+        if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+            (image->alpha_trait != UndefinedPixelTrait))
+          (void) FormatLocaleFile(stderr, "  -channel A -fx '%+lf*i %+lf*j %+lf' \\\n",
+              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+        break;
+      }
+      case BilinearColorInterpolate:
+      {
+        ssize_t x=0;
+        (void) FormatLocaleFile(stderr, "Bilinear Sparse Color\n");
+        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+          (void) FormatLocaleFile(stderr, "   -channel R -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+              coeff[ x ], coeff[x+1],
+              coeff[x+2], coeff[x+3]),x+=4;
+        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+          (void) FormatLocaleFile(stderr, "   -channel G -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+              coeff[ x ], coeff[x+1],
+              coeff[x+2], coeff[x+3]),x+=4;
+        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+          (void) FormatLocaleFile(stderr, "   -channel B -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+              coeff[ x ], coeff[x+1],
+              coeff[x+2], coeff[x+3]),x+=4;
+        if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+            (image->colorspace == CMYKColorspace))
+          (void) FormatLocaleFile(stderr, "   -channel K -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+              coeff[ x ], coeff[x+1],
+              coeff[x+2], coeff[x+3]),x+=4;
+        if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+            (image->alpha_trait != UndefinedPixelTrait))
+          (void) FormatLocaleFile(stderr, "   -channel A -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+              coeff[ x ], coeff[x+1],
+              coeff[x+2], coeff[x+3]),x+=4;
+        break;
+      }
+      default:
+        /* sparse color method is too complex for FX emulation */
+        break;
+    }
+  }
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3203,65 +3267,7 @@ MagickExport Image *SparseColorImage(const Image *image,
   }
 
   /* Verbose output */
-  if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
-
-    switch (sparse_method) {
-      case BarycentricColorInterpolate:
-      {
-        ssize_t x=0;
-        (void) FormatLocaleFile(stderr, "Barycentric Sparse Color:\n");
-        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "  -channel R -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "  -channel G -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "  -channel B -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-        if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->colorspace == CMYKColorspace))
-          (void) FormatLocaleFile(stderr, "  -channel K -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-        if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->alpha_trait != UndefinedPixelTrait))
-          (void) FormatLocaleFile(stderr, "  -channel A -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-        break;
-      }
-      case BilinearColorInterpolate:
-      {
-        ssize_t x=0;
-        (void) FormatLocaleFile(stderr, "Bilinear Sparse Color\n");
-        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "   -channel R -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "   -channel G -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "   -channel B -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->colorspace == CMYKColorspace))
-          (void) FormatLocaleFile(stderr, "   -channel K -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->alpha_trait != UndefinedPixelTrait))
-          (void) FormatLocaleFile(stderr, "   -channel A -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        break;
-      }
-      default:
-        /* sparse color method is too complex for FX emulation */
-        break;
-    }
-  }
+  PrintSparseColorFX(image,coeff,sparse_method);
 
   /* Generate new image for generated interpolated gradient.
    * ASIDE: Actually we could have just replaced the colors of the original
