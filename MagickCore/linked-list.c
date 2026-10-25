@@ -476,6 +476,14 @@ static void AppendElement(LinkedListInfo *list_info,ElementInfo *next)
   list_info->tail=next;
 }
 
+static void InsertFirstElement(LinkedListInfo *list_info,ElementInfo *next)
+{
+  if (list_info->next == (ElementInfo *) NULL)
+    list_info->next=next;
+  list_info->head=next;
+  list_info->tail=next;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -524,12 +532,7 @@ MagickExport MagickBooleanType InsertValueInLinkedList(
   next->next=(ElementInfo *) NULL;
   LockSemaphoreInfo(list_info->semaphore);
   if (list_info->elements == 0)
-    {
-      if (list_info->next == (ElementInfo *) NULL)
-        list_info->next=next;
-      list_info->head=next;
-      list_info->tail=next;
-    }
+    InsertFirstElement(list_info,next);
   else
     {
       if (index == 0)
