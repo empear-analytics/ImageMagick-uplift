@@ -486,6 +486,17 @@ static MagickBooleanType IsCoderTreeInstantiated(ExceptionInfo *exception)
   return(coder_cache != (SplayTreeInfo *) NULL ? MagickTrue : MagickFalse);
 }
 
+static void PrintCoderPathHeader(FILE *file,const CoderInfo **coder_info,
+  const ssize_t i)
+{
+  if (coder_info[i]->path != (char *) NULL)
+    (void) FormatLocaleFile(file,"\nPath: %s\n\n",coder_info[i]->path);
+  (void) FormatLocaleFile(file,"Magick          Coder\n");
+  (void) FormatLocaleFile(file,
+    "-------------------------------------------------"
+    "------------------------------\n");
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -540,14 +551,7 @@ MagickExport MagickBooleanType ListCoderInfo(FILE *file,
       continue;
     if ((path == (const char *) NULL) ||
         (LocaleCompare(path,coder_info[i]->path) != 0))
-      {
-        if (coder_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",coder_info[i]->path);
-        (void) FormatLocaleFile(file,"Magick          Coder\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
-      }
+      PrintCoderPathHeader(file,coder_info,i);
     path=coder_info[i]->path;
     (void) FormatLocaleFile(file,"%s",coder_info[i]->magick);
     for (j=(ssize_t) strlen(coder_info[i]->magick); j <= 15; j++)
