@@ -2295,6 +2295,14 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
 %
 */
 
+static inline MagickBooleanType IsMVGInfoMissing(const MVGInfo *mvg_info)
+{
+  return(((mvg_info == (MVGInfo *) NULL) ||
+    (mvg_info->primitive_info == (PrimitiveInfo **) NULL) ||
+    (*mvg_info->primitive_info == (PrimitiveInfo *) NULL) ||
+    (mvg_info->extent == (size_t *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType CheckPrimitiveExtent(MVGInfo *mvg_info,
   const double pad)
 {
@@ -2310,10 +2318,7 @@ static inline MagickBooleanType CheckPrimitiveExtent(MVGInfo *mvg_info,
   ssize_t
     i;
 
-  if ((mvg_info == (MVGInfo *) NULL) ||
-      (mvg_info->primitive_info == (PrimitiveInfo **) NULL) ||
-      (*mvg_info->primitive_info == (PrimitiveInfo *) NULL) ||
-      (mvg_info->extent == (size_t *) NULL))
+  if (IsMVGInfoMissing(mvg_info) != MagickFalse)
     return(MagickFalse);
   proposed_extent=mvg_info->offset+pad+PrimitiveExtentPad+1.0;
   if ((proposed_extent <= 0.0) || (proposed_extent > (double) MAGICK_SIZE_MAX))
