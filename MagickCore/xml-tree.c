@@ -1265,11 +1265,18 @@ static void ParseCharacterContent(XMLTreeRoot *root,char *xml,
     }
 }
 
+static inline MagickBooleanType IsUnmatchedCloseTag(const XMLTreeRoot *root,
+  const char *tag)
+{
+  return(((root->node == (XMLTreeInfo *) NULL) ||
+    (root->node->tag == (char *) NULL) ||
+    (strcmp(tag,root->node->tag) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static XMLTreeInfo *ParseCloseTag(XMLTreeRoot *root,char *tag,
   ExceptionInfo *exception)
 {
-  if ((root->node == (XMLTreeInfo *) NULL) ||
-      (root->node->tag == (char *) NULL) || (strcmp(tag,root->node->tag) != 0))
+  if (IsUnmatchedCloseTag(root,tag) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
         "ParseError","unexpected closing tag </%s>",tag);
