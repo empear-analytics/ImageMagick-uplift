@@ -422,6 +422,15 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsGradientDefaultDirection(const Image *image)
+{
+  return(((GetImageArtifact(image,"gradient:angle") == (const char *) NULL) &&
+    (GetImageArtifact(image,"gradient:direction") == (const char *) NULL) &&
+    (GetImageArtifact(image,"gradient:extent") == (const char *) NULL) &&
+    (GetImageArtifact(image,"gradient:vector") ==
+    (const char *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType GradientImage(Image *image,
   const GradientType type,const SpreadMethod method,const StopInfo *stops,
   const size_t number_stops,ExceptionInfo *exception)
@@ -543,10 +552,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
     (void) MagickSscanf(artifact,"%lf%*[ ,]%lf%*[ ,]%lf%*[ ,]%lf",
       &gradient->gradient_vector.x1,&gradient->gradient_vector.y1,
       &gradient->gradient_vector.x2,&gradient->gradient_vector.y2);
-  if ((GetImageArtifact(image,"gradient:angle") == (const char *) NULL) &&
-      (GetImageArtifact(image,"gradient:direction") == (const char *) NULL) &&
-      (GetImageArtifact(image,"gradient:extent") == (const char *) NULL) &&
-      (GetImageArtifact(image,"gradient:vector") == (const char *) NULL))
+  if (IsGradientDefaultDirection(image) != MagickFalse)
     if ((type == LinearGradient) && (gradient->gradient_vector.y2 != 0.0))
       gradient->gradient_vector.x2=0.0;
   gradient->center.x=(double) gradient->gradient_vector.x2/2.0;
