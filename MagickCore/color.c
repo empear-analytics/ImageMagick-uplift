@@ -2360,6 +2360,20 @@ static inline MagickBooleanType IsHueColorspaceName(const char *colorspace)
     (LocaleCompare(colorspace,"HWB") == 0)) ? MagickTrue : MagickFalse);
 }
 
+static void SetOklchColorFromGeometry(PixelInfo *color,
+  const GeometryInfo geometry_info,const MagickStatusType flags)
+{
+  if ((flags & RhoValue) != 0)
+    color->red=(MagickRealType) ClampToQuantum((double) QuantumRange*
+       geometry_info.rho);
+  if ((flags & SigmaValue) != 0)
+    color->green=(MagickRealType) ClampToQuantum((double) QuantumRange*
+       geometry_info.sigma);
+  if ((flags & XiValue) != 0)
+    color->blue=(MagickRealType) ClampToQuantum((double) QuantumRange*
+       DegreesToRadians(geometry_info.xi));
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2588,17 +2602,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
           return(status);
         }
       if (color->colorspace == OklchColorspace)
-         {
-           if ((flags & RhoValue) != 0)
-             color->red=(MagickRealType) ClampToQuantum((double) QuantumRange*
-                geometry_info.rho);
-           if ((flags & SigmaValue) != 0)
-             color->green=(MagickRealType) ClampToQuantum((double) QuantumRange*
-                geometry_info.sigma);
-           if ((flags & XiValue) != 0)
-             color->blue=(MagickRealType) ClampToQuantum((double) QuantumRange*
-                DegreesToRadians(geometry_info.xi));
-         }
+         SetOklchColorFromGeometry(color,geometry_info,flags);
       else
         if (IsLabCompatibleColorspace(color->colorspace) != MagickFalse)
           {
