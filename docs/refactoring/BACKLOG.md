@@ -150,7 +150,7 @@ needs before refactoring:
 | 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | 5.02 (rest returns from inside or is #if-built), [M54](tasks/M54-token.md) |
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | open |
 | 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | open |
-| 5.88 | `MagickCore/exception.c` | 1158 | 88% | 66% | open |
+| 5.88 | `MagickCore/exception.c` | 1158 | 88% | 66% | 6.16 (severity table needs a lookup recipe; ThrowException repeat-test bug reported), [M55](tasks/M55-exception.md) |
 | 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | open |
 | 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | open |
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |

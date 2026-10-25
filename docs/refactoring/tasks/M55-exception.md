@@ -172,3 +172,29 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 5.88 → 6.16** (`cs-mcp` 1.5.12). Branch `campaign/M55-exception`,
+stacked on `campaign/M54-token`. Two refactor commits:
+- **P (guard; ThrowException is not ready).** `IsRepeatedException`. Complex
+  Conditional leaves the file. The predicate takes five arguments, which adds one
+  Excess Number of Function Arguments entry, but the score still rises
+  (5.88 → 5.98).
+- **D (oracle; both handlers ready).** DefaultErrorHandler and DefaultWarningHandler
+  had identical bodies, which now live in `PrintExceptionMessage`. Code Duplication
+  drops from 12 functions to 9.
+
+**Possible bug, reported and not fixed.** ThrowException's "same as the last
+exception" test compares the new reason and description with `exception->reason` and
+`exception->description`, the container's own fields, instead of `p->reason` and
+`p->description` of the last recorded exception. Repeated exceptions are probably not
+collapsed as intended.
+
+**What is left, at 6.16.**
+- ExceptionSeverityToTag (cc 65): a pure severity-to-string switch. It needs a
+  lookup-table recipe, which the catalogue does not have yet.
+- The remaining duplicates are the `Set*Handler` setters and the
+  `MagickError`/`MagickWarning` wrappers. Each pair differs in both a type and a
+  global variable, which is two values, so Recipe D does not apply.
+- ThrowMagickExceptionList (8 arguments, public API).
