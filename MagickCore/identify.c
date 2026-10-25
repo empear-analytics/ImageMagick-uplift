@@ -997,6 +997,60 @@ static void PrintImageDirectory(FILE *file,const Image *image,
   image_info=DestroyImageInfo(image_info);
 }
 
+static void PrintConvexHullAndBoundingBox(FILE *file,Image *image,
+  ExceptionInfo *exception)
+{
+  char
+    buffer[MagickPathExtent];
+
+  char
+    *points;
+
+  PointInfo
+    *bounding_box,
+    *convex_hull;
+
+  ssize_t
+    n;
+
+  size_t
+    number_points;
+
+  /*
+    Display convex hull & minimum bounding box.
+  */
+  convex_hull=GetImageConvexHull(image,&number_points,exception);
+  if (convex_hull != (PointInfo *) NULL)
+    {
+      points=AcquireString("");
+      for (n=0; n < (ssize_t) number_points; n++)
+      {
+        (void) FormatLocaleString(buffer,MagickPathExtent,"%g,%g ",
+          convex_hull[n].x,convex_hull[n].y);
+        (void) ConcatenateString(&points,buffer);
+      }
+      convex_hull=(PointInfo *) RelinquishMagickMemory(convex_hull);
+      (void) FormatLocaleFile(file,"  Convex hull: ");
+      (void) FormatLocaleFile(file,"%s\n",points);
+      points=DestroyString(points);
+    }
+  bounding_box=GetImageMinimumBoundingBox(image,&number_points,exception);
+  if (bounding_box != (PointInfo *) NULL)
+    {
+      points=AcquireString("");
+      for (n=0; n < (ssize_t) number_points; n++)
+      {
+        (void) FormatLocaleString(buffer,MagickPathExtent,"%g,%g ",
+          bounding_box[n].x,bounding_box[n].y);
+        (void) ConcatenateString(&points,buffer);
+      }
+      bounding_box=(PointInfo *) RelinquishMagickMemory(bounding_box);
+      (void) FormatLocaleFile(file,"  Minimum bounding box: ");
+      (void) FormatLocaleFile(file,"%s\n",points);
+      points=DestroyString(points);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1667,54 +1721,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     }
   artifact=GetImageArtifact(image,"identify:convex-hull");
   if (IsStringTrue(artifact) != MagickFalse)
-    {
-      char
-        *points;
-
-      PointInfo
-        *bounding_box,
-        *convex_hull;
-
-      ssize_t
-        n;
-
-      size_t
-        number_points;
-
-      /*
-        Display convex hull & minimum bounding box.
-      */
-      convex_hull=GetImageConvexHull(image,&number_points,exception);
-      if (convex_hull != (PointInfo *) NULL)
-        {
-          points=AcquireString("");
-          for (n=0; n < (ssize_t) number_points; n++)
-          {
-            (void) FormatLocaleString(buffer,MagickPathExtent,"%g,%g ",
-              convex_hull[n].x,convex_hull[n].y);
-            (void) ConcatenateString(&points,buffer);
-          }
-          convex_hull=(PointInfo *) RelinquishMagickMemory(convex_hull);
-          (void) FormatLocaleFile(file,"  Convex hull: ");
-          (void) FormatLocaleFile(file,"%s\n",points);
-          points=DestroyString(points);
-        }
-      bounding_box=GetImageMinimumBoundingBox(image,&number_points,exception);
-      if (bounding_box != (PointInfo *) NULL)
-        {
-          points=AcquireString("");
-          for (n=0; n < (ssize_t) number_points; n++)
-          {
-            (void) FormatLocaleString(buffer,MagickPathExtent,"%g,%g ",
-              bounding_box[n].x,bounding_box[n].y);
-            (void) ConcatenateString(&points,buffer);
-          }
-          bounding_box=(PointInfo *) RelinquishMagickMemory(bounding_box);
-          (void) FormatLocaleFile(file,"  Minimum bounding box: ");
-          (void) FormatLocaleFile(file,"%s\n",points);
-          points=DestroyString(points);
-        }
-    }
+    PrintConvexHullAndBoundingBox(file,image,exception);
   PrintImageProfiles(file,image);
   PrintImageProperties(file,image,exception);
   ResetImageArtifactIterator(image);
