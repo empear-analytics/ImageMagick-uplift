@@ -136,7 +136,7 @@ needs before refactoring:
 | 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.09, in progress (Complex Conditional gone), [M36](tasks/M36-image.md) |
 | 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | 2.21, in progress (8 predicates; one POSIX-only site left), [M44](tasks/M44-blob.md) |
 | 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | 2.33, in progress (6 predicates; Raqm-only and one 5-argument site left), [M45](tasks/M45-annotate.md) |
-| 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | open |
+| 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | 2.54, in progress (ProfileImage #if-built; SyncExifProfile needs hoist), [M69](tasks/M69-profile.md) |
 | 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.38, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) |
 | 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | 3.77, in progress (Complex Conditional gone; scan loops need Recipe B), [M46](tasks/M46-layer.md) |
 | 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 3.40, plateau for now (new two-string helpers trigger String Heavy Function Arguments), [M30](tasks/M30-log.md) |

@@ -196,3 +196,36 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night)
+
+**Result: Code Health 2.12 → 2.54** (`cs-mcp` 1.5.12). Branch `campaign/M69-profile`,
+stacked on `campaign/M68-compress`. Ten refactor commits; nine are oracle-verified
+(every target function is ready).
+- **P (6).** `IsUnwritableDimension`, `IsExifInApp1`, `IsExifProfileName`,
+  `IsInvalidResourceCount`, `IsInvalid8BimCount` and `IsMissingXMPTag`. The last was
+  taken at guard level, because an unresolved survivor sits on its expression.
+- **D (1).** The IPTC, ICC, EXIF and XMP resource cases now share
+  `SetProfileFromResource`; they differed only in the profile name.
+- **E (3).** `ReadResolutionResource` and `WriteResolutionResource` (both
+  value-returning or plain on the resolution resource), and `SpliceProfileInto8Bim`
+  (7 arguments, 2.44 → 2.54). WriteTo8BimProfile leaves Bumpy Road Ahead, Deep, Nested
+  Complexity and Large Method.
+
+**Process slip, fixed before push.** One build failure (the helper was placed above
+WriteResourceLong's definition) was committed locally because verify.sh exits on
+`BUILD FAILED` before printing `VERIFY FAILED`. It was reset at once, and verify.sh
+now prints `VERIFY FAILED` on that path too.
+
+**What is left, at 2.54.**
+- **ProfileImage** (Brain Method, 492 lines) is built from
+  `MAGICKCORE_QUANTUM_DEPTH`, `MAGICKCORE_HDRI_SUPPORT` and `MAGICKCORE_LCMS_DELEGATE`
+  branches, so only one variant compiles here.
+- **SyncExifProfile** (cc 78) `#define`s its tag constants and `MaxDirectoryStack` in
+  its body, and two Complex Conditionals use them. **Observation for the hoist
+  proposal:** a `#define` inside a function stays defined until the end of the file.
+  A helper placed *after* the function, with a prototype before it, could therefore
+  use these macros without moving them. Owner decision needed.
+- **SetsRGBImageProfile** (284 lines) is mostly an embedded sRGB profile byte table.
+- UpdateClipPath and Update8BIMClipPath advance `blob`/`info` and `length` together in
+  every block.
