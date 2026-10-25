@@ -138,6 +138,22 @@ MagickExport TokenInfo *DestroyTokenInfo(TokenInfo *token_info)
   return(token_info);
 }
 
+static inline char GetClosingQuote(const char *magick_restrict p)
+{
+  char
+    escape;
+
+  switch (*p)
+  {
+    case '"': escape='"'; break;
+    case '\'': escape='\''; break;
+    case '`': escape='\''; break;
+    case '{': escape='}'; break;
+    default: escape=(*p); break;
+  }
+  return(escape);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -228,14 +244,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
       char
         escape;
 
-      switch (*p)
-      {
-        case '"': escape='"'; break;
-        case '\'': escape='\''; break;
-        case '`': escape='\''; break;
-        case '{': escape='}'; break;
-        default: escape=(*p); break;
-      }
+      escape=GetClosingQuote(p);
       for (p++; *p != '\0'; p++)
       {
         if (IsEscapedQuote(p,escape) != MagickFalse)
