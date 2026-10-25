@@ -286,6 +286,15 @@ MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
 %      file name is returned in this array.
 %
 */
+static inline MagickBooleanType IsCompressedFileExtension(const char *extension)
+{
+  return(((LocaleCompare(extension,"Z") == 0) ||
+    (LocaleCompare(extension,"bz2") == 0) ||
+    (LocaleCompare(extension,"gz") == 0) ||
+    (LocaleCompare(extension,"wmz") == 0) ||
+    (LocaleCompare(extension,"svgz") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport void AppendImageFormat(const char *format,char *filename)
 {
   char
@@ -309,11 +318,7 @@ MagickExport void AppendImageFormat(const char *format,char *filename)
       return;
     }
   GetPathComponent(filename,ExtensionPath,extension);
-  if ((LocaleCompare(extension,"Z") == 0) ||
-      (LocaleCompare(extension,"bz2") == 0) ||
-      (LocaleCompare(extension,"gz") == 0) ||
-      (LocaleCompare(extension,"wmz") == 0) ||
-      (LocaleCompare(extension,"svgz") == 0))
+  if (IsCompressedFileExtension(extension) != MagickFalse)
     {
       GetPathComponent(filename,RootPath,root);
       (void) CopyMagickString(filename,root,MagickPathExtent);
