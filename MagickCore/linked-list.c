@@ -438,6 +438,28 @@ MagickExport void *GetValueFromLinkedList(LinkedListInfo *list_info,
   return(value);
 }
 
+static void InsertElementAt(LinkedListInfo *list_info,ElementInfo *next,
+  const size_t index)
+{
+  ElementInfo
+    *element;
+
+  ssize_t
+    i;
+
+  element=list_info->head;
+  next->next=element->next;
+  for (i=1; i < (ssize_t) index; i++)
+  {
+    element=element->next;
+    next->next=element->next;
+  }
+  next=next->next;
+  element->next=next;
+  if (list_info->next == next->next)
+    list_info->next=next;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -471,9 +493,6 @@ MagickExport MagickBooleanType InsertValueInLinkedList(
 {
   ElementInfo
     *next;
-
-  ssize_t
-    i;
 
   assert(list_info != (LinkedListInfo *) NULL);
   assert(list_info->signature == MagickCoreSignature);
@@ -513,22 +532,7 @@ MagickExport MagickBooleanType InsertValueInLinkedList(
             list_info->tail=next;
           }
         else
-          {
-            ElementInfo
-              *element;
-
-            element=list_info->head;
-            next->next=element->next;
-            for (i=1; i < (ssize_t) index; i++)
-            {
-              element=element->next;
-              next->next=element->next;
-            }
-            next=next->next;
-            element->next=next;
-            if (list_info->next == next->next)
-              list_info->next=next;
-          }
+          InsertElementAt(list_info,next,index);
     }
   list_info->elements++;
   UnlockSemaphoreInfo(list_info->semaphore);
