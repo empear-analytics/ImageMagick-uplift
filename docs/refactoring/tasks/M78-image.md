@@ -203,3 +203,28 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): second pass
+
+**Result: Code Health 2.09 → 2.20** (`cs-mcp` 1.5.12). Branch `campaign/M78-image-e`,
+stacked on `campaign/M77-draw-e`. Three oracle-verified commits (the targets are ready):
+- `ParseSceneRange` (E, SetImageInfo): the scene specification parser. SetImageInfo
+  leaves Deep, Nested Complexity.
+- `SetUserSpecifiedFormat` (E, SetImageInfo, value-returning, 5 arguments). It sits
+  right above SetImageInfo, after SetImageInfoFromExtension, which it calls.
+  SetImageInfo goes from cc 56 to 42 and from 241 to 181 lines.
+- `ParseChromaticityPrimary` (D, SyncImageSettings): the blue, green, red and white
+  point parsers, which differed only in the member written, now passed as a
+  `PrimaryInfo *`. SyncImageSettings drops from 6 bumps to 2.
+
+**Reverted.**
+- AcquireImage's delay block: 2.20 → 2.13. **CodeScene parser quirk:** the first
+  function in a file is measured from the end of the license header, so the whole
+  `#include` block counts toward it. A helper placed above AcquireImage, the first
+  function in image.c, was reported as 91 lines instead of 25 and tripped Large
+  Method. New helpers must not become the first function in a file.
+- AppendImages' row copy (`AppendImageRow`): flat, and only one point of cc.
+
+**What is left, at 2.20.** CopyImagePixels and InterpretImageFilename (Brain Methods),
+the mask functions, SmushImages and AcquireImage. Their remaining blocks return,
+continue or write several outputs, or would land above AcquireImage.
