@@ -3973,6 +3973,27 @@ static int IntensityCompare(const void *x,const void *y)
 }
 #endif
 
+static ssize_t CompactGrayscaleColormap(const Image *image,
+  PixelInfo *colormap,ssize_t *colormap_index)
+{
+  ssize_t
+    i,
+    j;
+
+  j=0;
+  colormap[j]=image->colormap[0];
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    if (IsPixelInfoEquivalent(&colormap[j],&image->colormap[i]) == MagickFalse)
+      {
+        j++;
+        colormap[j]=image->colormap[i];
+      }
+    colormap_index[(ssize_t) image->colormap[i].alpha]=j;
+  }
+  return(j);
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4080,17 +4101,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
-  j=0;
-  colormap[j]=image->colormap[0];
-  for (i=0; i < (ssize_t) image->colors; i++)
-  {
-    if (IsPixelInfoEquivalent(&colormap[j],&image->colormap[i]) == MagickFalse)
-      {
-        j++;
-        colormap[j]=image->colormap[i];
-      }
-    colormap_index[(ssize_t) image->colormap[i].alpha]=j;
-  }
+  j=CompactGrayscaleColormap(image,colormap,colormap_index);
   image->colors=(size_t) (j+1);
   image->colormap=(PixelInfo *) RelinquishMagickMemory(image->colormap);
   image->colormap=colormap;
