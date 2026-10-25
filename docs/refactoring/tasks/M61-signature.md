@@ -105,3 +105,22 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 7.08 → 8.49** (`cs-mcp` 1.5.12). Branch `campaign/M61-signature`,
+stacked on `campaign/M60-memory`. SignatureImage is *not ready* (21 mutants, 14
+killed), so both commits are guard-level E. The oracle also ran: 292 cases, 0
+diverged.
+- `AppendPixelBytes`: the byte-order copy, value-returning on `q`. The float is passed
+  by value, so `&pixel` stays as written.
+- `AppendPixelChannels`: one pixel's channels, value-returning on `q`, 7.21 → 8.49.
+  SignatureImage leaves Deep, Nested Complexity and Complex Method.
+
+**What is left, at 8.49.**
+- TransformSignature (135 lines) `#define`s `Ch`, `Maj`, `RotateRight`, `Sigma0/1`,
+  `Suma0/1` and `Trunc32` inside its body, so no block that uses them can move. This
+  is another case for the proposed hoist recipe. Its word-loading branches also carry
+  `DisableMSCWarning` pragmas.
+- Code Duplication: DestroySignatureInfo and InitializeSignature, which differ in more
+  than one value.
