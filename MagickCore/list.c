@@ -166,6 +166,21 @@ MagickExport Image *CloneImageList(const Image *images,ExceptionInfo *exception)
   return(image);
 }
 
+static ssize_t GetFrameStep(const char *artifact)
+{
+  ssize_t
+    step;
+
+  step=1;
+  if (artifact != (const char *) NULL)
+    {
+      step=(ssize_t) StringToLong(artifact);
+      if (step == 0)
+        step=1;
+    }
+  return(step);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -269,13 +284,7 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
       }
     last%=(ssize_t) (length << 1);
     match=MagickFalse;
-    step=1;
-    if (artifact != (const char *) NULL)
-      {
-        step=(ssize_t) StringToLong(artifact);
-        if (step == 0)
-          step=1;
-      }
+    step=GetFrameStep(artifact);
     step=(ssize_t) (first > last ? -step : step);
     for ( ; step > 0 ? (last-first) >= 0 : (last-first) <= 0; first+=step)
     {
