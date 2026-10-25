@@ -327,6 +327,33 @@ MagickExport Image *PingImage(const ImageInfo *image_info,
   return(image);
 }
 
+static Image *PingSceneImages(const ImageInfo *image_info,
+  ImageInfo *read_info,char *ping_filename,ExceptionInfo *exception)
+{
+  Image
+    *image,
+    *images;
+
+  ssize_t
+    extent,
+    scene;
+
+  (void) CopyMagickString(ping_filename,read_info->filename,
+    MagickPathExtent);
+  images=NewImageList();
+  extent=(ssize_t) (read_info->scene+read_info->number_scenes);
+  for (scene=(ssize_t) read_info->scene; scene < (ssize_t) extent; scene++)
+  {
+    (void) InterpretImageFilename(image_info,(Image *) NULL,ping_filename,
+      (int) scene,read_info->filename,exception);
+    image=PingImage(read_info,exception);
+    if (image == (Image *) NULL)
+      continue;
+    AppendImageToList(&images,image);
+  }
+  return(images);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -361,7 +388,6 @@ MagickExport Image *PingImages(ImageInfo *image_info,const char *filename,
     ping_filename[MagickPathExtent];
 
   Image
-    *image,
     *images;
 
   ImageInfo
@@ -385,10 +411,6 @@ MagickExport Image *PingImages(ImageInfo *image_info,const char *filename,
       ExceptionInfo
         *sans;
 
-      ssize_t
-        extent,
-        scene;
-
       /*
         Images of the form image-%d.png[1-5].
       */
@@ -401,19 +423,7 @@ MagickExport Image *PingImages(ImageInfo *image_info,const char *filename,
           read_info=DestroyImageInfo(read_info);
           return(PingImage(image_info,exception));
         }
-      (void) CopyMagickString(ping_filename,read_info->filename,
-        MagickPathExtent);
-      images=NewImageList();
-      extent=(ssize_t) (read_info->scene+read_info->number_scenes);
-      for (scene=(ssize_t) read_info->scene; scene < (ssize_t) extent; scene++)
-      {
-        (void) InterpretImageFilename(image_info,(Image *) NULL,ping_filename,
-          (int) scene,read_info->filename,exception);
-        image=PingImage(read_info,exception);
-        if (image == (Image *) NULL)
-          continue;
-        AppendImageToList(&images,image);
-      }
+      images=PingSceneImages(image_info,read_info,ping_filename,exception);
       read_info=DestroyImageInfo(read_info);
       return(images);
     }
