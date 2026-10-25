@@ -191,3 +191,42 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 3.49 → 3.76** (`cs-mcp` 1.5.12). Branch `campaign/M49-string`,
+stacked on `campaign/M48-constitute`. Six E commits, all oracle-verified (the target
+functions are ready or careful, and no open survivor sits in a moved block):
+- `GetSiPrefixExponent` (InterpretSiPrefixValue): the 25-case SI prefix switch,
+  value-returning. InterpretSiPrefixValue goes from cc 34 to 9.
+- `CountArgvArguments` (StringToArgv). StringToArgv leaves Large Method.
+- `PrintStringInfoHexLine` (PrintStringInfo). PrintStringInfo leaves Complex Method.
+  This gave the biggest step, 3.54 → 3.72.
+- `CountTextLines` (StringToStrings, careful).
+- `SkipValueSeparator` (StringToArrayOfDoubles), value-returning.
+
+The oracle diverged on gaps/c5651ffad8 (the log-map tie) during the
+InterpretSiPrefixValue run. It diverges the same way on the unedited file.
+
+**Not moved, on purpose.** Two blocks contain `ThrowFatalException`: EscapeString's
+counting loop and StringToArgv's allocation failure. The macro expands
+`GetMagickModule()`, which records `__func__`, so moving either block would change the
+function name in the fatal message. Blocks with this macro, or any
+`Throw*Exception`, cannot use E unless the playbook decides that this message is
+not observable behaviour.
+
+**Bug, reported and not fixed: StripMagickString's return value.** The function
+returns `(size_t) (q-p+1)` after the last loop has moved `p` to the new terminator
+(`message + (q-p0+1)`). So it returns the number of leading characters stripped
+(`p0-message`), not the length of the stripped string. Example: `"ab"` returns 0. No
+caller in MagickCore, MagickWand, coders or utilities uses the value (all cast it to
+`void`), but the function is public API.
+
+**What is left, at 3.76.**
+- `StringToStrings` (careful, cc 28, 131 lines, 11 bumps). The hex branch's line
+  formatter writes both `p` and `q`, and both cleanup loops are unreached by any case.
+- Code Duplication across 26 small accessors. They share the
+  `assert`/`signature`/`LogMagickEvent` prologue. Folding that into a helper would move
+  `assert` lines and the `GetMagickModule()` location, which raises the question above.
+- The file-level String Heavy Function Arguments finding.
+- `FormatMagickSize` (5 arguments, public API).

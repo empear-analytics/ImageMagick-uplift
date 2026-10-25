@@ -112,7 +112,7 @@ needs before refactoring:
 | 2.58 | `MagickCore/attribute.c` | 2444 | 75% | 73% | 2.97, in progress (Complex Conditional: one site left, in a parallel loop), [M27](tasks/M27-attribute.md) |
 | 3.06 | `MagickCore/paint.c` | 1299 | 85% | 74% | 3.33, in progress (Complex Conditional gone; OilPaint blocked by a local macro), [M47](tasks/M47-paint.md) |
 | 3.26 | `MagickCore/utility.c` | 2087 | 28% | 73% | open |
-| 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | open |
+| 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | 3.76, in progress (Throw* blocks pinned by __func__; StripMagickString return bug reported), [M49](tasks/M49-string.md) |
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
 | 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | open |
 | 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 5.35, in progress (Complex Conditional gone; string helpers tip String Heavy), [M34](tasks/M34-configure.md) |
