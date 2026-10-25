@@ -356,6 +356,56 @@ MagickExport magick_hot_spot size_t GetNextToken(
   return((size_t) (p-start+1));
 }
 
+static MagickBooleanType MatchCharacterClass(const char *p,const char *q,
+  const int ecode)
+{
+  MagickBooleanType
+    matched = MagickFalse;
+
+  while (p < q)
+  {
+    const char
+      *next;
+
+    int
+      code = GetUTFCode(p);
+
+    size_t
+      octets = GetUTFOctets(p);
+
+    if (code == '\\')
+      {
+        p+=octets;
+        code=GetUTFCode(p);
+        octets=GetUTFOctets(p);
+      }
+    next=p+octets;
+    if ((next < q) && (GetUTFCode(next) == '-'))
+      {
+        int
+          ncode;
+
+        next+=GetUTFOctets(next);
+        ncode=GetUTFCode(next);
+        if (ncode == '\\')
+          {
+            next+=GetUTFOctets(next);
+            ncode=GetUTFCode(next);
+          }
+        if ((ecode >= code) && (ecode <= ncode))
+          matched=MagickTrue;
+        p=next+GetUTFOctets(next);
+      }
+    else
+      {
+        if (ecode == code)
+          matched=MagickTrue;
+        p+=octets;
+      }
+  }
+  return(matched);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -484,47 +534,7 @@ static MagickBooleanType GlobExpression_(const char *magick_restrict expression,
           q+=GetUTFOctets(q);
         if (GetUTFCode(q) == 0)
           return(MagickFalse);  /* malformed */
-        while (p < q)
-        {
-          const char
-            *next;
-
-          int
-            code = GetUTFCode(p);
-
-          size_t
-            octets = GetUTFOctets(p);
-
-          if (code == '\\')
-            {
-              p+=octets;
-              code=GetUTFCode(p);
-              octets=GetUTFOctets(p);
-            }
-          next=p+octets;
-          if ((next < q) && (GetUTFCode(next) == '-'))
-            {
-              int
-                ncode;
-
-              next+=GetUTFOctets(next);
-              ncode=GetUTFCode(next);
-              if (ncode == '\\')
-                {
-                  next+=GetUTFOctets(next);
-                  ncode=GetUTFCode(next);
-                }
-              if ((ecode >= code) && (ecode <= ncode))
-                matched=MagickTrue;
-              p=next+GetUTFOctets(next);
-            }
-          else
-            {
-              if (ecode == code)
-                matched=MagickTrue;
-              p+=octets;
-            }
-        }
+        matched=MatchCharacterClass(p,q,ecode);
         /*
           Skip consecutive '*'.
         */
