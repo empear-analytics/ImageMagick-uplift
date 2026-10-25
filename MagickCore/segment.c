@@ -1374,6 +1374,24 @@ static void Stability(IntervalTree *node)
   Stability(node->child);
 }
 
+static IntervalTree *AppendIntervalNode(const IntervalTree *head,
+  IntervalTree *node)
+{
+  if (node == head)
+    {
+      node->child=(IntervalTree *) AcquireQuantumMemory(1,
+        sizeof(*node->child));
+      node=node->child;
+    }
+  else
+    {
+      node->sibling=(IntervalTree *) AcquireQuantumMemory(1,
+        sizeof(*node->sibling));
+      node=node->sibling;
+    }
+  return(node);
+}
+
 static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -1430,18 +1448,7 @@ static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
       {
         if (zero_crossing[i+1].crossings[k] != 0)
           {
-            if (node == head)
-              {
-                node->child=(IntervalTree *) AcquireQuantumMemory(1,
-                  sizeof(*node->child));
-                node=node->child;
-              }
-            else
-              {
-                node->sibling=(IntervalTree *) AcquireQuantumMemory(1,
-                  sizeof(*node->sibling));
-                node=node->sibling;
-              }
+            node=AppendIntervalNode(head,node);
             if (node == (IntervalTree *) NULL)
               {
                 list=(IntervalTree **) RelinquishMagickMemory(list);
