@@ -1249,19 +1249,7 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
       }
     for (x=0; x < (ssize_t) flip_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait flip_traits = GetPixelChannelTraits(flip_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (flip_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(flip_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,flip_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(flip_image);
     }
