@@ -496,6 +496,14 @@ static inline MagickBooleanType HasChromaticity(const Image *image)
     (image->chromaticity.white_point.x != 0.0)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsDirectoryNameCharacter(const char *q,
+  const char *d,const ImageInfo *image_info)
+{
+  return(((*q != '\xff') && (*q != '\0') &&
+    ((size_t) (q-d+1) < sizeof(image_info->filename))) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1381,8 +1389,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       for (d=image->directory; *d != '\0'; d++)
       {
         q=d;
-        while ((*q != '\xff') && (*q != '\0') &&
-               ((size_t) (q-d+1) < sizeof(image_info->filename)))
+        while (IsDirectoryNameCharacter(q,d,image_info) != MagickFalse)
           q++;
         (void) CopyMagickString(image_info->filename,d,(size_t) (q-d+1));
         d=q;
