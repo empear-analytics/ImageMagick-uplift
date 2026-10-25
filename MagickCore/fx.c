@@ -772,9 +772,15 @@ static MagickBooleanType TranslateExpression
 
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe);
 
+static inline MagickBooleanType IsHslOrIntensityChannel(const PixelChannel pc)
+{
+  return((pc==HUE_CHANNEL || pc==SAT_CHANNEL || pc==LIGHT_CHANNEL ||
+    pc==INTENSITY_CHANNEL) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType ChanIsVirtual (PixelChannel pc)
 {
-  if (pc==HUE_CHANNEL || pc==SAT_CHANNEL || pc==LIGHT_CHANNEL || pc==INTENSITY_CHANNEL)
+  if (IsHslOrIntensityChannel(pc) != MagickFalse)
     return MagickTrue;
 
   return MagickFalse;
