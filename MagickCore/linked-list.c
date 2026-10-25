@@ -460,6 +460,14 @@ static void InsertElementAt(LinkedListInfo *list_info,ElementInfo *next,
     list_info->next=next;
 }
 
+static void PrependElement(LinkedListInfo *list_info,ElementInfo *next)
+{
+  if (list_info->next == list_info->head)
+    list_info->next=next;
+  next->next=list_info->head;
+  list_info->head=next;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -517,12 +525,7 @@ MagickExport MagickBooleanType InsertValueInLinkedList(
   else
     {
       if (index == 0)
-        {
-          if (list_info->next == list_info->head)
-            list_info->next=next;
-          next->next=list_info->head;
-          list_info->head=next;
-        }
+        PrependElement(list_info,next);
       else
         if (index == list_info->elements)
           {
