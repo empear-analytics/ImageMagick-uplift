@@ -173,6 +173,27 @@ MagickExport TokenInfo *DestroyTokenInfo(TokenInfo *token_info)
 %    o token: copy the token to this buffer.
 %
 */
+static inline MagickBooleanType IsEscapedQuote(const char *magick_restrict p,
+  const char escape)
+{
+  return(((*p == '\\') && ((*(p+1) == escape) ||
+    (*(p+1) == '\\'))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsSingleCharToken(const char *magick_restrict p)
+{
+  return(((*p != '\0') && (isalpha((int) ((unsigned char) *p)) == 0) &&
+    (*p != *DirectorySeparator) && (*p != '#') && (*p != '<')) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsTokenDelimiter(const char *magick_restrict p)
+{
+  return((((isspace((int) ((unsigned char) *p)) != 0) || (*p == '=') ||
+    (*p == ',') || (*p == ':') || (*p == ';')) &&
+    (*(p-1) != '\\')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport magick_hot_spot size_t GetNextToken(
   const char *magick_restrict start,const char **magick_restrict end,
   const size_t extent,char *magick_restrict token)
@@ -217,7 +238,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
       }
       for (p++; *p != '\0'; p++)
       {
-        if ((*p == '\\') && ((*(p+1) == escape) || (*(p+1) == '\\')))
+        if (IsEscapedQuote(p,escape) != MagickFalse)
           p++;
         else
           if (*p == escape)
@@ -266,8 +287,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
             }
           break;
         }
-      if ((*p != '\0') && (isalpha((int) ((unsigned char) *p)) == 0) &&
-          (*p != *DirectorySeparator) && (*p != '#') && (*p != '<'))
+      if (IsSingleCharToken(p) != MagickFalse)
         {
           if (i < (ssize_t) (extent-1))
             token[i++]=(*p);
@@ -276,8 +296,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
         }
       for ( ; *p != '\0'; p++)
       {
-        if (((isspace((int) ((unsigned char) *p)) != 0) || (*p == '=') ||
-            (*p == ',') || (*p == ':') || (*p == ';')) && (*(p-1) != '\\'))
+        if (IsTokenDelimiter(p) != MagickFalse)
           break;
         if ((i > 0) && (*p == '<'))
           break;
