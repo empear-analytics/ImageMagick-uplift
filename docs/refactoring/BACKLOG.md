@@ -130,7 +130,7 @@ needs before refactoring:
 | ---: | --- | ---: | ---: | ---: | --- |
 | 1.45 | `MagickCore/cache.c` | 6108 | 62% | 65% | open |
 | 1.48 | `MagickCore/property.c` | 4879 | 41% | 61% | open |
-| 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | open |
+| 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | 1.61, blocked (GetImageFeatures' function-local typedef needs a hoisting recipe), [M35](tasks/M35-feature.md) |
 | 1.61 | `MagickCore/xml-tree.c` | 2347 | 35% | 57% | open |
 | 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | open |
 | 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | open |

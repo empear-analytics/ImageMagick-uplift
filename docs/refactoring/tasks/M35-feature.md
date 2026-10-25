@@ -143,3 +143,32 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, late morning)
+
+**Result: Code Health 1.60 → 1.61** (`cs-mcp` 1.5.12). Branch `campaign/M35-feature`,
+stacked on `campaign/M34-configure`. 1 refactor commit: `SetCannyOrientation` (E,
+oracle), the orientation classification inside CannyEdgeImage's parallel loop.
+- The `CannyInfo` struct passes by value and comes back, so `pixel.orientation=` keeps
+  its text.
+- CannyEdgeImage: bumps 9 → 7, nesting 5 → 4.
+- Its readiness rests on thin evidence (2 mutants).
+
+**Blocked: GetImageFeatures (cc 180, 24 bumps).** Its working type `ChannelStatistics`
+is a typedef declared *inside* the function. A helper outside it cannot name that type,
+so none of its blocks can move: not even the six-pointer allocation test (probe: build
+error). Moving the typedef to file scope would unblock the whole function, but no
+catalogue recipe covers that. It would be a small, purely declarative recipe:
+
+- **Hoist a local type:** move a typedef that sits at the top of a function body, before
+  any statement, to file scope directly above the function. No other identifier may have
+  the same name.
+
+That is a candidate for the catalogue, for the owner to decide.
+
+**What is left, at 1.61.**
+- `GetImageFeatures`, as above.
+- `HoughLineImage` and `MeanShiftImage` (nesting 7, careful and not ready). Their bodies
+  are parallel loops that write several of the iteration's locals.
+- `CannyEdgeImage`'s neighbour-fetch `switch`, which writes two structs through `&`.
+- `TraceEdges` takes 7 arguments (Recipe B).
