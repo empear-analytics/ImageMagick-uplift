@@ -488,6 +488,14 @@ static inline MagickBooleanType IsSingleUnnumberedImage(const Image *image)
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType HasChromaticity(const Image *image)
+{
+  return(((image->chromaticity.red_primary.x != 0.0) ||
+    (image->chromaticity.green_primary.x != 0.0) ||
+    (image->chromaticity.blue_primary.x != 0.0) ||
+    (image->chromaticity.white_point.x != 0.0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1276,10 +1284,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     image->rendering_intent));
   if (image->gamma != 0.0)
     (void) FormatLocaleFile(file,"  Gamma: %g\n",image->gamma);
-  if ((image->chromaticity.red_primary.x != 0.0) ||
-      (image->chromaticity.green_primary.x != 0.0) ||
-      (image->chromaticity.blue_primary.x != 0.0) ||
-      (image->chromaticity.white_point.x != 0.0))
+  if (HasChromaticity(image) != MagickFalse)
     {
       /*
         Display image chromaticity.
