@@ -278,6 +278,61 @@ MagickExport ResampleFilter *DestroyResampleFilter(
   return(resample_filter);
 }
 
+static inline MagickBooleanType IsAreaOutsideImage(
+  const ResampleFilter *resample_filter,const double u0,const double v0)
+{
+  return(( resample_filter->limit_reached
+    || u0 + resample_filter->Ulimit < 0.0
+    || u0 - resample_filter->Ulimit >
+       (double) resample_filter->image->columns-1.0
+    || v0 + resample_filter->Vlimit < 0.0
+    || v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0
+    ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAreaOutsideCorner(
+  const ResampleFilter *resample_filter,const double u0,const double v0)
+{
+  return((    ( u0 + resample_filter->Ulimit < 0.0
+                && v0 + resample_filter->Vlimit < 0.0 )
+           || ( u0 + resample_filter->Ulimit < 0.0
+                && v0 - resample_filter->Vlimit >
+                   (double) resample_filter->image->rows-1.0 )
+           || ( u0 - resample_filter->Ulimit >
+                (double) resample_filter->image->columns-1.0
+                && v0 + resample_filter->Vlimit < 0.0 )
+           || ( u0 - resample_filter->Ulimit >
+                (double) resample_filter->image->columns-1.0
+                && v0 - resample_filter->Vlimit >
+                   (double) resample_filter->image->rows-1.0 )
+           ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAreaOutsideDitherCorner(
+  const ResampleFilter *resample_filter,const double u0,const double v0)
+{
+  return((    ( u0 + resample_filter->Ulimit < -32.0
+                && v0 + resample_filter->Vlimit < -32.0 )
+           || ( u0 + resample_filter->Ulimit < -32.0
+                && v0 - resample_filter->Vlimit >
+                   (double) resample_filter->image->rows+31.0 )
+           || ( u0 - resample_filter->Ulimit >
+                (double) resample_filter->image->columns+31.0
+                && v0 + resample_filter->Vlimit < -32.0 )
+           || ( u0 - resample_filter->Ulimit >
+                (double) resample_filter->image->columns+31.0
+                && v0 - resample_filter->Vlimit >
+                   (double) resample_filter->image->rows+31.0 )
+           ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsResampleUnweighted(const ssize_t hit,
+  const double divisor_m,const double divisor_c)
+{
+  return(( hit == 0 || divisor_m <= MagickEpsilon ||
+    divisor_c <= MagickEpsilon ) ? MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -357,25 +412,13 @@ MagickExport MagickBooleanType ResamplePixelColor(
     case GrayVirtualPixelMethod:
     case WhiteVirtualPixelMethod:
     case MaskVirtualPixelMethod:
-      if ( resample_filter->limit_reached
-           || u0 + resample_filter->Ulimit < 0.0
-           || u0 - resample_filter->Ulimit > (double) resample_filter->image->columns-1.0
-           || v0 + resample_filter->Vlimit < 0.0
-           || v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0
-           )
+      if (IsAreaOutsideImage(resample_filter,u0,v0) != MagickFalse)
         hit++;
       break;
 
     case UndefinedVirtualPixelMethod:
     case EdgeVirtualPixelMethod:
-      if (    ( u0 + resample_filter->Ulimit < 0.0 && v0 + resample_filter->Vlimit < 0.0 )
-           || ( u0 + resample_filter->Ulimit < 0.0
-                && v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0 )
-           || ( u0 - resample_filter->Ulimit > (double) resample_filter->image->columns-1.0
-                && v0 + resample_filter->Vlimit < 0.0 )
-           || ( u0 - resample_filter->Ulimit > (double) resample_filter->image->columns-1.0
-                && v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0 )
-           )
+      if (IsAreaOutsideCorner(resample_filter,u0,v0) != MagickFalse)
         hit++;
       break;
     case HorizontalTileVirtualPixelMethod:
@@ -391,14 +434,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
         hit++;  /* outside the vertically tiled images. */
       break;
     case DitherVirtualPixelMethod:
-      if (    ( u0 + resample_filter->Ulimit < -32.0 && v0 + resample_filter->Vlimit < -32.0 )
-           || ( u0 + resample_filter->Ulimit < -32.0
-                && v0 - resample_filter->Vlimit > (double) resample_filter->image->rows+31.0 )
-           || ( u0 - resample_filter->Ulimit > (double) resample_filter->image->columns+31.0
-                && v0 + resample_filter->Vlimit < -32.0 )
-           || ( u0 - resample_filter->Ulimit > (double) resample_filter->image->columns+31.0
-                && v0 - resample_filter->Vlimit > (double) resample_filter->image->rows+31.0 )
-           )
+      if (IsAreaOutsideDitherCorner(resample_filter,u0,v0) != MagickFalse)
         hit++;
       break;
     case TileVirtualPixelMethod:
@@ -654,7 +690,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
   /*
     Result sanity check -- this should NOT happen
   */
-  if ( hit == 0 || divisor_m <= MagickEpsilon || divisor_c <= MagickEpsilon ) {
+  if (IsResampleUnweighted(hit,divisor_m,divisor_c) != MagickFalse) {
     /* not enough pixels, or bad weighting in resampling,
        resort to direct interpolation */
 #if DEBUG_NO_PIXEL_HIT
