@@ -2684,12 +2684,18 @@ static inline MagickBooleanType IsUnknownSeparatedToken(
      (strchr(token+1,'_') != (char *) NULL))) ? MagickTrue : MagickFalse);
 }
 
-static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
-  char *token)
+static void RemoveTokenCharacter(char *token,const int c)
 {
   char
     *q;
 
+  while ((q=strchr(token+1,c)) != (char *) NULL)
+    (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
+}
+
+static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
+  char *token)
+{
   const OptionInfo
     *command_info;
 
@@ -2702,10 +2708,8 @@ static const OptionInfo *FindCommandOptionInfo(const OptionInfo *option_info,
   command_info=option_info+i;
   if (IsUnknownSeparatedToken(command_info,token) != MagickFalse)
     {
-      while ((q=strchr(token+1,'-')) != (char *) NULL)
-        (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
-      while ((q=strchr(token+1,'_')) != (char *) NULL)
-        (void) CopyMagickString(q,q+1,MagickPathExtent-strlen(q));
+      RemoveTokenCharacter(token,'-');
+      RemoveTokenCharacter(token,'_');
       for (i=0; option_info[i].mnemonic != (char *) NULL; i++)
         if (LocaleCompare(token,option_info[i].mnemonic) == 0)
           break;
