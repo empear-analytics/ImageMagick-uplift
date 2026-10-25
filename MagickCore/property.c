@@ -4454,6 +4454,24 @@ MagickExport void ResetImagePropertyIterator(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsReadOnlyMProperty(const char *property)
+{
+  return(((LocaleCompare("magick",property) == 0) ||
+    (LocaleCompare("max",property) == 0) ||
+    (LocaleCompare("mean",property) == 0) ||
+    (LocaleCompare("min",property) == 0) ||
+    (LocaleCompare("min",property) == 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsReadOnlySProperty(const char *property)
+{
+  return(((LocaleCompare("size",property) == 0) ||
+    (LocaleCompare("skewness",property) == 0) ||
+    (LocaleCompare("scenes",property) == 0) ||
+    (LocaleCompare("standard-deviation",property) == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageProperty(Image *image,
   const char *property,const char *value,ExceptionInfo *exception)
 {
@@ -4762,11 +4780,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     }
     case 'M':
     case 'm':
-      if ((LocaleCompare("magick",property) == 0) ||
-          (LocaleCompare("max",property) == 0) ||
-          (LocaleCompare("mean",property) == 0) ||
-          (LocaleCompare("min",property) == 0) ||
-          (LocaleCompare("min",property) == 0))
+      if (IsReadOnlyMProperty(property) != MagickFalse)
         {
           (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
              "SetReadOnlyProperty","`%s'",property);
@@ -4825,10 +4839,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     }
     case 'S':
     case 's':
-      if ((LocaleCompare("size",property) == 0) ||
-          (LocaleCompare("skewness",property) == 0) ||
-          (LocaleCompare("scenes",property) == 0) ||
-          (LocaleCompare("standard-deviation",property) == 0))
+      if (IsReadOnlySProperty(property) != MagickFalse)
         {
           (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
             "SetReadOnlyProperty","`%s'",property);
