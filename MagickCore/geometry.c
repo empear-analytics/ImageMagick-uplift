@@ -1039,6 +1039,15 @@ static MagickStatusType ShiftNegativeHeight(MagickStatusType flags,
   return(flags);
 }
 
+static void SetPercentGeometryInfo(const MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  if (((flags & SeparatorValue) == 0) && ((flags & SigmaValue) == 0))
+    geometry_info->sigma=geometry_info->rho;
+  if (((flags & SeparatorValue) != 0) && ((flags & RhoValue) == 0))
+    geometry_info->rho=geometry_info->sigma;
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -1321,12 +1330,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
   if (IsNegativeHeightGeometry(flags) != MagickFalse)
     flags=ShiftNegativeHeight(flags,geometry_info);
   if ((flags & PercentValue) != 0)
-    {
-      if (((flags & SeparatorValue) == 0) && ((flags & SigmaValue) == 0))
-        geometry_info->sigma=geometry_info->rho;
-      if (((flags & SeparatorValue) != 0) && ((flags & RhoValue) == 0))
-        geometry_info->rho=geometry_info->sigma;
-    }
+    SetPercentGeometryInfo(flags,geometry_info);
 #if 0
   /* Debugging Geometry */
   (void) fprintf(stderr,"ParseGeometry...\n");
