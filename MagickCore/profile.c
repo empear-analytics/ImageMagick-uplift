@@ -2712,6 +2712,14 @@ static void ReplaceXMPValue(StringInfo *profile,size_t start,size_t end,
     }
 }
 
+static inline MagickBooleanType IsMissingXMPTag(const char *pos,
+  const char *datum,const size_t tag_length,const size_t length)
+{
+  return(((pos == (char *) NULL) || ((pos-datum) < 1) || (*(pos-1) != '<') ||
+    (((size_t) (pos-datum)+tag_length) > length) ||
+    (*(pos+tag_length) != '>')) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType GetXMPOffsets(const StringInfo *profile,
   const char *tag,size_t *start,size_t *end)
 {
@@ -2727,9 +2735,7 @@ static MagickBooleanType GetXMPOffsets(const StringInfo *profile,
   length=GetStringInfoLength(profile);
   pos=strstr(datum,tag);
   tag_length=strlen(tag);
-  if ((pos == (char *) NULL) || ((pos-datum) < 1) || (*(pos-1) != '<') ||
-      (((size_t) (pos-datum)+tag_length) > length) ||
-      (*(pos+tag_length) != '>'))
+  if (IsMissingXMPTag(pos,datum,tag_length,length) != MagickFalse)
     return(MagickFalse);
   *start=(size_t) (pos-datum)+tag_length+1;
   pos=strstr(datum+*start,"<");
