@@ -167,3 +167,24 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 6.23 → 6.40** (`cs-mcp` 1.5.12). Branch `campaign/M58-list`,
+stacked on `campaign/M57-montage`. Five oracle-verified commits. CloneImages and
+DeleteImages are both ready.
+- CloneImages: `GetFrameStep` (E) and `ClampSceneIndex` (E, then D). The range's last
+  index is normalised by the same text as the first; a script confirmed the copies are
+  identical after the rename.
+- DeleteImages: `DeleteMarkedImages` and `MarkImagesForDeletion` (E). Moving the
+  deletion pass exposed an upstream dead store (`image=(*images)` assigned twice
+  before any read). With the second assignment moved out, the compiler warned that
+  `image` was set but unused, so the first assignment and the declaration were removed
+  too. The commit message says so.
+
+**What is left, at 6.40.**
+- CloneImages (depth 5): the clone loop appends through `&clone_images` and sets
+  `match`.
+- DeleteImages: the range parser `break`s and `continue`s.
+- Code Duplication over 16 small list functions that share the assert and log
+  prologue (`GetMagickModule()`).
