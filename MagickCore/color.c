@@ -2388,6 +2388,21 @@ static void SetLabColorFromGeometry(PixelInfo *color,
       (scale*geometry_info.xi+((double) QuantumRange+1)/2.0));
 }
 
+static void SetScaledColorFromGeometry(PixelInfo *color,
+  const GeometryInfo geometry_info,const MagickStatusType flags,
+  const double scale)
+{
+  if ((flags & RhoValue) != 0)
+    color->red=(double) ClampToQuantum((MagickRealType) (scale*
+      geometry_info.rho));
+  if ((flags & SigmaValue) != 0)
+    color->green=(double) ClampToQuantum((MagickRealType) (scale*
+      geometry_info.sigma));
+  if ((flags & XiValue) != 0)
+    color->blue=(double) ClampToQuantum((MagickRealType) (scale*
+      geometry_info.xi));
+}
+
 MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2621,17 +2636,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
         if (IsLabCompatibleColorspace(color->colorspace) != MagickFalse)
           SetLabColorFromGeometry(color,geometry_info,flags,scale);
         else
-          {
-            if ((flags & RhoValue) != 0)
-              color->red=(double) ClampToQuantum((MagickRealType) (scale*
-                geometry_info.rho));
-            if ((flags & SigmaValue) != 0)
-              color->green=(double) ClampToQuantum((MagickRealType) (scale*
-                geometry_info.sigma));
-            if ((flags & XiValue) != 0)
-              color->blue=(double) ClampToQuantum((MagickRealType) (scale*
-                geometry_info.xi));
-          }
+          SetScaledColorFromGeometry(color,geometry_info,flags,scale);
       if ((flags & AlphaValue) != 0)
         color->alpha_trait=BlendPixelTrait;
       color->alpha=(double) OpaqueAlpha;
