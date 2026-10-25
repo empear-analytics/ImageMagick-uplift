@@ -1131,6 +1131,13 @@ static const char * OprStr (int oprNum)
   return str;
 }
 
+static inline MagickBooleanType IsJumpElement(const ElementT *pel)
+{
+  return((pel->operator_index == rGoto || pel->operator_index == rGotoChk ||
+    pel->operator_index == rIfZeroGoto ||
+    pel->operator_index == rIfNotZeroGoto) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
 {
   int i;
@@ -1154,7 +1161,7 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
   }
   for (i=0; i < pfx->usedElements; i++) {
     ElementT * pel = &pfx->Elements[i];
-    if (pel->operator_index == rGoto || pel->operator_index == rGotoChk || pel->operator_index == rIfZeroGoto || pel->operator_index == rIfNotZeroGoto) {
+    if (IsJumpElement(pel) != MagickFalse) {
       if (pel->element_index >= 0 && pel->element_index < pfx->numElements) {
         ElementT * pelDest = &pfx->Elements[pel->element_index];
         pelDest->number_dest++;
