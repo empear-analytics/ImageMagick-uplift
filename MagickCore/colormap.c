@@ -102,12 +102,29 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport MagickBooleanType AcquireImageColormap(Image *image,
-  const size_t colors,ExceptionInfo *exception)
+static void InitializeGrayColormap(Image *image,const size_t colors)
 {
   ssize_t
     i;
 
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    double
+      pixel;
+
+    GetPixelInfo(image,image->colormap+i);
+    pixel=((double) i*(QuantumRange/MagickMax(colors-1,1)));
+    image->colormap[i].red=pixel;
+    image->colormap[i].green=pixel;
+    image->colormap[i].blue=pixel;
+    image->colormap[i].alpha=(MagickRealType) OpaqueAlpha;
+    image->colormap[i].alpha_trait=BlendPixelTrait;
+  }
+}
+
+MagickExport MagickBooleanType AcquireImageColormap(Image *image,
+  const size_t colors,ExceptionInfo *exception)
+{
   /*
     Allocate image colormap.
   */
@@ -136,19 +153,7 @@ MagickExport MagickBooleanType AcquireImageColormap(Image *image,
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
-  for (i=0; i < (ssize_t) image->colors; i++)
-  {
-    double
-      pixel;
-
-    GetPixelInfo(image,image->colormap+i);
-    pixel=((double) i*(QuantumRange/MagickMax(colors-1,1)));
-    image->colormap[i].red=pixel;
-    image->colormap[i].green=pixel;
-    image->colormap[i].blue=pixel;
-    image->colormap[i].alpha=(MagickRealType) OpaqueAlpha;
-    image->colormap[i].alpha_trait=BlendPixelTrait;
-  }
+  InitializeGrayColormap(image,colors);
   image->storage_class=PseudoClass;
   return(MagickTrue);
 }
