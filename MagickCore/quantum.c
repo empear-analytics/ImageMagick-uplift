@@ -406,6 +406,21 @@ MagickExport QuantumFormatType GetQuantumFormat(const QuantumInfo *quantum_info)
   return(quantum_info->format);
 }
 
+static void SetQuantumScaleFromRange(QuantumInfo *quantum_info)
+{
+  if ((quantum_info->minimum == 0.0) && (quantum_info->maximum == 0.0))
+    quantum_info->scale=0.0;
+  else
+    if (quantum_info->minimum == quantum_info->maximum)
+      {
+        quantum_info->scale=(double) QuantumRange/quantum_info->minimum;
+        quantum_info->minimum=0.0;
+      }
+    else
+      quantum_info->scale=(double) QuantumRange/(quantum_info->maximum-
+        quantum_info->minimum);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -456,17 +471,7 @@ MagickExport void GetQuantumInfo(const ImageInfo *image_info,
   option=GetImageOption(image_info,"quantum:maximum");
   if (option != (char *) NULL)
     quantum_info->maximum=StringToDouble(option,(char **) NULL);
-  if ((quantum_info->minimum == 0.0) && (quantum_info->maximum == 0.0))
-    quantum_info->scale=0.0;
-  else
-    if (quantum_info->minimum == quantum_info->maximum)
-      {
-        quantum_info->scale=(double) QuantumRange/quantum_info->minimum;
-        quantum_info->minimum=0.0;
-      }
-    else
-      quantum_info->scale=(double) QuantumRange/(quantum_info->maximum-
-        quantum_info->minimum);
+  SetQuantumScaleFromRange(quantum_info);
   option=GetImageOption(image_info,"quantum:scale");
   if (option != (char *) NULL)
     quantum_info->scale=StringToDouble(option,(char **) NULL);
