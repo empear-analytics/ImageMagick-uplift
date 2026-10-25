@@ -780,6 +780,66 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
 }
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
+static void ParseMimeMagic(MimeInfo *mime_info,const char *attribute)
+{
+  char
+    *token;
+
+  const char
+    *p;
+
+  unsigned char
+    *q;
+
+  token=AcquireString(attribute);
+  (void) SubstituteString(&token,"&lt;","<");
+  (void) SubstituteString(&token,"&gt;",">");
+  (void) SubstituteString(&token,"&amp;","&");
+  (void) SubstituteString(&token,"&quot;","\"");
+  (void) SubstituteString(&token,"&apos;","'");
+  mime_info->magic=(unsigned char *) AcquireString(token);
+  q=mime_info->magic;
+  for (p=token; *p != '\0'; )
+  {
+    if (*p == '\\')
+      {
+        p++;
+        if (isdigit((int) ((unsigned char) *p)) != 0)
+          {
+            char
+              *end;
+
+            *q++=(unsigned char) strtol(p,&end,8);
+            p+=(ptrdiff_t) (end-p);
+            mime_info->length++;
+            continue;
+          }
+        switch (*p)
+        {
+          case 'b': *q='\b'; break;
+          case 'f': *q='\f'; break;
+          case 'n': *q='\n'; break;
+          case 'r': *q='\r'; break;
+          case 't': *q='\t'; break;
+          case 'v': *q='\v'; break;
+          case 'a': *q='a'; break;
+          case '?': *q='\?'; break;
+          default: *q=(unsigned char) (*p); break;
+        }
+        p++;
+        q++;
+        mime_info->length++;
+        continue;
+      }
+    *q++=(unsigned char) (*p++);
+    mime_info->length++;
+  }
+  token=DestroyString(token);
+  if (mime_info->data_type != StringData)
+    mime_info->value=(ssize_t) strtoul((char *) mime_info->magic,
+      (char **) NULL,0);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -898,64 +958,7 @@ static MagickBooleanType LoadMimeCache(LinkedListInfo *cache,const char *xml,
         MagickTrue,attribute);
     attribute=GetXMLTreeAttribute(mime,"magic");
     if (attribute != (const char *) NULL)
-      {
-        char
-          *token;
-
-        const char
-          *p;
-
-        unsigned char
-          *q;
-
-        token=AcquireString(attribute);
-        (void) SubstituteString(&token,"&lt;","<");
-        (void) SubstituteString(&token,"&gt;",">");
-        (void) SubstituteString(&token,"&amp;","&");
-        (void) SubstituteString(&token,"&quot;","\"");
-        (void) SubstituteString(&token,"&apos;","'");
-        mime_info->magic=(unsigned char *) AcquireString(token);
-        q=mime_info->magic;
-        for (p=token; *p != '\0'; )
-        {
-          if (*p == '\\')
-            {
-              p++;
-              if (isdigit((int) ((unsigned char) *p)) != 0)
-                {
-                  char
-                    *end;
-
-                  *q++=(unsigned char) strtol(p,&end,8);
-                  p+=(ptrdiff_t) (end-p);
-                  mime_info->length++;
-                  continue;
-                }
-              switch (*p)
-              {
-                case 'b': *q='\b'; break;
-                case 'f': *q='\f'; break;
-                case 'n': *q='\n'; break;
-                case 'r': *q='\r'; break;
-                case 't': *q='\t'; break;
-                case 'v': *q='\v'; break;
-                case 'a': *q='a'; break;
-                case '?': *q='\?'; break;
-                default: *q=(unsigned char) (*p); break;
-              }
-              p++;
-              q++;
-              mime_info->length++;
-              continue;
-            }
-          *q++=(unsigned char) (*p++);
-          mime_info->length++;
-        }
-        token=DestroyString(token);
-        if (mime_info->data_type != StringData)
-          mime_info->value=(ssize_t) strtoul((char *) mime_info->magic,
-            (char **) NULL,0);
-      }
+      ParseMimeMagic(mime_info,attribute);
     attribute=GetXMLTreeAttribute(mime,"mask");
     if (attribute != (const char *) NULL)
       mime_info->mask=(ssize_t) strtoul(attribute,(char **) NULL,0);
