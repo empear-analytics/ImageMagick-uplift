@@ -217,3 +217,27 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 1.85 → 2.21** (`cs-mcp` 1.5.12). Branch `campaign/M44-blob`, stacked
+on `campaign/M43-vision`. 5 refactor commits, all Recipe P, adding 8 predicates.
+- Oracle-verified: CloseBlob, SeekBlob, OpenBlob. They are ready or careful, and no
+  open survivor sits on a moved line. Most runs covered about 14,000–15,000 cases, all
+  with 0 diverged.
+- Guard-verified: SyncBlob (no mutant) and FileToBlob (not ready).
+
+**The predicates:**
+- `IsWrittenBlobFailure`, `IsBlobOffsetOverflow`, `IsWriteBlobMode`, `IsUnseekableBlobFile`.
+- OpenBlob: `IsStandardStreamName`, `IsSharedListFilename`, `IsGzipMagick`,
+  `IsCompressedSVGExtension` (+0.16).
+
+**Not done:** OpenBlob's memory-map test (magick info, blob support,
+AcquireMagickResource). It sits inside a `MAGICKCORE_POSIX_SUPPORT` branch, so a predicate
+outside that branch would be unused on other platforms.
+
+**What is left, at 2.21.**
+- OpenBlob and CloseBlob (long per-blob-type `switch`es).
+- The ReadBlob* and WriteBlob* families: per-type `switch`es with many near-identical
+  cases.
+- Several functions with no case or not ready.

@@ -134,7 +134,7 @@ needs before refactoring:
 | 1.61 | `MagickCore/xml-tree.c` | 2347 | 35% | 57% | 2.15, in progress (17 predicates; 4 sites left: 3 with side effects, 1 repeat), [M42](tasks/M42-xml-tree.md) |
 | 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | 2.06, in progress (Complex Conditional gone), [M43](tasks/M43-vision.md) |
 | 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.09, in progress (Complex Conditional gone), [M36](tasks/M36-image.md) |
-| 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | open |
+| 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | 2.21, in progress (8 predicates; one POSIX-only site left), [M44](tasks/M44-blob.md) |
 | 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | open |
 | 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | open |
 | 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.38, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) |
