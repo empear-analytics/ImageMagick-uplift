@@ -348,6 +348,24 @@ static RectangleInfo GetLargestTileExtent(RectangleInfo extract_info,
   return(extract_info);
 }
 
+static DrawInfo *AcquireMontageDrawInfo(const ImageInfo *clone_info,
+  const MontageInfo *montage_info)
+{
+  DrawInfo
+    *draw_info;
+
+  draw_info=CloneDrawInfo(clone_info,(DrawInfo *) NULL);
+  if (montage_info->font != (char *) NULL)
+    (void) CloneString(&draw_info->font,montage_info->font);
+  if (montage_info->pointsize != 0.0)
+    draw_info->pointsize=montage_info->pointsize;
+  draw_info->gravity=CenterGravity;
+  draw_info->stroke=montage_info->stroke;
+  draw_info->fill=montage_info->fill;
+  draw_info->text=AcquireString("");
+  return(draw_info);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -543,15 +561,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   clone_info=CloneImageInfo(image_info);
   clone_info->background_color=montage_info->background_color;
   clone_info->border_color=montage_info->border_color;
-  draw_info=CloneDrawInfo(clone_info,(DrawInfo *) NULL);
-  if (montage_info->font != (char *) NULL)
-    (void) CloneString(&draw_info->font,montage_info->font);
-  if (montage_info->pointsize != 0.0)
-    draw_info->pointsize=montage_info->pointsize;
-  draw_info->gravity=CenterGravity;
-  draw_info->stroke=montage_info->stroke;
-  draw_info->fill=montage_info->fill;
-  draw_info->text=AcquireString("");
+  draw_info=AcquireMontageDrawInfo(clone_info,montage_info);
   (void) GetTypeMetrics(image_list[0],draw_info,&metrics,exception);
   texture=NewImageList();
   if (montage_info->texture != (char *) NULL)
