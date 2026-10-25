@@ -359,6 +359,14 @@ MagickExport void Ascii85Encode(Image *image,const unsigned char code)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsHuffmanBufferMissing(HuffmanTable **mb_hash,
+  HuffmanTable **mw_hash,const unsigned char *scanline)
+{
+  return(((mb_hash == (HuffmanTable **) NULL) ||
+    (mw_hash == (HuffmanTable **) NULL) ||
+    (scanline == (unsigned char *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -447,9 +455,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   mw_hash=(HuffmanTable **) AcquireQuantumMemory(HashSize,sizeof(*mw_hash));
   scanline=(unsigned char *) AcquireQuantumMemory((size_t) image->columns,
     sizeof(*scanline));
-  if ((mb_hash == (HuffmanTable **) NULL) ||
-      (mw_hash == (HuffmanTable **) NULL) ||
-      (scanline == (unsigned char *) NULL))
+  if (IsHuffmanBufferMissing(mb_hash,mw_hash,scanline) != MagickFalse)
     {
       if (mb_hash != (HuffmanTable **) NULL)
         mb_hash=(HuffmanTable **) RelinquishMagickMemory(mb_hash);
