@@ -990,6 +990,29 @@ MagickExport MagickBooleanType MinMaxStretchImage(Image *image,
   return(status != 0 ? MagickTrue : MagickFalse);
 }
 
+static void FormatColorTuple(const PixelInfo pixel,char *tuple)
+{
+  (void) CopyMagickString(tuple,"(",MagickPathExtent);
+  ConcatenateColorComponent(&pixel,RedPixelChannel,NoCompliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(&pixel,GreenPixelChannel,NoCompliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(&pixel,BluePixelChannel,NoCompliance,tuple);
+  if (pixel.colorspace == CMYKColorspace)
+    {
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(&pixel,BlackPixelChannel,NoCompliance,
+        tuple);
+    }
+  if (pixel.alpha_trait != UndefinedPixelTrait)
+    {
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(&pixel,AlphaPixelChannel,NoCompliance,
+        tuple);
+    }
+  (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1097,25 +1120,7 @@ MagickExport size_t GetNumberColors(const Image *image,FILE *file,
   for (i=0; i < (ssize_t) number_colors; i++)
   {
     pixel=(*p);
-    (void) CopyMagickString(tuple,"(",MagickPathExtent);
-    ConcatenateColorComponent(&pixel,RedPixelChannel,NoCompliance,tuple);
-    (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-    ConcatenateColorComponent(&pixel,GreenPixelChannel,NoCompliance,tuple);
-    (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-    ConcatenateColorComponent(&pixel,BluePixelChannel,NoCompliance,tuple);
-    if (pixel.colorspace == CMYKColorspace)
-      {
-        (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-        ConcatenateColorComponent(&pixel,BlackPixelChannel,NoCompliance,
-          tuple);
-      }
-    if (pixel.alpha_trait != UndefinedPixelTrait)
-      {
-        (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-        ConcatenateColorComponent(&pixel,AlphaPixelChannel,NoCompliance,
-          tuple);
-      }
-    (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
+    FormatColorTuple(pixel,tuple);
     (void) QueryColorname(image,&pixel,SVGCompliance,color,exception);
     GetColorTuple(&pixel,MagickTrue,hex);
     (void) FormatLocaleString(count,MagickPathExtent,"%10.20g:",(double)
