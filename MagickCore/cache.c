@@ -5286,6 +5286,24 @@ static inline void PrefetchPixelCacheNexusPixels(const NexusInfo *nexus_info,
   MagickCachePrefetch((unsigned char *) nexus_info->pixels+CACHE_LINE_SIZE,1,1);
 }
 
+static inline MagickBooleanType IsUnbufferedMemoryCache(
+  const CacheInfo *cache_info,const MagickBooleanType buffered)
+{
+  return((((cache_info->type == MemoryCache) ||
+    (cache_info->type == MapCache)) &&
+    (buffered == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsDirectCacheRegion(const CacheInfo *cache_info,
+  const ssize_t x,const ssize_t y,const size_t width,const size_t height)
+{
+  return((((x >= 0) && (y >= 0) &&
+    (((ssize_t) height+y-1) < (ssize_t) cache_info->rows)) &&
+    (((x == 0) && (width == cache_info->columns)) || ((height == 1) &&
+    (((ssize_t) width+x-1) < (ssize_t) cache_info->columns)))) ? MagickTrue :
+    MagickFalse);
+}
+
 static Quantum *SetPixelCacheNexusPixels(
   const CacheInfo *magick_restrict cache_info,const MapMode mode,
   const ssize_t x,const ssize_t y,const size_t width,const size_t height,
@@ -5325,13 +5343,9 @@ static Quantum *SetPixelCacheNexusPixels(
         "InvalidPixel","`%s'",cache_info->filename);
       return((Quantum *) NULL);
     }
-  if (((cache_info->type == MemoryCache) || (cache_info->type == MapCache)) &&
-      (buffered == MagickFalse))
+  if (IsUnbufferedMemoryCache(cache_info,buffered) != MagickFalse)
     {
-      if (((x >= 0) && (y >= 0) &&
-          (((ssize_t) height+y-1) < (ssize_t) cache_info->rows)) &&
-          (((x == 0) && (width == cache_info->columns)) || ((height == 1) &&
-          (((ssize_t) width+x-1) < (ssize_t) cache_info->columns))))
+      if (IsDirectCacheRegion(cache_info,x,y,width,height) != MagickFalse)
         {
           MagickOffsetType
             offset;
