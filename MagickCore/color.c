@@ -2005,6 +2005,21 @@ static inline MagickBooleanType IsIncludeElementOpen(const char *token,
     MagickTrue : MagickFalse);
 }
 
+static void SetColorInfoCompliance(ColorInfo *color_info,const char *token)
+{
+  ssize_t
+    compliance;
+
+  compliance=color_info->compliance;
+  if (StringLocateSubstring(token,"SVG") != (char *) NULL)
+    compliance|=SVGCompliance;
+  if (StringLocateSubstring(token,"X11") != (char *) NULL)
+    compliance|=X11Compliance;
+  if (StringLocateSubstring(token,"XPM") != (char *) NULL)
+    compliance|=XPMCompliance;
+  color_info->compliance=(ComplianceType) compliance;
+}
+
 static MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
   const char *filename,const size_t depth,ExceptionInfo *exception)
 {
@@ -2178,17 +2193,7 @@ static MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
           }
         if (LocaleCompare((char *) keyword,"compliance") == 0)
           {
-            ssize_t
-              compliance;
-
-            compliance=color_info->compliance;
-            if (StringLocateSubstring(token,"SVG") != (char *) NULL)
-              compliance|=SVGCompliance;
-            if (StringLocateSubstring(token,"X11") != (char *) NULL)
-              compliance|=X11Compliance;
-            if (StringLocateSubstring(token,"XPM") != (char *) NULL)
-              compliance|=XPMCompliance;
-            color_info->compliance=(ComplianceType) compliance;
+            SetColorInfoCompliance(color_info,token);
             break;
           }
         break;
