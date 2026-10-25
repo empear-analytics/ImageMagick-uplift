@@ -140,7 +140,7 @@ needs before refactoring:
 | 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.38, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) |
 | 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | 3.77, in progress (Complex Conditional gone; scan loops need Recipe B), [M46](tasks/M46-layer.md) |
 | 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 3.40, plateau for now (new two-string helpers trigger String Heavy Function Arguments), [M30](tasks/M30-log.md) |
-| 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | open |
+| 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | 4.45 (guard level, not ready; ReadImage and WriteImage left), [M48](tasks/M48-constitute.md) |
 | 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | 3.85, in progress (Complex Conditional: one sizeof site left), [M31](tasks/M31-policy.md) |
 | 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.13, in progress (Complex Conditional gone; out of the Red band), [M32](tasks/M32-type.md) |
 | 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | open |

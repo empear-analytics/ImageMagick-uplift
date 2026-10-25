@@ -176,3 +176,53 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, evening)
+
+**Result: Code Health 3.42 → 4.45** (`cs-mcp` 1.5.12). Branch `campaign/M48-constitute`,
+stacked on `campaign/M47-paint`. The backlog listed constitute.c at 3.33. The file
+measured 3.42 when the task started, because of the `cs-mcp` version.
+The readiness gate (merged reports, run on the unedited file) says every function in
+the file is *not ready*, so all 13 refactor commits are guard-verified (literal guard,
+the `--calls` extract fingerprint, a build without warnings). The oracle also ran on
+every commit: 0 diverged, apart from known flakes that pass when rerun alone.
+
+- **P (2 commits).** `IsTIFFResolutionFallback` (SyncResolutionFromProperties), plus
+  `IsSingleImageDelegateCopy` and `IsDirectDelegate` (WriteImage). Complex
+  Conditional leaves the file.
+- **E (11 commits).**
+  - ReadImage's per-frame loop: `SyncDelayFromConstituteInfo`,
+    `SetImageDateProperties`, `SyncDisposeFromConstituteInfo` (3.80 → 4.02, out of
+    the Red band) and `ApplyExtractGeometry`. ReadImage loses its nesting depth 6
+    and goes from cc 79 to 63.
+  - WriteImage: `CopyTemporaryImageFile` and `GetWriteMagickInfo`.
+  - ReadImages and PingImages: `ReadSceneImages` and `PingSceneImages`. Both
+    functions are now clean, and Code Duplication leaves the file.
+  - SyncResolutionFromProperties: `SetResolutionFromStrings` and
+    `DeleteResolutionProperties`.
+  - WriteImages: `SyncImageSceneNumbers`.
+
+  Five of these use the value-returning form (step 7): `ApplyExtractGeometry`
+  replaced `ReplaceImageInList(&next,...)` on the loop variable, and the other four
+  assign their output before reading it.
+
+**Order mattered.** `ApplyExtractGeometry` scored 3.69 → 3.65 when tried first and was
+reverted under rule 2. After the three smaller ReadImage extractions it scored
+4.02 → 4.09.
+
+**Process slip, corrected before push.** A known flake (write-mask `-scale`, plus the
+hough pair) stopped the predicate script after it had edited the file, and the next
+group then committed both functions' predicates together. That commit was split into
+one commit per function, and the script now reverts the file when the oracle
+diverges.
+
+**What is left, at 4.45.**
+- `ReadImage` (cc 63, 282 lines, 11 bumps). Its remaining blocks either return early
+  (the seekable-stream copy, the delegate path, the scene clone, and
+  `ThrowReaderException` in the ping check) or are the caption/comment/label triple,
+  which needs Recipe D and therefore the oracle level.
+- `WriteImage` (cc 36, nesting depth 4). The encoder fallbacks write both
+  `magick_info` and `encoder`, and the encode-under-semaphore block duplicates the
+  first one (D again). The seekable-stream block writes `status` and `temporary`.
+- `ConstituteImage` (6 arguments, which is public API, cc 30).
+- `WriteImages`: the write loop has a `break` and an OpenMP atomic.
