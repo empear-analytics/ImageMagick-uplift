@@ -885,6 +885,23 @@ static inline void IncrementRandomNonce(StringInfo *nonce)
   ThrowFatalException(RandomFatalError,"SequenceWrapError");
 }
 
+static void RefillRandomReservoir(RandomInfo *random_info,
+  SignatureInfo *signature_info,unsigned char *p,size_t i)
+{
+  unsigned char
+    *datum;
+
+  InitializeSignature(signature_info);
+  UpdateSignature(signature_info,random_info->nonce);
+  FinalizeSignature(signature_info);
+  IncrementRandomNonce(random_info->nonce);
+  SetStringInfo(random_info->reservoir,GetSignatureDigest(signature_info));
+  random_info->i=i;
+  datum=GetStringInfoDatum(random_info->reservoir);
+  while (i-- != 0)
+    p[i]=datum[i];
+}
+
 MagickExport void SetRandomKey(RandomInfo *random_info,const size_t length,
   unsigned char *key)
 {
@@ -931,17 +948,7 @@ MagickExport void SetRandomKey(RandomInfo *random_info,const size_t length,
     i-=GetSignatureDigestsize(signature_info);
   }
   if (i != 0)
-    {
-      InitializeSignature(signature_info);
-      UpdateSignature(signature_info,random_info->nonce);
-      FinalizeSignature(signature_info);
-      IncrementRandomNonce(random_info->nonce);
-      SetStringInfo(random_info->reservoir,GetSignatureDigest(signature_info));
-      random_info->i=i;
-      datum=GetStringInfoDatum(random_info->reservoir);
-      while (i-- != 0)
-        p[i]=datum[i];
-    }
+    RefillRandomReservoir(random_info,signature_info,p,i);
   UnlockSemaphoreInfo(random_info->semaphore);
 }
 
