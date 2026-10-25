@@ -5637,6 +5637,14 @@ MagickExport void SetCustomStreamWriter(CustomStreamInfo *custom_stream,
 %    o image: the image.
 %
 */
+static inline MagickBooleanType IsWriteBlobMode(const BlobInfo *blob_info)
+{
+  return(((blob_info->mode == WriteBlobMode) ||
+    (blob_info->mode == WriteBinaryBlobMode) ||
+    (blob_info->mode == AppendBlobMode) ||
+    (blob_info->mode == AppendBinaryBlobMode)) ? MagickTrue : MagickFalse);
+}
+
 static int SyncBlob(const Image *image)
 {
   BlobInfo
@@ -5660,10 +5668,7 @@ static int SyncBlob(const Image *image)
       break;
     case StandardStream:
     {
-      if ((blob_info->mode == WriteBlobMode) ||
-          (blob_info->mode == WriteBinaryBlobMode) ||
-          (blob_info->mode == AppendBlobMode) ||
-          (blob_info->mode == AppendBinaryBlobMode))
+      if (IsWriteBlobMode(blob_info) != MagickFalse)
         status=fflush(blob_info->file_info.file);
       break;
     }
