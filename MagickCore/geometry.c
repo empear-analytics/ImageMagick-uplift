@@ -998,6 +998,47 @@ static void NormalizeSamplingFactor(const MagickStatusType flags,
     geometry_info->sigma=2.0;
 }
 
+static MagickStatusType ShiftNegativeHeight(MagickStatusType flags,
+  GeometryInfo *geometry_info)
+{
+  if ((flags & PsiValue) == 0)
+    {
+      /*
+        Support negative height values (e.g. 30x-20).
+      */
+      geometry_info->sigma=geometry_info->xi;
+      geometry_info->xi=0.0;
+      flags|=SigmaValue;
+      flags&=(unsigned int) (~XiValue);
+    }
+  else
+    if ((flags & ChiValue) == 0)
+      {
+        /*
+          Support negative height values (e.g. 30x-20+10).
+        */
+        geometry_info->sigma=geometry_info->xi;
+        geometry_info->xi=geometry_info->psi;
+        flags|=SigmaValue;
+        flags|=XiValue;
+        flags&=(unsigned int) (~PsiValue);
+      }
+    else
+      {
+        /*
+          Support negative height values (e.g. 30x-20+10+10).
+        */
+        geometry_info->sigma=geometry_info->xi;
+        geometry_info->xi=geometry_info->psi;
+        geometry_info->psi=geometry_info->chi;
+        flags|=SigmaValue;
+        flags|=XiValue;
+        flags|=PsiValue;
+        flags&=(unsigned int) (~ChiValue);
+      }
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGeometry(const char *geometry,
   GeometryInfo *geometry_info)
 {
@@ -1278,43 +1319,7 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
   if (strchr(pedantic_geometry,':') != (char *) NULL)
     NormalizeSamplingFactor(flags,geometry_info);
   if (IsNegativeHeightGeometry(flags) != MagickFalse)
-    {
-      if ((flags & PsiValue) == 0)
-        {
-          /*
-            Support negative height values (e.g. 30x-20).
-          */
-          geometry_info->sigma=geometry_info->xi;
-          geometry_info->xi=0.0;
-          flags|=SigmaValue;
-          flags&=(unsigned int) (~XiValue);
-        }
-      else
-        if ((flags & ChiValue) == 0)
-          {
-            /*
-              Support negative height values (e.g. 30x-20+10).
-            */
-            geometry_info->sigma=geometry_info->xi;
-            geometry_info->xi=geometry_info->psi;
-            flags|=SigmaValue;
-            flags|=XiValue;
-            flags&=(unsigned int) (~PsiValue);
-          }
-        else
-          {
-            /*
-              Support negative height values (e.g. 30x-20+10+10).
-            */
-            geometry_info->sigma=geometry_info->xi;
-            geometry_info->xi=geometry_info->psi;
-            geometry_info->psi=geometry_info->chi;
-            flags|=SigmaValue;
-            flags|=XiValue;
-            flags|=PsiValue;
-            flags&=(unsigned int) (~ChiValue);
-          }
-    }
+    flags=ShiftNegativeHeight(flags,geometry_info);
   if ((flags & PercentValue) != 0)
     {
       if (((flags & SeparatorValue) == 0) && ((flags & SigmaValue) == 0))
