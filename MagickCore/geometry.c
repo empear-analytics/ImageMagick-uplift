@@ -206,6 +206,13 @@ static inline MagickBooleanType IsGeometryWidthTerminator(const int c,
     (*q == '\0')) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsGeometryHeightSeparator(const int c,
+  const char *p)
+{
+  return(((c == 215) || (*p == 'x') || (*p == 'X') || (*p == ':')) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -367,7 +374,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   if ((*p != '+') && (*p != '-'))
     {
       c=(int) ((unsigned char) *p);
-      if ((c == 215) || (*p == 'x') || (*p == 'X') || (*p == ':'))
+      if (IsGeometryHeightSeparator(c,p) != MagickFalse)
         {
           p++;
           if ((*p != '+') && (*p != '-'))
