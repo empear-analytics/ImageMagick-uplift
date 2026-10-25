@@ -117,7 +117,7 @@ For each function: the recipes applied, the score before and after, and the revi
 ### Report (2026-10-25, Mac, night)
 
 **Result: Code Health 4.58 → 5.02** (`cs-mcp` 1.5.12). Branch `campaign/M54-token`,
-stacked on `campaign/M53-splay-tree`. Six refactor commits:
+stacked on `campaign/M53-splay-tree`. Five refactor commits (the three predicates share one):
 - **P (oracle).** GetNextToken (careful): `IsEscapedQuote`, `IsSingleCharToken`
   and `IsTokenDelimiter`, 4.58 → 4.84. Complex Conditional leaves the file.
 - **E (oracle).** GetNextToken: `GetClosingQuote` (value-returning) and
