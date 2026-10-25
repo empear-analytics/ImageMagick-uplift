@@ -99,7 +99,7 @@ needs before refactoring:
 | 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | 1.10, in progress (fixed-map blocks moved out of 9 of 14 Export/Import functions), [M39](tasks/M39-pixel.md) |
 | 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | 1.81, in progress (Complex Conditional 42 -> 8 sites; the rest are repeats), [M38](tasks/M38-fx.md) |
 | 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | open |
-| 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | open |
+| 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | plateau 1.24 for E (loop helpers measured at +0.01 per function), [M70](tasks/M70-quantum-export.md) |
 | 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | 1.77, in progress (Complex Conditional gone: 20 sites, 22 predicates), [M37](tasks/M37-draw.md) |
 | 1.33 | `MagickCore/composite.c` | 3815 | 86% | 74% | 1.58, in progress (Complex Conditional gone), [M20](tasks/M20-composite.md) |
 | 1.38 | `MagickCore/effect.c` | 4405 | 89% | 75% | 1.40, in progress (Complex Conditional gone; parallel loops need K/T, the adaptive pair B), [M26](tasks/M26-effect.md) |

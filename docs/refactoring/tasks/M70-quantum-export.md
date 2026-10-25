@@ -244,3 +244,19 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night)
+
+**Result: Code Health 1.24, unchanged. Tried, measured and reverted.** The file has
+no `#if`, and its 18 Export*Quantum functions are switches over the sample depth.
+Each depth case ends in a pixel loop followed by `break`. Such a loop can move into a
+`void` helper because `p` and `q` are dead after it. Ten such helpers in
+ExportRGBQuantum (5–6 arguments each) cut its bumps from 9 to 4 and its length from
+296 to 200 lines, and removed its duplication. But the file only moved
+1.24 → 1.25, and the Brain Method stayed, because the 12-bit case keeps its two
+selector switches. Each of those writes both `pixel` and `p`.
+
+Doing this across the file would mean about 180 small helpers for a few hundredths,
+a poor trade for review effort. pixel.c (M39) showed the same pattern. This file
+needs a different recipe: one helper per channel layout and depth, which is Recipe B
+or a table-driven export. That is owner territory.
