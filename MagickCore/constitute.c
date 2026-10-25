@@ -440,6 +440,21 @@ static void SyncDelayFromConstituteInfo(Image *next,
     next->ticks_per_second=constitute_info->ticks_per_second;
 }
 
+static void SetImageDateProperties(Image *next,ExceptionInfo *exception)
+{
+  char
+    timestamp[MagickTimeExtent];
+
+  (void) FormatMagickTime(next->timestamp,sizeof(timestamp),timestamp);
+  (void) SetImageProperty(next,"date:timestamp",timestamp,exception);
+  (void) FormatMagickTime((time_t) GetBlobProperties(next)->st_mtime,
+    sizeof(timestamp),timestamp);
+  (void) SetImageProperty(next,"date:modify",timestamp,exception);
+  (void) FormatMagickTime((time_t) GetBlobProperties(next)->st_ctime,
+    sizeof(timestamp),timestamp);
+  (void) SetImageProperty(next,"date:create",timestamp,exception);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -964,19 +979,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
     if (profile == (const StringInfo *) NULL)
       profile=GetImageProfile(next,"8bim");
     if (IsSourceDataEpochSet() == MagickFalse)
-      {
-        char
-          timestamp[MagickTimeExtent];
-
-        (void) FormatMagickTime(next->timestamp,sizeof(timestamp),timestamp);
-        (void) SetImageProperty(next,"date:timestamp",timestamp,exception);
-        (void) FormatMagickTime((time_t) GetBlobProperties(next)->st_mtime,
-          sizeof(timestamp),timestamp);
-        (void) SetImageProperty(next,"date:modify",timestamp,exception);
-        (void) FormatMagickTime((time_t) GetBlobProperties(next)->st_ctime,
-          sizeof(timestamp),timestamp);
-        (void) SetImageProperty(next,"date:create",timestamp,exception);
-      }
+      SetImageDateProperties(next,exception);
     if (constitute_info.delay_flags != NoValue)
       SyncDelayFromConstituteInfo(next,&constitute_info);
     if (constitute_info.dispose != (const char *) NULL)
