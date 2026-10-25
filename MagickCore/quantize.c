@@ -2520,6 +2520,40 @@ static inline double KmeansMetric(const Image *magick_restrict image,
   return(metric);
 }
 
+static ssize_t ParseKmeansSeedColors(Image *image,const char *colors,
+  ExceptionInfo *exception)
+{
+  char
+    color[MagickPathExtent];
+
+  const char
+    *p;
+
+  ssize_t
+    n;
+
+  for (n=0, p=colors; n < (ssize_t) image->colors; n++)
+  {
+    const char
+      *q;
+
+    for (q=p; *q != '\0'; q++)
+      if (*q == ';')
+        break;
+    (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
+      MagickPathExtent));
+    (void) QueryColorCompliance(color,AllCompliance,image->colormap+n,
+      exception);
+    if (*q == '\0')
+      {
+        n++;
+        break;
+      }
+    p=q+1;
+  }
+  return(n);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -2607,37 +2641,13 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     }
   else
     {
-      char
-        color[MagickPathExtent];
-
-      const char
-        *p;
-
       /*
         Seed clusters from color list (e.g. red;green;blue).
       */
       status=AcquireImageColormap(image,number_colors,exception);
       if (status == MagickFalse)
         return(status);
-      for (n=0, p=colors; n < (ssize_t) image->colors; n++)
-      {
-        const char
-          *q;
-
-        for (q=p; *q != '\0'; q++)
-          if (*q == ';')
-            break;
-        (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
-          MagickPathExtent));
-        (void) QueryColorCompliance(color,AllCompliance,image->colormap+n,
-          exception);
-        if (*q == '\0')
-          {
-            n++;
-            break;
-          }
-        p=q+1;
-      }
+      n=ParseKmeansSeedColors(image,colors,exception);
       if (n < (ssize_t) image->colors)
         {
           RandomInfo
