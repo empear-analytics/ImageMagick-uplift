@@ -1357,6 +1357,42 @@ static PointInfo GetDensityResolution(const DrawInfo *clone_info)
   return(resolution);
 }
 
+static SegmentInfo GetPolygonBounds(const Image *image,
+  const PolygonInfo *polygon_info,const double mid)
+{
+  SegmentInfo
+    bounds;
+
+  ssize_t
+    i;
+
+  bounds=polygon_info->edges[0].bounds;
+  for (i=1; i < (ssize_t) polygon_info->number_edges; i++)
+  {
+    if (polygon_info->edges[i].bounds.x1 < (double) bounds.x1)
+      bounds.x1=polygon_info->edges[i].bounds.x1;
+    if (polygon_info->edges[i].bounds.y1 < (double) bounds.y1)
+      bounds.y1=polygon_info->edges[i].bounds.y1;
+    if (polygon_info->edges[i].bounds.x2 > (double) bounds.x2)
+      bounds.x2=polygon_info->edges[i].bounds.x2;
+    if (polygon_info->edges[i].bounds.y2 > (double) bounds.y2)
+      bounds.y2=polygon_info->edges[i].bounds.y2;
+  }
+  bounds.x1-=mid;
+  bounds.x1=bounds.x1 < 0.0 ? 0.0 : bounds.x1 >= (double)
+    image->columns ? (double) image->columns-1 : bounds.x1;
+  bounds.y1-=mid;
+  bounds.y1=bounds.y1 < 0.0 ? 0.0 : bounds.y1 >= (double)
+    image->rows ? (double) image->rows-1 : bounds.y1;
+  bounds.x2+=mid;
+  bounds.x2=bounds.x2 < 0.0 ? 0.0 : bounds.x2 >= (double)
+    image->columns ? (double) image->columns-1 : bounds.x2;
+  bounds.y2+=mid;
+  bounds.y2=bounds.y2 < 0.0 ? 0.0 : bounds.y2 >= (double)
+    image->rows ? (double) image->rows-1 : bounds.y2;
+  return(bounds);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1437,30 +1473,7 @@ static MagickBooleanType DrawBoundingRectangles(Image *image,
   bounds.y2=0.0;
   if (polygon_info != (PolygonInfo *) NULL)
     {
-      bounds=polygon_info->edges[0].bounds;
-      for (i=1; i < (ssize_t) polygon_info->number_edges; i++)
-      {
-        if (polygon_info->edges[i].bounds.x1 < (double) bounds.x1)
-          bounds.x1=polygon_info->edges[i].bounds.x1;
-        if (polygon_info->edges[i].bounds.y1 < (double) bounds.y1)
-          bounds.y1=polygon_info->edges[i].bounds.y1;
-        if (polygon_info->edges[i].bounds.x2 > (double) bounds.x2)
-          bounds.x2=polygon_info->edges[i].bounds.x2;
-        if (polygon_info->edges[i].bounds.y2 > (double) bounds.y2)
-          bounds.y2=polygon_info->edges[i].bounds.y2;
-      }
-      bounds.x1-=mid;
-      bounds.x1=bounds.x1 < 0.0 ? 0.0 : bounds.x1 >= (double)
-        image->columns ? (double) image->columns-1 : bounds.x1;
-      bounds.y1-=mid;
-      bounds.y1=bounds.y1 < 0.0 ? 0.0 : bounds.y1 >= (double)
-        image->rows ? (double) image->rows-1 : bounds.y1;
-      bounds.x2+=mid;
-      bounds.x2=bounds.x2 < 0.0 ? 0.0 : bounds.x2 >= (double)
-        image->columns ? (double) image->columns-1 : bounds.x2;
-      bounds.y2+=mid;
-      bounds.y2=bounds.y2 < 0.0 ? 0.0 : bounds.y2 >= (double)
-        image->rows ? (double) image->rows-1 : bounds.y2;
+      bounds=GetPolygonBounds(image,polygon_info,mid);
       for (i=0; i < (ssize_t) polygon_info->number_edges; i++)
       {
         if (polygon_info->edges[i].direction != 0)
