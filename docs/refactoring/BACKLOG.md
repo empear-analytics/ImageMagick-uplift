@@ -117,7 +117,7 @@ needs before refactoring:
 | 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | open |
 | 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 5.35, in progress (Complex Conditional gone; string helpers tip String Heavy), [M34](tasks/M34-configure.md) |
 | 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | 6.34 (tree descent returns from inside), [M56](tasks/M56-histogram.md) |
-| 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | open |
+| 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | 6.61 (guard level; the tile loop keeps multi-output blocks), [M57](tasks/M57-montage.md) |
 | 6.87 | `MagickCore/memory.c` | 1713 | 60% | 71% | open |
 | 8.22 | `MagickCore/coder.c` | 562 | 38% | 93% | open |
 | 9.09 | `MagickCore/static.c` | 379 | 52% | 82% | open |

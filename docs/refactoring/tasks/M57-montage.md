@@ -90,3 +90,41 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 6.01 → 6.61** (`cs-mcp` 1.5.12). Branch `campaign/M57-montage`,
+stacked on `campaign/M56-histogram`. MontageImageList is *not ready* (43 mutants, 29
+killed), so all 11 commits are guard-level Recipe E. The oracle also ran on each one:
+49 cases, 0 diverged.
+
+| Helper | What moved | Form |
+|---|---|---|
+| `SortImageListByScene` | scene-order check and qsort | plain |
+| `GetLargestTileExtent` | widen extract_info to the largest thumbnail | value-returning, struct by value |
+| `AcquireMontageDrawInfo` | label draw attributes | value-returning |
+| `GetMaximumLabelLines` | most label lines | value-returning |
+| `GetMontageDirectoryExtent` | directory size | value-returning |
+| `AddTileShadow` | drop shadow | value-returning (image) |
+| `AddTileBorder` | tile border (6 arguments) | value-returning (image) |
+| `AnnotateMontageTitle` | page title (7 arguments) | plain |
+| `AddTileFrame` | ornamental frame (6 arguments) | value-returning (image) |
+| `ParseMontageFrame` | -frame geometry | value-returning, struct by value |
+| `ReadMontageTexture` | -texture image | value-returning |
+
+**What we learned.**
+- Passing a struct by value (`extract_info`, `frame_info`, `metrics`) keeps every
+  `name.field` exactly as written, and a value-returning helper hands the struct back.
+- In this file, helpers with 6–7 arguments still raised the score even though
+  CodeScene names each of them under Excess Number of Function Arguments.
+
+**Reverted.** The directory fill loop as `FillMontageDirectory`. It contains a
+`ThrowMagickException(…GetMagickModule()…)`, and moving it would change the function
+name in the exception's `@ file/function/line` suffix. Throw blocks stay where they are.
+
+**What is left, at 6.61.** MontageImageList still has 367 lines and cc 67.
+- The per-page bounding-box loop writes `bounds`, `x_offset`, `y_offset`, `width` and
+  `max_height` together.
+- The label annotation inside the tile loop would need more than ten arguments.
+- The thumbnail loop and the per-page allocation return or throw from inside.
+- `GetMontageGeometry` takes 6 arguments.
