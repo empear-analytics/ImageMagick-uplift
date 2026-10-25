@@ -775,6 +775,14 @@ static inline void getcwd_utf8(char *path,size_t extent)
 #endif
 }
 
+static inline MagickBooleanType IsTextMagick(const char *magick)
+{
+  return(((LocaleCompare(magick,"CAPTION") == 0) ||
+    (LocaleCompare(magick,"LABEL") == 0) ||
+    (LocaleCompare(magick,"PANGO") == 0) ||
+    (LocaleCompare(magick,"VID") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -850,10 +858,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       continue;
     GetPathComponent(option,TailPath,filename);
     GetPathComponent(option,MagickPath,magick);
-    if ((LocaleCompare(magick,"CAPTION") == 0) ||
-        (LocaleCompare(magick,"LABEL") == 0) ||
-        (LocaleCompare(magick,"PANGO") == 0) ||
-        (LocaleCompare(magick,"VID") == 0))
+    if (IsTextMagick(magick) != MagickFalse)
       continue;
     if ((IsGlob(filename) == MagickFalse) && (*option != '@'))
       continue;
