@@ -170,3 +170,30 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 6.96 → 7.69** (`cs-mcp` 1.5.12). Branch `campaign/M18-magick`,
+stacked on `campaign/M17-matrix` (PR #23). 2 refactor commits, both Recipe E:
+- `ListMagickInfo`'s note printing, as `PrintMagickNote`, guard-verified (not ready);
+- `MagickCoreGenesis`' signal-handler installation, as `EstablishSignalHandlers`,
+  oracle-verified (careful; no survivor on the moved lines).
+
+| Steps | Recipe | Score |
+| --- | --- | --- |
+| `ListMagickInfo` leaves Deep Nesting, Bumpy Road and Large Method | E | 6.96 → 7.50 |
+| `MagickCoreGenesis` leaves Complex and Large Method | E | → 7.69 |
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**What is left, at 7.69.**
+- Code Duplication among the `GetMagick*` flag accessors (`GetMagickAdjoin`,
+  `GetMagickBlobSupport`, `GetMagickEndianSupport`, `GetMagickRawSupport`,
+  `GetMagickStealth`, and the rest). They differ in one flag, but each logs through
+  `GetMagickModule()`, which records the calling function's name. A shared helper
+  would change what the trace log says, so Recipe D cannot apply.
+- `GetMagickInfo`'s lookup-or-register block holds an uncompiled
+  `MAGICKCORE_BUILD_MODULES` branch.
+- `MagickSignalHandler` (cc 10) has no case.
+- `EstablishSignalHandlers` (cc 11) is one test per signal.
