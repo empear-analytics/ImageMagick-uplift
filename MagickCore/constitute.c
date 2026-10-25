@@ -420,6 +420,26 @@ MagickExport Image *PingImages(ImageInfo *image_info,const char *filename,
   return(PingImage(image_info,exception));
 }
 
+static void SyncDelayFromConstituteInfo(Image *next,
+  const ConstituteInfo *constitute_info)
+{
+  if ((constitute_info->delay_flags & GreaterValue) != 0)
+    {
+      if (next->delay > constitute_info->delay)
+        next->delay=constitute_info->delay;
+    }
+  else
+    if ((constitute_info->delay_flags & LessValue) != 0)
+      {
+        if (next->delay < constitute_info->delay)
+          next->delay=constitute_info->delay;
+      }
+    else
+      next->delay=constitute_info->delay;
+  if ((constitute_info->delay_flags & SigmaValue) != 0)
+    next->ticks_per_second=constitute_info->ticks_per_second;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -958,23 +978,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
         (void) SetImageProperty(next,"date:create",timestamp,exception);
       }
     if (constitute_info.delay_flags != NoValue)
-      {
-        if ((constitute_info.delay_flags & GreaterValue) != 0)
-          {
-            if (next->delay > constitute_info.delay)
-              next->delay=constitute_info.delay;
-          }
-        else
-          if ((constitute_info.delay_flags & LessValue) != 0)
-            {
-              if (next->delay < constitute_info.delay)
-                next->delay=constitute_info.delay;
-            }
-          else
-            next->delay=constitute_info.delay;
-        if ((constitute_info.delay_flags & SigmaValue) != 0)
-          next->ticks_per_second=constitute_info.ticks_per_second;
-      }
+      SyncDelayFromConstituteInfo(next,&constitute_info);
     if (constitute_info.dispose != (const char *) NULL)
       {
         ssize_t
