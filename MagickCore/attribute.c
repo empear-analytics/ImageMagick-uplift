@@ -1120,10 +1120,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
-  depth=current_depth[0];
-  for (i=1; i < (ssize_t) number_threads; i++)
-    if (depth < current_depth[i])
-      depth=current_depth[i];
+  depth=GetMaximumDepth(current_depth,number_threads);
   current_depth=(size_t *) RelinquishMagickMemory(current_depth);
   return(depth);
 }
