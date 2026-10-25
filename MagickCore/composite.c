@@ -891,9 +891,7 @@ static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
         PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
         PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
         PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (beta_traits == UndefinedPixelTrait) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
+        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
           continue;
         if (channel == AlphaPixelChannel)
           distance=QuantumScale*((double) p[i]-(double) GetPixelChannel(
