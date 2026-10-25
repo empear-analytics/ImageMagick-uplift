@@ -636,6 +636,14 @@ static inline char *ReplaceSpaceWithNewline(char **caption,char *space)
   return(space);
 }
 
+static inline MagickBooleanType IsBreakableSpace(const DrawInfo *draw_info,
+  const int code)
+{
+  return(((draw_info->word_break != BreakWordBreakType) &&
+    (IsUTFSpace(code) != MagickFalse) &&
+    (IsNonBreakingUTFSpace(code) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
   const MagickBooleanType split,TypeMetric *metrics,char **caption,
   ExceptionInfo *exception)
@@ -669,9 +677,7 @@ MagickExport ssize_t FormatMagickCaption(Image *image,DrawInfo *draw_info,
         q=draw_info->text;
         continue;
       }
-    if ((draw_info->word_break != BreakWordBreakType) &&
-        (IsUTFSpace(code) != MagickFalse) &&
-        (IsNonBreakingUTFSpace(code) == MagickFalse))
+    if (IsBreakableSpace(draw_info,code) != MagickFalse)
       {
         if (width > image->columns)
           p=ReplaceSpaceWithNewline(caption,p);
