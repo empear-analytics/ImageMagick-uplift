@@ -1525,7 +1525,8 @@ static inline MagickBooleanType IsUnauthorizedFontFile(
   const DrawInfo *draw_info)
 {
   return(((draw_info->font != (char *) NULL) && (*draw_info->font == '@') &&
-    (IsRightsAuthorized(PathPolicyDomain,ReadPolicyRights,draw_info->font) == MagickFalse)) ?
+    (IsRightsAuthorized(PathPolicyDomain,ReadPolicyRights,draw_info->font) ==
+    MagickFalse)) ?
     MagickTrue : MagickFalse);
 }
 
