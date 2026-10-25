@@ -1001,6 +1001,27 @@ static inline unsigned int RotateRight(const unsigned int x)
   return((x >> 8) | ((x & 0xff) << 24));
 }
 
+static ssize_t SetAESRounds(AESInfo *aes_info,const StringInfo *key)
+{
+  ssize_t
+    n;
+
+  n=4;
+  aes_info->rounds=10;
+  if ((8*GetStringInfoLength(key)) >= 256)
+    {
+      n=8;
+      aes_info->rounds=14;
+    }
+  else
+    if ((8*GetStringInfoLength(key)) >= 192)
+      {
+        n=6;
+        aes_info->rounds=12;
+      }
+  return(n);
+}
+
 static void SetAESKey(AESInfo *aes_info,const StringInfo *key)
 {
   ssize_t
@@ -1025,19 +1046,7 @@ static void SetAESKey(AESInfo *aes_info,const StringInfo *key)
   assert(key != (StringInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  n=4;
-  aes_info->rounds=10;
-  if ((8*GetStringInfoLength(key)) >= 256)
-    {
-      n=8;
-      aes_info->rounds=14;
-    }
-  else
-    if ((8*GetStringInfoLength(key)) >= 192)
-      {
-        n=6;
-        aes_info->rounds=12;
-      }
+  n=SetAESRounds(aes_info,key);
   /*
     Generate crypt key.
   */
