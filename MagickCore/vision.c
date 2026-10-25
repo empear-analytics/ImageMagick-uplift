@@ -147,6 +147,14 @@ static int CCObjectInfoCompare(const void *x,const void *y)
   return((int) (q->area-(ssize_t) p->area));
 }
 
+static inline MagickBooleanType IsDiagonalPair(const Quantum *pixels,
+  const ssize_t i)
+{
+  return(((((ssize_t) pixels[0] == i) && ((ssize_t) pixels[3] == i)) ||
+    (((ssize_t) pixels[1] == i) && ((ssize_t) pixels[2] == i))) ? MagickTrue :
+    MagickFalse);
+}
+
 static void PerimeterThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -236,8 +244,7 @@ static void PerimeterThreshold(const Image *component_image,
         else
           if (foreground == 2)
             {
-              if ((((ssize_t) pixels[0] == i) && ((ssize_t) pixels[3] == i)) ||
-                  (((ssize_t) pixels[1] == i) && ((ssize_t) pixels[2] == i)))
+              if (IsDiagonalPair(pixels,i) != MagickFalse)
                 pattern[0]++;  /* diagonal */
               else
                 pattern[2]++;
@@ -343,8 +350,7 @@ static void CircularityThreshold(const Image *component_image,
         else
           if (foreground == 2)
             {
-              if ((((ssize_t) pixels[0] == i) && ((ssize_t) pixels[3] == i)) ||
-                  (((ssize_t) pixels[1] == i) && ((ssize_t) pixels[2] == i)))
+              if (IsDiagonalPair(pixels,i) != MagickFalse)
                 pattern[0]++;  /* diagonal */
               else
                 pattern[2]++;
@@ -783,6 +789,41 @@ static void AngleThreshold(const Image *component_image,
   }
 }
 
+static inline MagickBooleanType IsMetricOutsideRange(const CCObjectInfo *object,
+  const ssize_t i,const ssize_t n,const double min_threshold,
+  const double max_threshold,const ssize_t background_id)
+{
+  return((((object[i].metric[n] < min_threshold) ||
+    (object[i].metric[n] >= max_threshold)) &&
+    (i != background_id)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsNeighborOutsideImage(const Image *image,
+  const ssize_t x,const ssize_t y,const ssize_t dx,const ssize_t dy)
+{
+  return((((x+dx) < 0) || ((x+dx) >= (ssize_t) image->columns) ||
+    ((y+dy) < 0) || ((y+dy) >= (ssize_t) image->rows)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsAreaOutsideRange(const CCObjectInfo *object,
+  const ssize_t i,const double min_threshold,const double max_threshold,
+  const ssize_t background_id)
+{
+  return((((object[i].area < min_threshold) ||
+    (object[i].area >= max_threshold)) && (i != background_id)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsGreaterAdjacentObject(
+  const CCObjectInfo *object,const size_t *neighbors,const ssize_t j,
+  const size_t id)
+{
+  return(((object[neighbors[j]].census > object[id].census) ||
+    ((object[neighbors[j]].census == object[id].census) &&
+    (neighbors[j] < id))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -936,8 +977,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           Is neighbor an authentic pixel and a different color than the pixel?
         */
         GetPixelInfoPixel(image,p,&pixel);
-        if (((x+dx) < 0) || ((x+dx) >= (ssize_t) image->columns) ||
-            ((y+dy) < 0) || ((y+dy) >= (ssize_t) image->rows))
+        if (IsNeighborOutsideImage(image,x,y,dx,dy) != MagickFalse)
           {
             p+=(ptrdiff_t) GetPixelChannels(image);
             continue;
@@ -1125,8 +1165,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       */
       (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
       for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (((object[i].area < min_threshold) ||
-             (object[i].area >= max_threshold)) && (i != background_id))
+        if (IsAreaOutsideRange(object,i,min_threshold,max_threshold,
+            background_id) != MagickFalse)
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:keep-colors");
@@ -1315,8 +1355,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       metrics[++n]="perimeter";
       PerimeterThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (((object[i].metric[n] < min_threshold) ||
-             (object[i].metric[n] >= max_threshold)) && (i != background_id))
+        if (IsMetricOutsideRange(object,i,n,min_threshold,max_threshold,
+            background_id) != MagickFalse)
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:circularity-threshold");
@@ -1329,8 +1369,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       metrics[++n]="circularity";
       CircularityThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (((object[i].metric[n] < min_threshold) ||
-             (object[i].metric[n] >= max_threshold)) && (i != background_id))
+        if (IsMetricOutsideRange(object,i,n,min_threshold,max_threshold,
+            background_id) != MagickFalse)
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:diameter-threshold");
@@ -1344,8 +1384,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       for (i=0; i < (ssize_t) component_image->colors; i++)
       {
         object[i].metric[n]=ceil(sqrt(4.0*object[i].area/MagickPI)-0.5);
-        if (((object[i].metric[n] < min_threshold) ||
-            (object[i].metric[n] >= max_threshold)) && (i != background_id))
+        if (IsMetricOutsideRange(object,i,n,min_threshold,max_threshold,
+            background_id) != MagickFalse)
           object[i].merge=MagickTrue;
       }
     }
@@ -1359,8 +1399,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       metrics[++n]="major-axis";
       MajorAxisThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (((object[i].metric[n] < min_threshold) ||
-             (object[i].metric[n] >= max_threshold)) && (i != background_id))
+        if (IsMetricOutsideRange(object,i,n,min_threshold,max_threshold,
+            background_id) != MagickFalse)
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:minor-axis-threshold");
@@ -1373,8 +1413,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       metrics[++n]="minor-axis";
       MinorAxisThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (((object[i].metric[n] < min_threshold) ||
-             (object[i].metric[n] >= max_threshold)) && (i != background_id))
+        if (IsMetricOutsideRange(object,i,n,min_threshold,max_threshold,
+            background_id) != MagickFalse)
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:eccentricity-threshold");
@@ -1387,8 +1427,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       metrics[++n]="eccentricity";
       EccentricityThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (((object[i].metric[n] < min_threshold) ||
-             (object[i].metric[n] >= max_threshold)) && (i != background_id))
+        if (IsMetricOutsideRange(object,i,n,min_threshold,max_threshold,
+            background_id) != MagickFalse)
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:angle-threshold");
@@ -1401,8 +1441,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       metrics[++n]="angle";
       AngleThreshold(component_image,object,n,exception);
       for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (((object[i].metric[n] < min_threshold) ||
-             (object[i].metric[n] >= max_threshold)) && (i != background_id))
+        if (IsMetricOutsideRange(object,i,n,min_threshold,max_threshold,
+            background_id) != MagickFalse)
           object[i].merge=MagickTrue;
     }
   /*
@@ -1501,9 +1541,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     */
     id=0;
     for (j=0; j < (ssize_t) count; j++)
-      if ((object[neighbors[j]].census > object[id].census) ||
-          ((object[neighbors[j]].census == object[id].census) &&
-           (neighbors[j] < id)))
+      if (IsGreaterAdjacentObject(object,neighbors,j,id) != MagickFalse)
         id=neighbors[j];
     for (j=0; j < (ssize_t) count; j++)
       object[neighbors[j]].census=0.0;

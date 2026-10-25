@@ -505,6 +505,197 @@ MagickExport MagickRealType EncodePixelGamma(const MagickRealType pixel)
 %
 */
 
+static MagickBooleanType ExportCharBGRPixels(const Image *image,
+  const RectangleInfo *roi,unsigned char *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportCharBGRAPixels(const Image *image,
+  const RectangleInfo *roi,unsigned char *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+      *q++=ScaleQuantumToChar(GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportCharBGRPPixels(const Image *image,
+  const RectangleInfo *roi,unsigned char *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+      *q++=ScaleQuantumToChar((Quantum) 0);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportCharIPixels(const Image *image,
+  const RectangleInfo *roi,unsigned char *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportCharRGBPixels(const Image *image,
+  const RectangleInfo *roi,unsigned char *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+      *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportCharRGBAPixels(const Image *image,
+  const RectangleInfo *roi,unsigned char *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+      *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToChar(GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportCharRGBPPixels(const Image *image,
+  const RectangleInfo *roi,unsigned char *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+      *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToChar((Quantum) 0);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportCharPixel(const Image *image,
   const RectangleInfo *roi,const char *magick_restrict map,
   const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
@@ -526,126 +717,19 @@ static MagickBooleanType ExportCharPixel(const Image *image,
 
   q=(unsigned char *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportCharBGRPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-          *q++=ScaleQuantumToChar(GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportCharBGRAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-          *q++=ScaleQuantumToChar((Quantum) 0);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportCharBGRPPixels(image,roi,q,exception));
   if (LocaleCompare(map,"I") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportCharIPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGB") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-          *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportCharRGBPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-          *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToChar(GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportCharRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-          *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToChar((Quantum) 0);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportCharRGBPPixels(image,roi,q,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -712,6 +796,197 @@ static MagickBooleanType ExportCharPixel(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static MagickBooleanType ExportDoubleBGRPixels(const Image *image,
+  const RectangleInfo *roi,double *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=QuantumScale*(double) GetPixelBlue(image,p);
+      *q++=QuantumScale*(double) GetPixelGreen(image,p);
+      *q++=QuantumScale*(double) GetPixelRed(image,p);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportDoubleBGRAPixels(const Image *image,
+  const RectangleInfo *roi,double *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=QuantumScale*(double) GetPixelBlue(image,p);
+      *q++=QuantumScale*(double) GetPixelGreen(image,p);
+      *q++=QuantumScale*(double) GetPixelRed(image,p);
+      *q++=QuantumScale*(double) GetPixelAlpha(image,p);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportDoubleBGRPPixels(const Image *image,
+  const RectangleInfo *roi,double *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=QuantumScale*(double) GetPixelBlue(image,p);
+      *q++=QuantumScale*(double) GetPixelGreen(image,p);
+      *q++=QuantumScale*(double) GetPixelRed(image,p);
+      *q++=0.0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportDoubleIPixels(const Image *image,
+  const RectangleInfo *roi,double *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=(double) (QuantumScale*(double) GetPixelIntensity(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportDoubleRGBPixels(const Image *image,
+  const RectangleInfo *roi,double *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=QuantumScale*(double) GetPixelRed(image,p);
+      *q++=QuantumScale*(double) GetPixelGreen(image,p);
+      *q++=QuantumScale*(double) GetPixelBlue(image,p);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportDoubleRGBAPixels(const Image *image,
+  const RectangleInfo *roi,double *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=QuantumScale*(double) GetPixelRed(image,p);
+      *q++=QuantumScale*(double) GetPixelGreen(image,p);
+      *q++=QuantumScale*(double) GetPixelBlue(image,p);
+      *q++=QuantumScale*(double) GetPixelAlpha(image,p);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportDoubleRGBPPixels(const Image *image,
+  const RectangleInfo *roi,double *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=QuantumScale*(double) GetPixelRed(image,p);
+      *q++=QuantumScale*(double) GetPixelGreen(image,p);
+      *q++=QuantumScale*(double) GetPixelBlue(image,p);
+      *q++=0.0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportDoublePixel(const Image *image,
   const RectangleInfo *roi,const char *magick_restrict map,
   const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
@@ -733,126 +1008,19 @@ static MagickBooleanType ExportDoublePixel(const Image *image,
 
   q=(double *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=QuantumScale*(double) GetPixelBlue(image,p);
-          *q++=QuantumScale*(double) GetPixelGreen(image,p);
-          *q++=QuantumScale*(double) GetPixelRed(image,p);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportDoubleBGRPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=QuantumScale*(double) GetPixelBlue(image,p);
-          *q++=QuantumScale*(double) GetPixelGreen(image,p);
-          *q++=QuantumScale*(double) GetPixelRed(image,p);
-          *q++=QuantumScale*(double) GetPixelAlpha(image,p);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportDoubleBGRAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=QuantumScale*(double) GetPixelBlue(image,p);
-          *q++=QuantumScale*(double) GetPixelGreen(image,p);
-          *q++=QuantumScale*(double) GetPixelRed(image,p);
-          *q++=0.0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportDoubleBGRPPixels(image,roi,q,exception));
   if (LocaleCompare(map,"I") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=(double) (QuantumScale*(double) GetPixelIntensity(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportDoubleIPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGB") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=QuantumScale*(double) GetPixelRed(image,p);
-          *q++=QuantumScale*(double) GetPixelGreen(image,p);
-          *q++=QuantumScale*(double) GetPixelBlue(image,p);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportDoubleRGBPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=QuantumScale*(double) GetPixelRed(image,p);
-          *q++=QuantumScale*(double) GetPixelGreen(image,p);
-          *q++=QuantumScale*(double) GetPixelBlue(image,p);
-          *q++=QuantumScale*(double) GetPixelAlpha(image,p);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportDoubleRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=QuantumScale*(double) GetPixelRed(image,p);
-          *q++=QuantumScale*(double) GetPixelGreen(image,p);
-          *q++=QuantumScale*(double) GetPixelBlue(image,p);
-          *q++=0.0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportDoubleRGBPPixels(image,roi,q,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -919,6 +1087,197 @@ static MagickBooleanType ExportDoublePixel(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static MagickBooleanType ExportFloatBGRPixels(const Image *image,
+  const RectangleInfo *roi,float *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportFloatBGRAPixels(const Image *image,
+  const RectangleInfo *roi,float *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportFloatBGRPPixels(const Image *image,
+  const RectangleInfo *roi,float *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      *q++=0.0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportFloatIPixels(const Image *image,
+  const RectangleInfo *roi,float *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=(float) (QuantumScale*(double) GetPixelIntensity(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportFloatRGBPixels(const Image *image,
+  const RectangleInfo *roi,float *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportFloatRGBAPixels(const Image *image,
+  const RectangleInfo *roi,float *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportFloatRGBPPixels(const Image *image,
+  const RectangleInfo *roi,float *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      *q++=0.0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportFloatPixel(const Image *image,
   const RectangleInfo *roi,const char *magick_restrict map,
   const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
@@ -940,126 +1299,19 @@ static MagickBooleanType ExportFloatPixel(const Image *image,
 
   q=(float *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportFloatBGRPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportFloatBGRAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
-          *q++=0.0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportFloatBGRPPixels(image,roi,q,exception));
   if (LocaleCompare(map,"I") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=(float) (QuantumScale*(double) GetPixelIntensity(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportFloatIPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGB") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportFloatRGBPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportFloatRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=(float) (QuantumScale*(double) GetPixelRed(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-          *q++=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-          *q++=0.0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportFloatRGBPPixels(image,roi,q,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -1126,6 +1378,197 @@ static MagickBooleanType ExportFloatPixel(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static MagickBooleanType ExportLongBGRPixels(const Image *image,
+  const RectangleInfo *roi,unsigned int *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongBGRAPixels(const Image *image,
+  const RectangleInfo *roi,unsigned int *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+      *q++=ScaleQuantumToLong(GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongBGRPPixels(const Image *image,
+  const RectangleInfo *roi,unsigned int *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+      *q++=0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongIPixels(const Image *image,
+  const RectangleInfo *roi,unsigned int *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLong(ClampToQuantum(GetPixelIntensity(image,p)));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongRGBPixels(const Image *image,
+  const RectangleInfo *roi,unsigned int *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+      *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongRGBAPixels(const Image *image,
+  const RectangleInfo *roi,unsigned int *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+      *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToLong(GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongRGBPPixels(const Image *image,
+  const RectangleInfo *roi,unsigned int *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+      *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+      *q++=0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportLongPixel(const Image *image,
   const RectangleInfo *roi,const char *magick_restrict map,
   const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
@@ -1147,126 +1590,19 @@ static MagickBooleanType ExportLongPixel(const Image *image,
 
   q=(unsigned int *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongBGRPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-          *q++=ScaleQuantumToLong(GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongBGRAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-          *q++=0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongBGRPPixels(image,roi,q,exception));
   if (LocaleCompare(map,"I") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLong(ClampToQuantum(GetPixelIntensity(image,p)));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongIPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGB") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-          *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongRGBPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-          *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToLong(GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-          *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-          *q++=0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongRGBPPixels(image,roi,q,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -1333,6 +1669,198 @@ static MagickBooleanType ExportLongPixel(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static MagickBooleanType ExportLongLongBGRPixels(const Image *image,
+  const RectangleInfo *roi,MagickSizeType *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongLongBGRAPixels(const Image *image,
+  const RectangleInfo *roi,MagickSizeType *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongLongBGRPPixels(const Image *image,
+  const RectangleInfo *roi,MagickSizeType *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+      *q++=0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongLongIPixels(const Image *image,
+  const RectangleInfo *roi,MagickSizeType *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLongLong(ClampToQuantum(
+        GetPixelIntensity(image,p)));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongLongRGBPixels(const Image *image,
+  const RectangleInfo *roi,MagickSizeType *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongLongRGBAPixels(const Image *image,
+  const RectangleInfo *roi,MagickSizeType *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongLongRGBPPixels(const Image *image,
+  const RectangleInfo *roi,MagickSizeType *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+      *q++=0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportLongLongPixel(const Image *image,
   const RectangleInfo *roi,const char *magick_restrict map,
   const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
@@ -1354,127 +1882,19 @@ static MagickBooleanType ExportLongLongPixel(const Image *image,
 
   q=(MagickSizeType *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongLongBGRPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongLongBGRAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-          *q++=0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongLongBGRPPixels(image,roi,q,exception));
   if (LocaleCompare(map,"I") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLongLong(ClampToQuantum(
-            GetPixelIntensity(image,p)));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongLongIPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGB") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongLongRGBPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongLongRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-          *q++=0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportLongLongRGBPPixels(image,roi,q,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -1542,6 +1962,197 @@ static MagickBooleanType ExportLongLongPixel(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static MagickBooleanType ExportQuantumBGRPixels(const Image *image,
+  const RectangleInfo *roi,Quantum *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=GetPixelBlue(image,p);
+      *q++=GetPixelGreen(image,p);
+      *q++=GetPixelRed(image,p);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportQuantumBGRAPixels(const Image *image,
+  const RectangleInfo *roi,Quantum *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=GetPixelBlue(image,p);
+      *q++=GetPixelGreen(image,p);
+      *q++=GetPixelRed(image,p);
+      *q++=(Quantum) (GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportQuantumBGRPPixels(const Image *image,
+  const RectangleInfo *roi,Quantum *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=GetPixelBlue(image,p);
+      *q++=GetPixelGreen(image,p);
+      *q++=GetPixelRed(image,p);
+      *q++=(Quantum) 0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportQuantumIPixels(const Image *image,
+  const RectangleInfo *roi,Quantum *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ClampToQuantum(GetPixelIntensity(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportQuantumRGBPixels(const Image *image,
+  const RectangleInfo *roi,Quantum *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=GetPixelRed(image,p);
+      *q++=GetPixelGreen(image,p);
+      *q++=GetPixelBlue(image,p);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportQuantumRGBAPixels(const Image *image,
+  const RectangleInfo *roi,Quantum *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=GetPixelRed(image,p);
+      *q++=GetPixelGreen(image,p);
+      *q++=GetPixelBlue(image,p);
+      *q++=(Quantum) (GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportQuantumRGBPPixels(const Image *image,
+  const RectangleInfo *roi,Quantum *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=GetPixelRed(image,p);
+      *q++=GetPixelGreen(image,p);
+      *q++=GetPixelBlue(image,p);
+      *q++=(Quantum) 0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportQuantumPixel(const Image *image,
   const RectangleInfo *roi,const char *magick_restrict map,
   const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
@@ -1563,126 +2174,19 @@ static MagickBooleanType ExportQuantumPixel(const Image *image,
 
   q=(Quantum *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=GetPixelBlue(image,p);
-          *q++=GetPixelGreen(image,p);
-          *q++=GetPixelRed(image,p);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportQuantumBGRPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=GetPixelBlue(image,p);
-          *q++=GetPixelGreen(image,p);
-          *q++=GetPixelRed(image,p);
-          *q++=(Quantum) (GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportQuantumBGRAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=GetPixelBlue(image,p);
-          *q++=GetPixelGreen(image,p);
-          *q++=GetPixelRed(image,p);
-          *q++=(Quantum) 0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportQuantumBGRPPixels(image,roi,q,exception));
   if (LocaleCompare(map,"I") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ClampToQuantum(GetPixelIntensity(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportQuantumIPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGB") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=GetPixelRed(image,p);
-          *q++=GetPixelGreen(image,p);
-          *q++=GetPixelBlue(image,p);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportQuantumRGBPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=GetPixelRed(image,p);
-          *q++=GetPixelGreen(image,p);
-          *q++=GetPixelBlue(image,p);
-          *q++=(Quantum) (GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportQuantumRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=GetPixelRed(image,p);
-          *q++=GetPixelGreen(image,p);
-          *q++=GetPixelBlue(image,p);
-          *q++=(Quantum) 0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportQuantumRGBPPixels(image,roi,q,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -1752,6 +2256,197 @@ static MagickBooleanType ExportQuantumPixel(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static MagickBooleanType ExportShortBGRPixels(const Image *image,
+  const RectangleInfo *roi,unsigned short *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportShortBGRAPixels(const Image *image,
+  const RectangleInfo *roi,unsigned short *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+      *q++=ScaleQuantumToShort(GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportShortBGRPPixels(const Image *image,
+  const RectangleInfo *roi,unsigned short *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+      *q++=0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportShortIPixels(const Image *image,
+  const RectangleInfo *roi,unsigned short *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToShort(ClampToQuantum(GetPixelIntensity(image,p)));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportShortRGBPixels(const Image *image,
+  const RectangleInfo *roi,unsigned short *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+      *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportShortRGBAPixels(const Image *image,
+  const RectangleInfo *roi,unsigned short *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+      *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+      *q++=ScaleQuantumToShort(GetPixelAlpha(image,p));
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportShortRGBPPixels(const Image *image,
+  const RectangleInfo *roi,unsigned short *magick_restrict q,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+      *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+      *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+      *q++=0;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportShortPixel(const Image *image,
   const RectangleInfo *roi,const char *magick_restrict map,
   const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
@@ -1773,126 +2468,19 @@ static MagickBooleanType ExportShortPixel(const Image *image,
 
   q=(unsigned short *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportShortBGRPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-          *q++=ScaleQuantumToShort(GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportShortBGRAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-          *q++=0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportShortBGRPPixels(image,roi,q,exception));
   if (LocaleCompare(map,"I") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToShort(ClampToQuantum(GetPixelIntensity(image,p)));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportShortIPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGB") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-          *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportShortRGBPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-          *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-          *q++=ScaleQuantumToShort(GetPixelAlpha(image,p));
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportShortRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-          *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-          *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-          *q++=0;
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ExportShortRGBPPixels(image,roi,q,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -2506,6 +3094,262 @@ MagickExport MagickRealType GetPixelIntensity(
 %
 */
 
+static MagickBooleanType ImportCharBGRPixels(Image *image,const RectangleInfo *roi,
+  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportCharBGRAPixels(Image *image,const RectangleInfo *roi,
+  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+      SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportCharBGROPixels(Image *image,const RectangleInfo *roi,
+  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+      SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportCharBGRPPixels(Image *image,const RectangleInfo *roi,
+  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+      p++;
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportCharIPixels(Image *image,const RectangleInfo *roi,
+  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelGray(image,ScaleCharToQuantum(*p++),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportCharRGBPixels(Image *image,const RectangleInfo *roi,
+  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportCharRGBAPixels(Image *image,const RectangleInfo *roi,
+  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+      SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportCharRGBOPixels(Image *image,const RectangleInfo *roi,
+  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+      SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportCharRGBPPixels(Image *image,const RectangleInfo *roi,
+  const unsigned char *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelRed(image,ScaleCharToQuantum(*p++),q);
+      SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
+      SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
+      p++;
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportCharPixel(Image *image,const RectangleInfo *roi,
   const char *magick_restrict map,const QuantumType *quantum_map,
   const void *pixels,ExceptionInfo *exception)
@@ -2527,180 +3371,23 @@ static MagickBooleanType ImportCharPixel(Image *image,const RectangleInfo *roi,
 
   p=(const unsigned char *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-          SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-          SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportCharBGRPixels(image,roi,p,exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-          SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-          SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-          SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportCharBGRAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"BGRO") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-          SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-          SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-          SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportCharBGROPixels(image,roi,p,exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-          SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-          SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-          p++;
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportCharBGRPPixels(image,roi,p,exception));
   if (LocaleCompare(map,"I") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelGray(image,ScaleCharToQuantum(*p++),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportCharIPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGB") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-          SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-          SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportCharRGBPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-          SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-          SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-          SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportCharRGBAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBO") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-          SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-          SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-          SetPixelAlpha(image,ScaleCharToQuantum(*p++),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportCharRGBOPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelRed(image,ScaleCharToQuantum(*p++),q);
-          SetPixelGreen(image,ScaleCharToQuantum(*p++),q);
-          SetPixelBlue(image,ScaleCharToQuantum(*p++),q);
-          p++;
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportCharRGBPPixels(image,roi,p,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -2767,6 +3454,224 @@ static MagickBooleanType ImportCharPixel(Image *image,const RectangleInfo *roi,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static MagickBooleanType ImportDoubleBGRPixels(Image *image,const RectangleInfo *roi,
+  const double *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportDoubleBGRAPixels(Image *image,const RectangleInfo *roi,
+  const double *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportDoubleBGRPPixels(Image *image,const RectangleInfo *roi,
+  const double *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      p++;
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportDoubleIPixels(Image *image,const RectangleInfo *roi,
+  const double *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelGray(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportDoubleRGBPixels(Image *image,const RectangleInfo *roi,
+  const double *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportDoubleRGBAPixels(Image *image,const RectangleInfo *roi,
+  const double *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportDoubleRGBPPixels(Image *image,const RectangleInfo *roi,
+  const double *magick_restrict p,ExceptionInfo *exception)
+{
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) roi->width; x++)
+    {
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      p++;
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportDoublePixel(Image *image,
   const RectangleInfo *roi,const char *magick_restrict map,
   const QuantumType *quantum_map,const void *pixels,ExceptionInfo *exception)
@@ -2788,160 +3693,19 @@ static MagickBooleanType ImportDoublePixel(Image *image,
 
   p=(const double *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportDoubleBGRPixels(image,roi,p,exception));
   if (LocaleCompare(map,"BGRA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportDoubleBGRAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"BGRP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          p++;
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportDoubleBGRPPixels(image,roi,p,exception));
   if (LocaleCompare(map,"I") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelGray(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportDoubleIPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGB") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportDoubleRGBPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBA") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportDoubleRGBAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
-    {
-      for (y=0; y < (ssize_t) roi->height; y++)
-      {
-        q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-        if (q == (Quantum *) NULL)
-          break;
-        for (x=0; x < (ssize_t) roi->width; x++)
-        {
-          SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-          p++;
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncAuthenticPixels(image,exception) == MagickFalse)
-          break;
-      }
-      return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
-    }
+    return(ImportDoubleRGBPPixels(image,roi,p,exception));
    length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {

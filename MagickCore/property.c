@@ -601,6 +601,20 @@ static inline signed short ReadPropertyMSBShort(const unsigned char **p,
   return(quantum.signed_value);
 }
 
+static inline MagickBooleanType IsInvalid8BIMFieldCount(const ssize_t count)
+{
+  return(((count != 2) && (count != 3) && (count != 4)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsUnrequestedResource(const char *resource,
+  const char *macroman_resource,const char *name)
+{
+  return(((resource == (char *) NULL) || (macroman_resource == (char *) NULL) ||
+    ((LocaleCompare(name,resource) != 0) &&
+    (LocaleCompare(name,macroman_resource) != 0))) ? MagickTrue : MagickFalse);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -641,7 +655,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
     return;
   count=(ssize_t) MagickSscanf(key,"8BIM:%ld,%ld:%1024[^\n]\n%1024[^\n]",
     &start,&stop,name,format);
-  if ((count != 2) && (count != 3) && (count != 4))
+  if (IsInvalid8BIMFieldCount(count) != MagickFalse)
     return;
   if (count < 4)
     (void) CopyMagickString(format,"SVG",MagickPathExtent);
@@ -698,9 +712,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
       macroman_resource=(char *) ConvertMacRomanToUTF8((unsigned char *)
         resource);
     if ((*name != '\0') && (*name != '#'))
-      if ((resource == (char *) NULL) || (macroman_resource == (char *) NULL) ||
-          ((LocaleCompare(name,resource) != 0) &&
-           (LocaleCompare(name,macroman_resource) != 0)))
+      if (IsUnrequestedResource(resource,macroman_resource,name) != MagickFalse)
         {
           /*
             No name match, scroll forward and try next.
@@ -1846,6 +1858,15 @@ static MagickBooleanType SkipXMPValue(const char *value)
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsNotNamespaceWildcard(
+  const char *xmp_namespace,const size_t xmp_namespace_length)
+{
+  return(((xmp_namespace_length <= 2) ||
+    (*(xmp_namespace+(xmp_namespace_length-2)) != ':') ||
+    (*(xmp_namespace+(xmp_namespace_length-1)) != '*')) ? MagickTrue :
+    MagickFalse);
+}
+
 static void GetXMPProperty(const Image *image,const char *property)
 {
   char
@@ -1915,9 +1936,8 @@ static void GetXMPProperty(const Image *image,const char *property)
               xmp_namespace=ConstantString(GetXMLTreeTag(node));
               (void) SubstituteString(&xmp_namespace,"exif:","xmp:");
               xmp_namespace_length=strlen(xmp_namespace);
-              if ((xmp_namespace_length <= 2) ||
-                  (*(xmp_namespace+(xmp_namespace_length-2)) != ':') ||
-                  (*(xmp_namespace+(xmp_namespace_length-1)) != '*'))
+              if (IsNotNamespaceWildcard(xmp_namespace,xmp_namespace_length) !=
+                  MagickFalse)
                 (void) AddValueToSplayTree((SplayTreeInfo *) image->properties,
                  ConstantString(xmp_namespace),ConstantString(content));
               xmp_namespace=DestroyString(xmp_namespace);
@@ -1930,9 +1950,8 @@ static void GetXMPProperty(const Image *image,const char *property)
                 xmp_namespace=ConstantString(GetXMLTreeTag(node));
                 (void) SubstituteString(&xmp_namespace,"exif:","xmp:");
                 xmp_namespace_length=strlen(xmp_namespace);
-                if ((xmp_namespace_length <= 2) ||
-                    (*(xmp_namespace+(xmp_namespace_length-2)) != ':') ||
-                    (*(xmp_namespace+(xmp_namespace_length-1)) != '*'))
+                if (IsNotNamespaceWildcard(xmp_namespace,
+                    xmp_namespace_length) != MagickFalse)
                   (void) AddValueToSplayTree((SplayTreeInfo *)
                     image->properties,ConstantString(xmp_namespace),
                     ConstantString(content));
@@ -1946,6 +1965,14 @@ static void GetXMPProperty(const Image *image,const char *property)
       }
     }
   xmp=DestroyXMLTree(xmp);
+}
+
+static inline MagickBooleanType IsPointCorner(const PointInfo *last,
+  const PointInfo *point)
+{
+  return(((last[1].x == last[2].x) && (last[1].y == last[2].y) &&
+    (point[0].x == point[1].x) && (point[0].y == point[1].y)) ? MagickTrue :
+    MagickFalse);
 }
 
 static char *TracePSClippath(const unsigned char *blob,size_t length)
@@ -2070,8 +2097,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
               Handle special cases when Bezier curves are used to describe
               corners and straight lines.
             */
-            if ((last[1].x == last[2].x) && (last[1].y == last[2].y) &&
-                (point[0].x == point[1].x) && (point[0].y == point[1].y))
+            if (IsPointCorner(last,point) != MagickFalse)
               (void) FormatLocaleString(message,MagickPathExtent,
                 "  %g %g l\n",point[1].x,point[1].y);
             else
@@ -2103,8 +2129,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
               Same special handling as above except we compare to the
               first point in the path and close the path.
             */
-            if ((last[1].x == last[2].x) && (last[1].y == last[2].y) &&
-                (first[0].x == first[1].x) && (first[0].y == first[1].y))
+            if (IsPointCorner(last,first) != MagickFalse)
               (void) FormatLocaleString(message,MagickPathExtent,
                 "  %g %g l z\n",first[1].x,first[1].y);
             else
@@ -2148,6 +2173,14 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
   return(path);
 }
 
+static inline MagickBooleanType IsBezierCorner(const PointInfo *last,
+  const PointInfo *point)
+{
+  return((((last+1)->x == (last+2)->x) && ((last+1)->y == (last+2)->y) &&
+    (point->x == (point+1)->x) && (point->y == (point+1)->y)) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline void TraceBezierCurve(char *message,PointInfo *last,
   PointInfo *point)
 {
@@ -2155,8 +2188,7 @@ static inline void TraceBezierCurve(char *message,PointInfo *last,
     Handle special cases when Bezier curves are used to describe
     corners and straight lines.
   */
-  if (((last+1)->x == (last+2)->x) && ((last+1)->y == (last+2)->y) &&
-      (point->x == (point+1)->x) && (point->y == (point+1)->y))
+  if (IsBezierCorner(last,point) != MagickFalse)
     (void) FormatLocaleString(message,MagickPathExtent,
       "L %g %g\n",point[1].x,point[1].y);
   else
@@ -2301,6 +2333,13 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
   return(path);
 }
 
+static inline MagickBooleanType IsWildcardProperty(const char *property,
+  const size_t property_length)
+{
+  return(((property_length > 2) && (*(property+(property_length-2)) == ':') &&
+    (*(property+(property_length-1)) == '*')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport const char *GetImageProperty(const Image *image,
   const char *property,ExceptionInfo *exception)
 {
@@ -2321,8 +2360,7 @@ MagickExport const char *GetImageProperty(const Image *image,
     return((const char *) NULL);
   read_from_properties=MagickTrue;
   property_length=strlen(property);
-  if ((property_length > 2) && (*(property+(property_length-2)) == ':') &&
-      (*(property+(property_length-1)) == '*'))
+  if (IsWildcardProperty(property,property_length) != MagickFalse)
     read_from_properties=MagickFalse;
   if (read_from_properties != MagickFalse)
     {
@@ -3699,6 +3737,18 @@ MagickExport const char *GetNextImageProperty(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsNonEmptyImage(const Image *image)
+{
+  return(((image != (Image *) NULL) && (image->columns != 0) &&
+    (image->rows != 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEscapeEnd(const char *p)
+{
+  return(((*p == '\0') || (*p == '\'') || (*p == '"')) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -3808,7 +3858,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
     property_info=image_info;
   else
     property_info=CloneImageInfo(image_info);
-  if ((image != (Image *) NULL) && (image->columns != 0) && (image->rows != 0))
+  if (IsNonEmptyImage(image) != MagickFalse)
     property_image=image;
   else
     {
@@ -3911,7 +3961,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
     /*
       Doubled Percent - or percent at end of string.
     */
-    if ((*p == '\0') || (*p == '\'') || (*p == '"'))
+    if (IsEscapeEnd(p) != MagickFalse)
       p--;
     if (*p == '%')
       {
@@ -4410,6 +4460,24 @@ MagickExport void ResetImagePropertyIterator(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsReadOnlyMProperty(const char *property)
+{
+  return(((LocaleCompare("magick",property) == 0) ||
+    (LocaleCompare("max",property) == 0) ||
+    (LocaleCompare("mean",property) == 0) ||
+    (LocaleCompare("min",property) == 0) ||
+    (LocaleCompare("min",property) == 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsReadOnlySProperty(const char *property)
+{
+  return(((LocaleCompare("size",property) == 0) ||
+    (LocaleCompare("skewness",property) == 0) ||
+    (LocaleCompare("scenes",property) == 0) ||
+    (LocaleCompare("standard-deviation",property) == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageProperty(Image *image,
   const char *property,const char *value,ExceptionInfo *exception)
 {
@@ -4441,8 +4509,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
       return(MagickFalse);
     }
   property_length=strlen(property);
-  if ((property_length > 2) && (*(property+(property_length-2)) == ':') &&
-      (*(property+(property_length-1)) == '*'))
+  if (IsWildcardProperty(property,property_length) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
         "SetReadOnlyProperty","`%s'",property);
@@ -4719,11 +4786,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     }
     case 'M':
     case 'm':
-      if ((LocaleCompare("magick",property) == 0) ||
-          (LocaleCompare("max",property) == 0) ||
-          (LocaleCompare("mean",property) == 0) ||
-          (LocaleCompare("min",property) == 0) ||
-          (LocaleCompare("min",property) == 0))
+      if (IsReadOnlyMProperty(property) != MagickFalse)
         {
           (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
              "SetReadOnlyProperty","`%s'",property);
@@ -4782,10 +4845,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     }
     case 'S':
     case 's':
-      if ((LocaleCompare("size",property) == 0) ||
-          (LocaleCompare("skewness",property) == 0) ||
-          (LocaleCompare("scenes",property) == 0) ||
-          (LocaleCompare("standard-deviation",property) == 0))
+      if (IsReadOnlySProperty(property) != MagickFalse)
         {
           (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
             "SetReadOnlyProperty","`%s'",property);

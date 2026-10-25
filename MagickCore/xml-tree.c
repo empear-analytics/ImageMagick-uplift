@@ -281,6 +281,12 @@ MagickExport XMLTreeInfo *AddChildToXMLTree(XMLTreeInfo *xml_info,
 %
 */
 
+static inline MagickBooleanType IsDisallowedControlChar(const unsigned char *p)
+{
+  return(((*p < 0x20) && (*p != 0x09) && (*p != 0x0a) &&
+    (*p != 0x0d)) ? MagickTrue : MagickFalse);
+}
+
 static char *CanonicalXMLContent(const char *content,
   const MagickBooleanType pedantic)
 {
@@ -301,7 +307,7 @@ static char *CanonicalXMLContent(const char *content,
   if (utf8 == (unsigned char *) NULL)
     return((char *) NULL);
   for (p=utf8; *p != '\0'; p++)
-    if ((*p < 0x20) && (*p != 0x09) && (*p != 0x0a) && (*p != 0x0d))
+    if (IsDisallowedControlChar(p) != MagickFalse)
       break;
   if (*p != '\0')
     {
@@ -571,6 +577,14 @@ MagickExport XMLTreeInfo *DestroyXMLTree(XMLTreeInfo *xml_info)
 %    o extent: Maximum length of the string.
 %
 */
+static inline MagickBooleanType IsUnseekableXMLFile(const int file,
+  const MagickOffsetType offset)
+{
+  return(((file == fileno(stdin)) || (offset < 0) ||
+    (offset != (MagickOffsetType) ((ssize_t) offset))) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickPrivate char *FileToXML(const char *filename,const size_t extent)
 {
   char
@@ -601,8 +615,7 @@ MagickPrivate char *FileToXML(const char *filename,const size_t extent)
     return((char *) NULL);
   offset=(MagickOffsetType) lseek(file,0,SEEK_END);
   count=0;
-  if ((file == fileno(stdin)) || (offset < 0) ||
-      (offset != (MagickOffsetType) ((ssize_t) offset)))
+  if (IsUnseekableXMLFile(file,offset) != MagickFalse)
     {
       size_t
         quantum;
@@ -1025,6 +1038,29 @@ static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
   return(utf8);
 }
 
+static inline MagickBooleanType IsEntityTextChar(const char *xml,
+  const int state)
+{
+  return(((*xml != '\0') && (*xml != '&') && ((*xml != '%') ||
+    (state != '%')) &&
+    (isspace((int) ((unsigned char) *xml)) == 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEntityReference(const char *xml,
+  const int state)
+{
+  return((((*xml == '&') && ((state == '&') || (state == ' ') ||
+    (state == '*'))) || ((state == '%') && (*xml == '%'))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsCollapsibleSpace(const char *xml,
+  const int state)
+{
+  return((((state == ' ') || (state == '*')) &&
+    (isspace((int) ((unsigned char) *xml)) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static char *ParseEntities(char *xml,char **entities,int state)
 {
   char
@@ -1058,8 +1094,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
     }
   for (xml=p; ; )
   {
-    while ((*xml != '\0') && (*xml != '&') && ((*xml != '%') ||
-           (state != '%')) && (isspace((int) ((unsigned char) *xml)) == 0))
+    while (IsEntityTextChar(xml,state) != MagickFalse)
       xml++;
     if (*xml == '\0')
       break;
@@ -1111,8 +1146,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
         (void) memmove(xml,strchr(xml,';')+1,strlen(strchr(xml,';')));
       }
     else
-      if (((*xml == '&') && ((state == '&') || (state == ' ') ||
-          (state == '*'))) || ((state == '%') && (*xml == '%')))
+      if (IsEntityReference(xml,state) != MagickFalse)
         {
           /*
             Find entity in the list.
@@ -1169,8 +1203,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
               }
         }
       else
-        if (((state == ' ') || (state == '*')) &&
-            (isspace((int) ((unsigned char) *xml)) != 0))
+        if (IsCollapsibleSpace(xml,state) != MagickFalse)
           *(xml++)=' ';
         else
           xml++;
@@ -1200,6 +1233,14 @@ static char *ParseEntities(char *xml,char **entities,int state)
   return(p == q ? ConstantString(p) : p);
 }
 
+static inline MagickBooleanType IsCharacterContentSkipped(
+  const XMLTreeInfo *xml_info,const size_t length)
+{
+  return(((xml_info == (XMLTreeInfo *) NULL) ||
+    (xml_info->tag == (char *) NULL) ||
+    (length == 0)) ? MagickTrue : MagickFalse);
+}
+
 static void ParseCharacterContent(XMLTreeRoot *root,char *xml,
   const size_t length,const char state)
 {
@@ -1207,8 +1248,7 @@ static void ParseCharacterContent(XMLTreeRoot *root,char *xml,
     *xml_info;
 
   xml_info=root->node;
-  if ((xml_info == (XMLTreeInfo *) NULL) || (xml_info->tag == (char *) NULL) ||
-      (length == 0))
+  if (IsCharacterContentSkipped(xml_info,length) != MagickFalse)
     return;
   xml[length]='\0';
   xml=ParseEntities(xml,root->entities,state);
@@ -1225,11 +1265,18 @@ static void ParseCharacterContent(XMLTreeRoot *root,char *xml,
     }
 }
 
+static inline MagickBooleanType IsUnmatchedCloseTag(const XMLTreeRoot *root,
+  const char *tag)
+{
+  return(((root->node == (XMLTreeInfo *) NULL) ||
+    (root->node->tag == (char *) NULL) ||
+    (strcmp(tag,root->node->tag) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static XMLTreeInfo *ParseCloseTag(XMLTreeRoot *root,char *tag,
   ExceptionInfo *exception)
 {
-  if ((root->node == (XMLTreeInfo *) NULL) ||
-      (root->node->tag == (char *) NULL) || (strcmp(tag,root->node->tag) != 0))
+  if (IsUnmatchedCloseTag(root,tag) != MagickFalse)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
         "ParseError","unexpected closing tag </%s>",tag);
@@ -1341,6 +1388,20 @@ static void ParseProcessingInstructions(XMLTreeRoot *root,char *xml,
   root->processing_instructions[i][j+1]=(char *) NULL;
 }
 
+static inline MagickBooleanType IsDoctypeTextChar(const char *xml)
+{
+  return(((*xml != '\0') && (*xml != '<') && (*xml != '%')) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsOtherAttributeList(XMLTreeRoot *root,
+  const ssize_t i,const char *n)
+{
+  return(((root->attributes[i] != (char **) NULL) &&
+    (n != (char *) NULL) &&
+    (strcmp(n,root->attributes[i][0]) != 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -1364,7 +1425,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   (void) memcpy(predefined_entities,sentinel,sizeof(sentinel));
   for (xml[length]='\0'; xml != (char *) NULL; )
   {
-    while ((*xml != '\0') && (*xml != '<') && (*xml != '%'))
+    while (IsDoctypeTextChar(xml) != MagickFalse)
       xml++;
     if (*xml == '\0')
       break;
@@ -1449,9 +1510,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
               continue;
             *xml='\0';
             i=0;
-            while ((root->attributes[i] != (char **) NULL) &&
-                   (n != (char *) NULL) &&
-                   (strcmp(n,root->attributes[i][0]) != 0))
+            while (IsOtherAttributeList(root,i,n) != MagickFalse)
               i++;
             while ((*(n=xml+strspn(xml+1,XMLWhitespace)+1) != '\0') &&
                    (*n != '>'))
@@ -1604,6 +1663,46 @@ static inline MagickBooleanType IsSkipTag(const char *tag)
   return(MagickFalse);
 }
 
+static inline MagickBooleanType IsXMLNameStart(const char *p,const int c)
+{
+  return(((isalpha((int) ((unsigned char) *p)) != 0) || (*p == '_') ||
+    (*p == ':') || (c < '\0')) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsNameStartOutsideIgnore(const char *p,
+  const size_t ignore_depth)
+{
+  return((((isalpha((int) ((unsigned char) *p)) != 0) || (*p == '_')) &&
+    (ignore_depth == 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsOtherDefaultAttribute(char **attribute,
+  const ssize_t j,char **attributes,const ssize_t l)
+{
+  return(((attribute != (char **) NULL) &&
+    (attribute[j] != (char *) NULL) &&
+    (strcmp(attribute[j],attributes[l]) != 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsTagNotClosed(const char *p,const int terminal)
+{
+  return((((*p != '\0') && (*p != '>')) ||
+    ((*p == '\0') && (terminal != '>'))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsTagClosed(const char *p,const int terminal)
+{
+  return(((*p == '>') || ((*p == '\0') && (terminal == '>'))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsUnterminatedSection(const char *p,
+  const int terminal)
+{
+  return(((p == (char *) NULL) || ((*p == '\0') &&
+    (terminal != '>'))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -1677,8 +1776,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
     attributes=(char **) sentinel;
     tag=p;
     c=(*p);
-    if ((isalpha((int) ((unsigned char) *p)) != 0) || (*p == '_') ||
-        (*p == ':') || (c < '\0'))
+    if (IsXMLNameStart(p,c) != MagickFalse)
       {
         /*
           Tag.
@@ -1693,8 +1791,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
         p+=(ptrdiff_t) strcspn(p,XMLWhitespace "/>");
         while (isspace((int) ((unsigned char) *p)) != 0)
           *p++='\0';
-        if (((isalpha((int) ((unsigned char) *p)) != 0) || (*p == '_')) &&
-            (ignore_depth == 0))
+        if (IsNameStartOutsideIgnore(p,ignore_depth) != MagickFalse)
           {
             if ((*p != '\0') && (*p != '/') && (*p != '>'))
               {
@@ -1759,9 +1856,8 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                           return(&root->root);
                         }
                       j=1;
-                      while ((attribute != (char **) NULL) &&
-                             (attribute[j] != (char *) NULL) &&
-                             (strcmp(attribute[j],attributes[l]) != 0))
+                      while (IsOtherDefaultAttribute(attribute,j,attributes,
+                          l) != MagickFalse)
                         j+=3;
                       attributes[l+1]=ParseEntities(attributes[l+1],
                         root->entities,(attribute != (char **) NULL) &&
@@ -1785,8 +1881,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
               Self closing tag.
             */
             *p++='\0';
-            if (((*p != '\0') && (*p != '>')) ||
-                ((*p == '\0') && (terminal != '>')))
+            if (IsTagNotClosed(p,terminal) != MagickFalse)
               {
                 if (l != 0)
                   (void) DestroyXMLTreeAttributes(attributes);
@@ -1806,7 +1901,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
         else
           {
             c=(*p);
-            if ((*p == '>') || ((*p == '\0') && (terminal == '>')))
+            if (IsTagClosed(p,terminal) != MagickFalse)
               {
                 *p='\0';
                 if ((ignore_depth == 0) && (IsSkipTag(tag) == MagickFalse))
@@ -1940,8 +2035,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                       break;
                     p++;
                   } while ((*p != '\0') && (*p != '>'));
-                  if ((p == (char *) NULL) || ((*p == '\0') &&
-                      (terminal != '>')))
+                  if (IsUnterminatedSection(p,terminal) != MagickFalse)
                     {
                       (void) ThrowMagickException(exception,GetMagickModule(),
                         OptionWarning,"ParseError","unclosed <?");
