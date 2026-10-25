@@ -457,6 +457,23 @@ MagickExport int CompareSplayTreeStringInfo(const void *target,
   return(CompareStringInfo(p,q));
 }
 
+static NodeInfo *GetSuccessorNode(const SplayTreeInfo *splay_tree)
+{
+  NodeInfo
+    *next,
+    *node;
+
+  next=(NodeInfo *) NULL;
+  node=splay_tree->root->right;
+  if (node != (NodeInfo *) NULL)
+    {
+      while (node->left != (NodeInfo *) NULL)
+        node=node->left;
+      next=(NodeInfo *) node->key;
+    }
+  return(next);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -487,8 +504,7 @@ MagickExport MagickBooleanType DeleteNodeByValueFromSplayTree(
   SplayTreeInfo *splay_tree,const void *value)
 {
   NodeInfo
-    *next,
-    *node;
+    *next;
 
   assert(splay_tree != (SplayTreeInfo *) NULL);
   assert(splay_tree->signature == MagickCoreSignature);
@@ -504,14 +520,7 @@ MagickExport MagickBooleanType DeleteNodeByValueFromSplayTree(
   while (next != (NodeInfo *) NULL)
   {
     SplaySplayTree(splay_tree,next);
-    next=(NodeInfo *) NULL;
-    node=splay_tree->root->right;
-    if (node != (NodeInfo *) NULL)
-      {
-        while (node->left != (NodeInfo *) NULL)
-          node=node->left;
-        next=(NodeInfo *) node->key;
-      }
+    next=GetSuccessorNode(splay_tree);
     if (splay_tree->root->value == value)
       {
         int
