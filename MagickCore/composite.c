@@ -309,6 +309,14 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
   return(magnitude_image);
 }
 
+static inline MagickBooleanType IsBlendRowsMissing(const Quantum *p,
+  const Quantum *q,const Quantum *r,const Quantum *s,const Quantum *t)
+{
+  return(((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
+    (r == (const Quantum *) NULL) || (s == (const Quantum *) NULL) ||
+    (t == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static Image *BlendMaxMagnitudeImage(const Image *alpha_image,
   const Image *beta_image,const Image *dx_image,const Image *dy_image,
   ExceptionInfo *exception)
@@ -367,9 +375,7 @@ static Image *BlendMaxMagnitudeImage(const Image *alpha_image,
     s=GetCacheViewVirtualPixels(dy_view,0,y,alpha_image->columns,1,exception);
     t=GetCacheViewAuthenticPixels(magnitude_view,0,y,alpha_image->columns,1,
       exception);
-    if ((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
-        (r == (const Quantum *) NULL) || (s == (const Quantum *) NULL) ||
-        (t == (Quantum *) NULL))
+    if (IsBlendRowsMissing(p,q,r,s,t) != MagickFalse)
       {
         status=MagickFalse;
         continue;
@@ -384,9 +390,7 @@ static Image *BlendMaxMagnitudeImage(const Image *alpha_image,
         PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
         PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
         PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (beta_traits == UndefinedPixelTrait) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
+        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
           continue;
         if (p[i] > GetPixelChannel(beta_image,channel,q))
           t[i]=GetPixelChannel(dx_image,channel,r);
