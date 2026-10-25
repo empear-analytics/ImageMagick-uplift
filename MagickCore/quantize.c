@@ -2554,13 +2554,39 @@ static ssize_t ParseKmeansSeedColors(Image *image,const char *colors,
   return(n);
 }
 
+#define RandomColorComponent(info)  \
+  ((double) QuantumRange*GetPseudoRandomValue(info))
+
+static void SeedKmeansRandomColors(Image *image,ssize_t n,
+  ExceptionInfo *exception)
+{
+  RandomInfo
+    *random_info;
+
+  /*
+    Seed clusters from random values.
+  */
+  random_info=AcquireRandomInfo();
+  for ( ; n < (ssize_t) image->colors; n++)
+  {
+    (void) QueryColorCompliance("#000",AllCompliance,image->colormap+n,
+      exception);
+    image->colormap[n].red=RandomColorComponent(random_info);
+    image->colormap[n].green=RandomColorComponent(random_info);
+    image->colormap[n].blue=RandomColorComponent(random_info);
+    if (image->alpha_trait != UndefinedPixelTrait)
+      image->colormap[n].alpha=RandomColorComponent(random_info);
+    if (image->colorspace == CMYKColorspace)
+      image->colormap[n].black=RandomColorComponent(random_info);
+  }
+  random_info=DestroyRandomInfo(random_info);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
 {
 #define KmeansImageTag  "Kmeans/Image"
-#define RandomColorComponent(info)  \
-  ((double) QuantumRange*GetPseudoRandomValue(info))
 
   CacheView
     *image_view;
@@ -2649,28 +2675,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
         return(status);
       n=ParseKmeansSeedColors(image,colors,exception);
       if (n < (ssize_t) image->colors)
-        {
-          RandomInfo
-            *random_info;
-
-          /*
-            Seed clusters from random values.
-          */
-          random_info=AcquireRandomInfo();
-          for ( ; n < (ssize_t) image->colors; n++)
-          {
-            (void) QueryColorCompliance("#000",AllCompliance,image->colormap+n,
-              exception);
-            image->colormap[n].red=RandomColorComponent(random_info);
-            image->colormap[n].green=RandomColorComponent(random_info);
-            image->colormap[n].blue=RandomColorComponent(random_info);
-            if (image->alpha_trait != UndefinedPixelTrait)
-              image->colormap[n].alpha=RandomColorComponent(random_info);
-            if (image->colorspace == CMYKColorspace)
-              image->colormap[n].black=RandomColorComponent(random_info);
-          }
-          random_info=DestroyRandomInfo(random_info);
-        }
+        SeedKmeansRandomColors(image,n,exception);
     }
   /*
     Iterative refinement.
