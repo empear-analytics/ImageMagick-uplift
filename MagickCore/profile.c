@@ -1785,6 +1785,13 @@ static void WriteTo8BimProfile(Image *image,const char *name,
   }
 }
 
+static inline MagickBooleanType IsInvalidResourceCount(const unsigned char *p,
+  const unsigned char *datum,const size_t length,const ssize_t count)
+{
+  return(((p > (datum+length-count)) || (count > (ssize_t) length) ||
+    (count <= 0)) ? MagickTrue : MagickFalse);
+}
+
 static void GetProfilesFromResourceBlock(Image *image,
   const StringInfo *resource_block,ExceptionInfo *exception)
 {
@@ -1828,8 +1835,7 @@ static void GetProfilesFromResourceBlock(Image *image,
       break;
     p=ReadResourceLong(p,&value);
     count=(ssize_t) value;
-    if ((p > (datum+length-count)) || (count > (ssize_t) length) ||
-        (count <= 0))
+    if (IsInvalidResourceCount(p,datum,length,count) != MagickFalse)
       break;
     switch (id)
     {
