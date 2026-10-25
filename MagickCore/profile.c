@@ -1601,6 +1601,18 @@ MagickExport void ResetImageProfileIterator(const Image *image)
   ResetSplayTreeIterator((SplayTreeInfo *) image->profiles);
 }
 
+static void SetProfileFromResource(Image *image,const char *name,
+  const unsigned char *p,const ssize_t count,ExceptionInfo *exception)
+{
+  StringInfo
+    *profile;
+
+  profile=BlobToProfileStringInfo(name,p,(size_t) count,exception);
+  if (profile != (StringInfo *) NULL)
+    (void) SetImageProfileInternal(image,GetStringInfoName(profile),
+      profile,MagickTrue,exception);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1814,9 +1826,6 @@ static void GetProfilesFromResourceBlock(Image *image,
   ssize_t
     count;
 
-  StringInfo
-    *profile;
-
   unsigned char
     length_byte;
 
@@ -1882,10 +1891,7 @@ static void GetProfilesFromResourceBlock(Image *image,
         /*
           IPTC profile.
         */
-        profile=BlobToProfileStringInfo("iptc",p,(size_t) count,exception);
-        if (profile != (StringInfo *) NULL)
-          (void) SetImageProfileInternal(image,GetStringInfoName(profile),
-            profile,MagickTrue,exception);
+        SetProfileFromResource(image,"iptc",p,count,exception);
         p+=(ptrdiff_t) count;
         break;
       }
@@ -1902,10 +1908,7 @@ static void GetProfilesFromResourceBlock(Image *image,
         /*
           ICC Profile.
         */
-        profile=BlobToProfileStringInfo("icc",p,(size_t) count,exception);
-        if (profile != (StringInfo *) NULL)
-          (void) SetImageProfileInternal(image,GetStringInfoName(profile),
-            profile,MagickTrue,exception);
+        SetProfileFromResource(image,"icc",p,count,exception);
         p+=(ptrdiff_t) count;
         break;
       }
@@ -1914,10 +1917,7 @@ static void GetProfilesFromResourceBlock(Image *image,
         /*
           EXIF Profile.
         */
-        profile=BlobToProfileStringInfo("exif",p,(size_t) count,exception);
-        if (profile != (StringInfo *) NULL)
-          (void) SetImageProfileInternal(image,GetStringInfoName(profile),
-            profile,MagickTrue,exception);
+        SetProfileFromResource(image,"exif",p,count,exception);
         p+=(ptrdiff_t) count;
         break;
       }
@@ -1926,10 +1926,7 @@ static void GetProfilesFromResourceBlock(Image *image,
         /*
           XMP Profile.
         */
-        profile=BlobToProfileStringInfo("xmp",p,(size_t) count,exception);
-        if (profile != (StringInfo *) NULL)
-          (void) SetImageProfileInternal(image,GetStringInfoName(profile),
-            profile,MagickTrue,exception);
+        SetProfileFromResource(image,"xmp",p,count,exception);
         p+=(ptrdiff_t) count;
         break;
       }
