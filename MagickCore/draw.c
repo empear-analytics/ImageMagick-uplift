@@ -5134,6 +5134,14 @@ static double GetFillAlpha(PolygonInfo *polygon_info,const double mid,
   return(subpath_alpha);
 }
 
+static inline MagickBooleanType IsBoundsOutsideImage(const Image *image,
+  const SegmentInfo bounds)
+{
+  return(((bounds.x1 >= (double) image->columns) ||
+    (bounds.y1 >= (double) image->rows) ||
+    (bounds.x2 <= 0.0) || (bounds.y2 <= 0.0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType DrawPolygonPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -5219,9 +5227,7 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
   bounds.y1-=(mid+1.0);
   bounds.x2+=(mid+1.0);
   bounds.y2+=(mid+1.0);
-  if ((bounds.x1 >= (double) image->columns) ||
-      (bounds.y1 >= (double) image->rows) ||
-      (bounds.x2 <= 0.0) || (bounds.y2 <= 0.0))
+  if (IsBoundsOutsideImage(image,bounds) != MagickFalse)
     {
       polygon_info=DestroyPolygonTLS(polygon_info);
       return(MagickTrue);  /* virtual polygon */
