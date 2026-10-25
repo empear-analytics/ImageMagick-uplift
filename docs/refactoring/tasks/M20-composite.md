@@ -220,3 +220,40 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, overnight)
+
+**Result: Code Health 1.33 → 1.58** (`cs-mcp` 1.5.12). Branch `campaign/M20-composite`,
+stacked on `campaign/M19-semaphore` (PR #25). 7 refactor commits, all Recipe P, one
+function each: 2 oracle-verified (`CompositeImage`, `TextureImage`) and 5
+guard-verified (the blend kernels have no mutant in the reports, and
+`CompositeOverImage` is not ready).
+
+**One category leaves the file:** Complex Conditional, ten sites, through five
+predicates:
+- `IsBlendRowMissing` and `IsBlendRowsMissing` (missing rows);
+- `IsBlendChannelSkipped` (four kernels);
+- `IsOutsideSourceColumn` (`CompositeOverImage` and `CompositeImage`);
+- `IsTextureComposited`.
+
+Six of the commits reuse a predicate that an earlier commit introduced. At guard level
+that shows `--calls` +1, the case raised as a question in #16.
+
+**Whole catalogue** at the branch tip against `8a4c272f1`: 15,884 cases, 1 diverged
+(`gaps/c5651ffad8`, the known log-map tie).
+
+**Process note.** The first two commits were redone before any push. The predicate tool
+bounded a function by the next documentation header. Between the blend kernels, which
+are static and have no headers, that slice ran into the following functions, and one
+commit changed `BlendSumImage` alongside `BlendMagnitudeImage`. The tool now bounds a
+function by brace matching. The branch was reset to the task-file commit and the steps
+were made again, one function each. Earlier tasks' uses of the tool were checked: they
+were public functions with headers, or expressions unique in the file.
+
+**What is left, at 1.58.**
+- `CompositeImage` (nesting 6, one `switch` over the compose operators inside its
+  parallel loop).
+- `CompositeOverImage` and `TextureImage` (nesting 5).
+- The blend kernels' channel loops. They are near-duplicates whose bodies differ in the
+  arithmetic, so Recipe D does not apply, and extracting each separately would be
+  reported as duplication.
