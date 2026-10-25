@@ -1386,6 +1386,12 @@ static MagickBooleanType ExpectChar (FxInfo * pfx, char c)
   return MagickTrue;
 }
 
+static inline MagickBooleanType IsUnqualifiableAttr(const ImgAttrE *pop)
+{
+  return((*pop != aPage && *pop != aPrintsize && *pop != aRes) ? MagickTrue :
+    MagickFalse);
+}
+
 static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
 /* If ".x" or ".y" or ".width" or ".height" increments *pop and returns 1 to 4 .
    Otherwise returns 0.
@@ -1393,7 +1399,7 @@ static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
 {
   int ret=0;
 
-  if (*pop != aPage && *pop != aPrintsize && *pop != aRes) return 0;
+  if (IsUnqualifiableAttr(pop) != MagickFalse) return 0;
 
   if (PeekChar (pfx) != '.') return 0;
 
