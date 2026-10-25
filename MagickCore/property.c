@@ -2320,6 +2320,13 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
   return(path);
 }
 
+static inline MagickBooleanType IsWildcardProperty(const char *property,
+  const size_t property_length)
+{
+  return(((property_length > 2) && (*(property+(property_length-2)) == ':') &&
+    (*(property+(property_length-1)) == '*')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport const char *GetImageProperty(const Image *image,
   const char *property,ExceptionInfo *exception)
 {
@@ -2340,8 +2347,7 @@ MagickExport const char *GetImageProperty(const Image *image,
     return((const char *) NULL);
   read_from_properties=MagickTrue;
   property_length=strlen(property);
-  if ((property_length > 2) && (*(property+(property_length-2)) == ':') &&
-      (*(property+(property_length-1)) == '*'))
+  if (IsWildcardProperty(property,property_length) != MagickFalse)
     read_from_properties=MagickFalse;
   if (read_from_properties != MagickFalse)
     {
