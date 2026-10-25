@@ -1488,6 +1488,53 @@ static void SetClientNameAndPath(const char *path)
   (void) SetClientPath(execution_path);
 }
 
+static void EstablishSignalHandlers(void)
+{
+  /*
+    Set signal handlers.
+  */
+#if defined(SIGABRT)
+  if (signal_handlers[SIGABRT] == (SignalHandler *) NULL)
+    signal_handlers[SIGABRT]=RegisterMagickSignalHandler(SIGABRT);
+#endif
+#if defined(SIGBUS)
+  if (signal_handlers[SIGBUS] == (SignalHandler *) NULL)
+    signal_handlers[SIGBUS]=RegisterMagickSignalHandler(SIGBUS);
+#endif
+#if defined(SIGSEGV)
+  if (signal_handlers[SIGSEGV] == (SignalHandler *) NULL)
+    signal_handlers[SIGSEGV]=RegisterMagickSignalHandler(SIGSEGV);
+#endif
+#if defined(SIGFPE)
+  if (signal_handlers[SIGFPE] == (SignalHandler *) NULL)
+    signal_handlers[SIGFPE]=RegisterMagickSignalHandler(SIGFPE);
+#endif
+#if defined(SIGHUP)
+  if (signal_handlers[SIGHUP] == (SignalHandler *) NULL)
+    signal_handlers[SIGHUP]=RegisterMagickSignalHandler(SIGHUP);
+#endif
+#if defined(SIGINT)
+  if (signal_handlers[SIGINT] == (SignalHandler *) NULL)
+    signal_handlers[SIGINT]=RegisterMagickSignalHandler(SIGINT);
+#endif
+#if defined(SIGQUIT)
+  if (signal_handlers[SIGQUIT] == (SignalHandler *) NULL)
+    signal_handlers[SIGQUIT]=RegisterMagickSignalHandler(SIGQUIT);
+#endif
+#if defined(SIGTERM)
+  if (signal_handlers[SIGTERM] == (SignalHandler *) NULL)
+    signal_handlers[SIGTERM]=RegisterMagickSignalHandler(SIGTERM);
+#endif
+#if defined(SIGXCPU)
+  if (signal_handlers[SIGXCPU] == (SignalHandler *) NULL)
+    signal_handlers[SIGXCPU]=RegisterMagickSignalHandler(SIGXCPU);
+#endif
+#if defined(SIGXFSZ)
+  if (signal_handlers[SIGXFSZ] == (SignalHandler *) NULL)
+    signal_handlers[SIGXFSZ]=RegisterMagickSignalHandler(SIGXFSZ);
+#endif
+}
+
 MagickExport void MagickCoreGenesis(const char *path,
   const MagickBooleanType establish_signal_handlers)
 {
@@ -1525,51 +1572,7 @@ MagickExport void MagickCoreGenesis(const char *path,
   NTWindowsGenesis();
 #endif
   if (establish_signal_handlers != MagickFalse)
-    {
-      /*
-        Set signal handlers.
-      */
-#if defined(SIGABRT)
-      if (signal_handlers[SIGABRT] == (SignalHandler *) NULL)
-        signal_handlers[SIGABRT]=RegisterMagickSignalHandler(SIGABRT);
-#endif
-#if defined(SIGBUS)
-      if (signal_handlers[SIGBUS] == (SignalHandler *) NULL)
-        signal_handlers[SIGBUS]=RegisterMagickSignalHandler(SIGBUS);
-#endif
-#if defined(SIGSEGV)
-      if (signal_handlers[SIGSEGV] == (SignalHandler *) NULL)
-        signal_handlers[SIGSEGV]=RegisterMagickSignalHandler(SIGSEGV);
-#endif
-#if defined(SIGFPE)
-      if (signal_handlers[SIGFPE] == (SignalHandler *) NULL)
-        signal_handlers[SIGFPE]=RegisterMagickSignalHandler(SIGFPE);
-#endif
-#if defined(SIGHUP)
-      if (signal_handlers[SIGHUP] == (SignalHandler *) NULL)
-        signal_handlers[SIGHUP]=RegisterMagickSignalHandler(SIGHUP);
-#endif
-#if defined(SIGINT)
-      if (signal_handlers[SIGINT] == (SignalHandler *) NULL)
-        signal_handlers[SIGINT]=RegisterMagickSignalHandler(SIGINT);
-#endif
-#if defined(SIGQUIT)
-      if (signal_handlers[SIGQUIT] == (SignalHandler *) NULL)
-        signal_handlers[SIGQUIT]=RegisterMagickSignalHandler(SIGQUIT);
-#endif
-#if defined(SIGTERM)
-      if (signal_handlers[SIGTERM] == (SignalHandler *) NULL)
-        signal_handlers[SIGTERM]=RegisterMagickSignalHandler(SIGTERM);
-#endif
-#if defined(SIGXCPU)
-      if (signal_handlers[SIGXCPU] == (SignalHandler *) NULL)
-        signal_handlers[SIGXCPU]=RegisterMagickSignalHandler(SIGXCPU);
-#endif
-#if defined(SIGXFSZ)
-      if (signal_handlers[SIGXFSZ] == (SignalHandler *) NULL)
-        signal_handlers[SIGXFSZ]=RegisterMagickSignalHandler(SIGXFSZ);
-#endif
-    }
+    EstablishSignalHandlers();
   /*
     Instantiate magick resources.
   */
