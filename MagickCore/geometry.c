@@ -1370,6 +1370,35 @@ MagickExport MagickStatusType ParseGeometry(const char *geometry,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickStatusType SetPercentRegion(const Image *image,
+  const char *geometry,RectangleInfo *region_info,MagickStatusType flags)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    status;
+
+  PointInfo
+    scale;
+
+  /*
+    Geometry is a percentage of the image size, not canvas size
+  */
+  if (image->gravity != UndefinedGravity)
+    flags|=XValue | YValue;
+  status=ParseGeometry(geometry,&geometry_info);
+  scale.x=geometry_info.rho;
+  if ((status & RhoValue) == 0)
+    scale.x=100.0;
+  scale.y=geometry_info.sigma;
+  if ((status & SigmaValue) == 0)
+    scale.y=scale.x;
+  region_info->width=CastDoubleToSizeT(scale.x*image->columns/100.0+0.5);
+  region_info->height=CastDoubleToSizeT(scale.y*image->rows/100.0+0.5);
+  return(flags);
+}
+
 MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
   const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
 {
@@ -1397,31 +1426,7 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
       return(flags);
     }
   if ((flags & PercentValue) != 0)
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        status;
-
-      PointInfo
-        scale;
-
-      /*
-        Geometry is a percentage of the image size, not canvas size
-      */
-      if (image->gravity != UndefinedGravity)
-        flags|=XValue | YValue;
-      status=ParseGeometry(geometry,&geometry_info);
-      scale.x=geometry_info.rho;
-      if ((status & RhoValue) == 0)
-        scale.x=100.0;
-      scale.y=geometry_info.sigma;
-      if ((status & SigmaValue) == 0)
-        scale.y=scale.x;
-      region_info->width=CastDoubleToSizeT(scale.x*image->columns/100.0+0.5);
-      region_info->height=CastDoubleToSizeT(scale.y*image->rows/100.0+0.5);
-    }
+    flags=SetPercentRegion(image,geometry,region_info,flags);
   if ((flags & AspectRatioValue) != 0)
     {
       double
