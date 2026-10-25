@@ -1582,10 +1582,16 @@ static ImgAttrE GetImgAttrToken (FxInfo * pfx)
   return ia;
 }
 
+static inline MagickBooleanType IsImageReferenceOperator(const int op)
+{
+  return((op == (OperatorE)fU || op == (OperatorE)fV || op == (OperatorE)fP ||
+    op == (OperatorE)fS) ? MagickTrue : MagickFalse);
+}
+
 static ImgAttrE GetImgAttrQualifier (FxInfo * pfx, int op)
 {
   ImgAttrE ia = aNull;
-  if (op == (OperatorE)fU || op == (OperatorE)fV || op == (OperatorE)fP || op == (OperatorE)fS) {
+  if (IsImageReferenceOperator(op) != MagickFalse) {
     (void) GetToken (pfx);
     if (pfx->lenToken == 0) {
       return aNull;
