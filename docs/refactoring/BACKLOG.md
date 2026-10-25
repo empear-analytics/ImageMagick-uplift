@@ -121,7 +121,7 @@ needs before refactoring:
 | 6.87 | `MagickCore/memory.c` | 1713 | 60% | 71% | plateau 6.87 (uncompiled branches), [M60](tasks/M60-memory.md) |
 | 8.22 | `MagickCore/coder.c` | 562 | 38% | 93% | open |
 | 9.09 | `MagickCore/static.c` | 379 | 52% | 82% | open |
-| 9.12 | `MagickCore/gem.c` | 348 | 100% | 70% | open |
+| 9.12 | `MagickCore/gem.c` | 348 | 100% | 70% | plateau 9.12 (local Sigma macros), [M74](tasks/M74-gem.md) |
 | 9.49 | `MagickCore/prepress.c` | 154 | 100% | 71% | open |
 
 ### Needs cases before refactoring (39 files)

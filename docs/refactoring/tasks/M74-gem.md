@@ -85,3 +85,13 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night)
+
+**Result: Code Health 9.12, unchanged. No legal step was found.**
+GenerateDifferentialNoise (cc 17, 103 lines) `#define`s `SigmaUniform`,
+`SigmaGaussian`, `SigmaImpulse`, `SigmaLaplacian`, `SigmaMultiplicativeGaussian`,
+`SigmaPoisson`, `SigmaRandom` and `TauGaussian` in its body, and every noise case uses
+them. No case can move until the macros are hoisted, or until a helper may be placed
+after the function with a prototype (see M69's note). GetOptimalKernelWidth2D is not
+ready and is only marginally complex (cc 9).
