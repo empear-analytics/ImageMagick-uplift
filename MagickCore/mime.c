@@ -706,6 +706,25 @@ static void PrintMimePathHeader(FILE *file,const MimeInfo **mime_info,
     "------------------------------\n");
 }
 
+static void PadMimeType(FILE *file,const MimeInfo **mime_info,
+  const ssize_t i)
+{
+  ssize_t
+    j;
+
+  if (strlen(mime_info[i]->type) <= 25)
+    {
+      for (j=(ssize_t) strlen(mime_info[i]->type); j <= 27; j++)
+        (void) FormatLocaleFile(file," ");
+    }
+  else
+    {
+      (void) FormatLocaleFile(file,"\n");
+      for (j=0; j <= 27; j++)
+        (void) FormatLocaleFile(file," ");
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -744,15 +763,11 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
   size_t
     number_aliases;
 
-  ssize_t
-    j;
-
   if (file == (const FILE *) NULL)
     file=stdout;
   mime_info=GetMimeInfoList("*",&number_aliases,exception);
   if (mime_info == (const MimeInfo **) NULL)
     return(MagickFalse);
-  j=0;
   path=(const char *) NULL;
   for (i=0; i < (ssize_t) number_aliases; i++)
   {
@@ -763,17 +778,7 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
       PrintMimePathHeader(file,mime_info,i);
     path=mime_info[i]->path;
     (void) FormatLocaleFile(file,"%s",mime_info[i]->type);
-    if (strlen(mime_info[i]->type) <= 25)
-      {
-        for (j=(ssize_t) strlen(mime_info[i]->type); j <= 27; j++)
-          (void) FormatLocaleFile(file," ");
-      }
-    else
-      {
-        (void) FormatLocaleFile(file,"\n");
-        for (j=0; j <= 27; j++)
-          (void) FormatLocaleFile(file," ");
-      }
+    PadMimeType(file,mime_info,i);
     if (mime_info[i]->description != (char *) NULL)
       (void) FormatLocaleFile(file,"%s",mime_info[i]->description);
     (void) FormatLocaleFile(file,"\n");
