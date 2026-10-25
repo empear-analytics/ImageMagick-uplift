@@ -2103,6 +2103,13 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsIncludeElementOpen(const char *token,
+  const char *q)
+{
+  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
   const char *xml,const char *filename,const size_t depth,
   ExceptionInfo *exception)
@@ -2196,7 +2203,7 @@ static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
         /*
           Include element.
         */
-        while (((*token != '/') && (*(token+1) != '>')) && (*q != '\0'))
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
           (void) CopyMagickString(keyword,token,MagickPathExtent);
           (void) GetNextToken(q,&q,extent,token);
