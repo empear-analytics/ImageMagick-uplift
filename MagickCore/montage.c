@@ -332,6 +332,22 @@ static void SortImageListByScene(Image **image_list,
       SceneCompare);
 }
 
+static RectangleInfo GetLargestTileExtent(RectangleInfo extract_info,
+  Image **image_list,const size_t number_images)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_images; i++)
+  {
+    if (image_list[i]->columns > extract_info.width)
+      extract_info.width=image_list[i]->columns;
+    if (image_list[i]->rows > extract_info.height)
+      extract_info.height=image_list[i]->rows;
+  }
+  return(extract_info);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -520,13 +536,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
       border_width=(size_t) MagickMax((ssize_t) frame_info.width,
         (ssize_t) frame_info.height);
     }
-  for (i=0; i < (ssize_t) number_images; i++)
-  {
-    if (image_list[i]->columns > extract_info.width)
-      extract_info.width=image_list[i]->columns;
-    if (image_list[i]->rows > extract_info.height)
-      extract_info.height=image_list[i]->rows;
-  }
+  extract_info=GetLargestTileExtent(extract_info,image_list,number_images);
   /*
     Initialize draw attributes.
   */
