@@ -539,6 +539,16 @@ MagickExport Image *ConsolidateCMYKImages(const Image *images,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsCropOutsideImage(const Image *image,
+  const RectangleInfo bounding_box,const RectangleInfo page)
+{
+  return(((((double) bounding_box.x-page.x) >= (double) page.width) ||
+    (((double) bounding_box.y-page.y) >= (double) page.height) ||
+    (((double) page.x-bounding_box.x) > (double) image->columns) ||
+    (((double) page.y-bounding_box.y) > (double) image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -588,10 +598,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
     page.width=bounding_box.width;
   if (page.height == 0)
     page.height=bounding_box.height;
-  if ((((double) bounding_box.x-page.x) >= (double) page.width) ||
-      (((double) bounding_box.y-page.y) >= (double) page.height) ||
-      (((double) page.x-bounding_box.x) > (double) image->columns) ||
-      (((double) page.y-bounding_box.y) > (double) image->rows))
+  if (IsCropOutsideImage(image,bounding_box,page) != MagickFalse)
     {
       /*
         Crop is not within virtual canvas, return 1 pixel transparent image.
