@@ -949,6 +949,23 @@ MagickExport Image *CompareImagesLayers(const Image *image,
 
 #define DEBUG_OPT_FRAME 0
 
+static inline MagickBooleanType IsPartialPageFrame(const Image *curr,
+  const Image *image)
+{
+  return(((curr->page.x != 0) || (curr->page.y != 0) ||
+    (curr->page.width != image->page.width) ||
+    (curr->page.height != image->page.height)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsBetterFrameBounds(
+  const MagickBooleanType try_cleared,const MagickBooleanType cleared,
+  const RectangleInfo try_bounds,const RectangleInfo *bounds,const ssize_t i)
+{
+  return(( (!try_cleared && cleared ) ||
+    try_bounds.width * try_bounds.height
+    <  bounds[i].width * bounds[i].height ) ? MagickTrue : MagickFalse);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1003,9 +1020,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     if ((curr->columns != image->columns) || (curr->rows != image->rows))
       ThrowImageException(OptionError,"ImagesAreNotTheSameSize");
 
-    if ((curr->page.x != 0) || (curr->page.y != 0) ||
-        (curr->page.width != image->page.width) ||
-        (curr->page.height != image->page.height))
+    if (IsPartialPageFrame(curr,image) != MagickFalse)
       ThrowImageException(OptionError,"ImagePagesAreNotCoalesced");
   }
   /*
@@ -1114,9 +1129,8 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
          (double) try_bounds.x,(double) try_bounds.y,
          try_cleared?"  (pixels were cleared)":"");
 #endif
-        if ( (!try_cleared && cleared ) ||
-                try_bounds.width * try_bounds.height
-                    <  bounds[i].width * bounds[i].height )
+        if (IsBetterFrameBounds(try_cleared,cleared,try_bounds,bounds,i) !=
+            MagickFalse)
           {
             cleared=try_cleared;
             bounds[i]=try_bounds;
