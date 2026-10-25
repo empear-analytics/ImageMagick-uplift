@@ -2523,15 +2523,9 @@ static MagickBooleanType QueryColorFromCSSName(const char *name,
   return(status);
 }
 
-MagickExport MagickBooleanType QueryColorCompliance(const char *name,
-  const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
+static MagickBooleanType QueryColorFunction(const char *name,
+  const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
-  const char
-    *q;
-
-  const ColorInfo
-    *p;
-
   double
     scale;
 
@@ -2544,6 +2538,104 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
   ssize_t
     i,
     type;
+
+  char
+    colorspace[2*MagickPathExtent];
+
+  MagickBooleanType
+    icc_color;
+
+  /*
+    Parse color of the form rgb(100,255,0).
+  */
+  i=(ssize_t) (q-name);
+  (void) CopyMagickString(colorspace,name,MagickPathExtent);
+  colorspace[i--]='\0';
+  scale=(double) ScaleCharToQuantum(1);
+  icc_color=MagickFalse;
+  if (LocaleNCompare(colorspace,"device-",7) == 0)
+    {
+      (void) CopyMagickString(colorspace,colorspace+7,MagickPathExtent);
+      if (strchr(name,'%') == (char *) NULL)
+        scale=(double) QuantumRange;
+      icc_color=MagickTrue;
+    }
+  if ((LocaleCompare(colorspace,"color") == 0) ||
+      (LocaleCompare(colorspace,"icc-color") == 0))
+    {
+      ssize_t
+        j;
+
+      (void) CopyMagickString(colorspace,name+i+2,MagickPathExtent);
+      for (j=0; colorspace[j] != '\0'; j++)
+        if ((colorspace[j] == ' ') || (colorspace[j] == ','))
+          break;
+      colorspace[j--]='\0';
+      i+=j+3;
+      scale=(double) QuantumRange;
+      icc_color=MagickTrue;
+    }
+  LocaleLower(colorspace);
+  color->alpha_trait=UndefinedPixelTrait;
+  if ((i > 0) && (colorspace[i] == 'a'))
+    {
+      colorspace[i]='\0';
+      color->alpha_trait=BlendPixelTrait;
+    }
+  type=ParseCommandOption(MagickColorspaceOptions,MagickFalse,colorspace);
+  if (type < 0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"UnrecognizedColor","`%s'",name);
+      return(MagickFalse);
+    }
+  color->colorspace=(ColorspaceType) type;
+  if ((icc_color == MagickFalse) && (color->colorspace == RGBColorspace))
+    {
+      color->colorspace=sRGBColorspace;  /* as required by SVG standard */
+      color->depth=8;
+    }
+  if (i >= (ssize_t) strlen(name))
+    flags=ParseCSSColor(name,&geometry_info);
+  else
+    flags=ParseCSSColor(name+i+1,&geometry_info);
+  if (flags == 0)
+    return(QueryColorFromCSSName(name,i,color,exception));
+  if (color->colorspace == OklchColorspace)
+     SetOklchColorFromGeometry(color,geometry_info,flags);
+  else
+    if (IsLabCompatibleColorspace(color->colorspace) != MagickFalse)
+      SetLabColorFromGeometry(color,geometry_info,flags,scale);
+    else
+      SetScaledColorFromGeometry(color,geometry_info,flags,scale);
+  if ((flags & AlphaValue) != 0)
+    color->alpha_trait=BlendPixelTrait;
+  color->alpha=(double) OpaqueAlpha;
+  if ((flags & PsiValue) != 0)
+    SetPsiColorFromGeometry(color,geometry_info,flags,scale);
+  if (((flags & ChiValue) != 0) &&
+      (color->alpha_trait != UndefinedPixelTrait))
+    color->alpha=(double) ClampToQuantum((double) QuantumRange*
+      geometry_info.chi);
+  if ((LocaleCompare(colorspace,"gray") == 0) ||
+      (LocaleCompare(colorspace,"lineargray") == 0))
+    SetGrayColorFromGeometry(color,geometry_info,flags);
+  if (IsHueColorspaceName(colorspace) != MagickFalse)
+    SetHueColorFromGeometry(color,geometry_info);
+  return(MagickTrue);
+}
+
+MagickExport MagickBooleanType QueryColorCompliance(const char *name,
+  const ComplianceType compliance,PixelInfo *color,ExceptionInfo *exception)
+{
+  const char
+    *q;
+
+  const ColorInfo
+    *p;
+
+  ssize_t
+    i;
 
   /*
     Initialize color return value.
@@ -2657,92 +2749,7 @@ MagickExport MagickBooleanType QueryColorCompliance(const char *name,
     }
   q=strchr(name,'(');
   if (q != (char *) NULL)
-    {
-      char
-        colorspace[2*MagickPathExtent];
-
-      MagickBooleanType
-        icc_color;
-
-      /*
-        Parse color of the form rgb(100,255,0).
-      */
-      i=(ssize_t) (q-name);
-      (void) CopyMagickString(colorspace,name,MagickPathExtent);
-      colorspace[i--]='\0';
-      scale=(double) ScaleCharToQuantum(1);
-      icc_color=MagickFalse;
-      if (LocaleNCompare(colorspace,"device-",7) == 0)
-        {
-          (void) CopyMagickString(colorspace,colorspace+7,MagickPathExtent);
-          if (strchr(name,'%') == (char *) NULL)
-            scale=(double) QuantumRange;
-          icc_color=MagickTrue;
-        }
-      if ((LocaleCompare(colorspace,"color") == 0) ||
-          (LocaleCompare(colorspace,"icc-color") == 0))
-        {
-          ssize_t
-            j;
-
-          (void) CopyMagickString(colorspace,name+i+2,MagickPathExtent);
-          for (j=0; colorspace[j] != '\0'; j++)
-            if ((colorspace[j] == ' ') || (colorspace[j] == ','))
-              break;
-          colorspace[j--]='\0';
-          i+=j+3;
-          scale=(double) QuantumRange;
-          icc_color=MagickTrue;
-        }
-      LocaleLower(colorspace);
-      color->alpha_trait=UndefinedPixelTrait;
-      if ((i > 0) && (colorspace[i] == 'a'))
-        {
-          colorspace[i]='\0';
-          color->alpha_trait=BlendPixelTrait;
-        }
-      type=ParseCommandOption(MagickColorspaceOptions,MagickFalse,colorspace);
-      if (type < 0)
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            OptionWarning,"UnrecognizedColor","`%s'",name);
-          return(MagickFalse);
-        }
-      color->colorspace=(ColorspaceType) type;
-      if ((icc_color == MagickFalse) && (color->colorspace == RGBColorspace))
-        {
-          color->colorspace=sRGBColorspace;  /* as required by SVG standard */
-          color->depth=8;
-        }
-      if (i >= (ssize_t) strlen(name))
-        flags=ParseCSSColor(name,&geometry_info);
-      else
-        flags=ParseCSSColor(name+i+1,&geometry_info);
-      if (flags == 0)
-        return(QueryColorFromCSSName(name,i,color,exception));
-      if (color->colorspace == OklchColorspace)
-         SetOklchColorFromGeometry(color,geometry_info,flags);
-      else
-        if (IsLabCompatibleColorspace(color->colorspace) != MagickFalse)
-          SetLabColorFromGeometry(color,geometry_info,flags,scale);
-        else
-          SetScaledColorFromGeometry(color,geometry_info,flags,scale);
-      if ((flags & AlphaValue) != 0)
-        color->alpha_trait=BlendPixelTrait;
-      color->alpha=(double) OpaqueAlpha;
-      if ((flags & PsiValue) != 0)
-        SetPsiColorFromGeometry(color,geometry_info,flags,scale);
-      if (((flags & ChiValue) != 0) &&
-          (color->alpha_trait != UndefinedPixelTrait))
-        color->alpha=(double) ClampToQuantum((double) QuantumRange*
-          geometry_info.chi);
-      if ((LocaleCompare(colorspace,"gray") == 0) ||
-          (LocaleCompare(colorspace,"lineargray") == 0))
-        SetGrayColorFromGeometry(color,geometry_info,flags);
-      if (IsHueColorspaceName(colorspace) != MagickFalse)
-        SetHueColorFromGeometry(color,geometry_info);
-      return(MagickTrue);
-    }
+    return(QueryColorFunction(name,q,color,exception));
   /*
     Parse named color.
   */
