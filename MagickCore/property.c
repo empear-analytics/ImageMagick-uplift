@@ -2110,8 +2110,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
               Same special handling as above except we compare to the
               first point in the path and close the path.
             */
-            if ((last[1].x == last[2].x) && (last[1].y == last[2].y) &&
-                (first[0].x == first[1].x) && (first[0].y == first[1].y))
+            if (IsPointCorner(last,first) != MagickFalse)
               (void) FormatLocaleString(message,MagickPathExtent,
                 "  %g %g l z\n",first[1].x,first[1].y);
             else
