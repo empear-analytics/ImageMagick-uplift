@@ -5159,6 +5159,15 @@ MagickExport BlobInfo *ReferenceBlob(BlobInfo *blob)
 %        SEEK_END  Set position to EOF plus offset.
 %
 */
+static inline MagickBooleanType IsBlobOffsetOverflow(
+  const MagickOffsetType offset,const BlobInfo *blob_info)
+{
+  return((((offset > 0) && (blob_info->offset > (MAGICK_SSIZE_MAX-offset))) ||
+    ((offset < 0) &&
+    (blob_info->offset < (MAGICK_SSIZE_MIN-offset)))) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickOffsetType SeekBlob(Image *image,
   const MagickOffsetType offset,const int whence)
 {
@@ -5215,8 +5224,7 @@ MagickExport MagickOffsetType SeekBlob(Image *image,
         }
         case SEEK_CUR:
         {
-          if (((offset > 0) && (blob_info->offset > (MAGICK_SSIZE_MAX-offset))) ||
-              ((offset < 0) && (blob_info->offset < (MAGICK_SSIZE_MIN-offset))))
+          if (IsBlobOffsetOverflow(offset,blob_info) != MagickFalse)
             {
               errno=EOVERFLOW;
               return(-1);
