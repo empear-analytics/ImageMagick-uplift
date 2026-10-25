@@ -720,6 +720,13 @@ MagickPrivate void LeastSquaresAddTerms(double **matrix,double **vectors,
 %  details see http://en.wikipedia.org/wiki/Gauss-Jordan_elimination
 %
 */
+static inline MagickBooleanType IsPivotMemoryMissing(const ssize_t *columns,
+  const ssize_t *rows,const ssize_t *pivots)
+{
+  return(((columns == (ssize_t *) NULL) || (rows == (ssize_t *) NULL) ||
+    (pivots == (ssize_t *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   double **vectors,const size_t rank,const size_t number_vectors)
 {
@@ -780,8 +787,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   columns=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*columns));
   rows=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*rows));
   pivots=(ssize_t *) AcquireQuantumMemory(rank,sizeof(*pivots));
-  if ((columns == (ssize_t *) NULL) || (rows == (ssize_t *) NULL) ||
-      (pivots == (ssize_t *) NULL))
+  if (IsPivotMemoryMissing(columns,rows,pivots) != MagickFalse)
     ThrowGaussJordanException();
   (void) memset(columns,0,rank*sizeof(*columns));
   (void) memset(rows,0,rank*sizeof(*rows));
