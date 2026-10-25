@@ -769,6 +769,14 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
 %
 */
 
+static inline MagickBooleanType IsUnchangedFrameBounds(
+  const RectangleInfo *bounds,const ssize_t i)
+{
+  return(((bounds[i].x == -1) && (bounds[i].y == -1) &&
+    (bounds[i].width == 1) && (bounds[i].height == 1)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport Image *CompareImagesLayers(const Image *image,
   const LayerMethod method,ExceptionInfo *exception)
 {
@@ -861,8 +869,7 @@ MagickExport Image *CompareImagesLayers(const Image *image,
   next=GetNextImageInList(next);
   for ( ; next != (const Image *) NULL; next=GetNextImageInList(next))
   {
-    if ((bounds[i].x == -1) && (bounds[i].y == -1) &&
-        (bounds[i].width == 1) && (bounds[i].height == 1))
+    if (IsUnchangedFrameBounds(bounds,i) != MagickFalse)
       {
         /*
           An empty frame is returned from CompareImageBounds(), which means the
