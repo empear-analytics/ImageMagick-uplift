@@ -2302,11 +2302,18 @@ static void WriteProfileShort(const EndianType endian,
   (void) memcpy(p,buffer,2);
 }
 
+static inline MagickBooleanType IsUnwritableDimension(const ssize_t format,
+  const int components)
+{
+  return(((components != 1) || ((format != 3) && (format != 4))) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline void WriteProfileDimension(const EndianType endian,
   const size_t dimension,const ssize_t format,const int components,
   unsigned char *entry,unsigned char *value)
 {
-  if ((components != 1) || ((format != 3) && (format != 4)))
+  if (IsUnwritableDimension(format,components) != MagickFalse)
     return;
   if ((format == 3) && (dimension <= MAGICK_USHORT_MAX))
     {
