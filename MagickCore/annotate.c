@@ -1536,6 +1536,23 @@ static inline MagickBooleanType IsTextWithoutGlyphs(const DrawInfo *draw_info,
     (first_glyph_id == 0)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsRenderedStroke(const DrawInfo *draw_info,
+  const MagickBooleanType status)
+{
+  return((((draw_info->stroke.alpha != (MagickRealType) TransparentAlpha) ||
+    (draw_info->stroke_pattern != (Image *) NULL)) &&
+    ((status != MagickFalse) &&
+    (draw_info->render != MagickFalse))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsVisibleStroke(const DrawInfo *draw_info,
+  const MagickBooleanType status)
+{
+  return((((draw_info->stroke.alpha != (MagickRealType) TransparentAlpha) ||
+    (draw_info->stroke_pattern != (Image *) NULL)) &&
+    (status != MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
   const char *encoding,const PointInfo *offset,TypeMetric *metrics,
   ExceptionInfo *exception)
@@ -1968,9 +1985,7 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
       metrics->bounds.x2=(double) bounds.xMax;
     if ((bounds.yMax > metrics->bounds.y2) && (bounds.yMax != 0))
       metrics->bounds.y2=(double) bounds.yMax;
-    if (((draw_info->stroke.alpha != (MagickRealType) TransparentAlpha) ||
-         (draw_info->stroke_pattern != (Image *) NULL)) &&
-        ((status != MagickFalse) && (draw_info->render != MagickFalse)))
+    if (IsRenderedStroke(draw_info,status) != MagickFalse)
       {
         /*
           Trace the glyph.
@@ -2115,9 +2130,7 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
             status=MagickFalse;
         }
         image_view=DestroyCacheView(image_view);
-        if (((draw_info->stroke.alpha != (MagickRealType) TransparentAlpha) ||
-             (draw_info->stroke_pattern != (Image *) NULL)) &&
-            (status != MagickFalse))
+        if (IsVisibleStroke(draw_info,status) != MagickFalse)
           {
             /*
               Draw text stroke.
