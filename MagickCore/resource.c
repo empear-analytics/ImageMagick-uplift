@@ -176,6 +176,23 @@ static void LockResourceSemaphore(const ResourceType type)
   }
 }
 
+static void UnlockResourceSemaphore(const ResourceType type)
+{
+  switch (type)
+  {
+    case DiskResource:
+    case FileResource:
+    case MapResource:
+    case MemoryResource:
+    case TimeResource:
+    {
+      UnlockSemaphoreInfo(resource_semaphore[type]);
+      break;
+    }
+    default: ;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -360,19 +377,7 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
       break;
     }
   }
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      UnlockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  UnlockResourceSemaphore(type);
   if ((GetLogEventMask() & ResourceEvent) != 0)
     {
       char
