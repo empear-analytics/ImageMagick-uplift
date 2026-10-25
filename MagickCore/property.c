@@ -3718,6 +3718,18 @@ MagickExport const char *GetNextImageProperty(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsNonEmptyImage(const Image *image)
+{
+  return(((image != (Image *) NULL) && (image->columns != 0) &&
+    (image->rows != 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsEscapeEnd(const char *p)
+{
+  return(((*p == '\0') || (*p == '\'') || (*p == '"')) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -3827,7 +3839,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
     property_info=image_info;
   else
     property_info=CloneImageInfo(image_info);
-  if ((image != (Image *) NULL) && (image->columns != 0) && (image->rows != 0))
+  if (IsNonEmptyImage(image) != MagickFalse)
     property_image=image;
   else
     {
@@ -3930,7 +3942,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
     /*
       Doubled Percent - or percent at end of string.
     */
-    if ((*p == '\0') || (*p == '\'') || (*p == '"'))
+    if (IsEscapeEnd(p) != MagickFalse)
       p--;
     if (*p == '%')
       {
