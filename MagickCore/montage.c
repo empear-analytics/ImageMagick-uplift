@@ -555,6 +555,22 @@ static size_t GetMontageDirectoryExtent(Image **image_list,
   return(extent);
 }
 
+static Image *ReadMontageTexture(ImageInfo *clone_info,
+  const MontageInfo *montage_info,ExceptionInfo *exception)
+{
+  Image
+    *texture;
+
+  texture=NewImageList();
+  if (montage_info->texture != (char *) NULL)
+    {
+      (void) CopyMagickString(clone_info->filename,montage_info->texture,
+        MagickPathExtent);
+      texture=ReadImage(clone_info,exception);
+    }
+  return(texture);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -736,13 +752,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   clone_info->border_color=montage_info->border_color;
   draw_info=AcquireMontageDrawInfo(clone_info,montage_info);
   (void) GetTypeMetrics(image_list[0],draw_info,&metrics,exception);
-  texture=NewImageList();
-  if (montage_info->texture != (char *) NULL)
-    {
-      (void) CopyMagickString(clone_info->filename,montage_info->texture,
-        MagickPathExtent);
-      texture=ReadImage(clone_info,exception);
-    }
+  texture=ReadMontageTexture(clone_info,montage_info,exception);
   /*
     Determine the number of lines in an next label.
   */
