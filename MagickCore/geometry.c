@@ -1596,6 +1596,38 @@ static double GetAspectScaleFactor(const MagickStatusType flags,
   return(scale_factor);
 }
 
+static void LimitGeometryArea(const char *geometry,size_t *width,
+  size_t *height,const size_t stasis_width,const size_t stasis_height)
+{
+  GeometryInfo
+    geometry_info;
+
+  double
+    area,
+    distance;
+
+  PointInfo
+    scale;
+
+  /*
+    Geometry is a maximum area in pixels.
+  */
+  (void) ParseGeometry(geometry,&geometry_info);
+  area=geometry_info.rho+sqrt(MagickEpsilon);
+  distance=sqrt((double) stasis_width*stasis_height);
+  scale.x=(double) stasis_width*MagickSafeReciprocal(distance*
+    MagickSafeReciprocal(sqrt(area)));
+  scale.y=(double) stasis_height*MagickSafeReciprocal(distance*
+    MagickSafeReciprocal(sqrt(area)));
+  if ((scale.x < (double) *width) || (scale.y < (double) *height))
+    {
+      *width=CastDoubleToSizeT((double) stasis_width*MagickSafeReciprocal(
+        distance*MagickSafeReciprocal(sqrt(area)))+0.5);
+      *height=CastDoubleToSizeT((double) stasis_height*MagickSafeReciprocal(
+        distance*MagickSafeReciprocal(sqrt(area)))+0.5);
+    }
+}
+
 MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -1706,32 +1738,7 @@ MagickExport MagickStatusType ParseMetaGeometry(const char *geometry,ssize_t *x,
   if ((flags & LessValue) != 0)
     EnlargeGeometryToSize(width,height,stasis_width,stasis_height);
   if ((flags & AreaValue) != 0)
-    {
-      double
-        area,
-        distance;
-
-      PointInfo
-        scale;
-
-      /*
-        Geometry is a maximum area in pixels.
-      */
-      (void) ParseGeometry(geometry,&geometry_info);
-      area=geometry_info.rho+sqrt(MagickEpsilon);
-      distance=sqrt((double) stasis_width*stasis_height);
-      scale.x=(double) stasis_width*MagickSafeReciprocal(distance*
-        MagickSafeReciprocal(sqrt(area)));
-      scale.y=(double) stasis_height*MagickSafeReciprocal(distance*
-        MagickSafeReciprocal(sqrt(area)));
-      if ((scale.x < (double) *width) || (scale.y < (double) *height))
-        {
-          *width=CastDoubleToSizeT((double) stasis_width*MagickSafeReciprocal(
-            distance*MagickSafeReciprocal(sqrt(area)))+0.5);
-          *height=CastDoubleToSizeT((double) stasis_height*MagickSafeReciprocal(
-            distance*MagickSafeReciprocal(sqrt(area)))+0.5);
-        }
-    }
+    LimitGeometryArea(geometry,width,height,stasis_width,stasis_height);
   return(flags);
 }
 
