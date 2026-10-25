@@ -245,7 +245,7 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
 
-### Report (2026-10-26, Mac, night)
+### Report (2026-10-25, Mac, night)
 
 **Result: Code Health 1.24, unchanged. Tried, measured and reverted.** The file has
 no `#if`, and its 18 Export*Quantum functions are switches over the sample depth.

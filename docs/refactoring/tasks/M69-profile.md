@@ -197,7 +197,7 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
 
-### Report (2026-10-26, Mac, night)
+### Report (2026-10-25, Mac, night)
 
 **Result: Code Health 2.12 → 2.54** (`cs-mcp` 1.5.12). Branch `campaign/M69-profile`,
 stacked on `campaign/M68-compress`. Ten refactor commits; nine are oracle-verified

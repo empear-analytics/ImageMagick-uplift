@@ -130,7 +130,7 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
 
-### Report (2026-10-26, Mac, night)
+### Report (2026-10-25, Mac, night)
 
 **Result: Code Health 6.28 → 6.90** (`cs-mcp` 1.5.12). Branch `campaign/M71-cipher`,
 stacked on `campaign/M70-quantum-export`. `MAGICKCORE_CIPHER_SUPPORT` is defined in
