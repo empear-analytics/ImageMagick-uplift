@@ -103,7 +103,7 @@ needs before refactoring:
 | 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | open |
 | 1.33 | `MagickCore/composite.c` | 3815 | 86% | 74% | 1.58, in progress (Complex Conditional gone), [M20](tasks/M20-composite.md) |
 | 1.38 | `MagickCore/effect.c` | 4405 | 89% | 75% | open |
-| 1.74 | `MagickCore/distort.c` | 3466 | 68% | 76% | open |
+| 1.74 | `MagickCore/distort.c` | 3466 | 68% | 76% | 2.29, in progress (Complex Conditional gone; the rest needs Recipe B, O or K), [M22](tasks/M22-distort.md) |
 | 1.82 | `MagickCore/quantize.c` | 4150 | 85% | 79% | open |
 | 1.99 | `MagickCore/transform.c` | 2599 | 78% | 77% | open |
 | 2.05 | `MagickCore/shear.c` | 1830 | 82% | 80% | 2.13, in progress (Complex Conditional gone; the shears need Recipe B), [M09](tasks/M09-shear.md) |
