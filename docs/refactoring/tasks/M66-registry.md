@@ -83,3 +83,16 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 8.55 → 8.79** (`cs-mcp` 1.5.12). Branch `campaign/M66-registry`,
+stacked on `campaign/M65-magic`. Two E commits:
+- `InstantiateRegistry` (SetImageRegistry, not ready, guard): the lazy creation of
+  the splay tree, test included.
+- `GetRegistryValueAsString` (GetImageRegistry, careful, oracle): the string form of an
+  entry, value-returning.
+
+**What is left, at 8.79.** SetImageRegistry (cc 13) validates image and image-info
+values inside its switch with `ThrowMagickException` and returns, so those cases stay.
+GetImageRegistry is at cc 10.

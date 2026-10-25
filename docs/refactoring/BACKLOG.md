@@ -160,7 +160,7 @@ needs before refactoring:
 | 7.68 | `MagickCore/random.c` | 996 | 62% | 24% | 8.06 (entropy gathering is #if-built), [M63](tasks/M63-random.md) |
 | 7.78 | `MagickCore/cache-view.c` | 1114 | 34% | 30% | plateau 7.78 (D needs cases for GetOneCacheView*), [M64](tasks/M64-cache-view.md) |
 | 7.88 | `MagickCore/magic.c` | 823 | 72% | 66% | 8.45, [M65](tasks/M65-magic.md) |
-| 8.55 | `MagickCore/registry.c` | 537 | 68% | 48% | open |
+| 8.55 | `MagickCore/registry.c` | 537 | 68% | 48% | 8.79, [M66](tasks/M66-registry.md) |
 | 8.81 | `MagickCore/timer.c` | 664 | 89% | 52% | open |
 | 9.09 | `MagickCore/artifact.c` | 491 | 80% | 60% | open |
 | 9.28 | `MagickCore/version.c` | 697 | 10% | 50% | open |
