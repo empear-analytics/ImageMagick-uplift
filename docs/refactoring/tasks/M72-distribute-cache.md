@@ -128,3 +128,21 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, night)
+
+**Result: Code Health 5.01 → 5.16** (`cs-mcp` 1.5.12). Branch
+`campaign/M72-distribute-cache`, stacked on `campaign/M71-cipher`. In this build
+`MAGICKCORE_DPC_SUPPORT`, `MAGICKCORE_HAVE_SOCKET` and `MAGICKCORE_THREAD_SUPPORT` are
+defined, so `MAGICKCORE_HAVE_DISTRIBUTE_CACHE` is on and the server and client code
+compiles. One guard-level P: `IsUsablePolicyLimit` (GetDPCPolicyLimit). Complex
+Conditional leaves the file. No oracle case reaches this code.
+
+**What is left, at 5.16.** Every remaining finding sits in code that interleaves
+`MAGICKCORE_HAVE_WINSOCK2`, `_MSC_VER` or thread `#if`s:
+- dpc_receive and dpc_receive_deadline;
+- DistributePixelCacheServer and DistributePixelCacheConnectionHandler;
+- ConnectPixelCacheServer.
+
+The Read/Write*Pixels/Metacontent pairs are reported as duplicates, but they differ
+in several statements.
