@@ -1040,6 +1040,20 @@ static void FlattenRowOverBackground(const Image *image,
   }
 }
 
+static void SetShapeAlphaPixels(const Image *image,PixelInfo pixel,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    pixel.alpha=GetPixelIntensity(image,q);
+    SetPixelViaPixelInfo(image,&pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -1360,9 +1374,6 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
@@ -1373,12 +1384,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
             continue;
           }
         pixel=background;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          pixel.alpha=GetPixelIntensity(image,q);
-          SetPixelViaPixelInfo(image,&pixel,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        SetShapeAlphaPixels(image,pixel,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
       }
