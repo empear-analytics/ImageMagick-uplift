@@ -199,6 +199,13 @@ static const PageInfo
 %      specification.
 %
 */
+static inline MagickBooleanType IsGeometryWidthTerminator(const int c,
+  const char *q)
+{
+  return(((c == 215) || (*q == 'x') || (*q == 'X') || (*q == ':') ||
+    (*q == '\0')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -340,8 +347,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   if ((*p != '+') && (*p != '-'))
     {
       c=(int) ((unsigned char) *q);
-      if ((c == 215) || (*q == 'x') || (*q == 'X') || (*q == ':') ||
-          (*q == '\0'))
+      if (IsGeometryWidthTerminator(c,q) != MagickFalse)
         {
           /*
             Parse width.
