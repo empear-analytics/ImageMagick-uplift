@@ -701,19 +701,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
       }
     for (x=0; x < (ssize_t) crop_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait crop_traits=GetPixelChannelTraits(crop_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (crop_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(crop_image,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(image,crop_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(crop_image);
     }
