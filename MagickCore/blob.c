@@ -617,6 +617,16 @@ static inline void ThrowBlobException(BlobInfo *blob_info)
   blob_info->status=(-1);
 }
 
+static inline MagickBooleanType IsWrittenBlobFailure(const int status,
+  const BlobInfo *blob_info)
+{
+  return(((status != 0) &&
+    ((blob_info->mode == WriteBlobMode) ||
+    (blob_info->mode == WriteBinaryBlobMode) ||
+    (blob_info->mode == AppendBlobMode) ||
+    (blob_info->mode == AppendBinaryBlobMode))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType CloseBlob(Image *image)
 {
   BlobInfo
@@ -637,11 +647,7 @@ MagickExport MagickBooleanType CloseBlob(Image *image)
     return(MagickTrue);
   status=SyncBlob(image);
   /* Some platforms report an error when a read-only stream is flushed. */
-  if ((status != 0) &&
-      ((blob_info->mode == WriteBlobMode) ||
-       (blob_info->mode == WriteBinaryBlobMode) ||
-       (blob_info->mode == AppendBlobMode) ||
-       (blob_info->mode == AppendBinaryBlobMode)))
+  if (IsWrittenBlobFailure(status,blob_info) != MagickFalse)
     ThrowBlobException(blob_info);
   status=blob_info->status;
   switch (blob_info->type)
