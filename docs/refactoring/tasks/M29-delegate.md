@@ -184,3 +184,36 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-25, Mac, morning)
+
+**Result: Code Health 2.15 → 2.38** (`cs-mcp` 1.5.12). Branch `campaign/M29-delegate`,
+stacked on `campaign/M28-stream`. 6 refactor commits, all oracle-verified. Every
+function in the file is ready in the merged mutation reports.
+
+**Recipe P; Complex Conditional leaves the file:**
+- `IsIncludeElementOpen` (the same predicate as color.c's).
+- `IsTwoStepDelegate`.
+- `IsWindowsDrivePath` and `IsDotRelativePath`.
+- `IsPropertyEnd`.
+- `IsListedDelegate`. This site was written `if(` with no space, so the predicate tool
+  could not match it and the replacement was made by hand.
+
+**Recipe E:** `GetIncludePath` (the same helper as color.c's).
+
+**Not done:**
+- `AcquireDelegateInfo` (probe: flat, 4 lines).
+- `LoadDelegateCache`'s attribute `switch`. Its `command` case holds an uncompiled
+  `MAGICKCORE_WINDOWS_SUPPORT` block.
+- `GetDelegateInfo`'s matching chain. Its paired nested `if`s would have to merge into
+  one condition, which is not a catalogue transformation.
+
+**Whole catalogue:** see the batch PR.
+
+**What is left, at 2.38.**
+- `LoadDelegateCache` (12 bumps, Brain Method): the DOCTYPE ladder (it cost 0.04 in
+  color.c), the include loop and the attribute `switch`.
+- `InvokeDelegate` (11 bumps) and `ExternalDelegateCommand` (7). Each has a long chain
+  of steps with shared state.
+- `GetMagickPropertyLetter` (cc 61): one letter `switch`.
+- Four 5-argument functions (Recipe B).

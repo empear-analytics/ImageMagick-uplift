@@ -137,7 +137,7 @@ needs before refactoring:
 | 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | open |
 | 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | open |
 | 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | open |
-| 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | open |
+| 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.38, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) |
 | 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | open |
 | 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | open |
 | 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | open |
