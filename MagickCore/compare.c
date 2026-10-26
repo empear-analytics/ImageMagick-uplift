@@ -2598,6 +2598,23 @@ static MagickBooleanType GetSimilarityForMetric(Image *image,
   return(status);
 }
 
+static void ConvertSimilarityToDistortionValue(const MetricType metric,
+  double *distortion)
+{
+  switch (metric)
+  {
+    case DotProductCorrelationErrorMetric:
+    case NormalizedCrossCorrelationErrorMetric:
+    case PhaseCorrelationErrorMetric:
+    case StructuralSimilarityErrorMetric:
+    {
+      *distortion=(1.0-(*distortion))/2.0;
+      break;
+    }
+    default: break;
+  }
+}
+
 MagickExport MagickBooleanType GetImageDistortion(Image *image,
   const Image *reconstruct_image,const MetricType metric,double *distortion,
   ExceptionInfo *exception)
@@ -2633,18 +2650,7 @@ MagickExport MagickBooleanType GetImageDistortion(Image *image,
   status=GetSimilarityForMetric(image,reconstruct_image,metric,
     channel_similarity,exception);
   *distortion=channel_similarity[CompositePixelChannel];
-  switch (metric)
-  {
-    case DotProductCorrelationErrorMetric:
-    case NormalizedCrossCorrelationErrorMetric:
-    case PhaseCorrelationErrorMetric:
-    case StructuralSimilarityErrorMetric:
-    {
-      *distortion=(1.0-(*distortion))/2.0;
-      break;
-    }
-    default: break;
-  }
+  ConvertSimilarityToDistortionValue(metric,distortion);
   channel_similarity=(double *) RelinquishMagickMemory(channel_similarity);
   if (fabs(*distortion) < MagickEpsilon)
     *distortion=0.0;
