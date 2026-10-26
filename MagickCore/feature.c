@@ -626,6 +626,19 @@ typedef struct _FeatureStatistics
     direction[4];  /* horizontal, vertical, left and right diagonals */
 } FeatureStatistics;
 
+static inline MagickBooleanType IsFeatureMemoryMissing(
+  FeatureStatistics **cooccurrence,FeatureStatistics *density_x,
+  FeatureStatistics *density_xy,FeatureStatistics *density_y,
+  FeatureStatistics **Q,FeatureStatistics *sum)
+{
+  return(((cooccurrence == (FeatureStatistics **) NULL) ||
+    (density_x == (FeatureStatistics *) NULL) ||
+    (density_xy == (FeatureStatistics *) NULL) ||
+    (density_y == (FeatureStatistics *) NULL) ||
+    (Q == (FeatureStatistics **) NULL) ||
+    (sum == (FeatureStatistics *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -793,12 +806,8 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     2*sizeof(*density_y));
   Q=(FeatureStatistics **) AcquireQuantumMemory(number_grays,sizeof(*Q));
   sum=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(*sum));
-  if ((cooccurrence == (FeatureStatistics **) NULL) ||
-      (density_x == (FeatureStatistics *) NULL) ||
-      (density_xy == (FeatureStatistics *) NULL) ||
-      (density_y == (FeatureStatistics *) NULL) ||
-      (Q == (FeatureStatistics **) NULL) ||
-      (sum == (FeatureStatistics *) NULL))
+  if (IsFeatureMemoryMissing(cooccurrence,density_x,density_xy,density_y,Q,
+        sum) != MagickFalse)
     {
       if (Q != (FeatureStatistics **) NULL)
         Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
