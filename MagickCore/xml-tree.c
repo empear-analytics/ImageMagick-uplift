@@ -508,11 +508,30 @@ static void DestroyXMLRootAttributes(XMLTreeRoot *root)
   }
 }
 
-static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
+static void DestroyXMLRootInstructions(XMLTreeRoot *root)
 {
   ssize_t
     i,
     j;
+
+  for (i=0; root->processing_instructions[i] != (char **) NULL; i++)
+  {
+    for (j=0; root->processing_instructions[i][j] != (char *) NULL; j++)
+      root->processing_instructions[i][j]=DestroyString(
+        root->processing_instructions[i][j]);
+    root->processing_instructions[i][j+1]=DestroyString(
+      root->processing_instructions[i][j+1]);
+    root->processing_instructions[i]=(char **) RelinquishMagickMemory(
+      root->processing_instructions[i]);
+  }
+  root->processing_instructions=(char ***) RelinquishMagickMemory(
+    root->processing_instructions);
+}
+
+static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
+{
+  ssize_t
+    i;
 
   XMLTreeRoot
     *root;
@@ -535,20 +554,7 @@ static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
   if (root->attributes[0] != (char **) NULL)
     root->attributes=(char ***) RelinquishMagickMemory(root->attributes);
   if (root->processing_instructions[0] != (char **) NULL)
-    {
-      for (i=0; root->processing_instructions[i] != (char **) NULL; i++)
-      {
-        for (j=0; root->processing_instructions[i][j] != (char *) NULL; j++)
-          root->processing_instructions[i][j]=DestroyString(
-            root->processing_instructions[i][j]);
-        root->processing_instructions[i][j+1]=DestroyString(
-          root->processing_instructions[i][j+1]);
-        root->processing_instructions[i]=(char **) RelinquishMagickMemory(
-          root->processing_instructions[i]);
-      }
-      root->processing_instructions=(char ***) RelinquishMagickMemory(
-        root->processing_instructions);
-    }
+    DestroyXMLRootInstructions(root);
 }
 
 static XMLTreeInfo *DestroyXMLTree_(XMLTreeInfo *xml_info,
