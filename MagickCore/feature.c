@@ -1818,6 +1818,18 @@ static inline double MagickRound(double x)
   return(ceil(x));
 }
 
+static void CopyBlobToPrimitive(Image *image,DrawInfo *draw_info)
+{
+  draw_info->primitive=(char *) AcquireQuantumMemory(1,(size_t)
+    GetBlobSize(image)+1);
+  if (draw_info->primitive != (char *) NULL)
+    {
+      (void) memcpy(draw_info->primitive,GetBlobStreamData(image),
+        (size_t) GetBlobSize(image));
+      draw_info->primitive[GetBlobSize(image)]='\0';
+    }
+}
+
 static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1866,16 +1878,7 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   if (GetBlobStreamData(image) == (unsigned char *) NULL)
     draw_info->primitive=FileToString(image->filename,~0UL,exception);
   else
-    {
-      draw_info->primitive=(char *) AcquireQuantumMemory(1,(size_t)
-        GetBlobSize(image)+1);
-      if (draw_info->primitive != (char *) NULL)
-        {
-          (void) memcpy(draw_info->primitive,GetBlobStreamData(image),
-            (size_t) GetBlobSize(image));
-          draw_info->primitive[GetBlobSize(image)]='\0';
-        }
-     }
+    CopyBlobToPrimitive(image,draw_info);
   (void) DrawImage(image,draw_info,exception);
   draw_info=DestroyDrawInfo(draw_info);
   if (CloseBlob(image) == MagickFalse)
