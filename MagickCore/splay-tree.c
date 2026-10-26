@@ -1199,8 +1199,7 @@ MagickExport void *RemoveNodeByValueFromSplayTree(SplayTreeInfo *splay_tree,
   const void *value)
 {
   NodeInfo
-    *next,
-    *node;
+    *next;
 
   void
     *key;
@@ -1217,14 +1216,7 @@ MagickExport void *RemoveNodeByValueFromSplayTree(SplayTreeInfo *splay_tree,
   while (next != (NodeInfo *) NULL)
   {
     SplaySplayTree(splay_tree,next);
-    next=(NodeInfo *) NULL;
-    node=splay_tree->root->right;
-    if (node != (NodeInfo *) NULL)
-      {
-        while (node->left != (NodeInfo *) NULL)
-          node=node->left;
-        next=(NodeInfo *) node->key;
-      }
+    next=GetSuccessorNode(splay_tree);
     if (splay_tree->root->value == value)
       {
         int
