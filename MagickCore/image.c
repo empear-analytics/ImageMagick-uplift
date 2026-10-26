@@ -2258,6 +2258,23 @@ MagickExport Image *ReferenceImage(Image *image)
 %    o page: the relative page specification.
 %
 */
+static void SetAbsolutePageOffset(Image *image,const MagickStatusType flags,
+  const RectangleInfo geometry)
+{
+  if ((flags & XValue) != 0)
+    {
+      image->page.x=geometry.x;
+      if ((image->page.width == 0) && (geometry.x > 0))
+        image->page.width=(size_t) ((ssize_t) image->columns+geometry.x);
+    }
+  if ((flags & YValue) != 0)
+    {
+      image->page.y=geometry.y;
+      if ((image->page.height == 0) && (geometry.y > 0))
+        image->page.height=(size_t) ((ssize_t) image->rows+geometry.y);
+    }
+}
+
 MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
 {
   MagickStatusType
@@ -2286,20 +2303,7 @@ MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
         image->page.y+=geometry.y;
     }
   else
-    {
-      if ((flags & XValue) != 0)
-        {
-          image->page.x=geometry.x;
-          if ((image->page.width == 0) && (geometry.x > 0))
-            image->page.width=(size_t) ((ssize_t) image->columns+geometry.x);
-        }
-      if ((flags & YValue) != 0)
-        {
-          image->page.y=geometry.y;
-          if ((image->page.height == 0) && (geometry.y > 0))
-            image->page.height=(size_t) ((ssize_t) image->rows+geometry.y);
-        }
-    }
+    SetAbsolutePageOffset(image,flags,geometry);
   return(MagickTrue);
 }
 
