@@ -178,3 +178,9 @@ stacked on `campaign/M79-identify-e`. Seven E commits:
   be D.
 - InitializeIntervalTree keeps depth 5: its allocation-failure branch returns from
   inside the loops.
+
+### Addendum (2026-10-26, M87): ConsolidateCrossings deduplicated
+
+ConsolidateCrossings was mutated again on the Mac (`mutation-segm-20261026.json`,
+ready). Its three candidate checks then became one D helper, `IsEvenCrossing`
+(branch `campaign/M87-segment-d`). segment.c 3.61 → 3.63.
