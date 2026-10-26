@@ -659,6 +659,33 @@ static unsigned int GetFeatureGrayLevels(const Image *image,
   return(number_grays);
 }
 
+static PixelPacket CompactFeatureGrays(const Image *image,PixelPacket *grays)
+{
+  PixelPacket
+    gray;
+
+  ssize_t
+    i;
+
+  (void) memset(&gray,0,sizeof(gray));
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    if (grays[i].red != ~0U)
+      grays[gray.red++].red=grays[i].red;
+    if (grays[i].green != ~0U)
+      grays[gray.green++].green=grays[i].green;
+    if (grays[i].blue != ~0U)
+      grays[gray.blue++].blue=grays[i].blue;
+    if (image->colorspace == CMYKColorspace)
+      if (grays[i].black != ~0U)
+        grays[gray.black++].black=grays[i].black;
+    if (image->alpha_trait != UndefinedPixelTrait)
+      if (grays[i].alpha != ~0U)
+        grays[gray.alpha++].alpha=grays[i].alpha;
+  }
+  return(gray);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -786,22 +813,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         channel_features);
       return(channel_features);
     }
-  (void) memset(&gray,0,sizeof(gray));
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    if (grays[i].red != ~0U)
-      grays[gray.red++].red=grays[i].red;
-    if (grays[i].green != ~0U)
-      grays[gray.green++].green=grays[i].green;
-    if (grays[i].blue != ~0U)
-      grays[gray.blue++].blue=grays[i].blue;
-    if (image->colorspace == CMYKColorspace)
-      if (grays[i].black != ~0U)
-        grays[gray.black++].black=grays[i].black;
-    if (image->alpha_trait != UndefinedPixelTrait)
-      if (grays[i].alpha != ~0U)
-        grays[gray.alpha++].alpha=grays[i].alpha;
-  }
+  gray=CompactFeatureGrays(image,grays);
   /*
     Allocate spatial dependence matrix.
   */
