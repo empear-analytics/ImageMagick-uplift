@@ -128,6 +128,27 @@ MagickExport double ExpandAffine(const AffineMatrix *affine)
 #define SigmaRandom  (attenuate)
 #define TauGaussian  (attenuate*0.078125)
 
+static double GenerateGaussianNoise(RandomInfo *random_info,
+  const Quantum pixel,const double attenuate,double alpha)
+{
+  double
+    beta,
+    gamma,
+    noise,
+    sigma,
+    tau;
+
+  if (fabs(alpha) < MagickEpsilon)
+    alpha=1.0;
+  beta=GetPseudoRandomValue(random_info);
+  gamma=sqrt(-2.0*log(alpha));
+  sigma=gamma*cos((double) (2.0*MagickPI*beta));
+  tau=gamma*sin((double) (2.0*MagickPI*beta));
+  noise=(double) pixel+sqrt((double) pixel)*SigmaGaussian*sigma+
+    (double) QuantumRange*TauGaussian*tau;
+  return(noise);
+}
+
 MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
   const Quantum pixel,const NoiseType noise_type,const double attenuate)
 {
@@ -148,18 +169,7 @@ MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
     }
     case GaussianNoise:
     {
-      double
-        gamma,
-        tau;
-
-      if (fabs(alpha) < MagickEpsilon)
-        alpha=1.0;
-      beta=GetPseudoRandomValue(random_info);
-      gamma=sqrt(-2.0*log(alpha));
-      sigma=gamma*cos((double) (2.0*MagickPI*beta));
-      tau=gamma*sin((double) (2.0*MagickPI*beta));
-      noise=(double) pixel+sqrt((double) pixel)*SigmaGaussian*sigma+
-        (double) QuantumRange*TauGaussian*tau;
+      noise=GenerateGaussianNoise(random_info,pixel,attenuate,alpha);
       break;
     }
     case ImpulseNoise:
