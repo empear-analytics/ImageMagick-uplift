@@ -784,8 +784,7 @@ MagickExport XMLTreeInfo *GetNextXMLTreeTag(XMLTreeInfo *xml_info)
 %    o tag: the attribute tag.
 %
 */
-MagickExport const char *GetXMLTreeAttribute(XMLTreeInfo *xml_info,
-  const char *tag)
+static const char *GetRootXMLAttribute(XMLTreeInfo *xml_info,const char *tag)
 {
   ssize_t
     i,
@@ -794,19 +793,6 @@ MagickExport const char *GetXMLTreeAttribute(XMLTreeInfo *xml_info,
   XMLTreeRoot
     *root;
 
-  assert(xml_info != (XMLTreeInfo *) NULL);
-  assert((xml_info->signature == MagickCoreSignature) ||
-         (((XMLTreeRoot *) xml_info)->signature == MagickCoreSignature));
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if (xml_info->attributes == (char **) NULL)
-    return((const char *) NULL);
-  i=0;
-  while ((xml_info->attributes[i] != (char *) NULL) &&
-         (strcmp(xml_info->attributes[i],tag) != 0))
-    i+=2;
-  if (xml_info->attributes[i] != (char *) NULL)
-    return(xml_info->attributes[i+1]);
   root=(XMLTreeRoot*) xml_info;
   while (root->root.parent != (XMLTreeInfo *) NULL)
     root=(XMLTreeRoot *) root->root.parent;
@@ -823,6 +809,28 @@ MagickExport const char *GetXMLTreeAttribute(XMLTreeInfo *xml_info,
   if (root->attributes[i][j] == (char *) NULL)
     return((const char *) NULL);
   return(root->attributes[i][j+1]);
+}
+
+MagickExport const char *GetXMLTreeAttribute(XMLTreeInfo *xml_info,
+  const char *tag)
+{
+  ssize_t
+    i;
+
+  assert(xml_info != (XMLTreeInfo *) NULL);
+  assert((xml_info->signature == MagickCoreSignature) ||
+         (((XMLTreeRoot *) xml_info)->signature == MagickCoreSignature));
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  if (xml_info->attributes == (char **) NULL)
+    return((const char *) NULL);
+  i=0;
+  while ((xml_info->attributes[i] != (char *) NULL) &&
+         (strcmp(xml_info->attributes[i],tag) != 0))
+    i+=2;
+  if (xml_info->attributes[i] != (char *) NULL)
+    return(xml_info->attributes[i+1]);
+  return(GetRootXMLAttribute(xml_info,tag));
 }
 
 /*
