@@ -686,6 +686,51 @@ static PixelPacket CompactFeatureGrays(const Image *image,PixelPacket *grays)
   return(gray);
 }
 
+static ssize_t GetFeatureAdjacencyOffset(const Image *image,
+  const size_t distance,const ssize_t i)
+{
+  ssize_t
+    offset;
+
+  switch (i)
+  {
+    case 0:
+    default:
+    {
+      /*
+        Horizontal adjacency.
+      */
+      offset=(ssize_t) distance;
+      break;
+    }
+    case 1:
+    {
+      /*
+        Vertical adjacency.
+      */
+      offset=(ssize_t) (image->columns+2*distance);
+      break;
+    }
+    case 2:
+    {
+      /*
+        Right diagonal adjacency.
+      */
+      offset=(ssize_t) ((image->columns+2*distance)-distance);
+      break;
+    }
+    case 3:
+    {
+      /*
+        Left diagonal adjacency.
+      */
+      offset=(ssize_t) ((image->columns+2*distance)+distance);
+      break;
+    }
+  }
+  return(offset);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -932,42 +977,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     {
       for (i=0; i < 4; i++)
       {
-        switch (i)
-        {
-          case 0:
-          default:
-          {
-            /*
-              Horizontal adjacency.
-            */
-            offset=(ssize_t) distance;
-            break;
-          }
-          case 1:
-          {
-            /*
-              Vertical adjacency.
-            */
-            offset=(ssize_t) (image->columns+2*distance);
-            break;
-          }
-          case 2:
-          {
-            /*
-              Right diagonal adjacency.
-            */
-            offset=(ssize_t) ((image->columns+2*distance)-distance);
-            break;
-          }
-          case 3:
-          {
-            /*
-              Left diagonal adjacency.
-            */
-            offset=(ssize_t) ((image->columns+2*distance)+distance);
-            break;
-          }
-        }
+        offset=GetFeatureAdjacencyOffset(image,distance,i);
         u=0;
         v=0;
         while (grays[u].red != ScaleQuantumToMap(GetPixelRed(image,p)))
