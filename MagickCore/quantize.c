@@ -2476,6 +2476,14 @@ static KmeansInfo **AcquireKmeansTLS(const size_t number_colors)
   return(kmeans_info);
 }
 
+static inline double WrapHueDistance(double pixel)
+{
+  if (fabs((double) pixel) > 0.5)
+    pixel-=0.5;
+  pixel*=2.0;
+  return(pixel);
+}
+
 static inline double KmeansMetric(const Image *magick_restrict image,
   const Quantum *magick_restrict p,const PixelInfo *magick_restrict q)
 {
@@ -2508,11 +2516,7 @@ static inline double KmeansMetric(const Image *magick_restrict image,
   metric*=3.0;
   pixel=QuantumScale*((double) GetPixelRed(image,p)-q->red);
   if (IsHueCompatibleColorspace(image->colorspace) != MagickFalse)
-    {
-      if (fabs((double) pixel) > 0.5)
-        pixel-=0.5;
-      pixel*=2.0;
-    }
+    pixel=WrapHueDistance(pixel);
   metric+=gamma*pixel*pixel;
   pixel=QuantumScale*((double) GetPixelGreen(image,p)-q->green);
   metric+=gamma*pixel*pixel;
