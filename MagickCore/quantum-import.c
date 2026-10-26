@@ -1650,9 +1650,17 @@ static void ImportCMYKQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportCMYKAQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -4433,7 +4441,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case CMYKAQuantum:
     {
-      ImportCMYKAQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportCMYKAQuantum(image,quantum_info,&span,exception);
       break;
     }
     case MultispectralQuantum:
