@@ -1357,9 +1357,17 @@ static void ImportBGROQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportBlackQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   if (image->colorspace != CMYKColorspace)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
@@ -4449,7 +4457,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case BlackQuantum:
     {
-      ImportBlackQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportBlackQuantum(image,quantum_info,&span,exception);
       break;
     }
     case BlueQuantum:
