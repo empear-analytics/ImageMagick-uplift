@@ -166,6 +166,31 @@ MagickExport Image *CloneImageList(const Image *images,ExceptionInfo *exception)
   return(image);
 }
 
+static ssize_t GetFrameStep(const char *artifact)
+{
+  ssize_t
+    step;
+
+  step=1;
+  if (artifact != (const char *) NULL)
+    {
+      step=(ssize_t) StringToLong(artifact);
+      if (step == 0)
+        step=1;
+    }
+  return(step);
+}
+
+static ssize_t ClampSceneIndex(ssize_t first,const size_t length)
+{
+  if (first < 0)
+    first+=(ssize_t) length;
+  else
+    if (first > (ssize_t) length)
+      first=(ssize_t) length;
+  return(first);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -249,11 +274,7 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
       p++;
     first=(ssize_t) strtol(p,&p,10);
     offset=first;
-    if (first < 0)
-      first+=(ssize_t) length;
-    else
-      if (first > (ssize_t) length)
-        first=(ssize_t) length;
+    first=ClampSceneIndex(first,length);
     first%=(ssize_t) (length << 1);
     last=first;
     while (isspace((int) ((unsigned char) *p)) != 0)
@@ -261,21 +282,11 @@ MagickExport Image *CloneImages(const Image *images,const char *scenes,
     if (*p == '-')
       {
         last=(ssize_t) strtol(p+1,&p,10);
-        if (last < 0)
-          last+=(ssize_t) length;
-        else
-          if (last > (ssize_t) length)
-            last=(ssize_t) length;
+        last=ClampSceneIndex(last,length);
       }
     last%=(ssize_t) (length << 1);
     match=MagickFalse;
-    step=1;
-    if (artifact != (const char *) NULL)
-      {
-        step=(ssize_t) StringToLong(artifact);
-        if (step == 0)
-          step=1;
-      }
+    step=GetFrameStep(artifact);
     step=(ssize_t) (first > last ? -step : step);
     for ( ; step > 0 ? (last-first) >= 0 : (last-first) <= 0; first+=step)
     {
@@ -333,6 +344,36 @@ MagickExport void DeleteImageFromList(Image **images)
     (void) DestroyImage(image);
 }
 
+static void DeleteMarkedImages(Image **images,
+  const MagickBooleanType *delete_list,const size_t length)
+{
+  Image
+    *image;
+
+  ssize_t
+    i;
+
+  image=(*images);
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    *images=image;
+    image=GetNextImageInList(image);
+    if (delete_list[i] != MagickFalse)
+      DeleteImageFromList(images);
+  }
+}
+
+static void MarkImagesForDeletion(MagickBooleanType *delete_list,
+  const long first,const long last,const size_t length)
+{
+  ssize_t
+    i;
+
+  for (i=(ssize_t) first; i <= (ssize_t) last; i++)
+    if ((i >= 0) && (i < (ssize_t) length))
+      delete_list[i]=MagickTrue;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -375,9 +416,6 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
   char
     *p;
 
-  Image
-    *image;
-
   long
     first,
     last;
@@ -409,7 +447,6 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
         ResourceLimitError,"MemoryAllocationFailed","`%s'",(*images)->filename);
       return;
     }
-  image=(*images);
   for (i=0; i < (ssize_t) length; i++)
     delete_list[i]=MagickFalse;
   /*
@@ -442,21 +479,12 @@ MagickExport void DeleteImages(Image **images,const char *scenes,
       }
     if (first > last)
       continue;
-    for (i=(ssize_t) first; i <= (ssize_t) last; i++)
-      if ((i >= 0) && (i < (ssize_t) length))
-        delete_list[i]=MagickTrue;
+    MarkImagesForDeletion(delete_list,first,last,length);
   }
   /*
     Delete images marked for deletion, once only.
   */
-  image=(*images);
-  for (i=0; i < (ssize_t) length; i++)
-  {
-    *images=image;
-    image=GetNextImageInList(image);
-    if (delete_list[i] != MagickFalse)
-      DeleteImageFromList(images);
-  }
+  DeleteMarkedImages(images,delete_list,length);
   (void) RelinquishMagickMemory(delete_list);
   *images=GetFirstImageInList(*images);
 }

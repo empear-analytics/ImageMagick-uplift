@@ -442,6 +442,42 @@ MagickPrivate void SetSignatureDigest(SignatureInfo *signature_info,
   SetStringInfo(signature_info->digest,digest);
 }
 
+static unsigned char *AppendPixelBytes(unsigned char *q,const float pixel,
+  const SignatureInfo *signature_info)
+{
+  ssize_t
+    j;
+
+  if (signature_info->lsb_first == MagickFalse)
+    for (j=(ssize_t) sizeof(pixel)-1; j >= 0; j--)
+      *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+  else
+    for (j=0; j < (ssize_t) sizeof(pixel); j++)
+      *q++=(unsigned char) ((unsigned char *) &pixel)[j];
+  return(q);
+}
+
+static unsigned char *AppendPixelChannels(const Image *image,
+  const Quantum *p,unsigned char *q,const SignatureInfo *signature_info)
+{
+  float
+    pixel;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    pixel=(float) (QuantumScale*(double) p[i]);
+    q=AppendPixelBytes(q,pixel,signature_info);
+  }
+  return(q);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -524,31 +560,12 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
     q=pixels;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
       if (GetPixelReadMask(image,p) <= (QuantumRange/2))
         {
           p+=(ptrdiff_t) GetPixelChannels(image);
           continue;
         }
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        ssize_t
-          j;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        pixel=(float) (QuantumScale*(double) p[i]);
-        if (signature_info->lsb_first == MagickFalse)
-          for (j=(ssize_t) sizeof(pixel)-1; j >= 0; j--)
-            *q++=(unsigned char) ((unsigned char *) &pixel)[j];
-        else
-          for (j=0; j < (ssize_t) sizeof(pixel); j++)
-            *q++=(unsigned char) ((unsigned char *) &pixel)[j];
-      }
+      q=AppendPixelChannels(image,p,q,signature_info);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     SetStringInfoLength(signature,(size_t) (q-pixels));

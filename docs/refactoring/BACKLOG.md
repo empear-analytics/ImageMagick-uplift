@@ -116,9 +116,9 @@ needs before refactoring:
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
 | 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | open |
 | 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 5.35, in progress (Complex Conditional gone; string helpers tip String Heavy), [M34](tasks/M34-configure.md) |
-| 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | open |
-| 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | open |
-| 6.87 | `MagickCore/memory.c` | 1713 | 60% | 71% | open |
+| 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | 6.34 (tree descent returns from inside), [M56](tasks/M56-histogram.md) |
+| 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | 6.61 (guard level; the tile loop keeps multi-output blocks), [M57](tasks/M57-montage.md) |
+| 6.87 | `MagickCore/memory.c` | 1713 | 60% | 71% | plateau 6.87 (uncompiled branches), [M60](tasks/M60-memory.md) |
 | 8.22 | `MagickCore/coder.c` | 562 | 38% | 93% | open |
 | 9.09 | `MagickCore/static.c` | 379 | 52% | 82% | open |
 | 9.12 | `MagickCore/gem.c` | 348 | 100% | 70% | open |
@@ -151,12 +151,12 @@ needs before refactoring:
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | open |
 | 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | open |
 | 5.88 | `MagickCore/exception.c` | 1158 | 88% | 66% | 6.16 (severity table needs a lookup recipe; ThrowException repeat-test bug reported), [M55](tasks/M55-exception.md) |
-| 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | open |
+| 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | 6.40 (rest is prologue duplication and a &list loop), [M58](tasks/M58-list.md) |
 | 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | open |
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |
-| 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | open |
+| 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.49 (TransformSignature needs the hoist recipe), [M61](tasks/M61-signature.md) |
 | 7.56 | `MagickCore/quantum.c` | 1110 | 90% | 69% | open |
-| 7.59 | `MagickCore/linked-list.c` | 1040 | 40% | 69% | open |
+| 7.59 | `MagickCore/linked-list.c` | 1040 | 40% | 69% | 8.95 (interior-insert bug reported), [M59](tasks/M59-linked-list.md) |
 | 7.68 | `MagickCore/random.c` | 996 | 62% | 24% | open |
 | 7.78 | `MagickCore/cache-view.c` | 1114 | 34% | 30% | open |
 | 7.88 | `MagickCore/magic.c` | 823 | 72% | 66% | open |

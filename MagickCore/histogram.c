@@ -203,6 +203,23 @@ static inline MagickBooleanType IsPixelInfoColorMatch(
 }
 
 
+static void GrowColorList(HNodeInfo *node_info,const ssize_t i)
+{
+  if (node_info->number_unique == 0)
+    {
+      node_info->extent=1;
+      node_info->list=(PixelInfo *) AcquireQuantumMemory(
+        node_info->extent,sizeof(*node_info->list));
+    }
+  else
+    if (i >= (ssize_t) node_info->extent)
+      {
+        node_info->extent<<=1;
+        node_info->list=(PixelInfo *) ResizeQuantumMemory(
+          node_info->list,node_info->extent,sizeof(*node_info->list));
+      }
+}
+
 static HCubeInfo *ClassifyImageColors(const Image *image,
   ExceptionInfo *exception)
 {
@@ -291,19 +308,7 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
         node_info->list[i].count++;
       else
         {
-          if (node_info->number_unique == 0)
-            {
-              node_info->extent=1;
-              node_info->list=(PixelInfo *) AcquireQuantumMemory(
-                node_info->extent,sizeof(*node_info->list));
-            }
-          else
-            if (i >= (ssize_t) node_info->extent)
-              {
-                node_info->extent<<=1;
-                node_info->list=(PixelInfo *) ResizeQuantumMemory(
-                  node_info->list,node_info->extent,sizeof(*node_info->list));
-              }
+          GrowColorList(node_info,i);
           if (node_info->list == (PixelInfo *) NULL)
             {
               (void) ThrowMagickException(exception,GetMagickModule(),
@@ -638,6 +643,28 @@ static HNodeInfo *GetHNodeInfo(HCubeInfo *cube_info,const size_t level)
   return(node_info);
 }
 
+static void ExtendColorList(HNodeInfo *node_info,const ssize_t i)
+{
+  if (node_info->list == (PixelInfo *) NULL)
+    node_info->list=(PixelInfo *) AcquireQuantumMemory(1,
+      sizeof(*node_info->list));
+  else
+    node_info->list=(PixelInfo *) ResizeQuantumMemory(node_info->list,
+      (size_t) (i+1),sizeof(*node_info->list));
+}
+
+static void SetColorListEntry(const Image *image,const Quantum *p,
+  HNodeInfo *node_info,const ssize_t i)
+{
+  GetPixelInfo(image,&node_info->list[i]);
+  node_info->list[i].red=(double) GetPixelRed(image,p);
+  node_info->list[i].green=(double) GetPixelGreen(image,p);
+  node_info->list[i].blue=(double) GetPixelBlue(image,p);
+  if (image->colorspace == CMYKColorspace)
+    node_info->list[i].black=(double) GetPixelBlack(image,p);
+  node_info->list[i].alpha=(double) GetPixelAlpha(image,p);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -758,12 +785,7 @@ static MagickBooleanType CheckImageColors(const Image *image,
           /*
             Add this unique color to the color list.
           */
-          if (node_info->list == (PixelInfo *) NULL)
-            node_info->list=(PixelInfo *) AcquireQuantumMemory(1,
-              sizeof(*node_info->list));
-          else
-            node_info->list=(PixelInfo *) ResizeQuantumMemory(node_info->list,
-              (size_t) (i+1),sizeof(*node_info->list));
+          ExtendColorList(node_info,i);
           if (node_info->list == (PixelInfo *) NULL)
             {
               (void) ThrowMagickException(exception,GetMagickModule(),
@@ -771,13 +793,7 @@ static MagickBooleanType CheckImageColors(const Image *image,
                 image->filename);
               break;
             }
-          GetPixelInfo(image,&node_info->list[i]);
-          node_info->list[i].red=(double) GetPixelRed(image,p);
-          node_info->list[i].green=(double) GetPixelGreen(image,p);
-          node_info->list[i].blue=(double) GetPixelBlue(image,p);
-          if (image->colorspace == CMYKColorspace)
-            node_info->list[i].black=(double) GetPixelBlack(image,p);
-          node_info->list[i].alpha=(double) GetPixelAlpha(image,p);
+          SetColorListEntry(image,p,node_info,i);
           node_info->list[i].count=1;
           node_info->number_unique++;
           cube_info->colors++;
@@ -974,6 +990,29 @@ MagickExport MagickBooleanType MinMaxStretchImage(Image *image,
   return(status != 0 ? MagickTrue : MagickFalse);
 }
 
+static void FormatColorTuple(const PixelInfo pixel,char *tuple)
+{
+  (void) CopyMagickString(tuple,"(",MagickPathExtent);
+  ConcatenateColorComponent(&pixel,RedPixelChannel,NoCompliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(&pixel,GreenPixelChannel,NoCompliance,tuple);
+  (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+  ConcatenateColorComponent(&pixel,BluePixelChannel,NoCompliance,tuple);
+  if (pixel.colorspace == CMYKColorspace)
+    {
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(&pixel,BlackPixelChannel,NoCompliance,
+        tuple);
+    }
+  if (pixel.alpha_trait != UndefinedPixelTrait)
+    {
+      (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
+      ConcatenateColorComponent(&pixel,AlphaPixelChannel,NoCompliance,
+        tuple);
+    }
+  (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1081,25 +1120,7 @@ MagickExport size_t GetNumberColors(const Image *image,FILE *file,
   for (i=0; i < (ssize_t) number_colors; i++)
   {
     pixel=(*p);
-    (void) CopyMagickString(tuple,"(",MagickPathExtent);
-    ConcatenateColorComponent(&pixel,RedPixelChannel,NoCompliance,tuple);
-    (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-    ConcatenateColorComponent(&pixel,GreenPixelChannel,NoCompliance,tuple);
-    (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-    ConcatenateColorComponent(&pixel,BluePixelChannel,NoCompliance,tuple);
-    if (pixel.colorspace == CMYKColorspace)
-      {
-        (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-        ConcatenateColorComponent(&pixel,BlackPixelChannel,NoCompliance,
-          tuple);
-      }
-    if (pixel.alpha_trait != UndefinedPixelTrait)
-      {
-        (void) ConcatenateMagickString(tuple,",",MagickPathExtent);
-        ConcatenateColorComponent(&pixel,AlphaPixelChannel,NoCompliance,
-          tuple);
-      }
-    (void) ConcatenateMagickString(tuple,")",MagickPathExtent);
+    FormatColorTuple(pixel,tuple);
     (void) QueryColorname(image,&pixel,SVGCompliance,color,exception);
     GetColorTuple(&pixel,MagickTrue,hex);
     (void) FormatLocaleString(count,MagickPathExtent,"%10.20g:",(double)
@@ -1124,6 +1145,17 @@ MagickExport size_t GetNumberColors(const Image *image,FILE *file,
   return(number_colors);
 }
 
+static void SetUniqueColorPixel(const Image *unique_image,const PixelInfo *p,
+  Quantum *magick_restrict q)
+{
+  SetPixelRed(unique_image,ClampToQuantum(p->red),q);
+  SetPixelGreen(unique_image,ClampToQuantum(p->green),q);
+  SetPixelBlue(unique_image,ClampToQuantum(p->blue),q);
+  SetPixelAlpha(unique_image,ClampToQuantum(p->alpha),q);
+  if (unique_image->colorspace == CMYKColorspace)
+    SetPixelBlack(unique_image,ClampToQuantum(p->black),q);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1187,12 +1219,7 @@ static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
           exception);
         if (q == (Quantum *) NULL)
           continue;
-        SetPixelRed(unique_image,ClampToQuantum(p->red),q);
-        SetPixelGreen(unique_image,ClampToQuantum(p->green),q);
-        SetPixelBlue(unique_image,ClampToQuantum(p->blue),q);
-        SetPixelAlpha(unique_image,ClampToQuantum(p->alpha),q);
-        if (unique_image->colorspace == CMYKColorspace)
-          SetPixelBlack(unique_image,ClampToQuantum(p->black),q);
+        SetUniqueColorPixel(unique_image,p,q);
         if (SyncCacheViewAuthenticPixels(unique_view,exception) == MagickFalse)
           break;
         cube_info->x++;

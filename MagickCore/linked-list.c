@@ -438,6 +438,52 @@ MagickExport void *GetValueFromLinkedList(LinkedListInfo *list_info,
   return(value);
 }
 
+static void InsertElementAt(LinkedListInfo *list_info,ElementInfo *next,
+  const size_t index)
+{
+  ElementInfo
+    *element;
+
+  ssize_t
+    i;
+
+  element=list_info->head;
+  next->next=element->next;
+  for (i=1; i < (ssize_t) index; i++)
+  {
+    element=element->next;
+    next->next=element->next;
+  }
+  next=next->next;
+  element->next=next;
+  if (list_info->next == next->next)
+    list_info->next=next;
+}
+
+static void PrependElement(LinkedListInfo *list_info,ElementInfo *next)
+{
+  if (list_info->next == list_info->head)
+    list_info->next=next;
+  next->next=list_info->head;
+  list_info->head=next;
+}
+
+static void AppendElement(LinkedListInfo *list_info,ElementInfo *next)
+{
+  if (list_info->next == (ElementInfo *) NULL)
+    list_info->next=next;
+  list_info->tail->next=next;
+  list_info->tail=next;
+}
+
+static void InsertFirstElement(LinkedListInfo *list_info,ElementInfo *next)
+{
+  if (list_info->next == (ElementInfo *) NULL)
+    list_info->next=next;
+  list_info->head=next;
+  list_info->tail=next;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -472,9 +518,6 @@ MagickExport MagickBooleanType InsertValueInLinkedList(
   ElementInfo
     *next;
 
-  ssize_t
-    i;
-
   assert(list_info != (LinkedListInfo *) NULL);
   assert(list_info->signature == MagickCoreSignature);
   if (value == (const void *) NULL)
@@ -489,46 +532,16 @@ MagickExport MagickBooleanType InsertValueInLinkedList(
   next->next=(ElementInfo *) NULL;
   LockSemaphoreInfo(list_info->semaphore);
   if (list_info->elements == 0)
-    {
-      if (list_info->next == (ElementInfo *) NULL)
-        list_info->next=next;
-      list_info->head=next;
-      list_info->tail=next;
-    }
+    InsertFirstElement(list_info,next);
   else
     {
       if (index == 0)
-        {
-          if (list_info->next == list_info->head)
-            list_info->next=next;
-          next->next=list_info->head;
-          list_info->head=next;
-        }
+        PrependElement(list_info,next);
       else
         if (index == list_info->elements)
-          {
-            if (list_info->next == (ElementInfo *) NULL)
-              list_info->next=next;
-            list_info->tail->next=next;
-            list_info->tail=next;
-          }
+          AppendElement(list_info,next);
         else
-          {
-            ElementInfo
-              *element;
-
-            element=list_info->head;
-            next->next=element->next;
-            for (i=1; i < (ssize_t) index; i++)
-            {
-              element=element->next;
-              next->next=element->next;
-            }
-            next=next->next;
-            element->next=next;
-            if (list_info->next == next->next)
-              list_info->next=next;
-          }
+          InsertElementAt(list_info,next,index);
     }
   list_info->elements++;
   UnlockSemaphoreInfo(list_info->semaphore);
@@ -749,6 +762,21 @@ MagickExport LinkedListInfo *NewLinkedList(const size_t capacity)
   return(list_info);
 }
 
+static ElementInfo *UnlinkNextElement(LinkedListInfo *list_info,
+  ElementInfo *next)
+{
+  ElementInfo
+    *element;
+
+  element=next->next;
+  next->next=element->next;
+  if (element == list_info->tail)
+    list_info->tail=next;
+  if (list_info->next == element)
+    list_info->next=element->next;
+  return(element);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -808,12 +836,7 @@ MagickExport void *RemoveElementByValueFromLinkedList(LinkedListInfo *list_info,
           UnlockSemaphoreInfo(list_info->semaphore);
           return((void *) NULL);
         }
-      element=next->next;
-      next->next=element->next;
-      if (element == list_info->tail)
-        list_info->tail=next;
-      if (list_info->next == element)
-        list_info->next=element->next;
+      element=UnlinkNextElement(list_info,next);
       element=(ElementInfo *) RelinquishMagickMemory(element);
     }
   list_info->elements--;
