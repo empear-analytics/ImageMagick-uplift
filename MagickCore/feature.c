@@ -639,6 +639,26 @@ static inline MagickBooleanType IsFeatureMemoryMissing(
     (sum == (FeatureStatistics *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static unsigned int GetFeatureGrayLevels(const Image *image,
+  const PixelPacket gray)
+{
+  unsigned int
+    number_grays;
+
+  number_grays=gray.red;
+  if (gray.green > number_grays)
+    number_grays=gray.green;
+  if (gray.blue > number_grays)
+    number_grays=gray.blue;
+  if (image->colorspace == CMYKColorspace)
+    if (gray.black > number_grays)
+      number_grays=gray.black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    if (gray.alpha > number_grays)
+      number_grays=gray.alpha;
+  return(number_grays);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -785,17 +805,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Allocate spatial dependence matrix.
   */
-  number_grays=gray.red;
-  if (gray.green > number_grays)
-    number_grays=gray.green;
-  if (gray.blue > number_grays)
-    number_grays=gray.blue;
-  if (image->colorspace == CMYKColorspace)
-    if (gray.black > number_grays)
-      number_grays=gray.black;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    if (gray.alpha > number_grays)
-      number_grays=gray.alpha;
+  number_grays=GetFeatureGrayLevels(image,gray);
   cooccurrence=(FeatureStatistics **) AcquireQuantumMemory(number_grays,
     sizeof(*cooccurrence));
   density_x=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
