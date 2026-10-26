@@ -1748,6 +1748,25 @@ static ssize_t FindStretchBlackLevel(const Image *image,
   return(j);
 }
 
+static ssize_t FindStretchWhiteLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double white_point)
+{
+  double
+    intensity;
+
+  ssize_t
+    j;
+
+  intensity=0.0;
+  for (j=(ssize_t) MaxMap; j != 0; j--)
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > ((double) image->columns*image->rows-white_point))
+      break;
+  }
+  return(j);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1839,9 +1858,6 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   */
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    double
-      intensity;
-
     ssize_t
       j;
 
@@ -1849,13 +1865,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     white[i]=(Quantum) ScaleQuantumToMap(QuantumRange);
     j=FindStretchBlackLevel(image,histogram,i,black_point);
     black[i]=(Quantum) j;
-    intensity=0.0;
-    for (j=(ssize_t) MaxMap; j != 0; j--)
-    {
-      intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    j=FindStretchWhiteLevel(image,histogram,i,white_point);
     white[i]=(Quantum) j;
   }
   histogram=(double *) RelinquishMagickMemory(histogram);
