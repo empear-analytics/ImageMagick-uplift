@@ -1193,6 +1193,32 @@ static void BuildCDLMap(const ColorCorrection color_correction,
   }
 }
 
+static void ApplyCDLToColormap(Image *image,
+  const ColorCorrection color_correction,const PixelInfo *cdl_map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    /*
+      Apply transfer function to colormap.
+    */
+    double
+      luma;
+
+    luma=0.21267*image->colormap[i].red+0.71526*image->colormap[i].green+
+      0.07217*image->colormap[i].blue;
+    image->colormap[i].red=luma+color_correction.saturation*cdl_map[
+      ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red))].red-luma;
+    image->colormap[i].green=luma+color_correction.saturation*cdl_map[
+      ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green))].green-
+      luma;
+    image->colormap[i].blue=luma+color_correction.saturation*cdl_map[
+      ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue))].blue-luma;
+  }
+}
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
@@ -1212,9 +1238,6 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
 
   PixelInfo
     *cdl_map;
-
-  ssize_t
-    i;
 
   ssize_t
     y;
@@ -1292,24 +1315,7 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   BuildCDLMap(color_correction,cdl_map);
   if (image->storage_class == PseudoClass)
     {
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        /*
-          Apply transfer function to colormap.
-        */
-        double
-          luma;
-
-        luma=0.21267*image->colormap[i].red+0.71526*image->colormap[i].green+
-          0.07217*image->colormap[i].blue;
-        image->colormap[i].red=luma+color_correction.saturation*cdl_map[
-          ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red))].red-luma;
-        image->colormap[i].green=luma+color_correction.saturation*cdl_map[
-          ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green))].green-
-          luma;
-        image->colormap[i].blue=luma+color_correction.saturation*cdl_map[
-          ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue))].blue-luma;
-      }
+      ApplyCDLToColormap(image,color_correction,cdl_map);
       cdl_map=(PixelInfo *) RelinquishMagickMemory(cdl_map);
       (void) SyncImage(image, exception);
       return(MagickTrue);
