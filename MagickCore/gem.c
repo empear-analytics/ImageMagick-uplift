@@ -119,9 +119,6 @@ MagickExport double ExpandAffine(const AffineMatrix *affine)
 %    o attenuate:  attenuate the noise.
 %
 */
-MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
-  const Quantum pixel,const NoiseType noise_type,const double attenuate)
-{
 #define SigmaUniform  (attenuate*0.015625)
 #define SigmaGaussian  (attenuate*0.015625)
 #define SigmaImpulse  (attenuate*0.1)
@@ -131,6 +128,9 @@ MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
 #define SigmaRandom  (attenuate)
 #define TauGaussian  (attenuate*0.078125)
 
+MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
+  const Quantum pixel,const NoiseType noise_type,const double attenuate)
+{
   double
     alpha,
     beta,
