@@ -1021,6 +1021,25 @@ static const char *GetEXIFTagDescription(const TagInfo *EXIFTag,
   return(description);
 }
 
+static size_t GetEXIFTagByName(const TagInfo *EXIFTag,const char *property,
+  size_t tag)
+{
+  ssize_t
+    i;
+
+  for (i=0; ; i++)
+  {
+    if (EXIFTag[i].tag == 0)
+      break;
+    if (LocaleCompare(EXIFTag[i].description,property) == 0)
+      {
+        tag=(size_t) EXIFTag[i].tag;
+        break;
+      }
+  }
+  return(tag);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1437,16 +1456,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
       /*
         Try to match the text with a tag name instead.
       */
-      for (i=0; ; i++)
-      {
-        if (EXIFTag[i].tag == 0)
-          break;
-        if (LocaleCompare(EXIFTag[i].description,property) == 0)
-          {
-            tag=(size_t) EXIFTag[i].tag;
-            break;
-          }
-      }
+      tag=GetEXIFTagByName(EXIFTag,property,tag);
       break;
     }
   }
