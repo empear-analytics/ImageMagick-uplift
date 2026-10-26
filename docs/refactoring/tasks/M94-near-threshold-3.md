@@ -35,3 +35,29 @@ map. Branch `campaign/M94`, stacked on `campaign/M93` (PR #46). Measured with `c
   or comparator ladder; nothing to extract.
 - GetImageBackgroundColor: its loop adds into two accumulators (Recipe K territory).
 - SetUserSpecifiedFormat: its blocks write two outputs or take three strings.
+
+### Addendum: fresh mutation of the guard-level steps (2026-10-26, afternoon)
+
+The six guard-level functions were mutated again on the Mac with the rebuilt case map.
+The Mull build was `mull-guard94` and the report is
+`build-oracle/work/mutation-guard94-all.json`.
+
+The first run used `--max-cases 0`. It spent two hours on ConformPixelInfo's
+survivors, because about 12,000 cases reach it and every survivor runs all of them. It
+was stopped and resumed with `--max-cases 300`; capped survivors are flagged as such.
+
+| Function (M94 step) | Mutants | Killed | Verdict |
+|---|---:|---:|---|
+| AddNodePixelList | 17 | 8 (9 equivalent: the skip list's random levels change its shape, not its results) | ready |
+| GetPHASHSimilarity | 18 | 17 (1 unobservable) | ready |
+| BlendMaskAlphaChannel | 14 | 12 (2 unobservable) | ready |
+| ConformPixelInfo | 9 | 7 (2 survivors, capped at 300 cases) | careful |
+| AddPathToXMLTree | 14 | 11 | careful |
+| KmeansMetric | 25 | 22 | careful |
+
+The extracted helpers show no mutants of their own: Mull attributes the mutants of the
+inlined helpers to their callers, so the callers' rows above cover the moved code. All
+six steps now stand at oracle level as well.
+
+**Lesson.** On a function that thousands of cases reach, use `--max-cases`. One
+uncapped survivor costs a full catalogue run.
