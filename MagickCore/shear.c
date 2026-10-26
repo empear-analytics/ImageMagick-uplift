@@ -560,6 +560,28 @@ static void GetImageBackgroundColor(Image *image,const ssize_t offset,
       (double) background.alpha/count);
 }
 
+static ssize_t FindDeskewSkew(const size_t *projection,const size_t width)
+{
+  size_t
+    max_projection;
+
+  ssize_t
+    i,
+    skew;
+
+  max_projection=0;
+  skew=0;
+  for (i=0; i < (ssize_t) (2*width-1); i++)
+  {
+    if (projection[i] > max_projection)
+      {
+        skew=i-(ssize_t) width+1;
+        max_projection=projection[i];
+      }
+  }
+  return(skew);
+}
+
 MagickExport Image *DeskewImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -585,12 +607,10 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
     geometry;
 
   size_t
-    max_projection,
     *projection,
     width;
 
   ssize_t
-    i,
     skew;
 
   /*
@@ -607,16 +627,7 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
       projection=(size_t *) RelinquishMagickMemory(projection);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  max_projection=0;
-  skew=0;
-  for (i=0; i < (ssize_t) (2*width-1); i++)
-  {
-    if (projection[i] > max_projection)
-      {
-        skew=i-(ssize_t) width+1;
-        max_projection=projection[i];
-      }
-  }
+  skew=FindDeskewSkew(projection,width);
   projection=(size_t *) RelinquishMagickMemory(projection);
   degrees=RadiansToDegrees(-atan((double) skew/width/8));
   if (image->debug != MagickFalse)
