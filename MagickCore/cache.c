@@ -3686,6 +3686,39 @@ static inline MagickBooleanType CacheOverflowSanityCheckGetSize(
   return(MagickFalse);
 }
 
+static int OpenPixelCacheFile(const CacheInfo *cache_info,const MapMode mode)
+{
+  int
+    file;
+
+  switch (mode)
+  {
+    case ReadMode:
+    {
+      file=open_utf8(cache_info->cache_filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
+      break;
+    }
+    case WriteMode:
+    {
+      file=open_utf8(cache_info->cache_filename,O_WRONLY | O_CLOEXEC | O_CREAT |
+        O_BINARY | O_EXCL,S_MODE);
+      if (file == -1)
+        file=open_utf8(cache_info->cache_filename,O_WRONLY | O_CLOEXEC | O_BINARY,S_MODE);
+      break;
+    }
+    case IOMode:
+    default:
+    {
+      file=open_utf8(cache_info->cache_filename,O_RDWR | O_CLOEXEC | O_CREAT | O_BINARY |
+        O_EXCL,S_MODE);
+      if (file == -1)
+        file=open_utf8(cache_info->cache_filename,O_RDWR | O_CLOEXEC | O_BINARY,S_MODE);
+      break;
+    }
+  }
+  return(file);
+}
+
 static MagickBooleanType OpenPixelCacheOnDisk(CacheInfo *cache_info,
   const MapMode mode)
 {
@@ -3700,31 +3733,7 @@ static MagickBooleanType OpenPixelCacheOnDisk(CacheInfo *cache_info,
   if (*cache_info->cache_filename == '\0')
     file=AcquireUniqueFileResource(cache_info->cache_filename);
   else
-    switch (mode)
-    {
-      case ReadMode:
-      {
-        file=open_utf8(cache_info->cache_filename,O_RDONLY | O_CLOEXEC | O_BINARY,0);
-        break;
-      }
-      case WriteMode:
-      {
-        file=open_utf8(cache_info->cache_filename,O_WRONLY | O_CLOEXEC | O_CREAT |
-          O_BINARY | O_EXCL,S_MODE);
-        if (file == -1)
-          file=open_utf8(cache_info->cache_filename,O_WRONLY | O_CLOEXEC | O_BINARY,S_MODE);
-        break;
-      }
-      case IOMode:
-      default:
-      {
-        file=open_utf8(cache_info->cache_filename,O_RDWR | O_CLOEXEC | O_CREAT | O_BINARY |
-          O_EXCL,S_MODE);
-        if (file == -1)
-          file=open_utf8(cache_info->cache_filename,O_RDWR | O_CLOEXEC | O_BINARY,S_MODE);
-        break;
-      }
-    }
+    file=OpenPixelCacheFile(cache_info,mode);
   if (file == -1)
     return(MagickFalse);
   (void) AcquireMagickResource(FileResource,1);
