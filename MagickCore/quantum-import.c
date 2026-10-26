@@ -72,6 +72,21 @@
 #include "MagickCore/utility.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _QuantumPixelSpan
+{
+  MagickSizeType
+    number_pixels;
+
+  const unsigned char
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+} QuantumPixelSpan;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -3777,9 +3792,17 @@ static void ImportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -4352,6 +4375,8 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     return(0);
   ResetQuantumState(quantum_info);
   extent=GetQuantumExtent(image,quantum_info,quantum_type);
+  const QuantumPixelSpan span = { number_pixels, p, q };
+
   switch (quantum_type)
   {
     case AlphaQuantum:
@@ -4456,7 +4481,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     case RGBAQuantum:
     case CbYCrAQuantum:
     {
-      ImportRGBAQuantum(image,quantum_info,number_pixels,p,q);
+      ImportRGBAQuantum(image,quantum_info,&span);
       break;
     }
     case RGBOQuantum:
