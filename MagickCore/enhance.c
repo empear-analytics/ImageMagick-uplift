@@ -1173,6 +1173,26 @@ static ColorCorrection ParseCDLSATNode(XMLTreeInfo *sat,
   return(color_correction);
 }
 
+static void BuildCDLMap(const ColorCorrection color_correction,
+  PixelInfo *cdl_map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    cdl_map[i].red=(double) ScaleMapToQuantum((double)
+      (MaxMap*(pow(color_correction.red.slope*i/MaxMap+
+      color_correction.red.offset,color_correction.red.power))));
+    cdl_map[i].green=(double) ScaleMapToQuantum((double)
+      (MaxMap*(pow(color_correction.green.slope*i/MaxMap+
+      color_correction.green.offset,color_correction.green.power))));
+    cdl_map[i].blue=(double) ScaleMapToQuantum((double)
+      (MaxMap*(pow(color_correction.blue.slope*i/MaxMap+
+      color_correction.blue.offset,color_correction.blue.power))));
+  }
+}
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
@@ -1269,18 +1289,7 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   if (cdl_map == (PixelInfo *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    cdl_map[i].red=(double) ScaleMapToQuantum((double)
-      (MaxMap*(pow(color_correction.red.slope*i/MaxMap+
-      color_correction.red.offset,color_correction.red.power))));
-    cdl_map[i].green=(double) ScaleMapToQuantum((double)
-      (MaxMap*(pow(color_correction.green.slope*i/MaxMap+
-      color_correction.green.offset,color_correction.green.power))));
-    cdl_map[i].blue=(double) ScaleMapToQuantum((double)
-      (MaxMap*(pow(color_correction.blue.slope*i/MaxMap+
-      color_correction.blue.offset,color_correction.blue.power))));
-  }
+  BuildCDLMap(color_correction,cdl_map);
   if (image->storage_class == PseudoClass)
     {
       for (i=0; i < (ssize_t) image->colors; i++)
