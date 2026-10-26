@@ -55,3 +55,29 @@ These steps keep the evidence level they were committed with: the readiness verd
 comes from the mutation reports, which do not change. Their oracle runs did reach the
 moved code. A fresh mutation run of these functions on the Mac, now that the map can
 route their mutants to cases, would raise them to oracle level.
+
+### Addendum: fresh mutation of the M92 guard-level steps (2026-10-26, 11:46)
+
+With the new map routing their mutants to cases, the functions behind four of M92's
+guard-level steps were mutated again on the Mac. The Mull build was `mull-guard92`
+(enhance, identify, linked-list, xml-tree). The report is
+`build-oracle/work/mutation-guard92-all.json`, assembled from the run's
+`.partial.jsonl`, because each `--function` run overwrites the `.json`.
+
+| Function (M92 step) | Mutants | Killed | Verdict |
+|---|---:|---:|---|
+| NegateColormap | 11 | 10 (1 loop bound) | ready |
+| IsNonGrayColormapEntry (the P) | 2 | 2 | ready |
+| PrintImageDirectory | 6 | 6 | ready |
+| PrintTileProperties | 3 | 3 | ready |
+| RemoveElementFromLinkedList | 6 | 5 (1 threads/resources) | ready |
+| UnlinkInteriorElement | 5 | 4 | careful |
+| EncodeBase64XMLContent | 1 | 1 | ready |
+
+These steps were guard-level when committed. The fresh data shows the oracle now kills
+mutants inside the moved code, so they stand at oracle level as well.
+
+**Gap:** UnlinkInteriorElement's survivor is `cxx_eq_to_ne` on
+`if (list_info->next == element)`. That line repairs the list's iterator when the removed
+element is the one the iterator would return next. No case iterates a linked list while
+removing an interior element. Such a case through imdriver would kill it.
