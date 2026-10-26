@@ -1681,6 +1681,24 @@ static inline MagickBooleanType IsUnknownFormatSpecifier(const char specifier)
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsValidDigitSpecifier(const char *start,
+  const size_t length)
+{
+  size_t
+    i = 0;
+
+  if (*start == '0')
+    {
+      if ((length >= 3) && (start[1] == '0'))
+        return(MagickFalse);
+      i=1;
+    }
+  for ( ; i < (length-1); i++)
+    if (isdigit((int) ((unsigned char) start[i])) == 0)
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
   const char *end)
 {
@@ -1698,21 +1716,7 @@ static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
   if ((length == 1) && (*start == specifier))
     return(MagickTrue);
   if (length >= 2)
-    {
-      size_t
-        i = 0;
-
-      if (*start == '0')
-        {
-          if ((length >= 3) && (start[1] == '0'))
-            return(MagickFalse);
-          i=1;
-        }
-      for ( ; i < (length-1); i++)
-        if (isdigit((int) ((unsigned char) start[i])) == 0)
-          return(MagickFalse);
-      return(MagickTrue);
-    }
+    return(IsValidDigitSpecifier(start,length));
   return(MagickFalse);
 }
 
