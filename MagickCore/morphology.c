@@ -1313,6 +1313,21 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static double SetSquareKernelGeometry(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  double
+    scale;
+
+  if (args->rho < 1.0)
+    kernel->width = kernel->height = 3;  /* default radius = 1 */
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho*2+1);
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  scale = args->sigma;
+  return(scale);
+}
+
 static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -1325,14 +1340,7 @@ static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
   double
     scale;
   if ( type == SquareKernel )
-    {
-      if (args->rho < 1.0)
-        kernel->width = kernel->height = 3;  /* default radius = 1 */
-      else
-        kernel->width = kernel->height = CastDoubleToSizeT(args->rho*2+1);
-      kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-      scale = args->sigma;
-    }
+    scale = SetSquareKernelGeometry(kernel,args);
   else {
       /* NOTE: user defaults set in "AcquireKernelInfo()" */
       if ( args->rho < 1.0 || args->sigma < 1.0 )
