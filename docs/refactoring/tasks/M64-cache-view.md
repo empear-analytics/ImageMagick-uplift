@@ -191,3 +191,14 @@ each, all uncovered), so D is not allowed and the flat step had no legal follow-
 
 **What would unlock it:** an oracle case that calls GetOneCacheViewVirtualPixel and
 GetOneCacheViewAuthenticPixel. The C API driver can do that.
+
+### Addendum (2026-10-26, Mac, night): fresh mutation data
+
+Cases now reach the three GetOneCacheView* getters (7 each). Mutated on the Mac tonight
+(`mutation-cview-*.json`), all three are ready (4 of 4 killed each, thin). The D step
+they waited for (`SetPixelToBackgroundColor`, one helper for the three identical
+background fills) then verified cleanly (21 case runs, 0 diverged). But it left the
+score flat at 7.78, and duplication dropped only from 18 functions to 17: the three
+getters stay duplicates of each other in their remaining lines. With no next step to
+name, rule 2 reverts it. cache-view.c's remaining duplication is the thin-wrapper
+pattern that Code Health weighs but no recipe here reduces.
