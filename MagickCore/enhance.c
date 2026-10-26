@@ -3571,6 +3571,25 @@ static ssize_t FindLinearBlackLevel(const double *histogram,
   return(black);
 }
 
+static ssize_t FindLinearWhiteLevel(const double *histogram,
+  const double white_point)
+{
+  double
+    intensity;
+
+  ssize_t
+    white;
+
+  intensity=0.0;
+  for (white=(ssize_t) MaxMap; white != 0; white--)
+  {
+    intensity+=histogram[white];
+    if (intensity >= white_point)
+      break;
+  }
+  return(white);
+}
+
 MagickExport MagickBooleanType LinearStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -3631,13 +3650,7 @@ MagickExport MagickBooleanType LinearStretchImage(Image *image,
     Find the histogram boundaries by locating the black and white point levels.
   */
   black=FindLinearBlackLevel(histogram,black_point);
-  intensity=0.0;
-  for (white=(ssize_t) MaxMap; white != 0; white--)
-  {
-    intensity+=histogram[white];
-    if (intensity >= white_point)
-      break;
-  }
+  white=FindLinearWhiteLevel(histogram,white_point);
   histogram=(double *) RelinquishMagickMemory(histogram);
   status=LevelImage(image,(double) ScaleMapToQuantum((MagickRealType) black),
     (double) ScaleMapToQuantum((MagickRealType) white),1.0,exception);
