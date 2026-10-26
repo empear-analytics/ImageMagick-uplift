@@ -103,3 +103,33 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): Recipe H, first uses
+
+This task added **Recipe H - Hoist Function-Local Macros** (`playbook:` commit, with
+`tools/pp_identical.sh`) and applied it to the four files whose blocks it had pinned. The
+branch `campaign/M84-hoist` therefore carries more than compress.c. Each hoist is its own
+commit, proven by an `IDENTICAL` preprocessed translation unit, and is followed in the
+same branch by the steps it unblocks:
+
+| File | Hoisted from | Code Health | Steps it unblocked |
+|---|---|---|---|
+| compress.c | HuffmanDecodeImage (31 lines) | 5.20 → 5.28 | `InitializeHuffmanHashes` (E, oracle) |
+| signature.c | TransformSignature (8 lines) | 8.49 → 8.54 | `ExpandMessageSchedule` (E, guard) |
+| gem.c | GenerateDifferentialNoise (8 lines) | 9.12 → 9.21 | `GenerateGaussianNoise` (E, oracle) |
+| profile.c | SyncExifProfile (9 lines) | 2.54 → 2.59 | `IsExifDirectoryOffset`, `IsNextDirectoryOffset` (P, oracle) |
+
+The compress.c hoist raised the score by itself (5.20 → 5.27), because the macro lines
+no longer count toward HuffmanDecodeImage. The other hoists were flat until their
+extraction followed.
+
+**Tried and reverted.**
+- signature.c `LoadMessageWords`. It would leave TransformSignature's `T` used only by
+  its closing `T=0;` wipe, and removing that wipe is not this recipe's call.
+- gem.c `GeneratePoissonNoise`. A file-level Overall Code Complexity finding appeared
+  (9.21 → 8.70).
+
+**Still pinned after the hoist.** HuffmanDecodeImage's decode loop uses `InputBit`,
+which advances `byte`, `mask`, `runlength` and `bit` together. That calls for Recipe O or
+K (out-parameters), not E. LZWEncodeImage and HuffmanEncodeImage write their bit
+accumulators through `OutputCode` and `HuffmanOutputCode` in the same way.

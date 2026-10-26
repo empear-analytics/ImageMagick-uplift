@@ -202,3 +202,16 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): Recipe H
+
+**Result: Code Health 1.92 → 2.02** (`cs-mcp` 1.5.12). Branch `campaign/M85-property-h`,
+stacked on `campaign/M84-hoist`. GetEXIFProperty's 87 lines of `#define` (formats, tags,
+`EXIFGPSFractions`, `EXIFMultipleValues`) were hoisted (Recipe H, preprocessed output
+`IDENTICAL`). The three compound tests M41 had to leave then became predicates
+(oracle; GetEXIFProperty is ready, 158 of 158 killed): `IsGPSFractionTag`,
+`IsSubdirectoryTag` and `IsNextIFDOffset`. Complex Conditional leaves property.c.
+
+**What is left.** GetEXIFProperty is still cc 116 and 736 lines at depth 7. Its
+per-format `switch` uses the two hoisted multi-line macros, which write the property
+buffer and advance several cursors, so it needs Recipe O or K.
