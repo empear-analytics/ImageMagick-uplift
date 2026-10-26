@@ -347,6 +347,20 @@ static ssize_t RedistributeCLAHEExcess(const double clip_limit,
   return(cumulative_excess);
 }
 
+static ssize_t GetCLAHEExcess(const double clip_limit,
+  const size_t number_bins,const size_t *histogram)
+{
+  ssize_t
+    cumulative_excess,
+    i;
+
+  cumulative_excess=0;
+  for (i=0; i < (ssize_t) number_bins; i++)
+    if (histogram[i] > clip_limit)
+      cumulative_excess+=(ssize_t) (histogram[i]-clip_limit);
+  return(cumulative_excess);
+}
+
 static void ClipCLAHEHistogram(const double clip_limit,const size_t number_bins,
   size_t *histogram)
 {
@@ -364,10 +378,7 @@ static void ClipCLAHEHistogram(const double clip_limit,const size_t number_bins,
   */
   if (number_bins == 0)
     return;
-  cumulative_excess=0;
-  for (i=0; i < (ssize_t) number_bins; i++)
-    if (histogram[i] > clip_limit)
-      cumulative_excess+=(ssize_t) (histogram[i]-clip_limit);
+  cumulative_excess=GetCLAHEExcess(clip_limit,number_bins,histogram);
   /*
     Clip histogram and redistribute excess pixels across all bins.
   */
