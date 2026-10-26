@@ -12,6 +12,7 @@ the functions it did not reach. Branch `campaign/M93`, stacked on `campaign/M92`
 | feature.c | RenderHoughLines (cc 9 → 7, no finding left) | E `CopyBlobToPrimitive` (guard: no mutants; oracle ran too, 21 cases) | flat at 1.81 |
 | threshold.c | OTSUThreshold (cc 12 → 8, Bumpy Road gone, no finding left) | E `FindOTSUThreshold` (oracle, careful) | flat at 2.08 |
 | image.c | SetImageInfoFromExtension (no finding left) | E `FindExplicitFormatType` (oracle, ready, 14,547 cases) | flat at 2.20 |
+| image.c | IsValidFormatSpecifier (Complex Method and Bumpy Road gone; the helper keeps one Bumpy Road) | E `IsValidDigitSpecifier`, step 7 (oracle, ready, 29 cases) | flat at 2.20 |
 
 **Reverted.**
 - delegate.c GetDelegateList. One predicate, `IsListedDelegateMatch`, would serve both
