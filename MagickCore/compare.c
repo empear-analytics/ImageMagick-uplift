@@ -904,6 +904,31 @@ static void AccumulateMAEPixel(const ComparePixels *pixels,
   }
 }
 
+static void NormalizeChannelSimilarity(const Image *image,
+  const Image *reconstruct_image,double area,double *similarity)
+{
+  ssize_t
+    channels = 0,
+    k;
+
+  area=MagickSafeReciprocal(area);
+  for (k=0; k < (ssize_t) GetPixelChannels(image); k++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,k);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[k]*=area;
+    channels++;
+  }
+  similarity[CompositePixelChannel]*=area;
+  if (channels != 0)
+    similarity[CompositePixelChannel]/=(double) channels;
+}
+
 static MagickBooleanType GetMAESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -922,8 +947,6 @@ static MagickBooleanType GetMAESimilarity(const Image *image,
     rows;
 
   ssize_t
-    channels = 0,
-    k,
     y;
 
   /*
@@ -1000,22 +1023,7 @@ static MagickBooleanType GetMAESimilarity(const Image *image,
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
   image_view=DestroyCacheView(image_view);
-  area=MagickSafeReciprocal(area);
-  for (k=0; k < (ssize_t) GetPixelChannels(image); k++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(image,k);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-      channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
-      continue;
-    similarity[k]*=area;
-    channels++;
-  }
-  similarity[CompositePixelChannel]*=area;
-  if (channels != 0)
-    similarity[CompositePixelChannel]/=(double) channels;
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
   return(status);
 }
 
@@ -1253,8 +1261,6 @@ static MagickBooleanType GetMSESimilarity(const Image *image,
     rows;
 
   ssize_t
-    channels = 0,
-    k,
     y;
 
   /*
@@ -1330,22 +1336,7 @@ static MagickBooleanType GetMSESimilarity(const Image *image,
   }
   reconstruct_view=DestroyCacheView(reconstruct_view);
   image_view=DestroyCacheView(image_view);
-  area=MagickSafeReciprocal(area);
-  for (k=0; k < (ssize_t) GetPixelChannels(image); k++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(image,k);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-      channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
-      continue;
-    similarity[k]*=area;
-    channels++;
-  }
-  similarity[CompositePixelChannel]*=area;
-  if (channels != 0)
-   similarity[CompositePixelChannel]/=(double) channels;
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
   return(status);
 }
 
@@ -2257,8 +2248,6 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
     rows;
 
   ssize_t
-    channels = 0,
-    l,
     y;
 
   /*
@@ -2446,22 +2435,7 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
   image_view=DestroyCacheView(image_view);
   reconstruct_view=DestroyCacheView(reconstruct_view);
   kernel_info=DestroyKernelInfo(kernel_info);
-  area=MagickSafeReciprocal(area);
-  for (l=0; l < (ssize_t) GetPixelChannels(image); l++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(image,l);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-      channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
-      continue;
-    similarity[l]*=area;
-    channels++;
-  }
-  similarity[CompositePixelChannel]*=area;
-  if (channels != 0)
-   similarity[CompositePixelChannel]/=(double) channels;
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
   return(status);
 }
 
