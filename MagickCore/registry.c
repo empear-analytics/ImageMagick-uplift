@@ -160,6 +160,37 @@ MagickExport MagickBooleanType DeleteImageRegistry(const char *key)
   return(DeleteNodeFromSplayTree(registry,key));
 }
 
+static void *GetRegistryValueAsString(const RegistryInfo *registry_info)
+{
+  void
+    *value;
+
+  value=(void *) NULL;
+  switch (registry_info->type)
+  {
+    case ImageRegistryType:
+    {
+      value=(Image *) ConstantString(((Image *)
+        registry_info->value)->filename);
+      break;
+    }
+    case ImageInfoRegistryType:
+    {
+      value=(Image *) ConstantString(((ImageInfo *)
+        registry_info->value)->filename);
+      break;
+    }
+    case StringRegistryType:
+    {
+      value=(void *) ConstantString((char *) registry_info->value);
+      break;
+    }
+    default:
+      break;
+  }
+  return(value);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -221,28 +252,7 @@ MagickExport void *GetImageRegistry(const RegistryType type,const char *key,
     }
     case StringRegistryType:
     {
-      switch (registry_info->type)
-      {
-        case ImageRegistryType:
-        {
-          value=(Image *) ConstantString(((Image *)
-            registry_info->value)->filename);
-          break;
-        }
-        case ImageInfoRegistryType:
-        {
-          value=(Image *) ConstantString(((ImageInfo *)
-            registry_info->value)->filename);
-          break;
-        }
-        case StringRegistryType:
-        {
-          value=(void *) ConstantString((char *) registry_info->value);
-          break;
-        }
-        default:
-          break;
-      }
+      value=GetRegistryValueAsString(registry_info);
       break;
     }
     default:
@@ -454,6 +464,20 @@ static void *DestroyRegistryNode(void *registry_info)
   return(RelinquishMagickMemory(p));
 }
 
+static void InstantiateRegistry(void)
+{
+  if (registry == (SplayTreeInfo *) NULL)
+    {
+      if (registry_semaphore == (SemaphoreInfo *) NULL)
+        ActivateSemaphoreInfo(&registry_semaphore);
+      LockSemaphoreInfo(registry_semaphore);
+      if (registry == (SplayTreeInfo *) NULL)
+        registry=NewSplayTree(CompareSplayTreeString,RelinquishMagickMemory,
+          DestroyRegistryNode);
+      UnlockSemaphoreInfo(registry_semaphore);
+    }
+}
+
 MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
   const char *key,const void *value,ExceptionInfo *exception)
 {
@@ -523,15 +547,6 @@ MagickExport MagickBooleanType SetImageRegistry(const RegistryType type,
   registry_info->type=type;
   registry_info->value=clone_value;
   registry_info->signature=MagickCoreSignature;
-  if (registry == (SplayTreeInfo *) NULL)
-    {
-      if (registry_semaphore == (SemaphoreInfo *) NULL)
-        ActivateSemaphoreInfo(&registry_semaphore);
-      LockSemaphoreInfo(registry_semaphore);
-      if (registry == (SplayTreeInfo *) NULL)
-        registry=NewSplayTree(CompareSplayTreeString,RelinquishMagickMemory,
-          DestroyRegistryNode);
-      UnlockSemaphoreInfo(registry_semaphore);
-    }
+  InstantiateRegistry();
   return(AddValueToSplayTree(registry,ConstantString(key),registry_info));
 }

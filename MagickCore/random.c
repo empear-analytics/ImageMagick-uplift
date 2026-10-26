@@ -146,6 +146,30 @@ static MagickBooleanType
 static StringInfo
   *GenerateEntropicChaos(RandomInfo *);
 
+static void SeedFromSecretKey(RandomInfo *random_info)
+{
+  const StringInfo
+    *digest;
+
+  SignatureInfo
+    *signature_info;
+
+  StringInfo
+    *key;
+
+  signature_info=AcquireSignatureInfo();
+  key=AcquireStringInfo(sizeof(random_info->secret_key));
+  SetStringInfoDatum(key,(unsigned char *) &random_info->secret_key);
+  UpdateSignature(signature_info,key);
+  key=DestroyStringInfo(key);
+  FinalizeSignature(signature_info);
+  digest=GetSignatureDigest(signature_info);
+  (void) memcpy(random_info->seed,GetStringInfoDatum(digest),
+    MagickMin((size_t) GetSignatureDigestsize(signature_info),
+    sizeof(random_info->seed)));
+  signature_info=DestroySignatureInfo(signature_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -166,9 +190,6 @@ static StringInfo
 */
 MagickExport RandomInfo *AcquireRandomInfo(void)
 {
-  const StringInfo
-    *digest;
-
   RandomInfo
     *random_info;
 
@@ -233,22 +254,7 @@ MagickExport RandomInfo *AcquireRandomInfo(void)
       key=DestroyStringInfo(key);
     }
   else
-    {
-      SignatureInfo
-        *signature_info;
-
-      signature_info=AcquireSignatureInfo();
-      key=AcquireStringInfo(sizeof(random_info->secret_key));
-      SetStringInfoDatum(key,(unsigned char *) &random_info->secret_key);
-      UpdateSignature(signature_info,key);
-      key=DestroyStringInfo(key);
-      FinalizeSignature(signature_info);
-      digest=GetSignatureDigest(signature_info);
-      (void) memcpy(random_info->seed,GetStringInfoDatum(digest),
-        MagickMin((size_t) GetSignatureDigestsize(signature_info),
-        sizeof(random_info->seed)));
-      signature_info=DestroySignatureInfo(signature_info);
-    }
+    SeedFromSecretKey(random_info);
   return(random_info);
 }
 
@@ -879,6 +885,23 @@ static inline void IncrementRandomNonce(StringInfo *nonce)
   ThrowFatalException(RandomFatalError,"SequenceWrapError");
 }
 
+static void RefillRandomReservoir(RandomInfo *random_info,
+  SignatureInfo *signature_info,unsigned char *p,size_t i)
+{
+  unsigned char
+    *datum;
+
+  InitializeSignature(signature_info);
+  UpdateSignature(signature_info,random_info->nonce);
+  FinalizeSignature(signature_info);
+  IncrementRandomNonce(random_info->nonce);
+  SetStringInfo(random_info->reservoir,GetSignatureDigest(signature_info));
+  random_info->i=i;
+  datum=GetStringInfoDatum(random_info->reservoir);
+  while (i-- != 0)
+    p[i]=datum[i];
+}
+
 MagickExport void SetRandomKey(RandomInfo *random_info,const size_t length,
   unsigned char *key)
 {
@@ -925,17 +948,7 @@ MagickExport void SetRandomKey(RandomInfo *random_info,const size_t length,
     i-=GetSignatureDigestsize(signature_info);
   }
   if (i != 0)
-    {
-      InitializeSignature(signature_info);
-      UpdateSignature(signature_info,random_info->nonce);
-      FinalizeSignature(signature_info);
-      IncrementRandomNonce(random_info->nonce);
-      SetStringInfo(random_info->reservoir,GetSignatureDigest(signature_info));
-      random_info->i=i;
-      datum=GetStringInfoDatum(random_info->reservoir);
-      while (i-- != 0)
-        p[i]=datum[i];
-    }
+    RefillRandomReservoir(random_info,signature_info,p,i);
   UnlockSemaphoreInfo(random_info->semaphore);
 }
 

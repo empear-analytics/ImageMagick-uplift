@@ -155,13 +155,13 @@ needs before refactoring:
 | 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | open |
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |
 | 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.49 (TransformSignature needs the hoist recipe), [M61](tasks/M61-signature.md) |
-| 7.56 | `MagickCore/quantum.c` | 1110 | 90% | 69% | open |
+| 7.56 | `MagickCore/quantum.c` | 1110 | 90% | 69% | 8.32, [M62](tasks/M62-quantum.md) |
 | 7.59 | `MagickCore/linked-list.c` | 1040 | 40% | 69% | 8.95 (interior-insert bug reported), [M59](tasks/M59-linked-list.md) |
-| 7.68 | `MagickCore/random.c` | 996 | 62% | 24% | open |
-| 7.78 | `MagickCore/cache-view.c` | 1114 | 34% | 30% | open |
-| 7.88 | `MagickCore/magic.c` | 823 | 72% | 66% | open |
-| 8.55 | `MagickCore/registry.c` | 537 | 68% | 48% | open |
-| 8.81 | `MagickCore/timer.c` | 664 | 89% | 52% | open |
+| 7.68 | `MagickCore/random.c` | 996 | 62% | 24% | 8.06 (entropy gathering is #if-built), [M63](tasks/M63-random.md) |
+| 7.78 | `MagickCore/cache-view.c` | 1114 | 34% | 30% | plateau 7.78 (D needs cases for GetOneCacheView*), [M64](tasks/M64-cache-view.md) |
+| 7.88 | `MagickCore/magic.c` | 823 | 72% | 66% | 8.45, [M65](tasks/M65-magic.md) |
+| 8.55 | `MagickCore/registry.c` | 537 | 68% | 48% | 8.79, [M66](tasks/M66-registry.md) |
+| 8.81 | `MagickCore/timer.c` | 664 | 89% | 52% | plateau 8.81 (prologue duplication only), [M67](tasks/M67-timer.md) |
 | 9.09 | `MagickCore/artifact.c` | 491 | 80% | 60% | open |
 | 9.28 | `MagickCore/version.c` | 697 | 10% | 50% | open |
 | 10.00 | `MagickCore/client.c` | 163 | 100% | 60% | open |

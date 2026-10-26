@@ -277,6 +277,33 @@ static void DestroyQuantumPixels(QuantumInfo *quantum_info)
     quantum_info->pixels);
 }
 
+static size_t GetQuantumChannels(const Image *image,
+  const QuantumType quantum_type)
+{
+  size_t
+    channels;
+
+  channels=1;
+  switch (quantum_type)
+  {
+    case GrayAlphaQuantum: channels=2; break;
+    case IndexAlphaQuantum: channels=2; break;
+    case RGBQuantum: channels=3; break;
+    case BGRQuantum: channels=3; break;
+    case RGBAQuantum: channels=4; break;
+    case RGBOQuantum: channels=4; break;
+    case BGRAQuantum: channels=4; break;
+    case CMYKQuantum: channels=4; break;
+    case CMYKAQuantum: channels=5; break;
+    case MultispectralQuantum: channels=GetImageChannels(image); break;
+    case CbYCrAQuantum: channels=4; break;
+    case CbYCrQuantum: channels=3; break;
+    case CbYCrYQuantum: channels=4; break;
+    default: break;
+  }
+  return(channels);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -313,24 +340,7 @@ MagickExport size_t GetQuantumExtent(const Image *image,
 
   assert(quantum_info != (QuantumInfo *) NULL);
   assert(quantum_info->signature == MagickCoreSignature);
-  channels=1;
-  switch (quantum_type)
-  {
-    case GrayAlphaQuantum: channels=2; break;
-    case IndexAlphaQuantum: channels=2; break;
-    case RGBQuantum: channels=3; break;
-    case BGRQuantum: channels=3; break;
-    case RGBAQuantum: channels=4; break;
-    case RGBOQuantum: channels=4; break;
-    case BGRAQuantum: channels=4; break;
-    case CMYKQuantum: channels=4; break;
-    case CMYKAQuantum: channels=5; break;
-    case MultispectralQuantum: channels=GetImageChannels(image); break;
-    case CbYCrAQuantum: channels=4; break;
-    case CbYCrQuantum: channels=3; break;
-    case CbYCrYQuantum: channels=4; break;
-    default: break;
-  }
+  channels=GetQuantumChannels(image,quantum_type);
   if (quantum_info->pack == MagickFalse)
     return((size_t) (channels*image->columns*((quantum_info->depth+7)/8))+
       (quantum_info->pad*image->columns));
@@ -396,6 +406,21 @@ MagickExport QuantumFormatType GetQuantumFormat(const QuantumInfo *quantum_info)
   return(quantum_info->format);
 }
 
+static void SetQuantumScaleFromRange(QuantumInfo *quantum_info)
+{
+  if ((quantum_info->minimum == 0.0) && (quantum_info->maximum == 0.0))
+    quantum_info->scale=0.0;
+  else
+    if (quantum_info->minimum == quantum_info->maximum)
+      {
+        quantum_info->scale=(double) QuantumRange/quantum_info->minimum;
+        quantum_info->minimum=0.0;
+      }
+    else
+      quantum_info->scale=(double) QuantumRange/(quantum_info->maximum-
+        quantum_info->minimum);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -446,17 +471,7 @@ MagickExport void GetQuantumInfo(const ImageInfo *image_info,
   option=GetImageOption(image_info,"quantum:maximum");
   if (option != (char *) NULL)
     quantum_info->maximum=StringToDouble(option,(char **) NULL);
-  if ((quantum_info->minimum == 0.0) && (quantum_info->maximum == 0.0))
-    quantum_info->scale=0.0;
-  else
-    if (quantum_info->minimum == quantum_info->maximum)
-      {
-        quantum_info->scale=(double) QuantumRange/quantum_info->minimum;
-        quantum_info->minimum=0.0;
-      }
-    else
-      quantum_info->scale=(double) QuantumRange/(quantum_info->maximum-
-        quantum_info->minimum);
+  SetQuantumScaleFromRange(quantum_info);
   option=GetImageOption(image_info,"quantum:scale");
   if (option != (char *) NULL)
     quantum_info->scale=StringToDouble(option,(char **) NULL);
