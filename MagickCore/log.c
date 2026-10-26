@@ -169,6 +169,16 @@ typedef struct _LogLoadTarget
     *exception;
 } LogLoadTarget;
 
+typedef struct _LogEventLocation
+{
+  const char
+    *module,
+    *function;
+
+  size_t
+    line;
+} LogEventLocation;
+
 /*
   Static declarations.
 */
@@ -1382,9 +1392,16 @@ static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
   *q='\0';
 }
 
-static char *TranslateEvent(const char *module,const char *function,
-  const size_t line,const char *domain,const char *event)
+static char *TranslateEvent(const LogEventLocation *location,
+  const char *domain,const char *event)
 {
+  const char
+    *module = location->module,
+    *function = location->function;
+
+  const size_t
+    line = location->line;
+
   char
     *text;
 
@@ -1608,6 +1625,8 @@ MagickExport MagickBooleanType LogMagickEventList(const LogEventType type,
   const char *module,const char *function,const size_t line,const char *format,
   va_list operands)
 {
+  const LogEventLocation location = { module, function, line };
+
   char
     event[MagickPathExtent],
     *text;
@@ -1641,7 +1660,7 @@ MagickExport MagickBooleanType LogMagickEventList(const LogEventType type,
   n=vsnprintf(event,MagickPathExtent,format,operands);
   if (n < 0)
     event[MagickPathExtent-1]='\0';
-  text=TranslateEvent(module,function,line,domain,event);
+  text=TranslateEvent(&location,domain,event);
   if (text == (char *) NULL)
     {
       (void) ContinueTimer((TimerInfo *) &log_info->timer);
