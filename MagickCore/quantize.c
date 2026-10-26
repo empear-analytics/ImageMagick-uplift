@@ -3324,6 +3324,28 @@ static void PruneToCubeDepth(QCubeInfo *cube_info,const QNodeInfo *node_info)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static size_t GetQuantizeTreeDepth(const QuantizeInfo *quantize_info,
+  const Image *image,const ImageType type,const size_t maximum_colors)
+{
+  size_t
+    colors,
+    depth;
+
+  /*
+    Depth of color tree is: Log4(colormap size)+2.
+  */
+  colors=maximum_colors;
+  for (depth=1; colors != 0; depth++)
+    colors>>=2;
+  if ((quantize_info->dither_method != NoDitherMethod) && (depth > 2))
+    depth--;
+  if ((image->alpha_trait != UndefinedPixelTrait) && (depth > 5))
+    depth--;
+  if (IsGrayImageType(type) != MagickFalse)
+    depth=MaxTreeDepth;
+  return(depth);
+}
+
 MagickExport MagickBooleanType QuantizeImage(const QuantizeInfo *quantize_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -3358,23 +3380,7 @@ MagickExport MagickBooleanType QuantizeImage(const QuantizeInfo *quantize_info,
     (void) SetGrayscaleImage(image,exception);
   depth=quantize_info->tree_depth;
   if (depth == 0)
-    {
-      size_t
-        colors;
-
-      /*
-        Depth of color tree is: Log4(colormap size)+2.
-      */
-      colors=maximum_colors;
-      for (depth=1; colors != 0; depth++)
-        colors>>=2;
-      if ((quantize_info->dither_method != NoDitherMethod) && (depth > 2))
-        depth--;
-      if ((image->alpha_trait != UndefinedPixelTrait) && (depth > 5))
-        depth--;
-      if (IsGrayImageType(type) != MagickFalse)
-        depth=MaxTreeDepth;
-    }
+    depth=GetQuantizeTreeDepth(quantize_info,image,type,maximum_colors);
   /*
     Initialize color cube.
   */
