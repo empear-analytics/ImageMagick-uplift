@@ -1219,6 +1219,30 @@ static void ApplyCDLToColormap(Image *image,
   }
 }
 
+static void ApplyCDLToPixels(const Image *image,
+  const ColorCorrection color_correction,const PixelInfo *cdl_map,
+  Quantum *magick_restrict q)
+{
+  double
+    luma;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    luma=0.21267*(double) GetPixelRed(image,q)+0.71526*(double)
+      GetPixelGreen(image,q)+0.07217*(double) GetPixelBlue(image,q);
+    SetPixelRed(image,ClampToQuantum(luma+color_correction.saturation*
+      (cdl_map[ScaleQuantumToMap(GetPixelRed(image,q))].red-luma)),q);
+    SetPixelGreen(image,ClampToQuantum(luma+color_correction.saturation*
+      (cdl_map[ScaleQuantumToMap(GetPixelGreen(image,q))].green-luma)),q);
+    SetPixelBlue(image,ClampToQuantum(luma+color_correction.saturation*
+      (cdl_map[ScaleQuantumToMap(GetPixelBlue(image,q))].blue-luma)),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
@@ -1332,14 +1356,8 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    double
-      luma;
-
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1349,18 +1367,7 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      luma=0.21267*(double) GetPixelRed(image,q)+0.71526*(double)
-        GetPixelGreen(image,q)+0.07217*(double) GetPixelBlue(image,q);
-      SetPixelRed(image,ClampToQuantum(luma+color_correction.saturation*
-        (cdl_map[ScaleQuantumToMap(GetPixelRed(image,q))].red-luma)),q);
-      SetPixelGreen(image,ClampToQuantum(luma+color_correction.saturation*
-        (cdl_map[ScaleQuantumToMap(GetPixelGreen(image,q))].green-luma)),q);
-      SetPixelBlue(image,ClampToQuantum(luma+color_correction.saturation*
-        (cdl_map[ScaleQuantumToMap(GetPixelBlue(image,q))].blue-luma)),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ApplyCDLToPixels(image,color_correction,cdl_map,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
