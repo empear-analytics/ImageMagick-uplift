@@ -2648,11 +2648,18 @@ static void ExportIndexAlphaQuantum(const Image *image,
   }
 }
 
-static void ExportMultispectralQuantum(const Image *image,
-  QuantumInfo *quantum_info,const MagickSizeType number_pixels,
-  const Quantum *magick_restrict p,unsigned char *magick_restrict q,
-  ExceptionInfo *exception)
+static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   ssize_t
     i,
     x;
@@ -3847,7 +3854,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case MultispectralQuantum:
     {
-      ExportMultispectralQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ExportMultispectralQuantum(image,quantum_info,&span,exception);
       break;
     }
     case CMYKOQuantum:
