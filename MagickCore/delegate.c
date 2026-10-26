@@ -1506,6 +1506,14 @@ static int DelegateCompare(const void *x,const void *y)
 }
 #endif
 
+static inline MagickBooleanType IsListedDelegateMatch(
+  const DelegateInfo *delegate_info,const char *command,const char *pattern)
+{
+  return(((delegate_info->stealth == MagickFalse) &&
+    (GlobExpression(command,pattern,MagickFalse) != MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport char **GetDelegateList(const char *pattern,
   size_t *number_delegates,ExceptionInfo *exception)
 {
@@ -1537,11 +1545,11 @@ MagickExport char **GetDelegateList(const char *pattern,
       *delegate_info;
 
     delegate_info=(const DelegateInfo *) p->value;
-    if ((delegate_info->stealth == MagickFalse) &&
-       (GlobExpression(delegate_info->decode,pattern,MagickFalse) != MagickFalse))
+    if (IsListedDelegateMatch(delegate_info,delegate_info->decode,pattern) !=
+        MagickFalse)
       delegates[i++]=ConstantString(delegate_info->decode);
-    if ((delegate_info->stealth == MagickFalse) &&
-        (GlobExpression(delegate_info->encode,pattern,MagickFalse) != MagickFalse))
+    if (IsListedDelegateMatch(delegate_info,delegate_info->encode,pattern) !=
+        MagickFalse)
       delegates[i++]=ConstantString(delegate_info->encode);
     p=p->next;
   }
