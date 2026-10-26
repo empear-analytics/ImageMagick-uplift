@@ -5258,6 +5258,19 @@ static SegmentInfo GetPolygonEdgesExtent(PolygonInfo **polygon_info,
   return(bounds);
 }
 
+static SegmentInfo ClampPolygonBounds(const Image *image,SegmentInfo bounds)
+{
+  bounds.x1=bounds.x1 < 0.0 ? 0.0 : bounds.x1 >= (double) image->columns-1.0 ?
+    (double) image->columns-1.0 : bounds.x1;
+  bounds.y1=bounds.y1 < 0.0 ? 0.0 : bounds.y1 >= (double) image->rows-1.0 ?
+    (double) image->rows-1.0 : bounds.y1;
+  bounds.x2=bounds.x2 < 0.0 ? 0.0 : bounds.x2 >= (double) image->columns-1.0 ?
+    (double) image->columns-1.0 : bounds.x2;
+  bounds.y2=bounds.y2 < 0.0 ? 0.0 : bounds.y2 >= (double) image->rows-1.0 ?
+    (double) image->rows-1.0 : bounds.y2;
+  return(bounds);
+}
+
 static MagickBooleanType DrawPolygonPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -5333,14 +5346,7 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
       polygon_info=DestroyPolygonTLS(polygon_info);
       return(MagickTrue);  /* virtual polygon */
     }
-  bounds.x1=bounds.x1 < 0.0 ? 0.0 : bounds.x1 >= (double) image->columns-1.0 ?
-    (double) image->columns-1.0 : bounds.x1;
-  bounds.y1=bounds.y1 < 0.0 ? 0.0 : bounds.y1 >= (double) image->rows-1.0 ?
-    (double) image->rows-1.0 : bounds.y1;
-  bounds.x2=bounds.x2 < 0.0 ? 0.0 : bounds.x2 >= (double) image->columns-1.0 ?
-    (double) image->columns-1.0 : bounds.x2;
-  bounds.y2=bounds.y2 < 0.0 ? 0.0 : bounds.y2 >= (double) image->rows-1.0 ?
-    (double) image->rows-1.0 : bounds.y2;
+  bounds=ClampPolygonBounds(image,bounds);
   poly_extent.x1=CastDoubleToSsizeT(ceil(bounds.x1-0.5));
   poly_extent.y1=CastDoubleToSsizeT(ceil(bounds.y1-0.5));
   poly_extent.x2=CastDoubleToSsizeT(floor(bounds.x2+0.5));
