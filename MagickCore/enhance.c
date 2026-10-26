@@ -4210,6 +4210,14 @@ static void NegateImageRow(const Image *image,Quantum *q)
   }
 }
 
+static inline MagickBooleanType IsNonGrayColormapEntry(const Image *image,
+  const ssize_t i)
+{
+  return(((image->colormap[i].red != image->colormap[i].green) ||
+    (image->colormap[i].green != image->colormap[i].blue)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void NegateColormap(Image *image,const MagickBooleanType grayscale)
 {
   ssize_t
@@ -4221,8 +4229,7 @@ static void NegateColormap(Image *image,const MagickBooleanType grayscale)
       Negate colormap.
     */
     if (grayscale != MagickFalse)
-      if ((image->colormap[i].red != image->colormap[i].green) ||
-          (image->colormap[i].green != image->colormap[i].blue))
+      if (IsNonGrayColormapEntry(image,i) != MagickFalse)
         continue;
     if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
       image->colormap[i].red=(double) QuantumRange-image->colormap[i].red;
