@@ -117,6 +117,18 @@ static const char
     "</typemap>";
 
 /*
+  Typedef declarations.
+*/
+typedef struct _TypeLoadTarget
+{
+  SplayTreeInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+} TypeLoadTarget;
+
+/*
   Static declarations.
 */
 static SemaphoreInfo
@@ -130,8 +142,8 @@ static SplayTreeInfo
 */
 static MagickBooleanType
   IsTypeTreeInstantiated(ExceptionInfo *),
-  LoadTypeCache(SplayTreeInfo *,const char *,const char *,const size_t,
-    ExceptionInfo *);
+  LoadTypeCache(const TypeLoadTarget *,const char *,const char *,
+    const size_t);
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -197,6 +209,8 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
     DestroyTypeNode);
   if (cache == (SplayTreeInfo *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  const TypeLoadTarget target = { cache, exception };
+
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
     char
@@ -215,8 +229,8 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
     while (option != (const StringInfo *) NULL)
     {
       (void) CopyMagickString(path,GetStringInfoPath(option),MagickPathExtent);
-      (void) LoadTypeCache(cache,(const char *) GetStringInfoDatum(option),
-        GetStringInfoPath(option),0,exception);
+      (void) LoadTypeCache(&target,(const char *) GetStringInfoDatum(option),
+        GetStringInfoPath(option),0);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
     }
     options=DestroyConfigureOptions(options);
@@ -234,7 +248,7 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
         xml=FileToString(path,~0UL,exception);
         if (xml != (void *) NULL)
           {
-            (void) LoadTypeCache(cache,xml,path,0,exception);
+            (void) LoadTypeCache(&target,xml,path,0);
             xml=DestroyString(xml);
           }
         font_path=DestroyString(font_path);
@@ -244,7 +258,7 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
   magick_unreferenced(filename);
 #endif
   if (GetNumberOfNodesInSplayTree(cache) == 0)
-    (void) LoadTypeCache(cache,TypeMap,"built-in",0,exception);
+    (void) LoadTypeCache(&target,TypeMap,"built-in",0);
   return(cache);
 }
 
@@ -1079,18 +1093,19 @@ MagickExport MagickBooleanType ListTypeInfo(FILE *file,ExceptionInfo *exception)
 %
 %  The format of the LoadTypeCache method is:
 %
-%      MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
-%        const char *filename,const size_t depth,ExceptionInfo *exception)
+%      MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
+%        const char *xml,const char *filename,const size_t depth)
 %
 %  A description of each parameter follows:
+%
+%    o target: the cache to load into, and the exception structure to
+%      return any errors or warnings in.
 %
 %    o xml:  The type list in XML format.
 %
 %    o filename:  The type list filename.
 %
 %    o depth: depth of <include /> statements.
-%
-%    o exception: return any errors or warnings in this structure.
 %
 */
 
@@ -1151,9 +1166,15 @@ static void GetIncludePath(const char *filename,const char *token,
     (void) ConcatenateMagickString(path,token,MagickPathExtent);
 }
 
-static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
-  const char *filename,const size_t depth,ExceptionInfo *exception)
+static MagickBooleanType LoadTypeCache(const TypeLoadTarget *target,
+  const char *xml,const char *filename,const size_t depth)
 {
+  SplayTreeInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
   char
     font_path[MagickPathExtent],
     keyword[MagickPathExtent],
@@ -1268,6 +1289,8 @@ static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
                   ConfigureError,"IncludeNodeNestedTooDeeply","`%s'",token);
               else
                 {
+                  const TypeLoadTarget include_target = { cache, exception };
+
                   char
                     path[MagickPathExtent],
                     *file_xml;
@@ -1282,8 +1305,8 @@ static MagickBooleanType LoadTypeCache(SplayTreeInfo *cache,const char *xml,
                   sans_exception=DestroyExceptionInfo(sans_exception);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=(MagickStatusType) LoadTypeCache(cache,file_xml,
-                        path,depth+1,exception);
+                      status&=(MagickStatusType) LoadTypeCache(
+                        &include_target,file_xml,path,depth+1);
                       file_xml=(char *) RelinquishMagickMemory(file_xml);
                     }
                 }
