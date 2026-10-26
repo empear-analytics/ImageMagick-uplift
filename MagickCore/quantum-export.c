@@ -1194,9 +1194,17 @@ static void ExportBlackQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   Quantum
     cbcr[4];
 
@@ -3864,7 +3872,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case CbYCrYQuantum:
     {
-      ExportCbYCrYQuantum(image,quantum_info,number_pixels,p,q);
+      ExportCbYCrYQuantum(image,quantum_info,&span);
       break;
     }
     case GrayQuantum:
