@@ -2835,6 +2835,23 @@ static HaldInfo GetHaldPoint(const Image *image,const size_t level,
   return(point);
 }
 
+static void SetHaldPixel(const Image *image,const PixelInfo pixel,
+  Quantum *magick_restrict q)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    SetPixelRed(image,ClampToQuantum(pixel.red),q);
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    SetPixelGreen(image,ClampToQuantum(pixel.green),q);
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
+  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    SetPixelBlack(image,ClampToQuantum(pixel.black),q);
+  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->alpha_trait != UndefinedPixelTrait))
+    SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
+}
+
 MagickExport MagickBooleanType HaldClutImage(Image *image,
   const Image *hald_image,ExceptionInfo *exception)
 {
@@ -2960,18 +2977,7 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
         area=(point.z < 0.5)? 0.0 : 1.0;
       CompositePixelInfoAreaBlend(&pixel3,pixel3.alpha,&pixel4,pixel4.alpha,
         area,&pixel);
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        SetPixelRed(image,ClampToQuantum(pixel.red),q);
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        SetPixelGreen(image,ClampToQuantum(pixel.green),q);
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
-      if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-          (image->colorspace == CMYKColorspace))
-        SetPixelBlack(image,ClampToQuantum(pixel.black),q);
-      if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-          (image->alpha_trait != UndefinedPixelTrait))
-        SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
+      SetHaldPixel(image,pixel,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
