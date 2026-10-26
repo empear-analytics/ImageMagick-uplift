@@ -1576,6 +1576,18 @@ static void FreeNodes(IntervalTree *node)
   node=(IntervalTree *) RelinquishMagickMemory(node);
 }
 
+static ssize_t FindFirstCrossing(const ZeroCrossing *zero_crossing,
+  const ssize_t i)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < 255; j++)
+    if (zero_crossing[i].crossings[j] != 0)
+      break;
+  return(j);
+}
+
 static void ForceCrossingEndpoints(ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -1585,9 +1597,7 @@ static void ForceCrossingEndpoints(ZeroCrossing *zero_crossing,
 
   for (i=0; i <= (ssize_t) number_crossings; i++)
   {
-    for (j=0; j < 255; j++)
-      if (zero_crossing[i].crossings[j] != 0)
-        break;
+    j=FindFirstCrossing(zero_crossing,i);
     zero_crossing[i].crossings[0]=(-zero_crossing[i].crossings[j]);
     for (j=255; j > 0; j--)
       if (zero_crossing[i].crossings[j] != 0)

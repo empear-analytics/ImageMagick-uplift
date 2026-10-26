@@ -870,7 +870,7 @@ MagickExport void *RemoveElementByValueFromLinkedList(LinkedListInfo *list_info,
 %    o index: the index.
 %
 */
-MagickExport void *RemoveElementFromLinkedList(LinkedListInfo *list_info,
+static void *UnlinkInteriorElement(LinkedListInfo *list_info,
   const size_t index)
 {
   ElementInfo
@@ -878,6 +878,32 @@ MagickExport void *RemoveElementFromLinkedList(LinkedListInfo *list_info,
 
   ssize_t
     i;
+
+  void
+    *value;
+
+  ElementInfo
+    *element;
+
+  next=list_info->head;
+  for (i=1; i < (ssize_t) index; i++)
+    next=next->next;
+  element=next->next;
+  next->next=element->next;
+  if (element == list_info->tail)
+    list_info->tail=next;
+  if (list_info->next == element)
+    list_info->next=element->next;
+  value=element->value;
+  element=(ElementInfo *) RelinquishMagickMemory(element);
+  return(value);
+}
+
+MagickExport void *RemoveElementFromLinkedList(LinkedListInfo *list_info,
+  const size_t index)
+{
+  ElementInfo
+    *next;
 
   void
     *value;
@@ -897,22 +923,7 @@ MagickExport void *RemoveElementFromLinkedList(LinkedListInfo *list_info,
       next=(ElementInfo *) RelinquishMagickMemory(next);
     }
   else
-    {
-      ElementInfo
-        *element;
-
-      next=list_info->head;
-      for (i=1; i < (ssize_t) index; i++)
-        next=next->next;
-      element=next->next;
-      next->next=element->next;
-      if (element == list_info->tail)
-        list_info->tail=next;
-      if (list_info->next == element)
-        list_info->next=element->next;
-      value=element->value;
-      element=(ElementInfo *) RelinquishMagickMemory(element);
-    }
+    value=UnlinkInteriorElement(list_info,index);
   list_info->elements--;
   UnlockSemaphoreInfo(list_info->semaphore);
   return(value);

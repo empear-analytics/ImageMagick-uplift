@@ -158,6 +158,22 @@ static PixelChannels **DestroyPixelTLS(const Image *images,
   return(pixels);
 }
 
+static void ClearPixelChannelsRow(PixelChannels **pixels,const ssize_t i,
+  const size_t columns)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) columns; j++)
+  {
+    ssize_t
+      k;
+
+    for (k=0; k < MaxPixelChannels; k++)
+      pixels[i][j].channel[k]=0.0;
+  }
+}
+
 static PixelChannels **AcquirePixelTLS(const Image *images)
 {
   const Image
@@ -185,20 +201,10 @@ static PixelChannels **AcquirePixelTLS(const Image *images)
     columns=MagickMax(next->columns,columns);
   for (i=0; i < (ssize_t) rows; i++)
   {
-    ssize_t
-      j;
-
     pixels[i]=(PixelChannels *) AcquireQuantumMemory(columns,sizeof(**pixels));
     if (pixels[i] == (PixelChannels *) NULL)
       return(DestroyPixelTLS(images,pixels));
-    for (j=0; j < (ssize_t) columns; j++)
-    {
-      ssize_t
-        k;
-
-      for (k=0; k < MaxPixelChannels; k++)
-        pixels[i][j].channel[k]=0.0;
-    }
+    ClearPixelChannelsRow(pixels,i,columns);
   }
   return(pixels);
 }
@@ -2072,6 +2078,22 @@ static void UpdateWelfordMoments(ChannelStatistics *cs,
   cs->M1+=delta_n;
 }
 
+static void ComputeChannelHigherMoments(ChannelStatistics *cs,
+  const double adj_area)
+{
+  if (cs->area > 1.0)
+    cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
+      cs->area-1.0));
+  else
+    cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
+      cs->area));
+  cs->variance=cs->standard_deviation*cs->standard_deviation;
+  cs->skewness=(double) (sqrtl(cs->area)*cs->M3/powl(cs->M2*adj_area,
+    1.5));
+  cs->kurtosis=(double) (cs->area*cs->M4/(cs->M2*cs->M2*adj_area*
+    adj_area)-3.0);
+}
+
 static void ComputeChannelMoments(ChannelStatistics *cs)
 {
   double
@@ -2093,19 +2115,7 @@ static void ComputeChannelMoments(ChannelStatistics *cs)
       cs->kurtosis=0.0;
     }
   else
-    {
-      if (cs->area > 1.0)
-        cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
-          cs->area-1.0));
-      else
-        cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
-          cs->area));
-      cs->variance=cs->standard_deviation*cs->standard_deviation;
-      cs->skewness=(double) (sqrtl(cs->area)*cs->M3/powl(cs->M2*adj_area,
-        1.5));
-      cs->kurtosis=(double) (cs->area*cs->M4/(cs->M2*cs->M2*adj_area*
-        adj_area)-3.0);
-    }
+    ComputeChannelHigherMoments(cs,adj_area);
 }
 
 static void ResetChannelStatistics(ChannelStatistics *channel_statistics)

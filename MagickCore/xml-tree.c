@@ -287,18 +287,37 @@ static inline MagickBooleanType IsDisallowedControlChar(const unsigned char *p)
     (*p != 0x0d)) ? MagickTrue : MagickFalse);
 }
 
-static char *CanonicalXMLContent(const char *content,
-  const MagickBooleanType pedantic)
+static char *EncodeBase64XMLContent(unsigned char *utf8)
 {
   char
     *base64,
     *canonical_content;
 
-  const unsigned char
-    *p;
-
   size_t
     length;
+
+  /*
+    String is binary, base64-encode it.
+  */
+  base64=Base64Encode(utf8,strlen((char *) utf8),&length);
+  utf8=(unsigned char *) RelinquishMagickMemory(utf8);
+  if (base64 == (char *) NULL)
+    return((char *) NULL);
+  canonical_content=AcquireString("<base64>");
+  (void) ConcatenateString(&canonical_content,base64);
+  base64=DestroyString(base64);
+  (void) ConcatenateString(&canonical_content,"</base64>");
+  return(canonical_content);
+}
+
+static char *CanonicalXMLContent(const char *content,
+  const MagickBooleanType pedantic)
+{
+  char
+    *canonical_content;
+
+  const unsigned char
+    *p;
 
   unsigned char
     *utf8;
@@ -310,20 +329,7 @@ static char *CanonicalXMLContent(const char *content,
     if (IsDisallowedControlChar(p) != MagickFalse)
       break;
   if (*p != '\0')
-    {
-      /*
-        String is binary, base64-encode it.
-      */
-      base64=Base64Encode(utf8,strlen((char *) utf8),&length);
-      utf8=(unsigned char *) RelinquishMagickMemory(utf8);
-      if (base64 == (char *) NULL)
-        return((char *) NULL);
-      canonical_content=AcquireString("<base64>");
-      (void) ConcatenateString(&canonical_content,base64);
-      base64=DestroyString(base64);
-      (void) ConcatenateString(&canonical_content,"</base64>");
-      return(canonical_content);
-    }
+    return(EncodeBase64XMLContent(utf8));
   canonical_content=SubstituteXMLEntities((const char *) utf8,pedantic);
   utf8=(unsigned char *) RelinquishMagickMemory(utf8);
   return(canonical_content);

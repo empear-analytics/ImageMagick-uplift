@@ -947,13 +947,28 @@ static void PrintImageChromaticity(FILE *file,const Image *image)
     image->chromaticity.white_point.z);
 }
 
-static void PrintImageDirectory(FILE *file,const Image *image,
+static void PrintTileProperties(FILE *file,Image *tile,
   ExceptionInfo *exception)
 {
   const char
     *property,
     *value;
 
+  ResetImagePropertyIterator(tile);
+  property=GetNextImageProperty(tile);
+  while (property != (const char *) NULL)
+  {
+    (void) FormatLocaleFile(file,"  %s:\n",property);
+    value=GetImageProperty(tile,property,exception);
+    if (value != (const char *) NULL)
+      (void) FormatLocaleFile(file,"%s\n",value);
+    property=GetNextImageProperty(tile);
+  }
+}
+
+static void PrintImageDirectory(FILE *file,const Image *image,
+  ExceptionInfo *exception)
+{
   Image
     *tile;
 
@@ -992,16 +1007,7 @@ static void PrintImageDirectory(FILE *file,const Image *image,
     (void) FormatLocaleFile(file," %.17gx%.17g %s\n",(double)
       tile->magick_columns,(double) tile->magick_rows,tile->magick);
     (void) SignatureImage(tile,exception);
-    ResetImagePropertyIterator(tile);
-    property=GetNextImageProperty(tile);
-    while (property != (const char *) NULL)
-    {
-      (void) FormatLocaleFile(file,"  %s:\n",property);
-      value=GetImageProperty(tile,property,exception);
-      if (value != (const char *) NULL)
-        (void) FormatLocaleFile(file,"%s\n",value);
-      property=GetNextImageProperty(tile);
-    }
+    PrintTileProperties(file,tile,exception);
     tile=DestroyImage(tile);
   }
   image_info=DestroyImageInfo(image_info);

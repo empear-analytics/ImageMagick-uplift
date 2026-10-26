@@ -3715,6 +3715,29 @@ static int QuantizeErrorCompare(const void *error_p,const void *error_q)
   return(-1);
 }
 
+static void SetRapidReductionThreshold(QCubeInfo *cube_info)
+{
+  double
+    *quantize_error;
+
+  /*
+    Enable rapid reduction of the number of unique colors.
+  */
+  quantize_error=(double *) AcquireQuantumMemory(cube_info->nodes,
+    sizeof(*quantize_error));
+  if (quantize_error != (double *) NULL)
+    {
+      (void) QuantizeErrorFlatten(cube_info,cube_info->root,0,
+        quantize_error);
+      qsort(quantize_error,cube_info->nodes,sizeof(double),
+        QuantizeErrorCompare);
+      if (cube_info->nodes > (110*(cube_info->maximum_colors+1)/100))
+        cube_info->next_threshold=quantize_error[cube_info->nodes-110*
+          (cube_info->maximum_colors+1)/100];
+      quantize_error=(double *) RelinquishMagickMemory(quantize_error);
+    }
+}
+
 static void ReduceImageColors(const Image *image,QCubeInfo *cube_info)
 {
 #define ReduceImageTag  "Reduce/Image"
@@ -3730,27 +3753,7 @@ static void ReduceImageColors(const Image *image,QCubeInfo *cube_info)
 
   cube_info->next_threshold=0.0;
   if (cube_info->colors > cube_info->maximum_colors)
-    {
-      double
-        *quantize_error;
-
-      /*
-        Enable rapid reduction of the number of unique colors.
-      */
-      quantize_error=(double *) AcquireQuantumMemory(cube_info->nodes,
-        sizeof(*quantize_error));
-      if (quantize_error != (double *) NULL)
-        {
-          (void) QuantizeErrorFlatten(cube_info,cube_info->root,0,
-            quantize_error);
-          qsort(quantize_error,cube_info->nodes,sizeof(double),
-            QuantizeErrorCompare);
-          if (cube_info->nodes > (110*(cube_info->maximum_colors+1)/100))
-            cube_info->next_threshold=quantize_error[cube_info->nodes-110*
-              (cube_info->maximum_colors+1)/100];
-          quantize_error=(double *) RelinquishMagickMemory(quantize_error);
-        }
-  }
+    SetRapidReductionThreshold(cube_info);
   for (span=cube_info->colors; cube_info->colors > cube_info->maximum_colors; )
   {
     cube_info->pruning_threshold=cube_info->next_threshold;

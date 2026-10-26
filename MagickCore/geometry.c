@@ -495,6 +495,26 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
 %      geometry (e.g. 612x792+36+36).
 %
 */
+static void ExpandPageMnemonic(char *page,const char *page_geometry,
+  const ssize_t i)
+{
+  MagickStatusType
+    flags;
+
+  RectangleInfo
+    geometry;
+
+  /*
+    Replace mnemonic with the equivalent size in dots-per-inch.
+  */
+  (void) FormatLocaleString(page,MagickPathExtent,"%s%.80s",
+    Pagesizes[i].geometry,page_geometry+Pagesizes[i].extent);
+  flags=GetGeometry(page,&geometry.x,&geometry.y,&geometry.width,
+    &geometry.height);
+  if ((flags & GreaterValue) == 0)
+    (void) ConcatenateMagickString(page,">",MagickPathExtent);
+}
+
 MagickExport char *GetPageGeometry(const char *page_geometry)
 {
   char
@@ -517,21 +537,7 @@ MagickExport char *GetPageGeometry(const char *page_geometry)
     status=LocaleNCompare(Pagesizes[i].name,page_geometry,Pagesizes[i].extent);
     if (status == 0)
       {
-        MagickStatusType
-          flags;
-
-        RectangleInfo
-          geometry;
-
-        /*
-          Replace mnemonic with the equivalent size in dots-per-inch.
-        */
-        (void) FormatLocaleString(page,MagickPathExtent,"%s%.80s",
-          Pagesizes[i].geometry,page_geometry+Pagesizes[i].extent);
-        flags=GetGeometry(page,&geometry.x,&geometry.y,&geometry.width,
-          &geometry.height);
-        if ((flags & GreaterValue) == 0)
-          (void) ConcatenateMagickString(page,">",MagickPathExtent);
+        ExpandPageMnemonic(page,page_geometry,i);
         break;
       }
   }

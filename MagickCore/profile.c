@@ -1963,7 +1963,7 @@ static inline MagickBooleanType IsExifProfileName(const char *name,
     (GetStringInfoLength(profile) > 2)) ? MagickTrue : MagickFalse);
 }
 
-static void PatchCorruptProfile(const char *name,StringInfo *profile)
+static void TrimXMPPacket(StringInfo *profile)
 {
   unsigned char
     *p;
@@ -1972,25 +1972,33 @@ static void PatchCorruptProfile(const char *name,StringInfo *profile)
     length;
 
   /*
+    Remove garbage after xpacket end.
+  */
+  p=GetStringInfoDatum(profile);
+  p=(unsigned char *) strstr((const char *) p,"<?xpacket end=\"w\"?>");
+  if (p != (unsigned char *) NULL)
+    {
+      p+=(ptrdiff_t) 19;
+      length=(size_t) (p-GetStringInfoDatum(profile));
+      if (length != GetStringInfoLength(profile))
+        {
+          *p='\0';
+          SetStringInfoLength(profile,length);
+        }
+    }
+}
+
+static void PatchCorruptProfile(const char *name,StringInfo *profile)
+{
+  unsigned char
+    *p;
+
+  /*
     Detect corrupt profiles and if discovered, repair.
   */
   if (LocaleCompare(name,"xmp") == 0)
     {
-      /*
-        Remove garbage after xpacket end.
-      */
-      p=GetStringInfoDatum(profile);
-      p=(unsigned char *) strstr((const char *) p,"<?xpacket end=\"w\"?>");
-      if (p != (unsigned char *) NULL)
-        {
-          p+=(ptrdiff_t) 19;
-          length=(size_t) (p-GetStringInfoDatum(profile));
-          if (length != GetStringInfoLength(profile))
-            {
-              *p='\0';
-              SetStringInfoLength(profile,length);
-            }
-        }
+      TrimXMPPacket(profile);
       return;
     }
   if (IsExifProfileName(name,profile) != MagickFalse)
