@@ -998,6 +998,29 @@ typedef struct _TagInfo
     description[36];
 } TagInfo;
 
+static const char *GetEXIFTagDescription(const TagInfo *EXIFTag,
+  const size_t tag_value)
+{
+  const char
+    *description;
+
+  ssize_t
+    i;
+
+  description="unknown";
+  for (i=0; ; i++)
+  {
+    if (EXIFTag[i].tag == 0)
+      break;
+    if (EXIFTag[i].tag == tag_value)
+      {
+        description=EXIFTag[i].description;
+        break;
+      }
+  }
+  return(description);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1679,17 +1702,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
                   const char
                     *description;
 
-                  description="unknown";
-                  for (i=0; ; i++)
-                  {
-                    if (EXIFTag[i].tag == 0)
-                      break;
-                    if (EXIFTag[i].tag == tag_value)
-                      {
-                        description=EXIFTag[i].description;
-                        break;
-                      }
-                  }
+                  description=GetEXIFTagDescription(EXIFTag,tag_value);
                   (void) FormatLocaleString(key,MagickPathExtent,"%s",
                     description);
                   if (level == 2)
