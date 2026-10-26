@@ -957,6 +957,26 @@ static inline unsigned short ReadPropertyUnsignedShort(const EndianType endian,
    value=AcquireString(buffer); \
 }
 
+static inline MagickBooleanType IsGPSFractionTag(const size_t tag_value)
+{
+  return(((tag_value == GPS_LATITUDE) || (tag_value == GPS_LONGITUDE) ||
+    (tag_value == GPS_TIMESTAMP)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsSubdirectoryTag(const size_t tag_value)
+{
+  return(((tag_value == TAG_EXIF_OFFSET) ||
+    (tag_value == TAG_INTEROP_OFFSET) || (tag_value == TAG_GPS_OFFSET)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsNextIFDOffset(const ssize_t tag_offset1,
+  const size_t length,const ssize_t level)
+{
+  return(((tag_offset1 != 0) && ((size_t) tag_offset1 < length) &&
+    (level < (MaxDirectoryStack-2))) ? MagickTrue : MagickFalse);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1585,8 +1605,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
             }
             case EXIF_FMT_URATIONAL:
             {
-              if ((tag_value == GPS_LATITUDE) || (tag_value == GPS_LONGITUDE) ||
-                  (tag_value == GPS_TIMESTAMP))
+              if (IsGPSFractionTag(tag_value) != MagickFalse)
                 {
                   if (number_bytes < 24)
                     break;  /* reads three rationals */
@@ -1703,8 +1722,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
               key=DestroyString(key);
             }
         }
-        if ((tag_value == TAG_EXIF_OFFSET) ||
-            (tag_value == TAG_INTEROP_OFFSET) || (tag_value == TAG_GPS_OFFSET))
+        if (IsSubdirectoryTag(tag_value) != MagickFalse)
           {
             ssize_t
               tag_offset1;
@@ -1739,8 +1757,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
                   break;
                 tag_offset1=(ssize_t) ReadPropertySignedLong(endian,directory+
                   2+(12*number_entries));
-                if ((tag_offset1 != 0) && ((size_t) tag_offset1 < length) &&
-                    (level < (MaxDirectoryStack-2)))
+                if (IsNextIFDOffset(tag_offset1,length,level) != MagickFalse)
                   {
                     directory_stack[level].directory=exif+tag_offset1;
                     directory_stack[level].entry=0;
