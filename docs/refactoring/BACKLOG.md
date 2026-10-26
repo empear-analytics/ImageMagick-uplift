@@ -100,7 +100,7 @@ needs before refactoring:
 | 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | 1.81, in progress (Complex Conditional 42 -> 8 sites; the rest are repeats), [M38](tasks/M38-fx.md) |
 | 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | open |
 | 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | plateau 1.24 for E (loop helpers measured at +0.01 per function), [M70](tasks/M70-quantum-export.md) |
-| 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | 1.77, in progress (Complex Conditional gone: 20 sites, 22 predicates), [M37](tasks/M37-draw.md) |
+| 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | 1.79, in progress (Complex Conditional gone: 20 sites, 22 predicates; DrawPolygonPrimitive bounds, [M91](tasks/M91-hoist-types-2.md)), [M37](tasks/M37-draw.md) |
 | 1.33 | `MagickCore/composite.c` | 3815 | 86% | 74% | 1.58, in progress (Complex Conditional gone), [M20](tasks/M20-composite.md) |
 | 1.38 | `MagickCore/effect.c` | 4405 | 89% | 75% | 1.40, in progress (Complex Conditional gone; parallel loops need K/T, the adaptive pair B), [M26](tasks/M26-effect.md) |
 | 1.74 | `MagickCore/distort.c` | 3466 | 68% | 76% | 2.29, in progress (Complex Conditional gone; the rest needs Recipe B, O or K), [M22](tasks/M22-distort.md) |
@@ -114,7 +114,7 @@ needs before refactoring:
 | 3.26 | `MagickCore/utility.c` | 2087 | 28% | 73% | 3.65, in progress (Complex Conditional gone; rest is multi-output or platform #if), [M50](tasks/M50-utility.md) |
 | 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | 3.76, in progress (Throw* blocks pinned by __func__; StripMagickString return bug reported), [M49](tasks/M49-string.md) |
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
-| 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | 5.28 (Recipe H applied, M84; Huffman/LZW bit macros need O/K), [M68](tasks/M68-compress.md) |
+| 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | 5.31 (Recipe H applied, M84; LZWEncodeImage's type hoisted, M91; Huffman/LZW bit macros need O/K), [M68](tasks/M68-compress.md) |
 | 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 5.35, in progress (Complex Conditional gone; string helpers tip String Heavy), [M34](tasks/M34-configure.md) |
 | 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | 6.34 (tree descent returns from inside), [M56](tasks/M56-histogram.md) |
 | 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | 6.61 (guard level; the tile loop keeps multi-output blocks), [M57](tasks/M57-montage.md) |
@@ -142,7 +142,7 @@ needs before refactoring:
 | 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 3.40, plateau for now (new two-string helpers trigger String Heavy Function Arguments), [M30](tasks/M30-log.md) |
 | 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | 4.45 (guard level, not ready; ReadImage and WriteImage left), [M48](tasks/M48-constitute.md) |
 | 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | 3.85, in progress (Complex Conditional: one sizeof site left), [M31](tasks/M31-policy.md) |
-| 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.13, in progress (Complex Conditional gone; out of the Red band), [M32](tasks/M32-type.md) |
+| 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.21, in progress (Complex Conditional gone; GetTypeInfoByFamily's scoring and exact pass extracted, [M91](tasks/M91-hoist-types-2.md)), [M32](tasks/M32-type.md) |
 | 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | 5.13 (guard level; rest is #if-built or Recipe B), [M51](tasks/M51-resample.md) |
 | 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | 5.02 (lock helpers reused in Relinquish, [M88](tasks/M88-reuse.md); env blocks are two-value), [M52](tasks/M52-resource.md) |
 | 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | 4.91 (helpers reused after fresh mutation, [M88](tasks/M88-reuse.md)), [M53](tasks/M53-splay-tree.md) |
