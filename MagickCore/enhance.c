@@ -1126,6 +1126,29 @@ typedef struct _ColorCorrection
     saturation;
 } ColorCorrection;
 
+static ColorCorrection ParseCDLSOPNode(XMLTreeInfo *sop,
+  ColorCorrection color_correction)
+{
+  XMLTreeInfo
+    *offset,
+    *power,
+    *slope;
+
+  slope=GetXMLTreeChild(sop,"Slope");
+  if (slope != (XMLTreeInfo *) NULL)
+    ParseCDLTriple(slope,&color_correction.red.slope,
+      &color_correction.green.slope,&color_correction.blue.slope);
+  offset=GetXMLTreeChild(sop,"Offset");
+  if (offset != (XMLTreeInfo *) NULL)
+    ParseCDLTriple(offset,&color_correction.red.offset,
+      &color_correction.green.offset,&color_correction.blue.offset);
+  power=GetXMLTreeChild(sop,"Power");
+  if (power != (XMLTreeInfo *) NULL)
+    ParseCDLTriple(power,&color_correction.red.power,
+      &color_correction.green.power,&color_correction.blue.power);
+  return(color_correction);
+}
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
@@ -1195,25 +1218,7 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   color_correction.saturation=0.0;
   sop=GetXMLTreeChild(cc,"SOPNode");
   if (sop != (XMLTreeInfo *) NULL)
-    {
-      XMLTreeInfo
-        *offset,
-        *power,
-        *slope;
-
-      slope=GetXMLTreeChild(sop,"Slope");
-      if (slope != (XMLTreeInfo *) NULL)
-        ParseCDLTriple(slope,&color_correction.red.slope,
-          &color_correction.green.slope,&color_correction.blue.slope);
-      offset=GetXMLTreeChild(sop,"Offset");
-      if (offset != (XMLTreeInfo *) NULL)
-        ParseCDLTriple(offset,&color_correction.red.offset,
-          &color_correction.green.offset,&color_correction.blue.offset);
-      power=GetXMLTreeChild(sop,"Power");
-      if (power != (XMLTreeInfo *) NULL)
-        ParseCDLTriple(power,&color_correction.red.power,
-          &color_correction.green.power,&color_correction.blue.power);
-    }
+    color_correction=ParseCDLSOPNode(sop,color_correction);
   sat=GetXMLTreeChild(cc,"SATNode");
   if (sat != (XMLTreeInfo *) NULL)
     {
