@@ -2248,8 +2248,6 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
     rows;
 
   ssize_t
-    channels = 0,
-    l,
     y;
 
   /*
@@ -2437,22 +2435,7 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
   image_view=DestroyCacheView(image_view);
   reconstruct_view=DestroyCacheView(reconstruct_view);
   kernel_info=DestroyKernelInfo(kernel_info);
-  area=MagickSafeReciprocal(area);
-  for (l=0; l < (ssize_t) GetPixelChannels(image); l++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(image,l);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-      channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
-      continue;
-    similarity[l]*=area;
-    channels++;
-  }
-  similarity[CompositePixelChannel]*=area;
-  if (channels != 0)
-   similarity[CompositePixelChannel]/=(double) channels;
+  NormalizeChannelSimilarity(image,reconstruct_image,area,similarity);
   return(status);
 }
 
