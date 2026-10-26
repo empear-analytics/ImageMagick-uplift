@@ -205,3 +205,12 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): second pass
+
+**Result: Code Health 2.97, unchanged. Tried and reverted.** SetImageType's switch
+(ready, cc 33) gets its complexity from the number of cases, not from their bodies.
+Moving the Bilevel case into a value-returning helper (its `status` is overwritten by
+`QuantizeImage` before it is read) left the file flat and SetImageType at cc 32.
+GetImageDepth, SetImageDepth and FloydSteinbergImageDepth are parallel loops that set
+`status` and several locals together.
