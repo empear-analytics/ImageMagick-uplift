@@ -869,9 +869,6 @@ static inline unsigned short ReadPropertyUnsignedShort(const EndianType endian,
   return(value & 0xffff);
 }
 
-static void GetEXIFProperty(const Image *image,const char *property,
-  ExceptionInfo *exception)
-{
 #define MaxDirectoryStack  16
 #define EXIF_DELIMITER  "\n"
 #define EXIF_NUM_FORMATS  12
@@ -960,6 +957,9 @@ static void GetEXIFProperty(const Image *image,const char *property,
    value=AcquireString(buffer); \
 }
 
+static void GetEXIFProperty(const Image *image,const char *property,
+  ExceptionInfo *exception)
+{
   typedef struct _DirectoryInfo
   {
     const unsigned char
