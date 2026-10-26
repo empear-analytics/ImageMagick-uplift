@@ -607,8 +607,6 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
 %    o signature_info: the address of a structure of type SignatureInfo.
 %
 */
-static void TransformSignature(SignatureInfo *signature_info)
-{
 #define Ch(x,y,z)  (((x) & (y)) ^ (~(x) & (z)))
 #define Maj(x,y,z)  (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
 #define RotateRight(x,n)  (Trunc32(((x) >> n) | ((x) << (32-n))))
@@ -618,6 +616,8 @@ static void TransformSignature(SignatureInfo *signature_info)
 #define Suma1(x)  (RotateRight(x,6) ^ RotateRight(x,11) ^ RotateRight(x,25))
 #define Trunc32(x)  ((unsigned int) ((x) & 0xffffffffU))
 
+static void TransformSignature(SignatureInfo *signature_info)
+{
   ssize_t
     i;
 
