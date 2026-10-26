@@ -1116,6 +1116,23 @@ static inline void RelinquishPixelCachePixels(CacheInfo *cache_info)
   cache_info->metacontent=(void *) NULL;
 }
 
+static void RelinquishPixelCacheResources(
+  CacheInfo *magick_restrict cache_info)
+{
+  if (cache_info->server_info != (DistributeCacheInfo *) NULL)
+    cache_info->server_info=DestroyDistributeCacheInfo((DistributeCacheInfo *)
+      cache_info->server_info);
+  if (cache_info->nexus_info != (NexusInfo **) NULL)
+    cache_info->nexus_info=DestroyPixelCacheNexus(cache_info->nexus_info,
+      cache_info->number_threads);
+  if (cache_info->random_info != (RandomInfo *) NULL)
+    cache_info->random_info=DestroyRandomInfo(cache_info->random_info);
+  if (cache_info->file_semaphore != (SemaphoreInfo *) NULL)
+    RelinquishSemaphoreInfo(&cache_info->file_semaphore);
+  if (cache_info->semaphore != (SemaphoreInfo *) NULL)
+    RelinquishSemaphoreInfo(&cache_info->semaphore);
+}
+
 MagickPrivate Cache DestroyPixelCache(Cache cache)
 {
   CacheInfo
@@ -1145,18 +1162,7 @@ MagickPrivate Cache DestroyPixelCache(Cache cache)
       (void) LogMagickEvent(CacheEvent,GetMagickModule(),"%s",message);
     }
   RelinquishPixelCachePixels(cache_info);
-  if (cache_info->server_info != (DistributeCacheInfo *) NULL)
-    cache_info->server_info=DestroyDistributeCacheInfo((DistributeCacheInfo *)
-      cache_info->server_info);
-  if (cache_info->nexus_info != (NexusInfo **) NULL)
-    cache_info->nexus_info=DestroyPixelCacheNexus(cache_info->nexus_info,
-      cache_info->number_threads);
-  if (cache_info->random_info != (RandomInfo *) NULL)
-    cache_info->random_info=DestroyRandomInfo(cache_info->random_info);
-  if (cache_info->file_semaphore != (SemaphoreInfo *) NULL)
-    RelinquishSemaphoreInfo(&cache_info->file_semaphore);
-  if (cache_info->semaphore != (SemaphoreInfo *) NULL)
-    RelinquishSemaphoreInfo(&cache_info->semaphore);
+  RelinquishPixelCacheResources(cache_info);
   cache_info->signature=(~MagickCoreSignature);
   cache_info=(CacheInfo *) RelinquishAlignedMemory(cache_info);
   cache=(Cache) NULL;
