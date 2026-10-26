@@ -2365,9 +2365,6 @@ static inline void WriteProfileDimension(const EndianType endian,
   WriteProfileLong(endian,dimension,value);
 }
 
-static void SyncExifProfile(const Image *image,unsigned char *exif,
-  size_t length)
-{
 #define MaxDirectoryStack  16
 #define EXIF_DELIMITER  "\n"
 #define EXIF_NUM_FORMATS  12
@@ -2378,6 +2375,9 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
 #define TAG_PIXEL_X_DIMENSION  0xa002
 #define TAG_PIXEL_Y_DIMENSION  0xa003
 
+static void SyncExifProfile(const Image *image,unsigned char *exif,
+  size_t length)
+{
   typedef struct _DirectoryInfo
   {
     unsigned char
