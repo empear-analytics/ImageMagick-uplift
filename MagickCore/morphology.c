@@ -1918,6 +1918,17 @@ static void SetLoGKernelValues(KernelInfo *kernel,const double sigma)
       }
 }
 
+static void SetLoGOrUnityKernelValues(KernelInfo *kernel,const double sigma)
+{
+  if ( sigma > MagickEpsilon )
+    SetLoGKernelValues(kernel,sigma);
+  else /* special case - generate a unity kernel */
+    { (void) memset(kernel->values,0, (size_t)
+        kernel->width*kernel->height*sizeof(*kernel->values));
+      kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    }
+}
+
 static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -1955,13 +1966,7 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
 
   if ( type == LoGKernel )
     { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
-      if ( sigma > MagickEpsilon )
-        SetLoGKernelValues(kernel,sigma);
-      else /* special case - generate a unity kernel */
-        { (void) memset(kernel->values,0, (size_t)
-            kernel->width*kernel->height*sizeof(*kernel->values));
-          kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-        }
+      SetLoGOrUnityKernelValues(kernel,sigma);
     }
 
   /* Note the above kernels may have been 'clipped' by a user defined
