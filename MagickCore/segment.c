@@ -387,6 +387,49 @@ static void ClassifyFuzzyPixel(Image *image,const double *squares,
   }
 }
 
+static ssize_t CountClusterPixel(Cluster *head,const PixelInfo pixel,
+  ssize_t count)
+{
+  Cluster
+    *cluster;
+
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
+    if (IsPixelInCluster(cluster,pixel.red,pixel.green,pixel.blue) !=
+        MagickFalse)
+      {
+        /*
+          Count this pixel.
+        */
+        count++;
+        cluster->red.center+=pixel.red;
+        cluster->green.center+=pixel.green;
+        cluster->blue.center+=pixel.blue;
+        cluster->count++;
+        break;
+      }
+  return(count);
+}
+
+static Cluster *ClassifyPixelByCluster(const Image *image,Cluster *head,
+  const PixelInfo pixel,Quantum *magick_restrict q)
+{
+  Cluster
+    *c;
+
+  for (c=head; c != (Cluster *) NULL; c=c->next)
+  {
+    if (IsPixelInCluster(c,pixel.red,pixel.green,pixel.blue) != MagickFalse)
+      {
+        /*
+          Classify this pixel.
+        */
+        SetPixelIndex(image,(Quantum) c->id,q);
+        break;
+      }
+  }
+  return(c);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const double cluster_threshold,const double weighting_exponent,
   const MagickBooleanType verbose,ExceptionInfo *exception)
@@ -532,20 +575,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
       pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,p));
       pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
       pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
-      for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-        if (IsPixelInCluster(cluster,pixel.red,pixel.green,pixel.blue) !=
-            MagickFalse)
-          {
-            /*
-              Count this pixel.
-            */
-            count++;
-            cluster->red.center+=pixel.red;
-            cluster->green.center+=pixel.green;
-            cluster->blue.center+=pixel.blue;
-            cluster->count++;
-            break;
-          }
+      count=CountClusterPixel(head,pixel,count);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -654,17 +684,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
       pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,q));
       pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,q));
       pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,q));
-      for (c=head; c != (Cluster *) NULL; c=c->next)
-      {
-        if (IsPixelInCluster(c,pixel.red,pixel.green,pixel.blue) != MagickFalse)
-          {
-            /*
-              Classify this pixel.
-            */
-            SetPixelIndex(image,(Quantum) c->id,q);
-            break;
-          }
-      }
+      c=ClassifyPixelByCluster(image,head,pixel,q);
       if (c == (Cluster *) NULL)
         ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
@@ -1374,6 +1394,40 @@ static void Stability(IntervalTree *node)
   Stability(node->child);
 }
 
+static IntervalTree *AppendIntervalNode(const IntervalTree *head,
+  IntervalTree *node)
+{
+  if (node == head)
+    {
+      node->child=(IntervalTree *) AcquireQuantumMemory(1,
+        sizeof(*node->child));
+      node=node->child;
+    }
+  else
+    {
+      node->sibling=(IntervalTree *) AcquireQuantumMemory(1,
+        sizeof(*node->sibling));
+      node=node->sibling;
+    }
+  return(node);
+}
+
+static IntervalTree *AcquireRootInterval(void)
+{
+  IntervalTree
+    *root;
+
+  root=(IntervalTree *) AcquireCriticalMemory(sizeof(*root));
+  root->child=(IntervalTree *) NULL;
+  root->sibling=(IntervalTree *) NULL;
+  root->tau=0.0;
+  root->left=0;
+  root->right=255;
+  root->mean_stability=0.0;
+  root->stability=0.0;
+  return(root);
+}
+
 static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -1402,14 +1456,7 @@ static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
   /*
     The root is the entire histogram.
   */
-  root=(IntervalTree *) AcquireCriticalMemory(sizeof(*root));
-  root->child=(IntervalTree *) NULL;
-  root->sibling=(IntervalTree *) NULL;
-  root->tau=0.0;
-  root->left=0;
-  root->right=255;
-  root->mean_stability=0.0;
-  root->stability=0.0;
+  root=AcquireRootInterval();
   (void) memset(list,0,(size_t) TreeLength*sizeof(*list));
   for (i=(-1); i < (ssize_t) number_crossings; i++)
   {
@@ -1430,18 +1477,7 @@ static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
       {
         if (zero_crossing[i+1].crossings[k] != 0)
           {
-            if (node == head)
-              {
-                node->child=(IntervalTree *) AcquireQuantumMemory(1,
-                  sizeof(*node->child));
-                node=node->child;
-              }
-            else
-              {
-                node->sibling=(IntervalTree *) AcquireQuantumMemory(1,
-                  sizeof(*node->sibling));
-                node=node->sibling;
-              }
+            node=AppendIntervalNode(head,node);
             if (node == (IntervalTree *) NULL)
               {
                 list=(IntervalTree **) RelinquishMagickMemory(list);
@@ -1609,6 +1645,33 @@ static void SetNodeExtrema(short *extrema,const IntervalTree *node,
   }
 }
 
+static double GetAverageTau(IntervalTree **list,const ssize_t number_nodes)
+{
+  double
+    average_tau;
+
+  ssize_t
+    i;
+
+  average_tau=0.0;
+  for (i=0; i < number_nodes; i++)
+    average_tau+=list[i]->tau;
+  average_tau*=MagickSafeReciprocal((double) number_nodes);
+  return(average_tau);
+}
+
+static ssize_t FindTauIndex(const ZeroCrossing *zero_crossing,
+  const size_t number_crossings,const IntervalTree *node,ssize_t k)
+{
+  ssize_t
+    j;
+
+  for (j=0; j <= (ssize_t) number_crossings; j++)
+    if (zero_crossing[j].tau == node->tau)
+      k=j;
+  return(k);
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
@@ -1729,9 +1792,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     */
     k=0;
     node=list[i];
-    for (j=0; j <= (ssize_t) number_crossings; j++)
-      if (zero_crossing[j].tau == node->tau)
-        k=j;
+    k=FindTauIndex(zero_crossing,number_crossings,node,k);
     /*
       Find the value of the peak.
     */
@@ -1743,10 +1804,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
   /*
     Determine the average tau.
   */
-  average_tau=0.0;
-  for (i=0; i < number_nodes; i++)
-    average_tau+=list[i]->tau;
-  average_tau*=MagickSafeReciprocal((double) number_nodes);
+  average_tau=GetAverageTau(list,number_nodes);
   /*
     Relinquish resources.
   */
@@ -1929,6 +1987,18 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   return(status);
 }
 
+static void MergeSmallDerivatives(double *second_derivative,
+  const double smooth_threshold)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= 255; i++)
+    if ((second_derivative[i] < smooth_threshold) &&
+        (second_derivative[i] >= -smooth_threshold))
+      second_derivative[i]=0.0;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1971,10 +2041,7 @@ static void ZeroCrossHistogram(double *second_derivative,
   /*
     Merge low numbers to zero to help prevent noise.
   */
-  for (i=0; i <= 255; i++)
-    if ((second_derivative[i] < smooth_threshold) &&
-        (second_derivative[i] >= -smooth_threshold))
-      second_derivative[i]=0.0;
+  MergeSmallDerivatives(second_derivative,smooth_threshold);
   /*
     Mark zero crossings.
   */

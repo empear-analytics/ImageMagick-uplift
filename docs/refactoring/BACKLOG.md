@@ -82,7 +82,7 @@ needs before refactoring:
 | 1.89 | `MagickCore/threshold.c` | 2648 | 87% | 85% | 2.08, in progress (Complex Conditional gone; the pixel drivers duplicate each other once thinned), [M08](tasks/M08-threshold.md) |
 | 1.92 | `MagickCore/statistic.c` | 3158 | 97% | 89% | 2.27, in progress (Complex Conditional gone; Recipe B next), [M07](tasks/M07-statistic.md) |
 | 2.16 | `MagickCore/identify.c` | 1705 | 68% | 85% | 3.21, in progress (Complex Conditional gone; IdentifyImage 1,143 -> 696 lines), [M15](tasks/M15-identify.md) |
-| 2.30 | `MagickCore/segment.c` | 1934 | 79% | 86% | 3.47, in progress (Complex Conditional gone; Brain Method left in Classify and GetImageDynamicThreshold), [M10](tasks/M10-segment.md) |
+| 2.30 | `MagickCore/segment.c` | 1934 | 79% | 86% | 3.61, in progress (second pass M80) (Complex Conditional gone; Brain Method left in Classify and GetImageDynamicThreshold), [M10](tasks/M10-segment.md) |
 | 2.57 | `MagickCore/colorspace.c` | 2899 | 90% | 92% | 2.80, plateau for the current catalogue (Complex Conditional gone; the transforms are case-per-pragma switches), [M06](tasks/M06-colorspace.md) |
 | 3.08 | `MagickCore/fourier.c` | 1626 | 92% | 86% | 3.27 on the Mac (`ComplexImages` only, [M12](tasks/M12-fourier.md)); the FFTW-only functions still wait for the Linux machine |
 | 3.28 | `MagickCore/channel.c` | 1394 | 65% | 81% | 4.04, in progress (out of the Red band), [M16](tasks/M16-channel.md) |
@@ -119,10 +119,10 @@ needs before refactoring:
 | 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | 6.34 (tree descent returns from inside), [M56](tasks/M56-histogram.md) |
 | 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | 6.61 (guard level; the tile loop keeps multi-output blocks), [M57](tasks/M57-montage.md) |
 | 6.87 | `MagickCore/memory.c` | 1713 | 60% | 71% | plateau 6.87 (uncompiled branches), [M60](tasks/M60-memory.md) |
-| 8.22 | `MagickCore/coder.c` | 562 | 38% | 93% | open |
+| 8.22 | `MagickCore/coder.c` | 562 | 38% | 93% | 8.28, [M76](tasks/M76-coder.md) |
 | 9.09 | `MagickCore/static.c` | 379 | 52% | 82% | open |
-| 9.12 | `MagickCore/gem.c` | 348 | 100% | 70% | open |
-| 9.49 | `MagickCore/prepress.c` | 154 | 100% | 71% | open |
+| 9.12 | `MagickCore/gem.c` | 348 | 100% | 70% | plateau 9.12 (local Sigma macros), [M74](tasks/M74-gem.md) |
+| 9.49 | `MagickCore/prepress.c` | 154 | 100% | 71% | plateau 9.49 (OpenMP critical block), [M75](tasks/M75-prepress.md) |
 
 ### Needs cases before refactoring (39 files)
 
@@ -133,7 +133,7 @@ needs before refactoring:
 | 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | 1.61, blocked (GetImageFeatures' function-local typedef needs a hoisting recipe), [M35](tasks/M35-feature.md) |
 | 1.61 | `MagickCore/xml-tree.c` | 2347 | 35% | 57% | 2.15, in progress (17 predicates; 4 sites left: 3 with side effects, 1 repeat), [M42](tasks/M42-xml-tree.md) |
 | 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | 2.06, in progress (Complex Conditional gone), [M43](tasks/M43-vision.md) |
-| 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.09, in progress (Complex Conditional gone), [M36](tasks/M36-image.md) |
+| 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.20, in progress (Complex Conditional gone; second pass [M78](tasks/M78-image.md)), [M36](tasks/M36-image.md) |
 | 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | 2.21, in progress (8 predicates; one POSIX-only site left), [M44](tasks/M44-blob.md) |
 | 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | 2.33, in progress (6 predicates; Raqm-only and one 5-argument site left), [M45](tasks/M45-annotate.md) |
 | 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | 2.54, in progress (ProfileImage #if-built; SyncExifProfile needs hoist), [M69](tasks/M69-profile.md) |
@@ -149,7 +149,7 @@ needs before refactoring:
 | 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | 4.43, in progress (Complex Conditional gone), [M33](tasks/M33-locale.md) |
 | 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | 5.02 (rest returns from inside or is #if-built), [M54](tasks/M54-token.md) |
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | 5.16 (rest interleaves Winsock/MSVC #if), [M72](tasks/M72-distribute-cache.md) |
-| 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | open |
+| 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | 5.87, [M73](tasks/M73-mime.md) |
 | 5.88 | `MagickCore/exception.c` | 1158 | 88% | 66% | 6.16 (severity table needs a lookup recipe; ThrowException repeat-test bug reported), [M55](tasks/M55-exception.md) |
 | 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | 6.40 (rest is prologue duplication and a &list loop), [M58](tasks/M58-list.md) |
 | 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | 6.90 (Passkey twins need D with mutation data), [M71](tasks/M71-cipher.md) |

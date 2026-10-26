@@ -2773,6 +2773,43 @@ MagickExport MagickBooleanType SetImageExtent(Image *image,const size_t columns,
   return(SyncImagePixelCache(image,exception));
 }
 
+static void ParseSceneRange(ImageInfo *image_info,const char *component)
+{
+  char
+    *q;
+
+  const char
+    *p;
+
+  size_t
+    first,
+    last;
+
+  (void) CloneString(&image_info->scenes,component);
+  image_info->scene=StringToUnsignedLong(image_info->scenes);
+  image_info->number_scenes=image_info->scene;
+  p=image_info->scenes;
+  for (q=(char *) image_info->scenes; *q != '\0'; p++)
+  {
+    while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
+      p++;
+    first=(size_t) strtol(p,&q,10);
+    last=first;
+    while (isspace((int) ((unsigned char) *q)) != 0)
+      q++;
+    if (*q == '-')
+      last=(size_t) strtol(q+1,&q,10);
+    if (first > last)
+      Swap(first,last);
+    if (first < image_info->scene)
+      image_info->scene=first;
+    if (last > image_info->number_scenes)
+      image_info->number_scenes=last;
+    p=q;
+  }
+  image_info->number_scenes-=image_info->scene-1;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2902,17 +2939,60 @@ static inline MagickBooleanType IsExtensionMagickMatch(
     magic_info)) == 0)) ? MagickTrue : MagickFalse);
 }
 
+static const MagickInfo *SetUserSpecifiedFormat(ImageInfo *image_info,
+  char *magic,char *component,ExceptionInfo *sans_exception,
+  ExceptionInfo *exception)
+{
+  const DelegateInfo
+    *delegate_info;
+
+  const MagickInfo
+    *magick_info;
+
+  /*
+    User specified image format.
+  */
+  LocaleUpper(magic);
+  magick_info=GetMagickInfo(magic,sans_exception);
+  delegate_info=(const DelegateInfo *) NULL;
+  if (magick_info == (const MagickInfo *) NULL)
+    {
+      delegate_info=GetDelegateInfo(magic,"*",sans_exception);
+      if (delegate_info == (const DelegateInfo *) NULL)
+        delegate_info=GetDelegateInfo("*",magic,sans_exception);
+      if (IsUndelegatedComponent(delegate_info,component) != MagickFalse)
+        {
+          /*
+            Retry in case GetMagickInfo loaded a custom module.
+          */
+          magick_info=SetImageInfoFromExtension(image_info,component,magic,
+            sans_exception);
+        }
+    }
+  if (IsUsableMagick(magick_info,delegate_info,magic) != MagickFalse)
+    {
+      char *literal = (char *) GetImageRegistry(StringRegistryType,
+        "filename:literal",exception);
+      image_info->affirm=MagickTrue;
+      (void) CopyMagickString(image_info->magick,magic,MagickPathExtent);
+      GetPathComponent(image_info->filename,CanonicalPath,component);
+      if (IsStringTrue(literal) != MagickFalse)
+        GetPathComponent(image_info->filename,SubcanonicalPath,component);
+      (void) CopyMagickString(image_info->filename,component,
+        MagickPathExtent);
+      if (literal != (char *) NULL)
+        literal=DestroyString(literal);
+    }
+  return(magick_info);
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
   char
     component[MagickPathExtent],
     magic[MagickPathExtent],
-    path[MagickPathExtent],
-    *q;
-
-  const char
-    *p;
+    path[MagickPathExtent];
 
   const MagicInfo
     *magic_info;
@@ -2959,35 +3039,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
             (void) CloneString(&image_info->extract,component);
         }
       else
-        {
-          size_t
-            first,
-            last;
-
-          (void) CloneString(&image_info->scenes,component);
-          image_info->scene=StringToUnsignedLong(image_info->scenes);
-          image_info->number_scenes=image_info->scene;
-          p=image_info->scenes;
-          for (q=(char *) image_info->scenes; *q != '\0'; p++)
-          {
-            while ((isspace((int) ((unsigned char) *p)) != 0) || (*p == ','))
-              p++;
-            first=(size_t) strtol(p,&q,10);
-            last=first;
-            while (isspace((int) ((unsigned char) *q)) != 0)
-              q++;
-            if (*q == '-')
-              last=(size_t) strtol(q+1,&q,10);
-            if (first > last)
-              Swap(first,last);
-            if (first < image_info->scene)
-              image_info->scene=first;
-            if (last > image_info->number_scenes)
-              image_info->number_scenes=last;
-            p=q;
-          }
-          image_info->number_scenes-=image_info->scene-1;
-        }
+        ParseSceneRange(image_info,component);
     }
   *component='\0';
   if (*image_info->magick == '\0')
@@ -3024,45 +3076,8 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
       (void) CopyMagickString(image_info->filename,component,MagickPathExtent);
     }
   else
-    {
-      const DelegateInfo
-        *delegate_info;
-
-      /*
-        User specified image format.
-      */
-      LocaleUpper(magic);
-      magick_info=GetMagickInfo(magic,sans_exception);
-      delegate_info=(const DelegateInfo *) NULL;
-      if (magick_info == (const MagickInfo *) NULL)
-        {
-          delegate_info=GetDelegateInfo(magic,"*",sans_exception);
-          if (delegate_info == (const DelegateInfo *) NULL)
-            delegate_info=GetDelegateInfo("*",magic,sans_exception);
-          if (IsUndelegatedComponent(delegate_info,component) != MagickFalse)
-            {
-              /*
-                Retry in case GetMagickInfo loaded a custom module.
-              */
-              magick_info=SetImageInfoFromExtension(image_info,component,magic,
-                sans_exception);
-            }
-        }
-      if (IsUsableMagick(magick_info,delegate_info,magic) != MagickFalse)
-        {
-          char *literal = (char *) GetImageRegistry(StringRegistryType,
-            "filename:literal",exception);
-          image_info->affirm=MagickTrue;
-          (void) CopyMagickString(image_info->magick,magic,MagickPathExtent);
-          GetPathComponent(image_info->filename,CanonicalPath,component);
-          if (IsStringTrue(literal) != MagickFalse)
-            GetPathComponent(image_info->filename,SubcanonicalPath,component);
-          (void) CopyMagickString(image_info->filename,component,
-            MagickPathExtent);
-          if (literal != (char *) NULL)
-            literal=DestroyString(literal);
-        }
-    }
+    magick_info=SetUserSpecifiedFormat(image_info,magic,component,
+      sans_exception,exception);
   sans_exception=DestroyExceptionInfo(sans_exception);
   if ((magick_info == (const MagickInfo *) NULL) ||
       (GetMagickEndianSupport(magick_info) == MagickFalse))
@@ -4137,6 +4152,22 @@ MagickExport MagickBooleanType SyncImage(Image *image,ExceptionInfo *exception)
   return(status);
 }
 
+static void ParseChromaticityPrimary(const char *option,PrimaryInfo *primary)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  flags=ParseGeometry(option,&geometry_info);
+  if ((flags & RhoValue) != 0)
+    primary->x=geometry_info.rho;
+  primary->y=primary->x;
+  if ((flags & SigmaValue) != 0)
+    primary->y=geometry_info.sigma;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -4257,14 +4288,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickBooleanOptions,MagickFalse,option);
   option=GetImageOption(image_info,"blue-primary");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->chromaticity.blue_primary.x=geometry_info.rho;
-      image->chromaticity.blue_primary.y=image->chromaticity.blue_primary.x;
-      if ((flags & SigmaValue) != 0)
-        image->chromaticity.blue_primary.y=geometry_info.sigma;
-    }
+    ParseChromaticityPrimary(option,&image->chromaticity.blue_primary);
   option=GetImageOption(image_info,"bordercolor");
   if (option != (const char *) NULL)
     (void) QueryColorCompliance(option,AllCompliance,&image->border_color,
@@ -4313,14 +4337,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickFalse,option);
   option=GetImageOption(image_info,"green-primary");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->chromaticity.green_primary.x=geometry_info.rho;
-      image->chromaticity.green_primary.y=image->chromaticity.green_primary.x;
-      if ((flags & SigmaValue) != 0)
-        image->chromaticity.green_primary.y=geometry_info.sigma;
-    }
+    ParseChromaticityPrimary(option,&image->chromaticity.green_primary);
   option=GetImageOption(image_info,"intent");
   if (option != (const char *) NULL)
     image->rendering_intent=(RenderingIntent) ParseCommandOption(
@@ -4363,14 +4380,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
     image->quality=StringToUnsignedLong(option);
   option=GetImageOption(image_info,"red-primary");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->chromaticity.red_primary.x=geometry_info.rho;
-      image->chromaticity.red_primary.y=image->chromaticity.red_primary.x;
-      if ((flags & SigmaValue) != 0)
-        image->chromaticity.red_primary.y=geometry_info.sigma;
-    }
+    ParseChromaticityPrimary(option,&image->chromaticity.red_primary);
   if (image_info->quality != UndefinedCompressionQuality)
     image->quality=image_info->quality;
   option=GetImageOption(image_info,"scene");
@@ -4425,14 +4435,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       exception);
   option=GetImageOption(image_info,"white-point");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->chromaticity.white_point.x=geometry_info.rho;
-      image->chromaticity.white_point.y=image->chromaticity.white_point.x;
-      if ((flags & SigmaValue) != 0)
-        image->chromaticity.white_point.y=geometry_info.sigma;
-    }
+    ParseChromaticityPrimary(option,&image->chromaticity.white_point);
   /*
     Pointer to allow the lookup of pre-image artifact will fallback to a global
     option setting/define.  This saves a lot of duplication of global options

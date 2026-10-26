@@ -192,6 +192,74 @@ MagickExport LinkedListInfo *AcquireMimeCache(const char *filename,
   return(cache);
 }
 
+static ssize_t ReadMimeShortValue(const MimeInfo *q,const unsigned char *r)
+{
+  EndianType
+    endian;
+
+  ssize_t
+    value;
+
+  endian=q->endian;
+  if (q->endian == UndefinedEndian)
+    endian=GetHostEndian();
+  if (endian == LSBEndian)
+    {
+      value=(ssize_t) (*r++);
+      value|=(*r++) << 8;
+    }
+  else
+    {
+      value=(ssize_t) (*r++) << 8;
+      value|=(*r++);
+    }
+  return(value);
+}
+
+static ssize_t ReadMimeLongValue(const MimeInfo *q,const unsigned char *r)
+{
+  EndianType
+    endian;
+
+  ssize_t
+    value;
+
+  endian=q->endian;
+  if (q->endian == UndefinedEndian)
+    endian=GetHostEndian();
+  if (endian == LSBEndian)
+    {
+      value=(ssize_t) (*r++);
+      value|=((ssize_t) *r++) << 8;
+      value|=((ssize_t) *r++) << 16;
+      value|=((ssize_t) *r++) << 24;
+    }
+  else
+    {
+      value=(ssize_t) (*r++) << 24;
+      value|=((ssize_t) *r++) << 16;
+      value|=((ssize_t) *r++) << 8;
+      value|=((ssize_t) *r++);
+    }
+  return(value);
+}
+
+static ElementInfo *MatchMimeValue(const MimeInfo *q,const ssize_t value,
+  ElementInfo *p,ElementInfo *element_info)
+{
+  if (q->mask == 0)
+    {
+      if (q->value == value)
+        element_info=p;
+    }
+  else
+    {
+      if ((q->value & q->mask) == value)
+        element_info=p;
+    }
+  return(element_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -231,9 +299,6 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
   ElementInfo
     *element_info,
     *p;
-
-  EndianType
-    endian;
 
   const unsigned char
     *r;
@@ -288,16 +353,7 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
           break;
         r=magic+q->offset;
         value=(ssize_t) (*r++);
-        if (q->mask == 0)
-          {
-            if (q->value == value)
-              element_info=p;
-          }
-        else
-          {
-            if ((q->value & q->mask) == value)
-              element_info=p;
-          }
+        element_info=MatchMimeValue(q,value,p,element_info);
         break;
       }
       case ShortData:
@@ -305,29 +361,8 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
         if ((size_t) (q->offset+4) > length)
           break;
         r=magic+q->offset;
-        endian=q->endian;
-        if (q->endian == UndefinedEndian)
-          endian=GetHostEndian();
-        if (endian == LSBEndian)
-          {
-            value=(ssize_t) (*r++);
-            value|=(*r++) << 8;
-          }
-        else
-          {
-            value=(ssize_t) (*r++) << 8;
-            value|=(*r++);
-          }
-        if (q->mask == 0)
-          {
-            if (q->value == value)
-              element_info=p;
-          }
-        else
-          {
-            if ((q->value & q->mask) == value)
-              element_info=p;
-          }
+        value=ReadMimeShortValue(q,r);
+        element_info=MatchMimeValue(q,value,p,element_info);
         break;
       }
       case LongData:
@@ -335,33 +370,8 @@ MagickExport const MimeInfo *GetMimeInfo(const char *filename,
         if ((size_t) (q->offset+4) > length)
           break;
         r=magic+q->offset;
-        endian=q->endian;
-        if (q->endian == UndefinedEndian)
-          endian=GetHostEndian();
-        if (endian == LSBEndian)
-          {
-            value=(ssize_t) (*r++);
-            value|=((ssize_t) *r++) << 8;
-            value|=((ssize_t) *r++) << 16;
-            value|=((ssize_t) *r++) << 24;
-          }
-        else
-          {
-            value=(ssize_t) (*r++) << 24;
-            value|=((ssize_t) *r++) << 16;
-            value|=((ssize_t) *r++) << 8;
-            value|=((ssize_t) *r++);
-          }
-        if (q->mask == 0)
-          {
-            if (q->value == value)
-              element_info=p;
-          }
-        else
-          {
-            if ((q->value & q->mask) == value)
-              element_info=p;
-          }
+        value=ReadMimeLongValue(q,r);
+        element_info=MatchMimeValue(q,value,p,element_info);
         break;
       }
       case StringData:
@@ -685,6 +695,36 @@ static MagickBooleanType IsMimeCacheInstantiated(ExceptionInfo *exception)
   return(mime_cache != (LinkedListInfo *) NULL ? MagickTrue : MagickFalse);
 }
 
+static void PrintMimePathHeader(FILE *file,const MimeInfo **mime_info,
+  const ssize_t i)
+{
+  if (mime_info[i]->path != (char *) NULL)
+    (void) FormatLocaleFile(file,"\nPath: %s\n\n",mime_info[i]->path);
+  (void) FormatLocaleFile(file,"Type                   Description\n");
+  (void) FormatLocaleFile(file,
+    "-------------------------------------------------"
+    "------------------------------\n");
+}
+
+static void PadMimeType(FILE *file,const MimeInfo **mime_info,
+  const ssize_t i)
+{
+  ssize_t
+    j;
+
+  if (strlen(mime_info[i]->type) <= 25)
+    {
+      for (j=(ssize_t) strlen(mime_info[i]->type); j <= 27; j++)
+        (void) FormatLocaleFile(file," ");
+    }
+  else
+    {
+      (void) FormatLocaleFile(file,"\n");
+      for (j=0; j <= 27; j++)
+        (void) FormatLocaleFile(file," ");
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -723,15 +763,11 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
   size_t
     number_aliases;
 
-  ssize_t
-    j;
-
   if (file == (const FILE *) NULL)
     file=stdout;
   mime_info=GetMimeInfoList("*",&number_aliases,exception);
   if (mime_info == (const MimeInfo **) NULL)
     return(MagickFalse);
-  j=0;
   path=(const char *) NULL;
   for (i=0; i < (ssize_t) number_aliases; i++)
   {
@@ -739,27 +775,10 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
       continue;
     if ((path == (const char *) NULL) ||
         (strcasecmp(path,mime_info[i]->path) != 0))
-      {
-        if (mime_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",mime_info[i]->path);
-        (void) FormatLocaleFile(file,"Type                   Description\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
-      }
+      PrintMimePathHeader(file,mime_info,i);
     path=mime_info[i]->path;
     (void) FormatLocaleFile(file,"%s",mime_info[i]->type);
-    if (strlen(mime_info[i]->type) <= 25)
-      {
-        for (j=(ssize_t) strlen(mime_info[i]->type); j <= 27; j++)
-          (void) FormatLocaleFile(file," ");
-      }
-    else
-      {
-        (void) FormatLocaleFile(file,"\n");
-        for (j=0; j <= 27; j++)
-          (void) FormatLocaleFile(file," ");
-      }
+    PadMimeType(file,mime_info,i);
     if (mime_info[i]->description != (char *) NULL)
       (void) FormatLocaleFile(file,"%s",mime_info[i]->description);
     (void) FormatLocaleFile(file,"\n");
@@ -770,6 +789,79 @@ MagickExport MagickBooleanType ListMimeInfo(FILE *file,ExceptionInfo *exception)
 }
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
+static void ParseMimeMagic(MimeInfo *mime_info,const char *attribute)
+{
+  char
+    *token;
+
+  const char
+    *p;
+
+  unsigned char
+    *q;
+
+  token=AcquireString(attribute);
+  (void) SubstituteString(&token,"&lt;","<");
+  (void) SubstituteString(&token,"&gt;",">");
+  (void) SubstituteString(&token,"&amp;","&");
+  (void) SubstituteString(&token,"&quot;","\"");
+  (void) SubstituteString(&token,"&apos;","'");
+  mime_info->magic=(unsigned char *) AcquireString(token);
+  q=mime_info->magic;
+  for (p=token; *p != '\0'; )
+  {
+    if (*p == '\\')
+      {
+        p++;
+        if (isdigit((int) ((unsigned char) *p)) != 0)
+          {
+            char
+              *end;
+
+            *q++=(unsigned char) strtol(p,&end,8);
+            p+=(ptrdiff_t) (end-p);
+            mime_info->length++;
+            continue;
+          }
+        switch (*p)
+        {
+          case 'b': *q='\b'; break;
+          case 'f': *q='\f'; break;
+          case 'n': *q='\n'; break;
+          case 'r': *q='\r'; break;
+          case 't': *q='\t'; break;
+          case 'v': *q='\v'; break;
+          case 'a': *q='a'; break;
+          case '?': *q='\?'; break;
+          default: *q=(unsigned char) (*p); break;
+        }
+        p++;
+        q++;
+        mime_info->length++;
+        continue;
+      }
+    *q++=(unsigned char) (*p++);
+    mime_info->length++;
+  }
+  token=DestroyString(token);
+  if (mime_info->data_type != StringData)
+    mime_info->value=(ssize_t) strtoul((char *) mime_info->magic,
+      (char **) NULL,0);
+}
+
+static void GetIncludePath(const char *filename,const char *attribute,
+  char *path)
+{
+  GetPathComponent(filename,HeadPath,path);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(path,DirectorySeparator,
+      MagickPathExtent);
+  if (*attribute == *DirectorySeparator)
+    (void) CopyMagickString(path,attribute,MagickPathExtent);
+  else
+    (void) ConcatenateMagickString(path,attribute,MagickPathExtent);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -846,14 +938,7 @@ static MagickBooleanType LoadMimeCache(LinkedListInfo *cache,const char *xml,
               path[MagickPathExtent],
               *file_xml;
 
-            GetPathComponent(filename,HeadPath,path);
-            if (*path != '\0')
-              (void) ConcatenateMagickString(path,DirectorySeparator,
-                MagickPathExtent);
-            if (*attribute == *DirectorySeparator)
-              (void) CopyMagickString(path,attribute,MagickPathExtent);
-            else
-              (void) ConcatenateMagickString(path,attribute,MagickPathExtent);
+            GetIncludePath(filename,attribute,path);
             file_xml=FileToXML(path,~0UL);
             if (file_xml != (char *) NULL)
               {
@@ -888,64 +973,7 @@ static MagickBooleanType LoadMimeCache(LinkedListInfo *cache,const char *xml,
         MagickTrue,attribute);
     attribute=GetXMLTreeAttribute(mime,"magic");
     if (attribute != (const char *) NULL)
-      {
-        char
-          *token;
-
-        const char
-          *p;
-
-        unsigned char
-          *q;
-
-        token=AcquireString(attribute);
-        (void) SubstituteString(&token,"&lt;","<");
-        (void) SubstituteString(&token,"&gt;",">");
-        (void) SubstituteString(&token,"&amp;","&");
-        (void) SubstituteString(&token,"&quot;","\"");
-        (void) SubstituteString(&token,"&apos;","'");
-        mime_info->magic=(unsigned char *) AcquireString(token);
-        q=mime_info->magic;
-        for (p=token; *p != '\0'; )
-        {
-          if (*p == '\\')
-            {
-              p++;
-              if (isdigit((int) ((unsigned char) *p)) != 0)
-                {
-                  char
-                    *end;
-
-                  *q++=(unsigned char) strtol(p,&end,8);
-                  p+=(ptrdiff_t) (end-p);
-                  mime_info->length++;
-                  continue;
-                }
-              switch (*p)
-              {
-                case 'b': *q='\b'; break;
-                case 'f': *q='\f'; break;
-                case 'n': *q='\n'; break;
-                case 'r': *q='\r'; break;
-                case 't': *q='\t'; break;
-                case 'v': *q='\v'; break;
-                case 'a': *q='a'; break;
-                case '?': *q='\?'; break;
-                default: *q=(unsigned char) (*p); break;
-              }
-              p++;
-              q++;
-              mime_info->length++;
-              continue;
-            }
-          *q++=(unsigned char) (*p++);
-          mime_info->length++;
-        }
-        token=DestroyString(token);
-        if (mime_info->data_type != StringData)
-          mime_info->value=(ssize_t) strtoul((char *) mime_info->magic,
-            (char **) NULL,0);
-      }
+      ParseMimeMagic(mime_info,attribute);
     attribute=GetXMLTreeAttribute(mime,"mask");
     if (attribute != (const char *) NULL)
       mime_info->mask=(ssize_t) strtoul(attribute,(char **) NULL,0);
