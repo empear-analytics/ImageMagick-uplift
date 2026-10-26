@@ -2947,11 +2947,18 @@ static void ImportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
       "InvalidColormapIndex","`%s'",image->filename);
 }
 
-static void ImportIndexAlphaQuantum(const Image *image,
-  QuantumInfo *quantum_info,const MagickSizeType number_pixels,
-  const unsigned char *magick_restrict p,Quantum *magick_restrict q,
-  ExceptionInfo *exception)
+static void ImportIndexAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   MagickBooleanType
     range_exception;
 
@@ -4537,7 +4544,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case IndexAlphaQuantum:
     {
-      ImportIndexAlphaQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportIndexAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
     case OpacityQuantum:
