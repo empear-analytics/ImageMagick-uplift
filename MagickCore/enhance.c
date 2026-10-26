@@ -1149,6 +1149,30 @@ static ColorCorrection ParseCDLSOPNode(XMLTreeInfo *sop,
   return(color_correction);
 }
 
+static ColorCorrection ParseCDLSATNode(XMLTreeInfo *sat,
+  ColorCorrection color_correction)
+{
+  char
+    token[MagickPathExtent];
+
+  const char
+    *content,
+    *p;
+
+  XMLTreeInfo
+    *saturation;
+
+  saturation=GetXMLTreeChild(sat,"Saturation");
+  if (saturation != (XMLTreeInfo *) NULL)
+    {
+      content=GetXMLTreeContent(saturation);
+      p=(const char *) content;
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+      color_correction.saturation=StringToDouble(token,(char **) NULL);
+    }
+  return(color_correction);
+}
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
@@ -1157,15 +1181,8 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   CacheView
     *image_view;
 
-  char
-    token[MagickPathExtent];
-
   ColorCorrection
     color_correction;
-
-  const char
-    *content,
-    *p;
 
   MagickBooleanType
     status;
@@ -1221,19 +1238,7 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
     color_correction=ParseCDLSOPNode(sop,color_correction);
   sat=GetXMLTreeChild(cc,"SATNode");
   if (sat != (XMLTreeInfo *) NULL)
-    {
-      XMLTreeInfo
-        *saturation;
-
-      saturation=GetXMLTreeChild(sat,"Saturation");
-      if (saturation != (XMLTreeInfo *) NULL)
-        {
-          content=GetXMLTreeContent(saturation);
-          p=(const char *) content;
-          (void) GetNextToken(p,&p,MagickPathExtent,token);
-          color_correction.saturation=StringToDouble(token,(char **) NULL);
-        }
-    }
+    color_correction=ParseCDLSATNode(sat,color_correction);
   ccc=DestroyXMLTree(ccc);
   if (image->debug != MagickFalse)
     {
