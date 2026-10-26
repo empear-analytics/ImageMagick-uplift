@@ -2823,6 +2823,18 @@ typedef struct _HaldInfo
     z;
 } HaldInfo;
 
+static HaldInfo GetHaldPoint(const Image *image,const size_t level,
+  const Quantum *magick_restrict q)
+{
+  HaldInfo
+    point;
+
+  point.x=QuantumScale*(level-1.0)*(double) GetPixelRed(image,q);
+  point.y=QuantumScale*(level-1.0)*(double) GetPixelGreen(image,q);
+  point.z=QuantumScale*(level-1.0)*(double) GetPixelBlue(image,q);
+  return(point);
+}
+
 MagickExport MagickBooleanType HaldClutImage(Image *image,
   const Image *hald_image,ExceptionInfo *exception)
 {
@@ -2914,9 +2926,7 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
         pixel3 = zero,
         pixel4 = zero;
 
-      point.x=QuantumScale*(level-1.0)*(double) GetPixelRed(image,q);
-      point.y=QuantumScale*(level-1.0)*(double) GetPixelGreen(image,q);
-      point.z=QuantumScale*(level-1.0)*(double) GetPixelBlue(image,q);
+      point=GetHaldPoint(image,level,q);
       offset=point.x+level*floor(point.y)+cube_size*floor(point.z);
       point.x-=floor(point.x);
       point.y-=floor(point.y);
