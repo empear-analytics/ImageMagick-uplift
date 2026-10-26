@@ -836,6 +836,83 @@ Claude Code (Claude Opus 5.5) during task M02, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe H - Hoist Function-Local Macros
+
+**Use when:** a function `#define`s constants or helper macros at the top of its body, and
+the blocks Recipe E or P would move use them. A helper outside the function cannot sit
+above those lines, so every such block is pinned: `HuffmanDecodeImage`, `LZWEncodeImage`,
+`TransformSignature`, `GenerateDifferentialNoise`, `SyncExifProfile`, `GetEXIFProperty`.
+
+**Not covered by:** Recipe E, whose step 7 moves a macro only together with a block that is
+its sole user; here the macros serve the whole function. Recipe S, which moves whole
+functions between files. No other recipe changes where a preprocessor line sits.
+
+**How:**
+
+1. Take the run of `#define` lines (with their `\` continuations and the blank lines
+   between them) that starts on the first line after the function's opening `{` and ends
+   before its first declaration. Nothing else may sit in that run.
+2. Move the run, unchanged, to directly above the function's signature: below its
+   comment banner and below any helper already placed there.
+3. Leave every `#undef` and any `#define` further down the body where it is.
+4. Run `sh tools/pp_identical.sh <file>`. It must print `IDENTICAL`: the preprocessed
+   translation unit, with the build's own flags, is the same before and after. If it
+   differs, a token between the old and new position named one of the macros (usually a
+   parameter in the signature); undo the step.
+5. Helpers that later use the macros go between the hoisted run and the function, never
+   above the run.
+
+**Before:**
+
+```c
+MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
+  ExceptionInfo *exception)
+{
+#define HashSize  1021L
+#define MBHashA  293L
+  ...
+  CacheView
+    *image_view;
+```
+
+**After:**
+
+```c
+#define HashSize  1021L
+#define MBHashA  293L
+  ...
+
+MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+```
+
+**Careful:**
+
+- A `#define` inside a function is already in force from its line to the end of the file
+  (or to its `#undef`), so the step widens the macro's reach only over the function's
+  signature. `pp_identical.sh` proves that no token there changed meaning.
+- Do not hoist a macro that is `#define`d differently in an earlier function of the same
+  file: the run would then redefine it above code that used the other definition. The
+  compiler warns about a redefinition, and the build must stay free of warnings.
+- The step changes no code Code Health measures and leaves the score flat. It is kept
+  under rule 2 only when the same task follows it with the extractions it unblocks, and
+  its commit names them.
+
+**Evidence level:** guard, with `tools/pp_identical.sh` printing `IDENTICAL`. That is a
+proof of identity for the build, stronger than the oracle, so no readiness verdict is
+needed for this step. The extractions it unblocks keep their own evidence level.
+
+**Provenance:** 2026-10-26, from the local macros that pinned `HuffmanDecodeImage`,
+`HuffmanEncodeImage` and `LZWEncodeImage` (M68), `TransformSignature` (M61),
+`GenerateDifferentialNoise` (M74), `SyncExifProfile` (M69) and `GetEXIFProperty` (M41), and
+the local typedef in `GetImageFeatures` (M35), which is a separate shape and not covered.
+Added by Claude Code (Claude Opus 5.5) during task M84, under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -896,3 +973,4 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
+| 2026-10-26 | NEW | H | Hoist Function-Local Macros: a run of `#define` lines at the top of a function body moves unchanged to directly above the function, proven by an identical preprocessed translation unit (`tools/pp_identical.sh`); the extractions it unblocks follow | Local macros pinned every block of `HuffmanDecodeImage`, `LZWEncodeImage`, `TransformSignature`, `GenerateDifferentialNoise` and `SyncExifProfile` (M61, M68, M69, M74); a trial hoist of `HuffmanDecodeImage`'s 31 lines preprocessed identically | mandate (2026-10-24) |

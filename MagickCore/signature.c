@@ -607,8 +607,6 @@ MagickExport MagickBooleanType SignatureImage(Image *image,
 %    o signature_info: the address of a structure of type SignatureInfo.
 %
 */
-static void TransformSignature(SignatureInfo *signature_info)
-{
 #define Ch(x,y,z)  (((x) & (y)) ^ (~(x) & (z)))
 #define Maj(x,y,z)  (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
 #define RotateRight(x,n)  (Trunc32(((x) >> n) | ((x) << (32-n))))
@@ -618,6 +616,17 @@ static void TransformSignature(SignatureInfo *signature_info)
 #define Suma1(x)  (RotateRight(x,6) ^ RotateRight(x,11) ^ RotateRight(x,25))
 #define Trunc32(x)  ((unsigned int) ((x) & 0xffffffffU))
 
+static void ExpandMessageSchedule(unsigned int *W)
+{
+  ssize_t
+    i;
+
+  for (i=16; i < 64; i++)
+    W[i]=Trunc32(Sigma1(W[i-2])+W[i-7]+Sigma0(W[i-15])+W[i-16]);
+}
+
+static void TransformSignature(SignatureInfo *signature_info)
+{
   ssize_t
     i;
 
@@ -715,8 +724,7 @@ RestoreMSCWarning
   F=signature_info->accumulator[5];
   G=signature_info->accumulator[6];
   H=signature_info->accumulator[7];
-  for (i=16; i < 64; i++)
-    W[i]=Trunc32(Sigma1(W[i-2])+W[i-7]+Sigma0(W[i-15])+W[i-16]);
+  ExpandMessageSchedule(W);
   for (j=0; j < 64; j++)
   {
     T1=Trunc32(H+Suma1(E)+Ch(E,F,G)+K[j]+W[j]);

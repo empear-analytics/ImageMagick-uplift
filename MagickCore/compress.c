@@ -367,9 +367,6 @@ static inline MagickBooleanType IsHuffmanBufferMissing(HuffmanTable **mb_hash,
     (scanline == (unsigned char *) NULL)) ? MagickTrue : MagickFalse);
 }
 
-MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
-  ExceptionInfo *exception)
-{
 #define HashSize  1021L
 #define MBHashA  293L
 #define MBHashB  2695L
@@ -402,6 +399,31 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     runlength=0;  \
 }
 
+static void InitializeHuffmanHashes(HuffmanTable **mb_hash,
+  HuffmanTable **mw_hash)
+{
+  const HuffmanTable
+    *entry;
+
+  ssize_t
+    i;
+
+  for (i=0; i < HashSize; i++)
+  {
+    mb_hash[i]=(HuffmanTable *) NULL;
+    mw_hash[i]=(HuffmanTable *) NULL;
+  }
+  InitializeHashTable(mw_hash,TWTable,MWHashA,MWHashB);
+  InitializeHashTable(mw_hash,MWTable,MWHashA,MWHashB);
+  InitializeHashTable(mw_hash,EXTable,MWHashA,MWHashB);
+  InitializeHashTable(mb_hash,TBTable,MBHashA,MBHashB);
+  InitializeHashTable(mb_hash,MBTable,MBHashA,MBHashB);
+  InitializeHashTable(mb_hash,EXTable,MBHashA,MBHashB);
+}
+
+MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
+  ExceptionInfo *exception)
+{
   CacheView
     *image_view;
 
@@ -431,7 +453,6 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
 
   ssize_t
     count,
-    i,
     y;
 
   unsigned char
@@ -469,17 +490,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   /*
     Initialize Huffman tables.
   */
-  for (i=0; i < HashSize; i++)
-  {
-    mb_hash[i]=(HuffmanTable *) NULL;
-    mw_hash[i]=(HuffmanTable *) NULL;
-  }
-  InitializeHashTable(mw_hash,TWTable,MWHashA,MWHashB);
-  InitializeHashTable(mw_hash,MWTable,MWHashA,MWHashB);
-  InitializeHashTable(mw_hash,EXTable,MWHashA,MWHashB);
-  InitializeHashTable(mb_hash,TBTable,MBHashA,MBHashB);
-  InitializeHashTable(mb_hash,MBTable,MBHashA,MBHashB);
-  InitializeHashTable(mb_hash,EXTable,MBHashA,MBHashB);
+  InitializeHuffmanHashes(mb_hash,mw_hash);
   /*
     Uncompress 1D Huffman to runlength encoded pixels.
   */
