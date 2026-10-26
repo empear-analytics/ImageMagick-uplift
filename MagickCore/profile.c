@@ -2375,6 +2375,22 @@ static inline void WriteProfileDimension(const EndianType endian,
 #define TAG_PIXEL_X_DIMENSION  0xa002
 #define TAG_PIXEL_Y_DIMENSION  0xa003
 
+static inline MagickBooleanType IsExifDirectoryOffset(
+  const unsigned short tag_value,const ssize_t format,const int components,
+  const size_t number_bytes)
+{
+  return((((tag_value == TAG_EXIF_OFFSET) ||
+    (tag_value == TAG_INTEROP_OFFSET)) && (format == 4) &&
+    (components == 1) && (number_bytes == 4)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsNextDirectoryOffset(const ssize_t offset,
+  const size_t length,const ssize_t level)
+{
+  return(((offset != 0) && ((size_t) offset < (length-1)) &&
+    (level < (MaxDirectoryStack-2))) ? MagickTrue : MagickFalse);
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -2595,9 +2611,8 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
         default:
           break;
       }
-      if (((tag_value == TAG_EXIF_OFFSET) ||
-           (tag_value == TAG_INTEROP_OFFSET)) && (format == 4) &&
-          (components == 1) && (number_bytes == 4))
+      if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) !=
+          MagickFalse)
         {
           offset=(ssize_t) ReadProfileLong(endian,p);
           if (((size_t) offset < (length-1)) &&
@@ -2616,8 +2631,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
                 break;
               offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
                 number_entries));
-              if ((offset != 0) && ((size_t) offset < (length-1)) &&
-                  (level < (MaxDirectoryStack-2)))
+              if (IsNextDirectoryOffset(offset,length,level) != MagickFalse)
                 {
                   directory_stack[level].directory=exif+offset;
                   directory_stack[level].entry=0;
