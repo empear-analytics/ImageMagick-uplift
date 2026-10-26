@@ -99,6 +99,21 @@
 #include "MagickCore/utility.h"
 #include "MagickCore/utility-private.h"
 #include "MagickCore/version.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _ChannelMomentsReport
+{
+  FILE
+    *file;
+
+  double
+    scale;
+
+  const ChannelMoments
+    *channel_moments;
+} ChannelMomentsReport;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -362,9 +377,18 @@ static ssize_t PrintChannelLocations(FILE *file,const Image *image,
   return(n);
 }
 
-static ssize_t PrintChannelMoments(FILE *file,const PixelChannel channel,
-  const char *name,const double scale,const ChannelMoments *channel_moments)
+static ssize_t PrintChannelMoments(const ChannelMomentsReport *report,
+  const PixelChannel channel,const char *name)
 {
+  FILE
+    *file = report->file;
+
+  const double
+    scale = report->scale;
+
+  const ChannelMoments
+    *channel_moments = report->channel_moments;
+
   double
     powers[MaximumNumberOfImageMoments] =
       { 1.0, 2.0, 3.0, 3.0, 6.0, 4.0, 6.0, 4.0 };
@@ -633,6 +657,8 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
     i;
 
   scale=(double) ((1UL << image->depth)-1);
+  const ChannelMomentsReport report = { file, scale, channel_moments };
+
   (void) FormatLocaleFile(file,"  Channel Hu moments:\n");
   switch (colorspace)
   {
@@ -640,37 +666,29 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
     case sRGBColorspace:
     {
       if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(file,RedPixelChannel,"Red",scale,
-          channel_moments);
+        (void) PrintChannelMoments(&report,RedPixelChannel,"Red");
       if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(file,GreenPixelChannel,"Green",scale,
-          channel_moments);
+        (void) PrintChannelMoments(&report,GreenPixelChannel,"Green");
       if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(file,BluePixelChannel,"Blue",scale,
-          channel_moments);
+        (void) PrintChannelMoments(&report,BluePixelChannel,"Blue");
       break;
     }
     case CMYKColorspace:
     {
       if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(file,CyanPixelChannel,"Cyan",scale,
-          channel_moments);
+        (void) PrintChannelMoments(&report,CyanPixelChannel,"Cyan");
       if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(file,MagentaPixelChannel,"Magenta",scale,
-          channel_moments);
+        (void) PrintChannelMoments(&report,MagentaPixelChannel,"Magenta");
       if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(file,YellowPixelChannel,"Yellow",scale,
-          channel_moments);
+        (void) PrintChannelMoments(&report,YellowPixelChannel,"Yellow");
       if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(file,BlackPixelChannel,"Black",scale,
-          channel_moments);
+        (void) PrintChannelMoments(&report,BlackPixelChannel,"Black");
       break;
     }
     case GRAYColorspace:
     {
       if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-        (void) PrintChannelMoments(file,GrayPixelChannel,"Gray",scale,
-          channel_moments);
+        (void) PrintChannelMoments(&report,GrayPixelChannel,"Gray");
       break;
     }
     default:
@@ -686,21 +704,18 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
           {
             (void) FormatLocaleString(label,MagickPathExtent,
               "Channel %.17g",(double) i);
-            (void) PrintChannelMoments(file,channel,label,scale,
-              channel_moments);
+            (void) PrintChannelMoments(&report,channel,label);
           }
       }
       break;
     }
   }
   if (image->alpha_trait != UndefinedPixelTrait)
-    (void) PrintChannelMoments(file,AlphaPixelChannel,"Alpha",scale,
-      channel_moments);
+    (void) PrintChannelMoments(&report,AlphaPixelChannel,"Alpha");
   if (colorspace != GRAYColorspace)
     {
       (void) FormatLocaleFile(file,"  Image moments:\n");
-      (void) PrintChannelMoments(file,CompositePixelChannel,"Overall",scale,
-        channel_moments);
+      (void) PrintChannelMoments(&report,CompositePixelChannel,"Overall");
     }
 }
 
