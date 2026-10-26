@@ -93,6 +93,13 @@ typedef struct _BlendSumWeights
     sign;
 } BlendSumWeights;
 
+typedef struct _BlendMagnitudePair
+{
+  const Image
+    *alpha_image,
+    *beta_image;
+} BlendMagnitudePair;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -327,10 +334,13 @@ static inline MagickBooleanType IsBlendRowsMissing(const Quantum *p,
     (t == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
 }
 
-static Image *BlendMaxMagnitudeImage(const Image *alpha_image,
-  const Image *beta_image,const Image *dx_image,const Image *dy_image,
-  ExceptionInfo *exception)
+static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
+  const Image *dx_image,const Image *dy_image,ExceptionInfo *exception)
 {
+  const Image
+    *alpha_image = magnitudes->alpha_image,
+    *beta_image = magnitudes->beta_image;
+
   CacheView
     *alpha_view,
     *beta_view,
@@ -595,15 +605,16 @@ static Image *BlendDivergentImage(const Image *alpha_image,
   /*
     Select alpha or beta gradient for larger of two magnitudes.
   */
-  dx_image=BlendMaxMagnitudeImage(magnitude_alpha,magnitude_beta,dx_alpha,
-    dx_beta,exception);
+  const BlendMagnitudePair
+    magnitudes = { magnitude_alpha, magnitude_beta };
+
+  dx_image=BlendMaxMagnitudeImage(&magnitudes,dx_alpha,dx_beta,exception);
   if (dx_image == (Image *) NULL)
     {
       FreeDivergentResources();
       return((Image *) NULL);
     }
-  dy_image=BlendMaxMagnitudeImage(magnitude_alpha,magnitude_beta,dy_alpha,
-    dy_beta,exception);
+  dy_image=BlendMaxMagnitudeImage(&magnitudes,dy_alpha,dy_beta,exception);
   if (dy_image == (Image *) NULL)
     {
       FreeDivergentResources();
