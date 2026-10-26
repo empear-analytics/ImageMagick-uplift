@@ -731,6 +731,51 @@ static ssize_t GetFeatureAdjacencyOffset(const Image *image,
   return(offset);
 }
 
+static double GetFeatureNormalization(const Image *image,
+  const size_t distance,const ssize_t i)
+{
+  double
+    normalize;
+
+  switch (i)
+  {
+    case 0:
+    default:
+    {
+      /*
+        Horizontal adjacency.
+      */
+      normalize=2.0*image->rows*(image->columns-distance);
+      break;
+    }
+    case 1:
+    {
+      /*
+        Vertical adjacency.
+      */
+      normalize=2.0*(image->rows-distance)*image->columns;
+      break;
+    }
+    case 2:
+    {
+      /*
+        Right diagonal adjacency.
+      */
+      normalize=2.0*(image->rows-distance)*(image->columns-distance);
+      break;
+    }
+    case 3:
+    {
+      /*
+        Left diagonal adjacency.
+      */
+      normalize=2.0*(image->rows-distance)*(image->columns-distance);
+      break;
+    }
+  }
+  return(normalize);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
@@ -1053,42 +1098,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     ssize_t
       y;
 
-    switch (i)
-    {
-      case 0:
-      default:
-      {
-        /*
-          Horizontal adjacency.
-        */
-        normalize=2.0*image->rows*(image->columns-distance);
-        break;
-      }
-      case 1:
-      {
-        /*
-          Vertical adjacency.
-        */
-        normalize=2.0*(image->rows-distance)*image->columns;
-        break;
-      }
-      case 2:
-      {
-        /*
-          Right diagonal adjacency.
-        */
-        normalize=2.0*(image->rows-distance)*(image->columns-distance);
-        break;
-      }
-      case 3:
-      {
-        /*
-          Left diagonal adjacency.
-        */
-        normalize=2.0*(image->rows-distance)*(image->columns-distance);
-        break;
-      }
-    }
+    normalize=GetFeatureNormalization(image,distance,i);
     normalize=MagickSafeReciprocal(normalize);
     for (y=0; y < (ssize_t) number_grays; y++)
     {
