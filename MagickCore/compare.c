@@ -2684,6 +2684,27 @@ MagickExport MagickBooleanType GetImageDistortion(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ConvertSimilarityToDistortion(const MetricType metric,
+  double *distortion)
+{
+  ssize_t
+    i;
+
+  switch (metric)
+  {
+    case DotProductCorrelationErrorMetric:
+    case NormalizedCrossCorrelationErrorMetric:
+    case PhaseCorrelationErrorMetric:
+    case StructuralSimilarityErrorMetric:
+    {
+      for (i=0; i <= MaxPixelChannels; i++)
+        distortion[i]=(1.0-distortion[i])/2.0;
+      break;
+    }
+    default: break;
+  }
+}
+
 MagickExport double *GetImageDistortions(Image *image,
   const Image *reconstruct_image,const MetricType metric,
   ExceptionInfo *exception)
@@ -2724,19 +2745,7 @@ MagickExport double *GetImageDistortions(Image *image,
       return((double *) NULL);
     }
   distortion=channel_similarity;
-  switch (metric)
-  {
-    case DotProductCorrelationErrorMetric:
-    case NormalizedCrossCorrelationErrorMetric:
-    case PhaseCorrelationErrorMetric:
-    case StructuralSimilarityErrorMetric:
-    {
-      for (i=0; i <= MaxPixelChannels; i++)
-        distortion[i]=(1.0-distortion[i])/2.0;
-      break;
-    }
-    default: break;
-  }
+  ConvertSimilarityToDistortion(metric,distortion);
   for (i=0; i <= MaxPixelChannels; i++)
     if (fabs(distortion[i]) < MagickEpsilon)
       distortion[i]=0.0;
