@@ -5234,6 +5234,30 @@ static inline MagickBooleanType IsBoundsOutsideImage(const Image *image,
     (bounds.x2 <= 0.0) || (bounds.y2 <= 0.0)) ? MagickTrue : MagickFalse);
 }
 
+static SegmentInfo GetPolygonEdgesExtent(PolygonInfo **polygon_info,
+  SegmentInfo bounds)
+{
+  EdgeInfo
+    *p;
+
+  ssize_t
+    i;
+
+  for (i=1; i < (ssize_t) polygon_info[0]->number_edges; i++)
+  {
+    p=polygon_info[0]->edges+i;
+    if (p->bounds.x1 < bounds.x1)
+      bounds.x1=p->bounds.x1;
+    if (p->bounds.y1 < bounds.y1)
+      bounds.y1=p->bounds.y1;
+    if (p->bounds.x2 > bounds.x2)
+      bounds.x2=p->bounds.x2;
+    if (p->bounds.y2 > bounds.y2)
+      bounds.y2=p->bounds.y2;
+  }
+  return(bounds);
+}
+
 static MagickBooleanType DrawPolygonPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -5256,9 +5280,6 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
   double
     mid;
 
-  EdgeInfo
-    *p;
-
   ExtentInfo
     poly_extent;
 
@@ -5276,7 +5297,6 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
     number_threads;
 
   ssize_t
-    i,
     y;
 
   assert(image != (Image *) NULL);
@@ -5303,18 +5323,7 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
   artifact=GetImageArtifact(image,"draw:render-bounding-rectangles");
   if (IsStringTrue(artifact) != MagickFalse)
     (void) DrawBoundingRectangles(image,draw_info,polygon_info[0],exception);
-  for (i=1; i < (ssize_t) polygon_info[0]->number_edges; i++)
-  {
-    p=polygon_info[0]->edges+i;
-    if (p->bounds.x1 < bounds.x1)
-      bounds.x1=p->bounds.x1;
-    if (p->bounds.y1 < bounds.y1)
-      bounds.y1=p->bounds.y1;
-    if (p->bounds.x2 > bounds.x2)
-      bounds.x2=p->bounds.x2;
-    if (p->bounds.y2 > bounds.y2)
-      bounds.y2=p->bounds.y2;
-  }
+  bounds=GetPolygonEdgesExtent(polygon_info,bounds);
   bounds.x1-=(mid+1.0);
   bounds.y1-=(mid+1.0);
   bounds.x2+=(mid+1.0);
