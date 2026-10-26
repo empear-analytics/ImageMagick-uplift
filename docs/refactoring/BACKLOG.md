@@ -99,7 +99,7 @@ needs before refactoring:
 | 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | 1.10, in progress (fixed-map blocks moved out of 9 of 14 Export/Import functions), [M39](tasks/M39-pixel.md) |
 | 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | 1.81, in progress (Complex Conditional 42 -> 8 sites; the rest are repeats), [M38](tasks/M38-fx.md) |
 | 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | open |
-| 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | open |
+| 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | plateau 1.24 for E (loop helpers measured at +0.01 per function), [M70](tasks/M70-quantum-export.md) |
 | 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | 1.77, in progress (Complex Conditional gone: 20 sites, 22 predicates), [M37](tasks/M37-draw.md) |
 | 1.33 | `MagickCore/composite.c` | 3815 | 86% | 74% | 1.58, in progress (Complex Conditional gone), [M20](tasks/M20-composite.md) |
 | 1.38 | `MagickCore/effect.c` | 4405 | 89% | 75% | 1.40, in progress (Complex Conditional gone; parallel loops need K/T, the adaptive pair B), [M26](tasks/M26-effect.md) |
@@ -114,7 +114,7 @@ needs before refactoring:
 | 3.26 | `MagickCore/utility.c` | 2087 | 28% | 73% | 3.65, in progress (Complex Conditional gone; rest is multi-output or platform #if), [M50](tasks/M50-utility.md) |
 | 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | 3.76, in progress (Throw* blocks pinned by __func__; StripMagickString return bug reported), [M49](tasks/M49-string.md) |
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
-| 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | open |
+| 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | 5.20 (Huffman and LZW need the hoist recipe), [M68](tasks/M68-compress.md) |
 | 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 5.35, in progress (Complex Conditional gone; string helpers tip String Heavy), [M34](tasks/M34-configure.md) |
 | 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | 6.34 (tree descent returns from inside), [M56](tasks/M56-histogram.md) |
 | 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | 6.61 (guard level; the tile loop keeps multi-output blocks), [M57](tasks/M57-montage.md) |
@@ -136,7 +136,7 @@ needs before refactoring:
 | 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.09, in progress (Complex Conditional gone), [M36](tasks/M36-image.md) |
 | 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | 2.21, in progress (8 predicates; one POSIX-only site left), [M44](tasks/M44-blob.md) |
 | 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | 2.33, in progress (6 predicates; Raqm-only and one 5-argument site left), [M45](tasks/M45-annotate.md) |
-| 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | open |
+| 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | 2.54, in progress (ProfileImage #if-built; SyncExifProfile needs hoist), [M69](tasks/M69-profile.md) |
 | 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.38, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) |
 | 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | 3.77, in progress (Complex Conditional gone; scan loops need Recipe B), [M46](tasks/M46-layer.md) |
 | 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 3.40, plateau for now (new two-string helpers trigger String Heavy Function Arguments), [M30](tasks/M30-log.md) |
@@ -148,11 +148,11 @@ needs before refactoring:
 | 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | 4.62 (reuse of the new helpers needs D at oracle level), [M53](tasks/M53-splay-tree.md) |
 | 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | 4.43, in progress (Complex Conditional gone), [M33](tasks/M33-locale.md) |
 | 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | 5.02 (rest returns from inside or is #if-built), [M54](tasks/M54-token.md) |
-| 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | open |
+| 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | 5.16 (rest interleaves Winsock/MSVC #if), [M72](tasks/M72-distribute-cache.md) |
 | 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | open |
 | 5.88 | `MagickCore/exception.c` | 1158 | 88% | 66% | 6.16 (severity table needs a lookup recipe; ThrowException repeat-test bug reported), [M55](tasks/M55-exception.md) |
 | 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | 6.40 (rest is prologue duplication and a &list loop), [M58](tasks/M58-list.md) |
-| 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | open |
+| 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | 6.90 (Passkey twins need D with mutation data), [M71](tasks/M71-cipher.md) |
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |
 | 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.49 (TransformSignature needs the hoist recipe), [M61](tasks/M61-signature.md) |
 | 7.56 | `MagickCore/quantum.c` | 1110 | 90% | 69% | 8.32, [M62](tasks/M62-quantum.md) |

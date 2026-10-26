@@ -1291,6 +1291,13 @@ static HANDLER_RETURN_TYPE DistributePixelCacheConnectionHandler(void *socket_ar
   return(HANDLER_RETURN_VALUE);
 }
 
+static inline MagickBooleanType IsUsablePolicyLimit(const char *policy_value,
+  const char *q,const unsigned long policy_limit)
+{
+  return(((errno == 0) && (q != policy_value) &&
+    (policy_limit != 0)) ? MagickTrue : MagickFalse);
+}
+
 static size_t GetDPCPolicyLimit(const char *name,const size_t default_limit)
 {
   char
@@ -1313,7 +1320,7 @@ static size_t GetDPCPolicyLimit(const char *name,const size_t default_limit)
 
       errno=0;
       policy_limit=strtoul(policy_value,&q,10);
-      if ((errno == 0) && (q != policy_value) && (policy_limit != 0))
+      if (IsUsablePolicyLimit(policy_value,q,policy_limit) != MagickFalse)
         limit=(size_t) policy_limit;
       policy_value=DestroyString(policy_value);
     }

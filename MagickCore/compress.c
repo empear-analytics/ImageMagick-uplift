@@ -359,6 +359,14 @@ MagickExport void Ascii85Encode(Image *image,const unsigned char code)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsHuffmanBufferMissing(HuffmanTable **mb_hash,
+  HuffmanTable **mw_hash,const unsigned char *scanline)
+{
+  return(((mb_hash == (HuffmanTable **) NULL) ||
+    (mw_hash == (HuffmanTable **) NULL) ||
+    (scanline == (unsigned char *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -447,9 +455,7 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
   mw_hash=(HuffmanTable **) AcquireQuantumMemory(HashSize,sizeof(*mw_hash));
   scanline=(unsigned char *) AcquireQuantumMemory((size_t) image->columns,
     sizeof(*scanline));
-  if ((mb_hash == (HuffmanTable **) NULL) ||
-      (mw_hash == (HuffmanTable **) NULL) ||
-      (scanline == (unsigned char *) NULL))
+  if (IsHuffmanBufferMissing(mb_hash,mw_hash,scanline) != MagickFalse)
     {
       if (mb_hash != (HuffmanTable **) NULL)
         mb_hash=(HuffmanTable **) RelinquishMagickMemory(mb_hash);
@@ -1043,6 +1049,40 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   return(MagickTrue);
 }
 
+static int GetPackedRunLength(const unsigned char *magick_restrict pixels,
+  const ssize_t i)
+{
+  int
+    count;
+
+  count=3;
+  while (((ssize_t) count < i) && (*pixels == *(pixels+count)))
+  {
+    count++;
+    if (count >= 127)
+      break;
+  }
+  return(count);
+}
+
+static int GetLiteralRunLength(const unsigned char *magick_restrict pixels,
+  unsigned char *packbits,const ssize_t i)
+{
+  int
+    count;
+
+  count=0;
+  while ((*(pixels+count) != *(pixels+count+1)) ||
+         (*(pixels+count+1) != *(pixels+count+2)))
+  {
+    packbits[count+1]=pixels[count];
+    count++;
+    if (((ssize_t) count >= (i-3)) || (count >= 127))
+      break;
+  }
+  return(count);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1140,13 +1180,7 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
             /*
               Packed run.
             */
-            count=3;
-            while (((ssize_t) count < i) && (*pixels == *(pixels+count)))
-            {
-              count++;
-              if (count >= 127)
-                break;
-            }
+            count=GetPackedRunLength(pixels,i);
             i-=count;
             (void) WriteBlobByte(image,(unsigned char) ((256-count)+1));
             (void) WriteBlobByte(image,*pixels);
@@ -1156,15 +1190,7 @@ MagickExport MagickBooleanType PackbitsEncodeImage(Image *image,
         /*
           Literal run.
         */
-        count=0;
-        while ((*(pixels+count) != *(pixels+count+1)) ||
-               (*(pixels+count+1) != *(pixels+count+2)))
-        {
-          packbits[count+1]=pixels[count];
-          count++;
-          if (((ssize_t) count >= (i-3)) || (count >= 127))
-            break;
-        }
+        count=GetLiteralRunLength(pixels,packbits,i);
         i-=count;
         *packbits=(unsigned char) (count-1);
         for (j=0; j <= (ssize_t) count; j++)
