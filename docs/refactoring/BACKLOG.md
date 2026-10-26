@@ -114,14 +114,14 @@ needs before refactoring:
 | 3.26 | `MagickCore/utility.c` | 2087 | 28% | 73% | 3.65, in progress (Complex Conditional gone; rest is multi-output or platform #if), [M50](tasks/M50-utility.md) |
 | 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | 3.76, in progress (Throw* blocks pinned by __func__; StripMagickString return bug reported), [M49](tasks/M49-string.md) |
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
-| 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | 5.20 (Huffman and LZW need the hoist recipe), [M68](tasks/M68-compress.md) |
+| 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | 5.28 (Recipe H applied, M84; Huffman/LZW bit macros need O/K), [M68](tasks/M68-compress.md) |
 | 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 5.35, in progress (Complex Conditional gone; string helpers tip String Heavy), [M34](tasks/M34-configure.md) |
 | 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | 6.34 (tree descent returns from inside), [M56](tasks/M56-histogram.md) |
 | 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | 6.61 (guard level; the tile loop keeps multi-output blocks), [M57](tasks/M57-montage.md) |
 | 6.87 | `MagickCore/memory.c` | 1713 | 60% | 71% | plateau 6.87 (uncompiled branches), [M60](tasks/M60-memory.md) |
 | 8.22 | `MagickCore/coder.c` | 562 | 38% | 93% | 8.28, [M76](tasks/M76-coder.md) |
 | 9.09 | `MagickCore/static.c` | 379 | 52% | 82% | open |
-| 9.12 | `MagickCore/gem.c` | 348 | 100% | 70% | plateau 9.12 (local Sigma macros), [M74](tasks/M74-gem.md) |
+| 9.12 | `MagickCore/gem.c` | 348 | 100% | 70% | 9.21 (Recipe H applied, M84), [M74](tasks/M74-gem.md) |
 | 9.49 | `MagickCore/prepress.c` | 154 | 100% | 71% | plateau 9.49 (OpenMP critical block), [M75](tasks/M75-prepress.md) |
 
 ### Needs cases before refactoring (39 files)
@@ -129,14 +129,14 @@ needs before refactoring:
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
 | 1.45 | `MagickCore/cache.c` | 6108 | 62% | 65% | 2.16, in progress (Complex Conditional gone: 13 predicates), [M40](tasks/M40-cache.md) |
-| 1.48 | `MagickCore/property.c` | 4879 | 41% | 61% | 1.92, in progress (Complex Conditional left only in GetEXIFProperty, blocked by its local macros), [M41](tasks/M41-property.md) |
+| 1.48 | `MagickCore/property.c` | 4879 | 41% | 61% | 2.02 (Complex Conditional gone via Recipe H, M85), in progress (Complex Conditional left only in GetEXIFProperty, blocked by its local macros), [M41](tasks/M41-property.md) |
 | 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | 1.61, blocked (GetImageFeatures' function-local typedef needs a hoisting recipe), [M35](tasks/M35-feature.md) |
 | 1.61 | `MagickCore/xml-tree.c` | 2347 | 35% | 57% | 2.15, in progress (17 predicates; 4 sites left: 3 with side effects, 1 repeat), [M42](tasks/M42-xml-tree.md) |
 | 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | 2.06, in progress (Complex Conditional gone), [M43](tasks/M43-vision.md) |
 | 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.20, in progress (Complex Conditional gone; second pass [M78](tasks/M78-image.md)), [M36](tasks/M36-image.md) |
 | 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | 2.21, in progress (8 predicates; one POSIX-only site left), [M44](tasks/M44-blob.md) |
 | 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | 2.33, in progress (6 predicates; Raqm-only and one 5-argument site left), [M45](tasks/M45-annotate.md) |
-| 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | 2.54, in progress (ProfileImage #if-built; SyncExifProfile needs hoist), [M69](tasks/M69-profile.md) |
+| 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | 2.59, in progress (ProfileImage #if-built; SyncExifProfile hoisted, M84), [M69](tasks/M69-profile.md) |
 | 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.38, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) |
 | 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | 3.77, in progress (Complex Conditional gone; scan loops need Recipe B), [M46](tasks/M46-layer.md) |
 | 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 3.40, plateau for now (new two-string helpers trigger String Heavy Function Arguments), [M30](tasks/M30-log.md) |
@@ -154,7 +154,7 @@ needs before refactoring:
 | 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | 6.40 (rest is prologue duplication and a &list loop), [M58](tasks/M58-list.md) |
 | 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | 6.90 (Passkey twins need D with mutation data), [M71](tasks/M71-cipher.md) |
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |
-| 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.49 (TransformSignature needs the hoist recipe), [M61](tasks/M61-signature.md) |
+| 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.54 (Recipe H applied, M84), [M61](tasks/M61-signature.md) |
 | 7.56 | `MagickCore/quantum.c` | 1110 | 90% | 69% | 8.32, [M62](tasks/M62-quantum.md) |
 | 7.59 | `MagickCore/linked-list.c` | 1040 | 40% | 69% | 8.95 (interior-insert bug reported), [M59](tasks/M59-linked-list.md) |
 | 7.68 | `MagickCore/random.c` | 996 | 62% | 24% | 8.06 (entropy gathering is #if-built), [M63](tasks/M63-random.md) |
