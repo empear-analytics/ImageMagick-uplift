@@ -434,6 +434,31 @@ static char
   *TraceSVGClippath(const unsigned char *,size_t,const size_t,
     const size_t);
 
+static char *AppendIPTCDataset(char *attribute,const StringInfo *profile,
+  const unsigned char *p,const ssize_t i)
+{
+  char
+    *message = (char *) NULL;
+
+  size_t declared = ((size_t) p[3] << 8) | (size_t) p[4];
+  size_t remaining = GetStringInfoLength(profile)-(i+5);
+  size_t length = MagickMin(declared,remaining);
+  if (~length >= 1)
+    message=(char *) AcquireQuantumMemory(length+1UL,sizeof(*message));
+  if (message != (char *) NULL)
+    {
+      /*
+        Copy only the clamped length.
+      */
+      (void) memcpy(message,p+5,length);
+      message[length]='\0';
+      (void) ConcatenateString(&attribute,message);
+      (void) ConcatenateString(&attribute,";");
+      message=DestroyString(message);
+    }
+  return(attribute);
+}
+
 static void GetIPTCProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -473,27 +498,7 @@ static void GetIPTCProperty(const Image *image,const char *key,
       Dataset and record.
     */
     if (((long) p[1] == dataset) && ((long) p[2] == record))
-      {
-        char
-          *message = (char *) NULL;
-
-        size_t declared = ((size_t) p[3] << 8) | (size_t) p[4];
-        size_t remaining = GetStringInfoLength(profile)-(i+5);
-        size_t length = MagickMin(declared,remaining);
-        if (~length >= 1)
-          message=(char *) AcquireQuantumMemory(length+1UL,sizeof(*message));
-        if (message != (char *) NULL)
-          {
-            /*
-              Copy only the clamped length.
-            */
-            (void) memcpy(message,p+5,length);
-            message[length]='\0';
-            (void) ConcatenateString(&attribute,message);
-            (void) ConcatenateString(&attribute,";");
-            message=DestroyString(message);
-          }
-      }
+      attribute=AppendIPTCDataset(attribute,profile,p,i);
     /*
       Advance past this record header + data.
     */
