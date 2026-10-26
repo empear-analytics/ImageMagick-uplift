@@ -819,12 +819,11 @@ static inline MagickBooleanType IsNeighborOutsideImage(const Image *image,
 }
 
 static inline MagickBooleanType IsAreaOutsideRange(const CCObjectInfo *object,
-  const ssize_t i,const double min_threshold,const double max_threshold,
-  const ssize_t background_id)
+  const ssize_t i,const CCThresholdRange *range)
 {
-  return((((object[i].area < min_threshold) ||
-    (object[i].area >= max_threshold)) && (i != background_id)) ? MagickTrue :
-    MagickFalse);
+  return((((object[i].area < range->min_threshold) ||
+    (object[i].area >= range->max_threshold)) &&
+    (i != range->background_id)) ? MagickTrue : MagickFalse);
 }
 
 static inline MagickBooleanType IsGreaterAdjacentObject(
@@ -1176,9 +1175,11 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         Merge any object not within the min and max area threshold.
       */
       (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
+      const CCThresholdRange range = { min_threshold, max_threshold,
+        background_id };
+
       for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsAreaOutsideRange(object,i,min_threshold,max_threshold,
-            background_id) != MagickFalse)
+        if (IsAreaOutsideRange(object,i,&range) != MagickFalse)
           object[i].merge=MagickTrue;
     }
   artifact=GetImageArtifact(image,"connected-components:keep-colors");
