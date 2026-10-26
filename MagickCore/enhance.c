@@ -2815,18 +2815,18 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _HaldInfo
+{
+  double
+    x,
+    y,
+    z;
+} HaldInfo;
+
 MagickExport MagickBooleanType HaldClutImage(Image *image,
   const Image *hald_image,ExceptionInfo *exception)
 {
 #define HaldClutImageTag  "Clut/Image"
-
-  typedef struct _HaldInfo
-  {
-    double
-      x,
-      y,
-      z;
-  } HaldInfo;
 
   CacheView
     *hald_view,
