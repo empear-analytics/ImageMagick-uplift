@@ -367,9 +367,6 @@ static inline MagickBooleanType IsHuffmanBufferMissing(HuffmanTable **mb_hash,
     (scanline == (unsigned char *) NULL)) ? MagickTrue : MagickFalse);
 }
 
-MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
-  ExceptionInfo *exception)
-{
 #define HashSize  1021L
 #define MBHashA  293L
 #define MBHashB  2695L
@@ -402,6 +399,9 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
     runlength=0;  \
 }
 
+MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
+  ExceptionInfo *exception)
+{
   CacheView
     *image_view;
 
