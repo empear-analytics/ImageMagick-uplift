@@ -2075,6 +2075,29 @@ static double AddPHashDifferences(
   return(difference);
 }
 
+static void NormalizePHashSimilarity(const Image *image,
+  const Image *reconstruct_image,const ChannelPerceptualHash *channel_phash,
+  double *similarity)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    similarity[i]=sqrt(similarity[i]/(double)
+      channel_phash[0].number_colorspaces);
+  }
+  similarity[CompositePixelChannel]=sqrt(similarity[CompositePixelChannel]/
+    (double) channel_phash[0].number_colorspaces);
+}
+
 static MagickBooleanType GetPHASHSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -2124,22 +2147,8 @@ static MagickBooleanType GetPHASHSimilarity(const Image *image,
     similarity[CompositePixelChannel]/=(double) channels;
   artifact=GetImageArtifact(image,"phash:normalize");
   if (IsStringTrue(artifact) != MagickFalse)
-    {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        similarity[i]=sqrt(similarity[i]/(double)
-          channel_phash[0].number_colorspaces);
-      }
-      similarity[CompositePixelChannel]=sqrt(similarity[CompositePixelChannel]/
-        (double) channel_phash[0].number_colorspaces);
-    }
+    NormalizePHashSimilarity(image,reconstruct_image,channel_phash,
+      similarity);
   /*
     Free resources.
   */
