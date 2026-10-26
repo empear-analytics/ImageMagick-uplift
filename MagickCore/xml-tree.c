@@ -481,7 +481,7 @@ static void DestroyXMLTreeOrdered(XMLTreeInfo *xml_info,
   }
 }
 
-static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
+static void DestroyXMLRootAttributes(XMLTreeRoot *root)
 {
   char
     **attributes;
@@ -489,6 +489,49 @@ static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
   ssize_t
     i,
     j;
+
+  for (i=0; root->attributes[i] != (char **) NULL; i++)
+  {
+    attributes=root->attributes[i];
+    if (attributes[0] != (char *) NULL)
+      attributes[0]=DestroyString(attributes[0]);
+    for (j=1; attributes[j] != (char *) NULL; j+=3)
+    {
+      if (attributes[j] != (char *) NULL)
+        attributes[j]=DestroyString(attributes[j]);
+      if (attributes[j+1] != (char *) NULL)
+        attributes[j+1]=DestroyString(attributes[j+1]);
+      if (attributes[j+2] != (char *) NULL)
+        attributes[j+2]=DestroyString(attributes[j+2]);
+    }
+    attributes=(char **) RelinquishMagickMemory(attributes);
+  }
+}
+
+static void DestroyXMLRootInstructions(XMLTreeRoot *root)
+{
+  ssize_t
+    i,
+    j;
+
+  for (i=0; root->processing_instructions[i] != (char **) NULL; i++)
+  {
+    for (j=0; root->processing_instructions[i][j] != (char *) NULL; j++)
+      root->processing_instructions[i][j]=DestroyString(
+        root->processing_instructions[i][j]);
+    root->processing_instructions[i][j+1]=DestroyString(
+      root->processing_instructions[i][j+1]);
+    root->processing_instructions[i]=(char **) RelinquishMagickMemory(
+      root->processing_instructions[i]);
+  }
+  root->processing_instructions=(char ***) RelinquishMagickMemory(
+    root->processing_instructions);
+}
+
+static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
+{
+  ssize_t
+    i;
 
   XMLTreeRoot
     *root;
@@ -507,39 +550,11 @@ static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
   for (i=NumberPredefinedEntities; root->entities[i] != (char *) NULL; i+=2)
     root->entities[i+1]=DestroyString(root->entities[i+1]);
   root->entities=(char **) RelinquishMagickMemory(root->entities);
-  for (i=0; root->attributes[i] != (char **) NULL; i++)
-  {
-    attributes=root->attributes[i];
-    if (attributes[0] != (char *) NULL)
-      attributes[0]=DestroyString(attributes[0]);
-    for (j=1; attributes[j] != (char *) NULL; j+=3)
-    {
-      if (attributes[j] != (char *) NULL)
-        attributes[j]=DestroyString(attributes[j]);
-      if (attributes[j+1] != (char *) NULL)
-        attributes[j+1]=DestroyString(attributes[j+1]);
-      if (attributes[j+2] != (char *) NULL)
-        attributes[j+2]=DestroyString(attributes[j+2]);
-    }
-    attributes=(char **) RelinquishMagickMemory(attributes);
-  }
+  DestroyXMLRootAttributes(root);
   if (root->attributes[0] != (char **) NULL)
     root->attributes=(char ***) RelinquishMagickMemory(root->attributes);
   if (root->processing_instructions[0] != (char **) NULL)
-    {
-      for (i=0; root->processing_instructions[i] != (char **) NULL; i++)
-      {
-        for (j=0; root->processing_instructions[i][j] != (char *) NULL; j++)
-          root->processing_instructions[i][j]=DestroyString(
-            root->processing_instructions[i][j]);
-        root->processing_instructions[i][j+1]=DestroyString(
-          root->processing_instructions[i][j+1]);
-        root->processing_instructions[i]=(char **) RelinquishMagickMemory(
-          root->processing_instructions[i]);
-      }
-      root->processing_instructions=(char ***) RelinquishMagickMemory(
-        root->processing_instructions);
-    }
+    DestroyXMLRootInstructions(root);
 }
 
 static XMLTreeInfo *DestroyXMLTree_(XMLTreeInfo *xml_info,
@@ -769,8 +784,7 @@ MagickExport XMLTreeInfo *GetNextXMLTreeTag(XMLTreeInfo *xml_info)
 %    o tag: the attribute tag.
 %
 */
-MagickExport const char *GetXMLTreeAttribute(XMLTreeInfo *xml_info,
-  const char *tag)
+static const char *GetRootXMLAttribute(XMLTreeInfo *xml_info,const char *tag)
 {
   ssize_t
     i,
@@ -779,19 +793,6 @@ MagickExport const char *GetXMLTreeAttribute(XMLTreeInfo *xml_info,
   XMLTreeRoot
     *root;
 
-  assert(xml_info != (XMLTreeInfo *) NULL);
-  assert((xml_info->signature == MagickCoreSignature) ||
-         (((XMLTreeRoot *) xml_info)->signature == MagickCoreSignature));
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
-  if (xml_info->attributes == (char **) NULL)
-    return((const char *) NULL);
-  i=0;
-  while ((xml_info->attributes[i] != (char *) NULL) &&
-         (strcmp(xml_info->attributes[i],tag) != 0))
-    i+=2;
-  if (xml_info->attributes[i] != (char *) NULL)
-    return(xml_info->attributes[i+1]);
   root=(XMLTreeRoot*) xml_info;
   while (root->root.parent != (XMLTreeInfo *) NULL)
     root=(XMLTreeRoot *) root->root.parent;
@@ -808,6 +809,28 @@ MagickExport const char *GetXMLTreeAttribute(XMLTreeInfo *xml_info,
   if (root->attributes[i][j] == (char *) NULL)
     return((const char *) NULL);
   return(root->attributes[i][j+1]);
+}
+
+MagickExport const char *GetXMLTreeAttribute(XMLTreeInfo *xml_info,
+  const char *tag)
+{
+  ssize_t
+    i;
+
+  assert(xml_info != (XMLTreeInfo *) NULL);
+  assert((xml_info->signature == MagickCoreSignature) ||
+         (((XMLTreeRoot *) xml_info)->signature == MagickCoreSignature));
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
+  if (xml_info->attributes == (char **) NULL)
+    return((const char *) NULL);
+  i=0;
+  while ((xml_info->attributes[i] != (char *) NULL) &&
+         (strcmp(xml_info->attributes[i],tag) != 0))
+    i+=2;
+  if (xml_info->attributes[i] != (char *) NULL)
+    return(xml_info->attributes[i+1]);
+  return(GetRootXMLAttribute(xml_info,tag));
 }
 
 /*

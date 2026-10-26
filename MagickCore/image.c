@@ -2258,6 +2258,32 @@ MagickExport Image *ReferenceImage(Image *image)
 %    o page: the relative page specification.
 %
 */
+static void AddRelativePageOffset(Image *image,const MagickStatusType flags,
+  const RectangleInfo geometry)
+{
+  if ((flags & XValue) != 0)
+    image->page.x+=geometry.x;
+  if ((flags & YValue) != 0)
+    image->page.y+=geometry.y;
+}
+
+static void SetAbsolutePageOffset(Image *image,const MagickStatusType flags,
+  const RectangleInfo geometry)
+{
+  if ((flags & XValue) != 0)
+    {
+      image->page.x=geometry.x;
+      if ((image->page.width == 0) && (geometry.x > 0))
+        image->page.width=(size_t) ((ssize_t) image->columns+geometry.x);
+    }
+  if ((flags & YValue) != 0)
+    {
+      image->page.y=geometry.y;
+      if ((image->page.height == 0) && (geometry.y > 0))
+        image->page.height=(size_t) ((ssize_t) image->rows+geometry.y);
+    }
+}
+
 MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
 {
   MagickStatusType
@@ -2279,27 +2305,9 @@ MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
       image->page.height=geometry.height;
     }
   if ((flags & AspectValue) != 0)
-    {
-      if ((flags & XValue) != 0)
-        image->page.x+=geometry.x;
-      if ((flags & YValue) != 0)
-        image->page.y+=geometry.y;
-    }
+    AddRelativePageOffset(image,flags,geometry);
   else
-    {
-      if ((flags & XValue) != 0)
-        {
-          image->page.x=geometry.x;
-          if ((image->page.width == 0) && (geometry.x > 0))
-            image->page.width=(size_t) ((ssize_t) image->columns+geometry.x);
-        }
-      if ((flags & YValue) != 0)
-        {
-          image->page.y=geometry.y;
-          if ((image->page.height == 0) && (geometry.y > 0))
-            image->page.height=(size_t) ((ssize_t) image->rows+geometry.y);
-        }
-    }
+    SetAbsolutePageOffset(image,flags,geometry);
   return(MagickTrue);
 }
 
