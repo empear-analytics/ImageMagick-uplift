@@ -100,6 +100,16 @@ typedef struct _BlendMagnitudePair
     *beta_image;
 } BlendMagnitudePair;
 
+typedef struct _CompositePlacement
+{
+  MagickBooleanType
+    clip_to_self;
+
+  ssize_t
+    x_offset,
+    y_offset;
+} CompositePlacement;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -957,10 +967,17 @@ static inline MagickBooleanType IsOutsideSourceColumn(const Quantum *pixels,
 }
 
 static MagickBooleanType CompositeOverImage(Image *image,
-  const Image *source_image,const MagickBooleanType clip_to_self,
-  const ssize_t x_offset,const ssize_t y_offset,ExceptionInfo *exception)
+  const Image *source_image,const CompositePlacement *placement,
+  ExceptionInfo *exception)
 {
 #define CompositeImageTag  "Composite/Image"
+
+  const MagickBooleanType
+    clip_to_self = placement->clip_to_self;
+
+  const ssize_t
+    x_offset = placement->x_offset,
+    y_offset = placement->y_offset;
 
   CacheView
     *image_view,
@@ -1299,7 +1316,10 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
       break;
     relax_image=DestroyImage(relax_image);
     relax_image=sum_image;
-    status=CompositeOverImage(relax_image,crop_image,MagickTrue,0,0,exception);
+    const CompositePlacement
+      origin = { MagickTrue, 0, 0 };
+
+    status=CompositeOverImage(relax_image,crop_image,&origin,exception);
     if (status == MagickFalse)
       break;
     status=BlendRMSEResidual(relax_image,residual_image,&residual,exception);
@@ -1326,8 +1346,10 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
   /*
     Composite relaxed over the background image.
   */
-  status=CompositeOverImage(image,relax_image,MagickTrue,x_offset,y_offset,
-    exception);
+  const CompositePlacement
+    placement = { MagickTrue, x_offset, y_offset };
+
+  status=CompositeOverImage(image,relax_image,&placement,exception);
   relax_image=DestroyImage(relax_image);
   return(status);
 }
@@ -1429,7 +1451,10 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
       break;
     relax_image=DestroyImage(relax_image);
     relax_image=convolve_image;
-    status=CompositeOverImage(relax_image,mean_image,MagickTrue,0,0,exception);
+    const CompositePlacement
+      origin = { MagickTrue, 0, 0 };
+
+    status=CompositeOverImage(relax_image,mean_image,&origin,exception);
     if (status == MagickFalse)
       break;
     status=BlendRMSEResidual(relax_image,residual_image,&residual,exception);
@@ -1465,8 +1490,10 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
     return(MagickFalse);
   (void) SetImageMask(foreground_image,ReadPixelMask,(const Image *) NULL,
     exception);
-  status=CompositeOverImage(image,foreground_image,MagickTrue,x_offset,y_offset,
-    exception);
+  const CompositePlacement
+    placement = { MagickTrue, x_offset, y_offset };
+
+  status=CompositeOverImage(image,foreground_image,&placement,exception);
   foreground_image=DestroyImage(foreground_image);
   return(status);
 }
@@ -1538,8 +1565,10 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
   (void) SetImageColorspace(source_image,image->colorspace,exception);
   if ((compose == OverCompositeOp) || (compose == SrcOverCompositeOp))
     {
-      status=CompositeOverImage(image,source_image,clip_to_self,x_offset,
-        y_offset,exception);
+      const CompositePlacement
+        placement = { clip_to_self, x_offset, y_offset };
+
+      status=CompositeOverImage(image,source_image,&placement,exception);
       source_image=DestroyImage(source_image);
       return(status);
     }
