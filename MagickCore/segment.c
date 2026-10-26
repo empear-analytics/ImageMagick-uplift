@@ -762,6 +762,16 @@ static ssize_t CountCrossingsBetween(const ZeroCrossing *zero_crossing,
   return(count);
 }
 
+static MagickBooleanType IsEvenCrossing(const ZeroCrossing *zero_crossing,
+  const ssize_t i,const ssize_t k,const ssize_t candidate)
+{
+  ssize_t
+    count;
+
+  count=CountCrossingsBetween(zero_crossing,i,k,candidate);
+  return((((count % 2) == 0) && (candidate != k)) ? MagickTrue : MagickFalse);
+}
+
 static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -774,7 +784,6 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
   ssize_t
     center,
     correct,
-    count,
     left,
     right;
 
@@ -813,29 +822,20 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       */
       correct=(-1);
       if (zero_crossing[i+1].crossings[j] != 0)
-        {
-          count=CountCrossingsBetween(zero_crossing,i,k,center);
-          if (((count % 2) == 0) && (center != k))
-            correct=center;
-        }
+        if (IsEvenCrossing(zero_crossing,i,k,center) != MagickFalse)
+          correct=center;
       /*
         Check left for an even number of crossings between k and j.
       */
       if (correct == -1)
-        {
-          count=CountCrossingsBetween(zero_crossing,i,k,left);
-          if (((count % 2) == 0) && (left != k))
-            correct=left;
-        }
+        if (IsEvenCrossing(zero_crossing,i,k,left) != MagickFalse)
+          correct=left;
       /*
         Check right for an even number of crossings between k and j.
       */
       if (correct == -1)
-        {
-          count=CountCrossingsBetween(zero_crossing,i,k,right);
-          if (((count % 2) == 0) && (right != k))
-            correct=right;
-        }
+        if (IsEvenCrossing(zero_crossing,i,k,right) != MagickFalse)
+          correct=right;
       l=(ssize_t) zero_crossing[i].crossings[j];
       zero_crossing[i].crossings[j]=0;
       if (correct != -1)
