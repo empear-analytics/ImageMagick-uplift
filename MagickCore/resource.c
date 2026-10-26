@@ -1023,21 +1023,7 @@ MagickExport void RelinquishMagickResource(const ResourceType type,
   bi=MagickFalse;
   limit=0;
   current=0;
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      if (resource_semaphore[type] == (SemaphoreInfo *) NULL)
-        ActivateSemaphoreInfo(&resource_semaphore[type]);
-      LockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  LockResourceSemaphore(type);
   switch (type)
   {
     case DiskResource:
@@ -1090,19 +1076,7 @@ MagickExport void RelinquishMagickResource(const ResourceType type,
       break;
     }
   }
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      UnlockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  UnlockResourceSemaphore(type);
   if ((GetLogEventMask() & ResourceEvent) != 0)
     {
       char
