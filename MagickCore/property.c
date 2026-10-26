@@ -977,30 +977,72 @@ static inline MagickBooleanType IsNextIFDOffset(const ssize_t tag_offset1,
     (level < (MaxDirectoryStack-2))) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _DirectoryInfo
+{
+  const unsigned char
+    *directory;
+
+  size_t
+    entry;
+
+  ssize_t
+    offset;
+} DirectoryInfo;
+
+typedef struct _TagInfo
+{
+  size_t
+    tag;
+
+  const char
+    description[36];
+} TagInfo;
+
+static const char *GetEXIFTagDescription(const TagInfo *EXIFTag,
+  const size_t tag_value)
+{
+  const char
+    *description;
+
+  ssize_t
+    i;
+
+  description="unknown";
+  for (i=0; ; i++)
+  {
+    if (EXIFTag[i].tag == 0)
+      break;
+    if (EXIFTag[i].tag == tag_value)
+      {
+        description=EXIFTag[i].description;
+        break;
+      }
+  }
+  return(description);
+}
+
+static size_t GetEXIFTagByName(const TagInfo *EXIFTag,const char *property,
+  size_t tag)
+{
+  ssize_t
+    i;
+
+  for (i=0; ; i++)
+  {
+    if (EXIFTag[i].tag == 0)
+      break;
+    if (LocaleCompare(EXIFTag[i].description,property) == 0)
+      {
+        tag=(size_t) EXIFTag[i].tag;
+        break;
+      }
+  }
+  return(tag);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
-  typedef struct _DirectoryInfo
-  {
-    const unsigned char
-      *directory;
-
-    size_t
-      entry;
-
-    ssize_t
-      offset;
-  } DirectoryInfo;
-
-  typedef struct _TagInfo
-  {
-    size_t
-      tag;
-
-    const char
-      description[36];
-  } TagInfo;
-
   static const TagInfo
     EXIFTag[] =
     {
@@ -1414,16 +1456,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
       /*
         Try to match the text with a tag name instead.
       */
-      for (i=0; ; i++)
-      {
-        if (EXIFTag[i].tag == 0)
-          break;
-        if (LocaleCompare(EXIFTag[i].description,property) == 0)
-          {
-            tag=(size_t) EXIFTag[i].tag;
-            break;
-          }
-      }
+      tag=GetEXIFTagByName(EXIFTag,property,tag);
       break;
     }
   }
@@ -1679,17 +1712,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
                   const char
                     *description;
 
-                  description="unknown";
-                  for (i=0; ; i++)
-                  {
-                    if (EXIFTag[i].tag == 0)
-                      break;
-                    if (EXIFTag[i].tag == tag_value)
-                      {
-                        description=EXIFTag[i].description;
-                        break;
-                      }
-                  }
+                  description=GetEXIFTagDescription(EXIFTag,tag_value);
                   (void) FormatLocaleString(key,MagickPathExtent,"%s",
                     description);
                   if (level == 2)

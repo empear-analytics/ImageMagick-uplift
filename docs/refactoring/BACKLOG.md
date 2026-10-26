@@ -75,7 +75,7 @@ needs before refactoring:
 | ---: | --- | ---: | ---: | ---: | --- |
 | 1.39 | `MagickCore/resize.c` | 4704 | 97% | 88% | plateau at 2.89 (Recipe T on `SampleImage`; OpenMP-bound nesting, survivor lines); magnify family split to `magnify.c`, plateau at 6.57 (from 6.21), [M01](tasks/M01-resize.md) |
 | 1.46 | `MagickCore/compare.c` | 4987 | 88% | 86% | plateau at 1.77 (FFTW-only region holds most categories; SSIM and PHASE loops write five sums), [M02](tasks/M02-compare.md) |
-| 1.53 | `MagickCore/enhance.c` | 4596 | 78% | 86% | 2.77, in progress (Brain Method, Deep Nesting, Complex Conditional gone; per-function steps left), [M03](tasks/M03-enhance.md) |
+| 1.53 | `MagickCore/enhance.c` | 4596 | 78% | 86% | 2.84, in progress (Brain Method, Deep Nesting, Complex Conditional gone; ColorDecisionListImage and HaldClutImage after Recipe L, [M90](tasks/M90-hoist-types.md)), [M03](tasks/M03-enhance.md) |
 | 1.53 | `MagickCore/morphology.c` | 4764 | 81% | 80% | 2.00, in progress (Complex Conditional gone; Brain Method left in `MorphologyPrimitive` and `MorphologyApply`, which need oracle-level evidence first), [M04](tasks/M04-morphology.md) |
 | 1.55 | `MagickCore/visual-effects.c` | 3789 | 86% | 83% | 2.41, in progress (Complex Conditional gone; Recipe B next for the six-argument pixel helpers), [M05](tasks/M05-visual-effects.md) |
 | 1.73 | `MagickCore/geometry.c` | 1831 | 65% | 85% | 3.38, in progress (Complex Conditional gone; ParseGeometry and GetGeometry parse with flags and cursor together), [M14](tasks/M14-geometry.md) |
@@ -129,8 +129,8 @@ needs before refactoring:
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
 | 1.45 | `MagickCore/cache.c` | 6108 | 62% | 65% | 2.16, in progress (Complex Conditional gone: 13 predicates), [M40](tasks/M40-cache.md) |
-| 1.48 | `MagickCore/property.c` | 4879 | 41% | 61% | 2.02, in progress (Complex Conditional gone: GetEXIFProperty's macros hoisted, [M85](tasks/M85-property.md)), [M41](tasks/M41-property.md) |
-| 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | 1.61, blocked (GetImageFeatures' function-local typedef needs a hoisting recipe), [M35](tasks/M35-feature.md) |
+| 1.48 | `MagickCore/property.c` | 4879 | 41% | 61% | 2.02, in progress (Complex Conditional gone: GetEXIFProperty's macros hoisted, [M85](tasks/M85-property.md); its types hoisted, [M90](tasks/M90-hoist-types.md)), [M41](tasks/M41-property.md) |
+| 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | 1.81, in progress (GetImageFeatures unblocked by Recipe L; its parallel texture regions need Recipe B, [M90](tasks/M90-hoist-types.md)), [M35](tasks/M35-feature.md) |
 | 1.61 | `MagickCore/xml-tree.c` | 2347 | 35% | 57% | 2.15, in progress (17 predicates; 4 sites left: 3 with side effects, 1 repeat), [M42](tasks/M42-xml-tree.md) |
 | 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | 2.06, in progress (Complex Conditional gone), [M43](tasks/M43-vision.md) |
 | 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.20, in progress (Complex Conditional gone; second pass [M78](tasks/M78-image.md)), [M36](tasks/M36-image.md) |

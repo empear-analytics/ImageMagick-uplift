@@ -620,22 +620,172 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _FeatureStatistics
+{
+  PixelInfo
+    direction[4];  /* horizontal, vertical, left and right diagonals */
+} FeatureStatistics;
+
+static inline MagickBooleanType IsFeatureMemoryMissing(
+  FeatureStatistics **cooccurrence,FeatureStatistics *density_x,
+  FeatureStatistics *density_xy,FeatureStatistics *density_y,
+  FeatureStatistics **Q,FeatureStatistics *sum)
+{
+  return(((cooccurrence == (FeatureStatistics **) NULL) ||
+    (density_x == (FeatureStatistics *) NULL) ||
+    (density_xy == (FeatureStatistics *) NULL) ||
+    (density_y == (FeatureStatistics *) NULL) ||
+    (Q == (FeatureStatistics **) NULL) ||
+    (sum == (FeatureStatistics *) NULL)) ? MagickTrue : MagickFalse);
+}
+
+static unsigned int GetFeatureGrayLevels(const Image *image,
+  const PixelPacket gray)
+{
+  unsigned int
+    number_grays;
+
+  number_grays=gray.red;
+  if (gray.green > number_grays)
+    number_grays=gray.green;
+  if (gray.blue > number_grays)
+    number_grays=gray.blue;
+  if (image->colorspace == CMYKColorspace)
+    if (gray.black > number_grays)
+      number_grays=gray.black;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    if (gray.alpha > number_grays)
+      number_grays=gray.alpha;
+  return(number_grays);
+}
+
+static PixelPacket CompactFeatureGrays(const Image *image,PixelPacket *grays)
+{
+  PixelPacket
+    gray;
+
+  ssize_t
+    i;
+
+  (void) memset(&gray,0,sizeof(gray));
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    if (grays[i].red != ~0U)
+      grays[gray.red++].red=grays[i].red;
+    if (grays[i].green != ~0U)
+      grays[gray.green++].green=grays[i].green;
+    if (grays[i].blue != ~0U)
+      grays[gray.blue++].blue=grays[i].blue;
+    if (image->colorspace == CMYKColorspace)
+      if (grays[i].black != ~0U)
+        grays[gray.black++].black=grays[i].black;
+    if (image->alpha_trait != UndefinedPixelTrait)
+      if (grays[i].alpha != ~0U)
+        grays[gray.alpha++].alpha=grays[i].alpha;
+  }
+  return(gray);
+}
+
+static ssize_t GetFeatureAdjacencyOffset(const Image *image,
+  const size_t distance,const ssize_t i)
+{
+  ssize_t
+    offset;
+
+  switch (i)
+  {
+    case 0:
+    default:
+    {
+      /*
+        Horizontal adjacency.
+      */
+      offset=(ssize_t) distance;
+      break;
+    }
+    case 1:
+    {
+      /*
+        Vertical adjacency.
+      */
+      offset=(ssize_t) (image->columns+2*distance);
+      break;
+    }
+    case 2:
+    {
+      /*
+        Right diagonal adjacency.
+      */
+      offset=(ssize_t) ((image->columns+2*distance)-distance);
+      break;
+    }
+    case 3:
+    {
+      /*
+        Left diagonal adjacency.
+      */
+      offset=(ssize_t) ((image->columns+2*distance)+distance);
+      break;
+    }
+  }
+  return(offset);
+}
+
+static double GetFeatureNormalization(const Image *image,
+  const size_t distance,const ssize_t i)
+{
+  double
+    normalize;
+
+  switch (i)
+  {
+    case 0:
+    default:
+    {
+      /*
+        Horizontal adjacency.
+      */
+      normalize=2.0*image->rows*(image->columns-distance);
+      break;
+    }
+    case 1:
+    {
+      /*
+        Vertical adjacency.
+      */
+      normalize=2.0*(image->rows-distance)*image->columns;
+      break;
+    }
+    case 2:
+    {
+      /*
+        Right diagonal adjacency.
+      */
+      normalize=2.0*(image->rows-distance)*(image->columns-distance);
+      break;
+    }
+    case 3:
+    {
+      /*
+        Left diagonal adjacency.
+      */
+      normalize=2.0*(image->rows-distance)*(image->columns-distance);
+      break;
+    }
+  }
+  return(normalize);
+}
+
 MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   const size_t distance,ExceptionInfo *exception)
 {
-  typedef struct _ChannelStatistics
-  {
-    PixelInfo
-      direction[4];  /* horizontal, vertical, left and right diagonals */
-  } ChannelStatistics;
-
   CacheView
     *image_view;
 
   ChannelFeatures
     *channel_features;
 
-  ChannelStatistics
+  FeatureStatistics
     **cooccurrence,
     correlation,
     *density_x,
@@ -753,65 +903,36 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
         channel_features);
       return(channel_features);
     }
-  (void) memset(&gray,0,sizeof(gray));
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    if (grays[i].red != ~0U)
-      grays[gray.red++].red=grays[i].red;
-    if (grays[i].green != ~0U)
-      grays[gray.green++].green=grays[i].green;
-    if (grays[i].blue != ~0U)
-      grays[gray.blue++].blue=grays[i].blue;
-    if (image->colorspace == CMYKColorspace)
-      if (grays[i].black != ~0U)
-        grays[gray.black++].black=grays[i].black;
-    if (image->alpha_trait != UndefinedPixelTrait)
-      if (grays[i].alpha != ~0U)
-        grays[gray.alpha++].alpha=grays[i].alpha;
-  }
+  gray=CompactFeatureGrays(image,grays);
   /*
     Allocate spatial dependence matrix.
   */
-  number_grays=gray.red;
-  if (gray.green > number_grays)
-    number_grays=gray.green;
-  if (gray.blue > number_grays)
-    number_grays=gray.blue;
-  if (image->colorspace == CMYKColorspace)
-    if (gray.black > number_grays)
-      number_grays=gray.black;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    if (gray.alpha > number_grays)
-      number_grays=gray.alpha;
-  cooccurrence=(ChannelStatistics **) AcquireQuantumMemory(number_grays,
+  number_grays=GetFeatureGrayLevels(image,gray);
+  cooccurrence=(FeatureStatistics **) AcquireQuantumMemory(number_grays,
     sizeof(*cooccurrence));
-  density_x=(ChannelStatistics *) AcquireQuantumMemory(number_grays+1,
+  density_x=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
     2*sizeof(*density_x));
-  density_xy=(ChannelStatistics *) AcquireQuantumMemory(number_grays+1,
+  density_xy=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
     2*sizeof(*density_xy));
-  density_y=(ChannelStatistics *) AcquireQuantumMemory(number_grays+1,
+  density_y=(FeatureStatistics *) AcquireQuantumMemory(number_grays+1,
     2*sizeof(*density_y));
-  Q=(ChannelStatistics **) AcquireQuantumMemory(number_grays,sizeof(*Q));
-  sum=(ChannelStatistics *) AcquireQuantumMemory(number_grays,sizeof(*sum));
-  if ((cooccurrence == (ChannelStatistics **) NULL) ||
-      (density_x == (ChannelStatistics *) NULL) ||
-      (density_xy == (ChannelStatistics *) NULL) ||
-      (density_y == (ChannelStatistics *) NULL) ||
-      (Q == (ChannelStatistics **) NULL) ||
-      (sum == (ChannelStatistics *) NULL))
+  Q=(FeatureStatistics **) AcquireQuantumMemory(number_grays,sizeof(*Q));
+  sum=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(*sum));
+  if (IsFeatureMemoryMissing(cooccurrence,density_x,density_xy,density_y,Q,
+        sum) != MagickFalse)
     {
-      if (Q != (ChannelStatistics **) NULL)
-        Q=(ChannelStatistics **) RelinquishMagickMemory(Q);
-      if (sum != (ChannelStatistics *) NULL)
-        sum=(ChannelStatistics *) RelinquishMagickMemory(sum);
-      if (density_y != (ChannelStatistics *) NULL)
-        density_y=(ChannelStatistics *) RelinquishMagickMemory(density_y);
-      if (density_xy != (ChannelStatistics *) NULL)
-        density_xy=(ChannelStatistics *) RelinquishMagickMemory(density_xy);
-      if (density_x != (ChannelStatistics *) NULL)
-        density_x=(ChannelStatistics *) RelinquishMagickMemory(density_x);
-      if (cooccurrence != (ChannelStatistics **) NULL)
-        cooccurrence=(ChannelStatistics **) RelinquishMagickMemory(
+      if (Q != (FeatureStatistics **) NULL)
+        Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
+      if (sum != (FeatureStatistics *) NULL)
+        sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
+      if (density_y != (FeatureStatistics *) NULL)
+        density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
+      if (density_xy != (FeatureStatistics *) NULL)
+        density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
+      if (density_x != (FeatureStatistics *) NULL)
+        density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
+      if (cooccurrence != (FeatureStatistics **) NULL)
+        cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(
           cooccurrence);
       grays=(PixelPacket *) RelinquishMagickMemory(grays);
       channel_features=(ChannelFeatures *) RelinquishMagickMemory(
@@ -836,11 +957,11 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   (void) memset(&variance,0,sizeof(variance));
   for (i=0; i < (ssize_t) number_grays; i++)
   {
-    cooccurrence[i]=(ChannelStatistics *) AcquireQuantumMemory(number_grays,
+    cooccurrence[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,
       sizeof(**cooccurrence));
-    Q[i]=(ChannelStatistics *) AcquireQuantumMemory(number_grays,sizeof(**Q));
-    if ((cooccurrence[i] == (ChannelStatistics *) NULL) ||
-        (Q[i] == (ChannelStatistics *) NULL))
+    Q[i]=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(**Q));
+    if ((cooccurrence[i] == (FeatureStatistics *) NULL) ||
+        (Q[i] == (FeatureStatistics *) NULL))
       break;
     (void) memset(cooccurrence[i],0,number_grays*
       sizeof(**cooccurrence));
@@ -850,18 +971,18 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     {
       for (i--; i >= 0; i--)
       {
-        if (Q[i] != (ChannelStatistics *) NULL)
-          Q[i]=(ChannelStatistics *) RelinquishMagickMemory(Q[i]);
-        if (cooccurrence[i] != (ChannelStatistics *) NULL)
-          cooccurrence[i]=(ChannelStatistics *)
+        if (Q[i] != (FeatureStatistics *) NULL)
+          Q[i]=(FeatureStatistics *) RelinquishMagickMemory(Q[i]);
+        if (cooccurrence[i] != (FeatureStatistics *) NULL)
+          cooccurrence[i]=(FeatureStatistics *)
             RelinquishMagickMemory(cooccurrence[i]);
       }
-      Q=(ChannelStatistics **) RelinquishMagickMemory(Q);
-      cooccurrence=(ChannelStatistics **) RelinquishMagickMemory(cooccurrence);
-      sum=(ChannelStatistics *) RelinquishMagickMemory(sum);
-      density_y=(ChannelStatistics *) RelinquishMagickMemory(density_y);
-      density_xy=(ChannelStatistics *) RelinquishMagickMemory(density_xy);
-      density_x=(ChannelStatistics *) RelinquishMagickMemory(density_x);
+      Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
+      cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
+      sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
+      density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
+      density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
+      density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
       grays=(PixelPacket *) RelinquishMagickMemory(grays);
       channel_features=(ChannelFeatures *) RelinquishMagickMemory(
         channel_features);
@@ -901,42 +1022,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     {
       for (i=0; i < 4; i++)
       {
-        switch (i)
-        {
-          case 0:
-          default:
-          {
-            /*
-              Horizontal adjacency.
-            */
-            offset=(ssize_t) distance;
-            break;
-          }
-          case 1:
-          {
-            /*
-              Vertical adjacency.
-            */
-            offset=(ssize_t) (image->columns+2*distance);
-            break;
-          }
-          case 2:
-          {
-            /*
-              Right diagonal adjacency.
-            */
-            offset=(ssize_t) ((image->columns+2*distance)-distance);
-            break;
-          }
-          case 3:
-          {
-            /*
-              Left diagonal adjacency.
-            */
-            offset=(ssize_t) ((image->columns+2*distance)+distance);
-            break;
-          }
-        }
+        offset=GetFeatureAdjacencyOffset(image,distance,i);
         u=0;
         v=0;
         while (grays[u].red != ScaleQuantumToMap(GetPixelRed(image,p)))
@@ -992,9 +1078,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   if (status == MagickFalse)
     {
       for (i=0; i < (ssize_t) number_grays; i++)
-        cooccurrence[i]=(ChannelStatistics *)
+        cooccurrence[i]=(FeatureStatistics *)
           RelinquishMagickMemory(cooccurrence[i]);
-      cooccurrence=(ChannelStatistics **) RelinquishMagickMemory(cooccurrence);
+      cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
       channel_features=(ChannelFeatures *) RelinquishMagickMemory(
         channel_features);
       (void) ThrowMagickException(exception,GetMagickModule(),
@@ -1012,42 +1098,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     ssize_t
       y;
 
-    switch (i)
-    {
-      case 0:
-      default:
-      {
-        /*
-          Horizontal adjacency.
-        */
-        normalize=2.0*image->rows*(image->columns-distance);
-        break;
-      }
-      case 1:
-      {
-        /*
-          Vertical adjacency.
-        */
-        normalize=2.0*(image->rows-distance)*image->columns;
-        break;
-      }
-      case 2:
-      {
-        /*
-          Right diagonal adjacency.
-        */
-        normalize=2.0*(image->rows-distance)*(image->columns-distance);
-        break;
-      }
-      case 3:
-      {
-        /*
-          Left diagonal adjacency.
-        */
-        normalize=2.0*(image->rows-distance)*(image->columns-distance);
-        break;
-      }
-    }
+    normalize=GetFeatureNormalization(image,distance,i);
     normalize=MagickSafeReciprocal(normalize);
     for (y=0; y < (ssize_t) number_grays; y++)
     {
@@ -1611,7 +1662,7 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
       ssize_t
         y;
 
-      ChannelStatistics
+      FeatureStatistics
         pixel;
 
       (void) memset(&pixel,0,sizeof(pixel));
@@ -1703,17 +1754,17 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   /*
     Relinquish resources.
   */
-  sum=(ChannelStatistics *) RelinquishMagickMemory(sum);
+  sum=(FeatureStatistics *) RelinquishMagickMemory(sum);
   for (i=0; i < (ssize_t) number_grays; i++)
-    Q[i]=(ChannelStatistics *) RelinquishMagickMemory(Q[i]);
-  Q=(ChannelStatistics **) RelinquishMagickMemory(Q);
-  density_y=(ChannelStatistics *) RelinquishMagickMemory(density_y);
-  density_xy=(ChannelStatistics *) RelinquishMagickMemory(density_xy);
-  density_x=(ChannelStatistics *) RelinquishMagickMemory(density_x);
+    Q[i]=(FeatureStatistics *) RelinquishMagickMemory(Q[i]);
+  Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
+  density_y=(FeatureStatistics *) RelinquishMagickMemory(density_y);
+  density_xy=(FeatureStatistics *) RelinquishMagickMemory(density_xy);
+  density_x=(FeatureStatistics *) RelinquishMagickMemory(density_x);
   for (i=0; i < (ssize_t) number_grays; i++)
-    cooccurrence[i]=(ChannelStatistics *)
+    cooccurrence[i]=(FeatureStatistics *)
       RelinquishMagickMemory(cooccurrence[i]);
-  cooccurrence=(ChannelStatistics **) RelinquishMagickMemory(cooccurrence);
+  cooccurrence=(FeatureStatistics **) RelinquishMagickMemory(cooccurrence);
   return(channel_features);
 }
 

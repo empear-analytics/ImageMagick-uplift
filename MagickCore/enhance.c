@@ -1107,42 +1107,152 @@ static void ParseCDLTriple(XMLTreeInfo *node,double *red,double *green,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _Correction
+{
+  double
+    slope,
+    offset,
+    power;
+} Correction;
+
+typedef struct _ColorCorrection
+{
+  Correction
+    red,
+    green,
+    blue;
+
+  double
+    saturation;
+} ColorCorrection;
+
+static ColorCorrection ParseCDLSOPNode(XMLTreeInfo *sop,
+  ColorCorrection color_correction)
+{
+  XMLTreeInfo
+    *offset,
+    *power,
+    *slope;
+
+  slope=GetXMLTreeChild(sop,"Slope");
+  if (slope != (XMLTreeInfo *) NULL)
+    ParseCDLTriple(slope,&color_correction.red.slope,
+      &color_correction.green.slope,&color_correction.blue.slope);
+  offset=GetXMLTreeChild(sop,"Offset");
+  if (offset != (XMLTreeInfo *) NULL)
+    ParseCDLTriple(offset,&color_correction.red.offset,
+      &color_correction.green.offset,&color_correction.blue.offset);
+  power=GetXMLTreeChild(sop,"Power");
+  if (power != (XMLTreeInfo *) NULL)
+    ParseCDLTriple(power,&color_correction.red.power,
+      &color_correction.green.power,&color_correction.blue.power);
+  return(color_correction);
+}
+
+static ColorCorrection ParseCDLSATNode(XMLTreeInfo *sat,
+  ColorCorrection color_correction)
+{
+  char
+    token[MagickPathExtent];
+
+  const char
+    *content,
+    *p;
+
+  XMLTreeInfo
+    *saturation;
+
+  saturation=GetXMLTreeChild(sat,"Saturation");
+  if (saturation != (XMLTreeInfo *) NULL)
+    {
+      content=GetXMLTreeContent(saturation);
+      p=(const char *) content;
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+      color_correction.saturation=StringToDouble(token,(char **) NULL);
+    }
+  return(color_correction);
+}
+
+static void BuildCDLMap(const ColorCorrection color_correction,
+  PixelInfo *cdl_map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) MaxMap; i++)
+  {
+    cdl_map[i].red=(double) ScaleMapToQuantum((double)
+      (MaxMap*(pow(color_correction.red.slope*i/MaxMap+
+      color_correction.red.offset,color_correction.red.power))));
+    cdl_map[i].green=(double) ScaleMapToQuantum((double)
+      (MaxMap*(pow(color_correction.green.slope*i/MaxMap+
+      color_correction.green.offset,color_correction.green.power))));
+    cdl_map[i].blue=(double) ScaleMapToQuantum((double)
+      (MaxMap*(pow(color_correction.blue.slope*i/MaxMap+
+      color_correction.blue.offset,color_correction.blue.power))));
+  }
+}
+
+static void ApplyCDLToColormap(Image *image,
+  const ColorCorrection color_correction,const PixelInfo *cdl_map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    /*
+      Apply transfer function to colormap.
+    */
+    double
+      luma;
+
+    luma=0.21267*image->colormap[i].red+0.71526*image->colormap[i].green+
+      0.07217*image->colormap[i].blue;
+    image->colormap[i].red=luma+color_correction.saturation*cdl_map[
+      ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red))].red-luma;
+    image->colormap[i].green=luma+color_correction.saturation*cdl_map[
+      ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green))].green-
+      luma;
+    image->colormap[i].blue=luma+color_correction.saturation*cdl_map[
+      ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue))].blue-luma;
+  }
+}
+
+static void ApplyCDLToPixels(const Image *image,
+  const ColorCorrection color_correction,const PixelInfo *cdl_map,
+  Quantum *magick_restrict q)
+{
+  double
+    luma;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    luma=0.21267*(double) GetPixelRed(image,q)+0.71526*(double)
+      GetPixelGreen(image,q)+0.07217*(double) GetPixelBlue(image,q);
+    SetPixelRed(image,ClampToQuantum(luma+color_correction.saturation*
+      (cdl_map[ScaleQuantumToMap(GetPixelRed(image,q))].red-luma)),q);
+    SetPixelGreen(image,ClampToQuantum(luma+color_correction.saturation*
+      (cdl_map[ScaleQuantumToMap(GetPixelGreen(image,q))].green-luma)),q);
+    SetPixelBlue(image,ClampToQuantum(luma+color_correction.saturation*
+      (cdl_map[ScaleQuantumToMap(GetPixelBlue(image,q))].blue-luma)),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
 #define ColorDecisionListCorrectImageTag  "ColorDecisionList/Image"
 
-  typedef struct _Correction
-  {
-    double
-      slope,
-      offset,
-      power;
-  } Correction;
-
-  typedef struct _ColorCorrection
-  {
-    Correction
-      red,
-      green,
-      blue;
-
-    double
-      saturation;
-  } ColorCorrection;
-
   CacheView
     *image_view;
 
-  char
-    token[MagickPathExtent];
-
   ColorCorrection
     color_correction;
-
-  const char
-    *content,
-    *p;
 
   MagickBooleanType
     status;
@@ -1152,9 +1262,6 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
 
   PixelInfo
     *cdl_map;
-
-  ssize_t
-    i;
 
   ssize_t
     y;
@@ -1195,40 +1302,10 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   color_correction.saturation=0.0;
   sop=GetXMLTreeChild(cc,"SOPNode");
   if (sop != (XMLTreeInfo *) NULL)
-    {
-      XMLTreeInfo
-        *offset,
-        *power,
-        *slope;
-
-      slope=GetXMLTreeChild(sop,"Slope");
-      if (slope != (XMLTreeInfo *) NULL)
-        ParseCDLTriple(slope,&color_correction.red.slope,
-          &color_correction.green.slope,&color_correction.blue.slope);
-      offset=GetXMLTreeChild(sop,"Offset");
-      if (offset != (XMLTreeInfo *) NULL)
-        ParseCDLTriple(offset,&color_correction.red.offset,
-          &color_correction.green.offset,&color_correction.blue.offset);
-      power=GetXMLTreeChild(sop,"Power");
-      if (power != (XMLTreeInfo *) NULL)
-        ParseCDLTriple(power,&color_correction.red.power,
-          &color_correction.green.power,&color_correction.blue.power);
-    }
+    color_correction=ParseCDLSOPNode(sop,color_correction);
   sat=GetXMLTreeChild(cc,"SATNode");
   if (sat != (XMLTreeInfo *) NULL)
-    {
-      XMLTreeInfo
-        *saturation;
-
-      saturation=GetXMLTreeChild(sat,"Saturation");
-      if (saturation != (XMLTreeInfo *) NULL)
-        {
-          content=GetXMLTreeContent(saturation);
-          p=(const char *) content;
-          (void) GetNextToken(p,&p,MagickPathExtent,token);
-          color_correction.saturation=StringToDouble(token,(char **) NULL);
-        }
-    }
+    color_correction=ParseCDLSATNode(sat,color_correction);
   ccc=DestroyXMLTree(ccc);
   if (image->debug != MagickFalse)
     {
@@ -1259,38 +1336,10 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   if (cdl_map == (PixelInfo *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  for (i=0; i <= (ssize_t) MaxMap; i++)
-  {
-    cdl_map[i].red=(double) ScaleMapToQuantum((double)
-      (MaxMap*(pow(color_correction.red.slope*i/MaxMap+
-      color_correction.red.offset,color_correction.red.power))));
-    cdl_map[i].green=(double) ScaleMapToQuantum((double)
-      (MaxMap*(pow(color_correction.green.slope*i/MaxMap+
-      color_correction.green.offset,color_correction.green.power))));
-    cdl_map[i].blue=(double) ScaleMapToQuantum((double)
-      (MaxMap*(pow(color_correction.blue.slope*i/MaxMap+
-      color_correction.blue.offset,color_correction.blue.power))));
-  }
+  BuildCDLMap(color_correction,cdl_map);
   if (image->storage_class == PseudoClass)
     {
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        /*
-          Apply transfer function to colormap.
-        */
-        double
-          luma;
-
-        luma=0.21267*image->colormap[i].red+0.71526*image->colormap[i].green+
-          0.07217*image->colormap[i].blue;
-        image->colormap[i].red=luma+color_correction.saturation*cdl_map[
-          ScaleQuantumToMap(ClampToQuantum(image->colormap[i].red))].red-luma;
-        image->colormap[i].green=luma+color_correction.saturation*cdl_map[
-          ScaleQuantumToMap(ClampToQuantum(image->colormap[i].green))].green-
-          luma;
-        image->colormap[i].blue=luma+color_correction.saturation*cdl_map[
-          ScaleQuantumToMap(ClampToQuantum(image->colormap[i].blue))].blue-luma;
-      }
+      ApplyCDLToColormap(image,color_correction,cdl_map);
       cdl_map=(PixelInfo *) RelinquishMagickMemory(cdl_map);
       (void) SyncImage(image, exception);
       return(MagickTrue);
@@ -1307,14 +1356,8 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    double
-      luma;
-
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1324,18 +1367,7 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      luma=0.21267*(double) GetPixelRed(image,q)+0.71526*(double)
-        GetPixelGreen(image,q)+0.07217*(double) GetPixelBlue(image,q);
-      SetPixelRed(image,ClampToQuantum(luma+color_correction.saturation*
-        (cdl_map[ScaleQuantumToMap(GetPixelRed(image,q))].red-luma)),q);
-      SetPixelGreen(image,ClampToQuantum(luma+color_correction.saturation*
-        (cdl_map[ScaleQuantumToMap(GetPixelGreen(image,q))].green-luma)),q);
-      SetPixelBlue(image,ClampToQuantum(luma+color_correction.saturation*
-        (cdl_map[ScaleQuantumToMap(GetPixelBlue(image,q))].blue-luma)),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ApplyCDLToPixels(image,color_correction,cdl_map,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -2783,18 +2815,47 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _HaldInfo
+{
+  double
+    x,
+    y,
+    z;
+} HaldInfo;
+
+static HaldInfo GetHaldPoint(const Image *image,const size_t level,
+  const Quantum *magick_restrict q)
+{
+  HaldInfo
+    point;
+
+  point.x=QuantumScale*(level-1.0)*(double) GetPixelRed(image,q);
+  point.y=QuantumScale*(level-1.0)*(double) GetPixelGreen(image,q);
+  point.z=QuantumScale*(level-1.0)*(double) GetPixelBlue(image,q);
+  return(point);
+}
+
+static void SetHaldPixel(const Image *image,const PixelInfo pixel,
+  Quantum *magick_restrict q)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    SetPixelRed(image,ClampToQuantum(pixel.red),q);
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    SetPixelGreen(image,ClampToQuantum(pixel.green),q);
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
+  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    SetPixelBlack(image,ClampToQuantum(pixel.black),q);
+  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->alpha_trait != UndefinedPixelTrait))
+    SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
+}
+
 MagickExport MagickBooleanType HaldClutImage(Image *image,
   const Image *hald_image,ExceptionInfo *exception)
 {
 #define HaldClutImageTag  "Clut/Image"
-
-  typedef struct _HaldInfo
-  {
-    double
-      x,
-      y,
-      z;
-  } HaldInfo;
 
   CacheView
     *hald_view,
@@ -2882,9 +2943,7 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
         pixel3 = zero,
         pixel4 = zero;
 
-      point.x=QuantumScale*(level-1.0)*(double) GetPixelRed(image,q);
-      point.y=QuantumScale*(level-1.0)*(double) GetPixelGreen(image,q);
-      point.z=QuantumScale*(level-1.0)*(double) GetPixelBlue(image,q);
+      point=GetHaldPoint(image,level,q);
       offset=point.x+level*floor(point.y)+cube_size*floor(point.z);
       point.x-=floor(point.x);
       point.y-=floor(point.y);
@@ -2918,18 +2977,7 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
         area=(point.z < 0.5)? 0.0 : 1.0;
       CompositePixelInfoAreaBlend(&pixel3,pixel3.alpha,&pixel4,pixel4.alpha,
         area,&pixel);
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        SetPixelRed(image,ClampToQuantum(pixel.red),q);
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        SetPixelGreen(image,ClampToQuantum(pixel.green),q);
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
-      if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-          (image->colorspace == CMYKColorspace))
-        SetPixelBlack(image,ClampToQuantum(pixel.black),q);
-      if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-          (image->alpha_trait != UndefinedPixelTrait))
-        SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
+      SetHaldPixel(image,pixel,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
