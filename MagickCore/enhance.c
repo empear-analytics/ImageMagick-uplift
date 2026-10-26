@@ -1107,29 +1107,29 @@ static void ParseCDLTriple(XMLTreeInfo *node,double *red,double *green,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _Correction
+{
+  double
+    slope,
+    offset,
+    power;
+} Correction;
+
+typedef struct _ColorCorrection
+{
+  Correction
+    red,
+    green,
+    blue;
+
+  double
+    saturation;
+} ColorCorrection;
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
 #define ColorDecisionListCorrectImageTag  "ColorDecisionList/Image"
-
-  typedef struct _Correction
-  {
-    double
-      slope,
-      offset,
-      power;
-  } Correction;
-
-  typedef struct _ColorCorrection
-  {
-    Correction
-      red,
-      green,
-      blue;
-
-    double
-      saturation;
-  } ColorCorrection;
 
   CacheView
     *image_view;
