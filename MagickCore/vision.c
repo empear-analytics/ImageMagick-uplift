@@ -90,6 +90,13 @@ typedef struct _CCThresholdRange
   ssize_t
     background_id;
 } CCThresholdRange;
+
+typedef struct _CCNeighborDirection
+{
+  ssize_t
+    dx,
+    dy;
+} CCNeighborDirection;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -811,8 +818,12 @@ static inline MagickBooleanType IsMetricOutsideRange(const CCObjectInfo *object,
 }
 
 static inline MagickBooleanType IsNeighborOutsideImage(const Image *image,
-  const ssize_t x,const ssize_t y,const ssize_t dx,const ssize_t dy)
+  const ssize_t x,const ssize_t y,const CCNeighborDirection *direction)
 {
+  const ssize_t
+    dx = direction->dx,
+    dy = direction->dy;
+
   return((((x+dx) < 0) || ((x+dx) >= (ssize_t) image->columns) ||
     ((y+dy) < 0) || ((y+dy) >= (ssize_t) image->rows)) ? MagickTrue :
     MagickFalse);
@@ -953,6 +964,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       continue;
     dx=connectivity > 4 ? connect8[n][1] : connect4[n][1];
     dy=connectivity > 4 ? connect8[n][0] : connect4[n][0];
+    const CCNeighborDirection direction = { dx, dy };
+
     for (y=0; y < (ssize_t) image->rows; y++)
     {
       const Quantum
@@ -988,7 +1001,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           Is neighbor an authentic pixel and a different color than the pixel?
         */
         GetPixelInfoPixel(image,p,&pixel);
-        if (IsNeighborOutsideImage(image,x,y,dx,dy) != MagickFalse)
+        if (IsNeighborOutsideImage(image,x,y,&direction) != MagickFalse)
           {
             p+=(ptrdiff_t) GetPixelChannels(image);
             continue;
