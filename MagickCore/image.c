@@ -1207,6 +1207,30 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
 %    o image: the image.
 %
 */
+static void DestroyImageResources(Image *image)
+{
+  DestroyImagePixels(image);
+  image->channel_map=DestroyPixelChannelMap(image->channel_map);
+  if (image->montage != (char *) NULL)
+    image->montage=DestroyString(image->montage);
+  if (image->directory != (char *) NULL)
+    image->directory=DestroyString(image->directory);
+  if (image->colormap != (PixelInfo *) NULL)
+    image->colormap=(PixelInfo *) RelinquishMagickMemory(image->colormap);
+  if (image->geometry != (char *) NULL)
+    image->geometry=DestroyString(image->geometry);
+  DestroyImageProfiles(image);
+  DestroyImageProperties(image);
+  DestroyImageArtifacts(image);
+  if (image->ascii85 != (Ascii85Info *) NULL)
+    image->ascii85=(Ascii85Info *) RelinquishMagickMemory(image->ascii85);
+  if (image->image_info != (ImageInfo *) NULL)
+    image->image_info=DestroyImageInfo(image->image_info);
+  DestroyBlob(image);
+  if (image->semaphore != (SemaphoreInfo *) NULL)
+    RelinquishSemaphoreInfo(&image->semaphore);
+}
+
 MagickExport Image *DestroyImage(Image *image)
 {
   MagickBooleanType
@@ -1230,26 +1254,7 @@ MagickExport Image *DestroyImage(Image *image)
   /*
     Destroy image.
   */
-  DestroyImagePixels(image);
-  image->channel_map=DestroyPixelChannelMap(image->channel_map);
-  if (image->montage != (char *) NULL)
-    image->montage=DestroyString(image->montage);
-  if (image->directory != (char *) NULL)
-    image->directory=DestroyString(image->directory);
-  if (image->colormap != (PixelInfo *) NULL)
-    image->colormap=(PixelInfo *) RelinquishMagickMemory(image->colormap);
-  if (image->geometry != (char *) NULL)
-    image->geometry=DestroyString(image->geometry);
-  DestroyImageProfiles(image);
-  DestroyImageProperties(image);
-  DestroyImageArtifacts(image);
-  if (image->ascii85 != (Ascii85Info *) NULL)
-    image->ascii85=(Ascii85Info *) RelinquishMagickMemory(image->ascii85);
-  if (image->image_info != (ImageInfo *) NULL)
-    image->image_info=DestroyImageInfo(image->image_info);
-  DestroyBlob(image);
-  if (image->semaphore != (SemaphoreInfo *) NULL)
-    RelinquishSemaphoreInfo(&image->semaphore);
+  DestroyImageResources(image);
   image->signature=(~MagickCoreSignature);
   image=(Image *) RelinquishMagickMemory(image);
   return(image);
@@ -1681,6 +1686,24 @@ static inline MagickBooleanType IsUnknownFormatSpecifier(const char specifier)
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsValidDigitSpecifier(const char *start,
+  const size_t length)
+{
+  size_t
+    i = 0;
+
+  if (*start == '0')
+    {
+      if ((length >= 3) && (start[1] == '0'))
+        return(MagickFalse);
+      i=1;
+    }
+  for ( ; i < (length-1); i++)
+    if (isdigit((int) ((unsigned char) start[i])) == 0)
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
   const char *end)
 {
@@ -1698,21 +1721,7 @@ static inline MagickBooleanType IsValidFormatSpecifier(const char *start,
   if ((length == 1) && (*start == specifier))
     return(MagickTrue);
   if (length >= 2)
-    {
-      size_t
-        i = 0;
-
-      if (*start == '0')
-        {
-          if ((length >= 3) && (start[1] == '0'))
-            return(MagickFalse);
-          i=1;
-        }
-      for ( ; i < (length-1); i++)
-        if (isdigit((int) ((unsigned char) start[i])) == 0)
-          return(MagickFalse);
-      return(MagickTrue);
-    }
+    return(IsValidDigitSpecifier(start,length));
   return(MagickFalse);
 }
 
@@ -2845,6 +2854,24 @@ static void ParseSceneRange(ImageInfo *image_info,const char *component)
 %
 */
 
+static MagickFormatType FindExplicitFormatType(const char *magic,
+  const char **format_type_formats,MagickFormatType format_type)
+{
+  ssize_t
+    i;
+
+  i=0;
+  while ((format_type == UndefinedFormatType) &&
+         (format_type_formats[i] != (char *) NULL))
+  {
+    if ((*magic == *format_type_formats[i]) &&
+        (LocaleCompare(magic,format_type_formats[i]) == 0))
+      format_type=ExplicitFormatType;
+    i++;
+  }
+  return(format_type);
+}
+
 static const MagickInfo *SetImageInfoFromExtension(ImageInfo *image_info,
   const char *component,char *magic,ExceptionInfo *exception)
 {
@@ -2853,9 +2880,6 @@ static const MagickInfo *SetImageInfoFromExtension(ImageInfo *image_info,
 
   MagickFormatType
     format_type;
-
-  ssize_t
-    i;
 
   static const char
     *format_type_formats[] =
@@ -2892,15 +2916,7 @@ static const MagickInfo *SetImageInfoFromExtension(ImageInfo *image_info,
   if ((magick_info != (const MagickInfo *) NULL) &&
       (magick_info->format_type != UndefinedFormatType))
     format_type=magick_info->format_type;
-  i=0;
-  while ((format_type == UndefinedFormatType) &&
-         (format_type_formats[i] != (char *) NULL))
-  {
-    if ((*magic == *format_type_formats[i]) &&
-        (LocaleCompare(magic,format_type_formats[i]) == 0))
-      format_type=ExplicitFormatType;
-    i++;
-  }
+  format_type=FindExplicitFormatType(magic,format_type_formats,format_type);
   if (format_type == UndefinedFormatType)
     (void) CopyMagickString(image_info->magick,magic,MagickPathExtent);
   else

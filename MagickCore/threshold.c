@@ -505,11 +505,37 @@ static inline MagickBooleanType IsOTSUBufferMissing(const double *myu,
     MagickTrue : MagickFalse);
 }
 
+static double FindOTSUThreshold(const double *myu,const double *omega,
+  double *sigma)
+{
+  double
+    max_sigma,
+    threshold;
+
+  ssize_t
+    i;
+
+  threshold=0;
+  max_sigma=0.0;
+  for (i=0; i < (ssize_t) MaxIntensity; i++)
+  {
+    sigma[i]=0.0;
+    if ((omega[i] != 0.0) && (omega[i] != 1.0))
+      sigma[i]=pow(myu[MaxIntensity]*omega[i]-myu[i],2.0)/(omega[i]*(1.0-
+        omega[i]));
+    if (sigma[i] > max_sigma)
+      {
+        max_sigma=sigma[i];
+        threshold=(double) i;
+      }
+  }
+  return(threshold);
+}
+
 static double OTSUThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
   double
-    max_sigma,
     *myu,
     *omega,
     *probability,
@@ -559,20 +585,7 @@ static double OTSUThreshold(const Image *image,const double *histogram,
   /*
     Sigma maximization: inter-class variance and compute optimal threshold.
   */
-  threshold=0;
-  max_sigma=0.0;
-  for (i=0; i < (ssize_t) MaxIntensity; i++)
-  {
-    sigma[i]=0.0;
-    if ((omega[i] != 0.0) && (omega[i] != 1.0))
-      sigma[i]=pow(myu[MaxIntensity]*omega[i]-myu[i],2.0)/(omega[i]*(1.0-
-        omega[i]));
-    if (sigma[i] > max_sigma)
-      {
-        max_sigma=sigma[i];
-        threshold=(double) i;
-      }
-  }
+  threshold=FindOTSUThreshold(myu,omega,sigma);
   /*
     Free resources.
   */

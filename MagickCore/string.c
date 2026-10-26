@@ -1529,6 +1529,18 @@ static void PrintStringInfoHexLine(FILE *file,
 %    o string_info: the string info.
 %
 */
+static size_t FindUnprintableChar(const StringInfo *string_info,
+  const unsigned char *p)
+{
+  size_t
+    i;
+
+  for (i=0; i < string_info->length; i++)
+    if ((p[i] < 32) && (isspace((int)p[i]) == 0))
+      break;
+  return(i);
+}
+
 MagickExport void PrintStringInfo(FILE *file,const char *id,
   const StringInfo *string_info)
 {
@@ -1545,9 +1557,7 @@ MagickExport void PrintStringInfo(FILE *file,const char *id,
   assert(string_info != (StringInfo *) NULL);
   assert(string_info->signature == MagickCoreSignature);
   p=(const unsigned char *) string_info->datum;
-  for (i=0; i < string_info->length; i++)
-    if ((p[i] < 32) && (isspace((int)p[i]) == 0))
-      break;
+  i=FindUnprintableChar(string_info,p);
   (void) FormatLocaleFile(file,"%s(%.17g):\n",id,(double) string_info->length);
   if (i == string_info->length)
    {

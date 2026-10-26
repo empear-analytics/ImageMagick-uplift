@@ -925,6 +925,27 @@ RestoreMSCWarning \
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _TableType
+{
+  ssize_t
+    prefix,
+    suffix,
+    next;
+} TableType;
+
+static void ResetLZWTable(TableType *table)
+{
+  ssize_t
+    index;
+
+  for (index=0; index < 256; index++)
+  {
+    table[index].prefix=(-1);
+    table[index].suffix=index;
+    table[index].next=(-1);
+  }
+}
+
 MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   unsigned char *magick_restrict pixels,ExceptionInfo *exception)
 {
@@ -941,14 +962,6 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
       number_bits-=8; \
     } \
 }
-
-  typedef struct _TableType
-  {
-    ssize_t
-      prefix,
-      suffix,
-      next;
-  } TableType;
 
   ssize_t
     i;
@@ -1036,12 +1049,7 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
                 */
                 code_width--;
                 OutputCode(LZWClr);
-                for (index=0; index < 256; index++)
-                {
-                  table[index].prefix=(-1);
-                  table[index].suffix=index;
-                  table[index].next=(-1);
-                }
+                ResetLZWTable(table);
                 next_index=LZWEod+1;
                 code_width=9;
               }

@@ -347,6 +347,20 @@ static ssize_t RedistributeCLAHEExcess(const double clip_limit,
   return(cumulative_excess);
 }
 
+static ssize_t GetCLAHEExcess(const double clip_limit,
+  const size_t number_bins,const size_t *histogram)
+{
+  ssize_t
+    cumulative_excess,
+    i;
+
+  cumulative_excess=0;
+  for (i=0; i < (ssize_t) number_bins; i++)
+    if (histogram[i] > clip_limit)
+      cumulative_excess+=(ssize_t) (histogram[i]-clip_limit);
+  return(cumulative_excess);
+}
+
 static void ClipCLAHEHistogram(const double clip_limit,const size_t number_bins,
   size_t *histogram)
 {
@@ -364,10 +378,7 @@ static void ClipCLAHEHistogram(const double clip_limit,const size_t number_bins,
   */
   if (number_bins == 0)
     return;
-  cumulative_excess=0;
-  for (i=0; i < (ssize_t) number_bins; i++)
-    if (histogram[i] > clip_limit)
-      cumulative_excess+=(ssize_t) (histogram[i]-clip_limit);
+  cumulative_excess=GetCLAHEExcess(clip_limit,number_bins,histogram);
   /*
     Clip histogram and redistribute excess pixels across all bins.
   */
@@ -1729,6 +1740,44 @@ static void StretchImageRow(const Image *image,const Quantum *black,
   }
 }
 
+static ssize_t FindStretchBlackLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double black_point)
+{
+  double
+    intensity;
+
+  ssize_t
+    j;
+
+  intensity=0.0;
+  for (j=0; j <= (ssize_t) MaxMap; j++)
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > black_point)
+      break;
+  }
+  return(j);
+}
+
+static ssize_t FindStretchWhiteLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double white_point)
+{
+  double
+    intensity;
+
+  ssize_t
+    j;
+
+  intensity=0.0;
+  for (j=(ssize_t) MaxMap; j != 0; j--)
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > ((double) image->columns*image->rows-white_point))
+      break;
+  }
+  return(j);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1820,29 +1869,14 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   */
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    double
-      intensity;
-
     ssize_t
       j;
 
     black[i]=(Quantum) 0;
     white[i]=(Quantum) ScaleQuantumToMap(QuantumRange);
-    intensity=0.0;
-    for (j=0; j <= (ssize_t) MaxMap; j++)
-    {
-      intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
-      if (intensity > black_point)
-        break;
-    }
+    j=FindStretchBlackLevel(image,histogram,i,black_point);
     black[i]=(Quantum) j;
-    intensity=0.0;
-    for (j=(ssize_t) MaxMap; j != 0; j--)
-    {
-      intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
-      if (intensity > ((double) image->columns*image->rows-white_point))
-        break;
-    }
+    j=FindStretchWhiteLevel(image,histogram,i,white_point);
     white[i]=(Quantum) j;
   }
   histogram=(double *) RelinquishMagickMemory(histogram);
@@ -2232,6 +2266,29 @@ static void EqualizeImageRow(const Image *image,const double *black,
   }
 }
 
+static void IntegrateEqualizeHistogram(const Image *image,
+  const double *histogram,double *map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      intensity;
+
+    ssize_t
+      j;
+
+    intensity=0.0;
+    for (j=0; j <= (ssize_t) MaxMap; j++)
+    {
+      intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+      map[(ssize_t) GetPixelChannels(image)*j+i]=intensity;
+    }
+  }
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2312,21 +2369,7 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   /*
     Integrate the histogram to get the equalization map.
   */
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    double
-      intensity;
-
-    ssize_t
-      j;
-
-    intensity=0.0;
-    for (j=0; j <= (ssize_t) MaxMap; j++)
-    {
-      intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
-      map[(ssize_t) GetPixelChannels(image)*j+i]=intensity;
-    }
-  }
+  IntegrateEqualizeHistogram(image,histogram,map);
   (void) memset(equalize_map,0,(MaxMap+1)*GetPixelChannels(image)*
     sizeof(*equalize_map));
   (void) memset(black,0,sizeof(*black));
@@ -3520,6 +3563,44 @@ MagickExport MagickBooleanType LevelImageColors(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ssize_t FindLinearBlackLevel(const double *histogram,
+  const double black_point)
+{
+  double
+    intensity;
+
+  ssize_t
+    black;
+
+  intensity=0.0;
+  for (black=0; black < (ssize_t) MaxMap; black++)
+  {
+    intensity+=histogram[black];
+    if (intensity >= black_point)
+      break;
+  }
+  return(black);
+}
+
+static ssize_t FindLinearWhiteLevel(const double *histogram,
+  const double white_point)
+{
+  double
+    intensity;
+
+  ssize_t
+    white;
+
+  intensity=0.0;
+  for (white=(ssize_t) MaxMap; white != 0; white--)
+  {
+    intensity+=histogram[white];
+    if (intensity >= white_point)
+      break;
+  }
+  return(white);
+}
+
 MagickExport MagickBooleanType LinearStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -3579,20 +3660,8 @@ MagickExport MagickBooleanType LinearStretchImage(Image *image,
   /*
     Find the histogram boundaries by locating the black and white point levels.
   */
-  intensity=0.0;
-  for (black=0; black < (ssize_t) MaxMap; black++)
-  {
-    intensity+=histogram[black];
-    if (intensity >= black_point)
-      break;
-  }
-  intensity=0.0;
-  for (white=(ssize_t) MaxMap; white != 0; white--)
-  {
-    intensity+=histogram[white];
-    if (intensity >= white_point)
-      break;
-  }
+  black=FindLinearBlackLevel(histogram,black_point);
+  white=FindLinearWhiteLevel(histogram,white_point);
   histogram=(double *) RelinquishMagickMemory(histogram);
   status=LevelImage(image,(double) ScaleMapToQuantum((MagickRealType) black),
     (double) ScaleMapToQuantum((MagickRealType) white),1.0,exception);
@@ -4152,6 +4221,14 @@ static void NegateImageRow(const Image *image,Quantum *q)
   }
 }
 
+static inline MagickBooleanType IsNonGrayColormapEntry(const Image *image,
+  const ssize_t i)
+{
+  return(((image->colormap[i].red != image->colormap[i].green) ||
+    (image->colormap[i].green != image->colormap[i].blue)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void NegateColormap(Image *image,const MagickBooleanType grayscale)
 {
   ssize_t
@@ -4163,8 +4240,7 @@ static void NegateColormap(Image *image,const MagickBooleanType grayscale)
       Negate colormap.
     */
     if (grayscale != MagickFalse)
-      if ((image->colormap[i].red != image->colormap[i].green) ||
-          (image->colormap[i].green != image->colormap[i].blue))
+      if (IsNonGrayColormapEntry(image,i) != MagickFalse)
         continue;
     if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
       image->colormap[i].red=(double) QuantumRange-image->colormap[i].red;
@@ -4622,6 +4698,60 @@ MagickExport MagickBooleanType SigmoidalContrastImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ShiftChromaRow(const Image *image,const double a_mean,
+  const double b_mean,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      a,
+      b;
+
+    /*
+      Scale the chroma distance shifted according to amount of luminance.
+    */
+    a=(double) GetPixela(image,q)-1.1*(double) GetPixelL(image,q)*a_mean;
+    b=(double) GetPixelb(image,q)-1.1*(double) GetPixelL(image,q)*b_mean;
+    SetPixela(image,ClampToQuantum(a),q);
+    SetPixelb(image,ClampToQuantum(b),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static MagickStatusType LevelVibrance(Image *image,const char *artifact,
+  MagickStatusType status,ExceptionInfo *exception)
+{
+  ChannelType
+    channel_mask;
+
+  double
+    black_point = 0.0;
+
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  /*
+    Level the a & b channels.
+  */
+  flags=ParseGeometry(artifact,&geometry_info);
+  if ((flags & RhoValue) != 0)
+    black_point=geometry_info.rho;
+  if ((flags & PercentValue) != 0)
+    black_point*=((double) QuantumRange/100.0);
+  channel_mask=SetImageChannelMask(image,(ChannelType) (aChannel |
+    bChannel));
+  status&=(MagickStatusType) LevelImage(image,black_point,(double)
+    QuantumRange-black_point,1.0,exception);
+  (void) SetImageChannelMask(image,channel_mask);
+  return(status);
+}
+
 MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4694,9 +4824,6 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -4705,21 +4832,7 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        a,
-        b;
-
-      /*
-        Scale the chroma distance shifted according to amount of luminance.
-      */
-      a=(double) GetPixela(image,q)-1.1*(double) GetPixelL(image,q)*a_mean;
-      b=(double) GetPixelb(image,q)-1.1*(double) GetPixelL(image,q)*b_mean;
-      SetPixela(image,ClampToQuantum(a),q);
-      SetPixelb(image,ClampToQuantum(b),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ShiftChromaRow(image,a_mean,b_mean,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -4740,33 +4853,7 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   image_view=DestroyCacheView(image_view);
   artifact=GetImageArtifact(image,"white-balance:vibrance");
   if (artifact != (const char *) NULL)
-    {
-      ChannelType
-        channel_mask;
-
-      double
-        black_point = 0.0;
-
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        flags;
-
-      /*
-        Level the a & b channels.
-      */
-      flags=ParseGeometry(artifact,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        black_point=geometry_info.rho;
-      if ((flags & PercentValue) != 0)
-        black_point*=((double) QuantumRange/100.0);
-      channel_mask=SetImageChannelMask(image,(ChannelType) (aChannel |
-        bChannel));
-      status&=(MagickStatusType) LevelImage(image,black_point,(double)
-        QuantumRange-black_point,1.0,exception);
-      (void) SetImageChannelMask(image,channel_mask);
-    }
+    status=LevelVibrance(image,artifact,status,exception);
   status&=(MagickStatusType) TransformImageColorspace(image,sRGBColorspace,
     exception);
   return(status != 0 ? MagickTrue : MagickFalse);

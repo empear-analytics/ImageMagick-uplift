@@ -1737,6 +1737,17 @@ MagickExport void RemoveDuplicateLayers(Image **images,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *GetFirstNonZeroDelayImage(Image **images)
+{
+  Image
+    *i;
+
+  i=GetFirstImageInList(*images);
+  for ( ; i != (Image *) NULL; i=GetNextImageInList(i))
+    if ( i->delay != 0L ) break;
+  return(i);
+}
+
 MagickExport void RemoveZeroDelayLayers(Image **images,
      ExceptionInfo *exception)
 {
@@ -1750,9 +1761,7 @@ MagickExport void RemoveZeroDelayLayers(Image **images,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       (*images)->filename);
-  i=GetFirstImageInList(*images);
-  for ( ; i != (Image *) NULL; i=GetNextImageInList(i))
-    if ( i->delay != 0L ) break;
+  i=GetFirstNonZeroDelayImage(images);
   if ( i == (Image *) NULL ) {
     (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
        "ZeroTimeAnimation","`%s'",GetFirstImageInList(*images)->filename);

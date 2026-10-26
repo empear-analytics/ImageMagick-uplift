@@ -1066,6 +1066,21 @@ static int HistogramCompare(const void *x,const void *y)
 }
 #endif
 
+static size_t CountImageColors(const Image *image,size_t number_colors,
+  ExceptionInfo *exception)
+{
+  HCubeInfo
+    *cube_info;
+
+  cube_info=ClassifyImageColors(image,exception);
+  if (cube_info != (HCubeInfo *) NULL)
+    {
+      number_colors=cube_info->colors;
+      cube_info=DestroyHCubeInfo(image,cube_info);
+    }
+  return(number_colors);
+}
+
 MagickExport size_t GetNumberColors(const Image *image,FILE *file,
   ExceptionInfo *exception)
 {
@@ -1097,18 +1112,7 @@ MagickExport size_t GetNumberColors(const Image *image,FILE *file,
 
   number_colors=0;
   if (file == (FILE *) NULL)
-    {
-      HCubeInfo
-        *cube_info;
-
-      cube_info=ClassifyImageColors(image,exception);
-      if (cube_info != (HCubeInfo *) NULL)
-        {
-          number_colors=cube_info->colors;
-          cube_info=DestroyHCubeInfo(image,cube_info);
-        }
-      return(number_colors);
-    }
+    return(CountImageColors(image,number_colors,exception));
   histogram=GetImageHistogram(image,&number_colors,exception);
   if (histogram == (PixelInfo *) NULL)
     return(number_colors);

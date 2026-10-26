@@ -654,6 +654,22 @@ MagickExport Image *GetFirstImageInList(const Image *images)
 %    o index: the position within the list.
 %
 */
+static const Image *GetImageFromListForward(const Image *images,
+  const ssize_t index)
+{
+  const Image
+    *p;
+
+  ssize_t
+    i;
+
+  p=GetFirstImageInList(images);
+  for (i=0; p != (Image *) NULL; p=p->next)
+    if (i++ == index)
+      break;
+  return(p);
+}
+
 MagickExport Image *GetImageFromList(const Image *images,const ssize_t index)
 {
   const Image
@@ -675,12 +691,7 @@ MagickExport Image *GetImageFromList(const Image *images,const ssize_t index)
           break;
     }
   else
-    {
-      p=GetFirstImageInList(images);
-      for (i=0; p != (Image *) NULL; p=p->next)
-        if (i++ == index)
-          break;
-    }
+    p=GetImageFromListForward(images,index);
   return((Image *) p);
 }
 

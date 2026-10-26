@@ -1313,6 +1313,21 @@ static KernelInfo *AcquireFreiChenKernel(KernelInfo *kernel,
   return(kernel);
 }
 
+static double SetSquareKernelGeometry(KernelInfo *kernel,
+  const GeometryInfo *args)
+{
+  double
+    scale;
+
+  if (args->rho < 1.0)
+    kernel->width = kernel->height = 3;  /* default radius = 1 */
+  else
+    kernel->width = kernel->height = CastDoubleToSizeT(args->rho*2+1);
+  kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+  scale = args->sigma;
+  return(scale);
+}
+
 static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -1325,14 +1340,7 @@ static KernelInfo *AcquireRectangleKernel(KernelInfo *kernel,
   double
     scale;
   if ( type == SquareKernel )
-    {
-      if (args->rho < 1.0)
-        kernel->width = kernel->height = 3;  /* default radius = 1 */
-      else
-        kernel->width = kernel->height = CastDoubleToSizeT(args->rho*2+1);
-      kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
-      scale = args->sigma;
-    }
+    scale = SetSquareKernelGeometry(kernel,args);
   else {
       /* NOTE: user defaults set in "AcquireKernelInfo()" */
       if ( args->rho < 1.0 || args->sigma < 1.0 )
@@ -1918,6 +1926,17 @@ static void SetLoGKernelValues(KernelInfo *kernel,const double sigma)
       }
 }
 
+static void SetLoGOrUnityKernelValues(KernelInfo *kernel,const double sigma)
+{
+  if ( sigma > MagickEpsilon )
+    SetLoGKernelValues(kernel,sigma);
+  else /* special case - generate a unity kernel */
+    { (void) memset(kernel->values,0, (size_t)
+        kernel->width*kernel->height*sizeof(*kernel->values));
+      kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    }
+}
+
 static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
   const KernelInfoType type,const GeometryInfo *args)
 {
@@ -1955,13 +1974,7 @@ static KernelInfo *AcquireGaussianKernel(KernelInfo *kernel,
 
   if ( type == LoGKernel )
     { /* Calculate a Laplacian of a Gaussian - Or Mexican Hat */
-      if ( sigma > MagickEpsilon )
-        SetLoGKernelValues(kernel,sigma);
-      else /* special case - generate a unity kernel */
-        { (void) memset(kernel->values,0, (size_t)
-            kernel->width*kernel->height*sizeof(*kernel->values));
-          kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
-        }
+      SetLoGOrUnityKernelValues(kernel,sigma);
     }
 
   /* Note the above kernels may have been 'clipped' by a user defined

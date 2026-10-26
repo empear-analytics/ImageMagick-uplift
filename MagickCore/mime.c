@@ -706,6 +706,16 @@ static void PrintMimePathHeader(FILE *file,const MimeInfo **mime_info,
     "------------------------------\n");
 }
 
+static void PadMimeTypeColumn(FILE *file,const MimeInfo **mime_info,
+  const ssize_t i)
+{
+  ssize_t
+    j;
+
+  for (j=(ssize_t) strlen(mime_info[i]->type); j <= 27; j++)
+    (void) FormatLocaleFile(file," ");
+}
+
 static void PadMimeType(FILE *file,const MimeInfo **mime_info,
   const ssize_t i)
 {
@@ -713,10 +723,7 @@ static void PadMimeType(FILE *file,const MimeInfo **mime_info,
     j;
 
   if (strlen(mime_info[i]->type) <= 25)
-    {
-      for (j=(ssize_t) strlen(mime_info[i]->type); j <= 27; j++)
-        (void) FormatLocaleFile(file," ");
-    }
+    PadMimeTypeColumn(file,mime_info,i);
   else
     {
       (void) FormatLocaleFile(file,"\n");
