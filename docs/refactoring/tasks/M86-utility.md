@@ -180,3 +180,11 @@ Before the branch is pushed: `python3 tools/oracle/oracle.py run`.
 ## 7. Report
 
 For each function: the recipes applied, the score before and after, and the review lines that changed. For the file: where it plateaued, and which smells are left.
+
+### Report (2026-10-26, Mac, night): Recipe O, tried and reverted
+
+GetPathComponent's subimage block, the depth-5 nest, writes `subimage_length` and
+`subimage_offset`. As a Recipe O helper (`GetSubimageSpecification`, two out-parameters,
+its `p` and `q` its own) it lowered utility.c from 3.65 to 3.55, because the helper keeps
+a depth-4 nest and cc 9 of its own. Reverted. Branch `campaign/M86-utility-o` carries only
+the task file. The next task, M87 (segment.c), is stacked on it.
