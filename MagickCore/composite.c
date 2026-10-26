@@ -84,6 +84,16 @@
 #include "MagickCore/version.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _BlendSumWeights
+{
+  double
+    attenuate,
+    sign;
+} BlendSumWeights;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -417,8 +427,12 @@ static Image *BlendMaxMagnitudeImage(const Image *alpha_image,
 }
 
 static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
-  const double attenuate,const double sign,ExceptionInfo *exception)
+  const BlendSumWeights *weights,ExceptionInfo *exception)
 {
+  const double
+    attenuate = weights->attenuate,
+    sign = weights->sign;
+
   CacheView
     *alpha_view,
     *beta_view,
@@ -614,7 +628,11 @@ static Image *BlendDivergentImage(const Image *alpha_image,
       FreeDivergentResources();
       return((Image *) NULL);
     }
-  divergent_image=BlendSumImage(dx_divergent,dy_divergent,0.25,1.0,exception);
+  const BlendSumWeights
+    quarter_sum = { 0.25, 1.0 };
+
+  divergent_image=BlendSumImage(dx_divergent,dy_divergent,&quarter_sum,
+    exception);
   dy_divergent=DestroyImage(dy_divergent);
   dx_divergent=DestroyImage(dx_divergent);
   if (divergent_image == (Image *) NULL)
@@ -1262,7 +1280,10 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
       break;
     relax_image=DestroyImage(relax_image);
     relax_image=convolve_image;
-    sum_image=BlendSumImage(relax_image,divergent_image,1.0,-1.0,exception);
+    const BlendSumWeights
+      difference = { 1.0, -1.0 };
+
+    sum_image=BlendSumImage(relax_image,divergent_image,&difference,exception);
     if (sum_image == (Image *) NULL)
       break;
     relax_image=DestroyImage(relax_image);
@@ -1339,7 +1360,10 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
     return(MagickFalse);
   DisableCompositeClampUnlessSpecified(crop_image);
   (void) ResetImagePage(crop_image,"0x0+0+0");
-  sum_image=BlendSumImage(crop_image,source_image,1.0,-1.0,exception);
+  const BlendSumWeights
+    difference = { 1.0, -1.0 };
+
+  sum_image=BlendSumImage(crop_image,source_image,&difference,exception);
   crop_image=DestroyImage(crop_image);
   if (sum_image == (Image *) NULL)
     return(MagickFalse);
@@ -1421,7 +1445,10 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
   /*
     Composite the foreground image over the background image.
   */
-  foreground_image=BlendSumImage(source_image,relax_image,1.0,1.0,exception);
+  const BlendSumWeights
+    sum = { 1.0, 1.0 };
+
+  foreground_image=BlendSumImage(source_image,relax_image,&sum,exception);
   relax_image=DestroyImage(relax_image);
   if (foreground_image == (Image *) NULL)
     return(MagickFalse);
