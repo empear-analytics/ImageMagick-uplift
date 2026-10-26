@@ -335,6 +335,20 @@ static char *CanonicalXMLContent(const char *content,
   return(canonical_content);
 }
 
+static XMLTreeInfo *GetOrderedXMLNode(XMLTreeInfo *node,const char *subnode)
+{
+  ssize_t
+    j;
+
+  for (j=(ssize_t) StringToLong(subnode)-1; j > 0; j--)
+  {
+    node=node->ordered;
+    if (node == (XMLTreeInfo *) NULL)
+      break;
+  }
+  return(node);
+}
+
 MagickPrivate XMLTreeInfo *AddPathToXMLTree(XMLTreeInfo *xml_info,
   const char *path,const size_t offset)
 {
@@ -347,8 +361,7 @@ MagickPrivate XMLTreeInfo *AddPathToXMLTree(XMLTreeInfo *xml_info,
     number_components;
 
   ssize_t
-    i,
-    j;
+    i;
 
   XMLTreeInfo
     *child,
@@ -373,12 +386,7 @@ MagickPrivate XMLTreeInfo *AddPathToXMLTree(XMLTreeInfo *xml_info,
     node=child;
     if (node == (XMLTreeInfo *) NULL)
       break;
-    for (j=(ssize_t) StringToLong(subnode)-1; j > 0; j--)
-    {
-      node=node->ordered;
-      if (node == (XMLTreeInfo *) NULL)
-        break;
-    }
+    node=GetOrderedXMLNode(node,subnode);
     if (node == (XMLTreeInfo *) NULL)
       break;
     components[i]=DestroyString(components[i]);

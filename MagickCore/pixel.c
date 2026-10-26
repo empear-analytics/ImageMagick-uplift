@@ -208,13 +208,8 @@ MagickExport PixelInfo *ClonePixelInfo(const PixelInfo *pixel)
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
-  PixelInfo *destination,ExceptionInfo *exception)
+static void ConformPixelColorspace(const Image *image,PixelInfo *destination)
 {
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(destination != (const PixelInfo *) NULL);
-  *destination=(*source);
   if (image->colorspace == CMYKColorspace)
     {
       if (IssRGBCompatibleColorspace(destination->colorspace) != MagickFalse)
@@ -226,6 +221,16 @@ MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
         if (IssRGBCompatibleColorspace(image->colorspace) != MagickFalse)
           ConvertCMYKToRGB(destination);
       }
+}
+
+MagickExport void ConformPixelInfo(Image *image,const PixelInfo *source,
+  PixelInfo *destination,ExceptionInfo *exception)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(destination != (const PixelInfo *) NULL);
+  *destination=(*source);
+  ConformPixelColorspace(image,destination);
   if ((IsPixelInfoGray(&image->background_color) == MagickFalse) &&
       (IsGrayColorspace(image->colorspace) != MagickFalse))
     (void) TransformImageColorspace(image,sRGBColorspace,exception);

@@ -626,6 +626,27 @@ static Image *BlendDivergentImage(const Image *alpha_image,
   return(divergent_image);
 }
 
+static void ClearMaskedAlphaRow(const Image *image,const Image *mask_image,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    Quantum
+      alpha = GetPixelAlpha(mask_image,p);
+
+    ssize_t
+      i = GetPixelChannelOffset(image,AlphaPixelChannel);
+
+    if (fabs((double) alpha) >= MagickEpsilon)
+      q[i]=(Quantum) 0;
+    p+=(ptrdiff_t) GetPixelChannels(mask_image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType BlendMaskAlphaChannel(Image *image,
   const Image *mask_image,ExceptionInfo *exception)
 {
@@ -658,9 +679,6 @@ static MagickBooleanType BlendMaskAlphaChannel(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(mask_view,0,y,image->columns,1,exception);
@@ -670,19 +688,7 @@ static MagickBooleanType BlendMaskAlphaChannel(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      Quantum
-        alpha = GetPixelAlpha(mask_image,p);
-
-      ssize_t
-        i = GetPixelChannelOffset(image,AlphaPixelChannel);
-
-      if (fabs((double) alpha) >= MagickEpsilon)
-        q[i]=(Quantum) 0;
-      p+=(ptrdiff_t) GetPixelChannels(mask_image);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ClearMaskedAlphaRow(image,mask_image,p,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
