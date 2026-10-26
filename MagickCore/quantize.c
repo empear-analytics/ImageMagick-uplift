@@ -1877,13 +1877,9 @@ static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
   return(MagickTrue);
 }
 
-static MagickBooleanType Riemersma(Image *image,CacheView *image_view,
-  QCubeInfo *cube_info,const size_t level,const unsigned int direction,
-  ExceptionInfo *exception)
+static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
+  const size_t level,const unsigned int direction,ExceptionInfo *exception)
 {
-  const RiemersmaCurve
-    curve = { image, image_view, cube_info };
-
   MagickBooleanType
     status;
 
@@ -1893,38 +1889,38 @@ static MagickBooleanType Riemersma(Image *image,CacheView *image_view,
     {
       case WestGravity:
       {
-        status=RiemersmaDither(&curve,EastGravity,exception);
+        status=RiemersmaDither(curve,EastGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,SouthGravity,exception);
+          status=RiemersmaDither(curve,SouthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,WestGravity,exception);
+          status=RiemersmaDither(curve,WestGravity,exception);
         break;
       }
       case EastGravity:
       {
-        status=RiemersmaDither(&curve,WestGravity,exception);
+        status=RiemersmaDither(curve,WestGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,NorthGravity,exception);
+          status=RiemersmaDither(curve,NorthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,EastGravity,exception);
+          status=RiemersmaDither(curve,EastGravity,exception);
         break;
       }
       case NorthGravity:
       {
-        status=RiemersmaDither(&curve,SouthGravity,exception);
+        status=RiemersmaDither(curve,SouthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,EastGravity,exception);
+          status=RiemersmaDither(curve,EastGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,NorthGravity,exception);
+          status=RiemersmaDither(curve,NorthGravity,exception);
         break;
       }
       case SouthGravity:
       {
-        status=RiemersmaDither(&curve,NorthGravity,exception);
+        status=RiemersmaDither(curve,NorthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,WestGravity,exception);
+          status=RiemersmaDither(curve,WestGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,SouthGravity,exception);
+          status=RiemersmaDither(curve,SouthGravity,exception);
         break;
       }
       default:
@@ -1935,86 +1931,70 @@ static MagickBooleanType Riemersma(Image *image,CacheView *image_view,
     {
       case WestGravity:
       {
-        status=Riemersma(image,image_view,cube_info,level-1,NorthGravity,
-          exception);
+        status=Riemersma(curve,level-1,NorthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,EastGravity,exception);
+          status=RiemersmaDither(curve,EastGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,WestGravity,
-            exception);
+          status=Riemersma(curve,level-1,WestGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,SouthGravity,exception);
+          status=RiemersmaDither(curve,SouthGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,WestGravity,
-            exception);
+          status=Riemersma(curve,level-1,WestGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,WestGravity,exception);
+          status=RiemersmaDither(curve,WestGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,SouthGravity,
-            exception);
+          status=Riemersma(curve,level-1,SouthGravity,exception);
         break;
       }
       case EastGravity:
       {
-        status=Riemersma(image,image_view,cube_info,level-1,SouthGravity,
-          exception);
+        status=Riemersma(curve,level-1,SouthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,WestGravity,exception);
+          status=RiemersmaDither(curve,WestGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,EastGravity,
-            exception);
+          status=Riemersma(curve,level-1,EastGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,NorthGravity,exception);
+          status=RiemersmaDither(curve,NorthGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,EastGravity,
-            exception);
+          status=Riemersma(curve,level-1,EastGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,EastGravity,exception);
+          status=RiemersmaDither(curve,EastGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,NorthGravity,
-            exception);
+          status=Riemersma(curve,level-1,NorthGravity,exception);
         break;
       }
       case NorthGravity:
       {
-        status=Riemersma(image,image_view,cube_info,level-1,WestGravity,
-          exception);
+        status=Riemersma(curve,level-1,WestGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,SouthGravity,exception);
+          status=RiemersmaDither(curve,SouthGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,NorthGravity,
-            exception);
+          status=Riemersma(curve,level-1,NorthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,EastGravity,exception);
+          status=RiemersmaDither(curve,EastGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,NorthGravity,
-            exception);
+          status=Riemersma(curve,level-1,NorthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,NorthGravity,exception);
+          status=RiemersmaDither(curve,NorthGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,EastGravity,
-            exception);
+          status=Riemersma(curve,level-1,EastGravity,exception);
         break;
       }
       case SouthGravity:
       {
-        status=Riemersma(image,image_view,cube_info,level-1,EastGravity,
-          exception);
+        status=Riemersma(curve,level-1,EastGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,NorthGravity,exception);
+          status=RiemersmaDither(curve,NorthGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,SouthGravity,
-            exception);
+          status=Riemersma(curve,level-1,SouthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,WestGravity,exception);
+          status=RiemersmaDither(curve,WestGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,SouthGravity,
-            exception);
+          status=Riemersma(curve,level-1,SouthGravity,exception);
         if (status != MagickFalse)
-          status=RiemersmaDither(&curve,SouthGravity,exception);
+          status=RiemersmaDither(curve,SouthGravity,exception);
         if (status != MagickFalse)
-          status=Riemersma(image,image_view,cube_info,level-1,WestGravity,
-            exception);
+          status=Riemersma(curve,level-1,WestGravity,exception);
         break;
       }
       default:
@@ -2058,11 +2038,11 @@ static MagickBooleanType DitherImage(Image *image,QCubeInfo *cube_info,
   cube_info->span=(MagickSizeType) image->columns*image->rows;
   image_view=AcquireAuthenticCacheView(image,exception);
   status=MagickTrue;
-  if (level > 0)
-    status=Riemersma(image,image_view,cube_info,level,NorthGravity,exception);
   const RiemersmaCurve
     curve = { image, image_view, cube_info };
 
+  if (level > 0)
+    status=Riemersma(&curve,level,NorthGravity,exception);
   if (status != MagickFalse)
     status=RiemersmaDither(&curve,ForgetGravity,exception);
   image_view=DestroyCacheView(image_view);
