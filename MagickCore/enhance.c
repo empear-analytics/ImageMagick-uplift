@@ -3552,6 +3552,25 @@ MagickExport MagickBooleanType LevelImageColors(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ssize_t FindLinearBlackLevel(const double *histogram,
+  const double black_point)
+{
+  double
+    intensity;
+
+  ssize_t
+    black;
+
+  intensity=0.0;
+  for (black=0; black < (ssize_t) MaxMap; black++)
+  {
+    intensity+=histogram[black];
+    if (intensity >= black_point)
+      break;
+  }
+  return(black);
+}
+
 MagickExport MagickBooleanType LinearStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -3611,13 +3630,7 @@ MagickExport MagickBooleanType LinearStretchImage(Image *image,
   /*
     Find the histogram boundaries by locating the black and white point levels.
   */
-  intensity=0.0;
-  for (black=0; black < (ssize_t) MaxMap; black++)
-  {
-    intensity+=histogram[black];
-    if (intensity >= black_point)
-      break;
-  }
+  black=FindLinearBlackLevel(histogram,black_point);
   intensity=0.0;
   for (white=(ssize_t) MaxMap; white != 0; white--)
   {
