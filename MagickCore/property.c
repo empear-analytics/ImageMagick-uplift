@@ -977,30 +977,30 @@ static inline MagickBooleanType IsNextIFDOffset(const ssize_t tag_offset1,
     (level < (MaxDirectoryStack-2))) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _DirectoryInfo
+{
+  const unsigned char
+    *directory;
+
+  size_t
+    entry;
+
+  ssize_t
+    offset;
+} DirectoryInfo;
+
+typedef struct _TagInfo
+{
+  size_t
+    tag;
+
+  const char
+    description[36];
+} TagInfo;
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
-  typedef struct _DirectoryInfo
-  {
-    const unsigned char
-      *directory;
-
-    size_t
-      entry;
-
-    ssize_t
-      offset;
-  } DirectoryInfo;
-
-  typedef struct _TagInfo
-  {
-    size_t
-      tag;
-
-    const char
-      description[36];
-  } TagInfo;
-
   static const TagInfo
     EXIFTag[] =
     {
