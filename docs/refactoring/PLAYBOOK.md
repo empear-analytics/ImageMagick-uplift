@@ -325,9 +325,27 @@ Copy the expression **character for character**. Do not simplify the boolean alg
 do not reorder the operands: `&&` short-circuits, so reordering can change which calls run
 and can dereference a null pointer the original never touched.
 
+**Several sites.** One predicate may replace the same expression at more than one site.
+That covers a new predicate written for several copies, and an existing predicate taking
+a further site. Three conditions apply:
+- At every site the expression must equal the predicate's body with the arguments
+  substituted for the parameters, character for character. Check this by script, not by
+  eye.
+- Every argument must be an identifier, a member access or a literal: nothing with a side
+  effect, and nothing evaluated a different number of times than before.
+- `refactor_guard.py --calls` must show only the expected counts: +2 for a new predicate
+  plus +1 for each further site, and, for each copy replaced beyond the first, the callees
+  inside the expression one fewer.
+
+The step stays at guard level: it moves expressions, and the script check stands in for
+reading each copy.
+
 **Evidence level:** guard.
 
-**Provenance:** founding recipe (2026-09-29).
+**Provenance:** founding recipe (2026-09-29). *Several sites:* 2026-10-26. It arose from
+the question in PR #16 (segment.c, a guard-level reuse showing +1 in `--calls`) and from
+delegate.c's `GetDelegateList`, whose decode and encode tests are the same expression on
+two fields.
 
 ---
 
@@ -1071,3 +1089,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 `after the fact`.
 | 2026-10-26 | NEW | H | Hoist Function-Local Macros: a run of `#define` lines at the top of a function body moves unchanged to directly above the function, proven by an identical preprocessed translation unit (`tools/pp_identical.sh`); the extractions it unblocks follow | Local macros pinned every block of `HuffmanDecodeImage`, `LZWEncodeImage`, `TransformSignature`, `GenerateDifferentialNoise` and `SyncExifProfile` (M61, M68, M69, M74); a trial hoist of `HuffmanDecodeImage`'s 31 lines preprocessed identically | mandate (2026-10-24) |
 | 2026-10-26 | NEW | L | Hoist Function-Local Types: a `typedef` at the top of a function body moves to directly above the function, renamed when its name is already declared at file scope, proven by an identical object file (`tools/obj_identical.sh`); the extractions it unblocks follow | `GetImageFeatures`' local `ChannelStatistics` (M35) pins every block of a cc-180 function; it shadows the public type of the same name. A trial rename compiled to the same object file; a planted `<` to `<=` was caught | mandate (2026-10-24) |
+| 2026-10-26 | AMEND | P | Several sites: one predicate may replace the same expression at several sites, at guard level, when a script confirms each site equals the body with arguments substituted and every argument is free of side effects; `--calls` shows +1 per extra site and one fewer of each inner callee per replaced copy. Decided by Claude Code under the owner's delegation of 2026-10-26 | PR #16's open question; `GetDelegateList` (decode/encode) | owner |
