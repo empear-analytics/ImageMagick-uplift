@@ -2810,6 +2810,20 @@ static PixelList **AcquirePixelListTLS(const size_t width,
   return(pixel_list);
 }
 
+static ssize_t GetSkipListLevel(PixelList *pixel_list)
+{
+  ssize_t
+    level;
+
+  for (level=0; ; level++)
+  {
+    pixel_list->seed=(pixel_list->seed*42893621L)+1L;
+    if ((pixel_list->seed & 0x300) != 0x300)
+      break;
+  }
+  return(level);
+}
+
 static void AddNodePixelList(PixelList *pixel_list,const size_t color)
 {
   SkipList
@@ -2842,12 +2856,7 @@ static void AddNodePixelList(PixelList *pixel_list,const size_t color)
   /*
     Generate a pseudo-random level for this node.
   */
-  for (level=0; ; level++)
-  {
-    pixel_list->seed=(pixel_list->seed*42893621L)+1L;
-    if ((pixel_list->seed & 0x300) != 0x300)
-      break;
-  }
+  level=GetSkipListLevel(pixel_list);
   if (level > 8)
     level=8;
   if (level > (p->level+2))
