@@ -1729,6 +1729,25 @@ static void StretchImageRow(const Image *image,const Quantum *black,
   }
 }
 
+static ssize_t FindStretchBlackLevel(const Image *image,
+  const double *histogram,const ssize_t i,const double black_point)
+{
+  double
+    intensity;
+
+  ssize_t
+    j;
+
+  intensity=0.0;
+  for (j=0; j <= (ssize_t) MaxMap; j++)
+  {
+    intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+    if (intensity > black_point)
+      break;
+  }
+  return(j);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1828,13 +1847,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
 
     black[i]=(Quantum) 0;
     white[i]=(Quantum) ScaleQuantumToMap(QuantumRange);
-    intensity=0.0;
-    for (j=0; j <= (ssize_t) MaxMap; j++)
-    {
-      intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
-      if (intensity > black_point)
-        break;
-    }
+    j=FindStretchBlackLevel(image,histogram,i,black_point);
     black[i]=(Quantum) j;
     intensity=0.0;
     for (j=(ssize_t) MaxMap; j != 0; j--)
