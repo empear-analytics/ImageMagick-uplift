@@ -157,6 +157,42 @@ static SemaphoreInfo
 static SplayTreeInfo
   *temporary_resources = (SplayTreeInfo *) NULL;
 
+static void LockResourceSemaphore(const ResourceType type)
+{
+  switch (type)
+  {
+    case DiskResource:
+    case FileResource:
+    case MapResource:
+    case MemoryResource:
+    case TimeResource:
+    {
+      if (resource_semaphore[type] == (SemaphoreInfo *) NULL)
+        ActivateSemaphoreInfo(&resource_semaphore[type]);
+      LockSemaphoreInfo(resource_semaphore[type]);
+      break;
+    }
+    default: ;
+  }
+}
+
+static void UnlockResourceSemaphore(const ResourceType type)
+{
+  switch (type)
+  {
+    case DiskResource:
+    case FileResource:
+    case MapResource:
+    case MemoryResource:
+    case TimeResource:
+    {
+      UnlockSemaphoreInfo(resource_semaphore[type]);
+      break;
+    }
+    default: ;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -205,21 +241,7 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
   current=0;
   bi=MagickFalse;
   status=MagickFalse;
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      if (resource_semaphore[type] == (SemaphoreInfo *) NULL)
-        ActivateSemaphoreInfo(&resource_semaphore[type]);
-      LockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  LockResourceSemaphore(type);
   switch (type)
   {
     case AreaResource:
@@ -355,19 +377,7 @@ MagickExport MagickBooleanType AcquireMagickResource(const ResourceType type,
       break;
     }
   }
-  switch (type)
-  {
-    case DiskResource:
-    case FileResource:
-    case MapResource:
-    case MemoryResource:
-    case TimeResource:
-    {
-      UnlockSemaphoreInfo(resource_semaphore[type]);
-      break;
-    }
-    default: ;
-  }
+  UnlockResourceSemaphore(type);
   if ((GetLogEventMask() & ResourceEvent) != 0)
     {
       char
@@ -712,6 +722,15 @@ MagickExport MagickSizeType GetMagickResource(const ResourceType type)
 %    o path: the file resource path.
 %
 */
+static inline MagickBooleanType IsChangedFileIdentity(
+  const struct stat attributes,const struct stat *temporary_attributes)
+{
+  return(((attributes.st_dev != temporary_attributes->st_dev) ||
+    (attributes.st_ino != temporary_attributes->st_ino) ||
+    (attributes.st_mode != temporary_attributes->st_mode)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType IsFileResourceIdentityValid(const char *path)
 {
   const struct stat
@@ -732,9 +751,8 @@ MagickExport MagickBooleanType IsFileResourceIdentityValid(const char *path)
     {
       status=GetPathAttributes(path,&attributes);
       if (status != MagickFalse)
-        if ((attributes.st_dev != temporary_attributes->st_dev) ||
-            (attributes.st_ino != temporary_attributes->st_ino) ||
-            (attributes.st_mode != temporary_attributes->st_mode))
+        if (IsChangedFileIdentity(attributes,temporary_attributes) !=
+            MagickFalse)
           status=MagickFalse;
     }
   UnlockSemaphoreInfo(resource_semaphore[FileResource]);

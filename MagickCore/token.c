@@ -138,6 +138,35 @@ MagickExport TokenInfo *DestroyTokenInfo(TokenInfo *token_info)
   return(token_info);
 }
 
+static inline char GetClosingQuote(const char *magick_restrict p)
+{
+  char
+    escape;
+
+  switch (*p)
+  {
+    case '"': escape='"'; break;
+    case '\'': escape='\''; break;
+    case '`': escape='\''; break;
+    case '{': escape='}'; break;
+    default: escape=(*p); break;
+  }
+  return(escape);
+}
+
+static inline void StripURLReference(char *magick_restrict token)
+{
+  char
+    *magick_restrict q;
+
+  q=strrchr(token,')');
+  if (q != (char *) NULL)
+    {
+      *q='\0';
+      (void) memmove(token,token+5,(size_t) (q-token-4));
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -173,6 +202,27 @@ MagickExport TokenInfo *DestroyTokenInfo(TokenInfo *token_info)
 %    o token: copy the token to this buffer.
 %
 */
+static inline MagickBooleanType IsEscapedQuote(const char *magick_restrict p,
+  const char escape)
+{
+  return(((*p == '\\') && ((*(p+1) == escape) ||
+    (*(p+1) == '\\'))) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsSingleCharToken(const char *magick_restrict p)
+{
+  return(((*p != '\0') && (isalpha((int) ((unsigned char) *p)) == 0) &&
+    (*p != *DirectorySeparator) && (*p != '#') && (*p != '<')) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsTokenDelimiter(const char *magick_restrict p)
+{
+  return((((isspace((int) ((unsigned char) *p)) != 0) || (*p == '=') ||
+    (*p == ',') || (*p == ':') || (*p == ';')) &&
+    (*(p-1) != '\\')) ? MagickTrue : MagickFalse);
+}
+
 MagickExport magick_hot_spot size_t GetNextToken(
   const char *magick_restrict start,const char **magick_restrict end,
   const size_t extent,char *magick_restrict token)
@@ -207,17 +257,10 @@ MagickExport magick_hot_spot size_t GetNextToken(
       char
         escape;
 
-      switch (*p)
-      {
-        case '"': escape='"'; break;
-        case '\'': escape='\''; break;
-        case '`': escape='\''; break;
-        case '{': escape='}'; break;
-        default: escape=(*p); break;
-      }
+      escape=GetClosingQuote(p);
       for (p++; *p != '\0'; p++)
       {
-        if ((*p == '\\') && ((*(p+1) == escape) || (*(p+1) == '\\')))
+        if (IsEscapedQuote(p,escape) != MagickFalse)
           p++;
         else
           if (*p == escape)
@@ -266,8 +309,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
             }
           break;
         }
-      if ((*p != '\0') && (isalpha((int) ((unsigned char) *p)) == 0) &&
-          (*p != *DirectorySeparator) && (*p != '#') && (*p != '<'))
+      if (IsSingleCharToken(p) != MagickFalse)
         {
           if (i < (ssize_t) (extent-1))
             token[i++]=(*p);
@@ -276,8 +318,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
         }
       for ( ; *p != '\0'; p++)
       {
-        if (((isspace((int) ((unsigned char) *p)) != 0) || (*p == '=') ||
-            (*p == ',') || (*p == ':') || (*p == ';')) && (*(p-1) != '\\'))
+        if (IsTokenDelimiter(p) != MagickFalse)
           break;
         if ((i > 0) && (*p == '<'))
           break;
@@ -307,14 +348,7 @@ MagickExport magick_hot_spot size_t GetNextToken(
   }
   token[i]='\0';
   if (LocaleNCompare(token,"url(#",5) == 0)
-    {
-      q=strrchr(token,')');
-      if (q != (char *) NULL)
-        {
-          *q='\0';
-          (void) memmove(token,token+5,(size_t) (q-token-4));
-        }
-    }
+    StripURLReference(token);
   while (isspace((int) ((unsigned char) *p)) != 0)
     p++;
   if (end != (const char **) NULL)
@@ -322,6 +356,56 @@ MagickExport magick_hot_spot size_t GetNextToken(
   return((size_t) (p-start+1));
 }
 
+static MagickBooleanType MatchCharacterClass(const char *p,const char *q,
+  const int ecode)
+{
+  MagickBooleanType
+    matched = MagickFalse;
+
+  while (p < q)
+  {
+    const char
+      *next;
+
+    int
+      code = GetUTFCode(p);
+
+    size_t
+      octets = GetUTFOctets(p);
+
+    if (code == '\\')
+      {
+        p+=octets;
+        code=GetUTFCode(p);
+        octets=GetUTFOctets(p);
+      }
+    next=p+octets;
+    if ((next < q) && (GetUTFCode(next) == '-'))
+      {
+        int
+          ncode;
+
+        next+=GetUTFOctets(next);
+        ncode=GetUTFCode(next);
+        if (ncode == '\\')
+          {
+            next+=GetUTFOctets(next);
+            ncode=GetUTFCode(next);
+          }
+        if ((ecode >= code) && (ecode <= ncode))
+          matched=MagickTrue;
+        p=next+GetUTFOctets(next);
+      }
+    else
+      {
+        if (ecode == code)
+          matched=MagickTrue;
+        p+=octets;
+      }
+  }
+  return(matched);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -450,47 +534,7 @@ static MagickBooleanType GlobExpression_(const char *magick_restrict expression,
           q+=GetUTFOctets(q);
         if (GetUTFCode(q) == 0)
           return(MagickFalse);  /* malformed */
-        while (p < q)
-        {
-          const char
-            *next;
-
-          int
-            code = GetUTFCode(p);
-
-          size_t
-            octets = GetUTFOctets(p);
-
-          if (code == '\\')
-            {
-              p+=octets;
-              code=GetUTFCode(p);
-              octets=GetUTFOctets(p);
-            }
-          next=p+octets;
-          if ((next < q) && (GetUTFCode(next) == '-'))
-            {
-              int
-                ncode;
-
-              next+=GetUTFOctets(next);
-              ncode=GetUTFCode(next);
-              if (ncode == '\\')
-                {
-                  next+=GetUTFOctets(next);
-                  ncode=GetUTFCode(next);
-                }
-              if ((ecode >= code) && (ecode <= ncode))
-                matched=MagickTrue;
-              p=next+GetUTFOctets(next);
-            }
-          else
-            {
-              if (ecode == code)
-                matched=MagickTrue;
-              p+=octets;
-            }
-        }
+        matched=MatchCharacterClass(p,q,ecode);
         /*
           Skip consecutive '*'.
         */
@@ -911,6 +955,27 @@ static void StoreToken(TokenInfo *token_info,char *string,
   }
 }
 
+static void HandleWhiteSpace(TokenInfo *token_info,char *token,
+  const size_t max_token_length,int c)
+{
+  switch (token_info->state)
+  {
+    case IN_WHITE:
+    case IN_OZONE:
+      break;
+    case IN_TOKEN:
+    {
+      token_info->state=IN_OZONE;
+      break;
+    }
+    case IN_QUOTE:
+    {
+      StoreToken(token_info,token,max_token_length,c);
+      break;
+    }
+  }
+}
+
 MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
   char *token,const size_t max_token_length,const char *line,const char *white,
   const char *break_set,const char *quote,const char escape,char *breaker,
@@ -990,22 +1055,7 @@ MagickExport int Tokenizer(TokenInfo *token_info,const unsigned flag,
     i=sindex(c,white);
     if (i >= 0)
       {
-        switch (token_info->state)
-        {
-          case IN_WHITE:
-          case IN_OZONE:
-            break;
-          case IN_TOKEN:
-          {
-            token_info->state=IN_OZONE;
-            break;
-          }
-          case IN_QUOTE:
-          {
-            StoreToken(token_info,token,max_token_length,c);
-            break;
-          }
-        }
+        HandleWhiteSpace(token_info,token,max_token_length,c);
         continue;
       }
     if (c == (int) escape)

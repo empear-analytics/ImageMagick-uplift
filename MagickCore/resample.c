@@ -278,6 +278,107 @@ MagickExport ResampleFilter *DestroyResampleFilter(
   return(resample_filter);
 }
 
+static inline MagickBooleanType IsAreaOutsideImage(
+  const ResampleFilter *resample_filter,const double u0,const double v0)
+{
+  return(( resample_filter->limit_reached
+    || u0 + resample_filter->Ulimit < 0.0
+    || u0 - resample_filter->Ulimit >
+       (double) resample_filter->image->columns-1.0
+    || v0 + resample_filter->Vlimit < 0.0
+    || v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0
+    ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAreaOutsideCorner(
+  const ResampleFilter *resample_filter,const double u0,const double v0)
+{
+  return((    ( u0 + resample_filter->Ulimit < 0.0
+                && v0 + resample_filter->Vlimit < 0.0 )
+           || ( u0 + resample_filter->Ulimit < 0.0
+                && v0 - resample_filter->Vlimit >
+                   (double) resample_filter->image->rows-1.0 )
+           || ( u0 - resample_filter->Ulimit >
+                (double) resample_filter->image->columns-1.0
+                && v0 + resample_filter->Vlimit < 0.0 )
+           || ( u0 - resample_filter->Ulimit >
+                (double) resample_filter->image->columns-1.0
+                && v0 - resample_filter->Vlimit >
+                   (double) resample_filter->image->rows-1.0 )
+           ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAreaOutsideDitherCorner(
+  const ResampleFilter *resample_filter,const double u0,const double v0)
+{
+  return((    ( u0 + resample_filter->Ulimit < -32.0
+                && v0 + resample_filter->Vlimit < -32.0 )
+           || ( u0 + resample_filter->Ulimit < -32.0
+                && v0 - resample_filter->Vlimit >
+                   (double) resample_filter->image->rows+31.0 )
+           || ( u0 - resample_filter->Ulimit >
+                (double) resample_filter->image->columns+31.0
+                && v0 + resample_filter->Vlimit < -32.0 )
+           || ( u0 - resample_filter->Ulimit >
+                (double) resample_filter->image->columns+31.0
+                && v0 - resample_filter->Vlimit >
+                   (double) resample_filter->image->rows+31.0 )
+           ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsResampleUnweighted(const ssize_t hit,
+  const double divisor_m,const double divisor_c)
+{
+  return(( hit == 0 || divisor_m <= MagickEpsilon ||
+    divisor_c <= MagickEpsilon ) ? MagickTrue : MagickFalse);
+}
+
+static void BlendCheckerTileAverage(ResampleFilter *resample_filter)
+{
+  double
+    divisor_c,
+    weight;
+
+  /* CheckerTile is a alpha blend of the image's average pixel
+     color and the current background color */
+
+  /* image's average pixel color */
+  weight = QuantumScale*((double)
+    resample_filter->average_pixel.alpha);
+  resample_filter->average_pixel.red *= weight;
+  resample_filter->average_pixel.green *= weight;
+  resample_filter->average_pixel.blue *= weight;
+  divisor_c = weight;
+
+  /* background color */
+  weight = QuantumScale*((double)
+    resample_filter->image->background_color.alpha);
+  resample_filter->average_pixel.red +=
+          weight*resample_filter->image->background_color.red;
+  resample_filter->average_pixel.green +=
+          weight*resample_filter->image->background_color.green;
+  resample_filter->average_pixel.blue +=
+          weight*resample_filter->image->background_color.blue;
+  resample_filter->average_pixel.alpha +=
+          resample_filter->image->background_color.alpha;
+  divisor_c += weight;
+
+  /* alpha blend */
+  resample_filter->average_pixel.red /= divisor_c;
+  resample_filter->average_pixel.green /= divisor_c;
+  resample_filter->average_pixel.blue /= divisor_c;
+  resample_filter->average_pixel.alpha /= 2; /* 50% blend */
+}
+
+static void ResetPixelAccumulator(PixelInfo *pixel)
+{
+  pixel->red = pixel->green = pixel->blue = 0.0;
+  if (pixel->colorspace == CMYKColorspace)
+    pixel->black = 0.0;
+  if (pixel->alpha_trait != UndefinedPixelTrait)
+    pixel->alpha = 0.0;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -357,25 +458,13 @@ MagickExport MagickBooleanType ResamplePixelColor(
     case GrayVirtualPixelMethod:
     case WhiteVirtualPixelMethod:
     case MaskVirtualPixelMethod:
-      if ( resample_filter->limit_reached
-           || u0 + resample_filter->Ulimit < 0.0
-           || u0 - resample_filter->Ulimit > (double) resample_filter->image->columns-1.0
-           || v0 + resample_filter->Vlimit < 0.0
-           || v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0
-           )
+      if (IsAreaOutsideImage(resample_filter,u0,v0) != MagickFalse)
         hit++;
       break;
 
     case UndefinedVirtualPixelMethod:
     case EdgeVirtualPixelMethod:
-      if (    ( u0 + resample_filter->Ulimit < 0.0 && v0 + resample_filter->Vlimit < 0.0 )
-           || ( u0 + resample_filter->Ulimit < 0.0
-                && v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0 )
-           || ( u0 - resample_filter->Ulimit > (double) resample_filter->image->columns-1.0
-                && v0 + resample_filter->Vlimit < 0.0 )
-           || ( u0 - resample_filter->Ulimit > (double) resample_filter->image->columns-1.0
-                && v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0 )
-           )
+      if (IsAreaOutsideCorner(resample_filter,u0,v0) != MagickFalse)
         hit++;
       break;
     case HorizontalTileVirtualPixelMethod:
@@ -391,14 +480,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
         hit++;  /* outside the vertically tiled images. */
       break;
     case DitherVirtualPixelMethod:
-      if (    ( u0 + resample_filter->Ulimit < -32.0 && v0 + resample_filter->Vlimit < -32.0 )
-           || ( u0 + resample_filter->Ulimit < -32.0
-                && v0 - resample_filter->Vlimit > (double) resample_filter->image->rows+31.0 )
-           || ( u0 - resample_filter->Ulimit > (double) resample_filter->image->columns+31.0
-                && v0 + resample_filter->Vlimit < -32.0 )
-           || ( u0 - resample_filter->Ulimit > (double) resample_filter->image->columns+31.0
-                && v0 - resample_filter->Vlimit > (double) resample_filter->image->rows+31.0 )
-           )
+      if (IsAreaOutsideDitherCorner(resample_filter,u0,v0) != MagickFalse)
         hit++;
       break;
     case TileVirtualPixelMethod:
@@ -496,38 +578,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
           average_image=DestroyImage(average_image);
 
           if ( resample_filter->virtual_pixel == CheckerTileVirtualPixelMethod )
-            {
-              /* CheckerTile is a alpha blend of the image's average pixel
-                 color and the current background color */
-
-              /* image's average pixel color */
-              weight = QuantumScale*((double)
-                resample_filter->average_pixel.alpha);
-              resample_filter->average_pixel.red *= weight;
-              resample_filter->average_pixel.green *= weight;
-              resample_filter->average_pixel.blue *= weight;
-              divisor_c = weight;
-
-              /* background color */
-              weight = QuantumScale*((double)
-                resample_filter->image->background_color.alpha);
-              resample_filter->average_pixel.red +=
-                      weight*resample_filter->image->background_color.red;
-              resample_filter->average_pixel.green +=
-                      weight*resample_filter->image->background_color.green;
-              resample_filter->average_pixel.blue +=
-                      weight*resample_filter->image->background_color.blue;
-              resample_filter->average_pixel.alpha +=
-                      resample_filter->image->background_color.alpha;
-              divisor_c += weight;
-
-              /* alpha blend */
-              resample_filter->average_pixel.red /= divisor_c;
-              resample_filter->average_pixel.green /= divisor_c;
-              resample_filter->average_pixel.blue /= divisor_c;
-              resample_filter->average_pixel.alpha /= 2; /* 50% blend */
-
-            }
+            BlendCheckerTileAverage(resample_filter);
         }
         *pixel=resample_filter->average_pixel;
         break;
@@ -541,11 +592,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
   hit = 0;
   divisor_c = 0.0;
   divisor_m = 0.0;
-  pixel->red = pixel->green = pixel->blue = 0.0;
-  if (pixel->colorspace == CMYKColorspace)
-    pixel->black = 0.0;
-  if (pixel->alpha_trait != UndefinedPixelTrait)
-    pixel->alpha = 0.0;
+  ResetPixelAccumulator(pixel);
 
   /*
     Determine the parallelogram bounding box fitted to the ellipse
@@ -654,7 +701,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
   /*
     Result sanity check -- this should NOT happen
   */
-  if ( hit == 0 || divisor_m <= MagickEpsilon || divisor_c <= MagickEpsilon ) {
+  if (IsResampleUnweighted(hit,divisor_m,divisor_c) != MagickFalse) {
     /* not enough pixels, or bad weighting in resampling,
        resort to direct interpolation */
 #if DEBUG_NO_PIXEL_HIT

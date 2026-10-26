@@ -286,6 +286,15 @@ MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
 %      file name is returned in this array.
 %
 */
+static inline MagickBooleanType IsCompressedFileExtension(const char *extension)
+{
+  return(((LocaleCompare(extension,"Z") == 0) ||
+    (LocaleCompare(extension,"bz2") == 0) ||
+    (LocaleCompare(extension,"gz") == 0) ||
+    (LocaleCompare(extension,"wmz") == 0) ||
+    (LocaleCompare(extension,"svgz") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport void AppendImageFormat(const char *format,char *filename)
 {
   char
@@ -309,11 +318,7 @@ MagickExport void AppendImageFormat(const char *format,char *filename)
       return;
     }
   GetPathComponent(filename,ExtensionPath,extension);
-  if ((LocaleCompare(extension,"Z") == 0) ||
-      (LocaleCompare(extension,"bz2") == 0) ||
-      (LocaleCompare(extension,"gz") == 0) ||
-      (LocaleCompare(extension,"wmz") == 0) ||
-      (LocaleCompare(extension,"svgz") == 0))
+  if (IsCompressedFileExtension(extension) != MagickFalse)
     {
       GetPathComponent(filename,RootPath,root);
       (void) CopyMagickString(filename,root,MagickPathExtent);
@@ -697,6 +702,26 @@ MagickPrivate void ExpandFilename(char *path)
   (void) CopyMagickString(path,expand_path,MagickPathExtent);
 }
 
+static void FormatExpandedPath(char *file_path,const char *magick,
+  const char *filename,const char *subimage)
+{
+  *file_path='\0';
+  if (*magick != '\0')
+    {
+      (void) ConcatenateMagickString(file_path,magick,
+        MagickPathExtent);
+      (void) ConcatenateMagickString(file_path,":",MagickPathExtent);
+    }
+  (void) ConcatenateMagickString(file_path,filename,MagickPathExtent);
+  if (*subimage != '\0')
+    {
+      (void) ConcatenateMagickString(file_path,"[",MagickPathExtent);
+      (void) ConcatenateMagickString(file_path,subimage,
+        MagickPathExtent);
+      (void) ConcatenateMagickString(file_path,"]",MagickPathExtent);
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -768,6 +793,14 @@ static inline void getcwd_utf8(char *path,size_t extent)
   (void) _wgetcwd(wide_path,MagickPathExtent-1);
   (void) WideCharToMultiByte(CP_UTF8,0,wide_path,-1,path,(int) extent,NULL,NULL);
 #endif
+}
+
+static inline MagickBooleanType IsTextMagick(const char *magick)
+{
+  return(((LocaleCompare(magick,"CAPTION") == 0) ||
+    (LocaleCompare(magick,"LABEL") == 0) ||
+    (LocaleCompare(magick,"PANGO") == 0) ||
+    (LocaleCompare(magick,"VID") == 0)) ? MagickTrue : MagickFalse);
 }
 
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
@@ -845,10 +878,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       continue;
     GetPathComponent(option,TailPath,filename);
     GetPathComponent(option,MagickPath,magick);
-    if ((LocaleCompare(magick,"CAPTION") == 0) ||
-        (LocaleCompare(magick,"LABEL") == 0) ||
-        (LocaleCompare(magick,"PANGO") == 0) ||
-        (LocaleCompare(magick,"VID") == 0))
+    if (IsTextMagick(magick) != MagickFalse)
       continue;
     if ((IsGlob(filename) == MagickFalse) && (*option != '@'))
       continue;
@@ -956,21 +986,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
           char
             file_path[MagickPathExtent];
 
-          *file_path='\0';
-          if (*magick != '\0')
-            {
-              (void) ConcatenateMagickString(file_path,magick,
-                MagickPathExtent);
-              (void) ConcatenateMagickString(file_path,":",MagickPathExtent);
-            }
-          (void) ConcatenateMagickString(file_path,filename,MagickPathExtent);
-          if (*subimage != '\0')
-            {
-              (void) ConcatenateMagickString(file_path,"[",MagickPathExtent);
-              (void) ConcatenateMagickString(file_path,subimage,
-                MagickPathExtent);
-              (void) ConcatenateMagickString(file_path,"]",MagickPathExtent);
-            }
+          FormatExpandedPath(file_path,magick,filename,subimage);
           if (strlen(file_path) >= (MagickPathExtent-1))
             ThrowFatalException(OptionFatalError,"FilenameTruncated");
           if (destroy != MagickFalse)
@@ -1259,6 +1275,22 @@ MagickExport MagickBooleanType GetPathAttributes(const char *path,
 %    o component: the selected file path component is returned here.
 %
 */
+static inline MagickBooleanType IsImageFormatPrefix(const char *component,
+  const char *p)
+{
+  return(((p != component) && (*p == ':') && (IsPathDirectory(component) < 0) &&
+    (IsPathAccessible(component) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsCompressionExtension(const char *extension)
+{
+  return(((LocaleCompare(extension,"bz2") == 0) ||
+    (LocaleCompare(extension,"gz") == 0) ||
+    (LocaleCompare(extension,"svgz") == 0) ||
+    (LocaleCompare(extension,"wmz") == 0) ||
+    (LocaleCompare(extension,"Z") == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1334,8 +1366,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
         if (*p == '\0')
           break;
       }
-    if ((p != component) && (*p == ':') && (IsPathDirectory(component) < 0) &&
-        (IsPathAccessible(component) == MagickFalse))
+    if (IsImageFormatPrefix(component,p) != MagickFalse)
       {
         /*
           Look for image format specification (e.g. ps3:image).
@@ -1418,11 +1449,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
         Base path sans any compression extension.
       */
       GetPathComponent(path,ExtensionPath,extension);
-      if ((LocaleCompare(extension,"bz2") == 0) ||
-          (LocaleCompare(extension,"gz") == 0) ||
-          (LocaleCompare(extension,"svgz") == 0) ||
-          (LocaleCompare(extension,"wmz") == 0) ||
-          (LocaleCompare(extension,"Z") == 0))
+      if (IsCompressionExtension(extension) != MagickFalse)
         GetPathComponent(path,BasePath,component);
       break;
     }

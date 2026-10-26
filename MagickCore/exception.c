@@ -265,6 +265,17 @@ MagickExport ExceptionInfo *CloneExceptionInfo(ExceptionInfo *exception)
   return(clone_exception);
 }
 
+static void PrintExceptionMessage(const char *reason,const char *description)
+{
+  if (reason == (char *) NULL)
+    return;
+  (void) FormatLocaleFile(stderr,"%s: %s",GetClientName(),reason);
+  if (description != (char *) NULL)
+    (void) FormatLocaleFile(stderr," (%s)",description);
+  (void) FormatLocaleFile(stderr,".\n");
+  (void) fflush(stderr);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -298,13 +309,7 @@ static void DefaultErrorHandler(const ExceptionType magick_unused(severity),
 {
   magick_unreferenced(severity);
 
-  if (reason == (char *) NULL)
-    return;
-  (void) FormatLocaleFile(stderr,"%s: %s",GetClientName(),reason);
-  if (description != (char *) NULL)
-    (void) FormatLocaleFile(stderr," (%s)",description);
-  (void) FormatLocaleFile(stderr,".\n");
-  (void) fflush(stderr);
+  PrintExceptionMessage(reason,description);
 }
 
 /*
@@ -382,13 +387,7 @@ static void DefaultWarningHandler(const ExceptionType magick_unused(severity),
 {
   magick_unreferenced(severity);
 
-  if (reason == (char *) NULL)
-    return;
-  (void) FormatLocaleFile(stderr,"%s: %s",GetClientName(),reason);
-  if (description != (char *) NULL)
-    (void) FormatLocaleFile(stderr," (%s)",description);
-  (void) FormatLocaleFile(stderr,".\n");
-  (void) fflush(stderr);
+  PrintExceptionMessage(reason,description);
 }
 
 /*
@@ -991,6 +990,16 @@ MagickExport WarningHandler SetWarningHandler(WarningHandler handler)
 %    o description: the exception description.
 %
 */
+static inline MagickBooleanType IsRepeatedException(const ExceptionInfo *p,
+  const ExceptionType severity,const ExceptionInfo *exception,
+  const char *reason,const char *description)
+{
+  return(((p != (ExceptionInfo *) NULL) && (p->severity == severity) &&
+    (LocaleCompare(exception->reason,reason) == 0) &&
+    (LocaleCompare(exception->description,description) == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
   const ExceptionType severity,const char *reason,const char *description)
 {
@@ -1019,9 +1028,8 @@ MagickExport MagickBooleanType ThrowException(ExceptionInfo *exception,
         }
     }
   p=(ExceptionInfo *) GetLastValueInLinkedList(exceptions);
-  if ((p != (ExceptionInfo *) NULL) && (p->severity == severity) &&
-      (LocaleCompare(exception->reason,reason) == 0) &&
-      (LocaleCompare(exception->description,description) == 0))
+  if (IsRepeatedException(p,severity,exception,reason,description) !=
+      MagickFalse)
     {
       UnlockSemaphoreInfo(exception->semaphore);
       return(MagickTrue);

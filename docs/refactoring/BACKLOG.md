@@ -111,7 +111,7 @@ needs before refactoring:
 | 2.45 | `MagickCore/stream.c` | 2832 | 78% | 74% | 3.10, in progress (Complex Conditional gone; StreamImagePixels needs a break-to-return recipe), [M28](tasks/M28-stream.md) |
 | 2.58 | `MagickCore/attribute.c` | 2444 | 75% | 73% | 2.97, in progress (Complex Conditional: one site left, in a parallel loop), [M27](tasks/M27-attribute.md) |
 | 3.06 | `MagickCore/paint.c` | 1299 | 85% | 74% | 3.33, in progress (Complex Conditional gone; OilPaint blocked by a local macro), [M47](tasks/M47-paint.md) |
-| 3.26 | `MagickCore/utility.c` | 2087 | 28% | 73% | open |
+| 3.26 | `MagickCore/utility.c` | 2087 | 28% | 73% | 3.65, in progress (Complex Conditional gone; rest is multi-output or platform #if), [M50](tasks/M50-utility.md) |
 | 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | 3.76, in progress (Throw* blocks pinned by __func__; StripMagickString return bug reported), [M49](tasks/M49-string.md) |
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
 | 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | open |
@@ -143,14 +143,14 @@ needs before refactoring:
 | 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | 4.45 (guard level, not ready; ReadImage and WriteImage left), [M48](tasks/M48-constitute.md) |
 | 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | 3.85, in progress (Complex Conditional: one sizeof site left), [M31](tasks/M31-policy.md) |
 | 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.13, in progress (Complex Conditional gone; out of the Red band), [M32](tasks/M32-type.md) |
-| 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | open |
-| 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | open |
-| 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | open |
+| 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | 5.13 (guard level; rest is #if-built or Recipe B), [M51](tasks/M51-resample.md) |
+| 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | 4.92 (mostly guard level; the rest needs D at oracle level or two-value D), [M52](tasks/M52-resource.md) |
+| 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | 4.62 (reuse of the new helpers needs D at oracle level), [M53](tasks/M53-splay-tree.md) |
 | 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | 4.43, in progress (Complex Conditional gone), [M33](tasks/M33-locale.md) |
-| 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | open |
+| 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | 5.02 (rest returns from inside or is #if-built), [M54](tasks/M54-token.md) |
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | open |
 | 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | open |
-| 5.88 | `MagickCore/exception.c` | 1158 | 88% | 66% | open |
+| 5.88 | `MagickCore/exception.c` | 1158 | 88% | 66% | 6.16 (severity table needs a lookup recipe; ThrowException repeat-test bug reported), [M55](tasks/M55-exception.md) |
 | 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | open |
 | 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | open |
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |
