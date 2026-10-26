@@ -2845,6 +2845,24 @@ static void ParseSceneRange(ImageInfo *image_info,const char *component)
 %
 */
 
+static MagickFormatType FindExplicitFormatType(const char *magic,
+  const char **format_type_formats,MagickFormatType format_type)
+{
+  ssize_t
+    i;
+
+  i=0;
+  while ((format_type == UndefinedFormatType) &&
+         (format_type_formats[i] != (char *) NULL))
+  {
+    if ((*magic == *format_type_formats[i]) &&
+        (LocaleCompare(magic,format_type_formats[i]) == 0))
+      format_type=ExplicitFormatType;
+    i++;
+  }
+  return(format_type);
+}
+
 static const MagickInfo *SetImageInfoFromExtension(ImageInfo *image_info,
   const char *component,char *magic,ExceptionInfo *exception)
 {
@@ -2853,9 +2871,6 @@ static const MagickInfo *SetImageInfoFromExtension(ImageInfo *image_info,
 
   MagickFormatType
     format_type;
-
-  ssize_t
-    i;
 
   static const char
     *format_type_formats[] =
@@ -2892,15 +2907,7 @@ static const MagickInfo *SetImageInfoFromExtension(ImageInfo *image_info,
   if ((magick_info != (const MagickInfo *) NULL) &&
       (magick_info->format_type != UndefinedFormatType))
     format_type=magick_info->format_type;
-  i=0;
-  while ((format_type == UndefinedFormatType) &&
-         (format_type_formats[i] != (char *) NULL))
-  {
-    if ((*magic == *format_type_formats[i]) &&
-        (LocaleCompare(magic,format_type_formats[i]) == 0))
-      format_type=ExplicitFormatType;
-    i++;
-  }
+  format_type=FindExplicitFormatType(magic,format_type_formats,format_type);
   if (format_type == UndefinedFormatType)
     (void) CopyMagickString(image_info->magick,magic,MagickPathExtent);
   else
