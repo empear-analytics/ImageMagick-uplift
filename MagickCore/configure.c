@@ -75,6 +75,15 @@ typedef struct _ConfigureMapInfo
     *value;
 } ConfigureMapInfo;
 
+typedef struct _ConfigureLoadTarget
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+} ConfigureLoadTarget;
+
 /*
   Static declarations.
 */
@@ -93,8 +102,8 @@ static MagickBooleanType
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
 static MagickBooleanType
-  LoadConfigureCache(LinkedListInfo *,const char *,const char *,const size_t,
-    ExceptionInfo *);
+  LoadConfigureCache(const ConfigureLoadTarget *,const char *,const char *,
+    const size_t);
 #endif
 
 /*
@@ -166,6 +175,8 @@ static LinkedListInfo *AcquireConfigureCache(const char *filename,
   cache=NewLinkedList(0);
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
+    const ConfigureLoadTarget target = { cache, exception };
+
     const StringInfo
       *option;
 
@@ -179,8 +190,8 @@ static LinkedListInfo *AcquireConfigureCache(const char *filename,
     option=(const StringInfo *) GetNextValueInLinkedList(options);
     while (option != (const StringInfo *) NULL)
     {
-      status=LoadConfigureCache(cache,(const char *)
-        GetStringInfoDatum(option),GetStringInfoPath(option),0,exception);
+      status=LoadConfigureCache(&target,(const char *)
+        GetStringInfoDatum(option),GetStringInfoPath(option),0);
       if (status == MagickTrue)
         break;
       option=(const StringInfo *) GetNextValueInLinkedList(options);
@@ -1140,19 +1151,19 @@ MagickExport MagickBooleanType ListConfigureInfo(FILE *file,
 %
 %  The format of the LoadConfigureCache method is:
 %
-%      MagickBooleanType LoadConfigureCache(LinkedListInfo *cache,
-%        const char *xml,const char *filename,const size_t depth,
-%        ExceptionInfo *exception)
+%      MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
+%        const char *xml,const char *filename,const size_t depth)
 %
 %  A description of each parameter follows:
+%
+%    o target: the cache to load into, and the exception structure to
+%      return any errors or warnings in.
 %
 %    o xml:  The configure list in XML format.
 %
 %    o filename:  The configure list filename.
 %
 %    o depth: depth of <include /> statements.
-%
-%    o exception: return any errors or warnings in this structure.
 %
 */
 static inline MagickBooleanType IsIncludeElementOpen(const char *token,
@@ -1162,10 +1173,15 @@ static inline MagickBooleanType IsIncludeElementOpen(const char *token,
     MagickTrue : MagickFalse);
 }
 
-static MagickBooleanType LoadConfigureCache(LinkedListInfo *cache,
-  const char *xml,const char *filename,const size_t depth,
-  ExceptionInfo *exception)
+static MagickBooleanType LoadConfigureCache(const ConfigureLoadTarget *target,
+  const char *xml,const char *filename,const size_t depth)
 {
+  LinkedListInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
   char
     keyword[MagickPathExtent],
     *token;
@@ -1267,6 +1283,9 @@ static MagickBooleanType LoadConfigureCache(LinkedListInfo *cache,
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
                 {
+                  const ConfigureLoadTarget include_target = { cache,
+                    exception };
+
                   char
                     path[MagickPathExtent],
                     *file_xml;
@@ -1282,8 +1301,8 @@ static MagickBooleanType LoadConfigureCache(LinkedListInfo *cache,
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=(MagickStatusType) LoadConfigureCache(cache,
-                        file_xml,path,depth+1,exception);
+                      status&=(MagickStatusType) LoadConfigureCache(
+                        &include_target,file_xml,path,depth+1);
                       file_xml=DestroyString(file_xml);
                     }
                 }
