@@ -4654,6 +4654,29 @@ MagickExport MagickBooleanType SigmoidalContrastImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ShiftChromaRow(const Image *image,const double a_mean,
+  const double b_mean,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      a,
+      b;
+
+    /*
+      Scale the chroma distance shifted according to amount of luminance.
+    */
+    a=(double) GetPixela(image,q)-1.1*(double) GetPixelL(image,q)*a_mean;
+    b=(double) GetPixelb(image,q)-1.1*(double) GetPixelL(image,q)*b_mean;
+    SetPixela(image,ClampToQuantum(a),q);
+    SetPixelb(image,ClampToQuantum(b),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4726,9 +4749,6 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -4737,21 +4757,7 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        a,
-        b;
-
-      /*
-        Scale the chroma distance shifted according to amount of luminance.
-      */
-      a=(double) GetPixela(image,q)-1.1*(double) GetPixelL(image,q)*a_mean;
-      b=(double) GetPixelb(image,q)-1.1*(double) GetPixelL(image,q)*b_mean;
-      SetPixela(image,ClampToQuantum(a),q);
-      SetPixelb(image,ClampToQuantum(b),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ShiftChromaRow(image,a_mean,b_mean,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
