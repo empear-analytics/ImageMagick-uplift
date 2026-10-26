@@ -132,6 +132,18 @@ typedef struct _ChannelLocationsReport
   const ChannelStatistics
     *channel_statistics;
 } ChannelLocationsReport;
+
+typedef struct _ChannelStatisticsReport
+{
+  FILE
+    *file;
+
+  double
+    scale;
+
+  const ChannelStatistics
+    *channel_statistics;
+} ChannelStatisticsReport;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -501,14 +513,22 @@ static ssize_t PrintChannelPerceptualHash(Image *image,FILE *file,
   return(n);
 }
 
-static ssize_t PrintChannelStatistics(FILE *file,const PixelChannel channel,
-  const char *name,const double scale,
-  const ChannelStatistics *channel_statistics)
+static ssize_t PrintChannelStatistics(const ChannelStatisticsReport *report,
+  const PixelChannel channel,const char *name)
 {
 #define StatisticsFormat "    %s:\n      min: %.*g  (%.*g)\n      " \
   "max: %.*g (%.*g)\n      mean: %.*g (%.*g)\n      median: %.*g (%.*g)\n      " \
   "standard deviation: %.*g (%.*g)\n      kurtosis: %.*g\n      " \
   "skewness: %.*g\n      entropy: %.*g\n"
+
+  FILE
+    *file = report->file;
+
+  const double
+    scale = report->scale;
+
+  const ChannelStatistics
+    *channel_statistics = report->channel_statistics;
 
   ssize_t
     n;
@@ -1451,6 +1471,9 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       if (image->depth <= MAGICKCORE_QUANTUM_DEPTH)
         scale=(double) (QuantumRange/((size_t) QuantumRange >> ((size_t)
           MAGICKCORE_QUANTUM_DEPTH-image->depth)));
+      const ChannelStatisticsReport report = { file, 1.0/scale,
+        channel_statistics };
+
       (void) FormatLocaleFile(file,"  Channel statistics:\n");
       (void) FormatLocaleFile(file,"    Pixels: %.17g\n",(double)
         image->columns*image->rows);
@@ -1460,38 +1483,31 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         case sRGBColorspace:
         {
           if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(file,RedPixelChannel,"Red",1.0/
-              scale,channel_statistics);
+            (void) PrintChannelStatistics(&report,RedPixelChannel,"Red");
           if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(file,GreenPixelChannel,"Green",1.0/
-              scale,channel_statistics);
+            (void) PrintChannelStatistics(&report,GreenPixelChannel,"Green");
           if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(file,BluePixelChannel,"Blue",1.0/
-              scale,channel_statistics);
+            (void) PrintChannelStatistics(&report,BluePixelChannel,"Blue");
           break;
         }
         case CMYKColorspace:
         {
           if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(file,CyanPixelChannel,"Cyan",1.0/
-              scale,channel_statistics);
+            (void) PrintChannelStatistics(&report,CyanPixelChannel,"Cyan");
           if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(file,MagentaPixelChannel,"Magenta",
-              1.0/scale,channel_statistics);
+            (void) PrintChannelStatistics(&report,MagentaPixelChannel,
+              "Magenta");
           if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(file,YellowPixelChannel,"Yellow",1.0/
-              scale,channel_statistics);
+            (void) PrintChannelStatistics(&report,YellowPixelChannel,"Yellow");
           if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(file,BlackPixelChannel,"Black",1.0/
-              scale,channel_statistics);
+            (void) PrintChannelStatistics(&report,BlackPixelChannel,"Black");
           break;
         }
         case LinearGRAYColorspace:
         case GRAYColorspace:
         {
           if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(file,GrayPixelChannel,"Gray",1.0/
-              scale,channel_statistics);
+            (void) PrintChannelStatistics(&report,GrayPixelChannel,"Gray");
           break;
         }
         default:
@@ -1507,25 +1523,22 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
               {
                 (void) FormatLocaleString(label,MagickPathExtent,
                   "Channel %.17g",(double) i);
-                (void) PrintChannelStatistics(file,channel,label,1.0/scale,
-                  channel_statistics);
+                (void) PrintChannelStatistics(&report,channel,label);
               }
           }
           break;
         }
       }
       if (image->alpha_trait != UndefinedPixelTrait)
-        (void) PrintChannelStatistics(file,AlphaPixelChannel,
-          "Alpha",1.0/scale,channel_statistics);
+        (void) PrintChannelStatistics(&report,AlphaPixelChannel,"Alpha");
       if ((image->channels & ReadMaskChannel) != 0)
-        (void) PrintChannelStatistics(file,ReadMaskPixelChannel,
-          "Read mask",1.0/scale,channel_statistics);
+        (void) PrintChannelStatistics(&report,ReadMaskPixelChannel,"Read mask");
       if ((image->channels & WriteMaskChannel) != 0)
-        (void) PrintChannelStatistics(file,WriteMaskPixelChannel,
-          "Write mask",1.0/scale,channel_statistics);
+        (void) PrintChannelStatistics(&report,WriteMaskPixelChannel,
+          "Write mask");
       if ((image->channels & CompositeMaskChannel) != 0)
-        (void) PrintChannelStatistics(file,WriteMaskPixelChannel,
-          "Composite mask",1.0/scale,channel_statistics);
+        (void) PrintChannelStatistics(&report,WriteMaskPixelChannel,
+          "Composite mask");
       if (image->number_meta_channels != 0)
         for (i=0; i < (ssize_t) image->number_meta_channels; i++)
         {
@@ -1537,15 +1550,14 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
 
           (void) FormatLocaleString(label,MagickPathExtent,
             "Meta channel[%.17g]",(double) i);
-          (void) PrintChannelStatistics(file,channel,label,1.0/scale,
-            channel_statistics);
+          (void) PrintChannelStatistics(&report,channel,label);
         }
       if ((colorspace != LinearGRAYColorspace) &&
           (colorspace != GRAYColorspace))
         {
           (void) FormatLocaleFile(file,"  Image statistics:\n");
-          (void) PrintChannelStatistics(file,CompositePixelChannel,"Overall",
-            1.0/scale,channel_statistics);
+          (void) PrintChannelStatistics(&report,CompositePixelChannel,
+            "Overall");
         }
       channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
         channel_statistics);
