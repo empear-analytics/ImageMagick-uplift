@@ -72,6 +72,21 @@
 #include "MagickCore/utility.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _QuantumPixelSpan
+{
+  MagickSizeType
+    number_pixels;
+
+  const Quantum
+    *magick_restrict p;
+
+  unsigned char
+    *magick_restrict q;
+} QuantumPixelSpan;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -656,9 +671,17 @@ static void ExportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -3761,6 +3784,8 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
   q=pixels;
   ResetQuantumState(quantum_info);
   extent=GetQuantumExtent(image,quantum_info,quantum_type);
+  const QuantumPixelSpan span = { number_pixels, p, q };
+
   switch (quantum_type)
   {
     case AlphaQuantum:
@@ -3775,7 +3800,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case BGRAQuantum:
     {
-      ExportBGRAQuantum(image,quantum_info,number_pixels,p,q);
+      ExportBGRAQuantum(image,quantum_info,&span);
       break;
     }
     case BGROQuantum:
