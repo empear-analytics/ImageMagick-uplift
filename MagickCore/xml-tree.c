@@ -481,11 +481,35 @@ static void DestroyXMLTreeOrdered(XMLTreeInfo *xml_info,
   }
 }
 
-static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
+static void DestroyXMLRootAttributes(XMLTreeRoot *root)
 {
   char
     **attributes;
 
+  ssize_t
+    i,
+    j;
+
+  for (i=0; root->attributes[i] != (char **) NULL; i++)
+  {
+    attributes=root->attributes[i];
+    if (attributes[0] != (char *) NULL)
+      attributes[0]=DestroyString(attributes[0]);
+    for (j=1; attributes[j] != (char *) NULL; j+=3)
+    {
+      if (attributes[j] != (char *) NULL)
+        attributes[j]=DestroyString(attributes[j]);
+      if (attributes[j+1] != (char *) NULL)
+        attributes[j+1]=DestroyString(attributes[j+1]);
+      if (attributes[j+2] != (char *) NULL)
+        attributes[j+2]=DestroyString(attributes[j+2]);
+    }
+    attributes=(char **) RelinquishMagickMemory(attributes);
+  }
+}
+
+static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
+{
   ssize_t
     i,
     j;
@@ -507,22 +531,7 @@ static void DestroyXMLTreeRoot(XMLTreeInfo *xml_info)
   for (i=NumberPredefinedEntities; root->entities[i] != (char *) NULL; i+=2)
     root->entities[i+1]=DestroyString(root->entities[i+1]);
   root->entities=(char **) RelinquishMagickMemory(root->entities);
-  for (i=0; root->attributes[i] != (char **) NULL; i++)
-  {
-    attributes=root->attributes[i];
-    if (attributes[0] != (char *) NULL)
-      attributes[0]=DestroyString(attributes[0]);
-    for (j=1; attributes[j] != (char *) NULL; j+=3)
-    {
-      if (attributes[j] != (char *) NULL)
-        attributes[j]=DestroyString(attributes[j]);
-      if (attributes[j+1] != (char *) NULL)
-        attributes[j+1]=DestroyString(attributes[j+1]);
-      if (attributes[j+2] != (char *) NULL)
-        attributes[j+2]=DestroyString(attributes[j+2]);
-    }
-    attributes=(char **) RelinquishMagickMemory(attributes);
-  }
+  DestroyXMLRootAttributes(root);
   if (root->attributes[0] != (char **) NULL)
     root->attributes=(char ***) RelinquishMagickMemory(root->attributes);
   if (root->processing_instructions[0] != (char **) NULL)
