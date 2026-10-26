@@ -2258,6 +2258,15 @@ MagickExport Image *ReferenceImage(Image *image)
 %    o page: the relative page specification.
 %
 */
+static void AddRelativePageOffset(Image *image,const MagickStatusType flags,
+  const RectangleInfo geometry)
+{
+  if ((flags & XValue) != 0)
+    image->page.x+=geometry.x;
+  if ((flags & YValue) != 0)
+    image->page.y+=geometry.y;
+}
+
 static void SetAbsolutePageOffset(Image *image,const MagickStatusType flags,
   const RectangleInfo geometry)
 {
@@ -2296,12 +2305,7 @@ MagickExport MagickBooleanType ResetImagePage(Image *image,const char *page)
       image->page.height=geometry.height;
     }
   if ((flags & AspectValue) != 0)
-    {
-      if ((flags & XValue) != 0)
-        image->page.x+=geometry.x;
-      if ((flags & YValue) != 0)
-        image->page.y+=geometry.y;
-    }
+    AddRelativePageOffset(image,flags,geometry);
   else
     SetAbsolutePageOffset(image,flags,geometry);
   return(MagickTrue);
