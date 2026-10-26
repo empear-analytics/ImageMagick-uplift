@@ -147,3 +147,15 @@ these functions, 0 diverged.
   mutation data for them first.
 - The duplicates reported after line 1080 are the `#else` stubs, which this build
   does not compile.
+
+### Addendum (2026-10-26, Mac, night): fresh mutation data
+
+PasskeyEncipherImage and PasskeyDecipherImage were mutated on the Mac tonight
+(`build-oracle/work/mutation-ciph-*.json`). Encipher is ready (27 of 33 killed) and
+Decipher careful (26 of 32). Both functions share their row-cipher block
+character for character: CTR mode enciphers the counter in both directions. But the
+unmatched survivors of both sit in that block's tail (the last `EncipherAESBlock` and
+the tail XOR loop over the final partial block), so Recipe D may not move it. The
+full-block loop alone hands `x` and `p` to the tail, which is two outputs. A case whose
+pixel row is not a multiple of 16 bytes, checked after a round trip, would kill those
+survivors and unlock the D.
