@@ -38,3 +38,14 @@ SyncAuthenticPixelCacheNexus, GetMedianPixel, WriteTo8BimProfile, CopyDelegateFi
 - The baseline cache for the new `main` (`ef0f98a05f`) had been recorded while a
   mutation run was loading the Mac.
 - The branch's whole-catalogue run therefore uses `--no-cache`.
+
+### Addendum: fresh mutation (2026-10-26, 15:57)
+
+xml-tree.c was mutated again on the Mac. The Mull build was `mull-guard95` and the
+report is `mutation-guard95-all.json`; the run used `--max-cases 300`.
+
+- GetXMLTreeAttribute: 5 of 5 killed, **ready**. That step now stands at oracle level.
+- DestroyXMLTreeRoot: 5 of 20 killed, 12 unobservable, 3 unmatched, **not ready**.
+  - The function only frees memory, so most mutants change nothing the oracle can see.
+  - Its two steps stay guard-level, as committed.
+  - A leak checker in the oracle would be needed to see this code.
