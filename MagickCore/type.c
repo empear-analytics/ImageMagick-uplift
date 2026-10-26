@@ -348,49 +348,42 @@ static inline MagickBooleanType IsSlantedStyleMatch(const TypeInfo *p,
     MagickTrue : MagickFalse);
 }
 
-MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
-  const StyleType style,const StretchType stretch,const size_t weight,
-  ExceptionInfo *exception)
+static size_t GetTypeScore(const TypeInfo *p,const StyleType style,
+  const StretchType stretch,const size_t font_weight)
 {
-  typedef struct _Fontmap
-  {
-    const char
-      name[17],
-      substitute[10];
-  } Fontmap;
+  size_t
+    score;
 
+  ssize_t
+    range;
+
+  score=0;
+  if (IsStyleMatch(p,style) != MagickFalse)
+    score+=32;
+  else
+    if (IsSlantedStyleMatch(p,style) != MagickFalse)
+      score+=25;
+  score+=(size_t) ((16L*(800L-((ssize_t) MagickMax(MagickMin(font_weight,900),
+    p->weight)-(ssize_t) MagickMin(MagickMin(font_weight,900),p->weight))))/
+    800L);
+  if ((stretch == UndefinedStretch) || (stretch == AnyStretch))
+    score+=8;
+  else
+    {
+      range=(ssize_t) UltraExpandedStretch-(ssize_t) NormalStretch;
+      score+=(size_t) ((ssize_t) (8L*(range-((ssize_t) MagickMax(stretch,
+        p->stretch)-(ssize_t) MagickMin(stretch,p->stretch))))/range);
+    }
+  return(score);
+}
+
+static const TypeInfo *GetExactTypeInfo(const char *family,
+  const StyleType style,const StretchType stretch,const size_t font_weight)
+{
   const TypeInfo
     *p,
     *type_info;
 
-  size_t
-    font_weight,
-    max_score,
-    score;
-
-  ssize_t
-    i,
-    range;
-
-  static const Fontmap
-    fontmap[] =
-    {
-      { "fixed", "courier" },
-      { "modern","courier" },
-      { "monotype corsiva", "courier" },
-      { "news gothic", "helvetica" },
-      { "system", "courier" },
-      { "terminal", "courier" },
-      { "wingdings", "symbol" }
-    };
-
-  /*
-    Check for an exact type match.
-  */
-  (void) GetTypeInfo("*",exception);
-  if (type_cache == (SplayTreeInfo *) NULL)
-    return((TypeInfo *) NULL);
-  font_weight=(size_t) (weight == 0 ? 400 : weight);
   LockSemaphoreInfo(type_semaphore);
   ResetSplayTreeIterator(type_cache);
   type_info=(const TypeInfo *) NULL;
@@ -436,6 +429,52 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
     break;
   }
   UnlockSemaphoreInfo(type_semaphore);
+  return(type_info);
+}
+
+MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
+  const StyleType style,const StretchType stretch,const size_t weight,
+  ExceptionInfo *exception)
+{
+  typedef struct _Fontmap
+  {
+    const char
+      name[17],
+      substitute[10];
+  } Fontmap;
+
+  const TypeInfo
+    *p,
+    *type_info;
+
+  size_t
+    font_weight,
+    max_score,
+    score;
+
+  ssize_t
+    i;
+
+  static const Fontmap
+    fontmap[] =
+    {
+      { "fixed", "courier" },
+      { "modern","courier" },
+      { "monotype corsiva", "courier" },
+      { "news gothic", "helvetica" },
+      { "system", "courier" },
+      { "terminal", "courier" },
+      { "wingdings", "symbol" }
+    };
+
+  /*
+    Check for an exact type match.
+  */
+  (void) GetTypeInfo("*",exception);
+  if (type_cache == (SplayTreeInfo *) NULL)
+    return((TypeInfo *) NULL);
+  font_weight=(size_t) (weight == 0 ? 400 : weight);
+  type_info=GetExactTypeInfo(family,style,stretch,font_weight);
   if (type_info != (const TypeInfo *) NULL)
     return(type_info);
   /*
@@ -467,23 +506,7 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
           p=(const TypeInfo *) GetNextValueInSplayTree(type_cache);
           continue;
         }
-    score=0;
-    if (IsStyleMatch(p,style) != MagickFalse)
-      score+=32;
-    else
-      if (IsSlantedStyleMatch(p,style) != MagickFalse)
-        score+=25;
-    score+=(size_t) ((16L*(800L-((ssize_t) MagickMax(MagickMin(font_weight,900),
-      p->weight)-(ssize_t) MagickMin(MagickMin(font_weight,900),p->weight))))/
-      800L);
-    if ((stretch == UndefinedStretch) || (stretch == AnyStretch))
-      score+=8;
-    else
-      {
-        range=(ssize_t) UltraExpandedStretch-(ssize_t) NormalStretch;
-        score+=(size_t) ((ssize_t) (8L*(range-((ssize_t) MagickMax(stretch,
-          p->stretch)-(ssize_t) MagickMin(stretch,p->stretch))))/range);
-      }
+    score=GetTypeScore(p,style,stretch,font_weight);
     if (score > max_score)
       {
         max_score=score;
