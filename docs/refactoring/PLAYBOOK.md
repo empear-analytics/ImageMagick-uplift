@@ -908,8 +908,104 @@ needed for this step. The extractions it unblocks keep their own evidence level.
 **Provenance:** 2026-10-26, from the local macros that pinned `HuffmanDecodeImage`,
 `HuffmanEncodeImage` and `LZWEncodeImage` (M68), `TransformSignature` (M61),
 `GenerateDifferentialNoise` (M74), `SyncExifProfile` (M69) and `GetEXIFProperty` (M41), and
-the local typedef in `GetImageFeatures` (M35), which is a separate shape and not covered.
+the local typedef in `GetImageFeatures` (M35), which is a separate shape (Recipe L).
 Added by Claude Code (Claude Opus 5.5) during task M84, under the mandate of 2026-10-24.
+
+---
+
+## Recipe L - Hoist Function-Local Types
+
+**Use when:** a function declares a `typedef` (a `struct` or an `enum`) at the top of its
+body, and the blocks Recipe E, O or K would move declare, read or write variables of that
+type. A helper outside the function cannot name the type, so every such block is pinned:
+`GetImageFeatures` (cc 180, all of its working variables are of its local
+`ChannelStatistics`), `ColorDecisionListImage`, `SyncExifProfile`, `GetEXIFProperty`.
+
+**Not covered by:** Recipe H, which moves preprocessor lines and is proven by an identical
+preprocessed text; a type that moves changes that text, and its scope ends at the
+function's closing brace, not at the end of the file. Recipe E, which moves statements and
+never declarations of types. No other recipe moves or renames a type.
+
+**How:**
+
+1. Take one `typedef` declaration that sits in the function's opening run of declarations
+   (before its first statement), with no initialiser and no storage class, and whose
+   members use only types declared at file scope or in headers.
+2. Move it, unchanged, to directly above the function's signature: below its comment
+   banner and below any helper or hoisted macro already placed there. Several such
+   typedefs move in their original order.
+3. Build. If the compiler reports that the tag, the typedef name or an enumerator is
+   already declared (in a header or elsewhere in the file), rename that name: prefix it
+   with a word from the function's name (`ChannelStatistics` in `GetImageFeatures` becomes
+   `FeatureStatistics`, `_ChannelStatistics` becomes `_FeatureStatistics`), and rename
+   every use inside the function. Choose a name that `grep` finds nowhere else in
+   `MagickCore/` and in the headers the file includes.
+4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`: the object file,
+   compiled with the build's own flags at `-g0`, is the same byte for byte. A use left
+   unrenamed in step 3 would name the other type and change the code; undo the step.
+5. Helpers that later use the type go between the hoisted type and the function.
+
+**Before:**
+
+```c
+MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
+  const size_t distance,ExceptionInfo *exception)
+{
+  typedef struct _ChannelStatistics
+  {
+    PixelInfo
+      direction[4];  /* horizontal, vertical, left and right diagonals */
+  } ChannelStatistics;
+
+  CacheView
+    *image_view;
+  ...
+  ChannelStatistics
+    **cooccurrence,
+```
+
+**After:**
+
+```c
+typedef struct _FeatureStatistics
+{
+  PixelInfo
+    direction[4];  /* horizontal, vertical, left and right diagonals */
+} FeatureStatistics;
+
+MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
+  const size_t distance,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+  ...
+  FeatureStatistics
+    **cooccurrence,
+```
+
+**Careful:**
+
+- The type's layout, its members' names and types, and every variable's type stay as they
+  were; only the place of the declaration and, in step 3, the type's own name change. The
+  local name in `GetImageFeatures` shadows the public `ChannelStatistics` of
+  `statistic.h`, which is why step 3 exists.
+- Do not hoist a typedef whose members use a local macro defined further down the body,
+  or another local type that stays behind: hoist those first (Recipe H, or this recipe).
+- A `static` table declared with the type (`property.c`'s `TagInfo` tables) stays where it
+  is; only the `typedef` moves.
+- The step changes little that Code Health measures (the function loses the typedef's
+  lines). It is kept under rule 2 only when the same task follows it with the extractions
+  it unblocks, and its commit names them.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL`. That is a
+proof of identity for the build, stronger than the oracle, so no readiness verdict is
+needed for this step. The extractions it unblocks keep their own evidence level.
+
+**Provenance:** 2026-10-26, from `GetImageFeatures` (M35, recorded there as blocked by its
+local typedef), with the same shape in `ColorDecisionListImage`, `SyncExifProfile`,
+`GetEXIFProperty` and `HaldClutImage`. A trial rename of the tag compiled to the same object file, and a planted
+`<` to `<=` was reported as differing. Added by Claude Code (Claude Opus 5.5) during task
+M90, under the mandate of 2026-10-24.
 
 ---
 
@@ -974,3 +1070,4 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
 | 2026-10-26 | NEW | H | Hoist Function-Local Macros: a run of `#define` lines at the top of a function body moves unchanged to directly above the function, proven by an identical preprocessed translation unit (`tools/pp_identical.sh`); the extractions it unblocks follow | Local macros pinned every block of `HuffmanDecodeImage`, `LZWEncodeImage`, `TransformSignature`, `GenerateDifferentialNoise` and `SyncExifProfile` (M61, M68, M69, M74); a trial hoist of `HuffmanDecodeImage`'s 31 lines preprocessed identically | mandate (2026-10-24) |
+| 2026-10-26 | NEW | L | Hoist Function-Local Types: a `typedef` at the top of a function body moves to directly above the function, renamed when its name is already declared at file scope, proven by an identical object file (`tools/obj_identical.sh`); the extractions it unblocks follow | `GetImageFeatures`' local `ChannelStatistics` (M35) pins every block of a cc-180 function; it shadows the public type of the same name. A trial rename compiled to the same object file; a planted `<` to `<=` was caught | mandate (2026-10-24) |
