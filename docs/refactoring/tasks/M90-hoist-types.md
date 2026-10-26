@@ -61,6 +61,21 @@ Function by function:
 - HaldClutImage: the four `status=InterpolatePixelInfo(...)` calls assign the shared
   `status` and `break`. That is neither E nor T.
 
+**Whole catalogue on the Mac** (`oracle.py run`, baseline `9afae6d183`): 15,884 cases,
+**1 diverged**: `gaps/c5651ffad8` (`driver logcfg: eight log maps in one file`), the
+catalogue defect M01 recorded. Its mechanism is now confirmed.
+- `LogInfoCompare` sorts by path first. Each build reads its configuration from its own
+  source tree:
+  - the candidate from the repository's `config/`;
+  - the base from `build-oracle/src/<sha>/config/`.
+- So the case's own `log.xml` sorts on opposite sides of the other file's entries. BSD
+  qsort then breaks the eight-way tie differently.
+- Swapping only the configuration path, with `oracle.run_case` and `source_dir_of`
+  patched, swaps the outputs: the base binary with the repository's path prints the
+  candidate's output, and the reverse.
+- The divergence therefore depends on where the source trees live, not on the code.
+  Running the base build from a source tree at the same depth would remove it.
+
 **A process note.** `tools/oracle/build.sh` sends compiler output to
 `build-oracle/cand/make.log`. A check that greps the script's own output sees no
 warnings. One step (`ApplyCDLToColormap`) left `i` unused, which only
