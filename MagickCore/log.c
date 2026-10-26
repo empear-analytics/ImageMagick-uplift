@@ -160,6 +160,15 @@ typedef struct _LogMapInfo
     *format;
 } LogMapInfo;
 
+typedef struct _LogLoadTarget
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+} LogLoadTarget;
+
 /*
   Static declarations.
 */
@@ -235,8 +244,8 @@ static MagickBooleanType
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
 static MagickBooleanType
-  LoadLogCache(LinkedListInfo *,const char *,const char *,const size_t,
-    ExceptionInfo *);
+  LoadLogCache(const LogLoadTarget *,const char *,const char *,
+    const size_t);
 #endif
 
 /*
@@ -284,6 +293,8 @@ static LinkedListInfo *AcquireLogCache(const char *filename,
   status=MagickTrue;
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
+    const LogLoadTarget target = { cache, exception };
+
     const StringInfo
       *option;
 
@@ -294,8 +305,8 @@ static LinkedListInfo *AcquireLogCache(const char *filename,
     option=(const StringInfo *) GetNextValueInLinkedList(options);
     while (option != (const StringInfo *) NULL)
     {
-      status&=(MagickStatusType) LoadLogCache(cache,(const char *)
-        GetStringInfoDatum(option),GetStringInfoPath(option),0,exception);
+      status&=(MagickStatusType) LoadLogCache(&target,(const char *)
+        GetStringInfoDatum(option),GetStringInfoPath(option),0);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
     }
     options=DestroyConfigureOptions(options);
@@ -894,10 +905,13 @@ MagickExport MagickBooleanType ListLogInfo(FILE *file,ExceptionInfo *exception)
 %
 %  The format of the LoadLogCache method is:
 %
-%      MagickBooleanType LoadLogCache(LinkedListInfo *cache,const char *xml,
-%        const char *filename,const size_t depth,ExceptionInfo *exception)
+%      MagickBooleanType LoadLogCache(const LogLoadTarget *target,
+%        const char *xml,const char *filename,const size_t depth)
 %
 %  A description of each parameter follows:
+%
+%    o target: the cache to load into, and the exception structure to
+%      return any errors or warnings in.
 %
 %    o xml:  The log list in XML format.
 %
@@ -905,12 +919,16 @@ MagickExport MagickBooleanType ListLogInfo(FILE *file,ExceptionInfo *exception)
 %
 %    o depth: depth of <include /> statements.
 %
-%    o exception: return any errors or warnings in this structure.
-%
 */
-static MagickBooleanType LoadLogCache(LinkedListInfo *cache,const char *xml,
-  const char *filename,const size_t depth,ExceptionInfo *exception)
+static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
+  const char *xml,const char *filename,const size_t depth)
 {
+  LinkedListInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
   char
     keyword[MagickPathExtent],
     *token;
@@ -1011,6 +1029,8 @@ static MagickBooleanType LoadLogCache(LinkedListInfo *cache,const char *xml,
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
                 {
+                  const LogLoadTarget include_target = { cache, exception };
+
                   char
                     path[MagickPathExtent],
                     *file_xml;
@@ -1026,8 +1046,8 @@ static MagickBooleanType LoadLogCache(LinkedListInfo *cache,const char *xml,
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=(MagickStatusType) LoadLogCache(cache,file_xml,
-                        path,depth+1,exception);
+                      status&=(MagickStatusType) LoadLogCache(
+                        &include_target,file_xml,path,depth+1);
                       file_xml=DestroyString(file_xml);
                     }
                 }
