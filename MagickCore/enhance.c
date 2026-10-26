@@ -2255,6 +2255,29 @@ static void EqualizeImageRow(const Image *image,const double *black,
   }
 }
 
+static void IntegrateEqualizeHistogram(const Image *image,
+  const double *histogram,double *map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      intensity;
+
+    ssize_t
+      j;
+
+    intensity=0.0;
+    for (j=0; j <= (ssize_t) MaxMap; j++)
+    {
+      intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
+      map[(ssize_t) GetPixelChannels(image)*j+i]=intensity;
+    }
+  }
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2335,21 +2358,7 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   /*
     Integrate the histogram to get the equalization map.
   */
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    double
-      intensity;
-
-    ssize_t
-      j;
-
-    intensity=0.0;
-    for (j=0; j <= (ssize_t) MaxMap; j++)
-    {
-      intensity+=histogram[(ssize_t) GetPixelChannels(image)*j+i];
-      map[(ssize_t) GetPixelChannels(image)*j+i]=intensity;
-    }
-  }
+  IntegrateEqualizeHistogram(image,histogram,map);
   (void) memset(equalize_map,0,(MaxMap+1)*GetPixelChannels(image)*
     sizeof(*equalize_map));
   (void) memset(black,0,sizeof(*black));
