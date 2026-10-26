@@ -925,6 +925,14 @@ RestoreMSCWarning \
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _TableType
+{
+  ssize_t
+    prefix,
+    suffix,
+    next;
+} TableType;
+
 MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
   unsigned char *magick_restrict pixels,ExceptionInfo *exception)
 {
@@ -941,14 +949,6 @@ MagickExport MagickBooleanType LZWEncodeImage(Image *image,const size_t length,
       number_bits-=8; \
     } \
 }
-
-  typedef struct _TableType
-  {
-    ssize_t
-      prefix,
-      suffix,
-      next;
-  } TableType;
 
   ssize_t
     i;
