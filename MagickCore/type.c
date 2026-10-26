@@ -377,48 +377,13 @@ static size_t GetTypeScore(const TypeInfo *p,const StyleType style,
   return(score);
 }
 
-MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
-  const StyleType style,const StretchType stretch,const size_t weight,
-  ExceptionInfo *exception)
+static const TypeInfo *GetExactTypeInfo(const char *family,
+  const StyleType style,const StretchType stretch,const size_t font_weight)
 {
-  typedef struct _Fontmap
-  {
-    const char
-      name[17],
-      substitute[10];
-  } Fontmap;
-
   const TypeInfo
     *p,
     *type_info;
 
-  size_t
-    font_weight,
-    max_score,
-    score;
-
-  ssize_t
-    i;
-
-  static const Fontmap
-    fontmap[] =
-    {
-      { "fixed", "courier" },
-      { "modern","courier" },
-      { "monotype corsiva", "courier" },
-      { "news gothic", "helvetica" },
-      { "system", "courier" },
-      { "terminal", "courier" },
-      { "wingdings", "symbol" }
-    };
-
-  /*
-    Check for an exact type match.
-  */
-  (void) GetTypeInfo("*",exception);
-  if (type_cache == (SplayTreeInfo *) NULL)
-    return((TypeInfo *) NULL);
-  font_weight=(size_t) (weight == 0 ? 400 : weight);
   LockSemaphoreInfo(type_semaphore);
   ResetSplayTreeIterator(type_cache);
   type_info=(const TypeInfo *) NULL;
@@ -464,6 +429,52 @@ MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
     break;
   }
   UnlockSemaphoreInfo(type_semaphore);
+  return(type_info);
+}
+
+MagickExport const TypeInfo *GetTypeInfoByFamily(const char *family,
+  const StyleType style,const StretchType stretch,const size_t weight,
+  ExceptionInfo *exception)
+{
+  typedef struct _Fontmap
+  {
+    const char
+      name[17],
+      substitute[10];
+  } Fontmap;
+
+  const TypeInfo
+    *p,
+    *type_info;
+
+  size_t
+    font_weight,
+    max_score,
+    score;
+
+  ssize_t
+    i;
+
+  static const Fontmap
+    fontmap[] =
+    {
+      { "fixed", "courier" },
+      { "modern","courier" },
+      { "monotype corsiva", "courier" },
+      { "news gothic", "helvetica" },
+      { "system", "courier" },
+      { "terminal", "courier" },
+      { "wingdings", "symbol" }
+    };
+
+  /*
+    Check for an exact type match.
+  */
+  (void) GetTypeInfo("*",exception);
+  if (type_cache == (SplayTreeInfo *) NULL)
+    return((TypeInfo *) NULL);
+  font_weight=(size_t) (weight == 0 ? 400 : weight);
+  type_info=GetExactTypeInfo(family,style,stretch,font_weight);
   if (type_info != (const TypeInfo *) NULL)
     return(type_info);
   /*
