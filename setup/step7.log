@@ -6768,3 +6768,8 @@ nohup: ignoring input
 21:00 fresh cipher:   killed 174, survived 0 (0 capped), no coverage 4, errors 0
 21:03 fresh semaphore:   killed 40, survived 0 (0 capped), no coverage 0, errors 0
 21:06 fresh magic:   killed 102, survived 1 (0 capped), no coverage 11, errors 0
+21:06 pushed
+21:06 fresh fourier:   killed 66, survived 0 (0 capped), no coverage 0, errors 0
+21:07 fresh distribute-cache:   killed 0, survived 0 (0 capped), no coverage 199, errors 0
+21:09 fresh configure:   killed 96, survived 19 (0 capped), no coverage 28, errors 0
+21:12 fresh coder:   killed 52, survived 1 (0 capped), no coverage 12, errors 0

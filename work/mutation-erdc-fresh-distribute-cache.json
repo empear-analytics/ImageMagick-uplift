@@ -1,0 +1,1992 @@
+[
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:199:31:199:32",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 199,
+  "col": 31,
+  "function": "distribute-cache.c:SetSocketReceiveTimeout",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_mul_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:199:51:199:52",
+  "mutator": "cxx_mul_to_div",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 199,
+  "col": 51,
+  "function": "distribute-cache.c:SetSocketReceiveTimeout",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:209:17:209:18",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 209,
+  "col": 17,
+  "function": "distribute-cache.c:dpc_receive",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:209:17:209:18",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 209,
+  "col": 17,
+  "function": "distribute-cache.c:dpc_receive",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:214:15:214:16",
+  "mutator": "cxx_gt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 214,
+  "col": 15,
+  "function": "distribute-cache.c:dpc_receive",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:214:15:214:16",
+  "mutator": "cxx_gt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 214,
+  "col": 15,
+  "function": "distribute-cache.c:dpc_receive",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:217:17:217:19",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 217,
+  "col": 17,
+  "function": "distribute-cache.c:dpc_receive",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:228:22:228:24",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 228,
+  "col": 22,
+  "function": "distribute-cache.c:dpc_receive",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:228:42:228:44",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 228,
+  "col": 42,
+  "function": "distribute-cache.c:dpc_receive",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:228:63:228:65",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 228,
+  "col": 63,
+  "function": "distribute-cache.c:dpc_receive",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:230:21:230:23",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 230,
+  "col": 21,
+  "function": "distribute-cache.c:dpc_receive",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:246:17:246:18",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 246,
+  "col": 17,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:246:17:246:18",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 246,
+  "col": 17,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:250:27:250:28",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 250,
+  "col": 27,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ge_to_gt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:258:13:258:15",
+  "mutator": "cxx_ge_to_gt",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 258,
+  "col": 13,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ge_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:258:13:258:15",
+  "mutator": "cxx_ge_to_lt",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 258,
+  "col": 13,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:260:19:260:20",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 260,
+  "col": 19,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:260:19:260:20",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 260,
+  "col": 19,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:262:5:262:44",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 262,
+  "col": 5,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:265:15:265:16",
+  "mutator": "cxx_gt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 265,
+  "col": 15,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:265:15:265:16",
+  "mutator": "cxx_gt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 265,
+  "col": 15,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:268:17:268:19",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 268,
+  "col": 17,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:280:22:280:24",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 280,
+  "col": 22,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:280:42:280:44",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 280,
+  "col": 42,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:280:63:280:65",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 280,
+  "col": 63,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:282:21:282:23",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 282,
+  "col": 21,
+  "function": "distribute-cache.c:dpc_receive_deadline",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:327:30:327:31",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 327,
+  "col": 30,
+  "function": "distribute-cache.c:ROTL",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:342:26:342:27",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 342,
+  "col": 26,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_rem_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:342:35:342:36",
+  "mutator": "cxx_rem_to_div",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 342,
+  "col": 35,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:357:19:357:21",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 357,
+  "col": 19,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:361:17:361:18",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 361,
+  "col": 17,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:361:17:361:18",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 361,
+  "col": 17,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:361:23:361:25",
+  "mutator": "cxx_post_inc_to_post_dec",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 361,
+  "col": 23,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:382:15:382:16",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 382,
+  "col": 15,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:382:15:382:16",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 382,
+  "col": 15,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:382:21:382:23",
+  "mutator": "cxx_post_inc_to_post_dec",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 382,
+  "col": 21,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:391:15:391:16",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 391,
+  "col": 15,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:391:15:391:16",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 391,
+  "col": 15,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:391:21:391:23",
+  "mutator": "cxx_post_inc_to_post_dec",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 391,
+  "col": 21,
+  "function": "distribute-cache.c:SIPHash24",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:413:15:413:16",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 413,
+  "col": 15,
+  "function": "distribute-cache.c:DeriveSIPKeyFromSecret",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:413:15:413:16",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 413,
+  "col": 15,
+  "function": "distribute-cache.c:DeriveSIPKeyFromSecret",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:413:26:413:28",
+  "mutator": "cxx_post_inc_to_post_dec",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 413,
+  "col": 26,
+  "function": "distribute-cache.c:DeriveSIPKeyFromSecret",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_mul_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:420:33:420:34",
+  "mutator": "cxx_mul_to_div",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 420,
+  "col": 33,
+  "function": "distribute-cache.c:DeriveSIPKeyFromSecret",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:433:3:433:44",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 433,
+  "col": 3,
+  "function": "distribute-cache.c:GenerateSessionKey",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:475:14:475:16",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 475,
+  "col": 14,
+  "function": "distribute-cache.c:ConnectPixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:483:21:483:23",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 483,
+  "col": 21,
+  "function": "distribute-cache.c:ConnectPixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:485:7:485:27",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 485,
+  "col": 7,
+  "function": "distribute-cache.c:ConnectPixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:493:3:493:23",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 493,
+  "col": 3,
+  "function": "distribute-cache.c:ConnectPixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:494:14:494:16",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 494,
+  "col": 14,
+  "function": "distribute-cache.c:ConnectPixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:507:13:507:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 507,
+  "col": 13,
+  "function": "distribute-cache.c:ConnectPixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:520:21:520:23",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 520,
+  "col": 21,
+  "function": "distribute-cache.c:ConnectPixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:534:13:534:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 534,
+  "col": 13,
+  "function": "distribute-cache.c:ConnectPixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:570:13:570:15",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 570,
+  "col": 13,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:578:17:578:19",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 578,
+  "col": 17,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:578:45:578:46",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 578,
+  "col": 45,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:578:49:578:51",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 578,
+  "col": 49,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:584:38:584:39",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 584,
+  "col": 38,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:585:23:585:25",
+  "mutator": "cxx_post_inc_to_post_dec",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 585,
+  "col": 23,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_rem_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:585:26:585:27",
+  "mutator": "cxx_rem_to_div",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 585,
+  "col": 26,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_add_to_sub:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:585:39:585:40",
+  "mutator": "cxx_add_to_sub",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 585,
+  "col": 39,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:588:15:588:16",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 588,
+  "col": 15,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:588:15:588:16",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 588,
+  "col": 15,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:588:34:588:36",
+  "mutator": "cxx_post_inc_to_post_dec",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 588,
+  "col": 34,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:593:16:593:18",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 593,
+  "col": 16,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:599:19:599:21",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 599,
+  "col": 19,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:603:15:603:16",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 603,
+  "col": 15,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:603:15:603:16",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 603,
+  "col": 15,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:603:34:603:36",
+  "mutator": "cxx_post_inc_to_post_dec",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 603,
+  "col": 34,
+  "function": "distribute-cache.c:GetHostname",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:633:25:633:27",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 633,
+  "col": 25,
+  "function": "AcquireDistributeCacheInfo",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:639:59:639:61",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 639,
+  "col": 59,
+  "function": "AcquireDistributeCacheInfo",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ge_to_gt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:676:25:676:27",
+  "mutator": "cxx_ge_to_gt",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 676,
+  "col": 25,
+  "function": "DestroyDistributeCacheInfo",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ge_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:676:25:676:27",
+  "mutator": "cxx_ge_to_lt",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 676,
+  "col": 25,
+  "function": "DestroyDistributeCacheInfo",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:734:15:734:16",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 734,
+  "col": 15,
+  "function": "distribute-cache.c:dpc_send",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:734:15:734:16",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 734,
+  "col": 15,
+  "function": "distribute-cache.c:dpc_send",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_le_to_gt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:739:15:739:17",
+  "mutator": "cxx_le_to_gt",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 739,
+  "col": 15,
+  "function": "distribute-cache.c:dpc_send",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_le_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:739:15:739:17",
+  "mutator": "cxx_le_to_lt",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 739,
+  "col": 15,
+  "function": "distribute-cache.c:dpc_send",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:742:19:742:21",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 742,
+  "col": 19,
+  "function": "distribute-cache.c:dpc_send",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:797:13:797:15",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 797,
+  "col": 13,
+  "function": "distribute-cache.c:OpenDistributeCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:804:13:804:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 804,
+  "col": 13,
+  "function": "distribute-cache.c:OpenDistributeCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:832:44:832:46",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 832,
+  "col": 44,
+  "function": "distribute-cache.c:OpenDistributeCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:838:14:838:16",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 838,
+  "col": 14,
+  "function": "distribute-cache.c:OpenDistributeCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:854:76:854:78",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 854,
+  "col": 76,
+  "function": "distribute-cache.c:ValidateDistributedPixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:856:64:856:66",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 856,
+  "col": 64,
+  "function": "distribute-cache.c:ValidateDistributedPixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:858:14:858:15",
+  "mutator": "cxx_gt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 858,
+  "col": 14,
+  "function": "distribute-cache.c:ValidateDistributedPixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:858:14:858:15",
+  "mutator": "cxx_gt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 858,
+  "col": 14,
+  "function": "distribute-cache.c:ValidateDistributedPixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:898:13:898:15",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 898,
+  "col": 13,
+  "function": "distribute-cache.c:ReadDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:903:13:903:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 903,
+  "col": 13,
+  "function": "distribute-cache.c:ReadDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_mul_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:916:40:916:41",
+  "mutator": "cxx_mul_to_div",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 916,
+  "col": 40,
+  "function": "distribute-cache.c:ReadDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:917:63:917:65",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 917,
+  "col": 63,
+  "function": "distribute-cache.c:ReadDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:921:9:921:11",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 921,
+  "col": 9,
+  "function": "distribute-cache.c:ReadDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:925:13:925:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 925,
+  "col": 13,
+  "function": "distribute-cache.c:ReadDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:962:13:962:15",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 962,
+  "col": 13,
+  "function": "distribute-cache.c:ReadDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:967:13:967:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 967,
+  "col": 13,
+  "function": "distribute-cache.c:ReadDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_mul_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:979:35:979:36",
+  "mutator": "cxx_mul_to_div",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 979,
+  "col": 35,
+  "function": "distribute-cache.c:ReadDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:980:63:980:65",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 980,
+  "col": 63,
+  "function": "distribute-cache.c:ReadDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:985:9:985:11",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 985,
+  "col": 9,
+  "function": "distribute-cache.c:ReadDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:988:13:988:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 988,
+  "col": 13,
+  "function": "distribute-cache.c:ReadDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1032:13:1032:15",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1032,
+  "col": 13,
+  "function": "distribute-cache.c:WriteDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1037:13:1037:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1037,
+  "col": 13,
+  "function": "distribute-cache.c:WriteDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_mul_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1049:40:1049:41",
+  "mutator": "cxx_mul_to_div",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1049,
+  "col": 40,
+  "function": "distribute-cache.c:WriteDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1050:63:1050:65",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1050,
+  "col": 63,
+  "function": "distribute-cache.c:WriteDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1055:9:1055:11",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1055,
+  "col": 9,
+  "function": "distribute-cache.c:WriteDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1059:13:1059:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1059,
+  "col": 13,
+  "function": "distribute-cache.c:WriteDistributeCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1096:13:1096:15",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1096,
+  "col": 13,
+  "function": "distribute-cache.c:WriteDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1101:13:1101:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1101,
+  "col": 13,
+  "function": "distribute-cache.c:WriteDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_mul_to_div:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1113:35:1113:36",
+  "mutator": "cxx_mul_to_div",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1113,
+  "col": 35,
+  "function": "distribute-cache.c:WriteDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1114:63:1114:65",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1114,
+  "col": 63,
+  "function": "distribute-cache.c:WriteDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1119:9:1119:11",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1119,
+  "col": 9,
+  "function": "distribute-cache.c:WriteDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1122:13:1122:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1122,
+  "col": 13,
+  "function": "distribute-cache.c:WriteDistributeCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1129:21:1129:23",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1129,
+  "col": 21,
+  "function": "distribute-cache.c:LockDPCSemaphore",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1130:5:1130:42",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1130,
+  "col": 5,
+  "function": "distribute-cache.c:LockDPCSemaphore",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1131:3:1131:35",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1131,
+  "col": 3,
+  "function": "distribute-cache.c:LockDPCSemaphore",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1136:3:1136:21",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1136,
+  "col": 3,
+  "function": "distribute-cache.c:AuthenticateDPCClient",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1137:35:1137:37",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1137,
+  "col": 35,
+  "function": "distribute-cache.c:AuthenticateDPCClient",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1139:3:1139:37",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1139,
+  "col": 3,
+  "function": "distribute-cache.c:AuthenticateDPCClient",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1144:3:1144:21",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1144,
+  "col": 3,
+  "function": "distribute-cache.c:RelinquishDPCClient",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1145:24:1145:26",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1145,
+  "col": 24,
+  "function": "distribute-cache.c:RelinquishDPCClient",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1145:72:1145:74",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1145,
+  "col": 72,
+  "function": "distribute-cache.c:RelinquishDPCClient",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1147:19:1147:21",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1147,
+  "col": 19,
+  "function": "distribute-cache.c:RelinquishDPCClient",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1149:3:1149:37",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1149,
+  "col": 3,
+  "function": "distribute-cache.c:RelinquishDPCClient",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1203:13:1203:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1203,
+  "col": 13,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1206:7:1206:38",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1206,
+  "col": 7,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_add_to_sub:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1213:35:1213:36",
+  "mutator": "cxx_add_to_sub",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1213,
+  "col": 35,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1214:14:1214:16",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1214,
+  "col": 14,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1214:57:1214:59",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1214,
+  "col": 57,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1217:7:1217:38",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1217,
+  "col": 7,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1220:3:1220:26",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1220,
+  "col": 3,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_add_to_sub:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1234:37:1234:38",
+  "mutator": "cxx_add_to_sub",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1234,
+  "col": 37,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_le_to_gt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1235:15:1235:17",
+  "mutator": "cxx_le_to_gt",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1235,
+  "col": 15,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_le_to_lt:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1235:15:1235:17",
+  "mutator": "cxx_le_to_lt",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1235,
+  "col": 15,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_add_to_sub:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1238:37:1238:38",
+  "mutator": "cxx_add_to_sub",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1238,
+  "col": 37,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1239:16:1239:18",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1239,
+  "col": 16,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1239:59:1239:61",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1239,
+  "col": 59,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1282:17:1282:19",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1282,
+  "col": 17,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1282:45:1282:47",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1282,
+  "col": 45,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1289:3:1290:17",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1289,
+  "col": 3,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1289:37:1289:39",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1289,
+  "col": 37,
+  "function": "distribute-cache.c:DistributePixelCacheConnectionHandler",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1297:18:1297:20",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1297,
+  "col": 18,
+  "function": "distribute-cache.c:IsUsablePolicyLimit",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1297:30:1297:32",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1297,
+  "col": 30,
+  "function": "distribute-cache.c:IsUsablePolicyLimit",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1298:19:1298:21",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1298,
+  "col": 19,
+  "function": "distribute-cache.c:IsUsablePolicyLimit",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1313:20:1313:22",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1313,
+  "col": 20,
+  "function": "distribute-cache.c:GetDPCPolicyLimit",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1323:60:1323:62",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1323,
+  "col": 60,
+  "function": "distribute-cache.c:GetDPCPolicyLimit",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1359:3:1359:21",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1359,
+  "col": 3,
+  "function": "distribute-cache.c:AcquireDPCClientWorker",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1360:20:1360:21",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1360,
+  "col": 20,
+  "function": "distribute-cache.c:AcquireDPCClientWorker",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1360:20:1360:21",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1360,
+  "col": 20,
+  "function": "distribute-cache.c:AcquireDPCClientWorker",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1361:36:1361:37",
+  "mutator": "cxx_lt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1361,
+  "col": 36,
+  "function": "distribute-cache.c:AcquireDPCClientWorker",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_lt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1361:36:1361:37",
+  "mutator": "cxx_lt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1361,
+  "col": 36,
+  "function": "distribute-cache.c:AcquireDPCClientWorker",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1363:18:1363:20",
+  "mutator": "cxx_post_inc_to_post_dec",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1363,
+  "col": 18,
+  "function": "distribute-cache.c:AcquireDPCClientWorker",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_post_inc_to_post_dec:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1364:34:1364:36",
+  "mutator": "cxx_post_inc_to_post_dec",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1364,
+  "col": 34,
+  "function": "distribute-cache.c:AcquireDPCClientWorker",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1367:3:1367:37",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1367,
+  "col": 3,
+  "function": "distribute-cache.c:AcquireDPCClientWorker",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1413:25:1413:27",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1413,
+  "col": 25,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1424:14:1424:16",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1424,
+  "col": 14,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1427:20:1427:22",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1427,
+  "col": 20,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1434:23:1434:25",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1434,
+  "col": 23,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1438:16:1438:18",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1438,
+  "col": 16,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1443:5:1443:47",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1443,
+  "col": 5,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1445:16:1445:18",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1445,
+  "col": 16,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1452:9:1452:11",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1452,
+  "col": 9,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1454:3:1454:23",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1454,
+  "col": 3,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1456:14:1456:16",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1456,
+  "col": 14,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1471:27:1471:29",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1471,
+  "col": 27,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1475:28:1475:30",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1475,
+  "col": 28,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1481:34:1481:36",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1481,
+  "col": 34,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1488:5:1488:52",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1488,
+  "col": 5,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_eq_to_ne:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1489:16:1489:18",
+  "mutator": "cxx_eq_to_ne",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1489,
+  "col": 16,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1492:9:1492:40",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1492,
+  "col": 9,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1500:16:1500:18",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1500,
+  "col": 16,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1503:9:1503:40",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1503,
+  "col": 9,
+  "function": "DistributePixelCacheServer",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1552:25:1552:27",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1552,
+  "col": 25,
+  "function": "DistributeCacheTerminus",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1554:21:1554:23",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1554,
+  "col": 21,
+  "function": "DistributeCacheTerminus",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_remove_void_call:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1555:5:1555:44",
+  "mutator": "cxx_remove_void_call",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1555,
+  "col": 5,
+  "function": "DistributeCacheTerminus",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1722:55:1722:56",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1722,
+  "col": 55,
+  "function": "OpenDistributePixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1723:13:1723:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1723,
+  "col": 13,
+  "function": "OpenDistributePixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1723:37:1723:38",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1723,
+  "col": 37,
+  "function": "OpenDistributePixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1727:13:1727:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1727,
+  "col": 13,
+  "function": "OpenDistributePixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1783:14:1783:15",
+  "mutator": "cxx_gt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1783,
+  "col": 14,
+  "function": "ReadDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1783:14:1783:15",
+  "mutator": "cxx_gt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1783,
+  "col": 14,
+  "function": "ReadDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1799:55:1799:56",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1799,
+  "col": 55,
+  "function": "ReadDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1800:13:1800:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1800,
+  "col": 13,
+  "function": "ReadDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1800:37:1800:38",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1800,
+  "col": 37,
+  "function": "ReadDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1856:14:1856:15",
+  "mutator": "cxx_gt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1856,
+  "col": 14,
+  "function": "ReadDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1856:14:1856:15",
+  "mutator": "cxx_gt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1856,
+  "col": 14,
+  "function": "ReadDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1872:55:1872:56",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1872,
+  "col": 55,
+  "function": "ReadDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1873:13:1873:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1873,
+  "col": 13,
+  "function": "ReadDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1873:37:1873:38",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1873,
+  "col": 37,
+  "function": "ReadDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1924:55:1924:56",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1924,
+  "col": 55,
+  "function": "RelinquishDistributePixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1925:13:1925:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1925,
+  "col": 13,
+  "function": "RelinquishDistributePixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1925:37:1925:38",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1925,
+  "col": 37,
+  "function": "RelinquishDistributePixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1929:13:1929:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1929,
+  "col": 13,
+  "function": "RelinquishDistributePixelCache",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1985:14:1985:15",
+  "mutator": "cxx_gt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1985,
+  "col": 14,
+  "function": "WriteDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:1985:14:1985:15",
+  "mutator": "cxx_gt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 1985,
+  "col": 14,
+  "function": "WriteDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:2001:55:2001:56",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 2001,
+  "col": 55,
+  "function": "WriteDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:2002:13:2002:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 2002,
+  "col": 13,
+  "function": "WriteDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:2002:37:2002:38",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 2002,
+  "col": 37,
+  "function": "WriteDistributePixelCacheMetacontent",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_ge:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:2059:14:2059:15",
+  "mutator": "cxx_gt_to_ge",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 2059,
+  "col": 14,
+  "function": "WriteDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_gt_to_le:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:2059:14:2059:15",
+  "mutator": "cxx_gt_to_le",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 2059,
+  "col": 14,
+  "function": "WriteDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:2075:55:2075:56",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 2075,
+  "col": 55,
+  "function": "WriteDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_ne_to_eq:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:2076:13:2076:15",
+  "mutator": "cxx_ne_to_eq",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 2076,
+  "col": 13,
+  "function": "WriteDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ },
+ {
+  "id": "cxx_sub_to_add:/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c:2076:37:2076:38",
+  "mutator": "cxx_sub_to_add",
+  "file": "/home/jovyan/imagemagick-mutation/ImageMagick/MagickCore/distribute-cache.c",
+  "line": 2076,
+  "col": 37,
+  "function": "WriteDistributePixelCachePixels",
+  "status": "no-coverage",
+  "cases": 0
+ }
+]

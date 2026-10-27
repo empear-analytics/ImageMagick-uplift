@@ -1,0 +1,16 @@
+mutate: 66 mutants in MagickCore/fourier\.c$, 3 functions
+mutate: baseline over 11 cases in 1s
+  mutants: 25/66 (0s)
+  mutants: 50/66 (0s)
+  mutants: 66/66 (1s)
+
+mutate: 66 mutants, 1s
+  killed 66, survived 0 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 100.0%   overall: 100.0%
+
+  function                           total killed survived no-cov
+  ComplexImages                         58     58        0      0
+  IsComplexRowMissing                    6      6        0      0
+  InverseFourierTransformImage           2      2        0      0
+
+  full results: build-oracle/work/mutation-fresh-fourier.json

@@ -1,0 +1,50 @@
+mutate: 199 mutants in MagickCore/distribute-cache\.c$, 33 functions
+mutate: baseline over 0 cases in 1s
+  mutants: 25/199 (0s)
+  mutants: 50/199 (0s)
+  mutants: 75/199 (0s)
+  mutants: 100/199 (0s)
+  mutants: 125/199 (0s)
+  mutants: 150/199 (0s)
+  mutants: 175/199 (0s)
+  mutants: 199/199 (0s)
+
+mutate: 199 mutants, 0s
+  killed 0, survived 0 (0 capped), no coverage 199, errors 0
+
+  function                           total killed survived no-cov
+  DistributePixelCacheServer            18      0        0     18
+  DistributePixelCacheConnectionHand    17      0        0     17
+  GetHostname                           16      0        0     16
+  dpc_receive_deadline                  15      0        0     15
+  SIPHash24                             12      0        0     12
+  dpc_receive                            9      0        0      9
+  ConnectPixelCacheServer                8      0        0      8
+  AcquireDPCClientWorker                 8      0        0      8
+  ReadDistributeCacheMetacontent         6      0        0      6
+  ReadDistributeCachePixels              6      0        0      6
+  WriteDistributeCacheMetacontent        6      0        0      6
+  WriteDistributeCachePixels             6      0        0      6
+  dpc_send                               5      0        0      5
+  RelinquishDPCClient                    5      0        0      5
+  ReadDistributePixelCacheMetaconten     5      0        0      5
+  ReadDistributePixelCachePixels         5      0        0      5
+  WriteDistributePixelCacheMetaconte     5      0        0      5
+  WriteDistributePixelCachePixels        5      0        0      5
+  DeriveSIPKeyFromSecret                 4      0        0      4
+  OpenDistributeCache                    4      0        0      4
+  ValidateDistributedPixelCache          4      0        0      4
+  OpenDistributePixelCache               4      0        0      4
+  RelinquishDistributePixelCache         4      0        0      4
+  LockDPCSemaphore                       3      0        0      3
+  AuthenticateDPCClient                  3      0        0      3
+  IsUsablePolicyLimit                    3      0        0      3
+  DistributeCacheTerminus                3      0        0      3
+  SetSocketReceiveTimeout                2      0        0      2
+  AcquireDistributeCacheInfo             2      0        0      2
+  DestroyDistributeCacheInfo             2      0        0      2
+  GetDPCPolicyLimit                      2      0        0      2
+  ROTL                                   1      0        0      1
+  GenerateSessionKey                     1      0        0      1
+
+  full results: build-oracle/work/mutation-fresh-distribute-cache.json
