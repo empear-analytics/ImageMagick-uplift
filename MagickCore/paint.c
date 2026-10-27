@@ -722,6 +722,41 @@ static size_t **AcquireHistogramTLS(const size_t count)
 #define NumberPaintBins  256
 #define OilPaintImageTag  "OilPaint/Image"
 
+static ssize_t GetMostFrequentOffset(const Image *linear_image,
+  const Quantum *magick_restrict p,size_t *histogram,const size_t width)
+{
+  size_t
+    count;
+
+  ssize_t
+    j,
+    k,
+    n,
+    u,
+    v;
+
+  k=0;
+  j=0;
+  count=0;
+  (void) memset(histogram,0,NumberPaintBins* sizeof(*histogram));
+  for (v=0; v < (ssize_t) width; v++)
+  {
+    for (u=0; u < (ssize_t) width; u++)
+    {
+      n=(ssize_t) ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(
+        linear_image,p+(ssize_t) GetPixelChannels(linear_image)*(u+k))));
+      histogram[n]++;
+      if (histogram[n] > count)
+        {
+          j=k+u;
+          count=histogram[n];
+        }
+    }
+    k+=(ssize_t) (linear_image->columns+width);
+  }
+  return(j);
+}
+
 MagickExport Image *OilPaintImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -822,40 +857,15 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
     for (x=0; x < (ssize_t) linear_image->columns; x++)
     {
       ssize_t
-        i,
-        u;
-
-      size_t
-        count;
+        i;
 
       ssize_t
-        j,
-        k,
-        n,
-        v;
+        j;
 
       /*
         Assign most frequent color.
       */
-      k=0;
-      j=0;
-      count=0;
-      (void) memset(histogram,0,NumberPaintBins* sizeof(*histogram));
-      for (v=0; v < (ssize_t) width; v++)
-      {
-        for (u=0; u < (ssize_t) width; u++)
-        {
-          n=(ssize_t) ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(
-            linear_image,p+(ssize_t) GetPixelChannels(linear_image)*(u+k))));
-          histogram[n]++;
-          if (histogram[n] > count)
-            {
-              j=k+u;
-              count=histogram[n];
-            }
-        }
-        k+=(ssize_t) (linear_image->columns+width);
-      }
+      j=GetMostFrequentOffset(linear_image,p,histogram,width);
       for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
       {
         PixelChannel channel = GetPixelChannelChannel(linear_image,i);
