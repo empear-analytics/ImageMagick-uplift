@@ -2578,6 +2578,22 @@ static void SetDeviceColorspace(const char *name,char *colorspace,
   *icc_color=MagickTrue;
 }
 
+static void SetICCColorspace(const char *name,char *colorspace,ssize_t *i,
+  double *scale,MagickBooleanType *icc_color)
+{
+  ssize_t
+    j;
+
+  (void) CopyMagickString(colorspace,name+(*i)+2,MagickPathExtent);
+  for (j=0; colorspace[j] != '\0'; j++)
+    if ((colorspace[j] == ' ') || (colorspace[j] == ','))
+      break;
+  colorspace[j--]='\0';
+  *i+=j+3;
+  *scale=(double) QuantumRange;
+  *icc_color=MagickTrue;
+}
+
 static MagickBooleanType QueryColorFunction(const char *name,
   const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2612,19 +2628,7 @@ static MagickBooleanType QueryColorFunction(const char *name,
     SetDeviceColorspace(name,colorspace,&scale,&icc_color);
   if ((LocaleCompare(colorspace,"color") == 0) ||
       (LocaleCompare(colorspace,"icc-color") == 0))
-    {
-      ssize_t
-        j;
-
-      (void) CopyMagickString(colorspace,name+i+2,MagickPathExtent);
-      for (j=0; colorspace[j] != '\0'; j++)
-        if ((colorspace[j] == ' ') || (colorspace[j] == ','))
-          break;
-      colorspace[j--]='\0';
-      i+=j+3;
-      scale=(double) QuantumRange;
-      icc_color=MagickTrue;
-    }
+    SetICCColorspace(name,colorspace,&i,&scale,&icc_color);
   LocaleLower(colorspace);
   color->alpha_trait=UndefinedPixelTrait;
   if ((i > 0) && (colorspace[i] == 'a'))
