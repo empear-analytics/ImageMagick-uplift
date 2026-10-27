@@ -6720,3 +6720,9 @@ nohup: ignoring input
 19:12 fresh option:   killed 119, survived 0 (0 capped), no coverage 16, errors 0
 19:15 fresh mime:   killed 136, survived 8 (0 capped), no coverage 3, errors 0
 19:20 fresh feature:   killed 850, survived 0 (0 capped), no coverage 2, errors 0
+19:20 pushed
+19:23 fresh composite:   killed 1307, survived 9 (0 capped), no coverage 0, errors 0
+19:26 fresh type:   killed 239, survived 4 (0 capped), no coverage 15, errors 0
+19:29 fresh delegate:   killed 306, survived 9 (0 capped), no coverage 15, errors 0
+19:33 fresh compress:   killed 234, survived 0 (0 capped), no coverage 0, errors 0
+19:36 fresh threshold:   killed 579, survived 1 (0 capped), no coverage 0, errors 0

@@ -1,0 +1,34 @@
+mutate: 234 mutants in MagickCore/compress\.c$, 14 functions
+mutate: baseline over 111 cases in 1s
+  mutants: 25/234 (0s)
+  mutants: 50/234 (1s)
+  mutants: 75/234 (1s)
+  mutants: 100/234 (2s)
+  mutants: 125/234 (2s)
+  mutants: 150/234 (3s)
+  mutants: 175/234 (3s)
+  mutants: 200/234 (5s)
+  mutants: 225/234 (133s)
+  mutants: 234/234 (269s)
+
+mutate: 234 mutants, 269s
+  killed 234, survived 0 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 100.0%   overall: 100.0%
+
+  function                           total killed survived no-cov
+  HuffmanDecodeImage                    75     75        0      0
+  HuffmanEncodeImage                    64     64        0      0
+  LZWEncodeImage                        19     19        0      0
+  Ascii85Encode                         13     13        0      0
+  PackbitsEncodeImage                   13     13        0      0
+  Ascii85Tuple                           9      9        0      0
+  GetLiteralRunLength                    9      9        0      0
+  Ascii85Flush                           8      8        0      0
+  ZLIBEncodeImage                        8      8        0      0
+  GetPackedRunLength                     6      6        0      0
+  IsHuffmanBufferMissing                 3      3        0      0
+  InitializeHuffmanHashes                3      3        0      0
+  ResetLZWTable                          3      3        0      0
+  Ascii85Initialize                      1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-compress.json

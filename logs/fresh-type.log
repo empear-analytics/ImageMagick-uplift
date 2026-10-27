@@ -1,0 +1,54 @@
+mutate: 258 mutants in MagickCore/type\.c$, 24 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/258 (1s)
+  mutants: 50/258 (2s)
+  mutants: 75/258 (2s)
+  mutants: 100/258 (2s)
+  mutants: 125/258 (3s)
+  mutants: 150/258 (4s)
+  mutants: 175/258 (4s)
+  mutants: 200/258 (5s)
+  mutants: 225/258 (5s)
+  mutants: 250/258 (6s)
+  mutants: 258/258 (134s)
+
+mutate: 258 mutants, 134s
+  killed 239, survived 4 (0 capped), no coverage 15, errors 0
+  mutation score on reached code: 98.4%   overall: 92.6%
+
+  function                           total killed survived no-cov
+  LoadFontConfigFonts                   62     62        0      0
+  LoadTypeCache                         53     53        0      0
+  GetTypeInfoByFamily                   24     24        0      0
+  GetTypeScore                          12     11        1      0
+  GetExactTypeInfo                      12     12        0      0
+  GetTypeInfoList                       12     11        1      0
+  GetTypeList                           12      0        0     12
+  ListTypeInfo                          11     11        0      0
+  DestroyTypeNode                        9      9        0      0
+  IsTypeTreeInstantiated                 7      7        0      0
+  TypeComponentTerminus                  6      6        0      0
+  AcquireTypeCache                       5      5        0      0
+  IsSlantedStyleMatch                    4      2        2      0
+  GetTypeInfo                            3      3        0      0
+  IsStyleMismatch                        3      3        0      0
+  IsStretchMismatch                      3      3        0      0
+  IsStyleMatch                           3      3        0      0
+  IsNonRegularFontStyle                  3      0        0      3
+  IsNewTypePath                          3      3        0      0
+  SetTypeNodePath                        3      3        0      0
+  IsIncludeElementOpen                   3      3        0      0
+  GetIncludePath                         3      3        0      0
+  TypeInfoCompare                        1      1        0      0
+  TypeComponentGenesis                   1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  type.c:360:19 cxx_eq_to_ne               return((((style == ItalicStyle) || (style == ObliqueStyle)) &&
+    x  type.c:361:45 cxx_eq_to_ne               ((p->style == ItalicStyle) || (p->style == ObliqueStyle))) ?
+    x  type.c:389:63 cxx_div_to_mul             p->stretch)-(ssize_t) MagickMin(stretch,p->stretch))))/range);
+    x  type.c:630:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-type.json

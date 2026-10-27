@@ -1,0 +1,67 @@
+mutate: 330 mutants in MagickCore/delegate\.c$, 29 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/330 (0s)
+  mutants: 50/330 (1s)
+  mutants: 75/330 (1s)
+  mutants: 100/330 (1s)
+  mutants: 125/330 (1s)
+  mutants: 150/330 (1s)
+  mutants: 175/330 (2s)
+  mutants: 200/330 (2s)
+  mutants: 225/330 (2s)
+  mutants: 250/330 (2s)
+  mutants: 275/330 (2s)
+  mutants: 300/330 (3s)
+  mutants: 325/330 (3s)
+  mutants: 330/330 (131s)
+
+mutate: 330 mutants, 131s
+  killed 306, survived 9 (0 capped), no coverage 15, errors 0
+  mutation score on reached code: 97.1%   overall: 92.7%
+
+  function                           total killed survived no-cov
+  InvokeDelegate                        47     47        0      0
+  LoadDelegateCache                     47     47        0      0
+  ExternalDelegateCommand               38     38        0      0
+  GetMagickPropertyLetter               24     24        0      0
+  GetDelegateInfo                       22     22        0      0
+  ListDelegateInfo                      19     18        1      0
+  InterpretDelegateProperties           17     17        0      0
+  CopyDelegateFile                      16     16        0      0
+  IsExecutableToken                     13     13        0      0
+  GetDelegateList                       13      0        0     13
+  GetDelegateInfoList                   11      9        2      0
+  IsDelegateCacheInstantiated            7      7        0      0
+  DestroyDelegate                        6      6        0      0
+  DelegateComponentTerminus              6      6        0      0
+  GetDelegateCommand                     6      4        2      0
+  DelegateInfoCompare                    6      6        0      0
+  IsTwoStepDelegate                      5      5        0      0
+  IsWindowsDrivePath                     4      4        0      0
+  IsDotRelativePath                      3      3        0      0
+  IsPropertyEnd                          3      3        0      0
+  IsListedDelegate                       3      3        0      0
+  IsIncludeElementOpen                   3      3        0      0
+  GetIncludePath                         3      0        3      0
+  AcquireDelegateCache                   2      2        0      0
+  IsListedDelegateMatch                  2      0        0      2
+  DelegateComponentGenesis               1      1        0      0
+  GetDelegateCommands                    1      1        0      0
+  GetDelegateMode                        1      0        1      0
+  GetDelegateThreadSupport               1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  delegate.c:1204:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  delegate.c:1229:25 cxx_ne_to_eq               for (i=0; commands[i] != (char *) NULL; i++)
+    x  delegate.c:1441:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  delegate.c:1447:52 cxx_add_to_sub             GetNumberOfElementsInLinkedList(delegate_cache)+1UL,sizeof(*delegates));
+    x  delegate.c:1606:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  delegate.c:2117:27 cxx_ne_to_eq               for (j=0; commands[j] != (char *) NULL; j++)
+    x  delegate.c:2168:3 cxx_remove_void_call       GetPathComponent(filename,HeadPath,path);
+    x  delegate.c:2169:13 cxx_ne_to_eq               if (*path != '\0')
+    x  delegate.c:2172:14 cxx_eq_to_ne               if (*token == *DirectorySeparator)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-delegate.json

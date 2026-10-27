@@ -1,0 +1,64 @@
+mutate: 580 mutants in MagickCore/threshold\.c$, 26 functions
+mutate: baseline over 489 cases in 1s
+  mutants: 25/580 (0s)
+  mutants: 50/580 (0s)
+  mutants: 75/580 (1s)
+  mutants: 100/580 (1s)
+  mutants: 125/580 (1s)
+  mutants: 150/580 (1s)
+  mutants: 175/580 (2s)
+  mutants: 200/580 (2s)
+  mutants: 225/580 (2s)
+  mutants: 250/580 (2s)
+  mutants: 275/580 (2s)
+  mutants: 300/580 (3s)
+  mutants: 325/580 (3s)
+  mutants: 350/580 (3s)
+  mutants: 375/580 (4s)
+  mutants: 400/580 (4s)
+  mutants: 425/580 (4s)
+  mutants: 450/580 (5s)
+  mutants: 475/580 (5s)
+  mutants: 500/580 (6s)
+  mutants: 525/580 (6s)
+  mutants: 550/580 (6s)
+  mutants: 575/580 (134s)
+  mutants: 580/580 (137s)
+
+mutate: 580 mutants, 137s
+  killed 579, survived 1 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 99.8%   overall: 99.8%
+
+  function                           total killed survived no-cov
+  AdaptiveThresholdImage                70     70        0      0
+  OrderedDitherImage                    65     65        0      0
+  TriangleThreshold                     48     48        0      0
+  KapurThreshold                        44     44        0      0
+  RangeThresholdImage                   44     44        0      0
+  ColorThresholdImage                   39     39        0      0
+  BlackThresholdImage                   31     31        0      0
+  GetThresholdMapFile                   31     31        0      0
+  WhiteThresholdImage                   31     31        0      0
+  PerceptibleImage                      25     25        0      0
+  RandomThresholdImage                  25     25        0      0
+  AutoThresholdImage                    23     23        0      0
+  BilevelImage                          23     23        0      0
+  ClampImage                            18     18        0      0
+  OTSUThreshold                         16     16        0      0
+  FindOTSUThreshold                     10     10        0      0
+  PerceptibleThreshold                   6      6        0      0
+  ListThresholdMapFile                   5      5        0      0
+  IsOTSUBufferMissing                    4      4        0      0
+  ClampPixelChannels                     4      4        0      0
+  IsKapurBufferMissing                   3      3        0      0
+  DestroyThresholdMap                    3      3        0      0
+  GetThresholdMap                        3      3        0      0
+  ListThresholdMaps                      3      2        1      0
+  IsThresholdMapSeparator                3      3        0      0
+  IsThresholdMapNameCharacter            3      3        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  threshold.c:1877:17 cxx_ne_to_eq               return(status != 0 ? MagickTrue : MagickFalse);
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-threshold.json

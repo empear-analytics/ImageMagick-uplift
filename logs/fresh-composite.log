@@ -1,0 +1,94 @@
+mutate: 1316 mutants in MagickCore/composite\.c$, 19 functions
+mutate: baseline over 1667 cases in 1s
+  mutants: 25/1316 (0s)
+  mutants: 50/1316 (0s)
+  mutants: 75/1316 (1s)
+  mutants: 100/1316 (1s)
+  mutants: 125/1316 (1s)
+  mutants: 150/1316 (3s)
+  mutants: 175/1316 (4s)
+  mutants: 200/1316 (4s)
+  mutants: 225/1316 (5s)
+  mutants: 250/1316 (5s)
+  mutants: 275/1316 (6s)
+  mutants: 300/1316 (6s)
+  mutants: 325/1316 (7s)
+  mutants: 350/1316 (8s)
+  mutants: 375/1316 (8s)
+  mutants: 400/1316 (9s)
+  mutants: 425/1316 (9s)
+  mutants: 450/1316 (10s)
+  mutants: 475/1316 (11s)
+  mutants: 500/1316 (11s)
+  mutants: 525/1316 (12s)
+  mutants: 550/1316 (12s)
+  mutants: 575/1316 (13s)
+  mutants: 600/1316 (13s)
+  mutants: 625/1316 (14s)
+  mutants: 650/1316 (14s)
+  mutants: 675/1316 (15s)
+  mutants: 700/1316 (16s)
+  mutants: 725/1316 (16s)
+  mutants: 750/1316 (17s)
+  mutants: 775/1316 (17s)
+  mutants: 800/1316 (18s)
+  mutants: 825/1316 (18s)
+  mutants: 850/1316 (19s)
+  mutants: 875/1316 (19s)
+  mutants: 900/1316 (20s)
+  mutants: 925/1316 (21s)
+  mutants: 950/1316 (21s)
+  mutants: 975/1316 (22s)
+  mutants: 1000/1316 (22s)
+  mutants: 1025/1316 (23s)
+  mutants: 1050/1316 (23s)
+  mutants: 1075/1316 (24s)
+  mutants: 1100/1316 (25s)
+  mutants: 1125/1316 (25s)
+  mutants: 1150/1316 (26s)
+  mutants: 1175/1316 (26s)
+  mutants: 1200/1316 (27s)
+  mutants: 1225/1316 (27s)
+  mutants: 1250/1316 (28s)
+  mutants: 1275/1316 (28s)
+  mutants: 1300/1316 (30s)
+  mutants: 1316/1316 (159s)
+
+mutate: 1316 mutants, 159s
+  killed 1307, survived 9 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 99.3%   overall: 99.3%
+
+  function                           total killed survived no-cov
+  CompositeImage                       996    996        0      0
+  CompositeOverImage                    71     71        0      0
+  TextureImage                          41     32        9      0
+  BlendMeanImage                        39     39        0      0
+  BlendRMSEResidual                     27     27        0      0
+  SeamlessBlendImage                    24     24        0      0
+  SaliencyBlendImage                    22     22        0      0
+  BlendMaxMagnitudeImage                17     17        0      0
+  BlendSumImage                         16     16        0      0
+  BlendMagnitudeImage                   15     15        0      0
+  BlendDivergentImage                   11     11        0      0
+  BlendMaskAlphaChannel                  9      9        0      0
+  IsOutsideSourceColumn                  6      6        0      0
+  IsBlendRowsMissing                     5      5        0      0
+  ClearMaskedAlphaRow                    5      5        0      0
+  IsTextureComposited                    4      4        0      0
+  IsBlendRowMissing                      3      3        0      0
+  IsBlendChannelSkipped                  3      3        0      0
+  BlendConvolveImage                     2      2        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  composite.c:3771:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  composite.c:3789:19 cxx_lt_to_le               for (y=0; y < (ssize_t) image->rows; y+=(ssize_t) texture_image->rows)
+    x  composite.c:3796:21 cxx_lt_to_le               for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) texture_image->columns)
+    x  composite.c:3810:37 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       composite.c:3817:25 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  composite.c:3865:17 cxx_lt_to_le               for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) texture_image->columns)
+    x  composite.c:3872:31 cxx_gt_to_ge               if ((x+(ssize_t) width) > (ssize_t) image->columns)
+    x  composite.c:3897:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       composite.c:3904:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-composite.json
