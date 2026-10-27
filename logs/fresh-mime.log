@@ -1,0 +1,51 @@
+mutate: 147 mutants in MagickCore/mime\.c$, 22 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/147 (1s)
+  mutants: 50/147 (1s)
+  mutants: 75/147 (2s)
+  mutants: 100/147 (3s)
+  mutants: 125/147 (4s)
+  mutants: 147/147 (132s)
+
+mutate: 147 mutants, 132s
+  killed 136, survived 8 (0 capped), no coverage 3, errors 0
+  mutation score on reached code: 94.4%   overall: 92.5%
+
+  function                           total killed survived no-cov
+  GetMimeInfo                           34     34        0      0
+  LoadMimeCache                         24     24        0      0
+  GetMimeInfoList                       12     11        1      0
+  GetMimeList                           12     10        2      0
+  ListMimeInfo                          11     11        0      0
+  ParseMimeMagic                         8      8        0      0
+  IsMimeCacheInstantiated                7      7        0      0
+  PadMimeType                            6      6        0      0
+  MimeComponentTerminus                  6      6        0      0
+  DestroyMimeElement                     5      5        0      0
+  MatchMimeValue                         3      3        0      0
+  PadMimeTypeColumn                      3      3        0      0
+  GetIncludePath                         3      0        3      0
+  MagickToMime                           3      0        0      3
+  ReadMimeShortValue                     2      2        0      0
+  ReadMimeLongValue                      2      2        0      0
+  AcquireMimeCache                       1      1        0      0
+  MimeInfoCompare                        1      1        0      0
+  GetMimeDescription                     1      0        1      0
+  GetMimeType                            1      0        1      0
+  PrintMimePathHeader                    1      1        0      0
+  MimeComponentGenesis                   1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  mime.c:478:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  mime.c:575:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  mime.c:602:7 cxx_remove_void_call       qsort((void *) aliases,(size_t) i,sizeof(*aliases),MimeCompare);
+    x  mime.c:635:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  mime.c:666:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  mime.c:872:3 cxx_remove_void_call       GetPathComponent(filename,HeadPath,path);
+    x  mime.c:873:13 cxx_ne_to_eq               if (*path != '\0')
+    x  mime.c:876:18 cxx_eq_to_ne               if (*attribute == *DirectorySeparator)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-mime.json

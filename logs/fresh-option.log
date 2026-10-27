@@ -1,0 +1,46 @@
+mutate: 135 mutants in MagickCore/option\.c$, 28 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/135 (1s)
+  mutants: 50/135 (1s)
+  mutants: 75/135 (1s)
+  mutants: 100/135 (2s)
+  mutants: 125/135 (2s)
+  mutants: 135/135 (2s)
+
+mutate: 135 mutants, 2s
+  killed 119, survived 0 (0 capped), no coverage 16, errors 0
+  mutation score on reached code: 100.0%   overall: 88.1%
+
+  function                           total killed survived no-cov
+  GetCommandOptionFlags                 15     15        0      0
+  ParseCommandOption                    15     15        0      0
+  IsOptionMember                        11     11        0      0
+  GetCommandOptions                      7      0        0      7
+  IsCommandOption                        7      7        0      0
+  ParseChannelOption                     7      7        0      0
+  CommandOptionToMnemonic                5      5        0      0
+  ListCommandOptions                     5      5        0      0
+  IsInvalidPixelChannelNumber            5      5        0      0
+  ParsePixelChannelOption                5      5        0      0
+  CloneImageOptions                      4      4        0      0
+  DefineImageOption                      4      4        0      0
+  IsUnknownSeparatedToken                4      4        0      0
+  IsBracketOption                        4      0        0      4
+  SetImageOption                         4      4        0      0
+  SearchOptionMnemonic                   3      3        0      0
+  FindCommandOptionInfo                  3      3        0      0
+  IsTokenSeparator                       3      3        0      0
+  IsTokenCharacter                       3      3        0      0
+  GetCommandOptionInfo                   3      3        0      0
+  ResetImageOptions                      3      0        0      3
+  ResetImageOptionIterator               3      3        0      0
+  DeleteImageOption                      2      2        0      0
+  DestroyImageOptions                    2      2        0      0
+  GetImageOption                         2      2        0      0
+  RemoveTokenCharacter                   2      2        0      0
+  GetNextImageOption                     2      2        0      0
+  RemoveImageOption                      2      0        0      2
+
+  full results: build-oracle/work/mutation-fresh-option.json

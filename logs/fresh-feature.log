@@ -1,0 +1,60 @@
+mutate: 852 mutants in MagickCore/feature\.c$, 15 functions
+mutate: baseline over 71 cases in 1s
+  mutants: 25/852 (0s)
+  mutants: 50/852 (1s)
+  mutants: 75/852 (1s)
+  mutants: 100/852 (2s)
+  mutants: 125/852 (7s)
+  mutants: 150/852 (11s)
+  mutants: 175/852 (14s)
+  mutants: 200/852 (23s)
+  mutants: 225/852 (32s)
+  mutants: 250/852 (34s)
+  mutants: 275/852 (42s)
+  mutants: 300/852 (47s)
+  mutants: 325/852 (53s)
+  mutants: 350/852 (62s)
+  mutants: 375/852 (70s)
+  mutants: 400/852 (78s)
+  mutants: 425/852 (81s)
+  mutants: 450/852 (93s)
+  mutants: 475/852 (101s)
+  mutants: 500/852 (109s)
+  mutants: 525/852 (122s)
+  mutants: 550/852 (130s)
+  mutants: 575/852 (136s)
+  mutants: 600/852 (143s)
+  mutants: 625/852 (146s)
+  mutants: 650/852 (147s)
+  mutants: 675/852 (150s)
+  mutants: 700/852 (152s)
+  mutants: 725/852 (157s)
+  mutants: 750/852 (158s)
+  mutants: 775/852 (160s)
+  mutants: 800/852 (162s)
+  mutants: 825/852 (163s)
+  mutants: 850/852 (290s)
+  mutants: 852/852 (290s)
+
+mutate: 852 mutants, 290s
+  killed 850, survived 0 (0 capped), no coverage 2, errors 0
+  mutation score on reached code: 100.0%   overall: 99.8%
+
+  function                           total killed survived no-cov
+  GetImageFeatures                     457    457        0      0
+  HoughLineImage                       114    114        0      0
+  MeanShiftImage                        90     90        0      0
+  CannyEdgeImage                        70     70        0      0
+  TraceEdges                            29     29        0      0
+  CompactFeatureGrays                   15     15        0      0
+  GetFeatureNormalization               14     14        0      0
+  SetCannyOrientation                   13     13        0      0
+  RenderHoughLines                      12     12        0      0
+  GetFeatureGrayLevels                  10     10        0      0
+  IsAuthenticPixel                       8      8        0      0
+  GetFeatureAdjacencyOffset              8      8        0      0
+  IsFeatureMemoryMissing                 6      6        0      0
+  MagickRound                            4      4        0      0
+  CopyBlobToPrimitive                    2      0        0      2
+
+  full results: build-oracle/work/mutation-fresh-feature.json

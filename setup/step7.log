@@ -6714,3 +6714,9 @@ nohup: ignoring input
 19:01 fresh quantize:   killed 930, survived 0 (0 capped), no coverage 2, errors 0
 19:01 fresh montage:   killed 235, survived 0 (0 capped), no coverage 0, errors 0
 19:04 fresh cache:   killed 945, survived 0 (0 capped), no coverage 2, errors 0
+19:05 pushed
+19:08 fresh pixel:   killed 2609, survived 0 (0 capped), no coverage 16, errors 0
+19:11 fresh attribute:   killed 523, survived 2 (0 capped), no coverage 8, errors 0
+19:12 fresh option:   killed 119, survived 0 (0 capped), no coverage 16, errors 0
+19:15 fresh mime:   killed 136, survived 8 (0 capped), no coverage 3, errors 0
+19:20 fresh feature:   killed 850, survived 0 (0 capped), no coverage 2, errors 0

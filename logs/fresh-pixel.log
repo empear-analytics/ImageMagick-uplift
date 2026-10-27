@@ -1,0 +1,224 @@
+mutate: 2625 mutants in MagickCore/pixel\.c$, 107 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15608 cases in 31s
+  mutants: 25/2625 (0s)
+  mutants: 50/2625 (1s)
+  mutants: 75/2625 (1s)
+  mutants: 100/2625 (1s)
+  mutants: 125/2625 (1s)
+  mutants: 150/2625 (2s)
+  mutants: 175/2625 (2s)
+  mutants: 200/2625 (2s)
+  mutants: 225/2625 (2s)
+  mutants: 250/2625 (2s)
+  mutants: 275/2625 (3s)
+  mutants: 300/2625 (3s)
+  mutants: 325/2625 (3s)
+  mutants: 350/2625 (3s)
+  mutants: 375/2625 (3s)
+  mutants: 400/2625 (3s)
+  mutants: 425/2625 (4s)
+  mutants: 450/2625 (4s)
+  mutants: 475/2625 (4s)
+  mutants: 500/2625 (4s)
+  mutants: 525/2625 (4s)
+  mutants: 550/2625 (5s)
+  mutants: 575/2625 (5s)
+  mutants: 600/2625 (5s)
+  mutants: 625/2625 (5s)
+  mutants: 650/2625 (6s)
+  mutants: 675/2625 (6s)
+  mutants: 700/2625 (6s)
+  mutants: 725/2625 (6s)
+  mutants: 750/2625 (7s)
+  mutants: 775/2625 (7s)
+  mutants: 800/2625 (7s)
+  mutants: 825/2625 (7s)
+  mutants: 850/2625 (7s)
+  mutants: 875/2625 (7s)
+  mutants: 900/2625 (8s)
+  mutants: 925/2625 (8s)
+  mutants: 950/2625 (8s)
+  mutants: 975/2625 (8s)
+  mutants: 1000/2625 (8s)
+  mutants: 1025/2625 (8s)
+  mutants: 1050/2625 (8s)
+  mutants: 1075/2625 (9s)
+  mutants: 1100/2625 (9s)
+  mutants: 1125/2625 (10s)
+  mutants: 1150/2625 (11s)
+  mutants: 1175/2625 (12s)
+  mutants: 1200/2625 (13s)
+  mutants: 1225/2625 (14s)
+  mutants: 1250/2625 (15s)
+  mutants: 1275/2625 (16s)
+  mutants: 1300/2625 (17s)
+  mutants: 1325/2625 (17s)
+  mutants: 1350/2625 (18s)
+  mutants: 1375/2625 (19s)
+  mutants: 1400/2625 (20s)
+  mutants: 1425/2625 (21s)
+  mutants: 1450/2625 (22s)
+  mutants: 1475/2625 (23s)
+  mutants: 1500/2625 (23s)
+  mutants: 1525/2625 (24s)
+  mutants: 1550/2625 (25s)
+  mutants: 1575/2625 (26s)
+  mutants: 1600/2625 (28s)
+  mutants: 1625/2625 (28s)
+  mutants: 1650/2625 (29s)
+  mutants: 1675/2625 (30s)
+  mutants: 1700/2625 (30s)
+  mutants: 1725/2625 (31s)
+  mutants: 1750/2625 (32s)
+  mutants: 1775/2625 (32s)
+  mutants: 1800/2625 (33s)
+  mutants: 1825/2625 (33s)
+  mutants: 1850/2625 (34s)
+  mutants: 1875/2625 (35s)
+  mutants: 1900/2625 (36s)
+  mutants: 1925/2625 (36s)
+  mutants: 1950/2625 (37s)
+  mutants: 1975/2625 (38s)
+  mutants: 2000/2625 (39s)
+  mutants: 2025/2625 (39s)
+  mutants: 2050/2625 (39s)
+  mutants: 2075/2625 (39s)
+  mutants: 2100/2625 (40s)
+  mutants: 2125/2625 (40s)
+  mutants: 2150/2625 (40s)
+  mutants: 2175/2625 (40s)
+  mutants: 2200/2625 (41s)
+  mutants: 2225/2625 (41s)
+  mutants: 2250/2625 (41s)
+  mutants: 2275/2625 (42s)
+  mutants: 2300/2625 (43s)
+  mutants: 2325/2625 (44s)
+  mutants: 2350/2625 (44s)
+  mutants: 2375/2625 (45s)
+  mutants: 2400/2625 (46s)
+  mutants: 2425/2625 (47s)
+  mutants: 2450/2625 (47s)
+  mutants: 2475/2625 (48s)
+  mutants: 2500/2625 (49s)
+  mutants: 2525/2625 (49s)
+  mutants: 2550/2625 (49s)
+  mutants: 2575/2625 (50s)
+  mutants: 2600/2625 (50s)
+  mutants: 2625/2625 (180s)
+
+mutate: 2625 mutants, 180s
+  killed 2609, survived 0 (0 capped), no coverage 16, errors 0
+  mutation score on reached code: 100.0%   overall: 99.4%
+
+  function                           total killed survived no-cov
+  InterpolatePixelChannels             244    244        0      0
+  InterpolatePixelInfo                 218    218        0      0
+  InterpolatePixelChannel              198    198        0      0
+  ImportFloatPixel                     154    154        0      0
+  ImportLongPixel                      126    126        0      0
+  ImportLongLongPixel                  126    126        0      0
+  ImportQuantumPixel                   126    126        0      0
+  ImportShortPixel                     126    126        0      0
+  ResetPixelChannelMap                  40     40        0      0
+  ImportDoublePixel                     35     35        0      0
+  IsFuzzyEquivalencePixelInfo           34     34        0      0
+  SortImagePixels                       32     32        0      0
+  ImportCharPixel                       30     30        0      0
+  ExportDoublePixel                     28     28        0      0
+  ExportFloatPixel                      28     28        0      0
+  SetPixelChannelMask                   23     23        0      0
+  GetPixelIntensity                     22     22        0      0
+  ExportCharPixel                       21     21        0      0
+  ExportLongPixel                       21     21        0      0
+  ExportLongLongPixel                   21     21        0      0
+  ExportQuantumPixel                    21     21        0      0
+  ExportShortPixel                      21     21        0      0
+  ImportDoubleBGRAPixels                19     19        0      0
+  ImportDoubleRGBAPixels                19     19        0      0
+  GetPixelInfoIntensity                 18     18        0      0
+  ImportDoubleBGRPixels                 17     17        0      0
+  ImportDoubleBGRPPixels                17     17        0      0
+  ImportDoubleRGBPixels                 17     17        0      0
+  ImportDoubleRGBPPixels                17     17        0      0
+  ImportCharBGRAPixels                  15     15        0      0
+  ImportCharBGROPixels                  15     15        0      0
+  ImportCharRGBAPixels                  15     15        0      0
+  ImportCharRGBOPixels                  15     15        0      0
+  LogPixelChannels                      15      0        0     15
+  DecodeGamma                           14     14        0      0
+  ExportDoubleBGRAPixels                14     14        0      0
+  ExportDoubleRGBAPixels                14     14        0      0
+  ExportFloatBGRAPixels                 14     14        0      0
+  ExportFloatRGBAPixels                 14     14        0      0
+  ImportCharBGRPixels                   14     14        0      0
+  ImportCharBGRPPixels                  14     14        0      0
+  ImportCharRGBPixels                   14     14        0      0
+  ImportCharRGBPPixels                  14     14        0      0
+  EncodeGamma                           13     13        0      0
+  ExportDoubleBGRPixels                 13     13        0      0
+  ExportDoubleBGRPPixels                13     13        0      0
+  ExportDoubleRGBPixels                 13     13        0      0
+  ExportDoubleRGBPPixels                13     13        0      0
+  ExportFloatBGRPixels                  13     13        0      0
+  ExportFloatBGRPPixels                 13     13        0      0
+  ExportFloatRGBPixels                  13     13        0      0
+  ExportFloatRGBPPixels                 13     13        0      0
+  ImportDoubleIPixels                   13     13        0      0
+  ImportCharIPixels                     12     12        0      0
+  SplineWeights                         12     12        0      0
+  IsFuzzyEquivalencePixel               12     12        0      0
+  ExportDoubleIPixels                   11     11        0      0
+  ExportFloatIPixels                    11     11        0      0
+  ExportCharBGRPixels                   10     10        0      0
+  ExportCharBGRAPixels                  10     10        0      0
+  ExportCharBGRPPixels                  10     10        0      0
+  ExportCharIPixels                     10     10        0      0
+  ExportCharRGBPixels                   10     10        0      0
+  ExportCharRGBAPixels                  10     10        0      0
+  ExportCharRGBPPixels                  10     10        0      0
+  ExportLongBGRPixels                   10     10        0      0
+  ExportLongBGRAPixels                  10     10        0      0
+  ExportLongBGRPPixels                  10     10        0      0
+  ExportLongIPixels                     10     10        0      0
+  ExportLongRGBPixels                   10     10        0      0
+  ExportLongRGBAPixels                  10     10        0      0
+  ExportLongRGBPPixels                  10     10        0      0
+  ExportLongLongBGRPixels               10     10        0      0
+  ExportLongLongBGRAPixels              10     10        0      0
+  ExportLongLongBGRPPixels              10     10        0      0
+  ExportLongLongIPixels                 10     10        0      0
+  ExportLongLongRGBPixels               10     10        0      0
+  ExportLongLongRGBAPixels              10     10        0      0
+  ExportLongLongRGBPPixels              10     10        0      0
+  ExportQuantumBGRPixels                10     10        0      0
+  ExportQuantumBGRAPixels               10     10        0      0
+  ExportQuantumBGRPPixels               10     10        0      0
+  ExportQuantumIPixels                  10     10        0      0
+  ExportQuantumRGBPixels                10     10        0      0
+  ExportQuantumRGBAPixels               10     10        0      0
+  ExportQuantumRGBPPixels               10     10        0      0
+  ExportShortBGRPixels                  10     10        0      0
+  ExportShortBGRAPixels                 10     10        0      0
+  ExportShortBGRPPixels                 10     10        0      0
+  ExportShortIPixels                    10     10        0      0
+  ExportShortRGBPixels                  10     10        0      0
+  ExportShortRGBAPixels                 10     10        0      0
+  ExportShortRGBPPixels                 10     10        0      0
+  CatromWeights                         10     10        0      0
+  ExportImagePixels                      9      9        0      0
+  AlphaBlendPixelInfo                    8      8        0      0
+  ConformPixelColorspace                 6      6        0      0
+  ImportImagePixels                      6      6        0      0
+  ConformPixelInfo                       5      5        0      0
+  DecodePixelGamma                       5      5        0      0
+  EncodePixelGamma                       5      5        0      0
+  AcquirePixelChannelMap                 4      4        0      0
+  MeshInterpolate                        3      3        0      0
+  SetPixelMetaChannels                   3      3        0      0
+  ClonePixelChannelMap                   1      1        0      0
+  ClonePixelInfo                         1      0        0      1
+  GetPixelInfo                           1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-pixel.json

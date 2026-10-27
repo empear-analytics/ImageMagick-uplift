@@ -1,0 +1,70 @@
+mutate: 533 mutants in MagickCore/attribute\.c$, 31 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 14431 cases in 31s
+  mutants: 25/533 (0s)
+  mutants: 50/533 (0s)
+  mutants: 75/533 (1s)
+  mutants: 100/533 (1s)
+  mutants: 125/533 (1s)
+  mutants: 150/533 (2s)
+  mutants: 175/533 (2s)
+  mutants: 200/533 (3s)
+  mutants: 225/533 (3s)
+  mutants: 250/533 (4s)
+  mutants: 275/533 (4s)
+  mutants: 300/533 (5s)
+  mutants: 325/533 (5s)
+  mutants: 350/533 (6s)
+  mutants: 375/533 (6s)
+  mutants: 400/533 (7s)
+  mutants: 425/533 (7s)
+  mutants: 450/533 (7s)
+  mutants: 475/533 (8s)
+  mutants: 500/533 (8s)
+  mutants: 525/533 (8s)
+  mutants: 533/533 (137s)
+
+mutate: 533 mutants, 137s
+  killed 523, survived 2 (0 capped), no coverage 8, errors 0
+  mutation score on reached code: 99.6%   overall: 98.1%
+
+  function                           total killed survived no-cov
+  GetImageMinimumBoundingBox            76     76        0      0
+  GetImageBoundingBox                   64     64        0      0
+  FloydSteinbergImageDepth              58     58        0      0
+  GetImageDepth                         28     28        0      0
+  GetEdgeBoundingBox                    27     27        0      0
+  GetEdgeBackgroundColor                27     27        0      0
+  GetImageConvexHull                    25     25        0      0
+  SetImageType                          25     25        0      0
+  SetImageDepth                         24     24        0      0
+  GetEdgeBackgroundCensus               21     21        0      0
+  TraceConvexHull                       21     21        0      0
+  IdentifyImageGray                     17     17        0      0
+  IdentifyImageMonochrome               13     13        0      0
+  RaiseColormapEntryDepth               12     12        0      0
+  IsImageOpaque                         11     11        0      0
+  MoveBoxToOrigin                       10      8        2      0
+  GetImageQuantumDepth                   9      9        0      0
+  getProjection                          8      8        0      0
+  getFeretDiameter                       8      8        0      0
+  GetImageType                           8      0        0      8
+  GetMinimumBoxAngle                     7      7        0      0
+  IsEmptyBoundingBox                     6      6        0      0
+  IdentifyImageType                      6      6        0      0
+  LexicographicalOrder                   5      5        0      0
+  GetMaximumDepth                        5      5        0      0
+  SetColormapEntryDepth                  4      4        0      0
+  getDistance                            3      3        0      0
+  getAngle                               2      2        0      0
+  IsImageGray                            1      1        0      0
+  IsImageMonochrome                      1      1        0      0
+  SetOpaqueAlphaIfMissing                1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  attribute.c:1259:27 cxx_lt_to_le               if (bounding_box[i].x < point.x)
+    x  attribute.c:1261:27 cxx_lt_to_le               if (bounding_box[i].y < point.y)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-attribute.json
