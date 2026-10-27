@@ -616,13 +616,7 @@ MagickExport MagickBooleanType DeleteNodeFromSplayTree(
     }
   left=splay_tree->root->left;
   right=splay_tree->root->right;
-  if ((splay_tree->relinquish_value != (void *(*)(void *)) NULL) &&
-      (splay_tree->root->value != (void *) NULL))
-    splay_tree->root->value=splay_tree->relinquish_value(
-      splay_tree->root->value);
-  if ((splay_tree->relinquish_key != (void *(*)(void *)) NULL) &&
-      (splay_tree->root->key != (void *) NULL))
-    splay_tree->root->key=splay_tree->relinquish_key(splay_tree->root->key);
+  RelinquishNodeContents(splay_tree,splay_tree->root);
   splay_tree->root=(NodeInfo *) RelinquishMagickMemory(splay_tree->root);
   splay_tree->nodes--;
   if (left == (NodeInfo *) NULL)
