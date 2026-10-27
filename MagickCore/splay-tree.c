@@ -121,6 +121,7 @@ static int
     const void *);
 
 static void
+  RelinquishNodeContents(const SplayTreeInfo *,NodeInfo *),
   SplaySplayTree(SplayTreeInfo *,const void *);
 
 /*
@@ -655,6 +656,17 @@ MagickExport MagickBooleanType DeleteNodeFromSplayTree(
   return(MagickTrue);
 }
 
+static void RelinquishNodeContents(const SplayTreeInfo *splay_tree,
+  NodeInfo *node)
+{
+  if ((splay_tree->relinquish_value != (void *(*)(void *)) NULL) &&
+      (node->value != (void *) NULL))
+    node->value=splay_tree->relinquish_value(node->value);
+  if ((splay_tree->relinquish_key != (void *(*)(void *)) NULL) &&
+      (node->key != (void *) NULL))
+    node->key=splay_tree->relinquish_key(node->key);
+}
+
 static void RelinquishSplayTreeNodes(SplayTreeInfo *splay_tree)
 {
   NodeInfo
@@ -662,13 +674,7 @@ static void RelinquishSplayTreeNodes(SplayTreeInfo *splay_tree)
     *node,
     *pend;
 
-  if ((splay_tree->relinquish_value != (void *(*)(void *)) NULL) &&
-      (splay_tree->root->value != (void *) NULL))
-    splay_tree->root->value=splay_tree->relinquish_value(
-      splay_tree->root->value);
-  if ((splay_tree->relinquish_key != (void *(*)(void *)) NULL) &&
-      (splay_tree->root->key != (void *) NULL))
-    splay_tree->root->key=splay_tree->relinquish_key(splay_tree->root->key);
+  RelinquishNodeContents(splay_tree,splay_tree->root);
   splay_tree->root->key=(void *) NULL;
   for (pend=splay_tree->root; pend != (NodeInfo *) NULL; )
   {
@@ -677,26 +683,13 @@ static void RelinquishSplayTreeNodes(SplayTreeInfo *splay_tree)
     {
       if (active->left != (NodeInfo *) NULL)
         {
-          if ((splay_tree->relinquish_value != (void *(*)(void *)) NULL) &&
-              (active->left->value != (void *) NULL))
-            active->left->value=splay_tree->relinquish_value(
-              active->left->value);
-          if ((splay_tree->relinquish_key != (void *(*)(void *)) NULL) &&
-              (active->left->key != (void *) NULL))
-            active->left->key=splay_tree->relinquish_key(active->left->key);
+          RelinquishNodeContents(splay_tree,active->left);
           active->left->key=(void *) pend;
           pend=active->left;
         }
       if (active->right != (NodeInfo *) NULL)
         {
-          if ((splay_tree->relinquish_value != (void *(*)(void *)) NULL) &&
-              (active->right->value != (void *) NULL))
-            active->right->value=splay_tree->relinquish_value(
-              active->right->value);
-          if ((splay_tree->relinquish_key != (void *(*)(void *)) NULL) &&
-              (active->right->key != (void *) NULL))
-            active->right->key=splay_tree->relinquish_key(
-              active->right->key);
+          RelinquishNodeContents(splay_tree,active->right);
           active->right->key=(void *) pend;
           pend=active->right;
         }
