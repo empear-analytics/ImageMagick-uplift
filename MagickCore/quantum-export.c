@@ -3750,6 +3750,31 @@ static void ExportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void SwapRedGreenQuantum(const Image *image,CacheView *image_view,
+  const MagickSizeType number_pixels)
+{
+  Quantum
+    quantum;
+
+  Quantum
+    *magick_restrict r;
+
+  ssize_t
+    x;
+
+  if (image_view == (CacheView *) NULL)
+    r=GetAuthenticPixelQueue(image);
+  else
+    r=GetCacheViewAuthenticPixelQueue(image_view);
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    quantum=GetPixelRed(image,r);
+    SetPixelRed(image,GetPixelGreen(image,r),r);
+    SetPixelGreen(image,quantum,r);
+    r+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void AssociateQuantumAlpha(const Image *image,CacheView *image_view)
 {
   double
@@ -3800,9 +3825,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
   size_t
     extent;
 
-  ssize_t
-    x;
-
   unsigned char
     *magick_restrict q;
 
@@ -3831,25 +3853,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
   if (quantum_info->alpha_type == AssociatedQuantumAlpha)
     AssociateQuantumAlpha(image,image_view);
   if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
-    {
-      Quantum
-        quantum;
-
-      Quantum
-        *magick_restrict r;
-
-      if (image_view == (CacheView *) NULL)
-        r=GetAuthenticPixelQueue(image);
-      else
-        r=GetCacheViewAuthenticPixelQueue(image_view);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        quantum=GetPixelRed(image,r);
-        SetPixelRed(image,GetPixelGreen(image,r),r);
-        SetPixelGreen(image,quantum,r);
-        r+=(ptrdiff_t) GetPixelChannels(image);
-      }
-    }
+    SwapRedGreenQuantum(image,image_view,number_pixels);
   q=pixels;
   ResetQuantumState(quantum_info);
   extent=GetQuantumExtent(image,quantum_info,quantum_type);
@@ -3972,24 +3976,6 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
       break;
   }
   if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
-    {
-      Quantum
-        quantum;
-
-      Quantum
-        *magick_restrict r;
-
-      if (image_view == (CacheView *) NULL)
-        r=GetAuthenticPixelQueue(image);
-      else
-        r=GetCacheViewAuthenticPixelQueue(image_view);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        quantum=GetPixelRed(image,r);
-        SetPixelRed(image,GetPixelGreen(image,r),r);
-        SetPixelGreen(image,quantum,r);
-        r+=(ptrdiff_t) GetPixelChannels(image);
-      }
-    }
+    SwapRedGreenQuantum(image,image_view,number_pixels);
   return(extent);
 }
