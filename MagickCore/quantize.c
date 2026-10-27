@@ -2570,6 +2570,32 @@ static void SeedKmeansRandomColors(Image *image,ssize_t n,
   random_info=DestroyRandomInfo(random_info);
 }
 
+static void ReduceKmeansPixels(const Image *image,KmeansInfo **kmeans_pixels,
+  const size_t number_threads)
+{
+  ssize_t
+    j;
+
+  for (j=1; j < (ssize_t) number_threads; j++)
+  {
+    ssize_t
+      k;
+
+    for (k=0; k < (ssize_t) image->colors; k++)
+    {
+      kmeans_pixels[0][k].red+=kmeans_pixels[j][k].red;
+      kmeans_pixels[0][k].green+=kmeans_pixels[j][k].green;
+      kmeans_pixels[0][k].blue+=kmeans_pixels[j][k].blue;
+      if (image->alpha_trait != UndefinedPixelTrait)
+        kmeans_pixels[0][k].alpha+=kmeans_pixels[j][k].alpha;
+      if (image->colorspace == CMYKColorspace)
+        kmeans_pixels[0][k].black+=kmeans_pixels[j][k].black;
+      kmeans_pixels[0][k].count+=kmeans_pixels[j][k].count;
+      kmeans_pixels[0][k].distortion+=kmeans_pixels[j][k].distortion;
+    }
+  }
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -2761,24 +2787,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     /*
       Reduce sums to [0] entry.
     */
-    for (j=1; j < (ssize_t) number_threads; j++)
-    {
-      ssize_t
-        k;
-
-      for (k=0; k < (ssize_t) image->colors; k++)
-      {
-        kmeans_pixels[0][k].red+=kmeans_pixels[j][k].red;
-        kmeans_pixels[0][k].green+=kmeans_pixels[j][k].green;
-        kmeans_pixels[0][k].blue+=kmeans_pixels[j][k].blue;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          kmeans_pixels[0][k].alpha+=kmeans_pixels[j][k].alpha;
-        if (image->colorspace == CMYKColorspace)
-          kmeans_pixels[0][k].black+=kmeans_pixels[j][k].black;
-        kmeans_pixels[0][k].count+=kmeans_pixels[j][k].count;
-        kmeans_pixels[0][k].distortion+=kmeans_pixels[j][k].distortion;
-      }
-    }
+    ReduceKmeansPixels(image,kmeans_pixels,number_threads);
     /*
       Calculate the new means (centroids) of the pixels in the new clusters.
     */
