@@ -31,6 +31,70 @@ finding.
 
 | annotate.c RenderType | image, draw_info (`RenderTarget`, new) | oracle, careful (80%, `n101`), 218 cases | 2.33 → 2.53 |
 
+| annotate.c RenderFreetype | image, draw_info, encoding (`FreetypeTarget`, new; one per call) | oracle, careful (79%, `n101`), 198 cases; the no-FreeType stub compiled separately | 2.53 → 2.77 |
+
+### The owner's decision: no mutation run before a step (evening)
+
+The owner stopped the per-step mutation runs: the harness was built under mutation
+guidance and is finished, and the 3SX and Jellyfin campaigns did not gate steps this
+way. *Two levels of evidence* now reads: a function some case executes
+(`casemap.py`) is oracle-verified for every recipe; the guard level stays for code no
+case reaches. AGENTS.md and CLAUDE.md say the same (`5a8c61007`). Steps from here on cite
+case reach and the oracle run.
+
+| File | Function | Recipe | Evidence | Code Health |
+|---|---|---|---|---|
+| policy.c | LoadPolicyCache (`PolicyLoadTarget`) | B | 15,903 cases; zero-configuration branch compiled separately | 3.85 → 4.39 |
+| color.c | LoadColorCache (`ColorLoadTarget`) | B | 1,391 cases | 3.16 → 3.49 |
+| matrix.c | GaussJordanElimination's macros | H | IDENTICAL preprocessed text | 6.76 → 6.84 |
+| matrix.c | UnscrambleColumns, SwapMatrixRows, SwapVectorEntries, EliminateColumn | E (4 commits) | 202 cases | 6.84 → 7.17 |
+| matrix.c | FindPivot (sets row, column, max) | O | 202 cases | 7.17 → 7.27 |
+| matrix.c | GetMatrixRange, GetMatrixScale (MatrixToImage) | O (2 commits) | 22 cases | 7.27 → 7.45 |
+| color.c | SetDeviceColorspace, SetICCColorspace (QueryColorFunction) | O (2 commits) | 143 cases, device- and icc-color among them | 3.49 → 3.55 |
+| constitute.c | SetInterpretedProperty (ReadImage's caption/comment/label) | D | 14,969 cases | 4.45 → 4.48 |
+| constitute.c | EncodeImageWithInfo (WriteImage's two encode blocks) | D | 13,088 cases | 4.48 → 4.52 |
+| constitute.c | FindFallbackEncoder, SyncEndianFromMagickInfo (WriteImage) | O, E | 13,088 cases, 251 on the fallback path | 4.52 → 4.65 |
+| fx.c | ExecuteRPN's six HSL-qualifier tests → existing IsHslChannelQualifier | P (several sites) | 767 cases | 1.93 → 2.15 |
+| fx.c | TranslateExpression's two user-symbol tests → IsUnassignedUserSymbolRead | P (several sites) | 821 cases | 2.15 → 2.28, no Complex Conditional left |
+
+Most of these were left by earlier tasks (M17, M21, M38, M48) only because the
+recipe needed the oracle level and the function's mutation score was below the gate.
+
+**New cases: SetMagickSecurityPolicy.** No case reached it (only the API calls it); a new
+`imdriver` command, `secpolicy XML [NAME...]`, and six cases (a coder rule, resource
+values, both, malformed XML, includes of a provided and a missing file) now do
+(`56a0ad2ab`). The case
+map was rebuilt (15,906 cases).
+
+**Not done.** MorphologyApply: its method switch sets five variables and its per-stage
+switch four (Edge also swaps `curr_image` and `save_image`), so Recipe O helpers would
+take seven to nine arguments. distort.c's best-fit bounds: each case writes `min` and
+`max` through macros defined mid-function that name the caller's locals. property.c and
+colorspace.c tables: Recipe F left the score flat (above).
+
+### Open: an intermittent divergence on write-mask cases
+
+`resize/6ee45e9cfa` and `resize/6efddf0c0a` (rose under a write mask, `-scale`, written
+as 32-bit floating-point MIFF) diverged three times today in full oracle runs: during the
+ImportIndexQuantum and ImportGrayQuantum steps and once at 21:08, when the case diverged
+in 4 of 5 runs on its own, with a peak error of 3.4e38 (FLT_MAX, a value no pixel had).
+Minutes later it diverged in none of: 16 runs against the baseline, 16 of the candidate
+against itself and 16 of the baseline against itself under a load average of 27, nor in
+full uncached runs of all 13,088 WriteImage cases (baseline against itself, and the
+candidate against the baseline). The baseline never diverged in any run. The pattern
+fits a read of uninitialised memory whose content depends on the run's surroundings, but
+it could not be reproduced to bisect. If it reappears, keep the candidate's output
+(`build-oracle/work/runs/cand/`) and bisect quantum-import.c and quantum-export.c first:
+the case reads and writes MIFF through both, and both changed today.
+
+### ERDC (night)
+
+The fresh reports after profile.c are unusable: transform, quantize, montage and cache
+show 0 survivors with most kills "exit status 0 → 1, out.miff missing", and constitute
+is partly affected; the earlier files look normal. The run was stopped. Those five
+reports are quarantined on the Mac (`build-oracle/work/quarantine/`); nothing used them.
+With the owner's decision above, night3 is not restarted.
+
 **Recipe F - Hoist Function-Local Static Data (new).** A `static` local whose
 initialiser is data and which nothing writes moves to file scope above its function.
 Proof: `tools/obj_same_code.sh` (new), which compares the machine code and the data as
