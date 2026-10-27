@@ -792,6 +792,28 @@ static void SwapVectorEntries(double **vectors,const size_t number_vectors,
     GaussJordanSwap(vectors[k][row],vectors[k][column]);
 }
 
+static void EliminateColumn(long double **hp_matrix,double **vectors,
+  const size_t rank,const size_t number_vectors,const ssize_t column)
+{
+  long double
+    scale;
+
+  ssize_t
+    j,
+    k;
+
+  for (j=0; j < (ssize_t) rank; j++)
+    if (j != column)
+      {
+        scale=hp_matrix[j][column];
+        hp_matrix[j][column]=0.0;
+        for (k=0; k < (ssize_t) rank; k++)
+          hp_matrix[j][k]-=scale*hp_matrix[column][k];
+        for (k=0; k < (ssize_t) number_vectors; k++)
+          vectors[k][j]-=(double)(scale*(long double) vectors[k][column]);
+      }
+}
+
 static void UnscrambleColumns(long double **hp_matrix,const size_t rank,
   const ssize_t *columns,const ssize_t *rows)
 {
@@ -886,16 +908,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
       hp_matrix[column][j]*=scale;
     for (j=0; j < (ssize_t) number_vectors; j++)
       vectors[j][column]*=(double) scale;
-    for (j=0; j < (ssize_t) rank; j++)
-      if (j != column)
-        {
-          scale=hp_matrix[j][column];
-          hp_matrix[j][column]=0.0;
-          for (k=0; k < (ssize_t) rank; k++)
-            hp_matrix[j][k]-=scale*hp_matrix[column][k];
-          for (k=0; k < (ssize_t) number_vectors; k++)
-            vectors[k][j]-=(double)(scale*(long double) vectors[k][column]);
-        }
+    EliminateColumn(hp_matrix,vectors,rank,number_vectors,column);
   }
   UnscrambleColumns(hp_matrix,rank,columns,rows);
   /*
