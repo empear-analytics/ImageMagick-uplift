@@ -296,6 +296,52 @@ static CannyInfo SetCannyOrientation(CannyInfo pixel,const double dx,
   return(pixel);
 }
 
+static void GetCannyNeighbors(const MatrixInfo *canny_cache,const ssize_t x,
+  const ssize_t y,const int orientation,CannyInfo *alpha_pixel,
+  CannyInfo *beta_pixel)
+{
+  switch (orientation)
+  {
+    case 0:
+    default:
+    {
+      /*
+        0 degrees, north and south.
+      */
+      (void) GetMatrixElement(canny_cache,x,y-1,alpha_pixel);
+      (void) GetMatrixElement(canny_cache,x,y+1,beta_pixel);
+      break;
+    }
+    case 1:
+    {
+      /*
+        45 degrees, northwest and southeast.
+      */
+      (void) GetMatrixElement(canny_cache,x-1,y-1,alpha_pixel);
+      (void) GetMatrixElement(canny_cache,x+1,y+1,beta_pixel);
+      break;
+    }
+    case 2:
+    {
+      /*
+        90 degrees, east and west.
+      */
+      (void) GetMatrixElement(canny_cache,x-1,y,alpha_pixel);
+      (void) GetMatrixElement(canny_cache,x+1,y,beta_pixel);
+      break;
+    }
+    case 3:
+    {
+      /*
+        135 degrees, northeast and southwest.
+      */
+      (void) GetMatrixElement(canny_cache,x+1,y-1,beta_pixel);
+      (void) GetMatrixElement(canny_cache,x-1,y+1,alpha_pixel);
+      break;
+    }
+  }
+}
+
 static void GetCannyGradient(const Image *edge_image,
   const Quantum *magick_restrict p,double *dx,double *dy)
 {
@@ -492,46 +538,8 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
         pixel;
 
       (void) GetMatrixElement(canny_cache,x,y,&pixel);
-      switch (pixel.orientation)
-      {
-        case 0:
-        default:
-        {
-          /*
-            0 degrees, north and south.
-          */
-          (void) GetMatrixElement(canny_cache,x,y-1,&alpha_pixel);
-          (void) GetMatrixElement(canny_cache,x,y+1,&beta_pixel);
-          break;
-        }
-        case 1:
-        {
-          /*
-            45 degrees, northwest and southeast.
-          */
-          (void) GetMatrixElement(canny_cache,x-1,y-1,&alpha_pixel);
-          (void) GetMatrixElement(canny_cache,x+1,y+1,&beta_pixel);
-          break;
-        }
-        case 2:
-        {
-          /*
-            90 degrees, east and west.
-          */
-          (void) GetMatrixElement(canny_cache,x-1,y,&alpha_pixel);
-          (void) GetMatrixElement(canny_cache,x+1,y,&beta_pixel);
-          break;
-        }
-        case 3:
-        {
-          /*
-            135 degrees, northeast and southwest.
-          */
-          (void) GetMatrixElement(canny_cache,x+1,y-1,&beta_pixel);
-          (void) GetMatrixElement(canny_cache,x-1,y+1,&alpha_pixel);
-          break;
-        }
-      }
+      GetCannyNeighbors(canny_cache,x,y,pixel.orientation,&alpha_pixel,
+        &beta_pixel);
       pixel.intensity=pixel.magnitude;
       if ((pixel.magnitude < alpha_pixel.magnitude) ||
           (pixel.magnitude < beta_pixel.magnitude))
