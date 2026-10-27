@@ -87,6 +87,18 @@ typedef struct _ExportPixelBuffer
     *pixels;
 } ExportPixelBuffer;
 
+typedef struct _ImportPixelBuffer
+{
+  const char
+    *magick_restrict map;
+
+  const QuantumType
+    *quantum_map;
+
+  const void
+    *pixels;
+} ImportPixelBuffer;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3434,10 +3446,19 @@ static MagickBooleanType ImportCharRGBPPixels(Image *image,const RectangleInfo *
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static MagickBooleanType ImportCharPixel(Image *image,const RectangleInfo *roi,
-  const char *magick_restrict map,const QuantumType *quantum_map,
-  const void *pixels,ExceptionInfo *exception)
+static MagickBooleanType ImportCharPixel(Image *image,
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const unsigned char
     *magick_restrict p;
 
@@ -5135,11 +5156,12 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   roi.height=height;
   roi.x=x;
   roi.y=y;
+  const ImportPixelBuffer buffer = { map, quantum_map, pixels };
   switch (type)
   {
     case CharPixel:
     {
-      status=ImportCharPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportCharPixel(image,&roi,&buffer,exception);
       break;
     }
     case DoublePixel:
