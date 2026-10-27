@@ -960,6 +960,35 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void GetMatrixRange(const MatrixInfo *matrix_info,double *min_value,
+  double *max_value)
+{
+  ssize_t
+    y;
+
+  (void) GetMatrixElement(matrix_info,0,0,min_value);
+  *max_value=(*min_value);
+  for (y=0; y < (ssize_t) matrix_info->rows; y++)
+  {
+    ssize_t
+      x;
+
+    for (x=0; x < (ssize_t) matrix_info->columns; x++)
+    {
+      double
+        value;
+
+      if (GetMatrixElement(matrix_info,x,y,&value) == MagickFalse)
+        continue;
+      if (value < *min_value)
+        *min_value=value;
+      else
+        if (value > *max_value)
+          *max_value=value;
+    }
+  }
+}
+
 MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
   ExceptionInfo *exception)
 {
@@ -989,27 +1018,7 @@ MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
   /*
     Determine range of matrix.
   */
-  (void) GetMatrixElement(matrix_info,0,0,&min_value);
-  max_value=min_value;
-  for (y=0; y < (ssize_t) matrix_info->rows; y++)
-  {
-    ssize_t
-      x;
-
-    for (x=0; x < (ssize_t) matrix_info->columns; x++)
-    {
-      double
-        value;
-
-      if (GetMatrixElement(matrix_info,x,y,&value) == MagickFalse)
-        continue;
-      if (value < min_value)
-        min_value=value;
-      else
-        if (value > max_value)
-          max_value=value;
-    }
-  }
+  GetMatrixRange(matrix_info,&min_value,&max_value);
   if ((min_value == 0.0) && (max_value == 0.0))
     scale_factor=0;
   else
