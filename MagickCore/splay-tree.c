@@ -116,6 +116,7 @@ struct _SplayTreeInfo
   Forward declarations.
 */
 static int
+  CompareNodeKey(const SplayTreeInfo *,const NodeInfo *,const void *),
   IterateOverSplayTree(SplayTreeInfo *,int (*)(NodeInfo *,const void *),
     const void *);
 
@@ -165,11 +166,7 @@ MagickExport MagickBooleanType AddValueToSplayTree(SplayTreeInfo *splay_tree,
   compare=0;
   if (splay_tree->root != (NodeInfo *) NULL)
     {
-      if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
-        compare=splay_tree->compare(splay_tree->root->key,key);
-      else
-        compare=(splay_tree->root->key > key) ? 1 :
-          ((splay_tree->root->key < key) ? -1 : 0);
+      compare=CompareNodeKey(splay_tree,splay_tree->root,key);
       if (compare == 0)
         {
           if ((splay_tree->relinquish_value != (void *(*)(void *)) NULL) &&
