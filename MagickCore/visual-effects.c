@@ -1727,6 +1727,50 @@ MagickExport MagickBooleanType PlasmaImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AnnotatePolaroidCaption(const Image *image,
+  const DrawInfo *draw_info,Image **caption_image,size_t *height,char **text,
+  ExceptionInfo *exception)
+{
+  char
+    geometry[MagickPathExtent];
+
+  DrawInfo
+    *annotate_info;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    count;
+
+  TypeMetric
+    metrics;
+
+  annotate_info=CloneDrawInfo((const ImageInfo *) NULL,draw_info);
+  (void) CloneString(&annotate_info->text,*text);
+  count=FormatMagickCaption(*caption_image,annotate_info,MagickTrue,
+    &metrics,text,exception);
+  status=SetImageExtent(*caption_image,image->columns,(size_t)
+    ((count+1)*(metrics.ascent-metrics.descent)+0.5),exception);
+  if (status == MagickFalse)
+    *caption_image=DestroyImage(*caption_image);
+  else
+    {
+      (*caption_image)->background_color=image->border_color;
+      (void) SetImageBackgroundColor(*caption_image,exception);
+      (void) CloneString(&annotate_info->text,*text);
+      (void) FormatLocaleString(geometry,MagickPathExtent,"+0+%.17g",
+        metrics.ascent);
+      if (annotate_info->gravity == UndefinedGravity)
+        (void) CloneString(&annotate_info->geometry,AcquireString(
+          geometry));
+      (void) AnnotateImage(*caption_image,annotate_info,exception);
+      *height+=(*caption_image)->rows;
+    }
+  annotate_info=DestroyDrawInfo(annotate_info);
+  *text=DestroyString(*text);
+}
+
 MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   const char *caption,const double angle,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -1773,46 +1817,8 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
       text=InterpretImageProperties((ImageInfo *) NULL,(Image *) image,caption,
         exception);
       if (text != (char *) NULL)
-        {
-          char
-            geometry[MagickPathExtent];
-
-          DrawInfo
-            *annotate_info;
-
-          MagickBooleanType
-            status;
-
-          ssize_t
-            count;
-
-          TypeMetric
-            metrics;
-
-          annotate_info=CloneDrawInfo((const ImageInfo *) NULL,draw_info);
-          (void) CloneString(&annotate_info->text,text);
-          count=FormatMagickCaption(caption_image,annotate_info,MagickTrue,
-            &metrics,&text,exception);
-          status=SetImageExtent(caption_image,image->columns,(size_t)
-            ((count+1)*(metrics.ascent-metrics.descent)+0.5),exception);
-          if (status == MagickFalse)
-            caption_image=DestroyImage(caption_image);
-          else
-            {
-              caption_image->background_color=image->border_color;
-              (void) SetImageBackgroundColor(caption_image,exception);
-              (void) CloneString(&annotate_info->text,text);
-              (void) FormatLocaleString(geometry,MagickPathExtent,"+0+%.17g",
-                metrics.ascent);
-              if (annotate_info->gravity == UndefinedGravity)
-                (void) CloneString(&annotate_info->geometry,AcquireString(
-                  geometry));
-              (void) AnnotateImage(caption_image,annotate_info,exception);
-              height+=caption_image->rows;
-            }
-          annotate_info=DestroyDrawInfo(annotate_info);
-          text=DestroyString(text);
-        }
+        AnnotatePolaroidCaption(image,draw_info,&caption_image,&height,&text,
+          exception);
     }
   picture_image=CloneImage(image,(size_t) ((ssize_t) image->columns+2*quantum),
     height,MagickTrue,exception);
