@@ -2596,6 +2596,30 @@ static void ReduceKmeansPixels(const Image *image,KmeansInfo **kmeans_pixels,
   }
 }
 
+static void FindNearestKmeansColor(const Image *image,
+  const Quantum *magick_restrict q,ssize_t *k,double *min_distance)
+{
+  ssize_t
+    i;
+
+  *k=0;
+  *min_distance=KmeansMetric(image,q,image->colormap+0);
+  for (i=1; i < (ssize_t) image->colors; i++)
+  {
+    double
+      distance;
+
+    if (*min_distance <= MagickEpsilon)
+      break;
+    distance=KmeansMetric(image,q,image->colormap+i);
+    if (distance < *min_distance)
+      {
+        *min_distance=distance;
+        *k=i;
+      }
+  }
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -2742,28 +2766,12 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
           min_distance;
 
         ssize_t
-          i,
           k;
 
         /*
           Assign each pixel whose mean has the least squared color distance.
         */
-        k=0;
-        min_distance=KmeansMetric(image,q,image->colormap+0);
-        for (i=1; i < (ssize_t) image->colors; i++)
-        {
-          double
-            distance;
-
-          if (min_distance <= MagickEpsilon)
-            break;
-          distance=KmeansMetric(image,q,image->colormap+i);
-          if (distance < min_distance)
-            {
-              min_distance=distance;
-              k=i;
-            }
-        }
+        FindNearestKmeansColor(image,q,&k,&min_distance);
         kmeans_pixels[id][k].red+=QuantumScale*(double) GetPixelRed(image,q);
         kmeans_pixels[id][k].green+=QuantumScale*(double)
           GetPixelGreen(image,q);
