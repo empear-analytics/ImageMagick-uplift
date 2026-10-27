@@ -1914,6 +1914,39 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   return(GetFirstImageInList(image));
 }
 
+static double GetHoughMaxima(const MatrixInfo *accumulator,const ssize_t x,
+  const ssize_t y,const size_t width,const size_t height,double count)
+{
+  double
+    maxima;
+
+  ssize_t
+    v;
+
+  maxima=count;
+  for (v=(-((ssize_t) height/2)); v <= (((ssize_t) height/2)); v++)
+  {
+    ssize_t
+      u;
+
+    for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
+    {
+      if ((u != 0) || (v !=0))
+        {
+          (void) GetMatrixElement(accumulator,x+u,y+v,&count);
+          if (count > maxima)
+            {
+              maxima=count;
+              break;
+            }
+        }
+    }
+    if (u < (ssize_t) (width/2))
+      break;
+  }
+  return(maxima);
+}
+
 static SegmentInfo GetHoughLine(const Image *image,const ssize_t x,
   const ssize_t y,const size_t accumulator_height)
 {
@@ -2132,33 +2165,10 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
           SegmentInfo
             line;
 
-          ssize_t
-            v;
-
           /*
             Is point a local maxima?
           */
-          maxima=count;
-          for (v=(-((ssize_t) height/2)); v <= (((ssize_t) height/2)); v++)
-          {
-            ssize_t
-              u;
-
-            for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
-            {
-              if ((u != 0) || (v !=0))
-                {
-                  (void) GetMatrixElement(accumulator,x+u,y+v,&count);
-                  if (count > maxima)
-                    {
-                      maxima=count;
-                      break;
-                    }
-                }
-            }
-            if (u < (ssize_t) (width/2))
-              break;
-          }
+          maxima=GetHoughMaxima(accumulator,x,y,width,height,count);
           (void) GetMatrixElement(accumulator,x,y,&count);
           if (maxima > count)
             continue;
