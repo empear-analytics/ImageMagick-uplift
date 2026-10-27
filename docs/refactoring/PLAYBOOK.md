@@ -690,7 +690,9 @@ merges code, not parameters.
 4. In each caller, declare a `const Name` local initialised from the exact argument
    expressions, member by member in declaration order. Each expression must be an
    identifier, a literal, or arithmetic on these (`1.0/scale`), not a call, a
-   dereference or anything with a side effect.
+   dereference or anything with a side effect. Member accesses (`shear.x`,
+   `image->rows`) and casts of these forms are allowed too, but only in a struct
+   declared directly before the one call that uses it, with no statement between.
 5. Nothing may write an identifier in the struct's initialiser between the declaration
    and the last call that uses the struct; declare it where that holds (inside the loop
    iteration, or just before a single call).
@@ -754,6 +756,11 @@ static inline void CopyPixels(const MagnifyPixels *magnify,
   calls (`q+=...`) cannot be a member.
 - Pointer members point to the same buffers the arguments did, so writes through them
   land where they always did.
+- A member access or cast is read at the declaration instead of in the call. Declared
+  directly before its one call, nothing can run between the two, not even a call that
+  writes the object through another pointer, so the value is the one the call would
+  have read. The expression has no call and no side effect, so evaluating it first
+  changes nothing, whatever order the call's arguments were evaluated in.
 - An arithmetic member (`1.0/scale`) is computed once, at the declaration, instead of at
   every call. Step 5 keeps its operands unchanged until the last call, so each call
   receives the value it computed before; the member has the parameter's type, so the
@@ -1096,3 +1103,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-26 | NEW | L | Hoist Function-Local Types: a `typedef` at the top of a function body moves to directly above the function, renamed when its name is already declared at file scope, proven by an identical object file (`tools/obj_identical.sh`); the extractions it unblocks follow | `GetImageFeatures`' local `ChannelStatistics` (M35) pins every block of a cc-180 function; it shadows the public type of the same name. A trial rename compiled to the same object file; a planted `<` to `<=` was caught | mandate (2026-10-24) |
 | 2026-10-26 | AMEND | P | Several sites: one predicate may replace the same expression at several sites, at guard level, when a script confirms each site equals the body with arguments substituted and every argument is free of side effects; `--calls` shows +1 per extra site and one fewer of each inner callee per replaced copy. Decided by Claude Code under the owner's delegation of 2026-10-26 | PR #16's open question; `GetDelegateList` (decode/encode) | owner |
 | 2026-10-26 | AMEND | B | Arithmetic members: an initialiser may be arithmetic on identifiers and literals (`1.0/scale`), computed once at the declaration; step 5 keeps its operands unchanged until the last call | `identify.c`'s `PrintChannelStatistics`: all 15 calls pass `file`, `1.0/scale` and `channel_statistics` | mandate (2026-10-24) |
+| 2026-10-27 | AMEND | B | Member accesses and casts: an initialiser may read a member (`a.b`, `p->b`) or cast an allowed expression, when the struct is declared directly before the one call that uses it, with no statement between | `shear.c`'s XShearImage, YShearImage and CropToFitImage (`shear.x`, `bounds.width`, `(ssize_t) (image->rows-height)/2`), `transform.c`'s CopyImageRegion, `channel.c`'s FlattenPixelInfo: the last argument findings of two files, refused only by step 4 | mandate (2026-10-24) |
