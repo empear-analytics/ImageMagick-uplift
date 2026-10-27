@@ -757,6 +757,31 @@ static ssize_t GetMostFrequentOffset(const Image *linear_image,
   return(j);
 }
 
+static inline void SetOilPaintChannels(const Image *linear_image,
+  const Image *paint_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q,const ssize_t center,const ssize_t j)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(linear_image,i);
+    PixelTrait traits = GetPixelChannelTraits(linear_image,channel);
+    PixelTrait paint_traits=GetPixelChannelTraits(paint_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (paint_traits == UndefinedPixelTrait))
+      continue;
+    if ((paint_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(paint_image,channel,p[center+i],q);
+        continue;
+      }
+    SetPixelChannel(paint_image,channel,p[j*(ssize_t)
+      GetPixelChannels(linear_image)+i],q);
+  }
+}
+
 MagickExport Image *OilPaintImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -857,31 +882,13 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
     for (x=0; x < (ssize_t) linear_image->columns; x++)
     {
       ssize_t
-        i;
-
-      ssize_t
         j;
 
       /*
         Assign most frequent color.
       */
       j=GetMostFrequentOffset(linear_image,p,histogram,width);
-      for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(linear_image,i);
-        PixelTrait traits = GetPixelChannelTraits(linear_image,channel);
-        PixelTrait paint_traits=GetPixelChannelTraits(paint_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (paint_traits == UndefinedPixelTrait))
-          continue;
-        if ((paint_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(paint_image,channel,p[center+i],q);
-            continue;
-          }
-        SetPixelChannel(paint_image,channel,p[j*(ssize_t)
-          GetPixelChannels(linear_image)+i],q);
-      }
+      SetOilPaintChannels(linear_image,paint_image,p,q,center,j);
       p+=(ptrdiff_t) GetPixelChannels(linear_image);
       q+=(ptrdiff_t) GetPixelChannels(paint_image);
     }
