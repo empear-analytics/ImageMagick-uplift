@@ -9,7 +9,7 @@ files where the baseline has them (display.c 1.02, accelerate.c 2.06, opencl.c 2
 
 ### Report (2026-10-27, Mac, afternoon)
 
-**Result: pixel.c 1.10 → 1.73**, in 14 commits, one Recipe B each.
+**Result: pixel.c 1.10 → 1.73**, in 14 commits, one Recipe B each; and draw.c 1.79 → 1.90 (below).
 
 | Function | Bundle | Evidence | Code Health |
 |---|---|---|---|
@@ -59,6 +59,27 @@ Full catalogue at the branch tip: 15,884 cases, 1 diverged, gaps/c5651ffad8 (log
   file-level finding stays.
 - *Brain Method* stays on `InterpolatePixelChannels` and `InterpolatePixelInfo`: one
   `switch` per interpolation method with shared locals.
+
+### draw.c GetFillAlpha (same afternoon)
+
+**draw.c 1.79 → 1.90**, one Recipe B commit. M99 passed GetFillAlpha over: with
+`draw_info->fill_rule` and `polygon_info[id]` ruled out as initialisers (a member access
+and a subscript), five of its seven arguments seemed to remain. Bundling `mid`, `fill`, `x`
+and `y` instead, in a `const FillAlphaSample` declared inside the `x` iteration just
+before the one call, leaves four: `polygon_info[id]`, `&sample`, `fill_rule` and the
+`stroke_alpha` out-pointer. Declared inside the parallel region, each thread has its own.
+The function loses *Brain Method* together with *Excess Number of Function Arguments*.
+
+Evidence: a fresh uncapped run (Mull build `fa100`, `--max-cases 400`, above its 356 cases)
+killed 108 of 125 killable mutants, 86%, careful. The older reports' survivors for this
+function were partly at stale positions (declarations and blank lines now) and partly
+capped at 200 cases. The 17 survivors are boundary flips in the floating-point comparisons
+of the alpha computation, which the step does not touch. 356 cases, 0 diverged.
+
+The rest of draw.c's *Excess Number of Function Arguments* (IsNewSubpathPoint,
+DrawClippingMask, DrawCompositeMask, IsDashSegmentPending, IsRenderableClass,
+TraceArcPath, and the public DrawPatternPath) carries no Brain Method, and the public one
+keeps the file-level finding, so B there would leave the score flat.
 
 ### Harness notes
 
