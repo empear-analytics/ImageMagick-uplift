@@ -119,6 +119,15 @@ typedef struct _PolicyMapInfo
     *pattern,
     *value;
 } PolicyMapInfo;
+
+typedef struct _PolicyLoadTarget
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+} PolicyLoadTarget;
 
 /*
   Static declarations.
@@ -141,8 +150,8 @@ static SemaphoreInfo
 */
 static MagickBooleanType
   IsPolicyCacheInstantiated(ExceptionInfo *),
-  LoadPolicyCache(LinkedListInfo *,const char *,const char *,const size_t,
-    ExceptionInfo *);
+  LoadPolicyCache(const PolicyLoadTarget *,const char *,const char *,
+    const size_t);
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -189,12 +198,15 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
   status=MagickTrue;
 #if MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   magick_unreferenced(filename);
-  status=LoadPolicyCache(cache,ZeroConfigurationPolicy,"[zero-configuration]",0,
-    exception);
+  const PolicyLoadTarget target = { cache, exception };
+  status=LoadPolicyCache(&target,ZeroConfigurationPolicy,"[zero-configuration]",
+    0);
   if (status == MagickFalse)
     CatchException(exception);
 #else
   {
+    const PolicyLoadTarget target = { cache, exception };
+
     const StringInfo
       *option;
 
@@ -205,8 +217,8 @@ static LinkedListInfo *AcquirePolicyCache(const char *filename,
     option=(const StringInfo *) GetNextValueInLinkedList(options);
     while (option != (const StringInfo *) NULL)
     {
-      status=LoadPolicyCache(cache,(const char *) GetStringInfoDatum(option),
-        GetStringInfoPath(option),0,exception);
+      status=LoadPolicyCache(&target,(const char *) GetStringInfoDatum(option),
+        GetStringInfoPath(option),0);
       if (status == MagickFalse)
         CatchException(exception);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
@@ -1090,18 +1102,19 @@ MagickExport MagickBooleanType ListPolicyInfo(FILE *file,
 %
 %  The format of the LoadPolicyCache method is:
 %
-%      MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,const char *xml,
-%        const char *filename,const size_t depth,ExceptionInfo *exception)
+%      MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
+%        const char *xml,const char *filename,const size_t depth)
 %
 %  A description of each parameter follows:
+%
+%    o target: the cache to load into, and the exception structure to
+%      return any errors or warnings in.
 %
 %    o xml:  The policy list in XML format.
 %
 %    o filename:  The policy list filename.
 %
 %    o depth: depth of <include /> statements.
-%
-%    o exception: return any errors or warnings in this structure.
 %
 */
 
@@ -1218,10 +1231,15 @@ static void SetPolicyInfoAttribute(PolicyInfo *policy_info,const char *keyword,
   }
 }
 
-static MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,
-  const char *policy,const char *filename,const size_t depth,
-  ExceptionInfo *exception)
+static MagickBooleanType LoadPolicyCache(const PolicyLoadTarget *target,
+  const char *policy,const char *filename,const size_t depth)
 {
+  LinkedListInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
   char
     keyword[MagickPathExtent],
     *token;
@@ -1325,6 +1343,8 @@ static MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
                 {
+                  const PolicyLoadTarget include_target = { cache, exception };
+
                   char
                     path[MagickPathExtent],
                     *file_xml;
@@ -1333,8 +1353,8 @@ static MagickBooleanType LoadPolicyCache(LinkedListInfo *cache,
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=(MagickStatusType) LoadPolicyCache(cache,file_xml,
-                        path,depth+1,exception);
+                      status&=(MagickStatusType) LoadPolicyCache(
+                        &include_target,file_xml,path,depth+1);
                       file_xml=DestroyString(file_xml);
                     }
                 }
@@ -1507,7 +1527,8 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
   if (ValidateSecurityPolicy(policy,PolicyFilename,exception) == MagickFalse)
     return(MagickFalse);
   LockSemaphoreInfo(policy_semaphore);
-  status=LoadPolicyCache(policy_cache,policy,"[user-policy]",0,exception);
+  const PolicyLoadTarget policy_target = { policy_cache, exception };
+  status=LoadPolicyCache(&policy_target,policy,"[user-policy]",0);
   UnlockSemaphoreInfo(policy_semaphore);
   if (status == MagickFalse)
     return(status);
@@ -1515,7 +1536,8 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
     Synchronize user policies.
   */
   user_policies=NewLinkedList(0);
-  status=LoadPolicyCache(user_policies,policy,"[user-policy]",0,exception);
+  const PolicyLoadTarget user_target = { user_policies, exception };
+  status=LoadPolicyCache(&user_target,policy,"[user-policy]",0);
   if (status == MagickFalse)
     {
       user_policies=DestroyLinkedList(user_policies,DestroyPolicyElement);
