@@ -296,6 +296,46 @@ static CannyInfo SetCannyOrientation(CannyInfo pixel,const double dx,
   return(pixel);
 }
 
+static void GetCannyGradient(const Image *edge_image,
+  const Quantum *magick_restrict p,double *dx,double *dy)
+{
+  const Quantum
+    *magick_restrict kernel_pixels;
+
+  ssize_t
+    v;
+
+  static double
+    Gx[2][2] =
+    {
+      { -1.0,  +1.0 },
+      { -1.0,  +1.0 }
+    },
+    Gy[2][2] =
+    {
+      { +1.0, +1.0 },
+      { -1.0, -1.0 }
+    };
+
+  kernel_pixels=p;
+  for (v=0; v < 2; v++)
+  {
+    ssize_t
+      u;
+
+    for (u=0; u < 2; u++)
+    {
+      double
+        intensity;
+
+      intensity=GetPixelIntensity(edge_image,kernel_pixels+u);
+      *dx+=0.5*Gx[v][u]*intensity;
+      *dy+=0.5*Gy[v][u]*intensity;
+    }
+    kernel_pixels+=edge_image->columns+1;
+  }
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -401,44 +441,10 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
         dx,
         dy;
 
-      const Quantum
-        *magick_restrict kernel_pixels;
-
-      ssize_t
-        v;
-
-      static double
-        Gx[2][2] =
-        {
-          { -1.0,  +1.0 },
-          { -1.0,  +1.0 }
-        },
-        Gy[2][2] =
-        {
-          { +1.0, +1.0 },
-          { -1.0, -1.0 }
-        };
-
       (void) memset(&pixel,0,sizeof(pixel));
       dx=0.0;
       dy=0.0;
-      kernel_pixels=p;
-      for (v=0; v < 2; v++)
-      {
-        ssize_t
-          u;
-
-        for (u=0; u < 2; u++)
-        {
-          double
-            intensity;
-
-          intensity=GetPixelIntensity(edge_image,kernel_pixels+u);
-          dx+=0.5*Gx[v][u]*intensity;
-          dy+=0.5*Gy[v][u]*intensity;
-        }
-        kernel_pixels+=edge_image->columns+1;
-      }
+      GetCannyGradient(edge_image,p,&dx,&dy);
       pixel.magnitude=hypot(dx,dy);
       pixel.orientation=0;
       pixel=SetCannyOrientation(pixel,dx,dy);
