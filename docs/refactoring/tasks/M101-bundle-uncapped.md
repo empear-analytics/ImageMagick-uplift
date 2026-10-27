@@ -127,6 +127,7 @@ delegate.c WaitForDelegateInput (InvokeDelegate, E, 2.60 → 2.61).
 | feature.c | GetCannyNeighbors (CannyEdgeImage's suppression) | O (amended) | 12 cases | 2.21 → 2.23 |
 
 | threshold.c | RangeThresholdChannels (RangeThresholdImage's per-pixel work around the earlier ladder helper) | E | 13 cases; Brain Method gone | 2.16 → 2.38 |
+| feature.c | WriteHoughHeader, VoteHoughLines (HoughLineImage) | E (2 commits) | 19 cases | 2.23 → 2.30 |
 | vision.c | CountPerimeterPattern, the 2x2 pattern count PerimeterThreshold and CircularityThreshold share | D | 4 cases; Deep Nesting gone in both | 2.10 → 2.35 |
 
 Whole catalogue at `f08adb1b0`: 15,906 cases, 1 diverged (`gaps/c5651ffad8`, the known Mac artifact). Brain Methods in MagickCore (built files): 27 left, from 44 in the morning.
