@@ -3778,9 +3778,18 @@ static MagickBooleanType ImportDoubleRGBPPixels(Image *image,const RectangleInfo
 }
 
 static MagickBooleanType ImportDoublePixel(Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,const void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const double
     *magick_restrict p;
 
@@ -5166,7 +5175,7 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
     }
     case DoublePixel:
     {
-      status=ImportDoublePixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportDoublePixel(image,&roi,&buffer,exception);
       break;
     }
     case FloatPixel:
