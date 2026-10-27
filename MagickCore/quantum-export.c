@@ -3750,6 +3750,42 @@ static void ExportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void AssociateQuantumAlpha(const Image *image,CacheView *image_view)
+{
+  double
+    Sa;
+
+  Quantum
+    *magick_restrict r;
+
+  ssize_t
+    x;
+
+  /*
+    Associate alpha.
+  */
+  if (image_view == (CacheView *) NULL)
+    r=GetAuthenticPixelQueue(image);
+  else
+    r=GetCacheViewAuthenticPixelQueue(image_view);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    Sa=QuantumScale*(double) GetPixelAlpha(image,r);
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      r[i]=ClampToQuantum(Sa*(double) r[i]);
+    }
+    r+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport size_t ExportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,unsigned char *magick_restrict pixels,
@@ -3793,37 +3829,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
   if (p == (Quantum *) NULL)
     return(0);
   if (quantum_info->alpha_type == AssociatedQuantumAlpha)
-    {
-      double
-        Sa;
-
-      Quantum
-        *magick_restrict r;
-
-      /*
-        Associate alpha.
-      */
-      if (image_view == (CacheView *) NULL)
-        r=GetAuthenticPixelQueue(image);
-      else
-        r=GetCacheViewAuthenticPixelQueue(image_view);
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        ssize_t
-          i;
-
-        Sa=QuantumScale*(double) GetPixelAlpha(image,r);
-        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-        {
-          PixelChannel channel = GetPixelChannelChannel(image,i);
-          PixelTrait traits = GetPixelChannelTraits(image,channel);
-          if ((traits & UpdatePixelTrait) == 0)
-            continue;
-          r[i]=ClampToQuantum(Sa*(double) r[i]);
-        }
-        r+=(ptrdiff_t) GetPixelChannels(image);
-      }
-    }
+    AssociateQuantumAlpha(image,image_view);
   if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
     {
       Quantum
