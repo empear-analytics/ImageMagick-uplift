@@ -29,6 +29,25 @@ finding.
 | shear.c YShearImage | the same struct | oracle, careful (78%), 43 cases | 2.45 → 2.67 |
 | shear.c CropToFitImage | x_shear, y_shear, width, height, rotate (`CropToFitRegion`, new) | oracle, careful (89%), 43 cases | 2.67 → 2.72, the file's last argument finding |
 
+| annotate.c RenderType | image, draw_info (`RenderTarget`, new) | oracle, careful (80%, `n101`), 218 cases | 2.33 → 2.53 |
+
+**Recipe F - Hoist Function-Local Static Data (new).** A `static` local whose
+initialiser is data and which nothing writes moves to file scope above its function.
+Proof: `tools/obj_same_code.sh` (new), which compares the machine code and the data as
+sets, since the compiler reorders the string pool when a literal moves (byte-identical
+objects, Recipe L's proof, fail on that alone). It printed SAME CODE for the steps below
+and DIFFERENT for a trial with one delegate name changed.
+
+| File | Function | Data moved | Evidence | Code Health |
+|---|---|---|---|---|
+| version.c | GetMagickDelegates | the `#if`-assembled delegates string (124 lines) | oracle (9 cases), SAME CODE | 9.28 → **10.00** |
+| signature.c | TransformSignature | the 64 SHA-256 round constants | oracle (1,867 cases), SAME CODE | 8.54 → 8.62 |
+
+Tried and reverted (score flat): property.c GetEXIFProperty's tag table (304 lines; the
+function stays Large at about 400 lines; the tool also flagged 4 bytes of alignment
+padding) and colorspace.c TransformsRGBImage's `YCCMap` (236 lines, the function stays
+at about 700). F pays only where the data is most of the function.
+
 **Recipe B amendment: member accesses and casts.** Step 4 refused any initialiser that
 reads a member (`shear.x`, `image->rows`) or casts, which left shear.c and transform.c
 out of reach though every one of their argument findings is on a static function. Such

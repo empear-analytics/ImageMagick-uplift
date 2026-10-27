@@ -1061,7 +1061,7 @@ statements, never declarations. No other recipe moves a variable.
    no statement assigns. A static the function updates (a counter, a cache, a flag set
    once) does not move.
 3. Move the declaration with its initialiser and the `#if` lines inside it, unchanged
-   except for two fewer spaces of indentation, to directly above the function's
+   except that lines indented under the declaration lose two spaces, to directly above the function's
    signature, below its comment banner and below any hoisted macro or type it uses.
 4. Keep the name unless `grep` finds it at file scope in this file or in a header the file
    includes; then prefix it with a word from the function's name and rename the uses in
