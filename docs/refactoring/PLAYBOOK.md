@@ -92,20 +92,19 @@ The oracle only proves what its cases reach and check. Before starting on a func
 find out which level it is at, and say in the commit message which one verified it
 (`Verified: oracle` or `Verified: guard`).
 
-**Oracle-verified.** The function passes the readiness gate:
+**Oracle-verified.** Some case executes the function:
 
 ```bash
 python3 tools/oracle/casemap.py <Function>              # some case executes it
-python3 tools/oracle/mutate.py --file <file> --function <Function> --max-cases 0
-python3 tools/oracle/gate.py build-oracle/work/mutation-<name>.json --file <file>.c
 ```
 
-A verdict of **ready** (90% or more of the killable mutants killed) allows every recipe
-in this catalogue. **Careful** (75-90%) allows them too, but read the unmatched and
-unreached survivors of the function first (`classify.py ... --kind unmatched`) and keep
-clear of the lines they sit on, or add a case that kills them.
+That allows every recipe in this catalogue. **No mutation run is needed before a step**
+(owner's decision, 2026-10-27): the harness was built under mutation guidance, and its
+cases are the protection now. The mutation reports already in `build-oracle/work/` may
+still be read, for instance to see which lines of a function no case checks, but do not
+start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 
-**Guard-verified.** The function is **not ready**, or no case executes it. It may still
+**Guard-verified.** No case executes the function. It may still
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P**. The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
@@ -1197,3 +1196,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-26 | AMEND | B | Arithmetic members: an initialiser may be arithmetic on identifiers and literals (`1.0/scale`), computed once at the declaration; step 5 keeps its operands unchanged until the last call | `identify.c`'s `PrintChannelStatistics`: all 15 calls pass `file`, `1.0/scale` and `channel_statistics` | mandate (2026-10-24) |
 | 2026-10-27 | AMEND | B | Member accesses and casts: an initialiser may read a member (`a.b`, `p->b`) or cast an allowed expression, when the struct is declared directly before the one call that uses it, with no statement between | `shear.c`'s XShearImage, YShearImage and CropToFitImage (`shear.x`, `bounds.width`, `(ssize_t) (image->rows-height)/2`), `transform.c`'s CopyImageRegion, `channel.c`'s FlattenPixelInfo: the last argument findings of two files, refused only by step 4 | mandate (2026-10-24) |
 | 2026-10-27 | NEW | F | Hoist Function-Local Static Data: a `static` declaration whose initialiser is data (a table, an `#if`-assembled string) and which nothing writes moves to directly above the function, proven by unchanged machine code and the same data (`tools/obj_same_code.sh`) | `GetMagickDelegates` (version.c's only finding: 130 lines, 124 of them one string); the same shape in `GetEXIFProperty`, `TransformsRGBImage`, `TransformSignature`, `AcquireResizeFilter` | mandate (2026-10-24) |
+| 2026-10-27 | AMEND | rule | *Two levels of evidence*: a function some case executes is oracle-verified for every recipe; no mutation run (readiness gate) before a step. Guard level stays for code no case reaches | The harness was built under mutation guidance and is finished; the 3SX and Jellyfin campaigns refactored without per-step mutation runs, and today's uncapped runs only confirmed it | owner |

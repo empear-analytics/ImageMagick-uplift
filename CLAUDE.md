@@ -32,12 +32,11 @@ which variables a block may write has to be checked by reading, not by a tool.
 - **The oracle is cheap now - use it on every commit.** `tools/oracle/oracle.py run
   --function <Function>` runs only the cases that reach the function, usually in seconds.
   The whole catalogue (about 2 minutes warm) runs before a branch is pushed.
-- **Check protection before you start, not after.** A function that no case executes, or
-  whose mutants mostly survive, is not protected by a green oracle run. The backlog's
-  readiness column and the readiness gate (`tools/oracle/gate.py`, see the playbook's *Two
-  levels of evidence*) say which files and functions are ready. Do not read
-  `docs/refactoring/MUTATION.md` whole (300 kB); search it for the function if you need
-  the details.
+- **Check reach before you start, not after.** A function that no case executes is not
+  protected by a green oracle run (`tools/oracle/casemap.py <Function>`). **Do not run
+  mutation testing to gate a step** (owner's decision, 2026-10-27): the harness was built
+  under mutation guidance and is finished. Do not read `docs/refactoring/MUTATION.md`
+  whole (300 kB); search it for the function if you need the details.
 - **A Code Health score of 4.00 is a milestone, not the finish line.** It marks leaving
   the Red band. Keep applying the catalogue, adding recipes as the playbook's *Growing the
   catalogue* allows, until nothing legal raises the score further; then record where the
