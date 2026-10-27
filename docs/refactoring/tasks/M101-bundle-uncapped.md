@@ -123,6 +123,15 @@ delegate.c WaitForDelegateInput (InvokeDelegate, E, 2.60 → 2.61).
 | quantum-export.c | SwapRedGreenQuantum, the two identical CbYCr swaps | D | 12,782 cases; Bumpy Road gone | 2.03 → 2.04 |
 | delegate.c | WaitForDelegateInput (InvokeDelegate) | E | 12 cases | 2.60 → 2.61 |
 
+| quantize.c | FindNearestKmeansColor, then AccumulateKmeansPixel (KmeansImage) | O (amended), E | 22 cases; flat, then Brain Method and Deep Nesting gone | 2.14 → 2.36 |
+| feature.c | GetCannyNeighbors (CannyEdgeImage's suppression) | O (amended) | 12 cases | 2.21 → 2.23 |
+
+**Recipe O amendment (`bf8fe8636`):** inside a parallel loop body, a selection may move
+when every variable it writes is declared in that body, it writes nothing declared
+outside it (`status` included) and it has no pragma, which is Recipe K's condition.
+DrawGradientImage's repeat offset was tried under it and left flat: its depth-6 nesting
+also sits in each spread's stop lookup.
+
 Reverted: DistortImage's -verbose printers (BilinearForward flat, Polynomial 2.49 → 2.47);
 the import side's single CbYCr swap (flat).
 
