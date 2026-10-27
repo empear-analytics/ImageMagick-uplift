@@ -57,6 +57,24 @@ case reach and the oracle run.
 | fx.c | ExecuteRPN's six HSL-qualifier tests → existing IsHslChannelQualifier | P (several sites) | 767 cases | 1.93 → 2.15 |
 | fx.c | TranslateExpression's two user-symbol tests → IsUnassignedUserSymbolRead | P (several sites) | 821 cases | 2.15 → 2.28, no Complex Conditional left |
 
+| image.c | GetFilenameOption (InterpretImageFilename's %[name] lookup) | E | 12,656 cases | 2.20 → 2.24 |
+| image.c | CopyPixelChannels (CopyImagePixels' channel loop, inside OpenMP) | E | 54 cases; Brain Method gone | 2.24 → 2.49 |
+| threshold.c | RangeThresholdValue (RangeThresholdImage's ladder) | E | 13 cases | 2.08 → 2.12 |
+| threshold.c | SumThresholdWindow (AdaptiveThresholdImage's first window) | K | 12 cases | 2.12 → 2.16 |
+| effect.c | UnsharpPixelChannels (UnsharpMaskImage's channel loop) | E | 53 cases; Brain Method gone | 1.40 → 1.48 |
+| effect.c | GetSurfaceShade, ShadePixelChannels (ShadeImage) | E (2 commits) | 17 cases; Brain Method gone | 1.48 → 1.59 |
+| paint.c | SetUpdatableFillChannels (OpaquePaintImage) | E | 36 cases; Brain Method gone | 3.33 → 3.82 |
+| paint.c | SetMaskedFillChannels (FloodfillPaintImage) | E | 41 cases | 3.82 → 3.87 |
+
+The pattern of the night: a public function's Brain Method often sits in one per-pixel
+channel loop inside its parallel row loop that writes only through `q`. Moved out by
+Recipe E (allowed inside OpenMP for a block that writes only the iteration's own data),
+the function loses Brain Method and Deep Nesting, and the file gains 0.1 to 0.5.
+Refused: the blur loops in effect.c (MotionBlur, SelectiveBlur, Bilateral) and
+MeanShiftImage, which write the shared `status` and accumulators in the same block
+(neither K nor T covers that); StatisticImage, whose accumulation writes five values;
+AdaptiveThresholdImage's sliding window (extracted, flat, reverted).
+
 Most of these were left by earlier tasks (M17, M21, M38, M48) only because the
 recipe needed the oracle level and the function's mutation score was below the gate.
 
