@@ -1,0 +1,89 @@
+mutate: 727 mutants in MagickCore/vision\.c$, 14 functions
+mutate: baseline over 62 cases in 1s
+  mutants: 25/727 (1s)
+  mutants: 50/727 (2s)
+  mutants: 75/727 (3s)
+  mutants: 100/727 (4s)
+  mutants: 125/727 (4s)
+  mutants: 150/727 (5s)
+  mutants: 175/727 (5s)
+  mutants: 200/727 (6s)
+  mutants: 225/727 (6s)
+  mutants: 250/727 (7s)
+  mutants: 275/727 (8s)
+  mutants: 300/727 (10s)
+  mutants: 325/727 (14s)
+  mutants: 350/727 (22s)
+  mutants: 375/727 (134s)
+  mutants: 400/727 (140s)
+  mutants: 425/727 (145s)
+  mutants: 450/727 (151s)
+  mutants: 475/727 (159s)
+  mutants: 500/727 (167s)
+  mutants: 525/727 (173s)
+  mutants: 550/727 (178s)
+  mutants: 575/727 (182s)
+  mutants: 600/727 (186s)
+  mutants: 625/727 (188s)
+  mutants: 650/727 (194s)
+  mutants: 675/727 (200s)
+  mutants: 700/727 (201s)
+  mutants: 725/727 (311s)
+  mutants: 727/727 (318s)
+
+mutate: 727 mutants, 318s
+  killed 695, survived 32 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 95.6%   overall: 95.6%
+
+  function                           total killed survived no-cov
+  ConnectedComponentsImage             369    369        0      0
+  AngleThreshold                        58     46       12      0
+  EccentricityThreshold                 50     47        3      0
+  CircularityThreshold                  44     40        4      0
+  PerimeterThreshold                    41     37        4      0
+  MajorAxisThreshold                    40     37        3      0
+  MinorAxisThreshold                    40     35        5      0
+  IntegralImage                         33     33        0      0
+  CCObjectInfoCompare                   21     21        0      0
+  IsNeighborOutsideImage                12     12        0      0
+  IsMetricOutsideRange                   5      4        1      0
+  IsAreaOutsideRange                     5      5        0      0
+  IsGreaterAdjacentObject                5      5        0      0
+  IsDiagonalPair                         4      4        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  vision.c:192:15 cxx_lt_to_le               for (i=0; i < (ssize_t) component_image->colors; i++)
+    x  vision.c:213:20 cxx_lt_to_le               for (y=(-1); y < (ssize_t) bounding_box.height; y++)
+    x  vision.c:258:41 cxx_eq_to_ne               if ((ssize_t) pixels[2*v+u] == i)
+       vision.c:268:27 cxx_post_inc_to_post_dec   pattern[0]++;  /* diagonal */
+    x  vision.c:298:15 cxx_lt_to_le               for (i=0; i < (ssize_t) component_image->colors; i++)
+    x  vision.c:319:20 cxx_lt_to_le               for (y=(-1); y < (ssize_t) bounding_box.height; y++)
+    x  vision.c:364:41 cxx_eq_to_ne               if ((ssize_t) pixels[2*v+u] == i)
+       vision.c:374:27 cxx_post_inc_to_post_dec   pattern[0]++;  /* diagonal */
+    x  vision.c:406:15 cxx_lt_to_le               for (i=0; i < (ssize_t) component_image->colors; i++)
+    x  vision.c:478:20 cxx_sub_to_add             M11+=(x-centroid.x)*(y-centroid.y);
+    x  vision.c:478:35 cxx_sub_to_add             M11+=(x-centroid.x)*(y-centroid.y);
+    x  vision.c:505:15 cxx_lt_to_le               for (i=0; i < (ssize_t) component_image->colors; i++)
+    x  vision.c:577:20 cxx_sub_to_add             M11+=(x-centroid.x)*(y-centroid.y);
+    x  vision.c:577:35 cxx_sub_to_add             M11+=(x-centroid.x)*(y-centroid.y);
+    x  vision.c:578:20 cxx_sub_to_add             M20+=(x-centroid.x)*(x-centroid.x);
+    x  vision.c:578:35 cxx_sub_to_add             M20+=(x-centroid.x)*(x-centroid.x);
+    x  vision.c:604:15 cxx_lt_to_le               for (i=0; i < (ssize_t) component_image->colors; i++)
+    x  vision.c:677:20 cxx_sub_to_add             M11+=(x-centroid.x)*(y-centroid.y);
+    x  vision.c:677:35 cxx_sub_to_add             M11+=(x-centroid.x)*(y-centroid.y);
+    x  vision.c:708:15 cxx_lt_to_le               for (i=0; i < (ssize_t) component_image->colors; i++)
+    x  vision.c:790:19 cxx_lt_to_le               if (fabs(M11) < 0.0)
+       vision.c:792:24 cxx_sub_to_add             if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+       vision.c:792:30 cxx_ge_to_gt               if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+       vision.c:792:30 cxx_ge_to_lt               if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+       vision.c:792:46 cxx_sub_to_add             if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+       vision.c:792:52 cxx_lt_to_ge               if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+       vision.c:792:52 cxx_lt_to_le               if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+    x  vision.c:798:25 cxx_sub_to_add             if (fabs(M20-M02) >= 0.0)
+    x  vision.c:800:25 cxx_sub_to_add             if ((M20-M02) < 0.0)
+    x  vision.c:807:24 cxx_sub_to_add             if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+    x  vision.c:807:30 cxx_ge_to_gt               if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+    x  vision.c:816:26 cxx_ge_to_gt               (object[i].metric[n] >= range->max_threshold)) &&
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-vision.json

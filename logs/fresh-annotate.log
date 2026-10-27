@@ -1,0 +1,73 @@
+mutate: 611 mutants in MagickCore/annotate\.c$, 29 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/611 (0s)
+  mutants: 50/611 (1s)
+  mutants: 75/611 (1s)
+  mutants: 100/611 (1s)
+  mutants: 125/611 (1s)
+  mutants: 150/611 (1s)
+  mutants: 175/611 (1s)
+  mutants: 200/611 (2s)
+  mutants: 225/611 (3s)
+  mutants: 250/611 (3s)
+  mutants: 275/611 (4s)
+  mutants: 300/611 (5s)
+  mutants: 325/611 (6s)
+  mutants: 350/611 (6s)
+  mutants: 375/611 (7s)
+  mutants: 400/611 (8s)
+  mutants: 425/611 (8s)
+  mutants: 450/611 (9s)
+  mutants: 475/611 (10s)
+  mutants: 500/611 (11s)
+  mutants: 525/611 (11s)
+  mutants: 550/611 (11s)
+  mutants: 575/611 (11s)
+  mutants: 600/611 (11s)
+  mutants: 611/611 (132s)
+
+mutate: 611 mutants, 132s
+  killed 518, survived 4 (0 capped), no coverage 89, errors 0
+  mutation score on reached code: 99.2%   overall: 84.8%
+
+  function                           total killed survived no-cov
+  RenderFreetype                       183    183        0      0
+  AnnotateImage                        175    175        0      0
+  RenderPostscript                      81      0        0     81
+  FormatMagickCaption                   28     28        0      0
+  RenderType                            27     27        0      0
+  GetMultilineTypeMetrics               18     15        3      0
+  TraceCubicBezier                      12     12        0      0
+  ComplexTextLayout                     11     11        0      0
+  TraceQuadraticBezier                   8      8        0      0
+  ReplaceSpaceWithNewline                7      6        1      0
+  FreetypeReadStream                     5      5        0      0
+  FreetypeRealloc                        5      5        0      0
+  TraceLineTo                            4      4        0      0
+  TraceMoveTo                            4      4        0      0
+  IsRenderedStroke                       4      4        0      0
+  IsPostscriptNameChar                   4      0        0      4
+  IsValidPostscriptFontname              4      0        0      4
+  RenderX11                              4      4        0      0
+  AnnotateComponentTerminus              3      3        0      0
+  IsBreakableSpace                       3      3        0      0
+  IsEmptyOutline                         3      3        0      0
+  FreetypeInit                           3      3        0      0
+  IsUnauthorizedFontFile                 3      3        0      0
+  IsTextWithoutGlyphs                    3      3        0      0
+  IsVisibleStroke                        3      3        0      0
+  GetTypeMetrics                         2      2        0      0
+  FreetypeAlloc                          2      2        0      0
+  AnnotateComponentGenesis               1      1        0      0
+  FreetypeCloseStream                    1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  annotate.c:626:18 cxx_ge_to_gt               if (offset >= 0)
+    x  annotate.c:806:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  annotate.c:873:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) count; i++)
+    x  annotate.c:873:15 cxx_lt_to_le               for (i=0; i < (ssize_t) count; i++)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-annotate.json

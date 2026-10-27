@@ -6738,3 +6738,9 @@ nohup: ignoring input
 20:00 fresh token:   killed 196, survived 1 (0 capped), no coverage 0, errors 0
 20:05 fresh splay-tree:   killed 230, survived 12 (0 capped), no coverage 0, errors 0
 20:08 fresh blob:   killed 624, survived 7 (0 capped), no coverage 3, errors 0
+20:08 pushed
+20:11 fresh annotate:   killed 518, survived 4 (0 capped), no coverage 89, errors 0
+20:17 fresh vision:   killed 695, survived 32 (0 capped), no coverage 0, errors 0
+20:19 fresh utility:   killed 329, survived 12 (0 capped), no coverage 14, errors 0
+20:20 fresh signature:   killed 81, survived 0 (0 capped), no coverage 2, errors 0
+20:23 fresh resource:   killed 212, survived 0 (0 capped), no coverage 3, errors 0

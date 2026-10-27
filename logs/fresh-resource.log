@@ -1,0 +1,37 @@
+mutate: 215 mutants in MagickCore/resource\.c$, 16 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/215 (1s)
+  mutants: 50/215 (1s)
+  mutants: 75/215 (2s)
+  mutants: 100/215 (2s)
+  mutants: 125/215 (2s)
+  mutants: 150/215 (3s)
+  mutants: 175/215 (3s)
+  mutants: 200/215 (4s)
+  mutants: 215/215 (134s)
+
+mutate: 215 mutants, 134s
+  killed 212, survived 0 (0 capped), no coverage 3, errors 0
+  mutation score on reached code: 100.0%   overall: 98.6%
+
+  function                           total killed survived no-cov
+  AcquireMagickResource                 56     56        0      0
+  ResourceComponentGenesis              31     31        0      0
+  AcquireUniqueFileResource             30     30        0      0
+  SetMagickResourceLimit                19     19        0      0
+  FormatTimeToLive                      18     18        0      0
+  ResourceComponentTerminus             12     12        0      0
+  RelinquishUniqueFileResource          10     10        0      0
+  ListMagickResourceInfo                 9      9        0      0
+  IsFileResourceIdentityValid            6      6        0      0
+  RelinquishMagickResource               6      6        0      0
+  GetMagickResource                      4      4        0      0
+  GetMagickResourceLimit                 4      4        0      0
+  LockResourceSemaphore                  3      3        0      0
+  AsynchronousResourceComponentTermi     3      0        0      3
+  IsChangedFileIdentity                  3      3        0      0
+  UnlockResourceSemaphore                1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-resource.json

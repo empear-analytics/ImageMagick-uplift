@@ -1,0 +1,67 @@
+mutate: 355 mutants in MagickCore/utility\.c$, 25 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/355 (0s)
+  mutants: 50/355 (1s)
+  mutants: 75/355 (1s)
+  mutants: 100/355 (2s)
+  mutants: 125/355 (3s)
+  mutants: 150/355 (3s)
+  mutants: 175/355 (4s)
+  mutants: 200/355 (5s)
+  mutants: 225/355 (5s)
+  mutants: 250/355 (6s)
+  mutants: 275/355 (6s)
+  mutants: 300/355 (6s)
+  mutants: 325/355 (7s)
+  mutants: 350/355 (7s)
+  mutants: 355/355 (130s)
+
+mutate: 355 mutants, 130s
+  killed 329, survived 12 (0 capped), no coverage 14, errors 0
+  mutation score on reached code: 96.5%   overall: 92.7%
+
+  function                           total killed survived no-cov
+  ExpandFilenames                       82     82        0      0
+  GetPathComponent                      57     57        0      0
+  Base64Decode                          28     19        9      0
+  Base64Encode                          26     26        0      0
+  ShredFile                             24     24        0      0
+  GetPathComponents                     17     14        3      0
+  ListFiles                             17     17        0      0
+  AcquireUniqueSymbolicLink             16     16        0      0
+  ExpandFilename                        11     11        0      0
+  GetPathTemplate                       11     11        0      0
+  AppendImageFormat                      9      9        0      0
+  IsPathAccessible                       6      6        0      0
+  IsCompressedFileExtension              5      5        0      0
+  GetExecutionPath                       5      0        0      5
+  IsImageFormatPrefix                    5      5        0      0
+  IsCompressionExtension                 5      5        0      0
+  MagickDelay                            5      0        0      5
+  ChopPathComponents                     4      0        0      4
+  IsTextMagick                           4      4        0      0
+  GetMagickPageSize                      4      4        0      0
+  IsPathDirectory                        4      4        0      0
+  MultilineCensus                        4      4        0      0
+  AcquireUniqueFilename                  2      2        0      0
+  FormatExpandedPath                     2      2        0      0
+  GetPathAttributes                      2      2        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  utility.c:377:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  utility.c:380:67 cxx_div_to_mul             decode=(unsigned char *) AcquireQuantumMemory((strlen(source)+3)/4,
+    x  utility.c:402:37 cxx_sub_to_add             decode[i]=(unsigned char)((q-Base64) << 2);
+    x  utility.c:409:38 cxx_sub_to_add             decode[i]=(unsigned char)(((q-Base64) & 0x0f) << 4);
+    x  utility.c:415:40 cxx_sub_to_add             decode[i++]|=(unsigned char)((q-Base64) >> 2);
+    x  utility.c:416:38 cxx_sub_to_add             decode[i]=(unsigned char)(((q-Base64) & 0x03) << 6);
+    x  utility.c:422:39 cxx_sub_to_add             decode[i++]|=(unsigned char)(q-Base64);
+    x  utility.c:455:22 cxx_ne_to_eq               for ( ; *p != '\0'; p++)
+       utility.c:468:53 cxx_eq_to_ne               if (isspace((int) ((unsigned char) *p)) == 0)
+       utility.c:1544:21 cxx_lt_to_ge               for (j=0; j < i; j++)
+       utility.c:1544:21 cxx_lt_to_le               for (j=0; j < i; j++)
+       utility.c:1544:27 cxx_post_inc_to_post_dec   for (j=0; j < i; j++)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-utility.json
