@@ -1,0 +1,750 @@
+mutate: 2564 mutants in MagickCore/draw\.c$, 74 functions
+  baseline: 4/4 (30s)
+mutate: 4 case(s) time out unmutated and are left out: gaps/3f0f18253e gaps/6a95c6af85 opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 13194 cases in 31s
+  mutants: 25/2564 (2s)
+  mutants: 50/2564 (3s)
+  mutants: 75/2564 (38s)
+  mutants: 100/2564 (51s)
+  mutants: 125/2564 (84s)
+  mutants: 150/2564 (98s)
+  mutants: 175/2564 (132s)
+  mutants: 200/2564 (135s)
+  mutants: 225/2564 (136s)
+  mutants: 250/2564 (138s)
+  mutants: 275/2564 (139s)
+  mutants: 300/2564 (140s)
+  mutants: 325/2564 (140s)
+  mutants: 350/2564 (140s)
+  mutants: 375/2564 (141s)
+  mutants: 400/2564 (142s)
+  mutants: 425/2564 (143s)
+  mutants: 450/2564 (144s)
+  mutants: 475/2564 (145s)
+  mutants: 500/2564 (152s)
+  mutants: 525/2564 (155s)
+  mutants: 550/2564 (163s)
+  mutants: 575/2564 (271s)
+  mutants: 600/2564 (403s)
+  mutants: 625/2564 (445s)
+  mutants: 650/2564 (464s)
+  mutants: 675/2564 (490s)
+  mutants: 700/2564 (492s)
+  mutants: 725/2564 (520s)
+  mutants: 750/2564 (533s)
+  mutants: 775/2564 (540s)
+  mutants: 800/2564 (545s)
+  mutants: 825/2564 (557s)
+  mutants: 850/2564 (585s)
+  mutants: 875/2564 (598s)
+  mutants: 900/2564 (616s)
+  mutants: 925/2564 (639s)
+  mutants: 950/2564 (652s)
+  mutants: 975/2564 (665s)
+  mutants: 1000/2564 (682s)
+  mutants: 1025/2564 (695s)
+  mutants: 1050/2564 (698s)
+  mutants: 1075/2564 (716s)
+  mutants: 1100/2564 (744s)
+  mutants: 1125/2564 (789s)
+  mutants: 1150/2564 (835s)
+  mutants: 1175/2564 (875s)
+  mutants: 1200/2564 (881s)
+  mutants: 1225/2564 (920s)
+  mutants: 1250/2564 (931s)
+  mutants: 1275/2564 (968s)
+  mutants: 1300/2564 (1014s)
+  mutants: 1325/2564 (1018s)
+  mutants: 1350/2564 (1020s)
+  mutants: 1375/2564 (1025s)
+  mutants: 1400/2564 (1060s)
+  mutants: 1425/2564 (1068s)
+  mutants: 1450/2564 (1104s)
+  mutants: 1475/2564 (1137s)
+  mutants: 1500/2564 (1155s)
+  mutants: 1525/2564 (1204s)
+  mutants: 1550/2564 (1209s)
+  mutants: 1575/2564 (1225s)
+  mutants: 1600/2564 (1254s)
+  mutants: 1625/2564 (1284s)
+  mutants: 1650/2564 (1299s)
+  mutants: 1675/2564 (1311s)
+  mutants: 1700/2564 (1347s)
+  mutants: 1725/2564 (1358s)
+  mutants: 1750/2564 (1382s)
+  mutants: 1775/2564 (1386s)
+  mutants: 1800/2564 (1386s)
+  mutants: 1825/2564 (1387s)
+  mutants: 1850/2564 (1387s)
+  mutants: 1875/2564 (1387s)
+  mutants: 1900/2564 (1388s)
+  mutants: 1925/2564 (1388s)
+  mutants: 1950/2564 (1392s)
+  mutants: 1975/2564 (1395s)
+  mutants: 2000/2564 (1405s)
+  mutants: 2025/2564 (1406s)
+  mutants: 2050/2564 (1409s)
+  mutants: 2075/2564 (1412s)
+  mutants: 2100/2564 (1413s)
+  mutants: 2125/2564 (1418s)
+  mutants: 2150/2564 (1422s)
+  mutants: 2175/2564 (1427s)
+  mutants: 2200/2564 (1428s)
+  mutants: 2225/2564 (1430s)
+  mutants: 2250/2564 (1430s)
+  mutants: 2275/2564 (1431s)
+  mutants: 2300/2564 (1437s)
+  mutants: 2325/2564 (1442s)
+  mutants: 2350/2564 (1445s)
+  mutants: 2375/2564 (1449s)
+  mutants: 2400/2564 (1451s)
+  mutants: 2425/2564 (1455s)
+  mutants: 2450/2564 (1458s)
+  mutants: 2475/2564 (1464s)
+  mutants: 2500/2564 (1472s)
+  mutants: 2525/2564 (1478s)
+  mutants: 2550/2564 (1479s)
+  mutants: 2564/2564 (1544s)
+
+mutate: 2564 mutants, 1544s
+  killed 1914, survived 558 (332 capped), no coverage 92, errors 0
+  mutation score on reached code: 77.4%   overall: 74.6%
+
+  function                           total killed survived no-cov
+  RenderMVGContent                     570    436      134      0
+  TraceStrokePolygon                   281    225       56      0
+  TracePath                            185    167       18      0
+  TraceArcPath                         159    141       18      0
+  GetFillAlpha                         129    108       21      0
+  DrawPrimitive                        109     86       23      0
+  DrawGradientImage                    107     96       11      0
+  DrawDashPolygon                       80     61       19      0
+  DrawPolygonPrimitive                  72     44       28      0
+  ConvertPathToPolygon                  69     51       18      0
+  DrawAffineImage                       61     45       16      0
+  AffineEdge                            54     40       14      0
+  TraceBezier                           50     41        9      0
+  TraceSquareLinecap                    40     28       12      0
+  TraceRoundRectangle                   36     28        8      0
+  TraceEllipse                          33     22       11      0
+  GetPolygonBounds                      31      0        0     31
+  CloneDrawInfo                         29     18       11      0
+  DrawBoundingRectangles                25      0        0     25
+  GetMVGMacros                          24     20        4      0
+  ClampPolygonBounds                    24     14       10      0
+  GetStopColorOffset                    23     23        0      0
+  GetDrawInfo                           23     11       12      0
+  CheckPrimitiveExtent                  20     12        8      0
+  LogPrimitiveInfo                      20      0        0     20
+  ConvertPrimitiveToPath                19     16        3      0
+  DestroyDrawInfo                       19      5       14      0
+  IsNonIdentityAffine                   14      8        6      0
+  ClonePolygonEdgesTLS                  14      1       13      0
+  InverseAffineMatrix                   11     11        0      0
+  GetPolygonEdgesExtent                 11      7        4      0
+  DrawStrokePolygon                     11      9        2      0
+  IsMVGBlockEndInvalid                  10      6        4      0
+  IsNewSubpathPoint                      9      7        2      0
+  IsMVGBlockEndOutside                   9      5        4      0
+  DrawPatternPath                        9      5        4      0
+  TraceRectangle                         9      8        1      0
+  LogPolygonInfo                         8      0        0      8
+  IsBoundsOutsideImage                   8      4        4      0
+  Permutate                              8      8        0      0
+  ReversePoints                          7      7        0      0
+  DrawClippingMask                       7      3        4      0
+  DrawCompositeMask                      7      4        3      0
+  IsVisibleDashedStroke                  7      4        3      0
+  IsDashSegmentPending                   6      4        2      0
+  TraceArc                               6      6        0      0
+  DestroyPolygonInfo                     5      3        2      0
+  LogPathInfo                            5      0        0      5
+  StopInfoCompare                        5      2        3      0
+  IsClipMaskChanged                      5      5        0      0
+  IsMVGFileReference                     5      1        4      0
+  IsFillAlphaSkipped                     5      3        2      0
+  DrawRoundLinecap                       5      4        1      0
+  IsMVGInfoMissing                       4      4        0      0
+  IsValidListChar                        4      4        0      0
+  IsMVGBlockEndMissing                   4      3        1      0
+  IsRenderableClass                      4      3        1      0
+  DestroyPolygonTLS                      4      2        2      0
+  AcquirePolygonTLS                      4      3        1      0
+  DestroyEdge                            4      3        1      0
+  IsVisibleWideStroke                    4      4        0      0
+  IsRoundStrokeOrPrimitive               4      4        0      0
+  IsCompositeOffset                      4      0        4      0
+  IsDirectionChange                      3      3        0      0
+  IsSubpathStart                         3      3        0      0
+  GetDensityResolution                   3      0        0      3
+  IsValidPoint                           3      2        1      0
+  IsGrayImageWithColor                   3      3        0      0
+  IsRoundStrokeJoin                      3      3        0      0
+  DrawClipPath                           2      2        0      0
+  TraceCircle                            2      2        0      0
+  TraceLine                              2      2        0      0
+  AcquireDrawInfo                        1      1        0      0
+  GetAffineMatrix                        1      0        1      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    xc draw.c:286:21 cxx_ne_to_eq               if (draw_info->id != (char *) NULL)
+    xc draw.c:288:28 cxx_ne_to_eq               if (draw_info->primitive != (char *) NULL)
+    xc draw.c:318:26 cxx_ne_to_eq               if (draw_info->metrics != (char *) NULL)
+    xc draw.c:320:25 cxx_ne_to_eq               if (draw_info->family != (char *) NULL)
+    xc draw.c:325:27 cxx_ne_to_eq               if (draw_info->encoding != (char *) NULL)
+    xc draw.c:333:26 cxx_ne_to_eq               if (draw_info->density != (char *) NULL)
+    xc draw.c:338:30 cxx_ne_to_eq               if (draw_info->server_name != (char *) NULL)
+    xc draw.c:345:50 cxx_ge_to_gt               for (x=0; fabs(draw_info->dash_pattern[x]) >= MagickEpsilon; x++) ;
+    xc draw.c:365:38 cxx_eq_to_ne               if (clone_info->gradient.stops == (StopInfo *) NULL)
+    xc draw.c:369:30 cxx_mul_to_div             (size_t) number_stops*sizeof(*clone_info->gradient.stops));
+    xc draw.c:377:28 cxx_ne_to_eq               if (draw_info->clip_mask != (char *) NULL)
+    xc draw.c:428:27 cxx_ne_to_eq               if (polygon_info->edges != (EdgeInfo *) NULL)
+    xc draw.c:431:43 cxx_ne_to_eq               if (polygon_info->edges[i].points != (PointInfo *) NULL)
+    xc draw.c:584:51 cxx_mul_to_div             (void) memset(polygon_info->edges,0,number_edges*
+    xc draw.c:629:70 cxx_gt_to_ge               polygon_info->edges[edge].direction=(ssize_t) (direction > 0);
+    xc draw.c:630:27 cxx_lt_to_le               if (direction < 0)
+    xc draw.c:641:20 cxx_eq_to_ne               if (points == (PointInfo *) NULL)
+    xc draw.c:666:44 cxx_lt_to_le               ((fabs(path_info[i].point.y-point.y) < MagickEpsilon) &&
+    xc draw.c:667:30 cxx_gt_to_ge               (path_info[i].point.x > point.x))) ? 1 : -1;
+    xc draw.c:674:18 cxx_eq_to_ne               if (edge == number_edges)
+     c draw.c:680:37 cxx_eq_to_ne               if (polygon_info->edges == (EdgeInfo *) NULL)
+    xc draw.c:692:66 cxx_gt_to_ge               polygon_info->edges[edge].direction=(ssize_t) (direction > 0);
+    xc draw.c:693:23 cxx_lt_to_le               if (direction < 0)
+    xc draw.c:699:40 cxx_add_to_sub             polygon_info->number_edges=edge+1;
+    xc draw.c:734:17 cxx_lt_to_le               if (point.x < bounds.x1)
+    xc draw.c:736:17 cxx_gt_to_ge               if (point.x > bounds.x2)
+    xc draw.c:763:68 cxx_gt_to_ge               polygon_info->edges[edge].direction=(ssize_t) (direction > 0);
+    xc draw.c:764:25 cxx_lt_to_le               if (direction < 0)
+    xc draw.c:785:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) polygon_info->number_edges; i++)
+    xc draw.c:802:39 cxx_ne_to_eq               if ((GetLogEventMask() & DrawEvent) != 0)
+     c draw.c:803:5 cxx_remove_void_call       LogPolygonInfo(polygon_info);
+    xc draw.c:857:42 cxx_ge_to_gt               (fabs(q.x-primitive_info[i].point.x) >= MagickEpsilon) ||
+    xc draw.c:858:42 cxx_ge_to_gt               (fabs(q.y-primitive_info[i].point.y) >= MagickEpsilon)) ? MagickTrue :
+    xc draw.c:901:62 cxx_add_to_sub             path_info=(PathInfo *) AcquireQuantumMemory((size_t) (3UL*i+1UL),
+    xc draw.c:963:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+     c draw.c:964:5 cxx_remove_void_call       LogPathInfo(path_info);
+    xc draw.c:996:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc draw.c:998:21 cxx_ne_to_eq               if (draw_info->id != (char *) NULL)
+    xc draw.c:1000:28 cxx_ne_to_eq               if (draw_info->primitive != (char *) NULL)
+    xc draw.c:1002:23 cxx_ne_to_eq               if (draw_info->text != (char *) NULL)
+    xc draw.c:1004:27 cxx_ne_to_eq               if (draw_info->geometry != (char *) NULL)
+    xc draw.c:1010:23 cxx_ne_to_eq               if (draw_info->font != (char *) NULL)
+    xc draw.c:1012:26 cxx_ne_to_eq               if (draw_info->metrics != (char *) NULL)
+    xc draw.c:1014:25 cxx_ne_to_eq               if (draw_info->family != (char *) NULL)
+    xc draw.c:1016:27 cxx_ne_to_eq               if (draw_info->encoding != (char *) NULL)
+    xc draw.c:1018:26 cxx_ne_to_eq               if (draw_info->density != (char *) NULL)
+    xc draw.c:1020:30 cxx_ne_to_eq               if (draw_info->server_name != (char *) NULL)
+    xc draw.c:1023:31 cxx_ne_to_eq               if (draw_info->dash_pattern != (double *) NULL)
+    xc draw.c:1026:33 cxx_ne_to_eq               if (draw_info->gradient.stops != (StopInfo *) NULL)
+    xc draw.c:1029:28 cxx_ne_to_eq               if (draw_info->clip_mask != (char *) NULL)
+    x  draw.c:1094:18 cxx_ge_to_gt               if (affine->sx >= MagickEpsilon)
+    x  draw.c:1098:13 cxx_gt_to_ge               if (x > inverse_edge.x1)
+    x  draw.c:1102:13 cxx_lt_to_le               if (x < inverse_edge.x2)
+    x  draw.c:1106:20 cxx_lt_to_le               if (affine->sx < -MagickEpsilon)
+    x  draw.c:1110:15 cxx_gt_to_ge               if (x > inverse_edge.x1)
+    x  draw.c:1114:15 cxx_lt_to_le               if (x < inverse_edge.x2)
+    x  draw.c:1118:14 cxx_lt_to_le               if ((z < 0.0) || ((size_t) floor(z+0.5) >= image->columns))
+    x  draw.c:1127:18 cxx_ge_to_gt               if (affine->rx >= MagickEpsilon)
+    x  draw.c:1131:13 cxx_gt_to_ge               if (x > inverse_edge.x1)
+    x  draw.c:1135:13 cxx_lt_to_le               if (x < inverse_edge.x2)
+    x  draw.c:1139:20 cxx_lt_to_le               if (affine->rx < -MagickEpsilon)
+    x  draw.c:1143:15 cxx_gt_to_ge               if (x > inverse_edge.x1)
+    x  draw.c:1147:15 cxx_lt_to_le               if (x < inverse_edge.x2)
+    x  draw.c:1151:47 cxx_ge_to_gt               if ((z < 0.0) || ((size_t) floor(z+0.5) >= image->rows))
+    x  draw.c:1217:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  draw.c:1230:15 cxx_lt_to_le               for (i=0; i < 4; i++)
+    x  draw.c:1243:15 cxx_gt_to_ge               if (min.x > extent[i].x)
+    x  draw.c:1245:15 cxx_gt_to_ge               if (min.y > extent[i].y)
+    x  draw.c:1247:15 cxx_lt_to_le               if (max.x < extent[i].x)
+    x  draw.c:1249:15 cxx_lt_to_le               if (max.y < extent[i].y)
+    x  draw.c:1263:15 cxx_lt_to_le               if (edge.y1 < 0.0)
+    x  draw.c:1265:15 cxx_gt_to_ge               if (edge.y2 > ((double) image->rows-1.0))
+    x  draw.c:1265:38 cxx_sub_to_add             if (edge.y2 > ((double) image->rows-1.0))
+       draw.c:1266:33 cxx_sub_to_add             edge.y2=(double) image->rows-1.0;
+    x  draw.c:1267:3 cxx_remove_void_call       GetPixelInfo(image,&zero);
+    x  draw.c:1299:25 cxx_lt_to_le               if (inverse_edge.x1 < 0.0)
+    x  draw.c:1301:25 cxx_gt_to_ge               if (inverse_edge.x2 > ((double) image->columns-1.0))
+    x  draw.c:1301:51 cxx_sub_to_add             if (inverse_edge.x2 > ((double) image->columns-1.0))
+    x  draw.c:1302:46 cxx_sub_to_add             inverse_edge.x2=(double) image->columns-1.0;
+    x  draw.c:1305:27 cxx_sub_to_add             inverse_edge.x2+0.5)-ceil(inverse_edge.x1-0.5)+1),1,exception);
+    x  draw.c:1631:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  draw.c:1643:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:1650:29 cxx_ne_to_eq               if (clone_info->clip_mask != (char *) NULL)
+    x  draw.c:1670:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:1725:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  draw.c:1738:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:1762:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:1802:52 cxx_lt_to_le               return(((status != MagickFalse) && (total_length < maximum_length) &&
+    x  draw.c:1803:29 cxx_gt_to_ge               ((n & 0x01) == 0) && (j > 1)) ? MagickTrue : MagickFalse);
+    x  draw.c:1838:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:1850:36 cxx_mul_to_div             (void) memset(dash_polygon,0,(2UL*number_vertices+32UL)*
+    x  draw.c:1850:58 cxx_mul_to_div             (void) memset(dash_polygon,0,(2UL*number_vertices+32UL)*
+    x  draw.c:1858:39 cxx_ge_to_gt               offset=fabs(draw_info->dash_offset) >= MagickEpsilon ?
+    x  draw.c:1866:16 cxx_gt_to_ge               if (offset > length)
+    x  draw.c:1873:16 cxx_lt_to_le               if (offset < length)
+       draw.c:1880:6 cxx_post_inc_to_post_dec   n++;
+    x  draw.c:1890:24 cxx_gt_to_ge               if (maximum_length > (double) (MaxBezierCoordinates >> 2))
+    x  draw.c:1892:22 cxx_lt_to_le               if (fabs(length) < MagickEpsilon)
+    x  draw.c:1894:46 cxx_ge_to_gt               if (fabs(draw_info->dash_pattern[n]) >= MagickEpsilon)
+    x  draw.c:1894:46 cxx_ge_to_lt               if (fabs(draw_info->dash_pattern[n]) >= MagickEpsilon)
+       draw.c:1895:12 cxx_post_inc_to_post_dec   n++;
+    x  draw.c:1896:46 cxx_lt_to_le               if (fabs(draw_info->dash_pattern[n]) < MagickEpsilon)
+    x  draw.c:1900:36 cxx_ge_to_gt               for (total_length=0.0; (length >= 0.0) && (maximum_length >= (total_length+length)); )
+    x  draw.c:1915:17 cxx_add_to_sub             if ((j+1) > (ssize_t) number_vertices)
+    x  draw.c:1917:43 cxx_sub_to_add             dash_polygon[j]=primitive_info[i-1];
+    x  draw.c:1932:44 cxx_ge_to_gt               if (fabs(draw_info->dash_pattern[n]) >= MagickEpsilon)
+    x  draw.c:1934:44 cxx_lt_to_le               if (fabs(draw_info->dash_pattern[n]) < MagickEpsilon)
+    x  draw.c:1961:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:2060:26 cxx_sub_to_add             if (fabs(stop_1->offset-stop_2->offset) <= MagickEpsilon)
+    x  draw.c:2060:43 cxx_le_to_gt               if (fabs(stop_1->offset-stop_2->offset) <= MagickEpsilon)
+    x  draw.c:2060:43 cxx_le_to_lt               if (fabs(stop_1->offset-stop_2->offset) <= MagickEpsilon)
+    x  draw.c:2104:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  draw.c:2115:3 cxx_remove_void_call       GetPixelInfo(image,&zero);
+    x  draw.c:2160:7 cxx_remove_void_call       GetPixelInfoPixel(image,q,&pixel);
+    x  draw.c:2201:22 cxx_lt_to_le               if (offset < 0.0)
+    x  draw.c:2208:24 cxx_lt_to_le               if (offset < gradient->stops[i].offset)
+    x  draw.c:2247:37 cxx_lt_to_le               antialias=(repeat < length) && ((repeat+1.0) > length) ?
+    x  draw.c:2247:64 cxx_gt_to_ge               antialias=(repeat < length) && ((repeat+1.0) > length) ?
+       draw.c:2255:44 cxx_sub_to_add             repeat=gradient->radius-fmod(-repeat,gradient->radius);
+       draw.c:2255:50 cxx_minus_to_noop          repeat=gradient->radius-fmod(-repeat,gradient->radius);
+    x  draw.c:2258:40 cxx_gt_to_ge               antialias=repeat+1.0 > gradient->radius ? MagickTrue :
+    x  draw.c:2264:24 cxx_lt_to_le               if (offset < gradient->stops[i].offset)
+    xc draw.c:2361:58 cxx_add_to_sub             proposed_extent=mvg_info->offset+pad+PrimitiveExtentPad+1.0;
+    xc draw.c:2362:24 cxx_le_to_lt               if ((proposed_extent <= 0.0) || (proposed_extent > (double) MAGICK_SIZE_MAX))
+    xc draw.c:2362:52 cxx_gt_to_ge               if ((proposed_extent <= 0.0) || (proposed_extent > (double) MAGICK_SIZE_MAX))
+    xc draw.c:2365:14 cxx_le_to_lt               if (extent <= *mvg_info->extent)
+    xc draw.c:2367:38 cxx_div_to_mul             if (extent > (GetMaxMemoryRequest()/sizeof(PrimitiveInfo)))
+    xc draw.c:2379:44 cxx_mul_to_div             (void) memset(primitive_info,0,extent*sizeof(*primitive_info));
+    xc draw.c:2392:41 cxx_lt_to_ge               for (i=(ssize_t) *mvg_info->extent; i < (ssize_t) extent; i++)
+    xc draw.c:2392:41 cxx_lt_to_le               for (i=(ssize_t) *mvg_info->extent; i < (ssize_t) extent; i++)
+    xc draw.c:2456:41 cxx_lt_to_le               if (GetNextToken(q,&q,extent,token) < 1)
+    xc draw.c:2488:51 cxx_lt_to_le               if (GetNextToken(p,&p,extent,token) < 1)
+    xc draw.c:2499:27 cxx_ge_to_gt               if (n++ >= MagickMaxRecursionDepth)
+    xc draw.c:2506:36 cxx_ge_to_gt               if ((n == 0) && (end >= start))
+    xc draw.c:2562:23 cxx_lt_to_le               return((fabs(value) < MagickEpsilon) && (p == point) ? MagickFalse :
+    xc draw.c:2578:32 cxx_ge_to_gt               return(((fabs(affine.sx-1.0) >= MagickEpsilon) ||
+    xc draw.c:2579:22 cxx_ge_to_gt               (fabs(affine.rx) >= MagickEpsilon) || (fabs(affine.ry) >= MagickEpsilon) ||
+    xc draw.c:2579:60 cxx_ge_to_gt               (fabs(affine.rx) >= MagickEpsilon) || (fabs(affine.ry) >= MagickEpsilon) ||
+    xc draw.c:2580:26 cxx_ge_to_gt               (fabs(affine.sy-1.0) >= MagickEpsilon) ||
+    xc draw.c:2581:22 cxx_ge_to_gt               (fabs(affine.tx) >= MagickEpsilon) ||
+    xc draw.c:2582:22 cxx_ge_to_gt               (fabs(affine.ty) >= MagickEpsilon)) ? MagickTrue : MagickFalse);
+    xc draw.c:2598:35 cxx_gt_to_ge               (strlen(draw_info->primitive) > 1) &&
+    xc draw.c:2598:35 cxx_gt_to_le               (strlen(draw_info->primitive) > 1) &&
+    xc draw.c:2599:32 cxx_ne_to_eq               (*(draw_info->primitive+1) != '-') && (depth == 0)) ? MagickTrue :
+    xc draw.c:2599:50 cxx_eq_to_ne               (*(draw_info->primitive+1) != '-') && (depth == 0)) ? MagickTrue :
+    x  draw.c:2607:12 cxx_lt_to_le               ((q-4) < p)) ? MagickTrue : MagickFalse);
+    x  draw.c:2614:36 cxx_lt_to_le               (p == (char *) NULL) || ((q-4) < p) ||
+    x  draw.c:2615:19 cxx_add_to_sub             ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+    x  draw.c:2615:21 cxx_add_to_sub             ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+    x  draw.c:2615:25 cxx_gt_to_ge               ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+    x  draw.c:2622:12 cxx_lt_to_le               ((q-4) < p) || ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+    x  draw.c:2622:34 cxx_add_to_sub             ((q-4) < p) || ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+    x  draw.c:2622:36 cxx_add_to_sub             ((q-4) < p) || ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+    x  draw.c:2622:40 cxx_gt_to_ge               ((q-4) < p) || ((size_t) (q-p+4+1) > extent)) ? MagickTrue : MagickFalse);
+    x  draw.c:2629:46 cxx_gt_to_ge               (mvg_class != (const char *) NULL) && (p > primitive)) ? MagickTrue :
+    xc draw.c:2714:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc draw.c:2716:13 cxx_ge_to_gt               if (depth >= MagickMaxRecursionDepth)
+    xc draw.c:2722:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+     c draw.c:2759:17 cxx_ge_to_gt               for ( ; n >= 0; n--)
+     c draw.c:2759:17 cxx_ge_to_lt               for ( ; n >= 0; n--)
+    xc draw.c:2765:57 cxx_add_to_sub             (void) memset(primitive_info,0,(size_t) (number_points+1)*
+    xc draw.c:2772:37 cxx_ne_to_eq               if (graphic_context[n]->primitive != (char *) NULL)
+    xc draw.c:2775:26 cxx_eq_to_ne               if ((image->page.width == 0) || (image->page.height == 0))
+    xc draw.c:2775:55 cxx_eq_to_ne               if ((image->page.width == 0) || (image->page.height == 0))
+    xc draw.c:2792:53 cxx_lt_to_le               if (GetNextToken(q,&q,MagickPathExtent,keyword) < 1)
+    xc draw.c:2805:8 cxx_sub_to_add             p=q-strlen(keyword)-1;
+    xc draw.c:2916:19 cxx_le_to_lt               if (i <= n)
+    xc draw.c:2918:27 cxx_post_inc_to_post_dec   if (classDepth++ >= MagickMaxRecursionDepth)
+    xc draw.c:2918:30 cxx_ge_to_gt               if (classDepth++ >= MagickMaxRecursionDepth)
+    xc draw.c:2974:52 cxx_ne_to_eq               if (graphic_context[n]->compliance != SVGCompliance)
+    xc draw.c:3020:17 cxx_remove_void_call       GetAffineMatrix(&current);
+     c draw.c:3050:51 cxx_eq_to_ne               if (LocaleCompare("currentColor",keyword) == 0)
+    xc draw.c:3161:48 cxx_eq_to_ne               if (graphic_context[n]->compliance == SVGCompliance)
+    xc draw.c:3165:48 cxx_ne_to_eq               if (graphic_context[n]->fill.alpha != (double) TransparentAlpha)
+    xc draw.c:3249:24 cxx_eq_to_ne               if (weight == -1)
+    xc draw.c:3349:54 cxx_mul_to_div             graphic_context[n]->kerning=metrics.width*
+    xc draw.c:3414:48 cxx_eq_to_ne               if (graphic_context[n]->compliance == SVGCompliance)
+    xc draw.c:3424:48 cxx_ne_to_eq               if (graphic_context[n]->fill.alpha != (double) TransparentAlpha)
+    xc draw.c:3469:49 cxx_lt_to_le               if (GetNextToken(q,&q,extent,token) < 1)
+    xc draw.c:3486:23 cxx_le_to_lt               if (n <= 0)
+    xc draw.c:3520:49 cxx_lt_to_le               if (GetNextToken(q,&q,extent,token) < 1)
+    xc draw.c:3527:30 cxx_ne_to_eq               for (p=q; *q != '\0'; )
+    xc draw.c:3529:55 cxx_lt_to_le               if (GetNextToken(q,&q,extent,token) < 1)
+    xc draw.c:3534:52 cxx_ne_to_eq               if (LocaleCompare(token,"class") != 0)
+    xc draw.c:3546:55 cxx_lt_to_le               if (GetNextToken(q,&q,extent,token) < 1)
+    xc draw.c:3566:54 cxx_gt_to_ge               graphic_context[n]->render=defsDepth > 0 ? MagickFalse :
+    xc draw.c:3617:32 cxx_eq_to_ne               if (*token == ',')
+    xc draw.c:3622:55 cxx_lt_to_le               if (GetNextToken(q,&q,extent,token) < 1)
+    xc draw.c:3638:59 cxx_add_to_sub             graphic_context[n]->affine.ry*segment.y1+
+    xc draw.c:3641:59 cxx_add_to_sub             graphic_context[n]->affine.sy*segment.y1+
+    xc draw.c:3644:59 cxx_add_to_sub             graphic_context[n]->affine.ry*segment.y2+
+    xc draw.c:3647:59 cxx_add_to_sub             graphic_context[n]->affine.sy*segment.y2+
+    xc draw.c:3684:23 cxx_ge_to_gt               if (n >= MagickMaxRecursionDepth)
+    xc draw.c:3711:31 cxx_sub_to_add             &next_token)-0.5));
+    xc draw.c:3720:31 cxx_sub_to_add             &next_token)-0.5));
+    xc draw.c:3743:55 cxx_lt_to_le               if (GetNextToken(q,&q,extent,token) < 1)
+    xc draw.c:3757:64 cxx_add_to_sub             (void) CopyMagickString(token,p,(size_t) (q-p-4+1));
+    xc draw.c:3771:28 cxx_post_inc_to_post_dec   symbolDepth++;
+    xc draw.c:3772:56 cxx_gt_to_ge               graphic_context[n]->render=symbolDepth > 0 ? MagickFalse :
+    xc draw.c:3772:56 cxx_gt_to_le               graphic_context[n]->render=symbolDepth > 0 ? MagickFalse :
+    xc draw.c:3856:32 cxx_gt_to_ge               if (number_stops > 2)
+    xc draw.c:3917:50 cxx_ne_to_eq               if (graphic_context[n]->dash_pattern != (double *) NULL)
+    xc draw.c:3949:21 cxx_mul_to_div             (2*x+2)*sizeof(*graphic_context[n]->dash_pattern));
+    xc draw.c:3949:23 cxx_add_to_sub             (2*x+2)*sizeof(*graphic_context[n]->dash_pattern));
+    xc draw.c:3949:26 cxx_mul_to_div             (2*x+2)*sizeof(*graphic_context[n]->dash_pattern));
+    xc draw.c:3961:59 cxx_le_to_lt               if (graphic_context[n]->dash_pattern[j] <= 0.0)
+    xc draw.c:4032:48 cxx_eq_to_ne               if (graphic_context[n]->compliance == SVGCompliance)
+    xc draw.c:4035:69 cxx_mul_to_div             graphic_context[n]->stroke_alpha=(double) QuantumRange*opacity;
+    xc draw.c:4147:48 cxx_ne_to_eq               if (draw_info->macro_expansion != (size_t *) NULL)
+    xc draw.c:4149:53 cxx_ge_to_gt               if (*draw_info->macro_expansion >= MacroExpansionLimit)
+    xc draw.c:4157:50 cxx_post_inc_to_post_dec   (*draw_info->macro_expansion)++;
+    xc draw.c:4175:46 cxx_sub_to_add             GetDrawValue(token,&next_token)-0.5));
+    xc draw.c:4184:51 cxx_sub_to_add             ceil(GetDrawValue(token,&next_token)-0.5));
+    xc draw.c:4193:46 cxx_add_to_sub             GetDrawValue(token,&next_token)+0.5));
+    xc draw.c:4202:46 cxx_add_to_sub             GetDrawValue(token,&next_token)+0.5));
+     c draw.c:4213:51 cxx_eq_to_ne               if (LocaleCompare("word-spacing",keyword) == 0)
+     c draw.c:4218:23 cxx_eq_to_ne               if (token == next_token)
+    xc draw.c:4237:70 cxx_mul_to_div             graphic_context[n]->affine.ry=current.sx*affine.ry+current.ry*affine.sy;
+    xc draw.c:4248:30 cxx_gt_to_ge               if (number_stops > 1)
+    xc draw.c:4259:29 cxx_gt_to_ge               if (number_stops > 0)
+    xc draw.c:4259:29 cxx_gt_to_le               if (number_stops > 0)
+    xc draw.c:4262:31 cxx_ne_to_eq               if ((draw_info->debug != MagickFalse) && (q > p))
+    xc draw.c:4262:53 cxx_gt_to_ge               if ((draw_info->debug != MagickFalse) && (q > p))
+    xc draw.c:4262:53 cxx_gt_to_le               if ((draw_info->debug != MagickFalse) && (q > p))
+     c draw.c:4264:15 cxx_sub_to_add             (q-p-1),p);
+     c draw.c:4264:17 cxx_sub_to_add             (q-p-1),p);
+    xc draw.c:4271:34 cxx_ne_to_eq               if (primitive_info[i].text != (char *) NULL)
+    xc draw.c:4311:13 cxx_lt_to_ge               if (i < (ssize_t) number_points)
+    xc draw.c:4311:13 cxx_lt_to_le               if (i < (ssize_t) number_points)
+     c draw.c:4316:18 cxx_eq_to_ne               if (status == MagickFalse)
+    xc draw.c:4321:32 cxx_ne_to_eq               if (primitive_info[j].text != (char *) NULL)
+    xc draw.c:4334:17 cxx_lt_to_le               for (k=1; k < (ssize_t) primitive_info[j].coordinates; k++)
+    xc draw.c:4337:19 cxx_lt_to_ge               if (point.x < bounds.x1)
+    xc draw.c:4337:19 cxx_lt_to_le               if (point.x < bounds.x1)
+    xc draw.c:4339:19 cxx_lt_to_ge               if (point.y < bounds.y1)
+    xc draw.c:4339:19 cxx_lt_to_le               if (point.y < bounds.y1)
+    xc draw.c:4341:19 cxx_gt_to_ge               if (point.x > bounds.x2)
+    xc draw.c:4341:19 cxx_gt_to_le               if (point.x > bounds.x2)
+    xc draw.c:4343:19 cxx_gt_to_ge               if (point.y > bounds.y2)
+    xc draw.c:4343:19 cxx_gt_to_le               if (point.y > bounds.y2)
+    xc draw.c:4364:24 cxx_sub_to_add             alpha=bounds.x2-bounds.x1;
+    xc draw.c:4365:23 cxx_sub_to_add             beta=bounds.y2-bounds.y1;
+    xc draw.c:4368:58 cxx_mul_to_div             coordinates+=2.0*((size_t) ceil((double) MagickPI*radius))+6.0*
+    xc draw.c:4369:24 cxx_add_to_sub             BezierQuantum+360.0;
+    xc draw.c:4374:35 cxx_mul_to_div             coordinates=(BezierQuantum*(double) primitive_info[j].coordinates);
+    xc draw.c:4386:26 cxx_ne_to_eq               for (s=token; *s != '\0'; s=t)
+    xc draw.c:4400:26 cxx_ne_to_eq               for (s=token; *s != '\0'; s++)
+    xc draw.c:4401:38 cxx_ne_to_eq               if (strspn(s,"AaCcQqSsTt") != 0)
+    xc draw.c:4410:21 cxx_add_to_sub             if (((size_t) (i+coordinates)) >= number_points)
+    xc draw.c:4410:36 cxx_ge_to_gt               if (((size_t) (i+coordinates)) >= number_points)
+    xc draw.c:4410:36 cxx_ge_to_lt               if (((size_t) (i+coordinates)) >= number_points)
+    xc draw.c:4415:44 cxx_add_to_sub             number_points+=(size_t) coordinates+1;
+    xc draw.c:4416:27 cxx_lt_to_le               if (number_points < (size_t) coordinates)
+    xc draw.c:4425:70 cxx_add_to_sub             status&=CheckPrimitiveExtent(&mvg_info,(double) number_points+
+    xc draw.c:4426:31 cxx_add_to_sub             (double) coordinates+1.0);
+    xc draw.c:4450:20 cxx_eq_to_ne               if (status == MagickFalse)
+    xc draw.c:4465:20 cxx_eq_to_ne               if (status == MagickFalse)
+    xc draw.c:4498:41 cxx_sub_to_add             if ((primitive_info[j+1].point.x-primitive_info[j].point.x) < 0.0)
+    xc draw.c:4498:69 cxx_lt_to_le               if ((primitive_info[j+1].point.x-primitive_info[j].point.x) < 0.0)
+    xc draw.c:4503:41 cxx_sub_to_add             if ((primitive_info[j+1].point.y-primitive_info[j].point.y) < 0.0)
+    xc draw.c:4503:69 cxx_lt_to_le               if ((primitive_info[j+1].point.y-primitive_info[j].point.y) < 0.0)
+    xc draw.c:4539:42 cxx_lt_to_le               if ((primitive_info[j+1].point.x < 0.0) ||
+    xc draw.c:4540:42 cxx_lt_to_le               (primitive_info[j+1].point.y < 0.0))
+    xc draw.c:4594:43 cxx_lt_to_le               if (primitive_info[j].coordinates < 3)
+    xc draw.c:4613:25 cxx_lt_to_le               if (coordinates < 0.0)
+    xc draw.c:4656:35 cxx_sub_to_add             if ((fabs(mvg_info.point.x-primitive_info->point.x) < MagickEpsilon) &&
+    xc draw.c:4656:61 cxx_lt_to_ge               if ((fabs(mvg_info.point.x-primitive_info->point.x) < MagickEpsilon) &&
+    xc draw.c:4656:61 cxx_lt_to_le               if ((fabs(mvg_info.point.x-primitive_info->point.x) < MagickEpsilon) &&
+    xc draw.c:4657:35 cxx_sub_to_add             (fabs(mvg_info.point.y-primitive_info->point.y) < MagickEpsilon))
+    xc draw.c:4657:61 cxx_lt_to_ge               (fabs(mvg_info.point.y-primitive_info->point.y) < MagickEpsilon))
+    xc draw.c:4657:61 cxx_lt_to_le               (fabs(mvg_info.point.y-primitive_info->point.y) < MagickEpsilon))
+    xc draw.c:4673:44 cxx_ne_to_eq               if (graphic_context[n]->compliance != SVGCompliance)
+    xc draw.c:4693:27 cxx_ne_to_eq               if ((draw_info->debug != MagickFalse) && (q > p))
+    xc draw.c:4693:49 cxx_gt_to_ge               if ((draw_info->debug != MagickFalse) && (q > p))
+    xc draw.c:4693:49 cxx_gt_to_le               if ((draw_info->debug != MagickFalse) && (q > p))
+     c draw.c:4694:74 cxx_sub_to_add             (void) LogMagickEvent(DrawEvent,GetMagickModule(),"  %.*s",(int) (q-p),p);
+    xc draw.c:4721:19 cxx_lt_to_le               if (point.x < graphic_context[n]->bounds.x1)
+    xc draw.c:4723:19 cxx_lt_to_le               if (point.y < graphic_context[n]->bounds.y1)
+    xc draw.c:4725:19 cxx_gt_to_ge               if (point.x > graphic_context[n]->bounds.x2)
+    xc draw.c:4727:19 cxx_gt_to_ge               if (point.y > graphic_context[n]->bounds.y2)
+    xc draw.c:4731:13 cxx_ge_to_gt               if (i >= (ssize_t) number_points)
+    xc draw.c:4743:27 cxx_ne_to_eq               if (clip_path != (const char *) NULL)
+    xc draw.c:4752:52 cxx_sub_to_add             proceed=SetImageProgress(image,RenderImageTag,q-primitive,(MagickSizeType)
+    xc draw.c:4759:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    xc draw.c:4766:22 cxx_ne_to_eq               if (primitive_info != (PrimitiveInfo *) NULL)
+    xc draw.c:4769:36 cxx_ne_to_eq               if (primitive_info[i].text != (char *) NULL)
+    xc draw.c:4774:13 cxx_ne_to_eq               if (stops != (StopInfo *) NULL)
+    xc draw.c:4776:13 cxx_ge_to_gt               for ( ; n >= 0; n--)
+    xc draw.c:4776:13 cxx_ge_to_lt               for ( ; n >= 0; n--)
+    x  draw.c:4856:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  draw.c:4875:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:4885:12 cxx_ne_to_eq               if (type != (const char *) NULL)
+    x  draw.c:4891:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    xc draw.c:4933:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) GetMagickResourceLimit(ThreadResource); i++)
+    xc draw.c:4934:25 cxx_ne_to_eq               if (polygon_info[i] != (PolygonInfo *) NULL)
+    xc draw.c:4961:46 cxx_mul_to_div             (void) memset(polygon_info,0,number_threads*sizeof(*polygon_info));
+    xc draw.c:4982:15 cxx_lt_to_le               for (i=1; i < (ssize_t) number_threads; i++)
+    xc draw.c:4982:44 cxx_post_inc_to_post_dec   for (i=1; i < (ssize_t) number_threads; i++)
+     c draw.c:4992:25 cxx_eq_to_ne               if (polygon_info[i] == (PolygonInfo *) NULL)
+     c draw.c:5002:32 cxx_eq_to_ne               if (polygon_info[i]->edges == (EdgeInfo *) NULL)
+     c draw.c:5009:36 cxx_mul_to_div             polygon_info[0]->number_edges*sizeof(*edge_info));
+     c draw.c:5010:17 cxx_lt_to_ge               for (j=0; j < (ssize_t) polygon_info[i]->number_edges; j++)
+     c draw.c:5010:17 cxx_lt_to_le               for (j=0; j < (ssize_t) polygon_info[i]->number_edges; j++)
+     c draw.c:5010:61 cxx_post_inc_to_post_dec   for (j=0; j < (ssize_t) polygon_info[i]->number_edges; j++)
+     c draw.c:5013:17 cxx_lt_to_ge               for (j=0; j < (ssize_t) polygon_info[i]->number_edges; j++)
+     c draw.c:5013:17 cxx_lt_to_le               for (j=0; j < (ssize_t) polygon_info[i]->number_edges; j++)
+     c draw.c:5013:61 cxx_post_inc_to_post_dec   for (j=0; j < (ssize_t) polygon_info[i]->number_edges; j++)
+     c draw.c:5018:44 cxx_eq_to_ne               if (polygon_info[i]->edges[j].points == (PointInfo *) NULL)
+     c draw.c:5025:33 cxx_mul_to_div             edge_info->number_points*sizeof(*edge_info->points));
+    xc draw.c:5037:12 cxx_lt_to_le               if (edge < (ssize_t) polygon_info->number_edges)
+    xc draw.c:5046:46 cxx_gt_to_ge               return(((fill == MagickFalse) || (distance > 1.0) ||
+    xc draw.c:5047:20 cxx_ge_to_gt               (subpath_alpha >= 1.0)) ? MagickTrue : MagickFalse);
+    xc draw.c:5082:20 cxx_le_to_lt               if ((double) y <= (p->bounds.y1-mid-0.5))
+    xc draw.c:5100:23 cxx_ne_to_eq               if (p->scanline != (double) y)
+    xc draw.c:5124:20 cxx_ge_to_gt               if (beta >= alpha)
+    xc draw.c:5150:30 cxx_lt_to_le               if ((*stroke_alpha < 1.0) &&
+    xc draw.c:5151:25 cxx_le_to_lt               (distance <= ((alpha+0.25)*(alpha+0.25))))
+    xc draw.c:5154:28 cxx_le_to_lt               if (distance <= ((alpha+0.25)*(alpha+0.25)))
+    xc draw.c:5159:36 cxx_sub_to_add             if (fabs(distance-1.0) >= MagickEpsilon)
+    xc draw.c:5159:42 cxx_ge_to_gt               if (fabs(distance-1.0) >= MagickEpsilon)
+    xc draw.c:5162:37 cxx_lt_to_le               if (*stroke_alpha < ((alpha-0.25)*(alpha-0.25)))
+    xc draw.c:5169:20 cxx_le_to_lt               if (distance <= 0.0)
+    xc draw.c:5174:20 cxx_gt_to_ge               if (distance > 1.0)
+    xc draw.c:5176:22 cxx_lt_to_le               if (fabs(beta) < MagickEpsilon)
+    xc draw.c:5179:28 cxx_sub_to_add             if (fabs(distance-1.0) >= MagickEpsilon)
+    xc draw.c:5179:34 cxx_ge_to_gt               if (fabs(distance-1.0) >= MagickEpsilon)
+    xc draw.c:5183:25 cxx_lt_to_le               if (subpath_alpha < (alpha*alpha))
+    xc draw.c:5192:21 cxx_ge_to_gt               if (subpath_alpha >= 1.0)
+    xc draw.c:5203:52 cxx_le_to_lt               if (((double) y > p->bounds.y2) || ((double) x <= p->bounds.x1))
+    xc draw.c:5205:20 cxx_gt_to_ge               if ((double) x > p->bounds.x2)
+    xc draw.c:5211:15 cxx_lt_to_le               for ( ; i < (ssize_t) (p->number_points-1); i++)
+    xc draw.c:5211:44 cxx_sub_to_add             for ( ; i < (ssize_t) (p->number_points-1); i++)
+    xc draw.c:5215:36 cxx_le_to_lt               if ((((q+1)->x-q->x)*(y-q->y)) <= (((q+1)->y-q->y)*(x-q->x)))
+    xc draw.c:5232:22 cxx_ge_to_gt               return(((bounds.x1 >= (double) image->columns) ||
+    xc draw.c:5233:16 cxx_ge_to_gt               (bounds.y1 >= (double) image->rows) ||
+    xc draw.c:5234:16 cxx_le_to_lt               (bounds.x2 <= 0.0) || (bounds.y2 <= 0.0)) ? MagickTrue : MagickFalse);
+    xc draw.c:5234:38 cxx_le_to_lt               (bounds.x2 <= 0.0) || (bounds.y2 <= 0.0)) ? MagickTrue : MagickFalse);
+    xc draw.c:5249:22 cxx_lt_to_le               if (p->bounds.x1 < bounds.x1)
+    xc draw.c:5251:22 cxx_lt_to_le               if (p->bounds.y1 < bounds.y1)
+    xc draw.c:5253:22 cxx_gt_to_ge               if (p->bounds.x2 > bounds.x2)
+    xc draw.c:5255:22 cxx_gt_to_ge               if (p->bounds.y2 > bounds.y2)
+    xc draw.c:5263:23 cxx_lt_to_le               bounds.x1=bounds.x1 < 0.0 ? 0.0 : bounds.x1 >= (double) image->columns-1.0 ?
+    xc draw.c:5263:47 cxx_ge_to_gt               bounds.x1=bounds.x1 < 0.0 ? 0.0 : bounds.x1 >= (double) image->columns-1.0 ?
+    xc draw.c:5265:23 cxx_lt_to_le               bounds.y1=bounds.y1 < 0.0 ? 0.0 : bounds.y1 >= (double) image->rows-1.0 ?
+    xc draw.c:5265:47 cxx_ge_to_gt               bounds.y1=bounds.y1 < 0.0 ? 0.0 : bounds.y1 >= (double) image->rows-1.0 ?
+    xc draw.c:5265:70 cxx_sub_to_add             bounds.y1=bounds.y1 < 0.0 ? 0.0 : bounds.y1 >= (double) image->rows-1.0 ?
+    xc draw.c:5266:25 cxx_sub_to_add             (double) image->rows-1.0 : bounds.y1;
+    xc draw.c:5267:23 cxx_lt_to_le               bounds.x2=bounds.x2 < 0.0 ? 0.0 : bounds.x2 >= (double) image->columns-1.0 ?
+    xc draw.c:5267:47 cxx_ge_to_gt               bounds.x2=bounds.x2 < 0.0 ? 0.0 : bounds.x2 >= (double) image->columns-1.0 ?
+    xc draw.c:5269:23 cxx_lt_to_le               bounds.y2=bounds.y2 < 0.0 ? 0.0 : bounds.y2 >= (double) image->rows-1.0 ?
+    xc draw.c:5269:47 cxx_ge_to_gt               bounds.y2=bounds.y2 < 0.0 ? 0.0 : bounds.y2 >= (double) image->rows-1.0 ?
+    xc draw.c:5320:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc draw.c:5330:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    xc draw.c:5355:20 cxx_sub_to_add             (poly_extent.y2-poly_extent.y1+1),1);
+    xc draw.c:5355:35 cxx_add_to_sub             (poly_extent.y2-poly_extent.y1+1),1);
+     c draw.c:5373:32 cxx_le_to_gt               for (y=poly_extent.y1; y <= poly_extent.y2; y++)
+     c draw.c:5373:32 cxx_le_to_lt               for (y=poly_extent.y1; y <= poly_extent.y2; y++)
+     c draw.c:5373:52 cxx_post_inc_to_post_dec   for (y=poly_extent.y1; y <= poly_extent.y2; y++)
+     c draw.c:5384:20 cxx_eq_to_ne               if (status == MagickFalse)
+     c draw.c:5387:78 cxx_sub_to_add             q=GetCacheViewAuthenticPixels(image_view,x,y,(size_t) (poly_extent.x2-
+     c draw.c:5388:12 cxx_add_to_sub             x+1),1,exception);
+     c draw.c:5389:15 cxx_eq_to_ne               if (q == (Quantum *) NULL)
+     c draw.c:5394:9 cxx_remove_void_call       GetPixelInfo(image,&pixel);
+     c draw.c:5395:19 cxx_le_to_gt               for ( ; x <= poly_extent.x2; x++)
+     c draw.c:5395:19 cxx_le_to_lt               for ( ; x <= poly_extent.x2; x++)
+     c draw.c:5395:39 cxx_post_inc_to_post_dec   for ( ; x <= poly_extent.x2; x++)
+     c draw.c:5397:18 cxx_eq_to_ne               if ((x == CastDoubleToSsizeT(ceil(primitive_info->point.x-0.5))) &&
+     c draw.c:5397:68 cxx_sub_to_add             if ((x == CastDoubleToSsizeT(ceil(primitive_info->point.x-0.5))) &&
+     c draw.c:5398:18 cxx_eq_to_ne               (y == CastDoubleToSsizeT(ceil(primitive_info->point.y-0.5))))
+     c draw.c:5398:68 cxx_sub_to_add             (y == CastDoubleToSsizeT(ceil(primitive_info->point.y-0.5))))
+     c draw.c:5400:15 cxx_remove_void_call       GetFillColor(draw_info,x-poly_extent.x1,y-poly_extent.y1,&pixel,
+     c draw.c:5400:39 cxx_sub_to_add             GetFillColor(draw_info,x-poly_extent.x1,y-poly_extent.y1,&pixel,
+     c draw.c:5400:56 cxx_sub_to_add             GetFillColor(draw_info,x-poly_extent.x1,y-poly_extent.y1,&pixel,
+     c draw.c:5402:15 cxx_remove_void_call       SetPixelViaPixelInfo(image,&pixel,q);
+     c draw.c:5406:64 cxx_eq_to_ne               if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+     c draw.c:5411:28 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    xc draw.c:5460:33 cxx_ge_to_gt               fill_alpha=fill_alpha >= AntialiasThreshold ? 1.0 : 0.0;
+    xc draw.c:5461:37 cxx_ge_to_gt               stroke_alpha=stroke_alpha >= AntialiasThreshold ? 1.0 : 0.0;
+    xc draw.c:5478:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:5645:16 cxx_ne_to_eq               return((((x1 != 0L) && (x1 != (ssize_t) composite_image->columns)) ||
+    x  draw.c:5645:30 cxx_ne_to_eq               return((((x1 != 0L) && (x1 != (ssize_t) composite_image->columns)) ||
+    x  draw.c:5646:10 cxx_ne_to_eq               ((y1 != 0L) && (y1 != (ssize_t) composite_image->rows))) ? MagickTrue :
+    x  draw.c:5646:24 cxx_ne_to_eq               ((y1 != 0L) && (y1 != (ssize_t) composite_image->rows))) ? MagickTrue :
+    xc draw.c:5654:39 cxx_ge_to_gt               (fabs(draw_info->dash_pattern[0]) >= MagickEpsilon) &&
+    xc draw.c:5655:16 cxx_mul_to_div             (fabs(scale*draw_info->stroke_width) >= MagickEpsilon) &&
+    xc draw.c:5655:42 cxx_ge_to_gt               (fabs(scale*draw_info->stroke_width) >= MagickEpsilon) &&
+    xc draw.c:5677:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    xc draw.c:5704:50 cxx_eq_to_ne               if ((image->alpha_trait & BlendPixelTrait) == 0)
+    xc draw.c:5735:11 cxx_remove_void_call       GetPixelInfo(image,&pixel);
+    xc draw.c:5745:25 cxx_lt_to_le               for (x=0; x < (ssize_t) image->columns; x++)
+    xc draw.c:5834:11 cxx_remove_void_call       GetPixelInfo(image,&pixel);
+    xc draw.c:5858:25 cxx_lt_to_le               for (x=0; x < (ssize_t) image->columns; x++)
+    xc draw.c:5901:11 cxx_remove_void_call       GetPixelInfo(image,&pixel);
+    xc draw.c:5967:34 cxx_ne_to_eq               if (clone_info->size != (char *) NULL)
+    xc draw.c:5969:37 cxx_ne_to_eq               if (clone_info->extract != (char *) NULL)
+    xc draw.c:5985:59 cxx_sub_to_add             x1=CastDoubleToSsizeT(ceil(primitive_info[1].point.x-0.5));
+    xc draw.c:5986:59 cxx_sub_to_add             y1=CastDoubleToSsizeT(ceil(primitive_info[1].point.y-0.5));
+    xc draw.c:6004:7 cxx_remove_void_call       SetGeometry(image,&geometry);
+    xc draw.c:6017:31 cxx_eq_to_ne               (draw_info->compose == SrcOverCompositeOp))
+    xc draw.c:6034:14 cxx_lt_to_le               if ((y < 0) || (y >= (ssize_t) image->rows))
+    xc draw.c:6034:25 cxx_ge_to_gt               if ((y < 0) || (y >= (ssize_t) image->rows))
+    xc draw.c:6036:14 cxx_lt_to_le               if ((x < 0) || (x >= (ssize_t) image->columns))
+    xc draw.c:6036:25 cxx_ge_to_gt               if ((x < 0) || (x >= (ssize_t) image->columns))
+    xc draw.c:6076:28 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+     c draw.c:6077:9 cxx_remove_void_call       LogPrimitiveInfo(primitive_info);
+    xc draw.c:6112:24 cxx_lt_to_le               if ((point_x < MagickEpsilon) && (point_y < MagickEpsilon))
+    xc draw.c:6112:53 cxx_lt_to_le               if ((point_x < MagickEpsilon) && (point_y < MagickEpsilon))
+    xc draw.c:6138:29 cxx_eq_to_ne               if (draw_info->compliance == SVGCompliance)
+    xc draw.c:6145:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:6192:15 cxx_lt_to_le               for (i=0; i < 4; i++)
+    x  draw.c:6226:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    x  draw.c:6266:24 cxx_ne_to_eq               if (draw_info->debug != MagickFalse)
+    xc draw.c:6297:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc draw.c:6344:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc draw.c:6369:70 cxx_ne_to_eq               draw_info->debug=(GetLogEventMask() & (DrawEvent | AnnotateEvent)) != 0 ?
+    xc draw.c:6374:38 cxx_ne_to_eq               if (draw_info->image_info->density != (char *) NULL)
+    xc draw.c:6377:46 cxx_ge_to_gt               if (fabs(draw_info->image_info->pointsize) >= MagickEpsilon)
+    xc draw.c:6380:42 cxx_ne_to_eq               if (draw_info->image_info->server_name != (char *) NULL)
+    xc draw.c:6383:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc draw.c:6389:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc draw.c:6392:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc draw.c:6419:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc draw.c:6427:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc draw.c:6433:18 cxx_eq_to_ne               if (weight == -1)
+    xc draw.c:6438:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    x  draw.c:6558:20 cxx_sub_to_add             if ((fabs(start.x-end.x) < MagickEpsilon) &&
+    x  draw.c:6558:28 cxx_lt_to_le               if ((fabs(start.x-end.x) < MagickEpsilon) &&
+    x  draw.c:6559:20 cxx_sub_to_add             (fabs(start.y-end.y) < MagickEpsilon))
+    x  draw.c:6559:28 cxx_lt_to_ge               (fabs(start.y-end.y) < MagickEpsilon))
+    x  draw.c:6559:28 cxx_lt_to_le               (fabs(start.y-end.y) < MagickEpsilon))
+    x  draw.c:6563:16 cxx_lt_to_le               if ((radii.x < MagickEpsilon) || (radii.y < MagickEpsilon))
+    x  draw.c:6563:45 cxx_lt_to_le               if ((radii.x < MagickEpsilon) || (radii.y < MagickEpsilon))
+    x  draw.c:6571:13 cxx_lt_to_le               if (delta < MagickEpsilon)
+    x  draw.c:6573:13 cxx_gt_to_ge               if (delta > 1.0)
+    x  draw.c:6584:28 cxx_mul_to_div             if (fabs(alpha*alpha+beta*beta) < MagickEpsilon)
+    x  draw.c:6584:35 cxx_lt_to_le               if (fabs(alpha*alpha+beta*beta) < MagickEpsilon)
+    x  draw.c:6587:14 cxx_le_to_lt               if (factor <= 0.0)
+       draw.c:6593:17 cxx_minus_to_noop          factor=(-factor);
+    x  draw.c:6599:14 cxx_lt_to_le               if ((theta < 0.0) && (sweep != MagickFalse))
+    x  draw.c:6599:31 cxx_ne_to_eq               if ((theta < 0.0) && (sweep != MagickFalse))
+    x  draw.c:6602:16 cxx_gt_to_ge               if ((theta > 0.0) && (sweep == MagickFalse))
+    x  draw.c:6657:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
+    x  draw.c:6657:15 cxx_lt_to_le               for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
+    x  draw.c:6697:15 cxx_lt_to_le               for (i=0; i < (ssize_t) number_coordinates; i++)
+    x  draw.c:6702:17 cxx_gt_to_ge               if (alpha > (double) GetMaxMemoryRequest())
+    x  draw.c:6708:17 cxx_gt_to_ge               if (alpha > (double) quantum)
+    x  draw.c:6711:17 cxx_gt_to_ge               if (alpha > (double) quantum)
+       draw.c:6723:18 cxx_ne_to_eq               if (points != (PointInfo *) NULL)
+       draw.c:6725:24 cxx_ne_to_eq               if (coefficients != (double *) NULL)
+    x  draw.c:6732:60 cxx_add_to_sub             if (CheckPrimitiveExtent(mvg_info,(double) control_points+1) == MagickFalse)
+    x  draw.c:6752:17 cxx_lt_to_le               for (j=0; j < (ssize_t) number_coordinates; j++)
+    x  draw.c:6785:15 cxx_lt_to_le               for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
+    x  draw.c:6845:22 cxx_lt_to_le               if ((fabs(radii.x) < MagickEpsilon) || (fabs(radii.y) < MagickEpsilon))
+    x  draw.c:6845:57 cxx_lt_to_le               if ((fabs(radii.x) < MagickEpsilon) || (fabs(radii.y) < MagickEpsilon))
+    x  draw.c:6851:12 cxx_lt_to_le               while (y < arc.x)
+    x  draw.c:6854:28 cxx_sub_to_add             coordinates=ceil((angle.y-angle.x)/step+1.0);
+    x  draw.c:6855:48 cxx_add_to_sub             if (CheckPrimitiveExtent(mvg_info,coordinates+1) == MagickFalse)
+    x  draw.c:6859:34 cxx_lt_to_le               for (p=primitive_info; angle.x < angle.y; angle.x+=step)
+    x  draw.c:6863:10 cxx_post_inc_to_post_dec   if (i++ >= (ssize_t) coordinates)
+    x  draw.c:6863:13 cxx_ge_to_gt               if (i++ >= (ssize_t) coordinates)
+    x  draw.c:6880:10 cxx_lt_to_le               if ((x < MagickEpsilon) && (y < MagickEpsilon))
+    x  draw.c:6880:33 cxx_lt_to_le               if ((x < MagickEpsilon) && (y < MagickEpsilon))
+    x  draw.c:6882:15 cxx_lt_to_le               for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
+    x  draw.c:7085:65 cxx_add_to_sub             end.x=(double) (attribute == (int) 'C' ? x : point.x+x);
+    x  draw.c:7086:65 cxx_add_to_sub             end.y=(double) (attribute == (int) 'C' ? y : point.y+y);
+    x  draw.c:7089:23 cxx_lt_to_le               for (i=0; i < 4; i++)
+    x  draw.c:7156:65 cxx_add_to_sub             point.x=(double) (attribute == (int) 'L' ? x : point.x+x);
+    x  draw.c:7157:65 cxx_add_to_sub             point.y=(double) (attribute == (int) 'L' ? y : point.y+y);
+    x  draw.c:7209:12 cxx_post_inc_to_post_dec   i++;
+    x  draw.c:7253:65 cxx_add_to_sub             end.x=(double) (attribute == (int) 'Q' ? x : point.x+x);
+    x  draw.c:7254:65 cxx_add_to_sub             end.y=(double) (attribute == (int) 'Q' ? y : point.y+y);
+    x  draw.c:7257:23 cxx_lt_to_le               for (i=0; i < 3; i++)
+    x  draw.c:7303:65 cxx_add_to_sub             end.x=(double) (attribute == (int) 'S' ? x : point.x+x);
+    x  draw.c:7304:65 cxx_add_to_sub             end.y=(double) (attribute == (int) 'S' ? y : point.y+y);
+    x  draw.c:7312:23 cxx_lt_to_le               for (i=0; i < 4; i++)
+    x  draw.c:7357:65 cxx_add_to_sub             end.x=(double) (attribute == (int) 'T' ? x : point.x+x);
+    x  draw.c:7358:65 cxx_add_to_sub             end.y=(double) (attribute == (int) 'T' ? y : point.y+y);
+    x  draw.c:7368:23 cxx_lt_to_le               for (i=0; i < 3; i++)
+    x  draw.c:7435:16 cxx_post_inc_to_post_dec   z_count++;
+    x  draw.c:7454:17 cxx_gt_to_ge               if (z_count > 1)
+    x  draw.c:7454:17 cxx_gt_to_le               if (z_count > 1)
+    x  draw.c:7495:15 cxx_lt_to_le               for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
+    x  draw.c:7526:18 cxx_lt_to_le               if ((segment.x < MagickEpsilon) || (segment.y < MagickEpsilon))
+    x  draw.c:7526:49 cxx_lt_to_le               if ((segment.x < MagickEpsilon) || (segment.y < MagickEpsilon))
+    x  draw.c:7531:13 cxx_gt_to_ge               if (arc.x > (0.5*segment.x))
+       draw.c:7532:14 cxx_mul_to_div             arc.x=0.5*segment.x;
+    x  draw.c:7533:13 cxx_gt_to_ge               if (arc.y > (0.5*segment.y))
+       draw.c:7534:14 cxx_mul_to_div             arc.y=0.5*segment.y;
+    x  draw.c:7577:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
+    x  draw.c:7577:15 cxx_lt_to_le               for (i=0; i < (ssize_t) primitive_info->coordinates; i++)
+    x  draw.c:7603:15 cxx_lt_to_le               for (i=1; i < (ssize_t) number_vertices; i++)
+    x  draw.c:7603:45 cxx_post_inc_to_post_dec   for (i=1; i < (ssize_t) number_vertices; i++)
+    x  draw.c:7607:28 cxx_ge_to_gt               if ((fabs((double) dx) >= MagickEpsilon) ||
+    x  draw.c:7607:28 cxx_ge_to_lt               if ((fabs((double) dx) >= MagickEpsilon) ||
+    x  draw.c:7608:28 cxx_ge_to_gt               (fabs((double) dy) >= MagickEpsilon))
+    x  draw.c:7608:28 cxx_ge_to_lt               (fabs((double) dy) >= MagickEpsilon))
+    x  draw.c:7611:9 cxx_eq_to_ne               if (i == (ssize_t) number_vertices)
+       draw.c:7612:32 cxx_sub_to_add             i=(ssize_t) number_vertices-1L;
+    x  draw.c:7622:28 cxx_ge_to_gt               if ((fabs((double) dx) >= MagickEpsilon) ||
+    x  draw.c:7622:28 cxx_ge_to_lt               if ((fabs((double) dx) >= MagickEpsilon) ||
+    x  draw.c:7623:28 cxx_ge_to_gt               (fabs((double) dy) >= MagickEpsilon))
+    x  draw.c:7623:28 cxx_ge_to_lt               (fabs((double) dy) >= MagickEpsilon))
+    x  draw.c:7756:31 cxx_lt_to_le               closed_path=(fabs(offset.x) < MagickEpsilon) &&
+    x  draw.c:7757:21 cxx_lt_to_le               (fabs(offset.y) < MagickEpsilon) ? MagickTrue : MagickFalse;
+    x  draw.c:7770:15 cxx_lt_to_le               for (n=1; n < (ssize_t) number_vertices; n++)
+    x  draw.c:7774:21 cxx_ge_to_gt               if ((fabs(dx.p) >= MagickEpsilon) || (fabs(dy.p) >= MagickEpsilon))
+    x  draw.c:7774:54 cxx_ge_to_gt               if ((fabs(dx.p) >= MagickEpsilon) || (fabs(dy.p) >= MagickEpsilon))
+       draw.c:7779:31 cxx_ne_to_eq               if ((draw_info->linecap != RoundCap) || (closed_path != MagickFalse))
+       draw.c:7779:60 cxx_ne_to_eq               if ((draw_info->linecap != RoundCap) || (closed_path != MagickFalse))
+       draw.c:7792:34 cxx_sub_to_add             n=(ssize_t) number_vertices-1L;
+    x  draw.c:7794:13 cxx_mul_to_div             extent_p=2*number_vertices;
+    x  draw.c:7795:13 cxx_mul_to_div             extent_q=2*number_vertices;
+       draw.c:7802:20 cxx_ne_to_eq               if (stroke_p != (PointInfo *) NULL)
+       draw.c:7804:20 cxx_ne_to_eq               if (stroke_q != (PointInfo *) NULL)
+    x  draw.c:7814:18 cxx_lt_to_le               if (fabs(dx.p) < MagickEpsilon)
+    x  draw.c:7817:22 cxx_lt_to_le               slope.p=dy.p < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
+       draw.c:7819:22 cxx_lt_to_ge               slope.p=dy.p < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+       draw.c:7819:22 cxx_lt_to_le               slope.p=dy.p < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+    x  draw.c:7822:20 cxx_lt_to_le               if (fabs(dy.p) < MagickEpsilon)
+    x  draw.c:7825:32 cxx_lt_to_le               inverse_slope.p=dx.p < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
+       draw.c:7827:32 cxx_lt_to_ge               inverse_slope.p=dx.p < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+       draw.c:7827:32 cxx_lt_to_le               inverse_slope.p=dx.p < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+    x  draw.c:7840:37 cxx_gt_to_ge               if ((dy.p*offset.x-dx.p*offset.y) > 0.0)
+    x  draw.c:7877:21 cxx_lt_to_le               if (dot_product < 0.25)
+    x  draw.c:7881:20 cxx_lt_to_le               if (fabs(dx.q) < MagickEpsilon)
+    x  draw.c:7884:24 cxx_lt_to_le               slope.q=dy.q < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
+       draw.c:7886:24 cxx_lt_to_ge               slope.q=dy.q < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+       draw.c:7886:24 cxx_lt_to_le               slope.q=dy.q < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+    x  draw.c:7889:22 cxx_lt_to_le               if (fabs(dy.q) < MagickEpsilon)
+    x  draw.c:7892:34 cxx_lt_to_le               inverse_slope.q=dx.q < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
+       draw.c:7894:34 cxx_lt_to_ge               inverse_slope.q=dx.q < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+       draw.c:7894:34 cxx_lt_to_le               inverse_slope.q=dx.q < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+    x  draw.c:7904:21 cxx_gt_to_ge               if (dot_product > 0.0)
+    x  draw.c:7926:42 cxx_lt_to_le               if (fabs((double) (slope.p-slope.q)) < MagickEpsilon)
+    x  draw.c:7944:21 cxx_le_to_lt               if (dot_product <= 0.0)
+    x  draw.c:7952:36 cxx_mul_to_div             (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+    x  draw.c:7953:27 cxx_le_to_lt               if (dot_product <= miterlimit)
+    x  draw.c:7966:27 cxx_le_to_lt               if (dot_product <= miterlimit)
+    x  draw.c:7983:36 cxx_mul_to_div             (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+    x  draw.c:7984:27 cxx_le_to_lt               if (dot_product <= miterlimit)
+    x  draw.c:7994:23 cxx_lt_to_le               if (theta.q < theta.p)
+    x  draw.c:8004:23 cxx_lt_to_le               for (j=1; j < (ssize_t) arc_segments; j++)
+    x  draw.c:8026:34 cxx_sub_to_add             dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+    x  draw.c:8026:58 cxx_sub_to_add             dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+    x  draw.c:8027:36 cxx_mul_to_div             (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+    x  draw.c:8028:27 cxx_le_to_lt               if (dot_product <= miterlimit)
+    x  draw.c:8039:34 cxx_sub_to_add             dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+    x  draw.c:8039:58 cxx_sub_to_add             dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+    x  draw.c:8041:27 cxx_le_to_lt               if (dot_product <= miterlimit)
+    x  draw.c:8057:34 cxx_sub_to_add             dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+    x  draw.c:8057:58 cxx_sub_to_add             dot_product=(box_q[4].x-box_p[4].x)*(box_q[4].x-box_p[4].x)+
+    x  draw.c:8058:24 cxx_sub_to_add             (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+    x  draw.c:8058:36 cxx_mul_to_div             (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+    x  draw.c:8058:48 cxx_sub_to_add             (box_q[4].y-box_p[4].y)*(box_q[4].y-box_p[4].y);
+    x  draw.c:8059:27 cxx_le_to_gt               if (dot_product <= miterlimit)
+    x  draw.c:8059:27 cxx_le_to_lt               if (dot_product <= miterlimit)
+    x  draw.c:8069:23 cxx_lt_to_le               if (theta.p < theta.q)
+    x  draw.c:8077:23 cxx_lt_to_le               for (j=1; j < (ssize_t) arc_segments; j++)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-draw.json

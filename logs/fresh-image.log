@@ -1,0 +1,345 @@
+mutate: 737 mutants in MagickCore/image\.c$, 68 functions
+  baseline: 481/481 (30s)
+mutate: 9 case(s) time out unmutated and are left out: gaps/3f0f18253e gaps/6a95c6af85 opencl/2124a0eb45 opencl/a8cc3ebf48 windrv/3ebc524471 windrv/41c234a591 windrv/7d14ba511e windrv/93dbbb465a windrv/cd7ea480a0
+mutate: baseline over 15563 cases in 31s
+  mutants: 25/737 (34s)
+  mutants: 50/737 (66s)
+  mutants: 75/737 (67s)
+  mutants: 100/737 (72s)
+  mutants: 125/737 (106s)
+  mutants: 150/737 (109s)
+  mutants: 175/737 (143s)
+  mutants: 200/737 (173s)
+  mutants: 225/737 (177s)
+  mutants: 250/737 (203s)
+  mutants: 275/737 (254s)
+  mutants: 300/737 (283s)
+  mutants: 325/737 (284s)
+  mutants: 350/737 (303s)
+  mutants: 375/737 (347s)
+  mutants: 400/737 (353s)
+  mutants: 425/737 (386s)
+  mutants: 450/737 (420s)
+  mutants: 475/737 (472s)
+  mutants: 500/737 (518s)
+  mutants: 525/737 (546s)
+  mutants: 550/737 (547s)
+  mutants: 575/737 (549s)
+  mutants: 600/737 (551s)
+  mutants: 625/737 (553s)
+  mutants: 650/737 (555s)
+  mutants: 675/737 (592s)
+  mutants: 700/737 (624s)
+  mutants: 725/737 (664s)
+  mutants: 737/737 (720s)
+
+mutate: 737 mutants, 720s
+  killed 465, survived 232 (186 capped), no coverage 40, errors 0
+  mutation score on reached code: 66.7%   overall: 63.1%
+
+  function                           total killed survived no-cov
+  SetImageInfo                          53     27       26      0
+  SyncImageSettings                     46     35       11      0
+  InterpretImageFilename                44     14       30      0
+  AppendImages                          40     34        6      0
+  AcquireImage                          38     11       27      0
+  SmushXGap                             27     21        6      0
+  SmushYGap                             27     21        6      0
+  CopyImagePixels                       23     22        1      0
+  SmushImages                           23     20        3      0
+  CloneImage                            22     15        7      0
+  SetImageMask                          20     19        1      0
+  GetImageMask                          19     17        2      0
+  IsHighDynamicRangeImage               19     17        2      0
+  SetImageRegionMask                    16     13        3      0
+  SetImageBackgroundColor               15     13        2      0
+  SyncImage                             15     14        1      0
+  CloneImageInfo                        14      6        8      0
+  DestroyImageResources                 13      1       12      0
+  DestroyImageInfo                      13      2       11      0
+  SetImageAlpha                         13     11        2      0
+  NewMagickImage                        12      0        0     12
+  ResetImagePixels                      12      0       12      0
+  ParseSceneRange                       12      8        4      0
+  SetImageColor                         11      0        0     11
+  IsOffsetRegionOutside                 10     10        0      0
+  SetAbsolutePageOffset                 10     10        0      0
+  IsInsideRegion                        10     10        0      0
+  IsValidDigitSpecifier                  9      8        1      0
+  SetImageExtent                         9      6        3      0
+  SetUserSpecifiedFormat                 9      5        4      0
+  GetImageInfo                           7      4        3      0
+  ClipImagePath                          6      3        3      0
+  DestroyImage                           6      4        2      0
+  IsValidFormatSpecifier                 6      6        0      0
+  ResetImagePage                         6      5        1      0
+  SetImageInfoFromExtension              6      3        3      0
+  IsLeftGapEdge                          6      5        1      0
+  IsTopGapEdge                           6      5        1      0
+  AcquireNextImage                       5      3        2      0
+  IsTaintImage                           5      0        0      5
+  ModifyImage                            5      0        0      5
+  FindExplicitFormatType                 5      0        5      0
+  IsRightGapEdge                         5      3        2      0
+  IsBottomGapEdge                        5      3        2      0
+  ConvertResolutionUnits                 5      5        0      0
+  ReferenceImage                         4      2        2      0
+  IsChannelNotCopied                     3      3        0      0
+  GetImageReferenceCount                 3      0        0      3
+  IsUnknownFormatSpecifier               3      3        0      0
+  IsIntegerSpecifierAt                   3      3        0      0
+  IsImageObject                          3      0        0      3
+  IsUndelegatedComponent                 3      1        2      0
+  IsUsableMagick                         3      3        0      0
+  IsExtensionMagickMatch                 3      2        1      0
+  CatchImageException                    2      0        2      0
+  DisassociateImageStream                2      0        2      0
+  AddRelativePageOffset                  2      2        0      0
+  StripImage                             2      1        1      0
+  PushColormapIndex                      2      2        0      0
+  ParseChromaticityPrimary               2      2        0      0
+  SyncImagesSettings                     2      1        1      0
+  AcquireImageInfo                       1      1        0      0
+  GetImageVirtualPixelMethod             1      0        1      0
+  SetImageStorageClass                   1      0        1      0
+  SetImageInfoBlob                       1      0        1      0
+  SetImageInfoCustomStream               1      0        0      1
+  SetImageInfoFile                       1      0        1      0
+  SetImageVirtualPixelMethod             1      0        1      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    xc image.c:153:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:181:3 cxx_remove_void_call       GetPixelInfoRGBA(BackgroundColorRGBA,&image->background_color);
+    xc image.c:182:3 cxx_remove_void_call       GetPixelInfoRGBA(BorderColorRGBA,&image->border_color);
+    xc image.c:183:3 cxx_remove_void_call       GetPixelInfoRGBA(MatteColorRGBA,&image->matte_color);
+    xc image.c:184:3 cxx_remove_void_call       GetPixelInfoRGBA(TransparentColorRGBA,&image->transparent_color);
+    xc image.c:197:32 cxx_add_to_sub             image->ttl=image->timestamp+(time_t) time_limit;
+    xc image.c:208:3 cxx_remove_void_call       SetBlobExempt(image,image_info->file != (FILE *) NULL ? MagickTrue :
+    xc image.c:208:40 cxx_ne_to_eq               SetBlobExempt(image,image_info->file != (FILE *) NULL ? MagickTrue :
+    xc image.c:224:27 cxx_ne_to_eq               if (image_info->extract != (char *) NULL)
+    xc image.c:231:29 cxx_ne_to_eq               if (((flags & XValue) != 0) || ((flags & YValue) != 0))
+    xc image.c:231:56 cxx_ne_to_eq               if (((flags & XValue) != 0) || ((flags & YValue) != 0))
+    xc image.c:243:27 cxx_ne_to_eq               if (image_info->density != (char *) NULL)
+    xc image.c:249:30 cxx_ne_to_eq               if ((flags & RhoValue) != 0)
+    xc image.c:252:32 cxx_ne_to_eq               if ((flags & SigmaValue) != 0)
+    xc image.c:276:5 cxx_remove_void_call       ClonePixelCacheMethods(image->cache,image_info->cache);
+    xc image.c:285:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc image.c:291:34 cxx_ne_to_eq               if ((flags & GreaterValue) != 0)
+    xc image.c:293:37 cxx_gt_to_ge               if ((double) image->delay > floor(geometry_info.rho+0.5))
+    xc image.c:293:37 cxx_gt_to_le               if ((double) image->delay > floor(geometry_info.rho+0.5))
+    xc image.c:293:62 cxx_add_to_sub             if ((double) image->delay > floor(geometry_info.rho+0.5))
+     c image.c:294:77 cxx_add_to_sub             image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
+    xc image.c:300:39 cxx_lt_to_ge               if ((double) image->delay < floor(geometry_info.rho+0.5))
+    xc image.c:300:39 cxx_lt_to_le               if ((double) image->delay < floor(geometry_info.rho+0.5))
+    xc image.c:300:64 cxx_add_to_sub             if ((double) image->delay < floor(geometry_info.rho+0.5))
+    xc image.c:302:36 cxx_add_to_sub             geometry_info.sigma+0.5));
+    xc image.c:305:75 cxx_add_to_sub             image->delay=(size_t) CastDoubleToSsizeT(floor(geometry_info.rho+
+    xc image.c:308:77 cxx_add_to_sub             image->ticks_per_second=CastDoubleToSsizeT(floor(geometry_info.sigma+
+    xc image.c:385:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:395:3 cxx_remove_void_call       DestroyBlob(GetNextImageInList(image));
+    x  image.c:482:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  image.c:494:21 cxx_gt_to_ge               if (next->depth > depth)
+    x  image.c:496:20 cxx_ne_to_eq               if (next->type != images->type)
+    x  image.c:505:27 cxx_gt_to_ge               if (next->columns > width)
+    x  image.c:511:20 cxx_gt_to_ge               if (next->rows > height)
+    x  image.c:585:7 cxx_remove_void_call       GetPixelInfo(next,&pixel);
+    x  image.c:653:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  image.c:656:3 cxx_remove_void_call       CatchException(exception);
+    x  image.c:721:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  image.c:746:32 cxx_eq_to_ne               if (clip_mask->storage_class == PseudoClass)
+       image.c:749:65 cxx_eq_to_ne               if (SetImageStorageClass(clip_mask,DirectClass,exception) == MagickFalse)
+    xc image.c:820:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:847:22 cxx_ne_to_eq               if (image->ascii85 != (void *) NULL)
+    xc image.c:848:5 cxx_remove_void_call       Ascii85Initialize(clone_image);
+    xc image.c:898:26 cxx_ne_to_eq               if (image->montage != (char *) NULL)
+    xc image.c:900:28 cxx_ne_to_eq               if (image->directory != (char *) NULL)
+    xc image.c:915:44 cxx_lt_to_ge               if (MagickAbsoluteValue(scale_x-scale_y) < 2.0)
+    xc image.c:915:44 cxx_lt_to_le               if (MagickAbsoluteValue(scale_x-scale_y) < 2.0)
+    xc image.c:972:27 cxx_ne_to_eq               if (image_info->extract != (char *) NULL)
+    xc image.c:974:26 cxx_ne_to_eq               if (image_info->scenes != (char *) NULL)
+    xc image.c:976:24 cxx_ne_to_eq               if (image_info->page != (char *) NULL)
+    xc image.c:982:35 cxx_ne_to_eq               if (image_info->sampling_factor != (char *) NULL)
+    xc image.c:985:31 cxx_ne_to_eq               if (image_info->server_name != (char *) NULL)
+    xc image.c:989:27 cxx_ne_to_eq               if (image_info->texture != (char *) NULL)
+    xc image.c:991:27 cxx_ne_to_eq               if (image_info->density != (char *) NULL)
+    xc image.c:1014:3 cxx_remove_void_call       SetImageInfoFile(clone_info,image_info->file);
+    x  image.c:1105:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:1212:3 cxx_remove_void_call       DestroyImagePixels(image);
+    xc image.c:1214:22 cxx_ne_to_eq               if (image->montage != (char *) NULL)
+    xc image.c:1216:24 cxx_ne_to_eq               if (image->directory != (char *) NULL)
+    xc image.c:1218:23 cxx_ne_to_eq               if (image->colormap != (PixelInfo *) NULL)
+    xc image.c:1220:23 cxx_ne_to_eq               if (image->geometry != (char *) NULL)
+    xc image.c:1222:3 cxx_remove_void_call       DestroyImageProfiles(image);
+    xc image.c:1223:3 cxx_remove_void_call       DestroyImageProperties(image);
+    xc image.c:1224:3 cxx_remove_void_call       DestroyImageArtifacts(image);
+    xc image.c:1225:22 cxx_ne_to_eq               if (image->ascii85 != (Ascii85Info *) NULL)
+    xc image.c:1229:3 cxx_remove_void_call       DestroyBlob(image);
+    xc image.c:1230:24 cxx_ne_to_eq               if (image->semaphore != (SemaphoreInfo *) NULL)
+    xc image.c:1231:5 cxx_remove_void_call       RelinquishSemaphoreInfo(&image->semaphore);
+    xc image.c:1244:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:1257:3 cxx_remove_void_call       DestroyImageResources(image);
+    xc image.c:1290:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:1293:24 cxx_ne_to_eq               if (image_info->size != (char *) NULL)
+    xc image.c:1295:27 cxx_ne_to_eq               if (image_info->extract != (char *) NULL)
+    xc image.c:1297:26 cxx_ne_to_eq               if (image_info->scenes != (char *) NULL)
+    xc image.c:1299:24 cxx_ne_to_eq               if (image_info->page != (char *) NULL)
+    xc image.c:1301:35 cxx_ne_to_eq               if (image_info->sampling_factor != (char *) NULL)
+    xc image.c:1304:31 cxx_ne_to_eq               if (image_info->server_name != (char *) NULL)
+    xc image.c:1307:24 cxx_ne_to_eq               if (image_info->font != (char *) NULL)
+    xc image.c:1309:27 cxx_ne_to_eq               if (image_info->texture != (char *) NULL)
+    xc image.c:1311:27 cxx_ne_to_eq               if (image_info->density != (char *) NULL)
+    xc image.c:1318:3 cxx_remove_void_call       DestroyImageOptions(image_info);
+    xc image.c:1352:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:1354:3 cxx_remove_void_call       DisassociateBlob(image);
+    xc image.c:1388:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:1399:19 cxx_ne_to_eq               if (synchronize != (const char *) NULL)
+    xc image.c:1409:54 cxx_ne_to_eq               image_info->debug=(GetLogEventMask() & ImageEvent) != 0 ? MagickTrue :
+    x  image.c:1487:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  image.c:1544:17 cxx_lt_to_le               for (x=0; x < (ssize_t) image->columns; x++)
+    xc image.c:1642:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  image.c:1701:28 cxx_post_inc_to_post_dec   for ( ; i < (length-1); i++)
+    xc image.c:1752:19 cxx_ne_to_eq               if (literal != (char *) NULL)
+    xc image.c:1757:15 cxx_ne_to_eq               if (literal != (char *) NULL)
+    xc image.c:1759:45 cxx_lt_to_le               while ((*cursor != '\0') && ((p-filename) < ((ssize_t) MagickPathExtent-1)))
+    xc image.c:1802:24 cxx_le_to_lt               if ((count <= 0) || ((size_t) count != pattern_length))
+    xc image.c:1804:28 cxx_add_to_sub             if ((p-filename+(ssize_t) pattern_length) >= MagickPathExtent)
+    xc image.c:1804:55 cxx_ge_to_gt               if ((p-filename+(ssize_t) pattern_length) >= MagickPathExtent)
+    xc image.c:1806:73 cxx_sub_to_add             (void) CopyMagickString(p,pattern,(size_t) (MagickPathExtent-
+    xc image.c:1807:17 cxx_sub_to_add             (p-filename)));
+    xc image.c:1822:17 cxx_eq_to_ne               if (*cursor == '[')
+    xc image.c:1832:17 cxx_eq_to_ne               if (end == (const char *) NULL)
+    xc image.c:1834:29 cxx_sub_to_add             extent=(size_t) (end-cursor-1);
+    xc image.c:1834:36 cxx_sub_to_add             extent=(size_t) (end-cursor-1);
+    xc image.c:1835:20 cxx_ge_to_gt               if (extent >= sizeof(pattern))
+    xc image.c:1835:20 cxx_ge_to_lt               if (extent >= sizeof(pattern))
+    xc image.c:1837:56 cxx_add_to_sub             (void) CopyMagickString(pattern,cursor+1,extent+1);
+    xc image.c:1839:19 cxx_ne_to_eq               if (image != NULL)
+    xc image.c:1842:24 cxx_eq_to_ne               if (option == (const char *) NULL)
+    xc image.c:1845:21 cxx_eq_to_ne               if ((option == (const char *) NULL) &&
+    xc image.c:1846:25 cxx_ne_to_eq               (image_info != (ImageInfo *) NULL))
+    xc image.c:1848:20 cxx_eq_to_ne               if (option == (const char *) NULL)
+    xc image.c:1851:15 cxx_sub_to_add             if ((p-filename+(ssize_t) option_length) >= MagickPathExtent)
+    xc image.c:1851:24 cxx_add_to_sub             if ((p-filename+(ssize_t) option_length) >= MagickPathExtent)
+    xc image.c:1851:50 cxx_ge_to_gt               if ((p-filename+(ssize_t) option_length) >= MagickPathExtent)
+    xc image.c:1851:50 cxx_ge_to_lt               if ((p-filename+(ssize_t) option_length) >= MagickPathExtent)
+    xc image.c:1853:68 cxx_sub_to_add             (void) CopyMagickString(p,option,(size_t) (MagickPathExtent-
+    xc image.c:1854:13 cxx_sub_to_add             (p-filename)));
+    xc image.c:1863:11 cxx_sub_to_add             if ((p-filename+1) >= MagickPathExtent)
+    xc image.c:1863:20 cxx_add_to_sub             if ((p-filename+1) >= MagickPathExtent)
+    xc image.c:1863:24 cxx_ge_to_gt               if ((p-filename+1) >= MagickPathExtent)
+    xc image.c:1863:24 cxx_ge_to_lt               if ((p-filename+1) >= MagickPathExtent)
+    xc image.c:1917:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:1924:15 cxx_lt_to_le               for (y=0; y < (ssize_t) image->rows; y++)
+    xc image.c:2229:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:2232:25 cxx_post_inc_to_post_dec   image->reference_count++;
+    xc image.c:2297:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:2360:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:2363:14 cxx_ne_to_eq               if (pixels != (void *) NULL)
+    xc image.c:2380:15 cxx_lt_to_ge               for (y=0; y < (ssize_t) image->rows; y++)
+    xc image.c:2380:15 cxx_lt_to_le               for (y=0; y < (ssize_t) image->rows; y++)
+    xc image.c:2380:41 cxx_post_inc_to_post_dec   for (y=0; y < (ssize_t) image->rows; y++)
+    xc image.c:2388:16 cxx_eq_to_ne               if (status == MagickFalse)
+    xc image.c:2391:11 cxx_eq_to_ne               if (q == (Quantum *) NULL)
+    xc image.c:2396:17 cxx_lt_to_ge               for (x=0; x < (ssize_t) image->columns; x++)
+    xc image.c:2396:17 cxx_lt_to_le               for (x=0; x < (ssize_t) image->columns; x++)
+    xc image.c:2396:46 cxx_post_inc_to_post_dec   for (x=0; x < (ssize_t) image->columns; x++)
+    xc image.c:2398:48 cxx_mul_to_div             (void) memset(q,0,GetPixelChannels(image)*sizeof(Quantum));
+    xc image.c:2401:60 cxx_eq_to_ne               if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    xc image.c:2453:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:2483:38 cxx_gt_to_ge               if (GetPixelWriteMask(image,q) > (QuantumRange/2))
+    xc image.c:2539:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:2544:47 cxx_eq_to_ne               ((image->alpha_trait & BlendPixelTrait) == 0))
+    xc image.c:2733:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:2773:16 cxx_gt_to_ge               if ((columns > (size_t) MAGICK_SSIZE_MAX) ||
+    xc image.c:2774:13 cxx_gt_to_ge               (rows > (size_t) MAGICK_SSIZE_MAX))
+    xc image.c:2784:20 cxx_gt_to_ge               if (image->depth > (8*sizeof(MagickSizeType)))
+    x  image.c:2819:15 cxx_gt_to_ge               if (first > last)
+    x  image.c:2821:15 cxx_lt_to_ge               if (first < image_info->scene)
+    x  image.c:2821:15 cxx_lt_to_le               if (first < image_info->scene)
+    x  image.c:2823:14 cxx_gt_to_ge               if (last > image_info->number_scenes)
+    xc image.c:2872:23 cxx_eq_to_ne               while ((format_type == UndefinedFormatType) &&
+    xc image.c:2873:34 cxx_ne_to_eq               (format_type_formats[i] != (char *) NULL))
+    xc image.c:2875:17 cxx_eq_to_ne               if ((*magic == *format_type_formats[i]) &&
+    xc image.c:2876:54 cxx_eq_to_ne               (LocaleCompare(magic,format_type_formats[i]) == 0))
+    xc image.c:2878:6 cxx_post_inc_to_post_dec   i++;
+    xc image.c:2925:33 cxx_ne_to_eq               (magick_info->format_type != UndefinedFormatType))
+    xc image.c:2931:21 cxx_eq_to_ne               if (format_type == ExplicitFormatType)
+    xc image.c:2936:34 cxx_eq_to_ne               if (LocaleCompare(magic,"RGB") == 0)
+    x  image.c:2944:26 cxx_eq_to_ne               return(((delegate_info == (const DelegateInfo *) NULL) &&
+    x  image.c:2945:49 cxx_eq_to_ne               ((*component != '\0') && (IsGlob(component) == MagickFalse))) ?
+    xc image.c:2963:18 cxx_eq_to_ne               magic_info)) == 0)) ? MagickTrue : MagickFalse);
+    xc image.c:2985:25 cxx_eq_to_ne               if (delegate_info == (const DelegateInfo *) NULL)
+    xc image.c:3003:33 cxx_ne_to_eq               if (IsStringTrue(literal) != MagickFalse)
+     c image.c:3004:9 cxx_remove_void_call       GetPathComponent(image_info->filename,SubcanonicalPath,component);
+    xc image.c:3007:19 cxx_ne_to_eq               if (literal != (char *) NULL)
+    xc image.c:3044:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:3048:3 cxx_remove_void_call       GetPathComponent(image_info->filename,SubimagePath,component);
+    xc image.c:3049:18 cxx_eq_to_ne               if (*component == '\0')
+    xc image.c:3055:18 cxx_ne_to_eq               if (*component != '\0')
+    xc image.c:3060:50 cxx_eq_to_ne               if (IsSceneGeometry(component,MagickFalse) == MagickFalse)
+    xc image.c:3062:37 cxx_ne_to_eq               if (IsGeometry(component) != MagickFalse)
+    xc image.c:3066:9 cxx_remove_void_call       ParseSceneRange(image_info,component);
+    xc image.c:3077:7 cxx_remove_void_call       GetPathComponent(path,ExtensionPath,component);
+    xc image.c:3096:18 cxx_eq_to_ne               if (frames == 0)
+    xc image.c:3107:44 cxx_eq_to_ne               (GetMagickEndianSupport(magick_info) == MagickFalse))
+    xc image.c:3109:27 cxx_ne_to_eq               if ((image_info->adjoin != MagickFalse) && (frames > 1))
+    xc image.c:3109:54 cxx_gt_to_ge               if ((image_info->adjoin != MagickFalse) && (frames > 1))
+    xc image.c:3109:54 cxx_gt_to_le               if ((image_info->adjoin != MagickFalse) && (frames > 1))
+    xc image.c:3117:34 cxx_eq_to_ne               (strchr(component,'%') == (char *) NULL))
+    xc image.c:3120:27 cxx_ne_to_eq               if ((image_info->adjoin != MagickFalse) && (frames > 0))
+    xc image.c:3120:54 cxx_gt_to_ge               if ((image_info->adjoin != MagickFalse) && (frames > 0))
+    xc image.c:3120:54 cxx_gt_to_le               if ((image_info->adjoin != MagickFalse) && (frames > 0))
+    xc image.c:3165:32 cxx_eq_to_ne               if (CloseBlob(image) == MagickFalse)
+    xc image.c:3167:22 cxx_eq_to_ne               if (status == MagickFalse)
+    xc image.c:3173:11 cxx_remove_void_call       SetImageInfoFile(image_info,(FILE *) NULL);
+    xc image.c:3176:22 cxx_eq_to_ne               if (status == MagickFalse)
+    xc image.c:3195:29 cxx_minus_to_noop          (void) SeekBlob(image,-((MagickOffsetType) count),SEEK_CUR);
+    xc image.c:3219:28 cxx_eq_to_ne               if ((magick_info == (const MagickInfo *) NULL) ||
+    xc image.c:3220:52 cxx_eq_to_ne               (GetMagickEndianSupport(magick_info) == MagickFalse))
+    xc image.c:3226:24 cxx_eq_to_ne               if ((magick_info == (const MagickInfo *) NULL) ||
+    xc image.c:3227:48 cxx_eq_to_ne               (GetMagickEndianSupport(magick_info) == MagickFalse))
+    xc image.c:3266:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:3337:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:3390:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  image.c:3559:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+       image.c:3641:11 cxx_remove_void_call       SetPixelReadMask(image,pixel,q);
+       image.c:3651:11 cxx_remove_void_call       SetPixelCompositeMask(image,pixel,q);
+    xc image.c:3699:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  image.c:3744:42 cxx_ge_to_gt               (((ssize_t) left_image->columns-x-1) >= (ssize_t) gap)) ? MagickTrue :
+    x  image.c:3753:8 cxx_add_to_sub             ((x+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+    x  image.c:3753:12 cxx_ge_to_gt               ((x+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+    x  image.c:3788:3 cxx_remove_void_call       GravityAdjustGeometry(right_image->columns,right_image->rows,
+    x  image.c:3797:15 cxx_lt_to_le               for (y=0; y < (ssize_t) smush_image->rows; y++)
+    x  image.c:3799:47 cxx_gt_to_ge               for (x=(ssize_t) left_image->columns-1; x > 0; x--)
+    x  image.c:3806:17 cxx_lt_to_le               for (x=0; x < (ssize_t) right_image->columns; x++)
+    x  image.c:3813:11 cxx_add_to_sub             if ((x+i) < (ssize_t) gap)
+    x  image.c:3813:15 cxx_lt_to_le               if ((x+i) < (ssize_t) gap)
+    x  image.c:3828:38 cxx_ge_to_gt               (((ssize_t) top_image->rows-y-1) >= (ssize_t) gap)) ? MagickTrue :
+    x  image.c:3837:8 cxx_add_to_sub             ((y+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+    x  image.c:3837:12 cxx_ge_to_gt               ((y+i) >= (ssize_t) gap)) ? MagickTrue : MagickFalse);
+    x  image.c:3872:3 cxx_remove_void_call       GravityAdjustGeometry(bottom_image->columns,bottom_image->rows,
+    x  image.c:3881:15 cxx_lt_to_le               for (x=0; x < (ssize_t) smush_image->columns; x++)
+    x  image.c:3883:43 cxx_gt_to_ge               for (y=(ssize_t) top_image->rows-1; y > 0; y--)
+    x  image.c:3890:17 cxx_lt_to_le               for (y=0; y < (ssize_t) bottom_image->rows; y++)
+    x  image.c:3897:11 cxx_add_to_sub             if ((y+i) < (ssize_t) gap)
+    x  image.c:3897:15 cxx_lt_to_le               if ((y+i) < (ssize_t) gap)
+    x  image.c:3950:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  image.c:3965:27 cxx_gt_to_ge               if (next->columns > width)
+    x  image.c:3975:20 cxx_gt_to_ge               if (next->rows > height)
+    x  image.c:4066:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:4128:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:4242:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:4303:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc image.c:4310:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc image.c:4315:5 cxx_remove_void_call       ParseChromaticityPrimary(option,&image->chromaticity.blue_primary);
+    xc image.c:4364:5 cxx_remove_void_call       ParseChromaticityPrimary(option,&image->chromaticity.green_primary);
+    xc image.c:4407:5 cxx_remove_void_call       ParseChromaticityPrimary(option,&image->chromaticity.red_primary);
+    xc image.c:4442:7 cxx_remove_void_call       ConvertResolutionUnits(image,units);
+    xc image.c:4445:18 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc image.c:4448:34 cxx_ne_to_eq               if ((flags & RhoValue) != 0)
+    xc image.c:4451:36 cxx_ne_to_eq               if ((flags & SigmaValue) != 0)
+    xc image.c:4456:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc image.c:4462:5 cxx_remove_void_call       ParseChromaticityPrimary(option,&image->chromaticity.white_point);
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-image.json

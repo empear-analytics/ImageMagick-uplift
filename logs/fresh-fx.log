@@ -1,0 +1,311 @@
+mutate: 991 mutants in MagickCore/fx\.c$, 98 functions
+mutate: baseline over 821 cases in 1s
+  mutants: 25/991 (5s)
+  mutants: 50/991 (9s)
+  mutants: 75/991 (25s)
+  mutants: 100/991 (32s)
+  mutants: 125/991 (33s)
+  mutants: 150/991 (34s)
+  mutants: 175/991 (41s)
+  mutants: 200/991 (49s)
+  mutants: 225/991 (54s)
+  mutants: 250/991 (64s)
+  mutants: 275/991 (68s)
+  mutants: 300/991 (76s)
+  mutants: 325/991 (79s)
+  mutants: 350/991 (92s)
+  mutants: 375/991 (104s)
+  mutants: 400/991 (121s)
+  mutants: 425/991 (141s)
+  mutants: 450/991 (152s)
+  mutants: 475/991 (169s)
+  mutants: 500/991 (202s)
+  mutants: 525/991 (217s)
+  mutants: 550/991 (226s)
+  mutants: 575/991 (237s)
+  mutants: 600/991 (265s)
+  mutants: 625/991 (281s)
+  mutants: 650/991 (287s)
+  mutants: 675/991 (291s)
+  mutants: 700/991 (293s)
+  mutants: 725/991 (299s)
+  mutants: 750/991 (326s)
+  mutants: 775/991 (349s)
+  mutants: 800/991 (374s)
+  mutants: 825/991 (399s)
+  mutants: 850/991 (420s)
+  mutants: 875/991 (431s)
+  mutants: 900/991 (467s)
+  mutants: 925/991 (479s)
+  mutants: 950/991 (507s)
+  mutants: 975/991 (525s)
+  mutants: 991/991 (836s)
+
+mutate: 991 mutants, 836s
+  killed 828, survived 160 (132 capped), no coverage 3, errors 0
+  mutation score on reached code: 83.8%   overall: 83.6%
+
+  function                           total killed survived no-cov
+  ExecuteRPN                           210    169       41      0
+  GetFunction                          106     90       16      0
+  GetOperand                            64     58        6      0
+  TranslateExpression                   34     26        8      0
+  ImageStat                             33     33        0      0
+  FxImage                               33     30        3      0
+  DumpTables                            30     30        0      0
+  DumpRPN                               26     20        6      0
+  AcquireFxInfoPrivate                  22     11       11      0
+  GetConstantColour                     20     18        2      0
+  GetOperator                           18     13        5      0
+  OprStr                                16     11        5      0
+  AddElement                            16     13        3      0
+  GetToken                              15     12        3      0
+  GetProperty                           14     13        1      0
+  AllocFxRt                             13     10        3      0
+  TypeOfOpr                             11      7        4      0
+  MaybeXYWH                             11     11        0      0
+  GetHexColour                          11      9        2      0
+  IsChannelQualifiableOperator          10      7        3      0
+  ProcessTernaryOpr                     10      9        1      0
+  FxGcd                                  9      8        1      0
+  GetImgAttrToken                        8      7        1      0
+  IsUnqualifiedPixelFunction             8      5        3      0
+  IsPixelAccessFunction                  8      7        1      0
+  IsStealth                              8      5        3      0
+  DeInitFx                               7      5        2      0
+  ResolveTernaryAddresses                7      5        2      0
+  ChkImgNum                              7      7        0      0
+  FindUserSymbol                         6      6        0      0
+  PushOperatorStack                      6      4        2      0
+  InitFx                                 5      2        3      0
+  AddUserSymbol                          5      3        2      0
+  IsAddressingOperator                   5      5        0      0
+  GetLeadingOp                           5      5        0      0
+  IsNoArgsFunction                       5      5        0      0
+  TranslateStatementList                 5      2        3      0
+  GetHslInt                              5      5        0      0
+  DestroyFxInfo                          5      2        3      0
+  IsHslOrIntensityChannel                4      4        0      0
+  OprInPlace                             4      4        0      0
+  IsJumpElement                          4      4        0      0
+  IsPixelReferenceElement                4      4        0      0
+  OprIsUnaryPrefix                       4      4        0      0
+  GetCoordQualifier                      4      4        0      0
+  IsAttributeWithVirtualChannel          4      3        1      0
+  IsImageReferenceOperator               4      3        1      0
+  IsDefaultArgsFunction                  4      4        0      0
+  IsUnqualifiedCoordFunction             4      4        0      0
+  IsQualifiedCoordFunction               4      2        2      0
+  IsLoopOrIfFunction                     4      4        0      0
+  IsRealOperator                         4      4        0      0
+  CollectOneImgStats                     4      4        0      0
+  GetHslFlt                              4      4        0      0
+  DumpUserSymbols                        3      3        0      0
+  BuildRPN                               3      3        0      0
+  ExtendRPN                              3      3        0      0
+  TokenMaybeUserSymbol                   3      3        0      0
+  IsUnqualifiableAttr                    3      3        0      0
+  IsNotCoordFunction                     3      3        0      0
+  GetChannelQualifier                    3      3        0      0
+  IsQualifierRequiredAttr                3      3        0      0
+  ParseISO860                            3      3        0      0
+  IsPadFunction                          3      0        0      3
+  IsHslChannelQualifier                  3      3        0      0
+  IsCoordFunction                        3      3        0      0
+  IsHslSymbol                            3      3        0      0
+  IsOpenGroupOperator                    3      3        0      0
+  TranslateStatement                     3      2        1      0
+  CollectStatistics                      3      2        1      0
+  PushVal                                3      2        1      0
+  GetIntensity                           3      2        1      0
+  SetPtrShortExp                         2      2        0      0
+  ExtendUserSymbols                      2      2        0      0
+  AddAddressingElement                   2      2        0      0
+  PeekStr                                2      2        0      0
+  ExtendOperatorStack                    2      2        0      0
+  PopOprOpenParen                        2      2        0      0
+  GetImgAttrQualifier                    2      2        0      0
+  IsColourSpaceNamed                     2      1        1      0
+  IsUnexpectedLimit                      2      2        0      0
+  IsAttributeQualified                   2      2        0      0
+  IsUnqualifiedAccess                    2      2        0      0
+  IsCompositeOnlyAccess                  2      1        1      0
+  IsOperatorStackBarrier                 2      2        0      0
+  PopVal                                 2      1        1      0
+  ChanIsVirtual                          1      1        0      0
+  NameOfUserSym                          1      1        0      0
+  AddColourElement                       1      1        0      0
+  PeekChar                               1      1        0      0
+  ExpectChar                             1      1        0      0
+  TopOprIsUnaryPrefix                    1      1        0      0
+  IsQualifier                            1      1        0      0
+  IsExpressionContinuing                 1      1        0      0
+  IsExpressionEnd                        1      1        0      0
+  IsPendingLimitChar                     1      1        0      0
+  IsMisplacedAssignment                  1      1        0      0
+  IsStatisticsPending                    1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+     c fx.c:837:17 cxx_gt_to_ge               for ( ; i > 0; i--) {
+     c fx.c:837:17 cxx_gt_to_le               for ( ; i > 0; i--) {
+     c fx.c:838:28 cxx_sub_to_add             pimg = &pfx->Imgs[i-1];
+    xc fx.c:859:57 cxx_gt_to_le               for (i = (ssize_t)GetImageListLength(pfx->image); i > 0; i--) {
+    xc fx.c:868:57 cxx_gt_to_le               for (i = (ssize_t)GetImageListLength(pfx->image); i > 0; i--) {
+    xc fx.c:882:10 cxx_le_to_lt               if (op <= fNull) return etFunction;
+    xc fx.c:883:10 cxx_le_to_lt               if (op <= aNull) return etImgAttr;
+    xc fx.c:884:10 cxx_le_to_lt               if (op <= sNull) return etSymbol;
+    xc fx.c:885:10 cxx_le_to_lt               if (op <= rNull) return etControl;
+    x  fx.c:955:30 cxx_ge_to_gt               if (++pfx->usedUserSymbols >= pfx->numUserSymbols) {
+    x  fx.c:955:30 cxx_ge_to_lt               if (++pfx->usedUserSymbols >= pfx->numUserSymbols) {
+    xc fx.c:1054:13 cxx_add_to_sub             nRnd = 20 + 10 * (int) GetPseudoRandomValue (pfxrt->random_info);
+    xc fx.c:1059:26 cxx_lt_to_le               if (pfxrt->numValStack < MinValStackSize) pfxrt->numValStack = MinValStackSize;
+    xc fx.c:1080:19 cxx_lt_to_ge               for (i = 0; i < pfx->usedUserSymbols; i++) pfxrt->UserSymVals[i] = (fxFltType) 0;
+    x  fx.c:1129:19 cxx_le_to_lt               else if (oprNum <= oNull) str = Operators[oprNum].str;
+    x  fx.c:1130:19 cxx_le_to_lt               else if (oprNum <= fNull) str = Functions[oprNum-(int) FirstFunc].str;
+    x  fx.c:1131:19 cxx_le_to_lt               else if (oprNum <= aNull) str = ImgAttrs[oprNum-(int) FirstImgAttr].str;
+    x  fx.c:1132:19 cxx_le_to_lt               else if (oprNum <= sNull) str = Symbols[oprNum-(int) FirstSym].str;
+    x  fx.c:1133:19 cxx_le_to_lt               else if (oprNum <= rNull) str = Controls[oprNum-(int) FirstCont].str;
+       fx.c:1167:24 cxx_eq_to_ne               else if (pfx->runType==rtCornerOnly)  fprintf (stderr, "CornerOnly");
+    x  fx.c:1171:15 cxx_lt_to_ge               for (i=0; i < pfx->usedElements; i++) {
+    x  fx.c:1171:15 cxx_lt_to_le               for (i=0; i < pfx->usedElements; i++) {
+    x  fx.c:1175:15 cxx_lt_to_le               for (i=0; i < pfx->usedElements; i++) {
+    x  fx.c:1178:30 cxx_ge_to_gt               if (pel->element_index >= 0 && pel->element_index < pfx->numElements) {
+    x  fx.c:1178:57 cxx_lt_to_le               if (pel->element_index >= 0 && pel->element_index < pfx->numElements) {
+     c fx.c:1275:36 cxx_post_inc_to_post_dec   while (isalpha ((int)*p)) { len++; p++; }
+    xc fx.c:1279:36 cxx_post_inc_to_post_dec   while (isalpha ((int)*p)) { len++; p++; }
+    xc fx.c:1294:58 cxx_lt_to_le               (void) CopyMagickString (pfx->token, pfx->pex, (len+1<MaxTokenLen)?len+1:MaxTokenLen);
+    xc fx.c:1347:19 cxx_le_to_lt               else if (oprNum <= fNull) pel->number_args = Functions[oprNum-(int) FirstFunc].number_args
+    xc fx.c:1348:19 cxx_le_to_lt               else if (oprNum <= aNull) pel->number_args = 0;
+    xc fx.c:1349:19 cxx_le_to_lt               else if (oprNum <= sNull) pel->number_args = 0;
+    xc fx.c:1484:27 cxx_ge_to_gt               if (++pfx->usedOprStack >= pfx->numOprStack) {
+    xc fx.c:1490:28 cxx_lt_to_le               if (pfx->maxUsedOprStack < pfx->usedOprStack)
+    xc fx.c:1557:8 cxx_eq_to_ne               op == fUP || op == fVP ||
+    xc fx.c:1557:21 cxx_eq_to_ne               op == fUP || op == fVP ||
+    xc fx.c:1558:49 cxx_le_to_lt               op == fS || (op >= (int) FirstImgAttr && op <= aNull)
+    x  fx.c:1565:42 cxx_le_to_lt               return((op >= (int) FirstImgAttr && op <= (int) ((OperatorE)aNull) &&
+    xc fx.c:1612:22 cxx_sub_to_add             if (ImgAttrs[ia-(int) FirstImgAttr].need_stats != MagickFalse) pfx->NeedStats = MagickTrue
+    x  fx.c:1630:60 cxx_eq_to_ne               return((op == (OperatorE)fU || op == (OperatorE)fV || op == (OperatorE)fP ||
+    x  fx.c:1712:13 cxx_gt_to_ge               if (len > MaxTokenLen) {
+    x  fx.c:1772:16 cxx_ge_to_gt               return((type >= 0 || IsIcc || IsDev) ? MagickTrue : MagickFalse);
+    x  fx.c:1801:10 cxx_remove_void_call       (void) GetPixelInfo (pfx->image, &colour);
+    x  fx.c:1829:20 cxx_gt_to_ge               if (lenfun > MaxTokenLen) {
+    x  fx.c:1892:11 cxx_ge_to_gt               if (len >= MaxTokenLen) {
+    x  fx.c:1901:10 cxx_remove_void_call       (void) GetPixelInfo (pfx->image, &colour);
+    x  fx.c:1947:33 cxx_eq_to_ne               (fe == fP || fe == fS || fe == fSP || fe == fU || fe == fUP || fe == fV ||
+    x  fx.c:1947:58 cxx_eq_to_ne               (fe == fP || fe == fS || fe == fSP || fe == fU || fe == fUP || fe == fV ||
+    x  fx.c:1948:8 cxx_eq_to_ne               fe == fVP)
+    x  fx.c:1979:12 cxx_eq_to_ne               iaQual == aNull) ? MagickTrue : MagickFalse);
+    xc fx.c:1991:45 cxx_eq_to_ne               fe == fV || fe == fVP || fe == fS || fe == fSP) ? MagickTrue : MagickFalse);
+    xc fx.c:1997:46 cxx_eq_to_ne               return((iaQual != aNull && (fe == fU || fe == fV || fe == fS)) ? MagickTrue :
+    xc fx.c:1997:58 cxx_eq_to_ne               return((iaQual != aNull && (fe == fU || fe == fV || fe == fS)) ? MagickTrue :
+    xc fx.c:2091:19 cxx_lt_to_le               if (lenOptArt < 0) return MagickFalse;
+    xc fx.c:2092:19 cxx_gt_to_ge               if (lenOptArt > 0) {
+     c fx.c:2115:29 cxx_ne_to_eq               if (IsPadFunction(fe) != MagickFalse) {
+    xc fx.c:2147:42 cxx_sub_to_add             pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
+    xc fx.c:2167:42 cxx_sub_to_add             pfx->Elements[pfx->usedElements-1].do_push = MagickTrue; /* we may need return from for() 
+    xc fx.c:2182:42 cxx_sub_to_add             pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
+    xc fx.c:2191:35 cxx_sub_to_add             lenExp = (size_t) (pfx->pex - pExpStart - 1);
+    xc fx.c:2191:47 cxx_sub_to_add             lenExp = (size_t) (pfx->pex - pExpStart - 1);
+     c fx.c:2212:11 cxx_eq_to_ne               if (fe==fChannel) {
+     c fx.c:2216:29 cxx_sub_to_add             funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
+     c fx.c:2221:29 cxx_sub_to_add             funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
+    xc fx.c:2275:21 cxx_eq_to_ne               else if (fe == fS) fe = fSP;
+    xc fx.c:2276:30 cxx_sub_to_add             funStr = Functions[fe-(int) FirstFunc].str;
+    xc fx.c:2317:18 cxx_ge_to_gt               if (iaQual >= FirstImgAttr && iaQual < aNull) {
+    xc fx.c:2340:26 cxx_sub_to_add             ImgAttrs[iaQual-(int) FirstImgAttr].str,
+    xc fx.c:2384:10 cxx_eq_to_ne               if (fe == fDebug)
+    xc fx.c:2393:16 cxx_ge_to_gt               (op >= FirstCont && op <= rNull) ? MagickTrue : MagickFalse
+    xc fx.c:2393:35 cxx_le_to_gt               (op >= FirstCont && op <= rNull) ? MagickTrue : MagickFalse
+    xc fx.c:2393:35 cxx_le_to_lt               (op >= FirstCont && op <= rNull) ? MagickTrue : MagickFalse
+    xc fx.c:2417:3 cxx_remove_void_call       SkipSpaces (pfx);
+    xc fx.c:2457:7 cxx_remove_void_call       SkipSpaces (pfx);
+    xc fx.c:2459:24 cxx_ge_to_gt               if (pfx->teDepth >= MagickMaxRecursionDepth) {
+    xc fx.c:2498:20 cxx_lt_to_le               if (lenToken < 0) {
+    xc fx.c:2504:27 cxx_gt_to_ge               } else if (lenToken > 0) {
+    xc fx.c:2556:21 cxx_gt_to_ge               if (pfx->lenToken > 0) {
+    xc fx.c:2763:36 cxx_sub_to_add             pfx->Elements[pfx->usedElements-1].do_push = MagickTrue;
+    xc fx.c:2783:3 cxx_remove_void_call       SkipSpaces (pfx);
+    xc fx.c:2817:28 cxx_gt_to_ge               while (pfx->usedOprStack > 0) {
+     c fx.c:2835:27 cxx_eq_to_ne               if (pfx->usedOprStack == 0) {
+     c fx.c:2843:45 cxx_sub_to_add             if (pfx->OperatorStack[pfx->usedOprStack-1] != oOpenParen) {
+     c fx.c:2843:49 cxx_ne_to_eq               if (pfx->OperatorStack[pfx->usedOprStack-1] != oOpenParen) {
+    xc fx.c:2865:62 cxx_eq_to_ne               if (ptern->addr_query == NULL_ADDRESS && ptern->addr_colon == NULL_ADDRESS)
+    xc fx.c:2879:32 cxx_ne_to_eq               } else if (ptern->addr_colon != NULL_ADDRESS) {
+    xc fx.c:2950:20 cxx_ge_to_gt               if (pfx->teDepth >= MagickMaxRecursionDepth) {
+    xc fx.c:2961:34 cxx_sub_to_add             StartEleNdx = pfx->usedElements-1;
+    xc fx.c:2962:19 cxx_lt_to_ge               if (StartEleNdx < 0) StartEleNdx = 0;
+    xc fx.c:2962:19 cxx_lt_to_le               if (StartEleNdx < 0) StartEleNdx = 0;
+    xc fx.c:3019:45 cxx_sub_to_add             pel = &pfx->Elements[pfx->usedElements-1];
+     c fx.c:3025:60 cxx_sub_to_add             OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
+    xc fx.c:3091:43 cxx_sub_to_add             pel = &pfx->Elements[pfx->usedElements-1];
+    xc fx.c:3148:32 cxx_ge_to_gt               if (pfx->exception->severity >= ErrorException)
+    xc fx.c:3159:3 cxx_remove_void_call       SkipSpaces (pfx);
+    xc fx.c:3182:3 cxx_remove_void_call       SkipSpaces (pfx);
+    xc fx.c:3187:27 cxx_eq_to_ne               if (strchr(strLimit,';')==NULL)
+    xc fx.c:3200:32 cxx_ge_to_gt               if (pfx->exception->severity >= ErrorException)
+    x  fx.c:3236:89 cxx_mul_to_div             pfx->statistics = (ChannelStatistics**) AcquireMagickMemory ((size_t) pfx->ImgListLen * si
+    xc fx.c:3259:27 cxx_ge_to_gt               if (pfxrt->usedValStack >=pfxrt->numValStack) {
+    xc fx.c:3273:27 cxx_le_to_lt               if (pfxrt->usedValStack <= 0) {
+    x  fx.c:3421:44 cxx_ge_to_gt               if ((fabs((double) y) < 0.001) || (depth >= FxMaxFunctionDepth))
+    x  fx.c:3521:10 cxx_remove_void_call       (void) GetPixelInfo (img, &pixelinf);
+    xc fx.c:3686:45 cxx_lt_to_le               regA = fabs((double) (regA-regB)) < MagickEpsilon ? 1.0 : 0.0;
+    xc fx.c:3689:45 cxx_ge_to_gt               regA = fabs((double) (regA-regB)) >= MagickEpsilon ? 1.0 : 0.0;
+    xc fx.c:3704:23 cxx_le_to_gt               regA = (regA<=0) ? 0.0 : (regB > 0) ? 1.0 : 0.0;
+    xc fx.c:3704:23 cxx_le_to_lt               regA = (regA<=0) ? 0.0 : (regB > 0) ? 1.0 : 0.0;
+    xc fx.c:3704:42 cxx_gt_to_ge               regA = (regA<=0) ? 0.0 : (regB > 0) ? 1.0 : 0.0;
+    xc fx.c:3704:42 cxx_gt_to_le               regA = (regA<=0) ? 0.0 : (regB > 0) ? 1.0 : 0.0;
+    xc fx.c:3710:23 cxx_eq_to_ne               regA = (regA==0) ? 1.0 : 0.0;
+    xc fx.c:3819:25 cxx_gt_to_ge               else if (regA > 1.0) regA = 1.0;
+    xc fx.c:3910:36 cxx_lt_to_ge               regA = (fxFltType) (regA < MagickEpsilon);
+    xc fx.c:3910:36 cxx_lt_to_le               regA = (fxFltType) (regA < MagickEpsilon);
+    xc fx.c:3923:39 cxx_add_to_sub             regA = floor ((double) regA + 0.5);
+    xc fx.c:3950:20 cxx_ge_to_gt               if (regA >= 0) regA = floor ((double) regA);
+    xc fx.c:3950:20 cxx_ge_to_lt               if (regA >= 0) regA = floor ((double) regA);
+    xc fx.c:3971:34 cxx_eq_to_ne               if (pfx->ImgNum==0) {
+    xc fx.c:3982:41 cxx_mul_to_div             regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
+    xc fx.c:3984:82 cxx_eq_to_ne               } else if (pel->channel_qual == HUE_CHANNEL || pel->channel_qual == SAT_CHANNEL ||
+    xc fx.c:3985:39 cxx_eq_to_ne               pel->channel_qual == LIGHT_CHANNEL) {
+    xc fx.c:3988:46 cxx_eq_to_ne               } else if (pel->channel_qual == INTENSITY_CHANNEL) {
+    xc fx.c:4015:43 cxx_lt_to_le               if ((int) pel->channel_qual < 0) {
+    xc fx.c:4063:37 cxx_mul_to_div             regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
+    xc fx.c:4105:39 cxx_lt_to_le               if ((int) pel->channel_qual < 0) {
+    xc fx.c:4148:41 cxx_lt_to_ge               if ((int) pel->channel_qual < 0) {
+    xc fx.c:4148:41 cxx_lt_to_le               if ((int) pel->channel_qual < 0) {
+    xc fx.c:4181:39 cxx_lt_to_le               if ((int) pel->channel_qual < 0) {
+    xc fx.c:4219:19 cxx_ne_to_eq               if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+    xc fx.c:4219:62 cxx_gt_to_ge               if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+    xc fx.c:4219:62 cxx_gt_to_le               if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+    xc fx.c:4231:19 cxx_ne_to_eq               if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+    xc fx.c:4231:62 cxx_gt_to_ge               if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+    xc fx.c:4231:62 cxx_gt_to_le               if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+     c fx.c:4255:71 cxx_mul_to_div             regA = (fxFltType) MagickSafeReciprocal (img->resolution.x) * img->columns;
+     c fx.c:4258:71 cxx_mul_to_div             regA = (fxFltType) MagickSafeReciprocal (img->resolution.y) * img->rows;
+    xc fx.c:4272:19 cxx_ne_to_eq               if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+    xc fx.c:4272:62 cxx_gt_to_ge               if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+    xc fx.c:4272:62 cxx_gt_to_le               if ((cs != (ChannelStatistics *) NULL) && (channel > 0))
+     c fx.c:4358:34 cxx_sub_to_add             i = pfx->usedElements-1; /* Do no more opcodes. */
+    xc fx.c:4365:35 cxx_lt_to_le               if (fabs((double) regA) < MagickEpsilon) i = pel->element_index-1;
+     c fx.c:4369:35 cxx_gt_to_ge               if (fabs((double) regA) > MagickEpsilon) i = pel->element_index-1;
+     c fx.c:4369:35 cxx_gt_to_le               if (fabs((double) regA) > MagickEpsilon) i = pel->element_index-1;
+     c fx.c:4369:74 cxx_sub_to_add             if (fabs((double) regA) > MagickEpsilon) i = pel->element_index-1;
+    xc fx.c:4402:32 cxx_ge_to_gt               if (pfx->exception->severity >= ErrorException)
+    xc fx.c:4484:12 cxx_remove_void_call       (void) DestroyRPN (pfx);
+     c fx.c:4498:12 cxx_remove_void_call       (void) DestroyRPN (pfx);
+    xc fx.c:4506:34 cxx_ne_to_eq               if (chLimit != '\0' && chLimit != ';') {
+     c fx.c:4512:12 cxx_remove_void_call       (void) DestroyRPN (pfx);
+     c fx.c:4522:14 cxx_remove_void_call       (void) DestroyRPN (pfx);
+     c fx.c:4547:14 cxx_remove_void_call       (void) DestroyRPN (pfx);
+     c fx.c:4562:22 cxx_sub_to_add             for (t2 = t-1; t2 >= 0; t2--) {
+     c fx.c:4562:29 cxx_ge_to_gt               for (t2 = t-1; t2 >= 0; t2--) {
+     c fx.c:4562:29 cxx_ge_to_lt               for (t2 = t-1; t2 >= 0; t2--) {
+     c fx.c:4563:13 cxx_remove_void_call       DestroyFxRt (&pfx->fxrts[t2]);
+     c fx.c:4567:16 cxx_remove_void_call       (void) DestroyRPN (pfx);
+    xc fx.c:4594:15 cxx_lt_to_ge               for (t=0; t < (ssize_t) GetMagickResourceLimit(ThreadResource); t++) {
+    xc fx.c:4595:5 cxx_remove_void_call       DestroyFxRt (&pfx->fxrts[t]);
+    xc fx.c:4599:3 cxx_remove_void_call       DestroyRPN (pfx);
+    xc fx.c:4639:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc fx.c:4710:13 cxx_remove_void_call       SetPixelChannel (fx_image, channel, p[i], q);
+    xc fx.c:4760:60 cxx_ge_to_gt               if ((status == MagickFalse) || (pfx->exception->severity >= ErrorException))
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-fx.json

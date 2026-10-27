@@ -6696,3 +6696,9 @@ nohup: ignoring input
 16:18 fresh enhance:   killed 919, survived 153 (0 capped), no coverage 0, errors 0
 16:36 fresh visual-effects:   killed 687, survived 171 (0 capped), no coverage 0, errors 0
 16:39 fresh segment:   killed 311, survived 51 (0 capped), no coverage 70, errors 0
+16:39 pushed
+16:43 fresh identify:   killed 334, survived 53 (39 capped), no coverage 0, errors 0
+16:59 fresh property:   killed 489, survived 284 (249 capped), no coverage 5, errors 0
+17:12 fresh image:   killed 465, survived 232 (186 capped), no coverage 40, errors 0
+17:26 fresh fx:   killed 828, survived 160 (132 capped), no coverage 3, errors 0
+17:52 fresh draw:   killed 1914, survived 558 (332 capped), no coverage 92, errors 0
