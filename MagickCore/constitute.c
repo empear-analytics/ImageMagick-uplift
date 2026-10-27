@@ -1361,6 +1361,17 @@ static inline MagickBooleanType IsDirectDelegate(
     MagickFalse);
 }
 
+static void SyncEndianFromMagickInfo(const ImageInfo *image_info,Image *image,
+  const MagickInfo *magick_info)
+{
+  if (GetMagickEndianSupport(magick_info) == MagickFalse)
+    image->endian=UndefinedEndian;
+  else
+    if ((image_info->endian == UndefinedEndian) &&
+        (GetMagickRawSupport(magick_info) != MagickFalse))
+      image->endian=GetHostEndian();
+}
+
 static void FindFallbackEncoder(ImageInfo *write_info,Image *image,
   const char *filename,const MagickInfo **magick_info,
   EncodeImageHandler **encoder,ExceptionInfo *exception)
@@ -1470,14 +1481,7 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
     magick_info=GetMagickInfo(write_info->magick,exception);
   sans_exception=DestroyExceptionInfo(sans_exception);
   if (magick_info != (const MagickInfo *) NULL)
-    {
-      if (GetMagickEndianSupport(magick_info) == MagickFalse)
-        image->endian=UndefinedEndian;
-      else
-        if ((image_info->endian == UndefinedEndian) &&
-            (GetMagickRawSupport(magick_info) != MagickFalse))
-          image->endian=GetHostEndian();
-    }
+    SyncEndianFromMagickInfo(image_info,image,magick_info);
   if ((image->ping != MagickFalse) &&
       (SyncImagePixelCache(image,exception) == MagickFalse))
     {
