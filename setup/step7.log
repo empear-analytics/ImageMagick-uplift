@@ -6678,3 +6678,21 @@ nohup: ignoring input
 /home/jovyan/imagemagick-mutation/ImageMagick/build-oracle/mull-fresh/utilities/magick
 == night3 Mon Oct 26 19:41:57 UTC 2026: step 3, mutation per file
 19:50 fresh log:   killed 143, survived 89 (49 capped), no coverage 24, errors 0
+nohup: ignoring input
+== night3 Tue Oct 27 14:09:50 UTC 2026: step 1, checkout and indexes
+dbeddd910 docs(refactoring): M99 night addendum and backlog rows
+14:16 indexes at dbeddd910
+== night3 Tue Oct 27 14:16:02 UTC 2026: step 2, Mull build
+build failed, see /home/jovyan/imagemagick-mutation/ImageMagick/build-oracle/mull-fresh/make.log
+14:17 mull build failed, see build-oracle/mull-fresh/make.log
+nohup: ignoring input
+== night3 Tue Oct 27 15:31:24 UTC 2026: step 1, checkout and indexes
+15:31 indexes at dbeddd910
+== night3 Tue Oct 27 15:31:25 UTC 2026: step 2, Mull build
+/home/jovyan/imagemagick-mutation/ImageMagick/build-oracle/mull-fresh/utilities/magick
+== night3 Tue Oct 27 15:41:55 UTC 2026: step 3, mutation per file
+15:55 fresh morphology:   killed 1040, survived 293 (216 capped), no coverage 6, errors 0
+16:09 fresh geometry:   killed 258, survived 81 (69 capped), no coverage 4, errors 0
+16:18 fresh enhance:   killed 919, survived 153 (0 capped), no coverage 0, errors 0
+16:36 fresh visual-effects:   killed 687, survived 171 (0 capped), no coverage 0, errors 0
+16:39 fresh segment:   killed 311, survived 51 (0 capped), no coverage 70, errors 0

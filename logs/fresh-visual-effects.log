@@ -1,0 +1,262 @@
+mutate: 858 mutants in MagickCore/visual-effects\.c$, 41 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 365 cases in 31s
+  mutants: 25/858 (0s)
+  mutants: 50/858 (1s)
+  mutants: 75/858 (2s)
+  mutants: 100/858 (5s)
+  mutants: 125/858 (10s)
+  mutants: 150/858 (16s)
+  mutants: 175/858 (25s)
+  mutants: 200/858 (32s)
+  mutants: 225/858 (33s)
+  mutants: 250/858 (37s)
+  mutants: 275/858 (312s)
+  mutants: 300/858 (407s)
+  mutants: 325/858 (539s)
+  mutants: 350/858 (701s)
+  mutants: 375/858 (720s)
+  mutants: 400/858 (725s)
+  mutants: 425/858 (728s)
+  mutants: 450/858 (731s)
+  mutants: 475/858 (808s)
+  mutants: 500/858 (811s)
+  mutants: 525/858 (825s)
+  mutants: 550/858 (827s)
+  mutants: 575/858 (829s)
+  mutants: 600/858 (832s)
+  mutants: 625/858 (842s)
+  mutants: 650/858 (858s)
+  mutants: 675/858 (860s)
+  mutants: 700/858 (861s)
+  mutants: 725/858 (862s)
+  mutants: 750/858 (864s)
+  mutants: 775/858 (898s)
+  mutants: 800/858 (901s)
+  mutants: 825/858 (915s)
+  mutants: 850/858 (950s)
+  mutants: 858/858 (1008s)
+
+mutate: 858 mutants, 1008s
+  killed 687, survived 171 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 80.1%   overall: 80.1%
+
+  function                           total killed survived no-cov
+  PlasmaImageProxy                      87     63       24      0
+  WaveletDenoiseImage                   87     77       10      0
+  SwirlImage                            49     41        8      0
+  ImplodeImage                          48     39        9      0
+  ColorMatrixImage                      46     28       18      0
+  MorphImages                           45     34       11      0
+  SteganoImage                          39     29       10      0
+  TintImage                             36     29        7      0
+  PolaroidImage                         31     28        3      0
+  HatTransform                          29     28        1      0
+  SepiaTonePixel                        28     22        6      0
+  ShadowImage                           28     27        1      0
+  WaveImage                             28     24        4      0
+  BlueShiftImage                        26     22        4      0
+  StereoAnaglyphImage                   25     18        7      0
+  ColorizeImage                         22     18        4      0
+  SketchImage                           20     20        0      0
+  AddNoiseImage                         18     14        4      0
+  SepiaToneImage                        18     14        4      0
+  SolarizeImage                         17     13        4      0
+  IsPlasmaSegmentAtMidpoint             12      2       10      0
+  SolarizeColormap                      12     11        1      0
+  VignetteImage                         12     10        2      0
+  MorphPixelChannels                     9      8        1      0
+  AddNoisePixelChannels                  8      7        1      0
+  CharcoalImage                          7      6        1      0
+  ParseColorizeBlendPercentage           7      5        2      0
+  SolarizePixelChannels                  7      7        0      0
+  ParseTintColorVector                   7      4        3      0
+  ColorizePixelChannels                  6      6        0      0
+  CopyPixelChannels                      6      2        4      0
+  SetPlasmaPixelChannels                 6      6        0      0
+  TintPixel                              6      5        1      0
+  SetRandomPixelChannels                 5      4        1      0
+  GetPixelMinimumRGB                     4      2        2      0
+  GetPixelMaximumRGB                     4      2        2      0
+  IsPlasmaPixelMissing                   3      3        0      0
+  IsStereoRowMissing                     3      3        0      0
+  IsNonRGBPixelChannel                   3      3        0      0
+  PlasmaPixel                            2      2        0      0
+  PlasmaImage                            2      1        1      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  visual-effects.c:156:9 cxx_remove_void_call       SetPixelChannel(noise_image,channel,p[i],q);
+    x  visual-effects.c:201:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:261:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:269:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:271:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:318:30 cxx_lt_to_le               if (GetPixelGreen(image,p) < quantum)
+    x  visual-effects.c:320:29 cxx_lt_to_le               if (GetPixelBlue(image,p) < quantum)
+    x  visual-effects.c:332:30 cxx_gt_to_ge               if (GetPixelGreen(image,p) > quantum)
+    x  visual-effects.c:334:29 cxx_gt_to_ge               if (GetPixelBlue(image,p) > quantum)
+    x  visual-effects.c:367:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:437:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:445:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:447:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:503:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:606:26 cxx_ne_to_eq               if ((flags & PsiValue) != 0)
+    x  visual-effects.c:612:30 cxx_ne_to_eq               if ((flags & ChiValue) != 0)
+    x  visual-effects.c:648:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:705:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:713:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:716:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:804:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:807:15 cxx_lt_to_le               for (v=0; v < (ssize_t) color_matrix->height; v++)
+    x  visual-effects.c:810:14 cxx_lt_to_le               if ((v < 6) && (u < 6))
+    x  visual-effects.c:810:25 cxx_lt_to_le               if ((v < 6) && (u < 6))
+    x  visual-effects.c:825:20 cxx_ne_to_eq               if (image->debug != MagickFalse)
+       visual-effects.c:834:19 cxx_lt_to_ge               for (v=0; v < 6; v++)
+       visual-effects.c:834:19 cxx_lt_to_le               for (v=0; v < 6; v++)
+       visual-effects.c:834:25 cxx_post_inc_to_post_dec   for (v=0; v < 6; v++)
+       visual-effects.c:839:21 cxx_lt_to_ge               for (u=0; u < 6; u++)
+       visual-effects.c:839:21 cxx_lt_to_le               for (u=0; u < 6; u++)
+       visual-effects.c:839:27 cxx_post_inc_to_post_dec   for (u=0; u < 6; u++)
+    x  visual-effects.c:884:5 cxx_remove_void_call       GetPixelInfo(image,&pixel);
+    x  visual-effects.c:894:35 cxx_gt_to_ge               height=color_matrix->height > 6 ? 6UL : color_matrix->height;
+    x  visual-effects.c:894:35 cxx_gt_to_le               height=color_matrix->height > 6 ? 6UL : color_matrix->height;
+    x  visual-effects.c:895:19 cxx_lt_to_le               for (h=0; h < (ssize_t) height; h++)
+    x  visual-effects.c:924:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:932:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:935:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:989:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
+    x  visual-effects.c:995:17 cxx_eq_to_ne               if ((traits == UndefinedPixelTrait) ||
+    x  visual-effects.c:996:29 cxx_eq_to_ne               (destination_traits == UndefinedPixelTrait))
+    x  visual-effects.c:998:5 cxx_remove_void_call       SetPixelChannel(destination,channel,p[i],q);
+    x  visual-effects.c:1039:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:1067:29 cxx_gt_to_ge               if (canvas_image->columns > canvas_image->rows)
+    x  visual-effects.c:1071:31 cxx_lt_to_le               if (canvas_image->columns < canvas_image->rows)
+    x  visual-effects.c:1125:20 cxx_ge_to_gt               if (distance >= (radius*radius))
+    x  visual-effects.c:1126:9 cxx_remove_void_call       CopyPixelChannels(canvas_image,implode_image,p,q);
+    x  visual-effects.c:1139:24 cxx_gt_to_ge               if (distance > 0.0)
+    x  visual-effects.c:1156:40 cxx_ne_to_eq               if (canvas_image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:1164:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:1167:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+       visual-effects.c:1227:9 cxx_remove_void_call       SetPixelChannel(morph_image,channel,p[i],q);
+    x  visual-effects.c:1270:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+       visual-effects.c:1280:19 cxx_lt_to_ge               for (n=1; n < (ssize_t) number_frames; n++)
+       visual-effects.c:1280:19 cxx_lt_to_le               for (n=1; n < (ssize_t) number_frames; n++)
+       visual-effects.c:1280:47 cxx_post_inc_to_post_dec   for (n=1; n < (ssize_t) number_frames; n++)
+       visual-effects.c:1283:25 cxx_eq_to_ne               if (morph_image == (Image *) NULL)
+       visual-effects.c:1288:9 cxx_remove_void_call       AppendImageToList(&morph_images,morph_image);
+       visual-effects.c:1289:37 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:1296:25 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:1399:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:1406:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:1409:10 cxx_post_inc_to_post_dec   scene++;
+    x  visual-effects.c:1474:28 cxx_sub_to_add             return(((fabs(segment->x1-x_mid) < MagickEpsilon) &&
+    x  visual-effects.c:1474:36 cxx_lt_to_ge               return(((fabs(segment->x1-x_mid) < MagickEpsilon) &&
+    x  visual-effects.c:1474:36 cxx_lt_to_le               return(((fabs(segment->x1-x_mid) < MagickEpsilon) &&
+    x  visual-effects.c:1475:22 cxx_sub_to_add             (fabs(segment->x2-x_mid) < MagickEpsilon) &&
+    x  visual-effects.c:1475:30 cxx_lt_to_le               (fabs(segment->x2-x_mid) < MagickEpsilon) &&
+    x  visual-effects.c:1476:22 cxx_sub_to_add             (fabs(segment->y1-y_mid) < MagickEpsilon) &&
+    x  visual-effects.c:1476:30 cxx_lt_to_ge               (fabs(segment->y1-y_mid) < MagickEpsilon) &&
+    x  visual-effects.c:1476:30 cxx_lt_to_le               (fabs(segment->y1-y_mid) < MagickEpsilon) &&
+    x  visual-effects.c:1477:22 cxx_sub_to_add             (fabs(segment->y2-y_mid) < MagickEpsilon)) ? MagickTrue : MagickFalse);
+    x  visual-effects.c:1477:30 cxx_lt_to_le               (fabs(segment->y2-y_mid) < MagickEpsilon)) ? MagickTrue : MagickFalse);
+    x  visual-effects.c:1522:24 cxx_sub_to_add             if ((fabs(segment->x2-segment->x1) < MagickEpsilon) &&
+    x  visual-effects.c:1522:38 cxx_lt_to_le               if ((fabs(segment->x2-segment->x1) < MagickEpsilon) &&
+    x  visual-effects.c:1523:24 cxx_sub_to_add             (fabs(segment->y2-segment->y1) < MagickEpsilon))
+    x  visual-effects.c:1523:38 cxx_lt_to_le               (fabs(segment->y2-segment->y1) < MagickEpsilon))
+    x  visual-effects.c:1568:24 cxx_sub_to_add             if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
+    x  visual-effects.c:1568:32 cxx_ge_to_gt               if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
+    x  visual-effects.c:1569:24 cxx_sub_to_add             (fabs(segment->x2-x_mid) >= MagickEpsilon))
+    x  visual-effects.c:1569:32 cxx_ge_to_gt               (fabs(segment->x2-x_mid) >= MagickEpsilon))
+    x  visual-effects.c:1584:27 cxx_sub_to_add             if (fabs(segment->x1-segment->x2) >= MagickEpsilon)
+    x  visual-effects.c:1584:41 cxx_ge_to_gt               if (fabs(segment->x1-segment->x2) >= MagickEpsilon)
+    x  visual-effects.c:1601:32 cxx_ge_to_gt               if ((fabs(segment->y1-y_mid) >= MagickEpsilon) ||
+    x  visual-effects.c:1602:32 cxx_ge_to_gt               (fabs(segment->y2-y_mid) >= MagickEpsilon))
+    x  visual-effects.c:1604:28 cxx_sub_to_add             if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
+    x  visual-effects.c:1604:36 cxx_ge_to_gt               if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
+    x  visual-effects.c:1604:36 cxx_ge_to_lt               if ((fabs(segment->x1-x_mid) >= MagickEpsilon) ||
+    x  visual-effects.c:1605:28 cxx_sub_to_add             (fabs(segment->y2-y_mid) >= MagickEpsilon))
+    x  visual-effects.c:1605:36 cxx_ge_to_gt               (fabs(segment->y2-y_mid) >= MagickEpsilon))
+    x  visual-effects.c:1621:27 cxx_sub_to_add             if (fabs(segment->y1-segment->y2) >= MagickEpsilon)
+    x  visual-effects.c:1621:41 cxx_ge_to_gt               if (fabs(segment->y1-segment->y2) >= MagickEpsilon)
+    x  visual-effects.c:1638:24 cxx_sub_to_add             if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) ||
+    x  visual-effects.c:1638:38 cxx_ge_to_gt               if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) ||
+    x  visual-effects.c:1639:24 cxx_sub_to_add             (fabs(segment->y1-segment->y2) >= MagickEpsilon))
+    x  visual-effects.c:1639:38 cxx_ge_to_gt               (fabs(segment->y1-segment->y2) >= MagickEpsilon))
+    x  visual-effects.c:1657:38 cxx_lt_to_le               (fabs(segment->y2-segment->y1) < 3.0))
+    x  visual-effects.c:1679:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:1756:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+       visual-effects.c:1821:25 cxx_ne_to_eq               if (caption_image != (Image *) NULL)
+    x  visual-effects.c:1855:60 cxx_div_to_mul             polaroid_image=ShadowImage(picture_image,80.0,2.0,quantum/3,quantum/3,
+    x  visual-effects.c:1927:18 cxx_gt_to_ge               tone=intensity > threshold ? (double) QuantumRange : intensity+
+    x  visual-effects.c:1930:18 cxx_gt_to_ge               tone=intensity > (7.0*threshold/6.0) ? (double) QuantumRange :
+    x  visual-effects.c:1933:18 cxx_lt_to_le               tone=intensity < (threshold/6.0) ? 0 : intensity-threshold/6.0;
+    x  visual-effects.c:1936:39 cxx_lt_to_le               if ((double) GetPixelGreen(image,q) < tone)
+    x  visual-effects.c:1938:38 cxx_lt_to_le               if ((double) GetPixelBlue(image,q) < tone)
+    x  visual-effects.c:1940:3 cxx_remove_void_call       SetPixelAlpha(sepia_image,GetPixelAlpha(image,p),q);
+    x  visual-effects.c:1971:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:2021:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:2029:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:2031:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:2111:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:2235:15 cxx_lt_to_le               for (i=0; i < (ssize_t) GetPixelChannels(random_image); i++)
+    x  visual-effects.c:2417:15 cxx_lt_to_le               for (i=0; i < (ssize_t) image->colors; i++)
+    x  visual-effects.c:2448:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:2493:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:2501:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:2503:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:2589:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:2612:32 cxx_ge_to_gt               for (i=(ssize_t) depth-1; (i >= 0) && (j < (ssize_t) depth); i--)
+    x  visual-effects.c:2612:44 cxx_lt_to_le               for (i=(ssize_t) depth-1; (i >= 0) && (j < (ssize_t) depth); i--)
+    x  visual-effects.c:2614:18 cxx_lt_to_le               for (y=0; (y < (ssize_t) watermark->rows) && (j < (ssize_t) depth); y++)
+    x  visual-effects.c:2614:53 cxx_lt_to_le               for (y=0; (y < (ssize_t) watermark->rows) && (j < (ssize_t) depth); y++)
+    x  visual-effects.c:2616:58 cxx_lt_to_le               for (x=0; (x < (ssize_t) watermark->columns) && (j < (ssize_t) depth); x++)
+       visual-effects.c:2661:12 cxx_post_inc_to_post_dec   j++;
+    x  visual-effects.c:2664:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:2670:16 cxx_sub_to_add             depth-i,depth);
+       visual-effects.c:2671:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:2758:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:2800:17 cxx_lt_to_le               for (x=0; x < (ssize_t) stereo_image->columns; x++)
+       visual-effects.c:2806:9 cxx_remove_void_call       SetPixelAlpha(stereo_image,(GetPixelAlpha(left_image,p)+
+       visual-effects.c:2806:64 cxx_add_to_sub             SetPixelAlpha(stereo_image,(GetPixelAlpha(left_image,p)+
+       visual-effects.c:2807:40 cxx_div_to_mul             GetPixelAlpha(right_image,q))/2,r);
+    x  visual-effects.c:2814:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:2821:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:2898:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:2925:29 cxx_gt_to_ge               if (canvas_image->columns > canvas_image->rows)
+    x  visual-effects.c:2928:31 cxx_lt_to_le               if (canvas_image->columns < canvas_image->rows)
+    x  visual-effects.c:2979:20 cxx_ge_to_gt               if (distance >= (radius*radius))
+    x  visual-effects.c:2980:9 cxx_remove_void_call       CopyPixelChannels(canvas_image,swirl_image,p,q);
+    x  visual-effects.c:3006:40 cxx_ne_to_eq               if (canvas_image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:3014:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:3017:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:3072:3 cxx_remove_void_call       GetPixelInfo(image,&color_vector);
+    x  visual-effects.c:3082:26 cxx_ne_to_eq               if ((flags & PsiValue) != 0)
+    x  visual-effects.c:3089:30 cxx_ne_to_eq               if ((flags & ChiValue) != 0)
+    x  visual-effects.c:3105:3 cxx_remove_void_call       GetPixelInfo(image,&pixel);
+    x  visual-effects.c:3156:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:3180:50 cxx_mul_to_div             color_vector.alpha=(double) (color_vector.alpha*tint->alpha/100.0-intensity);
+    x  visual-effects.c:3180:62 cxx_div_to_mul             color_vector.alpha=(double) (color_vector.alpha*tint->alpha/100.0-intensity);
+    x  visual-effects.c:3180:68 cxx_sub_to_add             color_vector.alpha=(double) (color_vector.alpha*tint->alpha/100.0-intensity);
+    x  visual-effects.c:3221:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:3229:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:3231:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:3293:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:3338:22 cxx_ne_to_eq               if (vignette_image != (Image *) NULL)
+    x  visual-effects.c:3412:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:3493:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:3501:17 cxx_post_inc_to_post_dec   progress++;
+       visual-effects.c:3504:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  visual-effects.c:3580:13 cxx_lt_to_le               for ( ; i < (ssize_t) extent; i++)
+    x  visual-effects.c:3637:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  visual-effects.c:3659:44 cxx_mul_to_div             if (AcquireMagickResource(WidthResource,4*image->columns) == MagickFalse)
+       visual-effects.c:3670:18 cxx_ne_to_eq               if (kernel != (float *) NULL)
+       visual-effects.c:3672:23 cxx_ne_to_eq               if (pixels_info != (MemoryInfo *) NULL)
+    x  visual-effects.c:3761:20 cxx_mul_to_div             p=kernel+id*(ssize_t) image->columns;
+    x  visual-effects.c:3784:20 cxx_mul_to_div             p=kernel+id*(ssize_t) image->rows;
+    x  visual-effects.c:3801:52 cxx_lt_to_le               if ((double) pixels[(ssize_t) high_pass+i] < -magnitude)
+    x  visual-effects.c:3804:54 cxx_gt_to_ge               if ((double) pixels[(ssize_t) high_pass+i] > magnitude)
+    x  visual-effects.c:3855:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       visual-effects.c:3862:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-visual-effects.json

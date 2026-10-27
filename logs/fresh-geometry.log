@@ -1,0 +1,170 @@
+mutate: 343 mutants in MagickCore/geometry\.c$, 36 functions
+  baseline: 500/12297 (3s)
+  baseline: 1000/12297 (5s)
+  baseline: 1500/12297 (8s)
+  baseline: 2000/12297 (12s)
+  baseline: 2500/12297 (16s)
+  baseline: 3000/12297 (21s)
+  baseline: 3500/12297 (24s)
+  baseline: 4000/12297 (28s)
+  baseline: 4500/12297 (32s)
+  baseline: 5000/12297 (36s)
+  baseline: 5500/12297 (41s)
+  baseline: 6000/12297 (51s)
+  baseline: 6500/12297 (65s)
+  baseline: 7000/12297 (77s)
+  baseline: 7500/12297 (83s)
+  baseline: 8000/12297 (87s)
+  baseline: 8500/12297 (90s)
+  baseline: 9000/12297 (93s)
+  baseline: 9500/12297 (96s)
+  baseline: 10000/12297 (100s)
+  baseline: 10500/12297 (104s)
+  baseline: 11000/12297 (110s)
+  baseline: 11500/12297 (119s)
+  baseline: 12000/12297 (130s)
+  baseline: 12297/12297 (154s)
+mutate: 9 case(s) time out unmutated and are left out: gaps/3f0f18253e gaps/6a95c6af85 opencl/2124a0eb45 opencl/a8cc3ebf48 windrv/3ebc524471 windrv/41c234a591 windrv/7d14ba511e windrv/93dbbb465a windrv/cd7ea480a0
+mutate: baseline over 14963 cases in 156s
+  mutants: 25/343 (15s)
+  mutants: 50/343 (42s)
+  mutants: 75/343 (69s)
+  mutants: 100/343 (103s)
+  mutants: 125/343 (112s)
+  mutants: 150/343 (131s)
+  mutants: 175/343 (152s)
+  mutants: 200/343 (174s)
+  mutants: 225/343 (195s)
+  mutants: 250/343 (297s)
+  mutants: 275/343 (399s)
+  mutants: 300/343 (429s)
+  mutants: 325/343 (549s)
+  mutants: 343/343 (670s)
+
+mutate: 343 mutants, 670s
+  killed 258, survived 81 (69 capped), no coverage 4, errors 0
+  mutation score on reached code: 76.1%   overall: 75.2%
+
+  function                           total killed survived no-cov
+  ParseGeometry                         49     33       16      0
+  GetGeometry                           44     43        1      0
+  ParseMetaGeometry                     28     24        4      0
+  GetAspectScaleFactor                  27     20        7      0
+  ParseGravityGeometry                  24     20        4      0
+  SetAspectRatioRegion                  19     17        2      0
+  GravityAdjustGeometry                 14     14        0      0
+  LimitGeometryArea                     12      9        3      0
+  IsSceneGeometry                       10      6        4      0
+  ParseAffineGeometry                    9      6        3      0
+  SetPercentRegion                       9      9        0      0
+  ParsePageGeometry                      8      8        0      0
+  IsGeometryRhoTerminator                7      7        0      0
+  GetPageGeometry                        6      1        5      0
+  IsGeometrySigmaSeparator               6      6        0      0
+  IsGeometrySigmaParsable                6      2        4      0
+  IsGeometryWidthTerminator              5      2        3      0
+  SetPercentGeometrySize                 5      4        1      0
+  IsGeometryOffsetPrefix                 5      2        3      0
+  IsGeometryHeightSeparator              4      1        3      0
+  IsGeometryHeightOnly                   4      0        4      0
+  ListPagesizes                          4      0        0      4
+  IsNegativeHeightGeometry               4      1        3      0
+  SetPercentGeometryInfo                 4      2        2      0
+  ShrinkGeometryToSize                   4      2        2      0
+  EnlargeGeometryToSize                  4      2        2      0
+  IsPageSizeScaled                       4      3        1      0
+  IsGeometryOffsetSeparator              3      3        0      0
+  NormalizeSamplingFactor                3      3        0      0
+  IsMetaGeometryAspectKept               3      3        0      0
+  IsGeometry                             2      2        0      0
+  ShiftNegativeHeight                    2      1        1      0
+  ParseRegionGeometry                    2      2        0      0
+  ExpandPageMnemonic                     1      0        1      0
+  SetGeometry                            1      0        1      0
+  SetGeometryInfo                        1      0        1      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    xc geometry.c:205:14 cxx_eq_to_ne               return(((c == 215) || (*q == 'x') || (*q == 'X') || (*q == ':') ||
+    xc geometry.c:205:44 cxx_eq_to_ne               return(((c == 215) || (*q == 'x') || (*q == 'X') || (*q == ':') ||
+    xc geometry.c:205:59 cxx_eq_to_ne               return(((c == 215) || (*q == 'x') || (*q == 'X') || (*q == ':') ||
+    xc geometry.c:212:14 cxx_eq_to_ne               return(((c == 215) || (*p == 'x') || (*p == 'X') || (*p == ':')) ?
+    xc geometry.c:212:44 cxx_eq_to_ne               return(((c == 215) || (*p == 'x') || (*p == 'X') || (*p == ':')) ?
+    xc geometry.c:212:59 cxx_eq_to_ne               return(((c == 215) || (*p == 'x') || (*p == 'X') || (*p == ':')) ?
+    xc geometry.c:219:37 cxx_ne_to_eq               return((((flags & SeparatorValue) != 0) && ((flags & WidthValue) == 0) &&
+    xc geometry.c:219:68 cxx_eq_to_ne               return((((flags & SeparatorValue) != 0) && ((flags & WidthValue) == 0) &&
+    xc geometry.c:220:13 cxx_ne_to_eq               (height != (size_t *) NULL) && (width != (size_t *) NULL)) ? MagickTrue :
+    xc geometry.c:220:43 cxx_ne_to_eq               (height != (size_t *) NULL) && (width != (size_t *) NULL)) ? MagickTrue :
+    xc geometry.c:233:48 cxx_ne_to_eq               if (IsGeometryHeightOnly(flags,width,height) != MagickFalse)
+    xc geometry.c:261:24 cxx_ge_to_gt               if (strlen(geometry) >= (MagickPathExtent-1))
+    x  geometry.c:514:30 cxx_eq_to_ne               if ((flags & GreaterValue) == 0)
+    xc geometry.c:527:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc geometry.c:530:32 cxx_ne_to_eq               for (i=0; *Pagesizes[i].name != '\0'; i++)
+    xc geometry.c:530:42 cxx_post_inc_to_post_dec   for (i=0; *Pagesizes[i].name != '\0'; i++)
+    xc geometry.c:535:29 cxx_eq_to_ne               if (Pagesizes[i].extent == 0)
+    xc geometry.c:540:9 cxx_remove_void_call       ExpandPageMnemonic(page,page_geometry,i);
+    xc geometry.c:715:13 cxx_gt_to_ge               if (value > (double) MAGICK_SSIZE_MAX)
+    xc geometry.c:717:13 cxx_lt_to_le               if (value < (double) MAGICK_SSIZE_MIN)
+    xc geometry.c:723:17 cxx_ne_to_eq               if ((pedantic != MagickFalse) && (strchr(geometry,',') != (char *) NULL))
+    xc geometry.c:723:58 cxx_ne_to_eq               if ((pedantic != MagickFalse) && (strchr(geometry,',') != (char *) NULL))
+    x  geometry.c:862:3 cxx_remove_void_call       GetAffineMatrix(affine_matrix);
+    x  geometry.c:865:32 cxx_lt_to_le               for (i=0; (*p != '\0') && (i < 6); i++)
+    x  geometry.c:908:25 cxx_lt_to_le               if (fabs(determinant) < MagickEpsilon)
+    xc geometry.c:955:45 cxx_eq_to_ne               return(((*p == '+') || (*p == '-') || (*p == ',') || (*p == '/') ||
+    xc geometry.c:955:60 cxx_eq_to_ne               return(((*p == '+') || (*p == '-') || (*p == ',') || (*p == '/') ||
+    xc geometry.c:956:9 cxx_eq_to_ne               (*p == ':')) ? MagickTrue : MagickFalse);
+    xc geometry.c:982:15 cxx_ne_to_eq               return((((c != 215) && (*q != 'x') && (*q != 'X') && (*q != ':')) ||
+    xc geometry.c:982:30 cxx_ne_to_eq               return((((c != 215) && (*q != 'x') && (*q != 'X') && (*q != ':')) ||
+    xc geometry.c:982:45 cxx_ne_to_eq               return((((c != 215) && (*q != 'x') && (*q != 'X') && (*q != ':')) ||
+    xc geometry.c:982:60 cxx_ne_to_eq               return((((c != 215) && (*q != 'x') && (*q != 'X') && (*q != ':')) ||
+    xc geometry.c:989:31 cxx_ne_to_eq               return((((flags & RhoValue) != 0) && ((flags & SigmaValue) == 0) &&
+    xc geometry.c:990:24 cxx_ne_to_eq               ((flags & XiValue) != 0) && ((flags & XiNegative) != 0)) ? MagickTrue :
+    xc geometry.c:990:55 cxx_ne_to_eq               ((flags & XiValue) != 0) && ((flags & XiNegative) != 0)) ? MagickTrue :
+    x  geometry.c:1021:28 cxx_eq_to_ne               if ((flags & ChiValue) == 0)
+    xc geometry.c:1051:33 cxx_eq_to_ne               if (((flags & SeparatorValue) == 0) && ((flags & SigmaValue) == 0))
+    xc geometry.c:1053:33 cxx_ne_to_eq               if (((flags & SeparatorValue) != 0) && ((flags & RhoValue) == 0))
+    xc geometry.c:1085:24 cxx_ge_to_gt               if (strlen(geometry) >= (MagickPathExtent-1))
+    xc geometry.c:1156:20 cxx_eq_to_ne               if (*(p+1) == ')')
+    xc geometry.c:1290:44 cxx_ne_to_eq               if (IsGeometryOffsetSeparator(p) != MagickFalse)
+    xc geometry.c:1292:22 cxx_eq_to_ne               while ((*p == '+') || (*p == '-'))
+    xc geometry.c:1304:24 cxx_minus_to_noop          value=(-value);
+    xc geometry.c:1308:50 cxx_ne_to_eq               while (isspace((int) ((unsigned char) *p)) != 0)
+    xc geometry.c:1310:37 cxx_ne_to_eq               if (IsGeometryOffsetPrefix(p) != MagickFalse)
+    xc geometry.c:1315:44 cxx_ne_to_eq               if (IsGeometryOffsetSeparator(p) != MagickFalse)
+    xc geometry.c:1317:22 cxx_eq_to_ne               while ((*p == '+') || (*p == '-'))
+    xc geometry.c:1317:37 cxx_eq_to_ne               while ((*p == '+') || (*p == '-'))
+    xc geometry.c:1319:20 cxx_eq_to_ne               if (*p == '-')
+    xc geometry.c:1325:17 cxx_ne_to_eq               if (p != q)
+    xc geometry.c:1328:41 cxx_ne_to_eq               if ((flags & ChiNegative) != 0)
+    xc geometry.c:1329:24 cxx_minus_to_noop          value=(-value);
+    xc geometry.c:1335:5 cxx_remove_void_call       NormalizeSamplingFactor(flags,geometry_info);
+    xc geometry.c:1339:5 cxx_remove_void_call       SetPercentGeometryInfo(flags,geometry_info);
+    x  geometry.c:1443:26 cxx_lt_to_le               if (geometry_ratio < image_ratio)
+    x  geometry.c:1451:24 cxx_ge_to_gt               if (geometry_ratio >= image_ratio)
+    xc geometry.c:1470:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc geometry.c:1501:29 cxx_lt_to_le               if ((region_info->width < image->columns) &&
+    xc geometry.c:1508:29 cxx_gt_to_ge               if ((region_info->width > image->columns) &&
+    xc geometry.c:1509:30 cxx_gt_to_ge               (region_info->height > image->rows))
+    xc geometry.c:1573:20 cxx_lt_to_le               if (stasis_width < *width)
+    xc geometry.c:1575:21 cxx_lt_to_le               if (stasis_height < *height)
+    x  geometry.c:1582:20 cxx_gt_to_ge               if (stasis_width > *width)
+    x  geometry.c:1584:21 cxx_gt_to_ge               if (stasis_height > *height)
+    xc geometry.c:1603:30 cxx_gt_to_ge               if (scale_factor > ((double) *height/(double) stasis_height))
+    xc geometry.c:1607:28 cxx_lt_to_le               if (scale_factor < ((double) *height/(double) stasis_height))
+    xc geometry.c:1615:29 cxx_lt_to_le               (scale_factor < ((double) *width/(double) stasis_height)))
+    xc geometry.c:1615:47 cxx_div_to_mul             (scale_factor < ((double) *width/(double) stasis_height)))
+    xc geometry.c:1621:39 cxx_ne_to_eq               if (((flags & MinimumValue) != 0) &&
+    xc geometry.c:1622:29 cxx_lt_to_le               (scale_factor < ((double) *height/(double) stasis_width)))
+     c geometry.c:1623:42 cxx_div_to_mul             scale_factor=(double) *height/(double) stasis_width;
+    x  geometry.c:1645:25 cxx_add_to_sub             area=geometry_info.rho+sqrt(MagickEpsilon);
+    x  geometry.c:1651:16 cxx_lt_to_le               if ((scale.x < (double) *width) || (scale.y < (double) *height))
+    x  geometry.c:1651:47 cxx_lt_to_le               if ((scale.x < (double) *width) || (scale.y < (double) *height))
+    xc geometry.c:1680:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc geometry.c:1689:3 cxx_remove_void_call       SetGeometryInfo(&geometry_info);
+    xc geometry.c:1727:26 cxx_ge_to_gt               if (geometry_ratio >= image_ratio)
+    xc geometry.c:1735:69 cxx_mul_to_div             *width=CastDoubleToSizeT(MagickSafeReciprocal(image_ratio)*
+    xc geometry.c:1810:30 cxx_ne_to_eq               (((flags & PercentValue) != 0) || ((flags & SeparatorValue) == 0))) ?
+    xc geometry.c:1925:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc geometry.c:1958:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-geometry.json

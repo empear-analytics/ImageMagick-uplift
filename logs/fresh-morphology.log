@@ -1,51 +1,383 @@
 mutate: 1339 mutants in MagickCore/morphology\.c$, 62 functions
-  baseline: 2/2 (30s)
+  baseline: 500/2668 (5s)
+  baseline: 1000/2668 (9s)
+  baseline: 1500/2668 (12s)
+  baseline: 2000/2668 (15s)
+  baseline: 2500/2668 (32s)
+  baseline: 2668/2668 (41s)
 mutate: 2 case(s) time out unmutated and are left out: gaps/3f0f18253e gaps/6a95c6af85
-mutate: baseline over 2668 cases in 31s
-  mutants: 25/1339 (4s)
-  mutants: 50/1339 (7s)
-  mutants: 75/1339 (72s)
-  mutants: 100/1339 (252s)
-  mutants: 125/1339 (256s)
-  mutants: 150/1339 (263s)
-  mutants: 175/1339 (269s)
-  mutants: 200/1339 (278s)
-  mutants: 225/1339 (288s)
-  mutants: 250/1339 (289s)
-  mutants: 275/1339 (289s)
-  mutants: 300/1339 (291s)
-  mutants: 325/1339 (295s)
-  mutants: 350/1339 (298s)
-  mutants: 375/1339 (300s)
-  mutants: 400/1339 (305s)
-  mutants: 425/1339 (312s)
-  mutants: 450/1339 (313s)
-  mutants: 475/1339 (316s)
-  mutants: 500/1339 (320s)
-  mutants: 525/1339 (588s)
-  mutants: 550/1339 (842s)
-  mutants: 575/1339 (922s)
-  mutants: 600/1339 (1163s)
-  mutants: 625/1339 (1274s)
-  mutants: 650/1339 (1343s)
-  mutants: 675/1339 (1393s)
-  mutants: 700/1339 (1418s)
-  mutants: 725/1339 (1443s)
-  mutants: 750/1339 (1478s)
-  mutants: 775/1339 (1668s)
-  mutants: 800/1339 (1821s)
-  mutants: 825/1339 (1991s)
-  mutants: 850/1339 (2150s)
-  mutants: 875/1339 (2282s)
-  mutants: 900/1339 (2290s)
-  mutants: 925/1339 (2322s)
-  mutants: 950/1339 (2354s)
-  mutants: 975/1339 (2359s)
-  mutants: 1000/1339 (2360s)
-  mutants: 1025/1339 (2369s)
-  mutants: 1050/1339 (2377s)
-  mutants: 1075/1339 (2389s)
-  mutants: 1100/1339 (2575s)
-  mutants: 1125/1339 (2649s)
-  mutants: 1150/1339 (2800s)
-  mutants: 1175/1339 (2880s)
+mutate: baseline over 2668 cases in 41s
+mutate: resuming, 1175 mutants already done
+  mutants: 1200/1339 (153s)
+  mutants: 1225/1339 (179s)
+  mutants: 1250/1339 (279s)
+  mutants: 1275/1339 (461s)
+  mutants: 1300/1339 (494s)
+  mutants: 1325/1339 (523s)
+  mutants: 1339/1339 (726s)
+
+mutate: 1339 mutants, 726s
+  killed 1040, survived 293 (216 capped), no coverage 6, errors 0
+  mutation score on reached code: 78.0%   overall: 77.7%
+
+  function                           total killed survived no-cov
+  MorphologyPrimitive                  216    162       54      0
+  MorphologyPrimitiveDirect            182    153       29      0
+  AcquireKernelBuiltIn                 144     66       78      0
+  MorphologyApply                       79     65       14      0
+  ParseKernelArray                      51     39       12      0
+  RotateSquareKernelBy90Degrees         39     33        6      0
+  AcquireFreiChenKernel                 36     29        7      0
+  AcquireRingKernel                     35     30        5      0
+  AcquireCometKernel                    29     24        5      0
+  AcquireBinomialKernel                 29     26        3      0
+  RotateKernelInfo                      28     14       14      0
+  SetGaussianKernelValues               27     26        1      0
+  SetLoGKernelValues                    25     19        6      0
+  SubtractGaussianKernelValues          24     23        1      0
+  ScaleKernelInfo                       23     17        6      0
+  AcquireDiskKernel                     22     21        1      0
+  AcquireOctagonKernel                  21     20        1      0
+  SetKernelArgumentDefaults             19      7       12      0
+  AcquireDiamondKernel                  19     18        1      0
+  AcquireGaussianKernel                 19     16        3      0
+  ParseKernelName                       18     15        3      0
+  AcquireChebyshevKernel                17     16        1      0
+  RotateKernelBy45Degrees               14     14        0      0
+  ShowKernelInfo                        14     10        4      0
+  AcquireRectangleKernel                12     10        2      0
+  AcquireRidgesKernel                   12     12        0      0
+  SetOddSquareKernelSize                11     11        0      0
+  AcquireKernelInfo                     11      8        3      0
+  MorphologyImage                       11      8        3      0
+  ReflectKernel                         11      9        2      0
+  AcquireSkeletonKernel                  9      9        0      0
+  ShowKernelValues                       9      9        0      0
+  IsKernelOriginOutside                  8      4        4      0
+  CloneKernelInfo                        8      8        0      0
+  SameKernelInfo                         8      6        2      0
+  CalcKernelMetaData                     8      6        2      0
+  SetLoGOrUnityKernelValues              7      6        1      0
+  ScaleGeometryKernelInfo                7      6        1      0
+  ExpandMirrorKernelInfo                 6      6        0      0
+  ZeroKernelNans                         6      0        0      6
+  AcquireDiagonalsKernel                 5      5        0      0
+  TransposeKernel                        5      5        0      0
+  UnityAddKernelInfo                     5      4        1      0
+  fact                                   4      4        0      0
+  SetSquareKernelGeometry                4      3        1      0
+  AcquireConvexHullKernel                4      4        0      0
+  IsKernelShapeDifferent                 4      4        0      0
+  ExpandRotateKernelInfo                 4      3        1      0
+  AttemptKernelRotationBy90Degrees       4      3        1      0
+  GetKernelNormalizeScale                4      2        2      0
+  GetMorphologyCompose                   3      3        0      0
+  AttemptKernelRotationBy45Degrees       3      3        0      0
+  AcquireKernelValues                    2      2        0      0
+  AcquireEdgesKernel                     2      2        0      0
+  AcquireLineEndsKernel                  2      2        0      0
+  AcquireLineJunctionsKernel             2      2        0      0
+  AcquireThinSEKernel                    2      2        0      0
+  GetConvolveBias                        2      2        0      0
+  LastKernelInfo                         1      1        0      0
+  AcquireUnityKernel                     1      1        0      0
+  AcquireLaplacianKernel                 1      1        0      0
+  DestroyKernelInfo                      1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    xc morphology.c:302:32 cxx_lt_to_le               if ( p != (char *) NULL && p < end)
+    xc morphology.c:308:7 cxx_remove_void_call       SetGeometryInfo(&args);
+    xc morphology.c:314:21 cxx_lt_to_le               if ( args.rho < 1.0 )            /* if width too small */
+    xc morphology.c:328:22 cxx_ge_to_gt               if ( kernel->x >= (ssize_t) kernel->width ||
+    xc morphology.c:329:22 cxx_ge_to_gt               kernel->y >= (ssize_t) kernel->height )
+    xc morphology.c:343:16 cxx_lt_to_le               for (i=0; (i < (ssize_t) (kernel->width*kernel->height)) && (p < end); i++)
+    xc morphology.c:343:66 cxx_lt_to_le               for (i=0; (i < (ssize_t) (kernel->width*kernel->height)) && (p < end); i++)
+    xc morphology.c:354:27 cxx_lt_to_le               ( kernel->values[i] < 0)
+    xc morphology.c:364:33 cxx_ne_to_eq               if ( *token != '\0' && *token != ';' && *token != '\'' )
+    xc morphology.c:364:50 cxx_ne_to_eq               if ( *token != '\0' && *token != ';' && *token != '\'' )
+    xc morphology.c:377:36 cxx_mul_to_div             if ( i < (ssize_t) (kernel->width*kernel->height) )
+     c morphology.c:390:5 cxx_remove_void_call       ExpandMirrorKernelInfo(kernel);       /* 90 degree mirror rotate */
+    xc morphology.c:401:33 cxx_eq_to_ne               if ( (flags & WidthValue) == 0 )
+    xc morphology.c:414:29 cxx_eq_to_ne               if ( (flags & XValue) == 0 )
+    xc morphology.c:420:21 cxx_lt_to_ge               if ( args.rho < 1.0 )            /* if width too small */
+    xc morphology.c:420:21 cxx_lt_to_le               if ( args.rho < 1.0 )            /* if width too small */
+    xc morphology.c:422:23 cxx_lt_to_le               if ( args.sigma < 1.0 )          /* if height too small */
+    xc morphology.c:424:29 cxx_eq_to_ne               if ( (flags & XValue) == 0 )     /* center offset if not defined */
+    xc morphology.c:425:46 cxx_sub_to_add             args.xi = (double)(((ssize_t)args.rho-1)/2);
+    xc morphology.c:425:49 cxx_div_to_mul             args.xi = (double)(((ssize_t)args.rho-1)/2);
+    xc morphology.c:427:49 cxx_sub_to_add             args.psi = (double)(((ssize_t)args.sigma-1)/2);
+    xc morphology.c:427:52 cxx_div_to_mul             args.psi = (double)(((ssize_t)args.sigma-1)/2);
+     c morphology.c:437:43 cxx_div_to_mul             args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
+     c morphology.c:437:55 cxx_add_to_sub             args.sigma = (double) QuantumRange/(args.sigma+1); /* maximum pixel distance */
+    xc morphology.c:475:13 cxx_lt_to_le               if ( type < 0 || type == UserDefinedKernel )
+    xc morphology.c:490:3 cxx_remove_void_call       SetGeometryInfo(&args);
+     c morphology.c:513:7 cxx_remove_void_call       ExpandMirrorKernelInfo(kernel);
+     c morphology.c:540:24 cxx_eq_to_ne               if (kernel_cache == (char *) NULL)
+     c morphology.c:559:24 cxx_ne_to_eq               if (kernel != (KernelInfo *) NULL)
+    xc morphology.c:577:20 cxx_ne_to_eq               if (kernel_cache != (char *) NULL)
+    x  morphology.c:987:21 cxx_lt_to_le               return(((args->xi < 0.0) || (args->xi  >= (double) kernel->width) ||
+    x  morphology.c:987:42 cxx_ge_to_gt               return(((args->xi < 0.0) || (args->xi  >= (double) kernel->width) ||
+    x  morphology.c:988:16 cxx_lt_to_le               (args->psi < 0.0) || (args->psi >= (double) kernel->height)) ?
+    x  morphology.c:988:37 cxx_ge_to_gt               (args->psi < 0.0) || (args->psi >= (double) kernel->height)) ?
+    x  morphology.c:1002:17 cxx_lt_to_le               if (args->rho < 1.0)
+    x  morphology.c:1069:14 cxx_gt_to_ge               if ( sigma > MagickEpsilon )
+    x  morphology.c:1097:22 cxx_mul_to_div             kernel->width*kernel->height*sizeof(*kernel->values));
+    x  morphology.c:1097:37 cxx_mul_to_div             kernel->width*kernel->height*sizeof(*kernel->values));
+    x  morphology.c:1098:31 cxx_add_to_sub             kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    x  morphology.c:1098:41 cxx_mul_to_div             kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    x  morphology.c:1127:17 cxx_lt_to_le               if (args->rho < 1.0)
+    x  morphology.c:1134:21 cxx_sub_to_add             if ((kernel->width-1) > max_order)
+    x  morphology.c:1134:25 cxx_gt_to_ge               if ((kernel->width-1) > max_order)
+    x  morphology.c:1226:18 cxx_eq_to_ne               if (kernel == (KernelInfo *) NULL)
+    x  morphology.c:1307:26 cxx_ge_to_gt               if ( fabs(args->sigma) >= MagickEpsilon )
+    x  morphology.c:1310:23 cxx_gt_to_ge               else if ( args->rho > 30.0 || args->rho < -30.0 )
+    x  morphology.c:1310:23 cxx_gt_to_le               else if ( args->rho > 30.0 || args->rho < -30.0 )
+    x  morphology.c:1310:43 cxx_lt_to_ge               else if ( args->rho > 30.0 || args->rho < -30.0 )
+    x  morphology.c:1310:43 cxx_lt_to_le               else if ( args->rho > 30.0 || args->rho < -30.0 )
+       morphology.c:1312:5 cxx_remove_void_call       RotateKernelInfo(kernel, args->rho);
+    x  morphology.c:1322:17 cxx_lt_to_le               if (args->rho < 1.0)
+    x  morphology.c:1346:22 cxx_lt_to_le               if ( args->rho < 1.0 || args->sigma < 1.0 )
+    x  morphology.c:1346:43 cxx_lt_to_le               if ( args->rho < 1.0 || args->sigma < 1.0 )
+    x  morphology.c:1378:17 cxx_lt_to_le               if (args->rho < 1.0)
+    x  morphology.c:1411:17 cxx_lt_to_le               if (args->rho < 0.4)           /* default radius approx 4.3 */
+    x  morphology.c:1445:17 cxx_lt_to_le               if (args->rho < args->sigma)
+    x  morphology.c:1453:51 cxx_mul_to_div             kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+    x  morphology.c:1453:53 cxx_add_to_sub             kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+    x  morphology.c:1454:37 cxx_mul_to_div             limit1 = (ssize_t)(args->sigma*args->sigma);
+    x  morphology.c:1455:35 cxx_mul_to_div             limit2 = (ssize_t)(args->rho*args->rho);
+    x  morphology.c:1845:17 cxx_lt_to_le               if (args->rho < 1.0)
+    x  morphology.c:1872:14 cxx_gt_to_ge               if ( sigma > MagickEpsilon )
+    x  morphology.c:1898:15 cxx_gt_to_ge               if ( sigma2 > MagickEpsilon )
+    x  morphology.c:1921:20 cxx_div_to_mul             B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
+    x  morphology.c:1921:30 cxx_mul_to_div             B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
+    x  morphology.c:1921:36 cxx_mul_to_div             B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
+    x  morphology.c:1921:42 cxx_mul_to_div             B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
+    x  morphology.c:1921:48 cxx_mul_to_div             B = (double) (1.0/(MagickPI*sigma*sigma*sigma*sigma));
+    x  morphology.c:1925:42 cxx_mul_to_div             kernel->values[i] = (1-R)*exp(-R)*B;
+    x  morphology.c:1931:14 cxx_gt_to_ge               if ( sigma > MagickEpsilon )
+    xc morphology.c:1947:18 cxx_ge_to_gt               if ( args->rho >= 1.0 )
+    xc morphology.c:1949:43 cxx_ge_to_gt               else if ( (type != DoGKernel) || (sigma >= sigma2) )
+    xc morphology.c:1949:43 cxx_ge_to_lt               else if ( (type != DoGKernel) || (sigma >= sigma2) )
+    xc morphology.c:2093:24 cxx_ge_to_gt               if ( args->rho >= 1.0 )
+    xc morphology.c:2122:24 cxx_mul_to_div             kernel->width*kernel->height*sizeof(*kernel->values));
+    xc morphology.c:2124:20 cxx_gt_to_ge               if ( sigma > MagickEpsilon )
+    xc morphology.c:2127:32 cxx_div_to_mul             beta= (double) (1.0/(MagickSQ2PI*sigma ));
+    xc morphology.c:2127:45 cxx_mul_to_div             beta= (double) (1.0/(MagickSQ2PI*sigma ));
+    xc morphology.c:2134:35 cxx_add_to_sub             kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    xc morphology.c:2134:45 cxx_mul_to_div             kernel->values[kernel->x+kernel->y*(ssize_t) kernel->width] = 1.0;
+    xc morphology.c:2204:20 cxx_eq_to_ne               if (kernel == (KernelInfo *) NULL)
+    xc morphology.c:2207:9 cxx_remove_void_call       RotateKernelInfo(kernel, args->rho);
+    xc morphology.c:2213:20 cxx_eq_to_ne               if (kernel == (KernelInfo *) NULL)
+    xc morphology.c:2216:9 cxx_remove_void_call       RotateKernelInfo(kernel, args->rho);
+    xc morphology.c:2222:20 cxx_eq_to_ne               if (kernel == (KernelInfo *) NULL)
+    xc morphology.c:2225:9 cxx_remove_void_call       RotateKernelInfo(kernel, args->rho);
+    xc morphology.c:2248:25 cxx_lt_to_ge               if (args->rho < 1.0)
+    xc morphology.c:2248:25 cxx_lt_to_le               if (args->rho < 1.0)
+    xc morphology.c:2251:74 cxx_mul_to_div             kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+    xc morphology.c:2251:76 cxx_add_to_sub             kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+    xc morphology.c:2252:59 cxx_sub_to_add             kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+    xc morphology.c:2252:62 cxx_div_to_mul             kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+    xc morphology.c:2254:43 cxx_eq_to_ne               if (AcquireKernelValues(kernel) == MagickFalse)
+    xc morphology.c:2258:24 cxx_minus_to_noop          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2258:38 cxx_le_to_gt               for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2258:38 cxx_le_to_lt               for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2258:62 cxx_post_inc_to_post_dec   for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2259:21 cxx_minus_to_noop          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2259:35 cxx_le_to_gt               for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2259:35 cxx_le_to_lt               for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2259:59 cxx_post_inc_to_post_dec   for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2259:64 cxx_post_inc_to_post_dec   for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2260:38 cxx_eq_to_ne               kernel->values[i] = (u == 0 || v == 0) ? args->sigma : nan;
+    xc morphology.c:2260:48 cxx_eq_to_ne               kernel->values[i] = (u == 0 || v == 0) ? args->sigma : nan;
+    xc morphology.c:2262:47 cxx_mul_to_div             kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
+    xc morphology.c:2267:25 cxx_lt_to_ge               if (args->rho < 1.0)
+    xc morphology.c:2267:25 cxx_lt_to_le               if (args->rho < 1.0)
+    xc morphology.c:2270:74 cxx_mul_to_div             kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+    xc morphology.c:2270:76 cxx_add_to_sub             kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+    xc morphology.c:2271:59 cxx_sub_to_add             kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+    xc morphology.c:2271:62 cxx_div_to_mul             kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+    xc morphology.c:2273:43 cxx_eq_to_ne               if (AcquireKernelValues(kernel) == MagickFalse)
+    xc morphology.c:2277:24 cxx_minus_to_noop          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2277:38 cxx_le_to_gt               for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2277:38 cxx_le_to_lt               for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2277:62 cxx_post_inc_to_post_dec   for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2278:21 cxx_minus_to_noop          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2278:35 cxx_le_to_gt               for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2278:35 cxx_le_to_lt               for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2278:59 cxx_post_inc_to_post_dec   for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2278:64 cxx_post_inc_to_post_dec   for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2279:38 cxx_eq_to_ne               kernel->values[i] = (u == v || u == -v) ? args->sigma : nan;
+    xc morphology.c:2279:48 cxx_eq_to_ne               kernel->values[i] = (u == v || u == -v) ? args->sigma : nan;
+    xc morphology.c:2279:51 cxx_minus_to_noop          kernel->values[i] = (u == v || u == -v) ? args->sigma : nan;
+    xc morphology.c:2281:47 cxx_mul_to_div             kernel->positive_range = args->sigma*(kernel->width*2.0 - 1.0);
+    xc morphology.c:2322:25 cxx_lt_to_le               if (args->rho < 1.0)
+    xc morphology.c:2325:74 cxx_mul_to_div             kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+    xc morphology.c:2325:76 cxx_add_to_sub             kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+    xc morphology.c:2340:23 cxx_lt_to_ge               if (args->rho < 2.0)
+    xc morphology.c:2340:23 cxx_lt_to_le               if (args->rho < 2.0)
+    xc morphology.c:2363:23 cxx_lt_to_ge               if (args->rho < 1.0)
+    xc morphology.c:2363:23 cxx_lt_to_le               if (args->rho < 1.0)
+    xc morphology.c:2366:72 cxx_mul_to_div             kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+    xc morphology.c:2366:74 cxx_add_to_sub             kernel->width = kernel->height = CastDoubleToSizeT(args->rho)*2+1;
+    xc morphology.c:2367:57 cxx_sub_to_add             kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+    xc morphology.c:2367:60 cxx_div_to_mul             kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+    xc morphology.c:2369:41 cxx_eq_to_ne               if (AcquireKernelValues(kernel) == MagickFalse)
+    xc morphology.c:2372:22 cxx_minus_to_noop          for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2372:36 cxx_le_to_gt               for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2372:36 cxx_le_to_lt               for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2372:60 cxx_post_inc_to_post_dec   for ( i=0, v=-kernel->y; v <= (ssize_t)kernel->y; v++)
+    xc morphology.c:2373:19 cxx_minus_to_noop          for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2373:33 cxx_le_to_gt               for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2373:33 cxx_le_to_lt               for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2373:57 cxx_post_inc_to_post_dec   for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2373:62 cxx_post_inc_to_post_dec   for ( u=-kernel->x; u <= (ssize_t)kernel->x; u++, i++)
+    xc morphology.c:2375:26 cxx_mul_to_div             args->sigma*sqrt((double) (u*u+v*v)) );
+    xc morphology.c:2375:43 cxx_mul_to_div             args->sigma*sqrt((double) (u*u+v*v)) );
+    xc morphology.c:2375:45 cxx_add_to_sub             args->sigma*sqrt((double) (u*u+v*v)) );
+    xc morphology.c:2375:47 cxx_mul_to_div             args->sigma*sqrt((double) (u*u+v*v)) );
+     c morphology.c:2383:20 cxx_eq_to_ne               if (kernel == (KernelInfo *) NULL)
+    xc morphology.c:2614:15 cxx_lt_to_le               for (i=0; i < (kernel1->width*kernel1->height); i++) {
+    xc morphology.c:2621:56 cxx_ge_to_gt               if ( fabs(kernel1->values[i] - kernel2->values[i]) >= MagickEpsilon )
+    xc morphology.c:2648:18 cxx_ne_to_eq               if (clone_info != (KernelInfo *) NULL)
+    xc morphology.c:2698:36 cxx_lt_to_le               if ( fabs(kernel->values[i]) < MagickEpsilon )
+    xc morphology.c:2700:27 cxx_lt_to_le               ( kernel->values[i] < 0)
+    xc morphology.c:2856:15 cxx_lt_to_le               for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    xc morphology.c:2939:17 cxx_remove_void_call       SetPixelChannel(morphology_image,channel,p[center+i],q);
+    xc morphology.c:2976:27 cxx_sub_to_add             if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
+    xc morphology.c:2976:45 cxx_add_to_sub             if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
+    xc morphology.c:2976:50 cxx_ge_to_gt               if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
+    xc morphology.c:2976:50 cxx_ge_to_lt               if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
+    xc morphology.c:2979:23 cxx_ne_to_eq               if (count != 0)
+    xc morphology.c:3007:19 cxx_lt_to_ge               for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    xc morphology.c:3007:19 cxx_lt_to_le               for (j=0; j < (ssize_t) GetOpenMPMaximumThreads(); j++)
+    xc morphology.c:3010:41 cxx_div_to_mul             return(status ? (ssize_t) (changed/GetImageChannels(image)) : 0);
+    xc morphology.c:3092:13 cxx_remove_void_call       SetPixelChannel(morphology_image,channel,p[center+i],q);
+    xc morphology.c:3199:39 cxx_ge_to_gt               if (!IsNaN(*k) && (*k >= 0.5))
+    xc morphology.c:3201:44 cxx_lt_to_le               if ((double) pixels[i] < pixel)
+    xc morphology.c:3225:25 cxx_lt_to_le               for (v=0; v < (ssize_t) kernel->height; v++)
+    xc morphology.c:3229:39 cxx_gt_to_ge               if (!IsNaN(*k) && (*k > 0.5))
+    xc morphology.c:3231:44 cxx_gt_to_ge               if ((double) pixels[i] > pixel)
+    xc morphology.c:3264:28 cxx_gt_to_ge               if (*k > 0.7)
+    xc morphology.c:3266:48 cxx_lt_to_le               if ((double) pixels[i] < minimum)
+    xc morphology.c:3270:30 cxx_lt_to_le               if (*k < 0.3)
+    xc morphology.c:3272:50 cxx_gt_to_ge               if ((double) pixels[i] > maximum)
+    xc morphology.c:3282:25 cxx_lt_to_le               if (minimum < 0.0)
+    xc morphology.c:3286:38 cxx_add_to_sub             pixel=(double) p[center+i]-minimum;
+    xc morphology.c:3286:41 cxx_sub_to_add             pixel=(double) p[center+i]-minimum;
+    xc morphology.c:3300:25 cxx_lt_to_ge               for (v=0; v < (ssize_t) kernel->height; v++)
+    xc morphology.c:3300:25 cxx_lt_to_le               for (v=0; v < (ssize_t) kernel->height; v++)
+    xc morphology.c:3300:54 cxx_post_inc_to_post_dec   for (v=0; v < (ssize_t) kernel->height; v++)
+    xc morphology.c:3302:27 cxx_lt_to_ge               for (u=0; u < (ssize_t) kernel->width; u++)
+    xc morphology.c:3302:27 cxx_lt_to_le               for (u=0; u < (ssize_t) kernel->width; u++)
+    xc morphology.c:3302:55 cxx_post_inc_to_post_dec   for (u=0; u < (ssize_t) kernel->width; u++)
+    xc morphology.c:3304:39 cxx_ge_to_gt               if (!IsNaN(*k) && (*k >= 0.5))
+    xc morphology.c:3304:39 cxx_ge_to_lt               if (!IsNaN(*k) && (*k >= 0.5))
+    xc morphology.c:3307:35 cxx_lt_to_ge               if (intensity < minimum)
+    xc morphology.c:3307:35 cxx_lt_to_le               if (intensity < minimum)
+    xc morphology.c:3317:38 cxx_sub_to_add             pixels+=(image->columns-1)*GetPixelChannels(image);
+    xc morphology.c:3317:41 cxx_mul_to_div             pixels+=(image->columns-1)*GetPixelChannels(image);
+    xc morphology.c:3329:25 cxx_lt_to_le               for (v=0; v < (ssize_t) kernel->height; v++)
+    xc morphology.c:3333:39 cxx_ge_to_gt               if (!IsNaN(*k) && (*k >= 0.5))
+    xc morphology.c:3336:35 cxx_gt_to_ge               if (intensity > maximum)
+    xc morphology.c:3375:45 cxx_mul_to_div             k=(&kernel->values[kernel->width*kernel->height-1]);
+    xc morphology.c:3375:60 cxx_sub_to_add             k=(&kernel->values[kernel->width*kernel->height-1]);
+    xc morphology.c:3376:25 cxx_lt_to_ge               for (v=0; v < (ssize_t) kernel->height; v++)
+    xc morphology.c:3376:25 cxx_lt_to_le               for (v=0; v < (ssize_t) kernel->height; v++)
+    xc morphology.c:3376:54 cxx_post_inc_to_post_dec   for (v=0; v < (ssize_t) kernel->height; v++)
+    xc morphology.c:3378:27 cxx_lt_to_ge               for (u=0; u < (ssize_t) kernel->width; u++)
+    xc morphology.c:3378:27 cxx_lt_to_le               for (u=0; u < (ssize_t) kernel->width; u++)
+    xc morphology.c:3378:55 cxx_post_inc_to_post_dec   for (u=0; u < (ssize_t) kernel->width; u++)
+    xc morphology.c:3382:44 cxx_add_to_sub             if (((double) pixels[i]+(*k)) < pixel)
+    xc morphology.c:3382:51 cxx_lt_to_ge               if (((double) pixels[i]+(*k)) < pixel)
+    xc morphology.c:3382:51 cxx_lt_to_le               if (((double) pixels[i]+(*k)) < pixel)
+    xc morphology.c:3383:47 cxx_add_to_sub             pixel=(double) pixels[i]+(*k);
+    xc morphology.c:3388:38 cxx_sub_to_add             pixels+=(image->columns-1)*GetPixelChannels(image);
+    xc morphology.c:3388:41 cxx_mul_to_div             pixels+=(image->columns-1)*GetPixelChannels(image);
+    xc morphology.c:3396:28 cxx_ne_to_eq               if (quantum_pixels != (const Quantum *) NULL)
+    xc morphology.c:3403:46 cxx_ge_to_gt               if (fabs(pixel-(double) p[center+i]) >= MagickEpsilon)
+    x  morphology.c:3581:51 cxx_lt_to_le               if (((double) pixels[i]+(*k)) < pixel)
+    x  morphology.c:3591:25 cxx_lt_to_le               for (u=0; u < offset.x; u++)
+    x  morphology.c:3593:36 cxx_add_to_sub             if (!IsNaN(*k) && ((x+u-offset.x) >= 0))
+    x  morphology.c:3595:49 cxx_lt_to_le               if (((double) pixels[i]+(*k)) < pixel)
+    x  morphology.c:3612:51 cxx_lt_to_le               if (((double) pixels[i]+(*k)) < pixel)
+    x  morphology.c:3624:36 cxx_add_to_sub             if (!IsNaN(*k) && ((x+u-offset.x) >= 0))
+    x  morphology.c:3624:49 cxx_ge_to_gt               if (!IsNaN(*k) && ((x+u-offset.x) >= 0))
+    x  morphology.c:3626:49 cxx_lt_to_le               if (((double) pixels[i]+(*k)) < pixel)
+    x  morphology.c:3637:23 cxx_sub_to_add             if (fabs(pixel-(double) q[i]) > MagickEpsilon)
+    x  morphology.c:3637:39 cxx_gt_to_ge               if (fabs(pixel-(double) q[i]) > MagickEpsilon)
+    x  morphology.c:3637:39 cxx_gt_to_le               if (fabs(pixel-(double) q[i]) > MagickEpsilon)
+    x  morphology.c:3646:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       morphology.c:3654:17 cxx_post_inc_to_post_dec   progress++;
+       morphology.c:3655:64 cxx_mul_to_div             proceed=SetImageProgress(image,MorphologyTag,progress,2*image->rows);
+       morphology.c:3656:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  morphology.c:3745:51 cxx_lt_to_le               if (((double) pixels[i]+(*k)) < pixel)
+    x  morphology.c:3760:49 cxx_lt_to_le               if (((double) pixels[i]+(*k)) < pixel)
+    x  morphology.c:3776:51 cxx_lt_to_le               if (((double) pixels[i]+(*k)) < pixel)
+    x  morphology.c:3789:38 cxx_sub_to_add             if (!IsNaN(*k) && ((x+u-offset.x) < (ssize_t) image->columns))
+    x  morphology.c:3791:49 cxx_lt_to_le               if (((double) pixels[i]+(*k)) < pixel)
+    x  morphology.c:3801:23 cxx_sub_to_add             if (fabs(pixel-(double) q[i]) > MagickEpsilon)
+    x  morphology.c:3801:39 cxx_gt_to_ge               if (fabs(pixel-(double) q[i]) > MagickEpsilon)
+    x  morphology.c:3801:39 cxx_gt_to_le               if (fabs(pixel-(double) q[i]) > MagickEpsilon)
+    x  morphology.c:3802:18 cxx_post_inc_to_post_dec   changed++;
+    x  morphology.c:3810:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       morphology.c:3818:17 cxx_post_inc_to_post_dec   progress++;
+       morphology.c:3819:64 cxx_mul_to_div             proceed=SetImageProgress(image,MorphologyTag,progress,2*image->rows);
+       morphology.c:3820:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  morphology.c:3826:37 cxx_div_to_mul             return(status ? (ssize_t) (changed/GetImageChannels(image)) : -1);
+    xc morphology.c:3898:19 cxx_lt_to_le               if ( iterations < 0 )  /* negative interactions = infinite (well almost) */
+    xc morphology.c:3899:35 cxx_gt_to_ge               kernel_limit = image->columns>image->rows ? image->columns : image->rows;
+    xc morphology.c:3899:35 cxx_gt_to_le               kernel_limit = image->columns>image->rows ? image->columns : image->rows;
+    xc morphology.c:3967:20 cxx_lt_to_le               if ( changed < 0 )
+    xc morphology.c:4011:56 cxx_gt_to_ge               while ( method_loop < method_limit && method_changed > 0 ) {
+    xc morphology.c:4048:29 cxx_eq_to_ne               if ( stage_loop == 2 )
+    xc morphology.c:4061:29 cxx_eq_to_ne               if ( stage_loop == 2 )
+    xc morphology.c:4084:29 cxx_eq_to_ne               if ( stage_loop == 2 ) {
+    xc morphology.c:4156:62 cxx_add_to_sub             method_changed = (size_t) ((ssize_t) method_changed+changed);
+    xc morphology.c:4203:23 cxx_ne_to_eq               if (verbose != MagickFalse)
+    xc morphology.c:4220:36 cxx_ne_to_eq               if ( this_kernel->next != (KernelInfo *) NULL )
+    xc morphology.c:4256:20 cxx_post_inc_to_post_dec   kernel_number++;
+     c morphology.c:4265:19 cxx_eq_to_ne               if ( curr_image == rslt_image )
+     c morphology.c:4267:19 cxx_ne_to_eq               if ( rslt_image != (Image *) NULL )
+    xc morphology.c:4397:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc morphology.c:4407:47 cxx_eq_to_ne               if ( method == ConvolveMorphology || method == CorrelateMorphology ) {
+    xc morphology.c:4419:28 cxx_eq_to_ne               if ( curr_kernel == kernel )
+    xc morphology.c:4544:37 cxx_add_to_sub             { t                    = k[i+j*(ssize_t) kernel->width];
+    xc morphology.c:4544:39 cxx_mul_to_div             { t                    = k[i+j*(ssize_t) kernel->width];
+    xc morphology.c:4545:14 cxx_add_to_sub             k[i+j*(ssize_t) kernel->width] = k[j+x*(ssize_t) kernel->width];
+    xc morphology.c:4545:16 cxx_mul_to_div             k[i+j*(ssize_t) kernel->width] = k[j+x*(ssize_t) kernel->width];
+    xc morphology.c:4555:29 cxx_minus_to_noop          kernel->x = (ssize_t) ( -y +(ssize_t) kernel->width-1)/2;
+    xc morphology.c:4558:21 cxx_add_to_sub             angle = fmod(angle+270.0, 360.0);     /* angle reduced 90 degrees */
+    xc morphology.c:4582:16 cxx_lt_to_le               for (i=0;  i < j;  i++, j--)
+    xc morphology.c:4587:21 cxx_sub_to_add             angle = fmod(angle-180.0, 360.0);   /* angle+180 degrees */
+     c morphology.c:4610:5 cxx_remove_void_call       perror("Unable to rotate a non-square, non-linear kernel 90 degrees");
+    xc morphology.c:4627:14 cxx_lt_to_le               if ( angle < 0 )
+    xc morphology.c:4630:14 cxx_lt_to_le               if ( 337.5 < angle || angle <= 22.5 )
+    xc morphology.c:4630:31 cxx_le_to_lt               if ( 337.5 < angle || angle <= 22.5 )
+    xc morphology.c:4658:18 cxx_lt_to_le               if ( 135.0 < angle && angle <= 225.0 )
+    xc morphology.c:4658:35 cxx_le_to_gt               if ( 135.0 < angle && angle <= 225.0 )
+    xc morphology.c:4658:35 cxx_le_to_lt               if ( 135.0 < angle && angle <= 225.0 )
+    xc morphology.c:4660:18 cxx_lt_to_le               if ( 225.0 < angle && angle <= 315.0 )
+    xc morphology.c:4660:35 cxx_le_to_gt               if ( 225.0 < angle && angle <= 315.0 )
+    xc morphology.c:4660:35 cxx_le_to_lt               if ( 225.0 < angle && angle <= 315.0 )
+    xc morphology.c:4668:13 cxx_lt_to_le               if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
+    xc morphology.c:4668:52 cxx_le_to_lt               if ( 22.5 < fmod(angle,90.0) && fmod(angle,90.0) <= 67.5 )
+    xc morphology.c:4670:56 cxx_le_to_lt               if ( 45.0 < fmod(angle, 180.0)  && fmod(angle,180.0) <= 135.0 )
+    xc morphology.c:4672:14 cxx_lt_to_le               if ( 135.0 < angle && angle <= 225.0 )
+    xc morphology.c:4672:31 cxx_le_to_lt               if ( 135.0 < angle && angle <= 225.0 )
+    x  morphology.c:4725:3 cxx_remove_void_call       SetGeometryInfo(&args);
+    x  morphology.c:4827:62 cxx_ge_to_gt               if ( fabs(kernel->positive_range + kernel->negative_range) >= MagickEpsilon )
+    x  morphology.c:4829:45 cxx_add_to_sub             pos_scale = fabs(kernel->positive_range + kernel->negative_range);
+    xc morphology.c:4857:48 cxx_ge_to_gt               pos_scale = ( fabs(kernel->positive_range) >= MagickEpsilon )
+    xc morphology.c:4859:48 cxx_ge_to_gt               neg_scale = ( fabs(kernel->negative_range) >= MagickEpsilon )
+    xc morphology.c:4871:47 cxx_ge_to_gt               kernel->values[i] *= (kernel->values[i] >= 0) ? pos_scale : neg_scale;
+    xc morphology.c:4877:39 cxx_ge_to_gt               kernel->maximum *= (kernel->maximum >= 0.0) ? pos_scale : neg_scale;
+    xc morphology.c:4878:39 cxx_ge_to_gt               kernel->minimum *= (kernel->minimum >= 0.0) ? pos_scale : neg_scale;
+    xc morphology.c:4881:23 cxx_lt_to_le               if ( scaling_factor < MagickEpsilon ) {
+    x  morphology.c:4950:25 cxx_ge_to_gt               if ( fabs(k->angle) >= MagickEpsilon )
+    x  morphology.c:4961:52 cxx_lt_to_le               if ( fabs(k->positive_range+k->negative_range) < MagickEpsilon )
+    x  morphology.c:4963:37 cxx_add_to_sub             else if ( fabs(k->positive_range+k->negative_range-1.0) < MagickEpsilon )
+    x  morphology.c:4963:61 cxx_lt_to_le               else if ( fabs(k->positive_range+k->negative_range-1.0) < MagickEpsilon )
+    x  morphology.c:5014:3 cxx_remove_void_call       CalcKernelMetaData(kernel);  /* recalculate the meta-data */
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-morphology.json

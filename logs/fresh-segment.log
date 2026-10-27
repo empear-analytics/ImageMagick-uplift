@@ -1,0 +1,115 @@
+mutate: 432 mutants in MagickCore/segment\.c$, 33 functions
+mutate: baseline over 29 cases in 1s
+  mutants: 25/432 (0s)
+  mutants: 50/432 (1s)
+  mutants: 75/432 (2s)
+  mutants: 100/432 (16s)
+  mutants: 125/432 (17s)
+  mutants: 150/432 (28s)
+  mutants: 175/432 (29s)
+  mutants: 200/432 (29s)
+  mutants: 225/432 (29s)
+  mutants: 250/432 (32s)
+  mutants: 275/432 (33s)
+  mutants: 300/432 (43s)
+  mutants: 325/432 (57s)
+  mutants: 350/432 (64s)
+  mutants: 375/432 (71s)
+  mutants: 400/432 (74s)
+  mutants: 425/432 (87s)
+  mutants: 432/432 (163s)
+
+mutate: 432 mutants, 163s
+  killed 311, survived 51 (0 capped), no coverage 70, errors 0
+  mutation score on reached code: 85.9%   overall: 72.0%
+
+  function                           total killed survived no-cov
+  GetImageDynamicThreshold              63      0        0     63
+  Classify                              55     43       12      0
+  OptimalTau                            34     29        5      0
+  ConsolidateCrossings                  32     28        4      0
+  ClassifyFuzzyPixel                    23     22        1      0
+  InitializeIntervalTree                23     21        2      0
+  ScaleSpace                            22     20        2      0
+  IsPixelInCluster                      18     18        0      0
+  SegmentImage                          15     11        4      0
+  DefineRegion                          13     11        2      0
+  InitializeHistogram                   13     13        0      0
+  ZeroCrossHistogram                    12     12        0      0
+  DerivativeHistogram                   11     11        0      0
+  ForceCrossingEndpoints                 8      6        2      0
+  FindPeakIndex                          8      1        7      0
+  MergeSmallDerivatives                  8      8        0      0
+  CountCrossingsBetween                  7      6        1      0
+  MeanStability                          7      7        0      0
+  ActiveNodes                            7      7        0      0
+  SetNodeExtrema                         6      6        0      0
+  SetClusterColormap                     5      5        0      0
+  InitializeList                         5      5        0      0
+  Stability                              5      5        0      0
+  CountClusterPixel                      4      3        1      0
+  HasObjectAndBackgroundClusters         4      0        0      4
+  FindFirstCrossing                      4      0        4      0
+  FindTauIndex                           4      4        0      0
+  PrintClusterStatistics                 3      0        0      3
+  ClassifyPixelByCluster                 3      3        0      0
+  IsEvenCrossing                         3      3        0      0
+  FreeNodes                              3      0        3      0
+  GetAverageTau                          3      2        1      0
+  AppendIntervalNode                     1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  segment.c:387:22 cxx_div_to_mul             ratio=numerator/distance_squared;
+    x  segment.c:414:14 cxx_post_inc_to_post_dec   count++;
+    x  segment.c:598:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       segment.c:606:17 cxx_post_inc_to_post_dec   progress++;
+       segment.c:607:66 cxx_mul_to_div             proceed=SetImageProgress(image,SegmentImageTag,progress,2*image->rows);
+       segment.c:608:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+       segment.c:647:5 cxx_remove_void_call       PrintClusterStatistics(head,cluster_threshold,weighting_exponent,
+    x  segment.c:649:23 cxx_gt_to_ge               if (number_clusters > 256)
+    x  segment.c:659:20 cxx_le_to_lt               for (i=(-255); i <= 255; i++)
+    x  segment.c:700:7 cxx_remove_void_call       SetPixelIndex(image,(Quantum) 0,q);
+    x  segment.c:711:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       segment.c:719:17 cxx_post_inc_to_post_dec   progress++;
+       segment.c:720:66 cxx_mul_to_div             proceed=SetImageProgress(image,SegmentImageTag,progress,2*image->rows);
+       segment.c:721:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  segment.c:778:12 cxx_post_inc_to_post_dec   count++;
+    x  segment.c:820:21 cxx_gt_to_ge               for (k=j-1; k > 0; k--)
+    x  segment.c:825:21 cxx_lt_to_le               for (k=j+1; k < 255; k++)
+    x  segment.c:832:21 cxx_gt_to_ge               for (k=j-1; k > 0; k--)
+    x  segment.c:835:13 cxx_lt_to_le               if (k < 0)
+    x  segment.c:904:22 cxx_gt_to_ge               if (extents->index > 255)
+    x  segment.c:911:33 cxx_lt_to_le               if (extrema[extents->index] < 0)
+       segment.c:1501:17 cxx_remove_void_call       FreeNodes(root);
+       segment.c:1520:15 cxx_remove_void_call       FreeNodes(root);
+    x  segment.c:1589:12 cxx_eq_to_ne               if (node == (IntervalTree *) NULL)
+    x  segment.c:1591:3 cxx_remove_void_call       FreeNodes(node->sibling);
+    x  segment.c:1592:3 cxx_remove_void_call       FreeNodes(node->child);
+    x  segment.c:1602:15 cxx_lt_to_ge               for (j=0; j < 255; j++)
+    x  segment.c:1602:15 cxx_lt_to_le               for (j=0; j < 255; j++)
+    x  segment.c:1602:23 cxx_post_inc_to_post_dec   for (j=0; j < 255; j++)
+    x  segment.c:1603:39 cxx_ne_to_eq               if (zero_crossing[i].crossings[j] != 0)
+    x  segment.c:1618:36 cxx_minus_to_noop          zero_crossing[i].crossings[0]=(-zero_crossing[i].crossings[j]);
+    x  segment.c:1619:19 cxx_gt_to_ge               for (j=255; j > 0; j--)
+    x  segment.c:1638:24 cxx_le_to_gt               for (x=node->left; x <= node->right; x++)
+    x  segment.c:1638:24 cxx_le_to_lt               for (x=node->left; x <= node->right; x++)
+    x  segment.c:1640:14 cxx_ne_to_eq               if (peak != MagickFalse)
+    x  segment.c:1642:43 cxx_gt_to_ge               if (zero_crossing[k].histogram[x] > value)
+    x  segment.c:1642:43 cxx_gt_to_le               if (zero_crossing[k].histogram[x] > value)
+    x  segment.c:1649:41 cxx_lt_to_ge               if (zero_crossing[k].histogram[x] < value)
+    x  segment.c:1649:41 cxx_lt_to_le               if (zero_crossing[k].histogram[x] < value)
+    x  segment.c:1684:15 cxx_lt_to_ge               for (i=0; i < number_nodes; i++)
+    x  segment.c:1746:27 cxx_sub_to_add             count=(size_t) ((max_tau-min_tau)/delta_tau)+2;
+    x  segment.c:1754:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) count; i++)
+    x  segment.c:1763:25 cxx_ge_to_gt               for (tau=max_tau; tau >= min_tau; tau-=delta_tau)
+    x  segment.c:1813:15 cxx_le_to_lt               for (i=0; i <= 255; i++)
+    x  segment.c:1838:3 cxx_remove_void_call       FreeNodes(root);
+    x  segment.c:1888:15 cxx_le_to_lt               for (x=0; x <= 255; x++)
+    x  segment.c:1891:18 cxx_lt_to_le               if (gamma[x] < MagickEpsilon)
+    x  segment.c:1974:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+       segment.c:1982:22 cxx_ge_to_gt               for (i-- ; i >= 0; i--)
+       segment.c:1982:22 cxx_ge_to_lt               for (i-- ; i >= 0; i--)
+    x  segment.c:2011:15 cxx_lt_to_ge               for (i=0; i < MaxDimension; i++)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-segment.json

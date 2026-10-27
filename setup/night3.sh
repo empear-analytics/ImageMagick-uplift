@@ -17,7 +17,7 @@
 # will not finish in one night, and the next night simply resumes it.
 SETUP=~/imagemagick-mutation/setup
 cd ~/imagemagick-mutation/ImageMagick && . $SETUP/sysroot.env
-export ORACLE_JOBS=28
+export ORACLE_JOBS=16
 W=build-oracle/work
 FILES="log morphology geometry enhance visual-effects segment identify property image fx draw color statistic distort xml-tree profile constitute transform quantize montage cache pixel attribute option mime feature composite type delegate compress threshold string policy list linked-list histogram compare channel token splay-tree blob annotate vision utility signature resource matrix layer effect stream resample decorate colorspace shear registry random quantum paint magick locale gem exception colormap cipher semaphore magic fourier distribute-cache configure coder"
 push() { $SETUP/push-results.sh > /dev/null 2>&1 && echo "$(date +%H:%M) pushed" || echo "$(date +%H:%M) push failed"; }
@@ -44,8 +44,8 @@ echo "== night3 $(date): step 3, mutation per file"
 n=0
 for f in $FILES; do
   [ -f $W/mutation-fresh-$f.json ] && continue
-  python3 -u tools/oracle/mutate.py --file "MagickCore/$f\\.c\$" --bin $BIN --name fresh-$f \
-    --max-cases 200 > build-oracle/fresh-$f.log 2>&1
+  ( ulimit -v 4194304; exec python3 -u tools/oracle/mutate.py --file "MagickCore/$f\\.c\$" --bin $BIN --name fresh-$f \
+    --max-cases 200 ) > build-oracle/fresh-$f.log 2>&1
   echo "$(date +%H:%M) fresh $f: $(grep -E 'killed [0-9]' build-oracle/fresh-$f.log || echo failed, see build-oracle/fresh-$f.log)"
   n=$((n+1)); [ $((n % 5)) = 0 ] && push
 done
