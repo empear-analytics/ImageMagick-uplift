@@ -1928,6 +1928,28 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   return(GetFirstImageInList(image));
 }
 
+static void VoteHoughLines(MatrixInfo *accumulator,const PointInfo *center,
+  const ssize_t x,const ssize_t y,const double hough_height)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < 180; i++)
+  {
+    double
+      count,
+      radius;
+
+    radius=(((double) x-center->x)*cos(DegreesToRadians((double) i)))+
+      (((double) y-center->y)*sin(DegreesToRadians((double) i)));
+    (void) GetMatrixElement(accumulator,i,(ssize_t)
+      MagickRound(radius+hough_height),&count);
+    count++;
+    (void) SetMatrixElement(accumulator,i,(ssize_t)
+      MagickRound(radius+hough_height),&count);
+  }
+}
+
 static MagickBooleanType WriteHoughHeader(const Image *image,const int file,
   const size_t width,const size_t height,const size_t threshold)
 {
@@ -2120,25 +2142,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       if (GetPixelIntensity(image,p) > ((double) QuantumRange/2.0))
-        {
-          ssize_t
-            i;
-
-          for (i=0; i < 180; i++)
-          {
-            double
-              count,
-              radius;
-
-            radius=(((double) x-center.x)*cos(DegreesToRadians((double) i)))+
-              (((double) y-center.y)*sin(DegreesToRadians((double) i)));
-            (void) GetMatrixElement(accumulator,i,(ssize_t)
-              MagickRound(radius+hough_height),&count);
-            count++;
-            (void) SetMatrixElement(accumulator,i,(ssize_t)
-              MagickRound(radius+hough_height),&count);
-          }
-        }
+        VoteHoughLines(accumulator,&center,x,y,hough_height);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
