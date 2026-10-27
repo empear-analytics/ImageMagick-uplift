@@ -122,6 +122,9 @@ cache kept those timeouts, so they diverged on unchanged code until rerun with
 `--no-cache`. Each affected step was reverted by the script and redone on a quiet
 machine; every commit cites a clean run.
 
+Full catalogue at `e77a54c39`: 15,884 cases, 1 diverged, gaps/c5651ffad8 (the known Mac
+artifact).
+
 ### Harness notes
 
 - **ERDC had not pushed since 2026-10-12.** `night3.sh` died silently on 2026-10-26 in
