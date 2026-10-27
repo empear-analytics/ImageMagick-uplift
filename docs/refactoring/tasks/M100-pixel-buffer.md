@@ -81,59 +81,10 @@ DrawClippingMask, DrawCompositeMask, IsDashSegmentPending, IsRenderableClass,
 TraceArcPath, and the public DrawPatternPath) carries no Brain Method, and the public one
 keeps the file-level finding, so B there would leave the score flat.
 
-### Quantum, morphology and distort (evening)
-
-**quantum-import.c 1.41 → 1.63, quantum-export.c 1.57 → 1.87, morphology.c 2.04 → 2.20,
-distort.c 2.29 → 2.49**, eight Recipe B commits, each losing *Brain Method* with
-*Excess Number of Function Arguments*.
-
-| Function | Bundle | Evidence | Code Health |
-|---|---|---|---|
-| ImportRGBQuantum | `QuantumPixelSpan` (M99) | oracle, ready (95%, uncapped `q100`) | 1.41 → 1.48 |
-| ImportIndexQuantum | the same | oracle, ready (95%) | 1.48 → 1.55 |
-| ImportGrayQuantum | the same | oracle, careful (80%) | 1.55 → 1.63 |
-| ExportGrayQuantum | export's `QuantumPixelSpan` (M99) | oracle, careful (85%) | 1.57 → 1.65 |
-| ExportRGBQuantum | the same | oracle, ready (92%) | 1.65 → 1.75 |
-| ExportRGBAQuantum | the same | oracle, ready (100%) | 1.75 → 1.87 |
-| MorphologyPrimitive | method, kernel, bias (`MorphologyPass`, new) | oracle, careful (79%, ERDC fresh capped run) | 2.04 → 2.20 |
-| GenerateCoefficients | number_arguments, arguments, number_values (`CoefficientInput`, new) | oracle, careful (86%, uncapped `q100`) | 2.29 → 2.49 |
-
-**The 200-case cap, not the harness, made these functions "not ready".** M99's capped
-runs gave the six quantum functions 18-51% adjusted and GenerateCoefficients 74%. The
-uncapped `q100` run (`--max-cases 4000`) puts every one at careful or ready. A mutant
-that survives only because the cases that would kill it lie beyond the cap is a
-*capped* survivor, which the gate counts against the function. When a capped run says
-"not ready" for a function reached by more than 200 cases, rerun it uncapped before
-recording it as weakly protected.
-
-MorphologyPrimitive's one call is in MorphologyApply's kernel loop, after an `if`
-chain that sets `primitive` and `this_kernel`; the struct is declared just before the
-call. MorphologyApply keeps Brain Method and seven arguments: it is `MagickPrivate`,
-called from other files. GenerateCoefficients keeps its `DistortMethod *method`
-out-pointer as a parameter (step 4 refuses `&method`); its two callers each declare
-their own `CoefficientInput`. GetGeometry, PolaroidImage and GetImageDynamicThreshold
-carry both findings too, but are public API.
-
-**Load-induced divergences.** While `q100` ran, two full oracle runs each had one
-`write-mask -scale` case diverge (`resize/6efddf0c0a`, `resize/6ee45e9cfa`, output
-differs); alone they passed 3/3 and 5/5, on both the changed and unchanged code. A
-third run had the *baseline* of two `compare -subimage-search` cases time out, and the
-cache kept those timeouts, so they diverged on unchanged code until rerun with
-`--no-cache`. Each affected step was reverted by the script and redone on a quiet
-machine; every commit cites a clean run.
-
-Full catalogue at `e77a54c39`: 15,884 cases, 1 diverged, gaps/c5651ffad8 (the known Mac
-artifact).
-
 ### Harness notes
 
-- **ERDC had not pushed since 2026-10-12.** `night3.sh` died silently on 2026-10-26 in
-  morphology.c, most likely by the container's 64 GB limit with 28 jobs. Restarted on
-  2026-10-27 with 16 jobs and a 4 GB per-process cap. Set for the whole script, the
-  cap made the Mull build fail (`posix_spawn failed: Cannot allocate memory`), so it
-  now wraps only the mutation step. The first five fresh reports (morphology,
-  geometry, enhance, visual-effects, segment) arrived at 17:39; MorphologyPrimitive
-  above uses them.
+- **ERDC has not pushed since 2026-10-12.** Restarted the same evening; see
+  [M101](M101-bundle-uncapped.md).
 - **Homebrew moved fontconfig and pango.** Build directories configured before the
   upgrade keep the old Cellar include paths, so a source change to a file that includes
   them (type.c here) breaks the build. `linecov.py` failed on type.c this way. Fixed for
@@ -142,4 +93,4 @@ artifact).
 - **Uncapped quantum run.** A Mac run of the not-ready quantum functions at HEAD (Mull
   build `q100`, `--max-cases 4000`) costs about 90 s per surviving mutant
   (ImportIndexQuantum: 2,725 cases), roughly ten hours for the six functions. It finished at
-  about 18:00 (results above).
+  about 18:00; see [M101](M101-bundle-uncapped.md).
