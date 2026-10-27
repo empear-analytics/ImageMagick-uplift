@@ -96,7 +96,7 @@ needs before refactoring:
 
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
-| 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | 1.10, in progress (fixed-map blocks moved out of 9 of 14 Export/Import functions), [M39](tasks/M39-pixel.md) [M94](tasks/M94-near-threshold-3.md) |
+| 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | 1.73, in progress (fixed-map blocks moved out of 9 of 14 Export/Import functions; Recipe B on all 14, fresh mutation ready; the other 5 extractions wait on an owner decision, see M100), [M39](tasks/M39-pixel.md) [M94](tasks/M94-near-threshold-3.md) [M100](tasks/M100-pixel-buffer.md) |
 | 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | 1.93, in progress (Complex Conditional 42 -> 8 sites; the rest are repeats; ExecuteRPN's Brain Method gone with Recipe B), [M38](tasks/M38-fx.md) [M99](tasks/M99-bundle-arguments.md) |
 | 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | 1.41, in progress (Recipe B span on 12 helpers; Gray, RGB, Index and the rest gate not ready), [M99](tasks/M99-bundle-arguments.md) |
 | 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | 1.57, in progress (plateau 1.24 for E; Recipe B span on 6 helpers, Gray, RGB and RGBA gate not ready), [M70](tasks/M70-quantum-export.md) [M99](tasks/M99-bundle-arguments.md) |
