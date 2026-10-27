@@ -1317,9 +1317,18 @@ static MagickBooleanType ExportFloatRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportFloatPixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -2734,7 +2743,7 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
     }
     case FloatPixel:
     {
-      status=ExportFloatPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportFloatPixel(image,&roi,&buffer,exception);
       break;
     }
     case LongPixel:
