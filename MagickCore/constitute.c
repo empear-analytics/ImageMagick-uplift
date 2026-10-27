@@ -1361,6 +1361,40 @@ static inline MagickBooleanType IsDirectDelegate(
     MagickFalse);
 }
 
+static void FindFallbackEncoder(ImageInfo *write_info,Image *image,
+  const char *filename,const MagickInfo **magick_info,
+  EncodeImageHandler **encoder,ExceptionInfo *exception)
+{
+  *magick_info=GetWriteMagickInfo(write_info,image,exception);
+  *encoder=GetImageEncoder(*magick_info);
+  if (*encoder == (EncodeImageHandler *) NULL)
+    {
+      char
+        extension[MagickPathExtent];
+
+      GetPathComponent(image->filename,ExtensionPath,extension);
+      if (*extension != '\0')
+        *magick_info=GetMagickInfo(extension,exception);
+      else
+        *magick_info=GetMagickInfo(image->magick,exception);
+      (void) CopyMagickString(image->filename,filename,
+        MagickPathExtent);
+      *encoder=GetImageEncoder(*magick_info);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        MissingDelegateWarning,"NoEncodeDelegateForThisImageFormat",
+        "`%s'",write_info->magick);
+    }
+  if (*encoder == (EncodeImageHandler *) NULL)
+    {
+      *magick_info=GetMagickInfo(image->magick,exception);
+      *encoder=GetImageEncoder(*magick_info);
+      if (*encoder == (EncodeImageHandler *) NULL)
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          MissingDelegateError,"NoEncodeDelegateForThisImageFormat",
+          "`%s'",write_info->magick);
+    }
+}
+
 static MagickBooleanType EncodeImageWithInfo(const MagickInfo *magick_info,
   EncodeImageHandler *encoder,ImageInfo *write_info,Image *image,
   ExceptionInfo *exception)
@@ -1526,34 +1560,8 @@ MagickExport MagickBooleanType WriteImage(const ImageInfo *image_info,
         }
       else
         {
-          magick_info=GetWriteMagickInfo(write_info,image,exception);
-          encoder=GetImageEncoder(magick_info);
-          if (encoder == (EncodeImageHandler *) NULL)
-            {
-              char
-                extension[MagickPathExtent];
-
-              GetPathComponent(image->filename,ExtensionPath,extension);
-              if (*extension != '\0')
-                magick_info=GetMagickInfo(extension,exception);
-              else
-                magick_info=GetMagickInfo(image->magick,exception);
-              (void) CopyMagickString(image->filename,filename,
-                MagickPathExtent);
-              encoder=GetImageEncoder(magick_info);
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                MissingDelegateWarning,"NoEncodeDelegateForThisImageFormat",
-                "`%s'",write_info->magick);
-            }
-          if (encoder == (EncodeImageHandler *) NULL)
-            {
-              magick_info=GetMagickInfo(image->magick,exception);
-              encoder=GetImageEncoder(magick_info);
-              if (encoder == (EncodeImageHandler *) NULL)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  MissingDelegateError,"NoEncodeDelegateForThisImageFormat",
-                  "`%s'",write_info->magick);
-            }
+          FindFallbackEncoder(write_info,image,filename,&magick_info,&encoder,
+            exception);
           if (encoder != (EncodeImageHandler *) NULL)
             {
               /*
