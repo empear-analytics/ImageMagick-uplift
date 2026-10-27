@@ -2219,9 +2219,18 @@ static MagickBooleanType ExportQuantumRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportQuantumPixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -2776,7 +2785,7 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
     }
     case QuantumPixel:
     {
-      status=ExportQuantumPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportQuantumPixel(image,&roi,&buffer,exception);
       break;
     }
     case ShortPixel:
