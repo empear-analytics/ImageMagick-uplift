@@ -772,6 +772,16 @@ static void CopyBackMatrix(double **matrix,long double **hp_matrix,
   return(MagickFalse); \
 }
 
+static void SwapMatrixRows(long double **hp_matrix,const size_t rank,
+  const ssize_t row,const ssize_t column)
+{
+  ssize_t
+    k;
+
+  for (k=0; k < (ssize_t) rank; k++)
+    GaussJordanSwapLD(hp_matrix[row][k],hp_matrix[column][k]);
+}
+
 static void UnscrambleColumns(long double **hp_matrix,const size_t rank,
   const ssize_t *columns,const ssize_t *rows)
 {
@@ -853,8 +863,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     pivots[column]++;
     if (row != column)
       {
-        for (k=0; k < (ssize_t) rank; k++)
-          GaussJordanSwapLD(hp_matrix[row][k],hp_matrix[column][k]);
+        SwapMatrixRows(hp_matrix,rank,row,column);
         for (k=0; k < (ssize_t) number_vectors; k++)
           GaussJordanSwap(vectors[k][row],vectors[k][column]);
       }
