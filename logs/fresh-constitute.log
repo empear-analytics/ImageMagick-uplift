@@ -1,0 +1,97 @@
+mutate: 274 mutants in MagickCore/constitute\.c$, 26 functions
+  baseline: 9/9 (30s)
+mutate: 9 case(s) time out unmutated and are left out: gaps/3f0f18253e gaps/6a95c6af85 opencl/2124a0eb45 opencl/a8cc3ebf48 windrv/3ebc524471 windrv/41c234a591 windrv/7d14ba511e windrv/93dbbb465a windrv/cd7ea480a0
+mutate: baseline over 14948 cases in 31s
+  mutants: 25/274 (1s)
+  mutants: 50/274 (13s)
+  mutants: 75/274 (50s)
+  mutants: 100/274 (69s)
+  mutants: 125/274 (97s)
+  mutants: 150/274 (98s)
+  mutants: 175/274 (98s)
+  mutants: 200/274 (98s)
+  mutants: 225/274 (99s)
+  mutants: 250/274 (99s)
+  mutants: 274/274 (132s)
+
+mutate: 274 mutants, 132s
+  killed 218, survived 45 (25 capped), no coverage 11, errors 0
+  mutation score on reached code: 82.9%   overall: 79.6%
+
+  function                           total killed survived no-cov
+  ReadImage                             77     65       12      0
+  WriteImage                            44     44        0      0
+  GetImplicitDataImageType              18     16        2      0
+  WriteImages                           16     16        0      0
+  ApplyExtractGeometry                  13     10        3      0
+  SyncResolutionFromProperties          13      7        6      0
+  SetResolutionFromStrings              10      4        6      0
+  ConstituteImage                        9      6        3      0
+  SyncDelayFromConstituteInfo            7      4        3      0
+  InitializeConstituteInfo               7      4        3      0
+  PingImage                              6      4        2      0
+  PingSceneImages                        6      6        0      0
+  ReadSceneImages                        6      0        0      6
+  SyncOrientationFromProperties          5      1        4      0
+  ReadInlineImage                        5      5        0      0
+  IsSingleImageDelegateCopy              5      5        0      0
+  SyncImageSceneNumbers                  5      5        0      0
+  PingImages                             3      2        1      0
+  IsTIFFResolutionFallback               3      3        0      0
+  ReadImages                             3      3        0      0
+  GetWriteMagickInfo                     3      3        0      0
+  IsDirectDelegate                       3      0        0      3
+  SyncDisposeFromConstituteInfo          2      0        0      2
+  IsCoderAuthorized                      2      2        0      0
+  CopyTemporaryImageFile                 2      2        0      0
+  DeleteResolutionProperties             1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  constitute.c:189:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  constitute.c:205:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) length; i++)
+    x  constitute.c:205:15 cxx_lt_to_le               for (i=0; i < (ssize_t) length; i++)
+    x  constitute.c:312:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  constitute.c:322:7 cxx_remove_void_call       ResetTimer(&image->timer);
+    x  constitute.c:402:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  constitute.c:438:23 cxx_gt_to_ge               if (next->delay > constitute_info->delay)
+    x  constitute.c:442:52 cxx_ne_to_eq               if ((constitute_info->delay_flags & LessValue) != 0)
+    x  constitute.c:444:25 cxx_lt_to_le               if (next->delay < constitute_info->delay)
+    x  constitute.c:489:3 cxx_remove_void_call       SetGeometry(next,&geometry);
+    x  constitute.c:492:19 cxx_ne_to_eq               (next->rows != geometry.height))
+    x  constitute.c:501:67 cxx_ne_to_eq               if (((flags & WidthValue) != 0) || ((flags & HeightValue) != 0))
+    xc constitute.c:575:14 cxx_ne_to_eq               if (option != (const char *) NULL)
+    xc constitute.c:584:59 cxx_ne_to_eq               if ((constitute_info->delay_flags & SigmaValue) != 0)
+    xc constitute.c:586:34 cxx_add_to_sub             geometry_info.sigma+0.5));
+    xc constitute.c:601:23 cxx_ne_to_eq               if (orientation != (const char *) NULL)
+    xc constitute.c:607:20 cxx_eq_to_ne               if ((orientation == (const char *) NULL) &&
+    xc constitute.c:608:40 cxx_ne_to_eq               (constitute_info->sync_from_tiff != MagickFalse))
+    xc constitute.c:611:23 cxx_ne_to_eq               if (orientation != (const char *) NULL)
+    x  constitute.c:639:42 cxx_div_to_mul             image->resolution.x=geometry_info.rho/geometry_info.sigma;
+       constitute.c:641:42 cxx_add_to_sub             image->resolution.x=geometry_info.rho+geometry_info.sigma/1000.0;
+       constitute.c:641:62 cxx_div_to_mul             image->resolution.x=geometry_info.rho+geometry_info.sigma/1000.0;
+    x  constitute.c:646:42 cxx_div_to_mul             image->resolution.y=geometry_info.rho/geometry_info.sigma;
+       constitute.c:648:42 cxx_add_to_sub             image->resolution.y=geometry_info.rho+geometry_info.sigma/1000.0;
+       constitute.c:648:62 cxx_div_to_mul             image->resolution.y=geometry_info.rho+geometry_info.sigma/1000.0;
+    xc constitute.c:687:25 cxx_ne_to_eq               if ((resolution_x != (const char *) NULL) &&
+    xc constitute.c:688:25 cxx_ne_to_eq               (resolution_y != (const char *) NULL))
+    xc constitute.c:711:7 cxx_remove_void_call       SetResolutionFromStrings(image,resolution_x,resolution_y);
+    xc constitute.c:712:28 cxx_ne_to_eq               if (resolution_units != (char *) NULL)
+    xc constitute.c:716:27 cxx_ge_to_gt               if (option_type >= 0)
+    xc constitute.c:716:27 cxx_ge_to_lt               if (option_type >= 0)
+    xc constitute.c:762:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc constitute.c:776:32 cxx_eq_to_ne               if (sans_exception->severity == PolicyError)
+    xc constitute.c:777:5 cxx_remove_void_call       InheritException(exception,sans_exception);
+    xc constitute.c:788:20 cxx_ne_to_eq               if ((magick_info != (const MagickInfo *) NULL) &&
+    xc constitute.c:825:25 cxx_eq_to_ne               if (delegate_info == (const DelegateInfo *) NULL)
+     c constitute.c:840:9 cxx_remove_void_call       LockSemaphoreInfo(magick_info->semaphore);
+     c constitute.c:847:9 cxx_remove_void_call       UnlockSemaphoreInfo(magick_info->semaphore);
+    xc constitute.c:852:25 cxx_eq_to_ne               if (delegate_info == (const DelegateInfo *) NULL)
+    xc constitute.c:857:36 cxx_ne_to_eq               if (read_info->temporary != MagickFalse)
+    xc constitute.c:874:51 cxx_eq_to_ne               if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
+    xc constitute.c:878:51 cxx_eq_to_ne               if (GetDelegateThreadSupport(delegate_info) == MagickFalse)
+    xc constitute.c:882:18 cxx_ne_to_eq               if (status != MagickFalse)
+    x  constitute.c:1203:52 cxx_ge_to_gt               if ((slash == (const char *) NULL) || ((slash+1) >= p))
+    x  constitute.c:1206:14 cxx_ge_to_gt               if (offset >= MagickPathExtent)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-constitute.json

@@ -1,0 +1,58 @@
+mutate: 593 mutants in MagickCore/transform\.c$, 23 functions
+  baseline: 2/2 (0s)
+mutate: baseline over 1576 cases in 1s
+  mutants: 25/593 (0s)
+  mutants: 50/593 (1s)
+  mutants: 75/593 (1s)
+  mutants: 100/593 (1s)
+  mutants: 125/593 (2s)
+  mutants: 150/593 (3s)
+  mutants: 175/593 (3s)
+  mutants: 200/593 (4s)
+  mutants: 225/593 (4s)
+  mutants: 250/593 (4s)
+  mutants: 275/593 (4s)
+  mutants: 300/593 (4s)
+  mutants: 325/593 (5s)
+  mutants: 350/593 (5s)
+  mutants: 375/593 (5s)
+  mutants: 400/593 (6s)
+  mutants: 425/593 (6s)
+  mutants: 450/593 (7s)
+  mutants: 475/593 (8s)
+  mutants: 500/593 (8s)
+  mutants: 525/593 (9s)
+  mutants: 550/593 (10s)
+  mutants: 575/593 (11s)
+  mutants: 593/593 (138s)
+
+mutate: 593 mutants, 138s
+  killed 546, survived 0 (0 capped), no coverage 47, errors 0
+  mutation score on reached code: 100.0%   overall: 92.1%
+
+  function                           total killed survived no-cov
+  CropImageToTiles                      80     80        0      0
+  SpliceImage                           76     76        0      0
+  CropImage                             69     69        0      0
+  ChopImage                             67     67        0      0
+  TrimImage                             44     44        0      0
+  TransverseImage                       28     28        0      0
+  ConsolidateCMYKImages                 24      0        0     24
+  FlipImage                             24     24        0      0
+  ExcerptImage                          23      0        0     23
+  FlopImage                             23     23        0      0
+  TransposeImage                        23     23        0      0
+  CopyImageRegion                       19     19        0      0
+  RollImage                             19     19        0      0
+  ShaveImage                            15     15        0      0
+  IsCropOutsideImage                    12     12        0      0
+  IsChopOutsideImage                    10     10        0      0
+  ExtentImage                            8      8        0      0
+  TransformImage                         8      8        0      0
+  CopyPixelChannelsTo                    6      6        0      0
+  ApplySpliceGravity                     6      6        0      0
+  PixelRoundOffset                       4      4        0      0
+  IsSingleRegionCrop                     4      4        0      0
+  AutoOrientImage                        1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-transform.json

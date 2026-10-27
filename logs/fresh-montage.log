@@ -1,0 +1,37 @@
+mutate: 235 mutants in MagickCore/montage\.c$, 17 functions
+mutate: baseline over 49 cases in 1s
+  mutants: 25/235 (0s)
+  mutants: 50/235 (1s)
+  mutants: 75/235 (1s)
+  mutants: 100/235 (1s)
+  mutants: 125/235 (1s)
+  mutants: 150/235 (1s)
+  mutants: 175/235 (2s)
+  mutants: 200/235 (2s)
+  mutants: 225/235 (2s)
+  mutants: 235/235 (2s)
+
+mutate: 235 mutants, 2s
+  killed 235, survived 0 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 100.0%   overall: 100.0%
+
+  function                           total killed survived no-cov
+  MontageImageList                     156    156        0      0
+  AddTileBorder                         10     10        0      0
+  AddTileFrame                           9      9        0      0
+  CloneMontageInfo                       8      8        0      0
+  GetMontageGeometry                     8      8        0      0
+  DestroyMontageInfo                     7      7        0      0
+  GetLargestTileExtent                   7      7        0      0
+  SortImageListByScene                   6      6        0      0
+  GetMaximumLabelLines                   6      6        0      0
+  ParseMontageFrame                      5      5        0      0
+  GetMontageDirectoryExtent              4      4        0      0
+  GetMontageInfo                         2      2        0      0
+  AnnotateMontageTitle                   2      2        0      0
+  AcquireMontageDrawInfo                 2      2        0      0
+  AddTileShadow                          1      1        0      0
+  SceneCompare                           1      1        0      0
+  ReadMontageTexture                     1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-montage.json

@@ -6708,3 +6708,9 @@ nohup: ignoring input
 18:41 fresh distort:   killed 808, survived 287 (232 capped), no coverage 0, errors 0
 18:48 fresh xml-tree:   killed 494, survived 154 (32 capped), no coverage 0, errors 0
 18:52 fresh profile:   killed 467, survived 72 (7 capped), no coverage 22, errors 0
+18:52 pushed
+18:55 fresh constitute:   killed 218, survived 45 (25 capped), no coverage 11, errors 0
+18:57 fresh transform:   killed 546, survived 0 (0 capped), no coverage 47, errors 0
+19:01 fresh quantize:   killed 930, survived 0 (0 capped), no coverage 2, errors 0
+19:01 fresh montage:   killed 235, survived 0 (0 capped), no coverage 0, errors 0
+19:04 fresh cache:   killed 945, survived 0 (0 capped), no coverage 2, errors 0

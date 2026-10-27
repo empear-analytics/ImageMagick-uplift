@@ -1,0 +1,108 @@
+mutate: 932 mutants in MagickCore/quantize\.c$, 58 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 13122 cases in 31s
+  mutants: 25/932 (1s)
+  mutants: 50/932 (1s)
+  mutants: 75/932 (2s)
+  mutants: 100/932 (3s)
+  mutants: 125/932 (3s)
+  mutants: 150/932 (4s)
+  mutants: 175/932 (4s)
+  mutants: 200/932 (5s)
+  mutants: 225/932 (6s)
+  mutants: 250/932 (6s)
+  mutants: 275/932 (7s)
+  mutants: 300/932 (7s)
+  mutants: 325/932 (7s)
+  mutants: 350/932 (8s)
+  mutants: 375/932 (8s)
+  mutants: 400/932 (9s)
+  mutants: 425/932 (9s)
+  mutants: 450/932 (10s)
+  mutants: 475/932 (12s)
+  mutants: 500/932 (13s)
+  mutants: 525/932 (14s)
+  mutants: 550/932 (16s)
+  mutants: 575/932 (17s)
+  mutants: 600/932 (19s)
+  mutants: 625/932 (20s)
+  mutants: 650/932 (22s)
+  mutants: 675/932 (25s)
+  mutants: 700/932 (27s)
+  mutants: 725/932 (27s)
+  mutants: 750/932 (30s)
+  mutants: 775/932 (32s)
+  mutants: 800/932 (36s)
+  mutants: 825/932 (39s)
+  mutants: 850/932 (44s)
+  mutants: 875/932 (52s)
+  mutants: 900/932 (59s)
+  mutants: 925/932 (141s)
+  mutants: 932/932 (189s)
+
+mutate: 932 mutants, 189s
+  killed 930, survived 0 (0 capped), no coverage 2, errors 0
+  mutation score on reached code: 100.0%   overall: 99.8%
+
+  function                           total killed survived no-cov
+  FloydSteinbergDither                 119    119        0      0
+  ClassifyImageColors                  104    104        0      0
+  KmeansImage                           86     86        0      0
+  PosterizeImage                        54     54        0      0
+  AssignImageColors                     51     51        0      0
+  Riemersma                             49     49        0      0
+  RiemersmaDither                       44     44        0      0
+  DefineImageColormap                   36     36        0      0
+  SetGrayscaleImage                     35     35        0      0
+  GetImageQuantizeError                 27     27        0      0
+  KmeansMetric                          26     26        0      0
+  ClosestColor                          24     24        0      0
+  QuantizeImages                        21     21        0      0
+  Reduce                                14     14        0      0
+  GetQCubeInfo                          13     13        0      0
+  QuantizeImage                         12     12        0      0
+  SetRapidReductionThreshold            11     11        0      0
+  ReduceImageColors                     11     11        0      0
+  DitherImage                            9      9        0      0
+  PruneToCubeDepth                       9      9        0      0
+  GetQuantizeTreeDepth                   9      9        0      0
+  IsDitherPositionInImage                8      8        0      0
+  PruneChild                             8      8        0      0
+  PruneLevel                             8      8        0      0
+  QuantizeErrorFlatten                   8      8        0      0
+  GetPixelRunLength                      7      7        0      0
+  ParseKmeansSeedColors                  7      7        0      0
+  RemapImage                             7      7        0      0
+  RemapImages                            7      7        0      0
+  AssociateAlphaPixel                    6      6        0      0
+  AssociateAlphaPixelInfo                6      6        0      0
+  DestroyQCubeInfo                       6      6        0      0
+  AcquirePixelTLS                        6      6        0      0
+  AcquireKmeansTLS                       6      6        0      0
+  SeedKmeansRandomColors                 5      5        0      0
+  PosterizePixel                         5      5        0      0
+  IsPosterizeDitherMap                   5      5        0      0
+  QuantizeErrorCompare                   5      5        0      0
+  IntensityCompare                       5      5        0      0
+  CompactGrayscaleColormap               5      5        0      0
+  SetImageColormap                       5      5        0      0
+  AcquireQuantizeInfo                    4      4        0      0
+  DestroyPixelTLS                        4      4        0      0
+  GetQNodeInfo                           4      4        0      0
+  DestroyKmeansTLS                       4      4        0      0
+  MagickRound                            4      4        0      0
+  SortGrayscaleColormap                  4      4        0      0
+  IsTwoColorGrayQuantize                 3      3        0      0
+  CompressImageColormap                  3      3        0      0
+  SetAssociatedAlpha                     2      2        0      0
+  CloneQuantizeInfo                      2      2        0      0
+  GetCacheEntry                          2      2        0      0
+  WrapHueDistance                        2      0        0      2
+  ColorToQNodeId                         1      1        0      0
+  DestroyQuantizeInfo                    1      1        0      0
+  CacheOffset                            1      1        0      0
+  GetQuantizeInfo                        1      1        0      0
+  DominantColorCompare                   1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-quantize.json

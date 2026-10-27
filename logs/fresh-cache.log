@@ -1,0 +1,139 @@
+mutate: 947 mutants in MagickCore/cache\.c$, 89 functions
+  baseline: 7/7 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/947 (1s)
+  mutants: 50/947 (1s)
+  mutants: 75/947 (1s)
+  mutants: 100/947 (1s)
+  mutants: 125/947 (2s)
+  mutants: 150/947 (2s)
+  mutants: 175/947 (2s)
+  mutants: 200/947 (3s)
+  mutants: 225/947 (3s)
+  mutants: 250/947 (3s)
+  mutants: 275/947 (4s)
+  mutants: 300/947 (4s)
+  mutants: 325/947 (5s)
+  mutants: 350/947 (5s)
+  mutants: 375/947 (6s)
+  mutants: 400/947 (6s)
+  mutants: 425/947 (6s)
+  mutants: 450/947 (7s)
+  mutants: 475/947 (7s)
+  mutants: 500/947 (7s)
+  mutants: 525/947 (8s)
+  mutants: 550/947 (8s)
+  mutants: 575/947 (9s)
+  mutants: 600/947 (9s)
+  mutants: 625/947 (10s)
+  mutants: 650/947 (10s)
+  mutants: 675/947 (10s)
+  mutants: 700/947 (10s)
+  mutants: 725/947 (11s)
+  mutants: 750/947 (11s)
+  mutants: 775/947 (11s)
+  mutants: 800/947 (12s)
+  mutants: 825/947 (12s)
+  mutants: 850/947 (13s)
+  mutants: 875/947 (13s)
+  mutants: 900/947 (13s)
+  mutants: 925/947 (13s)
+  mutants: 947/947 (133s)
+
+mutate: 947 mutants, 133s
+  killed 945, survived 0 (0 capped), no coverage 2, errors 0
+  mutation score on reached code: 100.0%   overall: 99.8%
+
+  function                           total killed survived no-cov
+  OpenPixelCache                        96     96        0      0
+  GetVirtualPixelCacheNexus             93     93        0      0
+  ReadPixelCachePixels                  53     53        0      0
+  ClonePixelCacheRepository             51     51        0      0
+  WritePixelCacheMetacontent            50     50        0      0
+  ReadPixelCacheMetacontent             49     49        0      0
+  WritePixelCachePixels                 46     46        0      0
+  SetPixelCacheNexusPixels              35     35        0      0
+  GetImagePixelCache                    33     33        0      0
+  ClonePixelCacheOnDisk                 32     32        0      0
+  ClipPixelCacheNexus                   23     23        0      0
+  MaskPixelCacheNexus                   17     17        0      0
+  QueueAuthenticPixelCacheNexus         17     17        0      0
+  IsDirectCacheRegion                   15     15        0      0
+  SetPixelCacheExtent                   14     14        0      0
+  PersistPixelCache                     14     14        0      0
+  SyncAuthenticPixelCacheNexus          13     13        0      0
+  IsRegionInsideCache                   12     12        0      0
+  IsCacheMorphologyChanged              11     11        0      0
+  SetPixelCacheMethods                  11     11        0      0
+  AcquirePixelCacheNexus                10     10        0      0
+  IsOffsetSumOverflow                   10     10        0      0
+  IsOutsideCachePixel                   10     10        0      0
+  SetCacheAlphaChannel                  10     10        0      0
+  IsSameCacheMorphology                  9      9        0      0
+  RelinquishPixelCachePixels             9      9        0      0
+  IsOffsetOutsideCache                   9      9        0      0
+  DestroyPixelCache                      8      8        0      0
+  SetPixelCacheVirtualMethod             8      8        0      0
+  AcquirePixelCache                      7      7        0      0
+  RelinquishPixelCacheResources          7      7        0      0
+  DitherX                                7      7        0      0
+  DitherY                                7      7        0      0
+  DestroyPixelCacheNexus                 6      6        0      0
+  GetPixelCacheTileSize                  6      6        0      0
+  VirtualPixelModulo                     6      6        0      0
+  CacheOverflowSanityCheckGetSize        6      6        0      0
+  WritePixelCacheRegion                  6      6        0      0
+  ReadPixelCacheRegion                   6      6        0      0
+  AcquireCacheNexusPixels                6      6        0      0
+  GetAuthenticPixelCacheNexus            5      5        0      0
+  EdgeX                                  5      5        0      0
+  EdgeY                                  5      5        0      0
+  ApplyPixelCompositeMask                5      5        0      0
+  OpenPixelCacheOnDisk                   5      5        0      0
+  IsCacheGeometryInvalid                 5      5        0      0
+  ReshapePixelCache                      5      5        0      0
+  IsMemoryCachePair                      4      4        0      0
+  CopyPixel                              4      4        0      0
+  IsMemoryCacheCandidate                 4      4        0      0
+  CacheComponentTerminus                 3      3        0      0
+  ClosePixelCacheOnDisk                  3      3        0      0
+  GetOneVirtualPixelInfo                 3      3        0      0
+  GetPixelCacheNexusExtent               3      3        0      0
+  IsCacheClonePending                    3      3        0      0
+  ReferencePixelCache                    3      3        0      0
+  PrefetchPixelCacheNexusPixels          3      3        0      0
+  IsUnbufferedMemoryCache                3      3        0      0
+  AcquirePixelCachePixels                2      2        0      0
+  DestroyImagePixelCache                 2      0        0      2
+  DestroyImagePixels                     2      2        0      0
+  GetDynamicThrottlePolicy               2      2        0      0
+  GetPixelCachePixels                    2      2        0      0
+  GetVirtualMetacontent                  2      2        0      0
+  OpenPixelCacheFile                     2      2        0      0
+  CacheComponentGenesis                  1      1        0      0
+  ClonePixelCache                        1      1        0      0
+  ClonePixelCacheMethods                 1      1        0      0
+  RelinquishCacheNexusPixels             1      1        0      0
+  GetAuthenticMetacontent                1      1        0      0
+  GetAuthenticPixelQueue                 1      1        0      0
+  GetAuthenticPixels                     1      1        0      0
+  GetAuthenticPixelsCache                1      1        0      0
+  GetImageExtent                         1      1        0      0
+  ValidatePixelCacheMorphology           1      1        0      0
+  GetOneAuthenticPixel                   1      1        0      0
+  GetOneVirtualPixel                     1      1        0      0
+  GetPixelCacheColorspace                1      1        0      0
+  GetPixelCacheStorageClass              1      1        0      0
+  GetVirtualMetacontentFromNexus         1      1        0      0
+  IsOffsetOverflow                       1      1        0      0
+  RandomX                                1      1        0      0
+  RandomY                                1      1        0      0
+  GetVirtualPixelQueue                   1      1        0      0
+  GetVirtualPixels                       1      1        0      0
+  GetVirtualPixelsNexus                  1      1        0      0
+  QueueAuthenticPixels                   1      1        0      0
+  SyncAuthenticPixels                    1      1        0      0
+  SyncImagePixelCache                    1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-cache.json
