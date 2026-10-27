@@ -4447,6 +4447,45 @@ static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void DisassociateQuantumAlpha(const Image *image,CacheView *image_view,
+  const MagickSizeType number_pixels)
+{
+  double
+    gamma,
+    Sa;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  /*
+    Disassociate alpha.
+  */
+  q=GetAuthenticPixelQueue(image);
+  if (image_view != (CacheView *) NULL)
+    q=GetCacheViewAuthenticPixelQueue(image_view);
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    ssize_t
+      i;
+
+    Sa=QuantumScale*(double) GetPixelAlpha(image,q);
+    gamma=MagickSafeReciprocal(Sa);
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((channel == AlphaPixelChannel) ||
+          ((traits & UpdatePixelTrait) == 0))
+        continue;
+      q[i]=ClampToQuantum(gamma*(double) q[i]);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport size_t ImportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,const unsigned char *magick_restrict pixels,
@@ -4627,35 +4666,6 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       }
     }
   if (quantum_info->alpha_type == AssociatedQuantumAlpha)
-    {
-      double
-        gamma,
-        Sa;
-
-      /*
-        Disassociate alpha.
-      */
-      q=GetAuthenticPixelQueue(image);
-      if (image_view != (CacheView *) NULL)
-        q=GetCacheViewAuthenticPixelQueue(image_view);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        ssize_t
-          i;
-
-        Sa=QuantumScale*(double) GetPixelAlpha(image,q);
-        gamma=MagickSafeReciprocal(Sa);
-        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-        {
-          PixelChannel channel = GetPixelChannelChannel(image,i);
-          PixelTrait traits = GetPixelChannelTraits(image,channel);
-          if ((channel == AlphaPixelChannel) ||
-              ((traits & UpdatePixelTrait) == 0))
-            continue;
-          q[i]=ClampToQuantum(gamma*(double) q[i]);
-        }
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
-    }
+    DisassociateQuantumAlpha(image,image_view,number_pixels);
   return(extent);
 }
