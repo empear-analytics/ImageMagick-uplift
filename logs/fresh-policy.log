@@ -1,0 +1,55 @@
+mutate: 274 mutants in MagickCore/policy\.c$, 26 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/274 (1s)
+  mutants: 50/274 (1s)
+  mutants: 75/274 (2s)
+  mutants: 100/274 (3s)
+  mutants: 125/274 (3s)
+  mutants: 150/274 (4s)
+  mutants: 175/274 (5s)
+  mutants: 200/274 (5s)
+  mutants: 225/274 (6s)
+  mutants: 250/274 (6s)
+  mutants: 274/274 (134s)
+
+mutate: 274 mutants, 134s
+  killed 239, survived 3 (0 capped), no coverage 32, errors 0
+  mutation score on reached code: 98.8%   overall: 87.2%
+
+  function                           total killed survived no-cov
+  IsRightsAuthorizedByName              43     43        0      0
+  LoadPolicyCache                       37     37        0      0
+  IsPathContainsSymlink                 29     29        0      0
+  SetMagickSecurityPolicyValue          20      0        0     20
+  GetPolicyInfo                         19     19        0      0
+  ListPolicyInfo                        15     15        0      0
+  AcquirePolicyCache                    12     12        0      0
+  GetPolicyInfoList                     11     10        1      0
+  GetPolicyList                         11      9        2      0
+  SetMagickSecurityPolicy               10      0        0     10
+  AcquirePolicyString                    8      8        0      0
+  IsPathAuthorized                       8      8        0      0
+  IsPolicyCacheInstantiated              7      7        0      0
+  IsEffectiveRightsAuthorized            6      6        0      0
+  SetPolicyInfoAttribute                 6      6        0      0
+  PolicyComponentTerminus                6      6        0      0
+  DestroyPolicyElement                   5      5        0      0
+  GetPolicyValue                         4      4        0      0
+  IsNewPolicyPath                        3      3        0      0
+  IsLimitPolicyDomain                    3      3        0      0
+  IsIncludeElementOpen                   3      3        0      0
+  GetIncludePath                         3      3        0      0
+  ValidateSecurityPolicy                 2      0        0      2
+  IsPolicyPathSeparator                  1      1        0      0
+  IsCanonicalRightsAuthorized            1      1        0      0
+  PolicyComponentGenesis                 1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  policy.c:400:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  policy.c:496:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  policy.c:502:50 cxx_add_to_sub             GetNumberOfElementsInLinkedList(policy_cache)+1UL,sizeof(*policies));
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-policy.json

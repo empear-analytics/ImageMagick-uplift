@@ -1,0 +1,71 @@
+mutate: 379 mutants in MagickCore/string\.c$, 43 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/379 (1s)
+  mutants: 50/379 (1s)
+  mutants: 75/379 (2s)
+  mutants: 100/379 (2s)
+  mutants: 125/379 (3s)
+  mutants: 150/379 (3s)
+  mutants: 175/379 (4s)
+  mutants: 200/379 (4s)
+  mutants: 225/379 (4s)
+  mutants: 250/379 (5s)
+  mutants: 275/379 (5s)
+  mutants: 300/379 (8s)
+  mutants: 325/379 (13s)
+  mutants: 350/379 (14s)
+  mutants: 375/379 (130s)
+  mutants: 379/379 (134s)
+
+mutate: 379 mutants, 134s
+  killed 375, survived 0 (0 capped), no coverage 4, errors 0
+  mutation score on reached code: 100.0%   overall: 98.9%
+
+  function                           total killed survived no-cov
+  StringToStrings                       57     57        0      0
+  StringToArgv                          26     26        0      0
+  CopyMagickString                      20     20        0      0
+  StripMagickString                     20     20        0      0
+  ConfigureFileToStringInfo             19     19        0      0
+  PrintStringInfoHexLine                18     18        0      0
+  SubstituteString                      15     15        0      0
+  EscapeString                          14     14        0      0
+  InterpretSiPrefixValue                12     12        0      0
+  CountArgvArguments                    12     12        0      0
+  StringToArrayOfDoubles                11     11        0      0
+  ConcatenateMagickString               10     10        0      0
+  CloneString                            9      9        0      0
+  ConcatenateString                      9      9        0      0
+  FormatMagickSize                       9      9        0      0
+  ConcatenateStringInfo                  8      8        0      0
+  AcquireString                          7      7        0      0
+  ConstantString                         7      7        0      0
+  PrintStringInfo                        7      7        0      0
+  SetStringInfoLength                    7      7        0      0
+  SplitStringInfo                        7      7        0      0
+  StringInfoToHexString                  7      7        0      0
+  AcquireStringInfo                      6      6        0      0
+  BlobToStringInfo                       6      6        0      0
+  FindUnprintableChar                    6      6        0      0
+  FileToString                           5      5        0      0
+  IsStringTrue                           5      5        0      0
+  IsStringFalse                          5      5        0      0
+  StringInfoToString                     5      5        0      0
+  CompareStringInfo                      4      4        0      0
+  StringToken                            4      4        0      0
+  DestroyStringInfo                      3      3        0      0
+  SkipValueSeparator                     3      3        0      0
+  CountTextLines                         3      3        0      0
+  CloneStringInfo                        2      2        0      0
+  DestroyStringList                      2      0        0      2
+  FileToStringInfo                       2      2        0      0
+  StringInfoToDigest                     2      0        0      2
+  GetEnvironmentValue                    1      1        0      0
+  SanitizeString                         1      1        0      0
+  SetStringInfo                          1      1        0      0
+  SetStringInfoDatum                     1      1        0      0
+  StringToStringInfo                     1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-string.json

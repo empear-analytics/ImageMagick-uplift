@@ -1,0 +1,48 @@
+mutate: 116 mutants in MagickCore/linked-list\.c$, 22 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/116 (1s)
+  mutants: 50/116 (1s)
+  mutants: 75/116 (2s)
+  mutants: 100/116 (131s)
+  mutants: 116/116 (261s)
+
+mutate: 116 mutants, 261s
+  killed 110, survived 6 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 94.8%   overall: 94.8%
+
+  function                           total killed survived no-cov
+  InsertValueInSortedLinkedList         17     17        0      0
+  InsertValueInLinkedList               15     14        1      0
+  GetValueFromLinkedList                12     11        1      0
+  RemoveElementByValueFromLinkedList    10     10        0      0
+  AppendValueToLinkedList                7      7        0      0
+  RemoveElementFromLinkedList            6      6        0      0
+  RemoveLastElementFromLinkedList        6      5        1      0
+  DestroyLinkedList                      5      5        0      0
+  LinkedListToArray                      5      5        0      0
+  UnlinkInteriorElement                  5      4        1      0
+  ClearLinkedList                        4      4        0      0
+  GetNextValueInLinkedList               4      4        0      0
+  InsertElementAt                        4      3        1      0
+  SetHeadElementInLinkedList             4      4        0      0
+  GetLastValueInLinkedList               3      3        0      0
+  UnlinkNextElement                      2      2        0      0
+  ResetLinkedListIterator                2      2        0      0
+  PrependElement                         1      1        0      0
+  AppendElement                          1      1        0      0
+  InsertFirstElement                     1      0        1      0
+  IsLinkedListEmpty                      1      1        0      0
+  NewLinkedList                          1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  linked-list.c:427:36 cxx_sub_to_add             if (index == (list_info->elements-1))
+    x  linked-list.c:459:23 cxx_eq_to_ne               if (list_info->next == next->next)
+    x  linked-list.c:481:23 cxx_eq_to_ne               if (list_info->next == (ElementInfo *) NULL)
+    x  linked-list.c:544:11 cxx_remove_void_call       InsertElementAt(list_info,next,index);
+    x  linked-list.c:895:23 cxx_eq_to_ne               if (list_info->next == element)
+    x  linked-list.c:965:23 cxx_eq_to_ne               if (list_info->next == list_info->tail)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-linked-list.json

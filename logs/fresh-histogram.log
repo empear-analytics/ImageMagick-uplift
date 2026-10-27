@@ -1,0 +1,42 @@
+mutate: 195 mutants in MagickCore/histogram\.c$, 24 functions
+mutate: baseline over 357 cases in 1s
+  mutants: 25/195 (0s)
+  mutants: 50/195 (1s)
+  mutants: 75/195 (1s)
+  mutants: 100/195 (1s)
+  mutants: 125/195 (1s)
+  mutants: 150/195 (2s)
+  mutants: 175/195 (3s)
+  mutants: 195/195 (133s)
+
+mutate: 195 mutants, 133s
+  killed 195, survived 0 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 100.0%   overall: 100.0%
+
+  function                           total killed survived no-cov
+  CheckImageColors                      39     39        0      0
+  ClassifyImageColors                   29     29        0      0
+  IsPixelInfoColorMatch                 18     18        0      0
+  UniqueColorsToImage                   18     18        0      0
+  MinMaxStretchImage                    13     13        0      0
+  GetNumberColors                       12     12        0      0
+  DefineImageHistogram                  10     10        0      0
+  DestroyColorCube                       7      7        0      0
+  FormatColorTuple                       7      7        0      0
+  HistogramCompare                       7      7        0      0
+  SetUniqueColorPixel                    6      6        0      0
+  GetImageHistogram                      4      4        0      0
+  IsPaletteImage                         4      4        0      0
+  UniqueImageColors                      4      4        0      0
+  GrowColorList                          3      3        0      0
+  DestroyHCubeInfo                       2      2        0      0
+  GetHCubeInfo                           2      2        0      0
+  GetHNodeInfo                           2      2        0      0
+  ExtendColorList                        2      2        0      0
+  SetColorListEntry                      2      2        0      0
+  ColorToNodeId                          1      1        0      0
+  IdentifyPaletteImage                   1      1        0      0
+  IsHistogramImage                       1      1        0      0
+  CountImageColors                       1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-histogram.json

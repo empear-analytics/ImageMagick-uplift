@@ -6726,3 +6726,9 @@ nohup: ignoring input
 19:29 fresh delegate:   killed 306, survived 9 (0 capped), no coverage 15, errors 0
 19:33 fresh compress:   killed 234, survived 0 (0 capped), no coverage 0, errors 0
 19:36 fresh threshold:   killed 579, survived 1 (0 capped), no coverage 0, errors 0
+19:36 pushed
+19:39 fresh string:   killed 375, survived 0 (0 capped), no coverage 4, errors 0
+19:42 fresh policy:   killed 239, survived 3 (0 capped), no coverage 32, errors 0
+19:45 fresh list:   killed 148, survived 3 (0 capped), no coverage 17, errors 0
+19:50 fresh linked-list:   killed 110, survived 6 (0 capped), no coverage 0, errors 0
+19:52 fresh histogram:   killed 195, survived 0 (0 capped), no coverage 0, errors 0
