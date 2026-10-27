@@ -4281,6 +4281,45 @@ MagickExport Image *SpreadImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline void UnsharpPixelChannels(const Image *image,
+  const Image *unsharp_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q,const double quantum_threshold,const double gain)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      pixel;
+
+    PixelChannel
+      channel;
+
+    PixelTrait
+      traits,
+      unsharp_traits;
+
+    channel=GetPixelChannelChannel(image,i);
+    traits=GetPixelChannelTraits(image,channel);
+    unsharp_traits=GetPixelChannelTraits(unsharp_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (unsharp_traits == UndefinedPixelTrait))
+      continue;
+    if ((unsharp_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(unsharp_image,channel,p[i],q);
+        continue;
+      }
+    pixel=(double) p[i]-(double) GetPixelChannel(unsharp_image,channel,q);
+    if (fabs(2.0*pixel) < quantum_threshold)
+      pixel=(double) p[i];
+    else
+      pixel=(double) p[i]+gain*pixel;
+    SetPixelChannel(unsharp_image,channel,ClampToQuantum(pixel),q);
+  }
+}
+
 MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
   const double sigma,const double gain,const double threshold,
   ExceptionInfo *exception)
@@ -4358,39 +4397,7 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits,
-          unsharp_traits;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        unsharp_traits=GetPixelChannelTraits(unsharp_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (unsharp_traits == UndefinedPixelTrait))
-          continue;
-        if ((unsharp_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(unsharp_image,channel,p[i],q);
-            continue;
-          }
-        pixel=(double) p[i]-(double) GetPixelChannel(unsharp_image,channel,q);
-        if (fabs(2.0*pixel) < quantum_threshold)
-          pixel=(double) p[i];
-        else
-          pixel=(double) p[i]+gain*pixel;
-        SetPixelChannel(unsharp_image,channel,ClampToQuantum(pixel),q);
-      }
+      UnsharpPixelChannels(image,unsharp_image,p,q,quantum_threshold,gain);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(unsharp_image);
     }
