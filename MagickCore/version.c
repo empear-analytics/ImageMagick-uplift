@@ -98,10 +98,8 @@ MagickExport const char *GetMagickCopyright(void)
 %  No parameters are required.
 %
 */
-MagickExport const char *GetMagickDelegates(void)
-{
-  static const char
-    *delegates=""
+static const char
+  *delegates=""
 #if defined(MAGICKCORE_AUTOTRACE_DELEGATE)
   " autotrace"
 #endif
@@ -224,6 +222,9 @@ MagickExport const char *GetMagickDelegates(void)
   " zstd"
 #endif
   ;
+
+MagickExport const char *GetMagickDelegates(void)
+{
   if (*delegates == '\0')
     return(delegates);
   return(delegates+1);
