@@ -746,9 +746,6 @@ static void CopyBackMatrix(double **matrix,long double **hp_matrix,
       matrix[i][j]=(double)hp_matrix[i][j];
 }
 
-MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
-  double **vectors,const size_t rank,const size_t number_vectors)
-{
 #define GaussJordanSwap(x,y) \
 { \
   double temp = (x); \
@@ -774,6 +771,10 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     columns=(ssize_t *) RelinquishMagickMemory(columns); \
   return(MagickFalse); \
 }
+
+MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
+  double **vectors,const size_t rank,const size_t number_vectors)
+{
 
   long double
     **hp_matrix = (long double **) NULL,
