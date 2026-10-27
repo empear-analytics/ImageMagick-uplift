@@ -1,0 +1,32 @@
+mutate: 95 mutants in MagickCore/quantum\.c$, 16 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 14643 cases in 31s
+  mutants: 25/95 (1s)
+  mutants: 50/95 (1s)
+  mutants: 75/95 (2s)
+  mutants: 95/95 (2s)
+
+mutate: 95 mutants, 2s
+  killed 95, survived 0 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 100.0%   overall: 100.0%
+
+  function                           total killed survived no-cov
+  SetQuantumExtent                      14     14        0      0
+  GetQuantumExtent                      13     13        0      0
+  AcquireQuantumPixels                  10     10        0      0
+  GetQuantumInfo                         9      9        0      0
+  GetQuantumType                         9      9        0      0
+  SetQuantumDepth                        8      8        0      0
+  SetQuantumScaleFromRange               6      6        0      0
+  SetQuantumMetaChannel                  5      5        0      0
+  DestroyQuantumInfo                     4      4        0      0
+  DestroyQuantumPixels                   4      4        0      0
+  SetQuantumPad                          4      4        0      0
+  AcquireQuantumInfo                     3      3        0      0
+  ResetQuantumState                      2      2        0      0
+  SetQuantumImageType                    2      2        0      0
+  SetQuantumEndian                       1      1        0      0
+  SetQuantumFormat                       1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-quantum.json

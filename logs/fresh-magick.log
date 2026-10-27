@@ -1,0 +1,61 @@
+mutate: 188 mutants in MagickCore/magick\.c$, 34 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/188 (1s)
+  mutants: 50/188 (1s)
+  mutants: 75/188 (1s)
+  mutants: 100/188 (1s)
+  mutants: 125/188 (2s)
+  mutants: 150/188 (2s)
+  mutants: 175/188 (3s)
+  mutants: 188/188 (132s)
+
+mutate: 188 mutants, 132s
+  killed 146, survived 4 (0 capped), no coverage 38, errors 0
+  mutation score on reached code: 97.3%   overall: 77.7%
+
+  function                           total killed survived no-cov
+  MagickCoreTerminus                    25     25        0      0
+  MagickSignalHandler                   18      0        0     18
+  ListMagickInfo                        15     14        1      0
+  GetMagickInfoList                     12      9        3      0
+  GetMagickList                         12      0        0     12
+  GetMagickInfo                         11     11        0      0
+  EstablishSignalHandlers               10     10        0      0
+  MagickCoreGenesis                      9      9        0      0
+  SetMagickPrecision                     9      9        0      0
+  GetImageMagick                         8      0        0      8
+  DestroyMagickNode                      8      8        0      0
+  IsMagickTreeInstantiated               7      7        0      0
+  UnregisterMagickInfo                   7      7        0      0
+  MagickComponentTerminus                6      6        0      0
+  SetClientNameAndPath                   5      5        0      0
+  RegisterMagickInfo                     4      4        0      0
+  PrintMagickNote                        3      3        0      0
+  SetMagickSignalHandler                 2      2        0      0
+  RegisterMagickSignalHandler            2      2        0      0
+  AcquireMagickInfo                      1      1        0      0
+  GetImageDecoder                        1      1        0      0
+  GetImageEncoder                        1      1        0      0
+  GetMagickAdjoin                        1      1        0      0
+  GetMagickBlobSupport                   1      1        0      0
+  GetMagickDecoderSeekableStream         1      1        0      0
+  GetMagickDecoderThreadSupport          1      1        0      0
+  GetMagickEncoderSeekableStream         1      1        0      0
+  GetMagickEncoderThreadSupport          1      1        0      0
+  GetMagickEndianSupport                 1      1        0      0
+  GetMagickPrecision                     1      1        0      0
+  GetMagickRawSupport                    1      1        0      0
+  GetMagickStealth                       1      1        0      0
+  GetMagickUseExtension                  1      1        0      0
+  MagickComponentGenesis                 1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  magick.c:712:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  magick.c:719:45 cxx_add_to_sub             GetNumberOfNodesInSplayTree(magick_list)+1UL,sizeof(*formats));
+    x  magick.c:736:3 cxx_remove_void_call       qsort((void *) formats,(size_t) i,sizeof(*formats),MagickInfoCompare);
+    x  magick.c:1206:3 cxx_remove_void_call       ClearMagickException(exception);
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-magick.json

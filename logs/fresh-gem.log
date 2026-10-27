@@ -1,0 +1,22 @@
+mutate: 114 mutants in MagickCore/gem\.c$, 5 functions
+  baseline: 1/1 (30s)
+mutate: 1 case(s) time out unmutated and are left out: opencl/2124a0eb45
+mutate: baseline over 1298 cases in 31s
+  mutants: 25/114 (0s)
+  mutants: 50/114 (0s)
+  mutants: 75/114 (1s)
+  mutants: 100/114 (1s)
+  mutants: 114/114 (131s)
+
+mutate: 114 mutants, 131s
+  killed 114, survived 0 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 100.0%   overall: 100.0%
+
+  function                           total killed survived no-cov
+  GenerateDifferentialNoise             43     43        0      0
+  GetOptimalKernelWidth2D               34     34        0      0
+  GetOptimalKernelWidth1D               27     27        0      0
+  GenerateGaussianNoise                  9      9        0      0
+  ExpandAffine                           1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-gem.json

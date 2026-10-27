@@ -1,0 +1,56 @@
+mutate: 193 mutants in MagickCore/locale\.c$, 28 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/193 (0s)
+  mutants: 50/193 (1s)
+  mutants: 75/193 (1s)
+  mutants: 100/193 (1s)
+  mutants: 125/193 (1s)
+  mutants: 150/193 (2s)
+  mutants: 175/193 (2s)
+  mutants: 193/193 (131s)
+
+mutate: 193 mutants, 131s
+  killed 184, survived 5 (0 capped), no coverage 4, errors 0
+  mutation score on reached code: 97.4%   overall: 95.3%
+
+  function                           total killed survived no-cov
+  LoadLocaleCache                       62     62        0      0
+  IsLocaleTreeInstantiated              13     13        0      0
+  GetLocaleInfoList                     12     10        2      0
+  GetLocaleList                         11      9        2      0
+  ListLocaleInfo                        10     10        0      0
+  ChopLocaleComponents                  10     10        0      0
+  LocaleNCompare                        10     10        0      0
+  LocaleCompare                          8      8        0      0
+  GetLocaleInfo_                         7      7        0      0
+  LocaleComponentTerminus                7      7        0      0
+  GetLocaleOptions                       6      6        0      0
+  AcquireLocaleSplayTree                 4      4        0      0
+  FormatLocaleStringList                 4      4        0      0
+  InterpretLocaleValue                   4      4        0      0
+  DestroyLocaleNode                      3      3        0      0
+  GetLocaleMessage                       3      3        0      0
+  LocaleFatalErrorHandler                3      0        0      3
+  IsIncludeElementOpen                   3      3        0      0
+  GetIncludePath                         3      3        0      0
+  DestroyCLocale                         2      2        0      0
+  AcquireCLocale                         1      1        0      0
+  DestroyLocaleOptions                   1      1        0      0
+  FormatLocaleFileList                   1      1        0      0
+  LocaleInfoCompare                      1      0        1      0
+  GetLocaleValue                         1      0        0      1
+  LocaleLower                            1      1        0      0
+  LocaleUpper                            1      1        0      0
+  LocaleComponentGenesis                 1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  locale.c:599:44 cxx_eq_to_ne               if (LocaleCompare((*p)->path,(*q)->path) == 0)
+    x  locale.c:625:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  locale.c:649:3 cxx_remove_void_call       qsort((void *) messages,(size_t) i,sizeof(*messages),LocaleInfoCompare);
+    x  locale.c:721:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  locale.c:741:3 cxx_remove_void_call       qsort((void *) messages,(size_t) i,sizeof(*messages),LocaleTagCompare);
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-locale.json
