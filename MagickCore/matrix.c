@@ -772,6 +772,19 @@ static void CopyBackMatrix(double **matrix,long double **hp_matrix,
   return(MagickFalse); \
 }
 
+static void UnscrambleColumns(long double **hp_matrix,const size_t rank,
+  const ssize_t *columns,const ssize_t *rows)
+{
+  ssize_t
+    i,
+    j;
+
+  for (j=(ssize_t) rank-1; j >= 0; j--)
+    if (columns[j] != rows[j])
+      for (i=0; i < (ssize_t) rank; i++)
+        GaussJordanSwapLD(hp_matrix[i][columns[j]],hp_matrix[i][rows[j]]);
+}
+
 MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
   double **vectors,const size_t rank,const size_t number_vectors)
 {
@@ -866,10 +879,7 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
             vectors[k][j]-=(double)(scale*(long double) vectors[k][column]);
         }
   }
-  for (j=(ssize_t) rank-1; j >= 0; j--)
-    if (columns[j] != rows[j])
-      for (i=0; i < (ssize_t) rank; i++)
-        GaussJordanSwapLD(hp_matrix[i][columns[j]],hp_matrix[i][rows[j]]);
+  UnscrambleColumns(hp_matrix,rank,columns,rows);
   /*
     Copy back the result to the original matrix.
   */
