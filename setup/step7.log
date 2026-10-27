@@ -6702,3 +6702,9 @@ nohup: ignoring input
 17:12 fresh image:   killed 465, survived 232 (186 capped), no coverage 40, errors 0
 17:26 fresh fx:   killed 828, survived 160 (132 capped), no coverage 3, errors 0
 17:52 fresh draw:   killed 1914, survived 558 (332 capped), no coverage 92, errors 0
+17:52 pushed
+18:01 fresh color:   killed 323, survived 107 (79 capped), no coverage 22, errors 0
+18:12 fresh statistic:   killed 776, survived 148 (43 capped), no coverage 3, errors 0
+18:41 fresh distort:   killed 808, survived 287 (232 capped), no coverage 0, errors 0
+18:48 fresh xml-tree:   killed 494, survived 154 (32 capped), no coverage 0, errors 0
+18:52 fresh profile:   killed 467, survived 72 (7 capped), no coverage 22, errors 0

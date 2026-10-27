@@ -1,0 +1,371 @@
+mutate: 1095 mutants in MagickCore/distort\.c$, 27 functions
+mutate: baseline over 598 cases in 1s
+  mutants: 25/1095 (1s)
+  mutants: 50/1095 (7s)
+  mutants: 75/1095 (16s)
+  mutants: 100/1095 (25s)
+  mutants: 125/1095 (29s)
+  mutants: 150/1095 (33s)
+  mutants: 175/1095 (57s)
+  mutants: 200/1095 (130s)
+  mutants: 225/1095 (151s)
+  mutants: 250/1095 (190s)
+  mutants: 275/1095 (226s)
+  mutants: 300/1095 (250s)
+  mutants: 325/1095 (311s)
+  mutants: 350/1095 (388s)
+  mutants: 375/1095 (457s)
+  mutants: 400/1095 (536s)
+  mutants: 425/1095 (618s)
+  mutants: 450/1095 (632s)
+  mutants: 475/1095 (637s)
+  mutants: 500/1095 (653s)
+  mutants: 525/1095 (683s)
+  mutants: 550/1095 (740s)
+  mutants: 575/1095 (818s)
+  mutants: 600/1095 (884s)
+  mutants: 625/1095 (975s)
+  mutants: 650/1095 (1060s)
+  mutants: 675/1095 (1110s)
+  mutants: 700/1095 (1164s)
+  mutants: 725/1095 (1259s)
+  mutants: 750/1095 (1326s)
+  mutants: 775/1095 (1406s)
+  mutants: 800/1095 (1504s)
+  mutants: 825/1095 (1556s)
+  mutants: 850/1095 (1562s)
+  mutants: 875/1095 (1581s)
+  mutants: 900/1095 (1586s)
+  mutants: 925/1095 (1587s)
+  mutants: 950/1095 (1590s)
+  mutants: 975/1095 (1594s)
+  mutants: 1000/1095 (1595s)
+  mutants: 1025/1095 (1597s)
+  mutants: 1050/1095 (1599s)
+  mutants: 1075/1095 (1600s)
+  mutants: 1095/1095 (1716s)
+
+mutate: 1095 mutants, 1716s
+  killed 808, survived 287 (232 capped), no coverage 0, errors 0
+  mutation score on reached code: 73.8%   overall: 73.8%
+
+  function                           total killed survived no-cov
+  DistortImage                         361    219      142      0
+  GenerateCoefficients                 286    197       89      0
+  SparseColorImage                     188    167       21      0
+  poly_basis_fn                         50     50        0      0
+  PrintSparseColorFX                    40     35        5      0
+  poly_basis_dx                         26     26        0      0
+  PrintBarrelFX                         19     13        6      0
+  InvertPerspectiveCoefficients         13     13        0      0
+  RotateImage                           13      6        7      0
+  GetSparseColorCount                   12     12        0      0
+  InvertAffineCoefficients              11     11        0      0
+  DistortResizeImage                    10      9        1      0
+  SetAffineSingleCoefficients            9      3        6      0
+  IsInvalidPolyOrder                     8      7        1      0
+  IsInvalidPolarRadius                   7      3        4      0
+  IsAffineFallback                       6      6        0      0
+  IsInvalidPolarArgumentCount            6      5        1      0
+  IsInvalidBarrelArgumentCount           6      5        1      0
+  poly_number_terms                      5      5        0      0
+  MagickRound                            4      3        1      0
+  PrintArcFX                             4      4        0      0
+  IsMatrixMemoryMissing                  3      3        0      0
+  PrintDePolarFX                         3      3        0      0
+  PrintCylinder2PlaneFX                  2      2        0      0
+  poly_basis_dy                          1      1        0      0
+  AffineTransformImage                   1      0        1      0
+  IsArcPageReset                         1      0        1      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  distort.c:147:47 cxx_gt_to_ge               ( order != floor(order) && (order-1.5) > MagickEpsilon) ) ?
+    x  distort.c:305:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  distort.c:373:20 cxx_lt_to_le               if ((x-floor(x)) < (ceil(x)-x))
+    x  distort.c:400:31 cxx_gt_to_ge               || number_arguments > 8 ) ? MagickTrue : MagickFalse);
+    x  distort.c:405:21 cxx_lt_to_le               return(( coeff[0] < MagickEpsilon || coeff[1] < -MagickEpsilon
+    x  distort.c:405:49 cxx_lt_to_le               return(( coeff[0] < MagickEpsilon || coeff[1] < -MagickEpsilon
+    x  distort.c:406:24 cxx_sub_to_add             || (coeff[0]-coeff[1]) < MagickEpsilon ) ? MagickTrue : MagickFalse);
+    x  distort.c:406:35 cxx_lt_to_le               || (coeff[0]-coeff[1]) < MagickEpsilon ) ? MagickTrue : MagickFalse);
+    x  distort.c:413:57 cxx_gt_to_ge               (number_arguments == 9) || (number_arguments > 10) ) ?
+       distort.c:432:16 cxx_lt_to_ge               for (i=0; i<number_values; i++)
+       distort.c:432:16 cxx_lt_to_le               for (i=0; i<number_values; i++)
+       distort.c:432:33 cxx_post_inc_to_post_dec   for (i=0; i<number_values; i++)
+       distort.c:433:14 cxx_mul_to_div             coeff[i*3+2] = arguments[cp_values+i];
+       distort.c:433:16 cxx_add_to_sub             coeff[i*3+2] = arguments[cp_values+i];
+       distort.c:433:41 cxx_add_to_sub             coeff[i*3+2] = arguments[cp_values+i];
+    xc distort.c:487:28 cxx_lt_to_le               if (number_arguments < 1)
+    xc distort.c:503:35 cxx_mul_to_div             if ((number_arguments < (1+i*cp_size)) ||
+     c distort.c:554:7 cxx_remove_void_call       perror("unknown method given"); /* just fail assertion */
+    xc distort.c:584:29 cxx_lt_to_le               number_arguments < cp_size ) {
+    xc distort.c:594:9 cxx_remove_void_call       SetAffineSingleCoefficients(coeff,arguments,cp_values,number_values);
+    xc distort.c:633:35 cxx_mul_to_div             if ( number_arguments == 2*cp_size ) {
+    xc distort.c:639:20 cxx_sub_to_add             - ( arguments[cp_size+cp_y] - arguments[cp_y] ); /* x2 */
+    xc distort.c:639:41 cxx_add_to_sub             - ( arguments[cp_size+cp_y] - arguments[cp_y] ); /* x2 */
+    xc distort.c:639:48 cxx_sub_to_add             - ( arguments[cp_size+cp_y] - arguments[cp_y] ); /* x2 */
+    xc distort.c:640:38 cxx_add_to_sub             terms[1] = arguments[cp_y] +
+    xc distort.c:641:41 cxx_add_to_sub             + ( arguments[cp_size+cp_x] - arguments[cp_x] ); /* y2 */
+    xc distort.c:641:48 cxx_sub_to_add             + ( arguments[cp_size+cp_x] - arguments[cp_x] ); /* y2 */
+    xc distort.c:643:26 cxx_eq_to_ne               if ( cp_values == 0 ) {
+    xc distort.c:647:35 cxx_sub_to_add             uv2[0] = arguments[0] - arguments[5] + arguments[1];   /* u2 */
+    xc distort.c:647:50 cxx_add_to_sub             uv2[0] = arguments[0] - arguments[5] + arguments[1];   /* u2 */
+    xc distort.c:648:35 cxx_add_to_sub             uv2[1] = arguments[1] + arguments[4] - arguments[0];   /* v2 */
+    xc distort.c:648:50 cxx_sub_to_add             uv2[1] = arguments[1] + arguments[4] - arguments[0];   /* v2 */
+    xc distort.c:649:13 cxx_remove_void_call       LeastSquaresAddTerms(matrix,vectors,terms,uv2,3UL,2UL);
+     c distort.c:653:13 cxx_remove_void_call       LeastSquaresAddTerms(matrix,vectors,terms,
+    xc distort.c:687:68 cxx_lt_to_le               if (((number_arguments % cp_size) != 0) || (number_arguments < cp_size))
+    xc distort.c:713:29 cxx_add_to_sub             terms[0]=arguments[i+0];
+    xc distort.c:719:29 cxx_add_to_sub             terms[1]=arguments[i+0];
+    xc distort.c:775:17 cxx_lt_to_le               for(i=0; i<6UL; i++ )
+    xc distort.c:812:45 cxx_add_to_sub             x = nx = (double)(image->columns)/2.0 + (double)image->page.x;
+    xc distort.c:868:21 cxx_lt_to_le               if ( fabs(sx) < MagickEpsilon || fabs(sy) < MagickEpsilon ) {
+    xc distort.c:868:49 cxx_lt_to_le               if ( fabs(sx) < MagickEpsilon || fabs(sy) < MagickEpsilon ) {
+    xc distort.c:931:38 cxx_mul_to_div             number_arguments < cp_size*4 ) {
+    xc distort.c:957:39 cxx_add_to_sub             terms[6]=-terms[0]*arguments[i+cp_u];  /* 1/(c6*x) */
+    xc distort.c:958:39 cxx_add_to_sub             terms[7]=-terms[1]*arguments[i+cp_u];  /* 1/(c7*y) */
+    xc distort.c:959:64 cxx_add_to_sub             LeastSquaresAddTerms(matrix,vectors,terms,&(arguments[i+cp_u]),
+    xc distort.c:991:28 cxx_lt_to_le               coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
+    xc distort.c:1017:38 cxx_mul_to_div             + coeff[7]*arguments[5] + 1.0;
+    xc distort.c:1018:28 cxx_lt_to_le               coeff[8] = (coeff[8] < 0.0) ? -1.0 : +1.0;
+    xc distort.c:1049:38 cxx_mul_to_div             number_arguments < cp_size*4 ) {
+    xc distort.c:1074:31 cxx_add_to_sub             terms[0] = arguments[i+cp_x];   /*  x  */
+    xc distort.c:1132:49 cxx_mul_to_div             coeff[8] = coeff[0]*coeff[5] - coeff[1]*coeff[4];
+    xc distort.c:1133:22 cxx_mul_to_div             coeff[9] = 2*(coeff[2]*coeff[5] - coeff[1]*coeff[6]);
+    xc distort.c:1133:52 cxx_mul_to_div             coeff[9] = 2*(coeff[2]*coeff[5] - coeff[1]*coeff[6]);
+    xc distort.c:1213:19 cxx_lt_to_le               for (i=0; i < number_values; i++)
+    xc distort.c:1217:21 cxx_lt_to_le               for (j=0; j < (ssize_t) nterms; j++)
+    xc distort.c:1220:27 cxx_add_to_sub             &(arguments[i+cp_values]),nterms,number_values);
+    xc distort.c:1272:29 cxx_ge_to_gt               if ( number_arguments >= 1 && arguments[0] < MagickEpsilon ) {
+    xc distort.c:1272:29 cxx_ge_to_lt               if ( number_arguments >= 1 && arguments[0] < MagickEpsilon ) {
+    xc distort.c:1272:50 cxx_lt_to_le               if ( number_arguments >= 1 && arguments[0] < MagickEpsilon ) {
+    xc distort.c:1279:29 cxx_ge_to_gt               if ( number_arguments >= 3 && arguments[2] < MagickEpsilon ) {
+    xc distort.c:1279:50 cxx_lt_to_ge               if ( number_arguments >= 3 && arguments[2] < MagickEpsilon ) {
+    xc distort.c:1279:50 cxx_lt_to_le               if ( number_arguments >= 3 && arguments[2] < MagickEpsilon ) {
+    xc distort.c:1287:29 cxx_ge_to_gt               if ( number_arguments >= 1 )
+    xc distort.c:1298:29 cxx_ge_to_gt               if ( number_arguments >= 3 ) {
+    xc distort.c:1299:31 cxx_ge_to_gt               if ( number_arguments >= 4 )
+    xc distort.c:1299:31 cxx_ge_to_lt               if ( number_arguments >= 4 )
+    xc distort.c:1300:35 cxx_sub_to_add             coeff[3] = arguments[2] - arguments[3];
+    xc distort.c:1302:35 cxx_div_to_mul             coeff[3] *= arguments[2]/coeff[2];
+    xc distort.c:1342:48 cxx_add_to_sub             coeff[2] = (double)(image->columns)/2.0+image->page.x;
+    xc distort.c:1343:45 cxx_add_to_sub             coeff[3] = (double)(image->rows)/2.0+image->page.y;
+    xc distort.c:1347:29 cxx_ge_to_gt               if ( number_arguments >= 5 )
+    xc distort.c:1350:29 cxx_ge_to_gt               if ( number_arguments >= 6 )
+    xc distort.c:1352:36 cxx_lt_to_le               if ( fabs(coeff[4]-coeff[5]) < MagickEpsilon )
+    xc distort.c:1355:21 cxx_lt_to_le               if ( coeff[0] < MagickEpsilon ) {
+    xc distort.c:1357:29 cxx_lt_to_le               if ( fabs(coeff[0]) < MagickEpsilon ) {
+    xc distort.c:1366:34 cxx_lt_to_le               if ( fabs(-1.0-coeff[0]) < MagickEpsilon ) {
+    xc distort.c:1368:24 cxx_sub_to_add             rx = coeff[2]-image->page.x;
+    xc distort.c:1369:24 cxx_sub_to_add             ry = coeff[3]-image->page.y;
+    xc distort.c:1370:30 cxx_mul_to_div             coeff[0] = rx*rx+ry*ry;
+    xc distort.c:1371:24 cxx_sub_to_add             ry = coeff[3]-image->page.y-image->rows;
+    xc distort.c:1373:24 cxx_sub_to_add             rx = coeff[2]-image->page.x-image->columns;
+    xc distort.c:1375:24 cxx_sub_to_add             ry = coeff[3]-image->page.y;
+    xc distort.c:1395:27 cxx_sub_to_add             coeff[7]=(coeff[0]-coeff[1])/image->rows;
+    xc distort.c:1431:25 cxx_lt_to_le               if ( arguments[0] < MagickEpsilon || arguments[0] > 160.0 ) {
+    xc distort.c:1431:57 cxx_gt_to_ge               if ( arguments[0] < MagickEpsilon || arguments[0] > 160.0 ) {
+    xc distort.c:1446:44 cxx_div_to_mul             coeff[1] = (double) image->columns / ( 2 * tan(coeff[0]/2) );
+    xc distort.c:1446:50 cxx_mul_to_div             coeff[1] = (double) image->columns / ( 2 * tan(coeff[0]/2) );
+    xc distort.c:1446:64 cxx_div_to_mul             coeff[1] = (double) image->columns / ( 2 * tan(coeff[0]/2) );
+    xc distort.c:1448:46 cxx_add_to_sub             coeff[2] = (double)(image->columns)/2.0+image->page.x;
+    xc distort.c:1449:43 cxx_add_to_sub             coeff[3] = (double)(image->rows)/2.0+image->page.y;
+    xc distort.c:1492:24 cxx_sub_to_add             coeff[3] = 1.0 - coeff[0] - coeff[1] - coeff[2];
+    xc distort.c:1492:35 cxx_sub_to_add             coeff[3] = 1.0 - coeff[0] - coeff[1] - coeff[2];
+    xc distort.c:1492:46 cxx_sub_to_add             coeff[3] = 1.0 - coeff[0] - coeff[1] - coeff[2];
+    xc distort.c:1497:25 cxx_mul_to_div             coeff[1] *= rscale*rscale;
+    xc distort.c:1500:29 cxx_ge_to_gt               if ( number_arguments >= 8 ) {
+    xc distort.c:1501:33 cxx_mul_to_div             coeff[4] = arguments[4] * pow(rscale,3.0);
+    xc distort.c:1502:33 cxx_mul_to_div             coeff[5] = arguments[5] * rscale*rscale;
+    xc distort.c:1502:41 cxx_mul_to_div             coeff[5] = arguments[5] * rscale*rscale;
+    xc distort.c:1503:33 cxx_mul_to_div             coeff[6] = arguments[6] * rscale;
+    xc distort.c:1527:47 cxx_add_to_sub             coeff[8] = (double)image->columns/2.0 + image->page.x;
+    xc distort.c:1528:47 cxx_add_to_sub             coeff[9] = (double)image->rows/2.0    + image->page.y;
+    xc distort.c:1540:29 cxx_lt_to_le               number_arguments < cp_size ) {
+    xc distort.c:1551:25 cxx_lt_to_le               if ( coeff[0] < MagickEpsilon ) {
+     c distort.c:1567:3 cxx_remove_void_call       perror("no method handler"); /* just fail assertion */
+    x  distort.c:1631:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc distort.c:1819:19 cxx_eq_to_ne               return(( method == ArcDistortion && !bestfit && !viewport_given ) ?
+    x  distort.c:1899:38 cxx_add_to_sub             xc=((double)image->columns-1.0)/2.0+image->page.x;
+    x  distort.c:1900:35 cxx_add_to_sub             yc=((double)image->rows-1.0)/2.0+image->page.y;
+    x  distort.c:1904:30 cxx_lt_to_le               if ( fabs(coeff[8]-xc-0.5) < 0.1 && fabs(coeff[9]-yc-0.5) < 0.1 )
+    x  distort.c:1904:61 cxx_lt_to_le               if ( fabs(coeff[8]-xc-0.5) < 0.1 && fabs(coeff[9]-yc-0.5) < 0.1 )
+       distort.c:1907:72 cxx_sub_to_add             (void) FormatLocaleFile(stderr,"  -fx 'xc=%lf;  yc=%lf;\n",coeff[8]-
+       distort.c:1908:19 cxx_sub_to_add             0.5,coeff[9]-0.5);
+    xc distort.c:1948:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc distort.c:2062:51 cxx_add_to_sub             d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+    xc distort.c:2067:40 cxx_mul_to_div             scale=inverse[6]*s.x+inverse[7]*s.y+1.0;
+    xc distort.c:2069:47 cxx_mul_to_div             d.x = scale*(inverse[0]*s.x+inverse[1]*s.y+inverse[2]);
+    xc distort.c:2070:47 cxx_mul_to_div             d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+    xc distort.c:2070:51 cxx_add_to_sub             d.y = scale*(inverse[3]*s.x+inverse[4]*s.y+inverse[5]);
+    xc distort.c:2088:34 cxx_mul_to_div             d.x = (coeff[2]-coeff[3])*ca;
+    xc distort.c:2095:34 cxx_mul_to_div             d.x = (coeff[2]-coeff[3])*ca;
+    xc distort.c:2100:17 cxx_lt_to_le               a<(coeff[0]+coeff[1]/2.0); a+=MagickPI2 ) {
+    xc distort.c:2117:30 cxx_lt_to_ge               if (number_arguments < 2)
+    xc distort.c:2117:30 cxx_lt_to_le               if (number_arguments < 2)
+    xc distort.c:2119:25 cxx_sub_to_add             min.x = coeff[2]-coeff[0];
+    xc distort.c:2120:25 cxx_add_to_sub             max.x = coeff[2]+coeff[0];
+    xc distort.c:2121:25 cxx_sub_to_add             min.y = coeff[3]-coeff[0];
+    xc distort.c:2122:25 cxx_add_to_sub             max.y = coeff[3]+coeff[0];
+    xc distort.c:2124:42 cxx_div_to_mul             coeff[7]=(double) geometry.height/(coeff[0]-coeff[1]);
+    xc distort.c:2124:52 cxx_sub_to_add             coeff[7]=(double) geometry.height/(coeff[0]-coeff[1]);
+    xc distort.c:2133:58 cxx_sub_to_add             geometry.height = CastDoubleToSizeT(ceil(coeff[0]-coeff[1]));
+    xc distort.c:2134:58 cxx_sub_to_add             geometry.width = CastDoubleToSizeT(ceil((coeff[0]-coeff[1])*
+    xc distort.c:2139:27 cxx_sub_to_add             coeff[7]=(coeff[0]-coeff[1]) * MagickSafeReciprocal(
+    xc distort.c:2149:53 cxx_mul_to_div             geometry.width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
+    xc distort.c:2149:62 cxx_mul_to_div             geometry.width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
+    xc distort.c:2149:75 cxx_div_to_mul             geometry.width = CastDoubleToSizeT(ceil( 2.0*coeff[1]*tan(coeff[0]/2.0) ));
+    xc distort.c:2150:54 cxx_mul_to_div             geometry.height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
+    xc distort.c:2150:63 cxx_div_to_mul             geometry.height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
+    xc distort.c:2150:76 cxx_div_to_mul             geometry.height = CastDoubleToSizeT(ceil( 2.0*coeff[3]/cos(coeff[0]/2.0) ));
+    xc distort.c:2152:43 cxx_div_to_mul             coeff[4] = (double) geometry.width/2.0;
+    xc distort.c:2153:44 cxx_div_to_mul             coeff[5] = (double) geometry.height/2.0;
+    xc distort.c:2289:21 cxx_eq_to_ne               if (inverse == (double *) NULL)
+    xc distort.c:2297:9 cxx_remove_void_call       InvertPerspectiveCoefficients(coeff, inverse);
+    xc distort.c:2301:21 cxx_lt_to_ge               for (i=0; i < 4; i++)
+    xc distort.c:2301:21 cxx_lt_to_le               for (i=0; i < 4; i++)
+    xc distort.c:2301:27 cxx_post_inc_to_post_dec   for (i=0; i < 4; i++)
+    xc distort.c:2305:19 cxx_lt_to_ge               for ( ; i < 7; i++)
+    xc distort.c:2305:19 cxx_lt_to_le               for ( ; i < 7; i++)
+    xc distort.c:2305:25 cxx_post_inc_to_post_dec   for ( ; i < 7; i++)
+    xc distort.c:2326:20 cxx_lt_to_ge               coeff[8] < 0.0 ? "<" : ">", lookup);
+    xc distort.c:2326:20 cxx_lt_to_le               coeff[8] < 0.0 ? "<" : ">", lookup);
+    xc distort.c:2346:59 cxx_sub_to_add             "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",0.5-coeff[3],0.5-
+    xc distort.c:2346:72 cxx_sub_to_add             "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",0.5-coeff[3],0.5-
+    xc distort.c:2349:21 cxx_minus_to_noop          coeff[6], -coeff[2], coeff[8]);
+    xc distort.c:2351:22 cxx_ne_to_eq               if (coeff[9] != 0)
+    xc distort.c:2354:59 cxx_mul_to_div             "       rt=bb*bb %+lf*(%lf*ii%+lf*jj);\n",-2*coeff[9],coeff[4],
+    xc distort.c:2355:15 cxx_minus_to_noop          -coeff[0]);
+     c distort.c:2361:13 cxx_minus_to_noop          -coeff[4],coeff[0]);
+    xc distort.c:2363:53 cxx_minus_to_noop          "       xx=(ii %+lf*yy)/(%lf %+lf*yy);\n",-coeff[1],coeff[0],
+    xc distort.c:2365:23 cxx_ne_to_eq               if ( coeff[9] != 0 )
+    xc distort.c:2406:21 cxx_lt_to_ge               for (i=0; i < (ssize_t) nterms; i++)
+    xc distort.c:2406:21 cxx_lt_to_le               for (i=0; i < (ssize_t) nterms; i++)
+    xc distort.c:2406:42 cxx_post_inc_to_post_dec   for (i=0; i < (ssize_t) nterms; i++)
+    xc distort.c:2408:18 cxx_ne_to_eq               if ((i != 0) && (i%4 == 0))
+    xc distort.c:2408:29 cxx_rem_to_div             if ((i != 0) && (i%4 == 0))
+    xc distort.c:2408:32 cxx_eq_to_ne               if ((i != 0) && (i%4 == 0))
+    xc distort.c:2410:59 cxx_add_to_sub             (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i],
+    xc distort.c:2414:21 cxx_lt_to_ge               for (i=0; i < (ssize_t) nterms; i++)
+    xc distort.c:2414:21 cxx_lt_to_le               for (i=0; i < (ssize_t) nterms; i++)
+    xc distort.c:2414:42 cxx_post_inc_to_post_dec   for (i=0; i < (ssize_t) nterms; i++)
+    xc distort.c:2416:18 cxx_ne_to_eq               if ((i != 0) && (i%4 == 0))
+    xc distort.c:2416:29 cxx_rem_to_div             if ((i != 0) && (i%4 == 0))
+    xc distort.c:2416:32 cxx_eq_to_ne               if ((i != 0) && (i%4 == 0))
+    xc distort.c:2418:59 cxx_add_to_sub             (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i+(int) nterms],
+    xc distort.c:2418:61 cxx_add_to_sub             (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i+(int) nterms],
+    xc distort.c:2426:9 cxx_remove_void_call       PrintArcFX(coeff,image_gen);
+    xc distort.c:2432:21 cxx_lt_to_ge               for (i=0; i < 8; i++)
+    xc distort.c:2432:21 cxx_lt_to_le               for (i=0; i < 8; i++)
+    xc distort.c:2432:27 cxx_post_inc_to_post_dec   for (i=0; i < 8; i++)
+    xc distort.c:2438:56 cxx_minus_to_noop          "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",-coeff[2],-coeff[3]);
+    xc distort.c:2438:66 cxx_minus_to_noop          "  -fx 'ii=i+page.x%+lf; jj=j+page.y%+lf;\n",-coeff[2],-coeff[3]);
+    xc distort.c:2440:11 cxx_minus_to_noop          -(coeff[4]+coeff[5])/2 );
+    xc distort.c:2440:21 cxx_add_to_sub             -(coeff[4]+coeff[5])/2 );
+    xc distort.c:2440:31 cxx_div_to_mul             -(coeff[4]+coeff[5])/2 );
+    xc distort.c:2445:11 cxx_minus_to_noop          -coeff[1],coeff[7] );
+    xc distort.c:2468:64 cxx_minus_to_noop          "  -fx 'ii=i+page.x%+lf+0.5; jj=j+page.y%+lf+0.5;\n",-coeff[4],
+    xc distort.c:2469:11 cxx_minus_to_noop          -coeff[5]);
+    xc distort.c:2501:27 cxx_lt_to_le               if ( output_scaling < 0.1 ) {
+    xc distort.c:2507:25 cxx_div_to_mul             output_scaling = 1/output_scaling;
+    xc distort.c:2533:52 cxx_ne_to_eq               (IsGrayColorspace(distort_image->colorspace) != MagickFalse))
+    xc distort.c:2631:42 cxx_mul_to_div             d.x = (double) (geometry.x+i+0.5)*output_scaling;
+    xc distort.c:2632:42 cxx_mul_to_div             d.y = (double) (geometry.y+j+0.5)*output_scaling;
+    xc distort.c:2653:26 cxx_mul_to_div             validity = (r*coeff[8] < 0.0) ? 0.0 : 1.0;
+    xc distort.c:2653:36 cxx_lt_to_le               validity = (r*coeff[8] < 0.0) ? 0.0 : 1.0;
+    xc distort.c:2655:28 cxx_mul_to_div             abs_r = fabs(r)*2;
+    xc distort.c:2658:25 cxx_gt_to_ge               if ( abs_c6 > abs_c7 ) {
+    xc distort.c:2659:26 cxx_lt_to_le               if ( abs_r < abs_c6*output_scaling )
+    xc distort.c:2659:34 cxx_mul_to_div             if ( abs_r < abs_c6*output_scaling )
+     c distort.c:2660:32 cxx_sub_to_add             validity = 0.5 - coeff[8]*r/(coeff[6]*output_scaling);
+     c distort.c:2660:42 cxx_mul_to_div             validity = 0.5 - coeff[8]*r/(coeff[6]*output_scaling);
+     c distort.c:2660:44 cxx_div_to_mul             validity = 0.5 - coeff[8]*r/(coeff[6]*output_scaling);
+     c distort.c:2660:54 cxx_mul_to_div             validity = 0.5 - coeff[8]*r/(coeff[6]*output_scaling);
+    xc distort.c:2662:29 cxx_lt_to_le               else if ( abs_r < abs_c7*output_scaling )
+    xc distort.c:2662:37 cxx_mul_to_div             else if ( abs_r < abs_c7*output_scaling )
+    xc distort.c:2663:52 cxx_mul_to_div             validity = 0.5 - coeff[8]*r/(coeff[7]*output_scaling);
+    xc distort.c:2665:27 cxx_gt_to_ge               if ( validity > 0.0 ) {
+    xc distort.c:2683:38 cxx_mul_to_div             s.x=coeff[0]*d.x+coeff[1]*d.y+coeff[2]*d.x*d.y+coeff[3];
+    xc distort.c:2683:51 cxx_mul_to_div             s.x=coeff[0]*d.x+coeff[1]*d.y+coeff[2]*d.x*d.y+coeff[3];
+    xc distort.c:2683:59 cxx_add_to_sub             s.x=coeff[0]*d.x+coeff[1]*d.y+coeff[2]*d.x*d.y+coeff[3];
+    xc distort.c:2684:38 cxx_mul_to_div             s.y=coeff[4]*d.x+coeff[5]*d.y
+    xc distort.c:2685:30 cxx_mul_to_div             +coeff[6]*d.x*d.y+coeff[7];
+    xc distort.c:2685:38 cxx_add_to_sub             +coeff[6]*d.x*d.y+coeff[7];
+    xc distort.c:2700:40 cxx_mul_to_div             b = coeff[6]*d.x - coeff[2]*d.y + coeff[8];
+    xc distort.c:2700:45 cxx_add_to_sub             b = coeff[6]*d.x - coeff[2]*d.y + coeff[8];
+    xc distort.c:2701:40 cxx_mul_to_div             c = coeff[4]*d.x - coeff[0]*d.y;
+    xc distort.c:2706:33 cxx_lt_to_ge               if ( fabs(coeff[9]) < MagickEpsilon )
+    xc distort.c:2706:33 cxx_lt_to_le               if ( fabs(coeff[9]) < MagickEpsilon )
+     c distort.c:2707:22 cxx_minus_to_noop          s.y =  -c/b;
+     c distort.c:2707:24 cxx_div_to_mul             s.y =  -c/b;
+    xc distort.c:2709:26 cxx_mul_to_div             c = b*b - 2*coeff[9]*c;
+    xc distort.c:2709:35 cxx_mul_to_div             c = b*b - 2*coeff[9]*c;
+    xc distort.c:2710:22 cxx_lt_to_ge               if ( c < 0.0 )
+    xc distort.c:2710:22 cxx_lt_to_le               if ( c < 0.0 )
+    xc distort.c:2713:25 cxx_minus_to_noop          s.y = ( -b + sqrt(c) )/coeff[9];
+    xc distort.c:2713:28 cxx_add_to_sub             s.y = ( -b + sqrt(c) )/coeff[9];
+    xc distort.c:2713:39 cxx_div_to_mul             s.y = ( -b + sqrt(c) )/coeff[9];
+    xc distort.c:2715:27 cxx_gt_to_ge               if ( validity > 0.0 )
+    xc distort.c:2715:27 cxx_gt_to_le               if ( validity > 0.0 )
+    xc distort.c:2716:43 cxx_div_to_mul             s.x = ( d.x - coeff[1]*s.y) / ( coeff[0] + coeff[2]*s.y );
+    xc distort.c:2758:46 cxx_sub_to_add             s.x  = (double) ((atan2(d.y,d.x) - coeff[0])/Magick2PI);
+    xc distort.c:2767:22 cxx_gt_to_ge               if ( s.y > MagickEpsilon )
+    xc distort.c:2775:43 cxx_add_to_sub             s.x = s.x*coeff[1] + coeff[4] + image->page.x +0.5;
+    xc distort.c:2783:35 cxx_sub_to_add             s.x  = atan2(d.x,d.y) - (coeff[4]+coeff[5])/2;
+    xc distort.c:2783:56 cxx_div_to_mul             s.x  = atan2(d.x,d.y) - (coeff[4]+coeff[5])/2;
+    xc distort.c:2792:22 cxx_gt_to_ge               if ( s.y > MagickEpsilon )
+    xc distort.c:2800:61 cxx_add_to_sub             s.x = s.x*coeff[6] + (double)image->columns/2.0 + image->page.x;
+    xc distort.c:2807:34 cxx_mul_to_div             d.x = ((double)i+0.5)*output_scaling*coeff[6]+coeff[4];
+    xc distort.c:2808:34 cxx_mul_to_div             d.y = ((double)j+0.5)*output_scaling*coeff[7]+coeff[1];
+    xc distort.c:2846:65 cxx_div_to_mul             validity = (double) (coeff[1]*MagickPI2 - fabs(d.x))/output_scaling + 0.5;
+    xc distort.c:2846:81 cxx_add_to_sub             validity = (double) (coeff[1]*MagickPI2 - fabs(d.x))/output_scaling + 0.5;
+    xc distort.c:2848:27 cxx_gt_to_ge               if ( validity > 0.0 ) {
+    xc distort.c:2881:20 cxx_gt_to_ge               if ( r > MagickEpsilon ) {
+    xc distort.c:2888:23 cxx_div_to_mul             fx = 1/fx;  fy = 1/fy;
+    xc distort.c:2888:35 cxx_div_to_mul             fx = 1/fx;  fy = 1/fy;
+    xc distort.c:2889:23 cxx_minus_to_noop          gx *= -fx*fx;  gy *= -fy*fy;
+    xc distort.c:2889:26 cxx_mul_to_div             gx *= -fx*fx;  gy *= -fy*fy;
+    xc distort.c:2889:38 cxx_minus_to_noop          gx *= -fx*fx;  gy *= -fy*fy;
+    xc distort.c:2889:41 cxx_mul_to_div             gx *= -fx*fx;  gy *= -fy*fy;
+     c distort.c:2905:27 cxx_eq_to_ne               if ( method == BarrelDistortion )
+    xc distort.c:2937:33 cxx_lt_to_le               weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
+    xc distort.c:2960:23 cxx_le_to_lt               if ( validity <= 0.0 ) {
+    xc distort.c:2969:13 cxx_remove_void_call       SetPixelViaPixelInfo(distort_image,&invalid,q);
+    xc distort.c:2987:35 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+     c distort.c:2995:19 cxx_post_inc_to_post_dec   progress++;
+     c distort.c:2997:23 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  distort.c:3074:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  distort.c:3079:16 cxx_lt_to_le               while (angle < -45.0)
+    x  distort.c:3081:27 cxx_gt_to_ge               for (rotations=0; angle > 45.0; rotations++)
+    x  distort.c:3084:12 cxx_minus_to_noop          shear.x=(-tan((double) DegreesToRadians(angle)/2.0));
+    x  distort.c:3084:49 cxx_div_to_mul             shear.x=(-tan((double) DegreesToRadians(angle)/2.0));
+    x  distort.c:3086:22 cxx_lt_to_le               if ((fabs(shear.x) < MagickEpsilon) && (fabs(shear.y) < MagickEpsilon))
+    x  distort.c:3086:57 cxx_lt_to_le               if ((fabs(shear.x) < MagickEpsilon) && (fabs(shear.y) < MagickEpsilon))
+    x  distort.c:3183:62 cxx_ne_to_eq               if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+    x  distort.c:3184:32 cxx_eq_to_ne               (image->colorspace == CMYKColorspace))
+       distort.c:3186:34 cxx_add_to_sub             coeff[ x ], coeff[x+1],
+       distort.c:3187:22 cxx_add_to_sub             coeff[x+2], coeff[x+3]),x+=4;
+       distort.c:3187:34 cxx_add_to_sub             coeff[x+2], coeff[x+3]),x+=4;
+    x  distort.c:3245:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  distort.c:3338:7 cxx_remove_void_call       GetPixelInfo(sparse_image,&pixel);
+    x  distort.c:3341:9 cxx_remove_void_call       GetPixelInfoPixel(sparse_image,q,&pixel);
+    x  distort.c:3378:73 cxx_ne_to_eq               if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+    x  distort.c:3379:36 cxx_eq_to_ne               (image->colorspace == CMYKColorspace))
+       distort.c:3380:55 cxx_add_to_sub             pixel.black   = coeff[x]*i     + coeff[x+1]*j +
+       distort.c:3380:58 cxx_mul_to_div             pixel.black   = coeff[x]*i     + coeff[x+1]*j +
+       distort.c:3381:38 cxx_add_to_sub             coeff[x+2]*i*j + coeff[x+3], x+=4;
+       distort.c:3381:41 cxx_mul_to_div             coeff[x+2]*i*j + coeff[x+3], x+=4;
+       distort.c:3381:46 cxx_add_to_sub             coeff[x+2]*i*j + coeff[x+3], x+=4;
+       distort.c:3381:55 cxx_add_to_sub             coeff[x+2]*i*j + coeff[x+3], x+=4;
+    x  distort.c:3418:33 cxx_lt_to_le               weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
+    x  distort.c:3427:45 cxx_post_inc_to_post_dec   pixel.black   += arguments[x++]*weight;
+    x  distort.c:3430:43 cxx_post_inc_to_post_dec   pixel.alpha += arguments[x++]*weight;
+    x  distort.c:3472:42 cxx_post_inc_to_post_dec   pixel.black=arguments[x++];
+    x  distort.c:3475:42 cxx_post_inc_to_post_dec   pixel.alpha=arguments[x++];
+    x  distort.c:3507:42 cxx_post_inc_to_post_dec   pixel.black=arguments[x++];
+    x  distort.c:3510:42 cxx_post_inc_to_post_dec   pixel.alpha=arguments[x++];
+    x  distort.c:3541:35 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       distort.c:3549:19 cxx_post_inc_to_post_dec   progress++;
+       distort.c:3551:23 cxx_eq_to_ne               if (proceed == MagickFalse)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-distort.json

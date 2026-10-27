@@ -1,0 +1,248 @@
+mutate: 927 mutants in MagickCore/statistic\.c$, 47 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: gaps/3f0f18253e gaps/6a95c6af85
+mutate: baseline over 987 cases in 31s
+  mutants: 25/927 (3s)
+  mutants: 50/927 (9s)
+  mutants: 75/927 (15s)
+  mutants: 100/927 (16s)
+  mutants: 125/927 (26s)
+  mutants: 150/927 (28s)
+  mutants: 175/927 (36s)
+  mutants: 200/927 (45s)
+  mutants: 225/927 (56s)
+  mutants: 250/927 (69s)
+  mutants: 275/927 (76s)
+  mutants: 300/927 (85s)
+  mutants: 325/927 (86s)
+  mutants: 350/927 (88s)
+  mutants: 375/927 (112s)
+  mutants: 400/927 (121s)
+  mutants: 425/927 (122s)
+  mutants: 450/927 (145s)
+  mutants: 475/927 (146s)
+  mutants: 500/927 (147s)
+  mutants: 525/927 (148s)
+  mutants: 550/927 (149s)
+  mutants: 575/927 (159s)
+  mutants: 600/927 (211s)
+  mutants: 625/927 (228s)
+  mutants: 650/927 (233s)
+  mutants: 675/927 (270s)
+  mutants: 700/927 (294s)
+  mutants: 725/927 (323s)
+  mutants: 750/927 (333s)
+  mutants: 775/927 (335s)
+  mutants: 800/927 (345s)
+  mutants: 825/927 (395s)
+  mutants: 850/927 (454s)
+  mutants: 875/927 (464s)
+  mutants: 900/927 (527s)
+  mutants: 925/927 (617s)
+  mutants: 927/927 (633s)
+
+mutate: 927 mutants, 633s
+  killed 776, survived 148 (43 capped), no coverage 3, errors 0
+  mutation score on reached code: 84.0%   overall: 83.7%
+
+  function                           total killed survived no-cov
+  GetImageMoments                      241    212       29      0
+  EvaluateImages                       107     92       15      0
+  GetImageStatistics                    87     72       15      0
+  StatisticImage                        66     60        6      0
+  ApplyEvaluateOperator                 58     54        4      0
+  ApplyFunction                         47     45        2      0
+  PolynomialImage                       33     26        7      0
+  GetMedianPixel                        30     21        9      0
+  GetImagePerceptualHash                19     17        2      0
+  EvaluateImage                         16     12        4      0
+  UpdateWelfordMoments                  16     16        0      0
+  FunctionImage                         15     11        4      0
+  ComputeChannelHigherMoments           15     12        3      0
+  AddNodePixelList                      15      9        6      0
+  GetImageRange                         14     10        4      0
+  ComputeChannelMoments                  9      8        1      0
+  AcquirePixelTLS                        8      6        2      0
+  IntensityCompare                       8      7        1      0
+  AccumulateChannelRange                 8      6        2      0
+  CountHistogramBins                     8      8        0      0
+  SetPolynomialPixels                    8      7        1      0
+  AcquireImageCanvas                     7      5        2      0
+  MagickSafeReciprocalLD                 7      3        4      0
+  ClearPixelChannelsRow                  6      3        3      0
+  EvaluatePixel                          6      6        0      0
+  ClearPolynomialPixels                  6      5        1      0
+  AcquirePixelListTLS                    6      4        2      0
+  GetNonpeakPixelList                    6      6        0      0
+  DestroyPixelTLS                        4      2        2      0
+  ApplyFunctionToPixel                   4      4        0      0
+  DestroyPixelListTLS                    4      2        2      0
+  GetSkipListLevel                       4      1        3      0
+  GetModePixelList                       4      3        1      0
+  ResetPixelList                         4      3        1      0
+  GetImageExtrema                        3      0        0      3
+  ResetChannelStatistics                 3      2        1      0
+  AcquirePixelList                       3      3        0      0
+  InsertPixelList                        3      3        0      0
+  IsPixelListStatistic                   3      3        0      0
+  EvaluateMax                            2      1        1      0
+  GetImageEntropy                        2      1        1      0
+  GetImageKurtosis                       2      1        1      0
+  GetImageMean                           2      1        1      0
+  GetImageMedian                         2      1        1      0
+  NormalizeChannelSums                   2      0        2      0
+  DestroyPixelList                       2      0        2      0
+  GetMedianPixelList                     2      2        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  statistic.c:154:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) rows; i++)
+    x  statistic.c:155:19 cxx_ne_to_eq               if (pixels[i] != (PixelChannels *) NULL)
+    x  statistic.c:167:15 cxx_lt_to_ge               for (j=0; j < (ssize_t) columns; j++)
+    x  statistic.c:172:17 cxx_lt_to_ge               for (k=0; k < MaxPixelChannels; k++)
+    x  statistic.c:172:17 cxx_lt_to_le               for (k=0; k < MaxPixelChannels; k++)
+    x  statistic.c:198:30 cxx_mul_to_div             (void) memset(pixels,0,rows*sizeof(*pixels));
+    x  statistic.c:207:5 cxx_remove_void_call       ClearPixelChannelsRow(pixels,i,columns);
+    x  statistic.c:214:9 cxx_gt_to_ge               if (x > y)
+    x  statistic.c:240:19 cxx_lt_to_le               return(distance < 0.0 ? -1 : distance > 0.0 ? 1 : 0);
+    xc statistic.c:338:41 cxx_ge_to_gt               if ((QuantumScale*(double) pixel) >= MagickEpsilon)
+    xc statistic.c:387:23 cxx_le_to_lt               if (fabs(value) <= MagickEpsilon)
+    xc statistic.c:389:27 cxx_lt_to_le               if (((double) pixel < 0.0) && ((value-floor(value)) > MagickEpsilon))
+    xc statistic.c:389:59 cxx_gt_to_ge               if (((double) pixel < 0.0) && ((value-floor(value)) > MagickEpsilon))
+    x  statistic.c:476:20 cxx_gt_to_ge               if (p->columns > columns)
+    x  statistic.c:478:17 cxx_gt_to_ge               if (p->rows > rows)
+    x  statistic.c:527:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:633:25 cxx_lt_to_le               for (i=0; i < MaxPixelChannels; i++)
+    x  statistic.c:652:23 cxx_lt_to_le               for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    x  statistic.c:665:38 cxx_ne_to_eq               if (images->progress_monitor != (MagickProgressMonitor) NULL)
+       statistic.c:673:21 cxx_post_inc_to_post_dec   progress++;
+       statistic.c:676:25 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  statistic.c:739:23 cxx_lt_to_le               for (i=0; i < MaxPixelChannels; i++)
+    x  statistic.c:768:27 cxx_lt_to_le               for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    x  statistic.c:774:27 cxx_lt_to_le               for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    x  statistic.c:783:27 cxx_lt_to_le               for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    x  statistic.c:794:23 cxx_lt_to_le               for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    x  statistic.c:807:38 cxx_ne_to_eq               if (images->progress_monitor != (MagickProgressMonitor) NULL)
+       statistic.c:815:21 cxx_post_inc_to_post_dec   progress++;
+       statistic.c:818:25 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  statistic.c:823:15 cxx_lt_to_ge               for (n=0; n < (ssize_t) number_images; n++)
+    xc statistic.c:888:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc statistic.c:931:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+     c statistic.c:939:17 cxx_post_inc_to_post_dec   progress++;
+     c statistic.c:941:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  statistic.c:1047:18 cxx_le_to_lt               if (result <= -1.0)
+    x  statistic.c:1050:20 cxx_ge_to_gt               if (result >= 1.0)
+    x  statistic.c:1122:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:1162:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       statistic.c:1170:17 cxx_post_inc_to_post_dec   progress++;
+       statistic.c:1172:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  statistic.c:1215:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:1316:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:1370:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:1422:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:1496:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:1599:25 cxx_sub_to_add             M22[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+    x  statistic.c:1599:46 cxx_mul_to_div             M22[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+    x  statistic.c:1599:49 cxx_sub_to_add             M22[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+    x  statistic.c:1599:70 cxx_mul_to_div             M22[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+    x  statistic.c:1600:13 cxx_sub_to_add             (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+    x  statistic.c:1600:34 cxx_mul_to_div             (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+    x  statistic.c:1600:37 cxx_sub_to_add             (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+    x  statistic.c:1600:58 cxx_mul_to_div             (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+    x  statistic.c:1602:39 cxx_sub_to_add             M22[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+    x  statistic.c:1602:60 cxx_mul_to_div             M22[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+    x  statistic.c:1602:63 cxx_sub_to_add             M22[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+    x  statistic.c:1603:31 cxx_mul_to_div             centroid[channel].x)*(y-centroid[channel].y)*(y-centroid[channel].y)*
+    x  statistic.c:1603:34 cxx_sub_to_add             centroid[channel].x)*(y-centroid[channel].y)*(y-centroid[channel].y)*
+    x  statistic.c:1603:55 cxx_mul_to_div             centroid[channel].x)*(y-centroid[channel].y)*(y-centroid[channel].y)*
+    x  statistic.c:1603:58 cxx_sub_to_add             centroid[channel].x)*(y-centroid[channel].y)*(y-centroid[channel].y)*
+    x  statistic.c:1603:79 cxx_mul_to_div             centroid[channel].x)*(y-centroid[channel].y)*(y-centroid[channel].y)*
+    x  statistic.c:1645:22 cxx_lt_to_le               if (fabs(M11[c]) < 0.0)
+       statistic.c:1647:25 cxx_sub_to_add             if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+       statistic.c:1647:34 cxx_ge_to_gt               if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+       statistic.c:1647:34 cxx_ge_to_lt               if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+       statistic.c:1647:53 cxx_sub_to_add             if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+       statistic.c:1647:62 cxx_lt_to_ge               if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+       statistic.c:1647:62 cxx_lt_to_le               if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+    x  statistic.c:1653:26 cxx_sub_to_add             if (fabs(M20[c]-M02[c]) >= 0.0)
+    x  statistic.c:1653:35 cxx_ge_to_gt               if (fabs(M20[c]-M02[c]) >= 0.0)
+    x  statistic.c:1655:35 cxx_lt_to_le               if ((M20[c]-M02[c]) < 0.0)
+    x  statistic.c:1662:25 cxx_sub_to_add             if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+    x  statistic.c:1662:34 cxx_ge_to_gt               if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+    x  statistic.c:1822:29 cxx_le_to_lt               for (channel=0; channel <= MaxPixelChannels; channel++)
+    x  statistic.c:1823:19 cxx_lt_to_le               for (j=0; j < MaximumNumberOfPerceptualHashes; j++)
+    x  statistic.c:1875:23 cxx_gt_to_ge               if ((double) p[i] > (*channel_maxima))
+    x  statistic.c:1877:23 cxx_lt_to_le               if ((double) p[i] < (*channel_minima))
+    x  statistic.c:1906:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:1914:15 cxx_lt_to_le               for (y=0; y < (ssize_t) image->rows; y++)
+    x  statistic.c:1944:32 cxx_gt_to_ge               if (channel_range.maxima > range_info.maxima)
+    x  statistic.c:1946:32 cxx_lt_to_le               if (channel_range.minima < range_info.minima)
+    xc statistic.c:2006:14 cxx_add_to_sub             l = low+1,
+    xc statistic.c:2014:25 cxx_gt_to_ge               if (pixels[low] > pixels[high])
+    xc statistic.c:2018:21 cxx_gt_to_ge               if (pixels[mid] > pixels[high])
+    xc statistic.c:2020:21 cxx_gt_to_ge               if (pixels[low] > pixels[high])
+    xc statistic.c:2022:21 cxx_gt_to_ge               if (pixels[mid] > pixels[low])
+    xc statistic.c:2027:34 cxx_gt_to_ge               do l++; while (pixels[low] > pixels[l]);
+    xc statistic.c:2029:13 cxx_lt_to_le               if (h < l)
+    xc statistic.c:2034:11 cxx_le_to_lt               if (h <= median)
+    xc statistic.c:2036:11 cxx_ge_to_gt               if (h >= median)
+    xc statistic.c:2049:10 cxx_lt_to_le               sign=x < 0.0 ? -1.0 : 1.0;
+    xc statistic.c:2050:12 cxx_mul_to_div             if ((sign*x) >= MagickEpsilon)
+    xc statistic.c:2050:16 cxx_ge_to_gt               if ((sign*x) >= MagickEpsilon)
+    xc statistic.c:2052:14 cxx_div_to_mul             return(sign/MagickEpsilon);
+    xc statistic.c:2084:16 cxx_gt_to_ge               if (cs->area > 1.0)
+     c statistic.c:2088:49 cxx_div_to_mul             cs->standard_deviation=(double) sqrtl(cs->M2/((long double)
+    xc statistic.c:2090:38 cxx_mul_to_div             cs->variance=cs->standard_deviation*cs->standard_deviation;
+    xc statistic.c:2106:20 cxx_gt_to_ge               if (cs->area > 1.0)
+    xc statistic.c:2126:15 cxx_le_to_lt               for (i=0; i <= (ssize_t) MaxPixelChannels; i++)
+    xc statistic.c:2162:16 cxx_gt_to_ge               if (cs->area > 0.0)
+    xc statistic.c:2162:16 cxx_gt_to_le               if (cs->area > 0.0)
+    xc statistic.c:2205:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+     c statistic.c:2214:21 cxx_ne_to_eq               if (histogram != (double *) NULL)
+     c statistic.c:2216:30 cxx_ne_to_eq               if (channel_statistics != (ChannelStatistics *) NULL)
+    xc statistic.c:2268:31 cxx_gt_to_ge               if (cs->depth > channel_statistics[CompositePixelChannel].depth)
+    xc statistic.c:2268:31 cxx_gt_to_le               if (cs->depth > channel_statistics[CompositePixelChannel].depth)
+    xc statistic.c:2275:27 cxx_lt_to_le               if ((double) p[i] < cs->minima)
+    xc statistic.c:2277:27 cxx_gt_to_ge               if ((double) p[i] > cs->maxima)
+    xc statistic.c:2288:37 cxx_mul_to_div             cs->sum_cubed+=(double) p[i]*(double) p[i]*(double) p[i];
+    xc statistic.c:2289:44 cxx_mul_to_div             cs->sum_fourth_power+=(double) p[i]*(double) p[i]*(double) p[i]*
+    xc statistic.c:2289:58 cxx_mul_to_div             cs->sum_fourth_power+=(double) p[i]*(double) p[i]*(double) p[i]*
+    xc statistic.c:2296:15 cxx_lt_to_le               for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    xc statistic.c:2324:5 cxx_remove_void_call       NormalizeChannelSums(cs);
+    xc statistic.c:2342:75 cxx_div_to_mul             channel_statistics[CompositePixelChannel].entropy+=((double) entropy/
+    xc statistic.c:2419:27 cxx_lt_to_le               if (cs_comp->maxima < cs->maxima)
+    xc statistic.c:2421:27 cxx_gt_to_ge               if (cs_comp->minima > cs->minima)
+    x  statistic.c:2498:17 cxx_lt_to_le               for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    x  statistic.c:2519:17 cxx_lt_to_le               for (i=0; i < MaxPixelChannels; i++)
+    x  statistic.c:2551:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:2616:17 cxx_lt_to_le               for (j=0; j < (ssize_t) number_images; j++)
+    x  statistic.c:2621:13 cxx_ge_to_gt               if (j >= (ssize_t) number_terms)
+    x  statistic.c:2632:21 cxx_lt_to_le               for (i=0; i < (ssize_t) GetPixelChannels(next); i++)
+    x  statistic.c:2657:34 cxx_ne_to_eq               if (images->progress_monitor != (MagickProgressMonitor) NULL)
+       statistic.c:2665:17 cxx_post_inc_to_post_dec   progress++;
+       statistic.c:2668:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  statistic.c:2744:18 cxx_eq_to_ne               if (pixel_list == (PixelList *) NULL)
+    x  statistic.c:2746:35 cxx_ne_to_eq               if (pixel_list->skip_list.nodes != (SkipNode *) NULL)
+    x  statistic.c:2759:15 cxx_lt_to_ge               for (i=0; i < (ssize_t) GetMagickResourceLimit(ThreadResource); i++)
+    x  statistic.c:2760:23 cxx_ne_to_eq               if (pixel_list[i] != (PixelList *) NULL)
+    x  statistic.c:2803:44 cxx_mul_to_div             (void) memset(pixel_list,0,number_threads*sizeof(*pixel_list));
+    x  statistic.c:2804:15 cxx_lt_to_le               for (i=0; i < (ssize_t) number_threads; i++)
+    x  statistic.c:2820:39 cxx_mul_to_div             pixel_list->seed=(pixel_list->seed*42893621L)+1L;
+    x  statistic.c:2820:50 cxx_add_to_sub             pixel_list->seed=(pixel_list->seed*42893621L)+1L;
+    x  statistic.c:2821:36 cxx_ne_to_eq               if ((pixel_list->seed & 0x300) != 0x300)
+    x  statistic.c:2852:41 cxx_lt_to_le               while (p->nodes[search].next[level] < color)
+    x  statistic.c:2860:13 cxx_gt_to_ge               if (level > 8)
+    x  statistic.c:2860:13 cxx_gt_to_le               if (level > 8)
+    x  statistic.c:2862:13 cxx_gt_to_ge               if (level > (p->level+2))
+    x  statistic.c:2862:24 cxx_add_to_sub             if (level > (p->level+2))
+    x  statistic.c:2867:16 cxx_gt_to_ge               while (level > p->level)
+    x  statistic.c:2937:18 cxx_lt_to_le               } while (count < (ssize_t) pixel_list->length);
+    x  statistic.c:3013:41 cxx_post_inc_to_post_dec   pixel_list->seed=pixel_list->signature++;
+    x  statistic.c:3052:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  statistic.c:3168:36 cxx_lt_to_le               if ((double) pixels[i] < minimum)
+    x  statistic.c:3170:36 cxx_gt_to_ge               if ((double) pixels[i] > maximum)
+    x  statistic.c:3240:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       statistic.c:3248:17 cxx_post_inc_to_post_dec   progress++;
+       statistic.c:3250:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-statistic.json

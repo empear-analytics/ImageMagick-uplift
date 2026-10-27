@@ -1,0 +1,180 @@
+mutate: 452 mutants in MagickCore/color\.c$, 39 functions
+  baseline: 315/315 (32s)
+mutate: 9 case(s) time out unmutated and are left out: gaps/3f0f18253e gaps/6a95c6af85 opencl/2124a0eb45 opencl/a8cc3ebf48 windrv/3ebc524471 windrv/41c234a591 windrv/7d14ba511e windrv/93dbbb465a windrv/cd7ea480a0
+mutate: baseline over 15876 cases in 33s
+  mutants: 25/452 (30s)
+  mutants: 50/452 (50s)
+  mutants: 75/452 (51s)
+  mutants: 100/452 (52s)
+  mutants: 125/452 (64s)
+  mutants: 150/452 (77s)
+  mutants: 175/452 (111s)
+  mutants: 200/452 (113s)
+  mutants: 225/452 (228s)
+  mutants: 250/452 (257s)
+  mutants: 275/452 (273s)
+  mutants: 300/452 (280s)
+  mutants: 325/452 (292s)
+  mutants: 350/452 (297s)
+  mutants: 375/452 (307s)
+  mutants: 400/452 (330s)
+  mutants: 425/452 (340s)
+  mutants: 450/452 (439s)
+  mutants: 452/452 (479s)
+
+mutate: 452 mutants, 479s
+  killed 323, survived 107 (79 capped), no coverage 22, errors 0
+  mutation score on reached code: 75.1%   overall: 71.5%
+
+  function                           total killed survived no-cov
+  QueryColorCompliance                  63     50       13      0
+  LoadColorCache                        37      2       35      0
+  QueryColorFunction                    37     32        5      0
+  IsEquivalentImage                     33     26        7      0
+  ConcatenateColorComponent             30     28        2      0
+  GetColorTuple                         24     20        4      0
+  GetColorCompliance                    15     12        3      0
+  ParseCSSColor                         15     13        2      0
+  SetHueColorFromGeometry               15     12        3      0
+  IsSVGCompliant                        13     10        3      0
+  ListColorInfo                         13     13        0      0
+  IsColorNameMatch                      13      9        4      0
+  GetColorInfoList                      12     11        1      0
+  GetColorList                          12      0        0     12
+  QueryColorname                        12     11        1      0
+  AcquireColorCache                      8      5        3      0
+  IsColorCacheInstantiated               7      5        2      0
+  ColorComponentTerminus                 6      3        3      0
+  ConcatenateHexColorComponent           6      6        0      0
+  IsEquivalentAlpha                      6      6        0      0
+  IsHexColorLength                       6      6        0      0
+  SetOklchColorFromGeometry              6      0        0      6
+  SetScaledColorFromGeometry             6      6        0      0
+  SetPsiColorFromGeometry                6      5        1      0
+  IsEquivalentIntensity                  5      5        0      0
+  SetColorInfoAttribute                  5      5        0      0
+  IsInvalidHexAlphaLength                5      2        3      0
+  IsHueColorspaceName                    5      5        0      0
+  SetLabColorFromGeometry                4      4        0      0
+  QueryColorFromCSSName                  4      0        0      4
+  DestroyColorElement                    3      1        2      0
+  IsPercentColorComponent                3      3        0      0
+  IsLCHColorspace                        3      3        0      0
+  IsIncludeElementOpen                   3      0        3      0
+  SetColorInfoCompliance                 3      3        0      0
+  GetIncludePath                         3      0        3      0
+  SetGrayColorFromGeometry               3      0        3      0
+  ColorComponentGenesis                  1      0        1      0
+  ColorInfoCompare                       1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    xc color.c:861:19 cxx_ne_to_eq               while (option != (const StringInfo *) NULL)
+    xc color.c:875:15 cxx_lt_to_le               for (i=0; i < (ssize_t) (sizeof(Colormap)/sizeof(*Colormap)); i++)
+    xc color.c:894:5 cxx_remove_void_call       GetPixelInfo((Image *) NULL,&color_info->color);
+    xc color.c:930:23 cxx_eq_to_ne               if (color_semaphore == (SemaphoreInfo *) NULL)
+    xc color.c:962:19 cxx_ne_to_eq               if (p->path != (char *) NULL)
+    xc color.c:964:19 cxx_ne_to_eq               if (p->name != (char *) NULL)
+    xc color.c:973:23 cxx_eq_to_ne               if (color_semaphore == (SemaphoreInfo *) NULL)
+     c color.c:974:5 cxx_remove_void_call       ActivateSemaphoreInfo(&color_semaphore);
+    xc color.c:979:3 cxx_remove_void_call       RelinquishSemaphoreInfo(&color_semaphore);
+    xc color.c:1034:24 cxx_ne_to_eq               for (q=colorname; *q != '\0'; q++)
+    xc color.c:1050:13 cxx_ne_to_eq               if (p != (ElementInfo *) NULL)
+    xc color.c:1069:5 cxx_remove_void_call       SetHeadElementInLinkedList(color_cache,p);
+    xc color.c:1156:49 cxx_sub_to_add             (fabs((double) (SVGCompliant(pixel->black)-pixel->black)) >= SVGEpsilon))
+    xc color.c:1156:65 cxx_ge_to_gt               (fabs((double) (SVGCompliant(pixel->black)-pixel->black)) >= SVGEpsilon))
+    xc color.c:1156:65 cxx_ge_to_lt               (fabs((double) (SVGCompliant(pixel->black)-pixel->black)) >= SVGEpsilon))
+    xc color.c:1202:23 cxx_ne_to_eq               if ((compliance != NoCompliance) &&
+    xc color.c:1216:23 cxx_ne_to_eq               if ((compliance != NoCompliance) &&
+    x  color.c:1341:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc color.c:1575:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc color.c:1597:20 cxx_gt_to_ge               if ((color.depth > 8) && (IsSVGCompliant(pixel) != MagickFalse))
+    xc color.c:1597:20 cxx_gt_to_le               if ((color.depth > 8) && (IsSVGCompliant(pixel) != MagickFalse))
+    xc color.c:1597:51 cxx_ne_to_eq               if ((color.depth > 8) && (IsSVGCompliant(pixel) != MagickFalse))
+    xc color.c:1657:27 cxx_eq_to_ne               if (color_semaphore == (SemaphoreInfo *) NULL)
+     c color.c:1658:9 cxx_remove_void_call       ActivateSemaphoreInfo(&color_semaphore);
+    x  color.c:1785:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  color.c:1789:3 cxx_remove_void_call       GetPixelInfo(image,&pixel);
+    x  color.c:1790:3 cxx_remove_void_call       GetPixelInfo(image,&target);
+    x  color.c:1795:14 cxx_eq_to_ne               for (x=y == 0 ? *x_offset : 0; x < (ssize_t) image->columns; x++)
+    x  color.c:1799:21 cxx_lt_to_le               for (i=0; i < (ssize_t) target_image->columns; i++)
+    x  color.c:1820:33 cxx_ne_to_eq               if (image->progress_monitor != (MagickProgressMonitor) NULL)
+       color.c:1827:21 cxx_eq_to_ne               if (proceed == MagickFalse)
+    x  color.c:2004:20 cxx_ne_to_eq               return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    x  color.c:2004:43 cxx_ne_to_eq               return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    x  color.c:2004:59 cxx_ne_to_eq               return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    x  color.c:2026:3 cxx_remove_void_call       GetPathComponent(filename,HeadPath,path);
+    x  color.c:2027:13 cxx_ne_to_eq               if (*path != '\0')
+    x  color.c:2030:14 cxx_eq_to_ne               if (*token == *DirectorySeparator)
+    xc color.c:2124:23 cxx_add_to_sub             extent=strlen(token)+MagickPathExtent;
+    xc color.c:2125:27 cxx_ne_to_eq               for (q=(char *) xml; *q != '\0'; )
+    xc color.c:2131:16 cxx_eq_to_ne               if (*token == '\0')
+    xc color.c:2134:47 cxx_eq_to_ne               if (LocaleNCompare(keyword,"<!DOCTYPE",9) == 0)
+    xc color.c:2143:20 cxx_ne_to_eq               for ( ; *q != '\0'; q++)
+    xc color.c:2145:21 cxx_ne_to_eq               if (quote != 0)
+    xc color.c:2147:22 cxx_eq_to_ne               if (*q == quote)
+    xc color.c:2152:23 cxx_eq_to_ne               if ((*q == '"') || (*q == '\''))
+    xc color.c:2152:38 cxx_eq_to_ne               if ((*q == '"') || (*q == '\''))
+    xc color.c:2155:24 cxx_eq_to_ne               if (*q == '[')
+    xc color.c:2156:32 cxx_post_inc_to_post_dec   bracket_depth++;
+    xc color.c:2158:26 cxx_eq_to_ne               if (*q == ']')
+    xc color.c:2160:41 cxx_gt_to_ge               if (bracket_depth > 0)
+    xc color.c:2160:41 cxx_gt_to_le               if (bracket_depth > 0)
+    xc color.c:2164:29 cxx_eq_to_ne               if ((*q == '>') && (bracket_depth == 0))
+    xc color.c:2164:55 cxx_eq_to_ne               if ((*q == '>') && (bracket_depth == 0))
+    xc color.c:2173:42 cxx_eq_to_ne               if (LocaleNCompare(keyword,"<!--",4) == 0)
+    xc color.c:2178:42 cxx_ne_to_eq               while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    xc color.c:2178:55 cxx_ne_to_eq               while ((LocaleNCompare(q,"->",2) != 0) && (*q != '\0'))
+    xc color.c:2182:43 cxx_eq_to_ne               if (LocaleCompare(keyword,"<include") == 0)
+    xc color.c:2187:46 cxx_ne_to_eq               while (IsIncludeElementOpen(token,q) != MagickFalse)
+    xc color.c:2191:22 cxx_ne_to_eq               if (*token != '=')
+    xc color.c:2194:45 cxx_eq_to_ne               if (LocaleCompare(keyword,"file") == 0)
+    xc color.c:2196:25 cxx_ge_to_gt               if (depth >= MagickMaxRecursionDepth)
+    xc color.c:2196:25 cxx_ge_to_lt               if (depth >= MagickMaxRecursionDepth)
+    xc color.c:2205:19 cxx_remove_void_call       GetIncludePath(filename,token,path);
+    xc color.c:2207:32 cxx_ne_to_eq               if (file_xml != (char *) NULL)
+     c color.c:2210:35 cxx_add_to_sub             path,depth+1,exception);
+    xc color.c:2218:41 cxx_eq_to_ne               if (LocaleCompare(keyword,"<color") == 0)
+    xc color.c:2226:20 cxx_eq_to_ne               if (color_info == (ColorInfo *) NULL)
+    xc color.c:2228:38 cxx_eq_to_ne               if ((LocaleCompare(keyword,"/>") == 0) ||
+    xc color.c:2229:45 cxx_eq_to_ne               (LocaleCompare(keyword,"</policy>") == 0))
+    xc color.c:2232:20 cxx_eq_to_ne               if (status == MagickFalse)
+    xc color.c:2240:16 cxx_ne_to_eq               if (*token != '=')
+    xc color.c:2244:5 cxx_remove_void_call       SetColorInfoAttribute(color_info,keyword,token,exception);
+    x  color.c:2296:3 cxx_remove_void_call       SetGeometryInfo(geometry_info);
+    x  color.c:2303:16 cxx_lt_to_le               for (i=0; (i < 5) && (*q != ')') && (*q != '\0'); i++)
+    xc color.c:2376:38 cxx_ne_to_eq               return(((n != 4) && (n != 8) && (n != 16) && (n != 32) && (n != 64)) ?
+    xc color.c:2376:51 cxx_ne_to_eq               return(((n != 4) && (n != 8) && (n != 16) && (n != 32) && (n != 64)) ?
+    xc color.c:2376:64 cxx_ne_to_eq               return(((n != 4) && (n != 8) && (n != 16) && (n != 32) && (n != 64)) ?
+       color.c:2443:71 cxx_mul_to_div             color->alpha=(double) ClampToQuantum((MagickRealType) (scale*
+    x  color.c:2476:57 cxx_add_to_sub             ConvertHSBToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
+    x  color.c:2482:57 cxx_add_to_sub             ConvertHSLToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
+    x  color.c:2488:57 cxx_add_to_sub             ConvertHSVToRGB(fmod(fmod(geometry_info.rho,360.0)+360.0,360.0)/
+    x  color.c:2512:29 cxx_ne_to_eq               if (((flags & SigmaValue) != 0) &&
+    x  color.c:2513:27 cxx_ne_to_eq               (color->alpha_trait != UndefinedPixelTrait))
+       color.c:2514:63 cxx_mul_to_div             color->alpha=(double) ClampToQuantum((double) QuantumRange*
+    x  color.c:2604:3 cxx_remove_void_call       LocaleLower(colorspace);
+    x  color.c:2606:10 cxx_gt_to_ge               if ((i > 0) && (colorspace[i] == 'a'))
+    x  color.c:2612:12 cxx_lt_to_le               if (type < 0)
+    x  color.c:2624:9 cxx_ge_to_gt               if (i >= (ssize_t) strlen(name))
+       color.c:2631:6 cxx_remove_void_call       SetOklchColorFromGeometry(color,geometry_info,flags);
+    xc color.c:2672:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    xc color.c:2674:20 cxx_gt_to_ge               if (strlen(name) > MagickPathExtent)
+    xc color.c:2682:3 cxx_remove_void_call       GetPixelInfo((Image *) NULL,color);
+    xc color.c:2714:36 cxx_le_to_lt               if ((c >= '0') && (c <= '9'))
+    xc color.c:2717:24 cxx_ge_to_gt               if ((c >= 'A') && (c <= 'F'))
+    xc color.c:2717:24 cxx_ge_to_lt               if ((c >= 'A') && (c <= 'F'))
+    xc color.c:2717:38 cxx_le_to_lt               if ((c >= 'A') && (c <= 'F'))
+    xc color.c:2718:48 cxx_sub_to_add             pixel.blue|=(unsigned int) (c-('A'-10));
+    xc color.c:2720:26 cxx_ge_to_gt               if ((c >= 'a') && (c <= 'f'))
+    xc color.c:2746:36 cxx_le_to_lt               if ((c >= '0') && (c <= '9'))
+    xc color.c:2749:24 cxx_ge_to_gt               if ((c >= 'A') && (c <= 'F'))
+    xc color.c:2750:48 cxx_sub_to_add             pixel.alpha|=(unsigned int) c-('A'-10);
+    xc color.c:2752:26 cxx_ge_to_gt               if ((c >= 'a') && (c <= 'f'))
+    xc color.c:2843:52 cxx_lt_to_le               ((fabs((double) (value->color.red-color->red)) < MagickEpsilon)) &&
+    xc color.c:2844:55 cxx_lt_to_le               (fabs((double) (value->color.green-color->green)) < MagickEpsilon) &&
+    xc color.c:2845:53 cxx_lt_to_le               (fabs((double) (value->color.blue-color->blue)) < MagickEpsilon) &&
+    xc color.c:2846:48 cxx_lt_to_le               (fabs((double) (value->color.alpha-alpha)) < MagickEpsilon)) ?
+    xc color.c:2871:23 cxx_gt_to_ge               if (pixel.depth > 16)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-color.json

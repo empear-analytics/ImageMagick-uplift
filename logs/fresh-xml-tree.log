@@ -1,0 +1,246 @@
+mutate: 648 mutants in MagickCore/xml-tree\.c$, 51 functions
+  baseline: 1/1 (30s)
+mutate: 1 case(s) time out unmutated and are left out: gaps/3f0f18253e
+mutate: baseline over 1635 cases in 31s
+  mutants: 25/648 (0s)
+  mutants: 50/648 (1s)
+  mutants: 75/648 (14s)
+  mutants: 100/648 (26s)
+  mutants: 125/648 (146s)
+  mutants: 150/648 (146s)
+  mutants: 175/648 (162s)
+  mutants: 200/648 (175s)
+  mutants: 225/648 (182s)
+  mutants: 250/648 (185s)
+  mutants: 275/648 (191s)
+  mutants: 300/648 (192s)
+  mutants: 325/648 (196s)
+  mutants: 350/648 (199s)
+  mutants: 375/648 (201s)
+  mutants: 400/648 (205s)
+  mutants: 425/648 (207s)
+  mutants: 450/648 (214s)
+  mutants: 475/648 (216s)
+  mutants: 500/648 (221s)
+  mutants: 525/648 (224s)
+  mutants: 550/648 (231s)
+  mutants: 575/648 (233s)
+  mutants: 600/648 (234s)
+  mutants: 625/648 (235s)
+  mutants: 648/648 (351s)
+
+mutate: 648 mutants, 351s
+  killed 494, survived 154 (32 capped), no coverage 0, errors 0
+  mutation score on reached code: 76.2%   overall: 76.2%
+
+  function                           total killed survived no-cov
+  NewXMLTree                           115    106        9      0
+  ParseInternalDoctype                  75     69        6      0
+  ParseEntities                         55     49        6      0
+  XMLTreeTagToXML                       50     45        5      0
+  ConvertUTF16ToUTF8                    43     17       26      0
+  XMLTreeInfoToXML                      42     39        3      0
+  FileToXML                             34      3       31      0
+  ParseProcessingInstructions           28     26        2      0
+  InsertTagIntoXMLTree                  20     18        2      0
+  AddPathToXMLTree                      13      9        4      0
+  DestroyXMLRootAttributes              13      3       10      0
+  ValidateEntities                      12     10        2      0
+  EncodePredefinedEntities              10      9        1      0
+  DestroyXMLTreeRoot                     9      5        4      0
+  GetRootXMLAttribute                    9      9        0      0
+  DestroyXMLTreeAttributes               8      3        5      0
+  DestroyXMLTree_                        8      0        8      0
+  DestroyXMLRootInstructions             6      2        4      0
+  GetXMLTreeAttribute                    6      5        1      0
+  IsEntityReference                      6      3        3      0
+  IsDisallowedControlChar                5      5        0      0
+  IsEntityTextChar                       5      3        2      0
+  IsXMLNameStart                         5      4        1      0
+  CanonicalXMLContent                    4      4        0      0
+  GetOrderedXMLNode                      4      3        1      0
+  IsUnseekableXMLFile                    4      3        1      0
+  GetXMLTreeChild                        4      3        1      0
+  ParseCharacterContent                  4      3        1      0
+  IsTagNotClosed                         4      4        0      0
+  IsCollapsibleSpace                     3      3        0      0
+  IsCharacterContentSkipped              3      3        0      0
+  IsUnmatchedCloseTag                    3      3        0      0
+  IsDoctypeTextChar                      3      3        0      0
+  IsOtherAttributeList                   3      1        2      0
+  IsSkipTag                              3      3        0      0
+  IsNameStartOutsideIgnore               3      2        1      0
+  IsOtherDefaultAttribute                3      1        2      0
+  IsTagClosed                            3      1        2      0
+  IsUnterminatedSection                  3      3        0      0
+  AddChildToXMLTree                      2      2        0      0
+  DestroyXMLTreeChild                    2      1        1      0
+  DestroyXMLTreeOrdered                  2      1        1      0
+  ParseOpenTag                           2      2        0      0
+  SetXMLTreeContent                      2      0        2      0
+  EncodeBase64XMLContent                 1      1        0      0
+  GetNextXMLTreeTag                      1      0        1      0
+  GetXMLTreeContent                      1      0        1      0
+  GetXMLTreeSibling                      1      0        1      0
+  GetXMLTreeTag                          1      0        1      0
+  ParseCloseTag                          1      1        0      0
+  NewXMLTreeTag                          1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  xml-tree.c:211:34 cxx_le_to_lt               (node->next->offset <= offset))
+    x  xml-tree.c:218:21 cxx_ne_to_eq               if ((previous != (XMLTreeInfo *) NULL) && (node != (XMLTreeInfo *) NULL))
+       xml-tree.c:346:14 cxx_eq_to_ne               if (node == (XMLTreeInfo *) NULL)
+    x  xml-tree.c:373:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:381:5 cxx_remove_void_call       GetPathComponent(components[i],SubimagePath,subnode);
+    x  xml-tree.c:394:13 cxx_lt_to_le               for ( ; i < (ssize_t) number_components; i++)
+    x  xml-tree.c:394:45 cxx_post_inc_to_post_dec   for ( ; i < (ssize_t) number_components; i++)
+    x  xml-tree.c:434:19 cxx_eq_to_ne               if ((attributes == (char **) NULL) || (attributes == sentinel))
+    x  xml-tree.c:436:27 cxx_ne_to_eq               for (i=0; attributes[i] != (char *) NULL; i+=2)
+    x  xml-tree.c:441:23 cxx_ne_to_eq               if (attributes[i] != (char *) NULL)
+    x  xml-tree.c:443:21 cxx_add_to_sub             if (attributes[i+1] != (char *) NULL)
+    x  xml-tree.c:443:25 cxx_ne_to_eq               if (attributes[i+1] != (char *) NULL)
+    x  xml-tree.c:463:38 cxx_add_to_sub             (void) DestroyXMLTree_(node,depth+1);
+    x  xml-tree.c:480:38 cxx_add_to_sub             (void) DestroyXMLTree_(node,depth+1);
+    x  xml-tree.c:493:33 cxx_ne_to_eq               for (i=0; root->attributes[i] != (char **) NULL; i++)
+    x  xml-tree.c:496:23 cxx_ne_to_eq               if (attributes[0] != (char *) NULL)
+    x  xml-tree.c:498:29 cxx_ne_to_eq               for (j=1; attributes[j] != (char *) NULL; j+=3)
+    x  xml-tree.c:500:25 cxx_ne_to_eq               if (attributes[j] != (char *) NULL)
+    x  xml-tree.c:502:23 cxx_add_to_sub             if (attributes[j+1] != (char *) NULL)
+    x  xml-tree.c:502:27 cxx_ne_to_eq               if (attributes[j+1] != (char *) NULL)
+    x  xml-tree.c:503:21 cxx_add_to_sub             attributes[j+1]=DestroyString(attributes[j+1]);
+    x  xml-tree.c:503:51 cxx_add_to_sub             attributes[j+1]=DestroyString(attributes[j+1]);
+    x  xml-tree.c:504:23 cxx_add_to_sub             if (attributes[j+2] != (char *) NULL)
+    x  xml-tree.c:504:27 cxx_ne_to_eq               if (attributes[j+2] != (char *) NULL)
+    x  xml-tree.c:517:46 cxx_ne_to_eq               for (i=0; root->processing_instructions[i] != (char **) NULL; i++)
+    x  xml-tree.c:519:51 cxx_ne_to_eq               for (j=0; root->processing_instructions[i][j] != (char *) NULL; j++)
+    x  xml-tree.c:522:39 cxx_add_to_sub             root->processing_instructions[i][j+1]=DestroyString(
+    x  xml-tree.c:523:41 cxx_add_to_sub             root->processing_instructions[i][j+1]);
+    x  xml-tree.c:542:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:551:21 cxx_add_to_sub             root->entities[i+1]=DestroyString(root->entities[i+1]);
+    x  xml-tree.c:553:3 cxx_remove_void_call       DestroyXMLRootAttributes(root);
+    x  xml-tree.c:557:5 cxx_remove_void_call       DestroyXMLRootInstructions(root);
+    x  xml-tree.c:566:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:568:13 cxx_ge_to_gt               if (depth >= MagickMaxRecursionDepth)
+    x  xml-tree.c:568:13 cxx_ge_to_lt               if (depth >= MagickMaxRecursionDepth)
+    x  xml-tree.c:570:3 cxx_remove_void_call       DestroyXMLTreeChild(xml_info,depth+1);
+    x  xml-tree.c:570:37 cxx_add_to_sub             DestroyXMLTreeChild(xml_info,depth+1);
+    x  xml-tree.c:571:3 cxx_remove_void_call       DestroyXMLTreeOrdered(xml_info,depth+1);
+    x  xml-tree.c:571:39 cxx_add_to_sub             DestroyXMLTreeOrdered(xml_info,depth+1);
+    x  xml-tree.c:572:3 cxx_remove_void_call       DestroyXMLTreeRoot(xml_info);
+    xc xml-tree.c:612:46 cxx_lt_to_le               return(((file == fileno(stdin)) || (offset < 0) ||
+    xc xml-tree.c:643:12 cxx_eq_to_ne               if (file == -1)
+     c xml-tree.c:660:36 cxx_eq_to_ne               if ((fstat(file,&file_stats) == 0) && (file_stats.st_size > 0))
+     c xml-tree.c:660:65 cxx_gt_to_ge               if ((fstat(file,&file_stats) == 0) && (file_stats.st_size > 0))
+     c xml-tree.c:660:65 cxx_gt_to_le               if ((fstat(file,&file_stats) == 0) && (file_stats.st_size > 0))
+     c xml-tree.c:663:21 cxx_ne_to_eq               for (i=0; xml != (char *) NULL; i+=(size_t) count)
+     c xml-tree.c:666:19 cxx_le_to_gt               if (count <= 0)
+     c xml-tree.c:666:19 cxx_le_to_lt               if (count <= 0)
+     c xml-tree.c:668:27 cxx_lt_to_ge               if (~((size_t) i) < (quantum+1))
+     c xml-tree.c:668:27 cxx_lt_to_le               if (~((size_t) i) < (quantum+1))
+     c xml-tree.c:668:37 cxx_add_to_sub             if (~((size_t) i) < (quantum+1))
+     c xml-tree.c:673:47 cxx_add_to_sub             xml=(char *) ResizeQuantumMemory(xml,i+quantum+1,sizeof(*xml));
+     c xml-tree.c:673:55 cxx_add_to_sub             xml=(char *) ResizeQuantumMemory(xml,i+quantum+1,sizeof(*xml));
+     c xml-tree.c:674:15 cxx_add_to_sub             if ((i+(size_t) count) >= extent)
+     c xml-tree.c:674:32 cxx_ge_to_gt               if ((i+(size_t) count) >= extent)
+     c xml-tree.c:674:32 cxx_ge_to_lt               if ((i+(size_t) count) >= extent)
+     c xml-tree.c:677:39 cxx_ne_to_eq               if (LocaleCompare(filename,"-") != 0)
+     c xml-tree.c:679:15 cxx_eq_to_ne               if (xml == (char *) NULL)
+     c xml-tree.c:681:16 cxx_eq_to_ne               if (file == -1)
+    xc xml-tree.c:692:15 cxx_ge_to_gt               if (~length >= (MagickPathExtent-1))
+     c xml-tree.c:693:45 cxx_add_to_sub             xml=(char *) AcquireQuantumMemory(length+MagickPathExtent,sizeof(*xml));
+    xc xml-tree.c:694:11 cxx_eq_to_ne               if (xml == (char *) NULL)
+     c xml-tree.c:700:11 cxx_ne_to_eq               if (map != (char *) NULL)
+     c xml-tree.c:708:19 cxx_lt_to_ge               for (i=0; i < length; i+=(size_t) count)
+     c xml-tree.c:708:19 cxx_lt_to_le               for (i=0; i < length; i+=(size_t) count)
+     c xml-tree.c:712:19 cxx_le_to_gt               if (count <= 0)
+     c xml-tree.c:712:19 cxx_le_to_lt               if (count <= 0)
+     c xml-tree.c:715:13 cxx_lt_to_ge               if (i < length)
+     c xml-tree.c:715:13 cxx_lt_to_le               if (i < length)
+     c xml-tree.c:717:32 cxx_sub_to_add             file=close_utf8(file)-1;
+     c xml-tree.c:723:35 cxx_ne_to_eq               if (LocaleCompare(filename,"-") != 0)
+     c xml-tree.c:725:12 cxx_eq_to_ne               if (file == -1)
+    x  xml-tree.c:757:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:823:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:867:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:904:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:936:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:968:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:1026:41 cxx_mul_to_div             (void) memcpy(utf8,content,*length*sizeof(*utf8));
+    x  xml-tree.c:1032:15 cxx_lt_to_le               for (i=2; i < (ssize_t) (*length-1); i+=2)
+    x  xml-tree.c:1032:35 cxx_sub_to_add             for (i=2; i < (ssize_t) (*length-1); i+=2)
+    x  xml-tree.c:1034:17 cxx_ne_to_eq               c=(encoding != 0) ? ((content[i] & 0xff) << 8) | (content[i+1] & 0xff) :
+    x  xml-tree.c:1034:64 cxx_add_to_sub             c=(encoding != 0) ? ((content[i] & 0xff) << 8) | (content[i+1] & 0xff) :
+    x  xml-tree.c:1035:18 cxx_add_to_sub             ((content[i+1] & 0xff) << 8) | (content[i] & 0xff);
+    x  xml-tree.c:1036:12 cxx_ge_to_gt               if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
+    x  xml-tree.c:1036:12 cxx_ge_to_lt               if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
+    x  xml-tree.c:1036:29 cxx_le_to_gt               if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
+    x  xml-tree.c:1036:29 cxx_le_to_lt               if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
+    x  xml-tree.c:1036:51 cxx_lt_to_ge               if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
+    x  xml-tree.c:1036:51 cxx_lt_to_le               if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
+    x  xml-tree.c:1036:71 cxx_sub_to_add             if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
+    x  xml-tree.c:1038:24 cxx_ne_to_eq               byte=(encoding != 0) ? ((content[i] & 0xff) << 8) |
+    x  xml-tree.c:1039:21 cxx_add_to_sub             (content[i+1] & 0xff) : ((content[i+1] & 0xff) << 8) |
+    x  xml-tree.c:1039:46 cxx_add_to_sub             (content[i+1] & 0xff) : ((content[i+1] & 0xff) << 8) |
+    x  xml-tree.c:1043:39 cxx_gt_to_ge               if ((size_t) (j+MagickPathExtent) > extent)
+    x  xml-tree.c:1047:18 cxx_eq_to_ne               if (utf8 == (char *) NULL)
+    x  xml-tree.c:1050:11 cxx_lt_to_le               if (c < 0x80)
+       xml-tree.c:1053:10 cxx_post_inc_to_post_dec   j++;
+    x  xml-tree.c:1060:23 cxx_ne_to_eq               for (bits=0; byte != 0; byte/=2)
+    x  xml-tree.c:1062:15 cxx_sub_to_add             bits=(bits-2)/5;
+    x  xml-tree.c:1063:34 cxx_sub_to_add             utf8[j++]=(char) ((0xFF << (7-bits)) | (c >> (6*bits)));
+    x  xml-tree.c:1063:52 cxx_mul_to_div             utf8[j++]=(char) ((0xFF << (7-bits)) | (c >> (6*bits)));
+    x  xml-tree.c:1064:17 cxx_ne_to_eq               while (bits != 0)
+    x  xml-tree.c:1073:12 cxx_ne_to_eq               if (utf8 != (char *) NULL)
+    x  xml-tree.c:1081:53 cxx_ne_to_eq               return(((*xml != '\0') && (*xml != '&') && ((*xml != '%') ||
+    x  xml-tree.c:1082:12 cxx_ne_to_eq               (state != '%')) &&
+    x  xml-tree.c:1090:12 cxx_eq_to_ne               (state == '*'))) || ((state == '%') && (*xml == '%'))) ? MagickTrue :
+    x  xml-tree.c:1090:33 cxx_eq_to_ne               (state == '*'))) || ((state == '%') && (*xml == '%'))) ? MagickTrue :
+    x  xml-tree.c:1090:50 cxx_eq_to_ne               (state == '*'))) || ((state == '%') && (*xml == '%'))) ? MagickTrue :
+    x  xml-tree.c:1206:34 cxx_ge_to_gt               ((length-1L) >= (size_t) (entity-xml)))
+    x  xml-tree.c:1212:64 cxx_add_to_sub             p=(char *) ResizeQuantumMemory(p,extent+1,sizeof(*p));
+    x  xml-tree.c:1213:31 cxx_ne_to_eq               if (p != (char *) NULL)
+    x  xml-tree.c:1225:55 cxx_mul_to_div             memset(extent_xml,0,extent*sizeof(*extent_xml));
+    x  xml-tree.c:1226:72 cxx_mul_to_div             (void) CopyMagickString(extent_xml,p,extent*
+    x  xml-tree.c:1267:16 cxx_ge_to_gt               if ((xml >= p) && (*xml == ' '))
+    x  xml-tree.c:1299:29 cxx_ne_to_eq               if (xml_info->content != (char *) NULL)
+    x  xml-tree.c:1335:13 cxx_ge_to_gt               if (depth >= MagickMaxRecursionDepth)
+    x  xml-tree.c:1346:25 cxx_ne_to_eq               while ((entities[i] != (char *) NULL) &&
+    x  xml-tree.c:1377:72 cxx_eq_to_ne               (strncmp(xml+strspn(xml+10,XMLWhitespace "='\"")+10,"yes",3) == 0))
+    x  xml-tree.c:1420:41 cxx_add_to_sub             if (root->processing_instructions[i][j+2] == (char *) NULL)
+    x  xml-tree.c:1438:8 cxx_ne_to_eq               (n != (char *) NULL) &&
+    x  xml-tree.c:1439:39 cxx_ne_to_eq               (strcmp(n,root->attributes[i][0]) != 0)) ? MagickTrue : MagickFalse);
+    x  xml-tree.c:1469:22 cxx_gt_to_ge               if ((strlen(xml) > 9) && (strncmp(xml,"<!ENTITY",8) == 0))
+    x  xml-tree.c:1488:30 cxx_ne_to_eq               if ((q != '"') && (q != '\''))
+    x  xml-tree.c:1521:27 cxx_add_to_sub             if (entities[i+1] != v)
+    x  xml-tree.c:1521:31 cxx_ne_to_eq               if (entities[i+1] != v)
+    x  xml-tree.c:1522:25 cxx_add_to_sub             entities[i+1]=DestroyString(entities[i+1]);
+       xml-tree.c:1569:49 cxx_add_to_sub             xml+=strspn(xml+8,XMLWhitespace)+8;
+    x  xml-tree.c:1706:23 cxx_lt_to_le               (*p == ':') || (c < '\0')) ? MagickTrue : MagickFalse);
+    x  xml-tree.c:1712:62 cxx_eq_to_ne               return((((isalpha((int) ((unsigned char) *p)) != 0) || (*p == '_')) &&
+    x  xml-tree.c:1719:22 cxx_ne_to_eq               return(((attribute != (char **) NULL) &&
+    x  xml-tree.c:1720:19 cxx_ne_to_eq               (attribute[j] != (char *) NULL) &&
+    x  xml-tree.c:1732:31 cxx_eq_to_ne               return(((*p == '>') || ((*p == '\0') && (terminal == '>'))) ? MagickTrue :
+    x  xml-tree.c:1732:53 cxx_eq_to_ne               return(((*p == '>') || ((*p == '\0') && (terminal == '>'))) ? MagickTrue :
+    x  xml-tree.c:1873:40 cxx_eq_to_ne               if ((c == '"') || (c == '\''))
+    x  xml-tree.c:1912:24 cxx_ne_to_eq               while ((*p != '\0') && (*p != '/') && (*p != '>'))
+       xml-tree.c:1923:23 cxx_ne_to_eq               if (l != 0)
+       xml-tree.c:1955:23 cxx_ne_to_eq               if (l != 0)
+    x  xml-tree.c:1990:51 cxx_ne_to_eq               if (isspace((int) ((unsigned char) *p)) != 0)
+    x  xml-tree.c:2000:66 cxx_ne_to_eq               if ((p == (char *) NULL) || ((*(p+=2) != '>') && (*p != '\0')) ||
+    x  xml-tree.c:2001:44 cxx_ne_to_eq               ((*p == '\0') && (terminal != '>')))
+    x  xml-tree.c:2041:47 cxx_ne_to_eq               if ((*p == '\0') && (terminal != '>'))
+    x  xml-tree.c:2048:23 cxx_ne_to_eq               if (l != 0)
+    x  xml-tree.c:2208:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:2210:25 cxx_ne_to_eq               if (xml_info->content != (char *) NULL)
+    x  xml-tree.c:2259:60 cxx_gt_to_ge               if ((*length+strlen(canonical_content)+MagickPathExtent) > *extent)
+    x  xml-tree.c:2295:56 cxx_gt_to_ge               if ((*length+strlen(xml_info->tag)+MagickPathExtent) > *extent)
+    x  xml-tree.c:2309:68 cxx_gt_to_ge               if ((*length+strlen(xml_info->attributes[i])+MagickPathExtent) > *extent)
+    x  xml-tree.c:2330:25 cxx_add_to_sub             if ((attributes[i][j+1] == (char *) NULL) ||
+    x  xml-tree.c:2336:61 cxx_gt_to_ge               if ((*length+strlen(attributes[i][j])+MagickPathExtent) > *extent)
+    x  xml-tree.c:2357:56 cxx_gt_to_ge               if ((*length+strlen(xml_info->tag)+MagickPathExtent) > *extent)
+    x  xml-tree.c:2404:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  xml-tree.c:2431:59 cxx_gt_to_ge               if ((length+strlen(p)+strlen(q)+MagickPathExtent) > extent)
+    x  xml-tree.c:2465:59 cxx_gt_to_ge               if ((length+strlen(p)+strlen(q)+MagickPathExtent) > extent)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-xml-tree.json
