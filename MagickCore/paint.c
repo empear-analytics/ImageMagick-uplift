@@ -109,6 +109,22 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline void SetMaskedFillChannels(const Image *image,
+  const PixelInfo *fill_color,Quantum *magick_restrict q)
+{
+  if ((image->channel_mask & RedChannel) != 0)
+    SetPixelRed(image,(Quantum) fill_color->red,q);
+  if ((image->channel_mask & GreenChannel) != 0)
+    SetPixelGreen(image,(Quantum) fill_color->green,q);
+  if ((image->channel_mask & BlueChannel) != 0)
+    SetPixelBlue(image,(Quantum) fill_color->blue,q);
+  if ((image->channel_mask & BlackChannel) != 0)
+    SetPixelBlack(image,(Quantum) fill_color->black,q);
+  if (((image->channel_mask & AlphaChannel) != 0) &&
+      ((image->alpha_trait & BlendPixelTrait) != 0))
+    SetPixelAlpha(image,(Quantum) fill_color->alpha,q);
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -359,17 +375,7 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
             fill_color;
 
           GetFillColor(draw_info,x,y,&fill_color,exception);
-          if ((image->channel_mask & RedChannel) != 0)
-            SetPixelRed(image,(Quantum) fill_color.red,q);
-          if ((image->channel_mask & GreenChannel) != 0)
-            SetPixelGreen(image,(Quantum) fill_color.green,q);
-          if ((image->channel_mask & BlueChannel) != 0)
-            SetPixelBlue(image,(Quantum) fill_color.blue,q);
-          if ((image->channel_mask & BlackChannel) != 0)
-            SetPixelBlack(image,(Quantum) fill_color.black,q);
-          if (((image->channel_mask & AlphaChannel) != 0) &&
-              ((image->alpha_trait & BlendPixelTrait) != 0))
-            SetPixelAlpha(image,(Quantum) fill_color.alpha,q);
+          SetMaskedFillChannels(image,&fill_color,q);
         }
       p+=(ptrdiff_t) GetPixelChannels(floodplane_image);
       q+=(ptrdiff_t) GetPixelChannels(image);
