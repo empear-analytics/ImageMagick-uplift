@@ -130,6 +130,15 @@ typedef struct _GraphemeInfo
   size_t
     cluster;
 } GraphemeInfo;
+
+typedef struct _RenderTarget
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+} RenderTarget;
 
 /*
   Annotate semaphores.
@@ -141,7 +150,7 @@ static SemaphoreInfo
   Forward declarations.
 */
 static MagickBooleanType
-  RenderType(Image *,const DrawInfo *,const PointInfo *,TypeMetric *,
+  RenderType(const RenderTarget *,const PointInfo *,TypeMetric *,
     ExceptionInfo *),
   RenderPostscript(Image *,const DrawInfo *,const PointInfo *,TypeMetric *,
     ExceptionInfo *),
@@ -542,7 +551,8 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       default:
         break;
     }
-    status=RenderType(image,annotate,&offset,&metrics,exception);
+    const RenderTarget target = { image, annotate };
+    status=RenderType(&target,&offset,&metrics,exception);
     if (status == MagickFalse)
       break;
 
@@ -947,7 +957,8 @@ MagickExport MagickBooleanType GetTypeMetrics(Image *image,
   (void) memset(metrics,0,sizeof(*metrics));
   offset.x=0.0;
   offset.y=0.0;
-  status=RenderType(image,annotate_info,&offset,metrics,exception);
+  const RenderTarget target = { image, annotate_info };
+  status=RenderType(&target,&offset,metrics,exception);
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),"Metrics: text: %s; "
       "width: %g; height: %g; ascent: %g; descent: %g; max advance: %g; "
@@ -978,14 +989,12 @@ MagickExport MagickBooleanType GetTypeMetrics(Image *image,
 %
 %  The format of the RenderType method is:
 %
-%      MagickBooleanType RenderType(Image *image,DrawInfo *draw_info,
+%      MagickBooleanType RenderType(const RenderTarget *target,
 %        const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
-%    o image: the image.
-%
-%    o draw_info: the draw info.
+%    o target: the image and the draw info.
 %
 %    o offset: (x,y) location of text relative to image.
 %
@@ -994,9 +1003,15 @@ MagickExport MagickBooleanType GetTypeMetrics(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static MagickBooleanType RenderType(Image *image,const DrawInfo *draw_info,
+static MagickBooleanType RenderType(const RenderTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
+  Image
+    *image = target->image;
+
+  const DrawInfo
+    *draw_info = target->draw_info;
+
   char
     *font;
 
