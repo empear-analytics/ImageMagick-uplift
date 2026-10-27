@@ -1378,8 +1378,7 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
 %  The format of the YShearImage method is:
 %
 %      MagickBooleanType YShearImage(Image *image,const double degrees,
-%        const size_t width,const size_t height,
-%        const ssize_t x_offset,const ssize_t y_offset,ExceptionInfo *exception)
+%        const ShearRegion *region,ExceptionInfo *exception)
 %
 %  A description of each parameter follows.
 %
@@ -1388,17 +1387,24 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
 %    o degrees: A double representing the shearing angle along the Y
 %      axis.
 %
-%    o width, height, x_offset, y_offset: Defines a region of the image
-%      to shear.
+%    o region: the width, height, x_offset and y_offset that define the
+%      region of the image to shear.
 %
 %    o exception: return any errors or warnings in this structure.
 %
 */
 static MagickBooleanType YShearImage(Image *image,const double degrees,
-  const size_t width,const size_t height,const ssize_t x_offset,
-  const ssize_t y_offset,ExceptionInfo *exception)
+  const ShearRegion *region,ExceptionInfo *exception)
 {
 #define YShearImageTag  "YShear/Image"
+
+  const size_t
+    width = region->width,
+    height = region->height;
+
+  const ssize_t
+    x_offset = region->x_offset,
+    y_offset = region->y_offset;
 
   typedef enum
   {
@@ -1691,8 +1697,9 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
       shear_image=DestroyImage(shear_image);
       return((Image *) NULL);
     }
-  status=YShearImage(shear_image,shear.y,bounds.width,image->rows,(ssize_t)
-    (shear_image->columns-bounds.width)/2,bounds.y,exception);
+  const ShearRegion second_pass = { bounds.width, image->rows, (ssize_t)
+    (shear_image->columns-bounds.width)/2, bounds.y };
+  status=YShearImage(shear_image,shear.y,&second_pass,exception);
   if (status == MagickFalse)
     {
       shear_image=DestroyImage(shear_image);
@@ -1841,8 +1848,9 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
       rotate_image=DestroyImage(rotate_image);
       return((Image *) NULL);
     }
-  status=YShearImage(rotate_image,shear.y,bounds.width,height,(ssize_t)
-    (rotate_image->columns-bounds.width)/2,bounds.y,exception);
+  const ShearRegion second_pass = { bounds.width, height, (ssize_t)
+    (rotate_image->columns-bounds.width)/2, bounds.y };
+  status=YShearImage(rotate_image,shear.y,&second_pass,exception);
   if (status == MagickFalse)
     {
       rotate_image=DestroyImage(rotate_image);
