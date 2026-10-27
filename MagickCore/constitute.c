@@ -720,6 +720,20 @@ static void SyncResolutionFromProperties(Image *image,
     }
 }
 
+static void SetInterpretedProperty(ImageInfo *read_info,Image *next,
+  const char *name,const char *value,ExceptionInfo *exception)
+{
+  char
+    *property;
+
+  if (value != (const char *) NULL)
+    {
+      property=InterpretImageProperties(read_info,next,value,exception);
+      (void) SetImageProperty(next,name,property,exception);
+      property=DestroyString(property);
+    }
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -957,8 +971,7 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
   for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
   {
     char
-      magick_path[MagickPathExtent],
-      *property;
+      magick_path[MagickPathExtent];
 
     const StringInfo
       *profile;
@@ -985,27 +998,12 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
       next->page.width=next->columns;
     if (next->page.height == 0)
       next->page.height=next->rows;
-    if (constitute_info.caption != (const char *) NULL)
-      {
-        property=InterpretImageProperties(read_info,next,
-          constitute_info.caption,exception);
-        (void) SetImageProperty(next,"caption",property,exception);
-        property=DestroyString(property);
-      }
-    if (constitute_info.comment != (const char *) NULL)
-      {
-        property=InterpretImageProperties(read_info,next,
-          constitute_info.comment,exception);
-        (void) SetImageProperty(next,"comment",property,exception);
-        property=DestroyString(property);
-      }
-    if (constitute_info.label != (const char *) NULL)
-      {
-        property=InterpretImageProperties(read_info,next,
-          constitute_info.label,exception);
-        (void) SetImageProperty(next,"label",property,exception);
-        property=DestroyString(property);
-      }
+    SetInterpretedProperty(read_info,next,"caption",constitute_info.caption,
+      exception);
+    SetInterpretedProperty(read_info,next,"comment",constitute_info.comment,
+      exception);
+    SetInterpretedProperty(read_info,next,"label",constitute_info.label,
+      exception);
     if (LocaleCompare(next->magick,"TEXT") == 0)
       (void) ParseAbsoluteGeometry("0x0+0+0",&next->page);
     if ((read_info->extract != (char *) NULL) &&
