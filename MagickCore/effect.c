@@ -3770,6 +3770,32 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline double GetSurfaceShade(const PrimaryInfo *normal,
+  const PrimaryInfo *light)
+{
+  double
+    distance,
+    normal_distance,
+    shade;
+
+  if ((fabs(normal->x) <= MagickEpsilon) &&
+      (fabs(normal->y) <= MagickEpsilon))
+    shade=light->z;
+  else
+    {
+      shade=0.0;
+      distance=normal->x*light->x+normal->y*light->y+normal->z*light->z;
+      if (distance > MagickEpsilon)
+        {
+          normal_distance=normal->x*normal->x+normal->y*normal->y+
+            normal->z*normal->z;
+          if (normal_distance > (MagickEpsilon*MagickEpsilon))
+            shade=distance/sqrt((double) normal_distance);
+        }
+    }
+  return(shade);
+}
+
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   const double azimuth,const double elevation,ExceptionInfo *exception)
 {
@@ -3844,8 +3870,6 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   for (y=0; y < (ssize_t) linear_image->rows; y++)
   {
     double
-      distance,
-      normal_distance,
       shade;
 
     PrimaryInfo
@@ -3903,21 +3927,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
         GetShadeIntensity(linear_image,pre-GetPixelChannels(linear_image))-
         GetShadeIntensity(linear_image,pre)-
         GetShadeIntensity(linear_image,pre+GetPixelChannels(linear_image)));
-      if ((fabs(normal.x) <= MagickEpsilon) &&
-          (fabs(normal.y) <= MagickEpsilon))
-        shade=light.z;
-      else
-        {
-          shade=0.0;
-          distance=normal.x*light.x+normal.y*light.y+normal.z*light.z;
-          if (distance > MagickEpsilon)
-            {
-              normal_distance=normal.x*normal.x+normal.y*normal.y+
-                normal.z*normal.z;
-              if (normal_distance > (MagickEpsilon*MagickEpsilon))
-                shade=distance/sqrt((double) normal_distance);
-            }
-        }
+      shade=GetSurfaceShade(&normal,&light);
       for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
       {
         PixelChannel
