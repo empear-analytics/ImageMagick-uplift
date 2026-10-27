@@ -2418,6 +2418,31 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline Quantum RangeThresholdValue(const double pixel,
+  const double low_black,const double low_white,const double high_white,
+  const double high_black)
+{
+  if (pixel < low_black)
+    return((Quantum) 0);
+  else
+    if ((pixel >= low_black) && (pixel < low_white))
+      return(ClampToQuantum((double) QuantumRange*
+        MagickSafeReciprocal(low_white-low_black)*(pixel-low_black)));
+    else
+      if ((pixel >= low_white) && (pixel <= high_white))
+        return(QuantumRange);
+      else
+        if ((pixel > high_white) && (pixel <= high_black))
+          return(ClampToQuantum((double) QuantumRange*(double)
+            MagickSafeReciprocal(high_black-high_white)*
+            (high_black-pixel)));
+        else
+          if (pixel > high_black)
+            return((Quantum) 0);
+          else
+            return((Quantum) 0);
+}
+
 MagickExport MagickBooleanType RangeThresholdImage(Image *image,
   const double low_black,const double low_white,const double high_white,
   const double high_black,ExceptionInfo *exception)
@@ -2487,25 +2512,8 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
           continue;
         if (image->channel_mask != AllChannels)
           pixel=(double) q[i];
-        if (pixel < low_black)
-          q[i]=(Quantum) 0;
-        else
-          if ((pixel >= low_black) && (pixel < low_white))
-            q[i]=ClampToQuantum((double) QuantumRange*
-              MagickSafeReciprocal(low_white-low_black)*(pixel-low_black));
-          else
-            if ((pixel >= low_white) && (pixel <= high_white))
-              q[i]=QuantumRange;
-            else
-              if ((pixel > high_white) && (pixel <= high_black))
-                q[i]=ClampToQuantum((double) QuantumRange*(double)
-                  MagickSafeReciprocal(high_black-high_white)*
-                  (high_black-pixel));
-              else
-                if (pixel > high_black)
-                  q[i]=(Quantum) 0;
-                else
-                  q[i]=(Quantum) 0;
+        q[i]=RangeThresholdValue(pixel,low_black,low_white,high_white,
+          high_black);
       }
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
