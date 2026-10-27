@@ -3981,8 +3981,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
                     }
                     regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
                   }
-                } else if (pel->channel_qual == HUE_CHANNEL || pel->channel_qual == SAT_CHANNEL ||
-                    pel->channel_qual == LIGHT_CHANNEL) {
+                } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
                   regA = GetHslInt (pfx, ImgNum, imgx, imgy, pel->channel_qual);
                   break;
                 } else if (pel->channel_qual == INTENSITY_CHANNEL) {
@@ -4013,8 +4012,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
             if (pel->img_attr_qual == aNull) {
               const Quantum * pv;
               if ((int) pel->channel_qual < 0) {
-                if (pel->channel_qual == HUE_CHANNEL || pel->channel_qual == SAT_CHANNEL ||
-                    pel->channel_qual == LIGHT_CHANNEL)
+                if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse)
                 {
                   regA = GetHslInt (pfx, ImgNum, imgx, imgy, pel->channel_qual);
                   break;
@@ -4063,8 +4061,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
                 regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
               }
 
-            } else if (pel->channel_qual == HUE_CHANNEL || pel->channel_qual == SAT_CHANNEL ||
-                       pel->channel_qual == LIGHT_CHANNEL) {
+            } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
               regA = GetHslInt (pfx, 0, imgx, imgy, pel->channel_qual);
               break;
             } else if (pel->channel_qual == INTENSITY_CHANNEL) {
@@ -4103,8 +4100,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           }
 
           if ((int) pel->channel_qual < 0) {
-            if (pel->channel_qual == HUE_CHANNEL || pel->channel_qual == SAT_CHANNEL
-             || pel->channel_qual == LIGHT_CHANNEL) {
+            if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
               regA = GetHslFlt (pfx, ImgNum, fx, fy, pel->channel_qual);
               break;
             } else if (pel->channel_qual == INTENSITY_CHANNEL) {
@@ -4146,8 +4142,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
             }
 
             if ((int) pel->channel_qual < 0) {
-              if (pel->channel_qual == HUE_CHANNEL || pel->channel_qual == SAT_CHANNEL ||
-                  pel->channel_qual == LIGHT_CHANNEL) {
+              if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
                 regA = GetHslInt (pfx, ImgNum, imgx, imgy, pel->channel_qual);
                 break;
               } else if (pel->channel_qual == INTENSITY_CHANNEL) {
@@ -4179,8 +4174,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
             fy = regB;
           }
           if ((int) pel->channel_qual < 0) {
-            if (pel->channel_qual == HUE_CHANNEL || pel->channel_qual == SAT_CHANNEL ||
-                pel->channel_qual == LIGHT_CHANNEL) {
+            if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
               regA = GetHslFlt (pfx, ImgNum, fx, fy, pel->channel_qual);
               break;
             } else if (pel->channel_qual == INTENSITY_CHANNEL) {
