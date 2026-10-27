@@ -712,14 +712,9 @@ static inline MagickBooleanType IsOutsideStreamRegion(const Image *image,
     (columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
 }
 
-static const Quantum *GetVirtualPixelStream(const Image *image,
-  const VirtualPixelMethod magick_unused(virtual_pixel_method),const ssize_t x,
-  const ssize_t y,const size_t columns,const size_t rows,
-  ExceptionInfo *exception)
+static Quantum *AcquireStreamRegion(CacheInfo *cache_info,const size_t columns,
+  const size_t rows,ExceptionInfo *exception)
 {
-  CacheInfo
-    *cache_info;
-
   MagickBooleanType
     status;
 
@@ -729,26 +724,6 @@ static const Quantum *GetVirtualPixelStream(const Image *image,
   size_t
     length;
 
-  magick_unreferenced(virtual_pixel_method);
-
-  /*
-    Validate pixel cache geometry.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (IsOutsideStreamRegion(image,x,y,columns,rows) != MagickFalse)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),StreamError,
-        "ImageDoesNotContainTheStreamGeometry","`%s'",image->filename);
-      return((Quantum *) NULL);
-    }
-  cache_info=(CacheInfo *) image->cache;
-  assert(cache_info->signature == MagickCoreSignature);
-  /*
-    Pixels are stored in a temporary buffer until they are synced to the cache.
-  */
   number_pixels=(MagickSizeType) columns*rows;
   length=(size_t) number_pixels*cache_info->number_channels*sizeof(Quantum);
   if (cache_info->number_channels == 0)
@@ -782,6 +757,37 @@ static const Quantum *GetVirtualPixelStream(const Image *image,
     cache_info->metacontent=(void *) (cache_info->pixels+number_pixels*
       cache_info->number_channels);
   return(cache_info->pixels);
+}
+
+static const Quantum *GetVirtualPixelStream(const Image *image,
+  const VirtualPixelMethod magick_unused(virtual_pixel_method),const ssize_t x,
+  const ssize_t y,const size_t columns,const size_t rows,
+  ExceptionInfo *exception)
+{
+  CacheInfo
+    *cache_info;
+
+  magick_unreferenced(virtual_pixel_method);
+
+  /*
+    Validate pixel cache geometry.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (IsOutsideStreamRegion(image,x,y,columns,rows) != MagickFalse)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),StreamError,
+        "ImageDoesNotContainTheStreamGeometry","`%s'",image->filename);
+      return((Quantum *) NULL);
+    }
+  cache_info=(CacheInfo *) image->cache;
+  assert(cache_info->signature == MagickCoreSignature);
+  /*
+    Pixels are stored in a temporary buffer until they are synced to the cache.
+  */
+  return(AcquireStreamRegion(cache_info,columns,rows,exception));
 }
 
 /*
