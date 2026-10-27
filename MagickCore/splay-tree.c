@@ -170,14 +170,7 @@ MagickExport MagickBooleanType AddValueToSplayTree(SplayTreeInfo *splay_tree,
       compare=CompareNodeKey(splay_tree,splay_tree->root,key);
       if (compare == 0)
         {
-          if ((splay_tree->relinquish_value != (void *(*)(void *)) NULL) &&
-              (splay_tree->root->value != (void *) NULL))
-            splay_tree->root->value=splay_tree->relinquish_value(
-              splay_tree->root->value);
-          if ((splay_tree->relinquish_key != (void *(*)(void *)) NULL) &&
-              (splay_tree->root->key != (void *) NULL))
-            splay_tree->root->key=splay_tree->relinquish_key(
-              splay_tree->root->key);
+          RelinquishNodeContents(splay_tree,splay_tree->root);
           splay_tree->root->key=(void *) key;
           splay_tree->root->value=(void *) value;
           UnlockSemaphoreInfo(splay_tree->semaphore);
