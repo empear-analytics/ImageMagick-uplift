@@ -2928,6 +2928,14 @@ static inline MagickBooleanType IsMisplacedAssignment(const OperatorE op,
     !Update) ) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsUnassignedUserSymbolRead(
+  const MagickBooleanType UserSymbol,const MagickBooleanType Assign,
+  const MagickBooleanType Update,const int UserSymNdx0)
+{
+  return((UserSymbol && !Assign && !Update && UserSymNdx0 != NULL_ADDRESS) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3012,7 +3020,8 @@ static MagickBooleanType TranslateExpression (
       if (!*strLimit) break;
       if (strchr(strLimit,*chLimit)!=NULL) break;
     }
-    if (UserSymbol && !Assign && !Update && UserSymNdx0 != NULL_ADDRESS) {
+    if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
+        MagickFalse) {
       ElementT * pel;
       (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx0);
       UserSymNdx0 = NULL_ADDRESS;
@@ -3078,7 +3087,8 @@ static MagickBooleanType TranslateExpression (
     UserSymNdx0 = UserSymNdx1;
   }
 
-  if (UserSymbol && !Assign && !Update && UserSymNdx0 != NULL_ADDRESS) {
+  if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
+      MagickFalse) {
     ElementT * pel;
     if (NewUserSymbol) {
       (void) ThrowMagickException (
