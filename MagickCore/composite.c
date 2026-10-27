@@ -1498,6 +1498,75 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
   return(status);
 }
 
+static inline void SetVirtualCompositeChannels(const Image *image,
+  const Image *source_image,const CompositeOperator compose,
+  const Quantum *source,const MagickRealType canvas_dissolve,
+  const MagickBooleanType clamp,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    MagickRealType
+      pixel = 0.0;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait source_traits = GetPixelChannelTraits(source_image,
+      channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (source_traits == UndefinedPixelTrait))
+      continue;
+    switch (compose)
+    {
+      case AlphaCompositeOp:
+      case ChangeMaskCompositeOp:
+      case CopyAlphaCompositeOp:
+      case DstAtopCompositeOp:
+      case DstInCompositeOp:
+      case InCompositeOp:
+      case OutCompositeOp:
+      case SrcInCompositeOp:
+      case SrcOutCompositeOp:
+      {
+        if (channel == AlphaPixelChannel)
+          pixel=(MagickRealType) TransparentAlpha;
+        else
+          pixel=(MagickRealType) q[i];
+        break;
+      }
+      case ClearCompositeOp:
+      case CopyCompositeOp:
+      case ReplaceCompositeOp:
+      {
+        if (channel == AlphaPixelChannel)
+          pixel=(MagickRealType) TransparentAlpha;
+        else
+          pixel=0.0;
+        break;
+      }
+      case BlendCompositeOp:
+      case DissolveCompositeOp:
+      {
+        if (channel == AlphaPixelChannel)
+          pixel=canvas_dissolve*(double) GetPixelAlpha(source_image,
+            source);
+        else
+          pixel=(MagickRealType) source[channel];
+        break;
+      }
+      default:
+      {
+        pixel=(MagickRealType) source[channel];
+        break;
+      }
+    }
+    q[i]=clamp != MagickFalse ? ClampPixel(pixel) :
+      ClampToQuantum(pixel);
+  }
+}
+
 static inline void CopySourceChannels(const Image *source_image,
   const Image *image,const Quantum *magick_restrict p,
   Quantum *magick_restrict q)
@@ -2405,65 +2474,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           (void) GetOneVirtualPixel(source_image,
             CastDoubleToSsizeT((double) x-x_offset),
             CastDoubleToSsizeT((double) y-y_offset),source,exception);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            MagickRealType
-              pixel = 0.0;
-
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            PixelTrait source_traits = GetPixelChannelTraits(source_image,
-              channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (source_traits == UndefinedPixelTrait))
-              continue;
-            switch (compose)
-            {
-              case AlphaCompositeOp:
-              case ChangeMaskCompositeOp:
-              case CopyAlphaCompositeOp:
-              case DstAtopCompositeOp:
-              case DstInCompositeOp:
-              case InCompositeOp:
-              case OutCompositeOp:
-              case SrcInCompositeOp:
-              case SrcOutCompositeOp:
-              {
-                if (channel == AlphaPixelChannel)
-                  pixel=(MagickRealType) TransparentAlpha;
-                else
-                  pixel=(MagickRealType) q[i];
-                break;
-              }
-              case ClearCompositeOp:
-              case CopyCompositeOp:
-              case ReplaceCompositeOp:
-              {
-                if (channel == AlphaPixelChannel)
-                  pixel=(MagickRealType) TransparentAlpha;
-                else
-                  pixel=0.0;
-                break;
-              }
-              case BlendCompositeOp:
-              case DissolveCompositeOp:
-              {
-                if (channel == AlphaPixelChannel)
-                  pixel=canvas_dissolve*(double) GetPixelAlpha(source_image,
-                    source);
-                else
-                  pixel=(MagickRealType) source[channel];
-                break;
-              }
-              default:
-              {
-                pixel=(MagickRealType) source[channel];
-                break;
-              }
-            }
-            q[i]=clamp != MagickFalse ? ClampPixel(pixel) :
-              ClampToQuantum(pixel);
-          }
+          SetVirtualCompositeChannels(image,source_image,compose,source,
+            canvas_dissolve,clamp,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
           continue;
         }
