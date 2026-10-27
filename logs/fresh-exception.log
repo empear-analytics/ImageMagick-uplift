@@ -1,0 +1,40 @@
+mutate: 115 mutants in MagickCore/exception\.c$, 23 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/115 (1s)
+  mutants: 50/115 (1s)
+  mutants: 75/115 (1s)
+  mutants: 100/115 (2s)
+  mutants: 115/115 (132s)
+
+mutate: 115 mutants, 132s
+  killed 109, survived 0 (0 capped), no coverage 6, errors 0
+  mutation score on reached code: 100.0%   overall: 94.8%
+
+  function                           total killed survived no-cov
+  CatchException                        19     19        0      0
+  ThrowException                        19     19        0      0
+  ThrowMagickExceptionList              14     14        0      0
+  DestroyExceptionInfo                  10     10        0      0
+  DefaultFatalErrorHandler               6      6        0      0
+  ExceptionComponentTerminus             5      5        0      0
+  InheritException                       5      5        0      0
+  ClearMagickException                   4      4        0      0
+  SetErrorHandler                        4      0        0      4
+  SetFatalErrorHandler                   4      4        0      0
+  SetWarningHandler                      4      4        0      0
+  IsRepeatedException                    4      4        0      0
+  MagickFatalError                       3      3        0      0
+  DestroyExceptionElement                2      2        0      0
+  CloneExceptionInfo                     2      0        0      2
+  PrintExceptionMessage                  2      2        0      0
+  GetLocaleExceptionMessage              2      2        0      0
+  AcquireExceptionInfo                   1      1        0      0
+  DefaultErrorHandler                    1      1        0      0
+  DefaultWarningHandler                  1      1        0      0
+  ExceptionComponentGenesis              1      1        0      0
+  MagickError                            1      1        0      0
+  MagickWarning                          1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-exception.json

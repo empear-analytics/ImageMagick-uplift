@@ -1,0 +1,35 @@
+mutate: 114 mutants in MagickCore/magic\.c$, 14 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/114 (1s)
+  mutants: 50/114 (1s)
+  mutants: 75/114 (2s)
+  mutants: 100/114 (2s)
+  mutants: 114/114 (132s)
+
+mutate: 114 mutants, 132s
+  killed 102, survived 1 (0 capped), no coverage 11, errors 0
+  mutation score on reached code: 99.0%   overall: 89.5%
+
+  function                           total killed survived no-cov
+  GetMagicInfo                          18     18        0      0
+  MagicComponentTerminus                12     12        0      0
+  GetMagicInfoList                      11     10        1      0
+  GetMagicList                          11      0        0     11
+  CompareMagickInfoExtent               10     10        0      0
+  GetMagicPatternExtent                 10     10        0      0
+  ListMagicInfo                         10     10        0      0
+  CompareMagic                           8      8        0      0
+  IsMagicCacheInstantiated               7      7        0      0
+  IsMagicListInstantiated                7      7        0      0
+  AcquireMagicList                       5      5        0      0
+  PrintMagicBytes                        3      3        0      0
+  GetMagicName                           1      1        0      0
+  MagicComponentGenesis                  1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  magic.c:489:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-magic.json

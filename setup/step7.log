@@ -6762,3 +6762,9 @@ nohup: ignoring input
 20:49 fresh magick:   killed 146, survived 4 (0 capped), no coverage 38, errors 0
 20:52 fresh locale:   killed 184, survived 5 (0 capped), no coverage 4, errors 0
 20:55 fresh gem:   killed 114, survived 0 (0 capped), no coverage 0, errors 0
+20:55 pushed
+20:58 fresh exception:   killed 109, survived 0 (0 capped), no coverage 6, errors 0
+21:00 fresh colormap:   killed 51, survived 3 (0 capped), no coverage 0, errors 0
+21:00 fresh cipher:   killed 174, survived 0 (0 capped), no coverage 4, errors 0
+21:03 fresh semaphore:   killed 40, survived 0 (0 capped), no coverage 0, errors 0
+21:06 fresh magic:   killed 102, survived 1 (0 capped), no coverage 11, errors 0
