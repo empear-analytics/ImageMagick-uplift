@@ -1039,6 +1039,98 @@ M90, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe F - Hoist Function-Local Static Data
+
+**Use when:** CodeScene reports *Large Method* (or the function's length tips *Complex
+Method* or *Bumpy Road Ahead* over a threshold), and much of the body is one `static`
+declaration whose initialiser is data, not logic: a lookup table, a string assembled from
+literals under `#if` lines (`GetMagickDelegates`: 124 of 130 lines), a set of
+coefficients.
+
+**Not covered by:** Recipe L, which moves a type and refuses anything with a storage class
+or an initialiser; Recipe H, which moves preprocessor lines only; Recipe E, which moves
+statements, never declarations. No other recipe moves a variable.
+
+**How:**
+
+1. Take one declaration in the function's opening run of declarations (before its first
+   statement) with storage class `static` and an initialiser made only of literals,
+   constant expressions, the `#if` lines inside it, and the addresses of other file-scope
+   data.
+2. The variable is never written: its type is `const`, or it is a pointer to `const` that
+   no statement assigns. A static the function updates (a counter, a cache, a flag set
+   once) does not move.
+3. Move the declaration with its initialiser and the `#if` lines inside it, unchanged
+   except for two fewer spaces of indentation, to directly above the function's
+   signature, below its comment banner and below any hoisted macro or type it uses.
+4. Keep the name unless `grep` finds it at file scope in this file or in a header the file
+   includes; then prefix it with a word from the function's name and rename the uses in
+   the function.
+5. Build without warnings: a later function with a local of the same name now shadows
+   the file-scope variable, and the build's warnings say so; rename as in step 4.
+6. Run `sh tools/obj_same_code.sh <file>`. It must print `SAME CODE`: every function's
+   machine code is unchanged, and the strings and data are the same, though the compiler
+   may lay them out in another order.
+
+**Before:**
+
+```c
+MagickExport const char *GetMagickDelegates(void)
+{
+  static const char
+    *delegates=""
+#if defined(MAGICKCORE_AUTOTRACE_DELEGATE)
+  " autotrace"
+#endif
+  ...
+  ;
+  if (*delegates == '\0')
+    return(delegates);
+  return(delegates+1);
+}
+```
+
+**After:**
+
+```c
+static const char
+  *delegates=""
+#if defined(MAGICKCORE_AUTOTRACE_DELEGATE)
+  " autotrace"
+#endif
+  ...
+  ;
+
+MagickExport const char *GetMagickDelegates(void)
+{
+  if (*delegates == '\0')
+    return(delegates);
+  return(delegates+1);
+}
+```
+
+**Careful:**
+
+- A `static` local already has static storage duration and is initialised once, before
+  the program runs; at file scope it keeps both, so only its visibility widens, to the
+  rest of the file below it. Step 2 makes that harmless: nothing else writes it.
+- `tools/obj_same_code.sh` compares the machine code before the linker fills in data
+  addresses, so it cannot tell which of two hoisted tables an instruction reads. Two
+  tables from one function, or a rename in step 4, are checked by reading that each use
+  names the table it named before; the oracle covers the rest.
+- The step changes nothing but the function's length. Rule 2 keeps it only if the score
+  rises or a finding leaves the function.
+
+**Evidence level:** oracle, with `tools/obj_same_code.sh` printing `SAME CODE`.
+
+**Provenance:** 2026-10-27, from `version.c`'s `GetMagickDelegates`, whose only finding,
+*Large Method* (130 lines), is a 124-line `#if`-assembled string; the same shape holds
+`GetEXIFProperty`'s tag table (304 lines), `TransformsRGBImage`'s colour tables (236),
+`TransformSignature`'s constants and `AcquireResizeFilter`'s mapping table. Added by
+Claude Code (Claude Opus 5.5) during task M101, under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -1104,3 +1196,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-26 | AMEND | P | Several sites: one predicate may replace the same expression at several sites, at guard level, when a script confirms each site equals the body with arguments substituted and every argument is free of side effects; `--calls` shows +1 per extra site and one fewer of each inner callee per replaced copy. Decided by Claude Code under the owner's delegation of 2026-10-26 | PR #16's open question; `GetDelegateList` (decode/encode) | owner |
 | 2026-10-26 | AMEND | B | Arithmetic members: an initialiser may be arithmetic on identifiers and literals (`1.0/scale`), computed once at the declaration; step 5 keeps its operands unchanged until the last call | `identify.c`'s `PrintChannelStatistics`: all 15 calls pass `file`, `1.0/scale` and `channel_statistics` | mandate (2026-10-24) |
 | 2026-10-27 | AMEND | B | Member accesses and casts: an initialiser may read a member (`a.b`, `p->b`) or cast an allowed expression, when the struct is declared directly before the one call that uses it, with no statement between | `shear.c`'s XShearImage, YShearImage and CropToFitImage (`shear.x`, `bounds.width`, `(ssize_t) (image->rows-height)/2`), `transform.c`'s CopyImageRegion, `channel.c`'s FlattenPixelInfo: the last argument findings of two files, refused only by step 4 | mandate (2026-10-24) |
+| 2026-10-27 | NEW | F | Hoist Function-Local Static Data: a `static` declaration whose initialiser is data (a table, an `#if`-assembled string) and which nothing writes moves to directly above the function, proven by unchanged machine code and the same data (`tools/obj_same_code.sh`) | `GetMagickDelegates` (version.c's only finding: 130 lines, 124 of them one string); the same shape in `GetEXIFProperty`, `TransformsRGBImage`, `TransformSignature`, `AcquireResizeFilter` | mandate (2026-10-24) |
