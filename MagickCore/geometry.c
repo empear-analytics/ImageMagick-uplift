@@ -235,6 +235,31 @@ static MagickStatusType SetPercentGeometrySize(MagickStatusType flags,
   return(flags);
 }
 
+static void ParseGeometryXOffset(char **p,MagickStatusType *flags,ssize_t *x)
+{
+  char
+    *q;
+
+  /*
+    Parse x value.
+  */
+  while ((**p == '+') || (**p == '-'))
+  {
+    if (**p == '-')
+      *flags^=XNegative;  /* negate sign */
+    (*p)++;
+  }
+  q=(*p);
+  if (x != (ssize_t *) NULL)
+    *x=CastDoubleToSsizeT(StringToDouble(*p,p));
+  if (*p != q)
+    {
+      *flags|=XValue;
+      if (((*flags & XNegative) != 0) && (x != (ssize_t *) NULL))
+        *x=CastDoubleToSsizeT(-1.0**x);
+    }
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -413,26 +438,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
         }
     }
   if ((*p == '+') || (*p == '-'))
-    {
-      /*
-        Parse x value.
-      */
-      while ((*p == '+') || (*p == '-'))
-      {
-        if (*p == '-')
-          flags^=XNegative;  /* negate sign */
-        p++;
-      }
-      q=p;
-      if (x != (ssize_t *) NULL)
-        *x=CastDoubleToSsizeT(StringToDouble(p,&p));
-      if (p != q)
-        {
-          flags|=XValue;
-          if (((flags & XNegative) != 0) && (x != (ssize_t *) NULL))
-            *x=CastDoubleToSsizeT(-1.0**x);
-        }
-    }
+    ParseGeometryXOffset(&p,&flags,x);
   if ((*p == '+') || (*p == '-'))
     {
       /*
