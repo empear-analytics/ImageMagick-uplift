@@ -1914,6 +1914,43 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   return(GetFirstImageInList(image));
 }
 
+static SegmentInfo GetHoughLine(const Image *image,const ssize_t x,
+  const ssize_t y,const size_t accumulator_height)
+{
+  SegmentInfo
+    line;
+
+  if ((x >= 45) && (x <= 135))
+    {
+      /*
+        y = (r-x cos(t))/sin(t)
+      */
+      line.x1=0.0;
+      line.y1=((double) (y-(accumulator_height/2.0))-((line.x1-
+        (image->columns/2.0))*cos(DegreesToRadians((double) x))))/
+        sin(DegreesToRadians((double) x))+(image->rows/2.0);
+      line.x2=(double) image->columns;
+      line.y2=((double) (y-(accumulator_height/2.0))-((line.x2-
+        (image->columns/2.0))*cos(DegreesToRadians((double) x))))/
+        sin(DegreesToRadians((double) x))+(image->rows/2.0);
+    }
+  else
+    {
+      /*
+        x = (r-y cos(t))/sin(t)
+      */
+      line.y1=0.0;
+      line.x1=((double) (y-(accumulator_height/2.0))-((line.y1-
+        (image->rows/2.0))*sin(DegreesToRadians((double) x))))/
+        cos(DegreesToRadians((double) x))+(image->columns/2.0);
+      line.y2=(double) image->rows;
+      line.x2=((double) (y-(accumulator_height/2.0))-((line.y2-
+        (image->rows/2.0))*sin(DegreesToRadians((double) x))))/
+        cos(DegreesToRadians((double) x))+(image->columns/2.0);
+    }
+  return(line);
+}
+
 MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const size_t height,const size_t threshold,ExceptionInfo *exception)
 {
@@ -2125,34 +2162,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
           (void) GetMatrixElement(accumulator,x,y,&count);
           if (maxima > count)
             continue;
-          if ((x >= 45) && (x <= 135))
-            {
-              /*
-                y = (r-x cos(t))/sin(t)
-              */
-              line.x1=0.0;
-              line.y1=((double) (y-(accumulator_height/2.0))-((line.x1-
-                (image->columns/2.0))*cos(DegreesToRadians((double) x))))/
-                sin(DegreesToRadians((double) x))+(image->rows/2.0);
-              line.x2=(double) image->columns;
-              line.y2=((double) (y-(accumulator_height/2.0))-((line.x2-
-                (image->columns/2.0))*cos(DegreesToRadians((double) x))))/
-                sin(DegreesToRadians((double) x))+(image->rows/2.0);
-            }
-          else
-            {
-              /*
-                x = (r-y cos(t))/sin(t)
-              */
-              line.y1=0.0;
-              line.x1=((double) (y-(accumulator_height/2.0))-((line.y1-
-                (image->rows/2.0))*sin(DegreesToRadians((double) x))))/
-                cos(DegreesToRadians((double) x))+(image->columns/2.0);
-              line.y2=(double) image->rows;
-              line.x2=((double) (y-(accumulator_height/2.0))-((line.y2-
-                (image->rows/2.0))*sin(DegreesToRadians((double) x))))/
-                cos(DegreesToRadians((double) x))+(image->columns/2.0);
-            }
+          line=GetHoughLine(image,x,y,accumulator_height);
           (void) FormatLocaleString(message,MagickPathExtent,
             "line %g,%g %g,%g  # %g %g %g\n",line.x1,line.y1,line.x2,line.y2,
             maxima,(double) x,(double) y);
