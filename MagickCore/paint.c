@@ -719,12 +719,12 @@ static size_t **AcquireHistogramTLS(const size_t count)
   return(histogram);
 }
 
-MagickExport Image *OilPaintImage(const Image *image,const double radius,
-  const double sigma,ExceptionInfo *exception)
-{
 #define NumberPaintBins  256
 #define OilPaintImageTag  "OilPaint/Image"
 
+MagickExport Image *OilPaintImage(const Image *image,const double radius,
+  const double sigma,ExceptionInfo *exception)
+{
   CacheView
     *image_view,
     *paint_view;
