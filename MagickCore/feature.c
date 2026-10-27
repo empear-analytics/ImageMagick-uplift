@@ -1928,6 +1928,32 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   return(GetFirstImageInList(image));
 }
 
+static MagickBooleanType WriteHoughHeader(const Image *image,const int file,
+  const size_t width,const size_t height,const size_t threshold)
+{
+  char
+    message[MagickPathExtent];
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  (void) FormatLocaleString(message,MagickPathExtent,
+    "# Hough line transform: %.17gx%.17g%+.20g\n",(double) width,
+    (double) height,(double) threshold);
+  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
+    status=MagickFalse;
+  (void) FormatLocaleString(message,MagickPathExtent,
+    "viewbox 0 0 %.17g %.17g\n",(double) image->columns,(double) image->rows);
+  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
+    status=MagickFalse;
+  (void) FormatLocaleString(message,MagickPathExtent,
+    "# x1,y1 x2,y2 # count angle distance\n");
+  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
+    status=MagickFalse;
+  return(status);
+}
+
 static double GetHoughMaxima(const MatrixInfo *accumulator,const ssize_t x,
   const ssize_t y,const size_t width,const size_t height,double count)
 {
@@ -2144,19 +2170,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       accumulator=DestroyMatrixInfo(accumulator);
       return((Image *) NULL);
     }
-  (void) FormatLocaleString(message,MagickPathExtent,
-    "# Hough line transform: %.17gx%.17g%+.20g\n",(double) width,
-    (double) height,(double) threshold);
-  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
-    status=MagickFalse;
-  (void) FormatLocaleString(message,MagickPathExtent,
-    "viewbox 0 0 %.17g %.17g\n",(double) image->columns,(double) image->rows);
-  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
-    status=MagickFalse;
-  (void) FormatLocaleString(message,MagickPathExtent,
-    "# x1,y1 x2,y2 # count angle distance\n");
-  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
-    status=MagickFalse;
+  status=WriteHoughHeader(image,file,width,height,threshold);
   line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
   if (threshold != 0)
     line_count=threshold;
