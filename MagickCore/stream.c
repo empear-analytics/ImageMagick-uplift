@@ -918,12 +918,6 @@ static Quantum *QueueAuthenticPixelsStream(Image *image,const ssize_t x,
   MagickBooleanType
     status;
 
-  MagickSizeType
-    number_pixels;
-
-  size_t
-    length;
-
   StreamHandler
     stream_handler;
 
@@ -969,39 +963,7 @@ static Quantum *QueueAuthenticPixelsStream(Image *image,const ssize_t x,
   */
   cache_info->columns=columns;
   cache_info->rows=rows;
-  number_pixels=(MagickSizeType) columns*rows;
-  length=(size_t) number_pixels*cache_info->number_channels*sizeof(Quantum);
-  if (cache_info->number_channels == 0)
-    length=(size_t) number_pixels*sizeof(Quantum);
-  if (cache_info->metacontent_extent != 0)
-    length+=(size_t) number_pixels*cache_info->metacontent_extent;
-  if (cache_info->pixels == (Quantum *) NULL)
-    {
-      cache_info->length=length;
-      status=AcquireStreamPixels(cache_info,exception);
-      if (status == MagickFalse)
-        {
-          cache_info->length=0;
-          return((Quantum *) NULL);
-        }
-    }
-  else
-    if (cache_info->length < length)
-      {
-        RelinquishStreamPixels(cache_info);
-        cache_info->length=length;
-        status=AcquireStreamPixels(cache_info,exception);
-        if (status == MagickFalse)
-          {
-            cache_info->length=0;
-            return((Quantum *) NULL);
-          }
-      }
-  cache_info->metacontent=(void *) NULL;
-  if (cache_info->metacontent_extent != 0)
-    cache_info->metacontent=(void *) (cache_info->pixels+number_pixels*
-      cache_info->number_channels);
-  return(cache_info->pixels);
+  return(AcquireStreamRegion(cache_info,columns,rows,exception));
 }
 
 /*
