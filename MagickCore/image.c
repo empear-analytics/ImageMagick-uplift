@@ -1079,6 +1079,24 @@ static inline MagickBooleanType IsChannelNotCopied(const PixelTrait traits,
     (source_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
+static inline void CopyPixelChannels(const Image *image,
+  const Image *source_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait source_traits=GetPixelChannelTraits(source_image,channel);
+    if (IsChannelNotCopied(traits,source_traits) != MagickFalse)
+      continue;
+    SetPixelChannel(image,channel,p[i],q);
+  }
+}
+
 MagickExport MagickBooleanType CopyImagePixels(Image *image,
   const Image *source_image,const RectangleInfo *geometry,
   const OffsetInfo *offset,ExceptionInfo *exception)
@@ -1147,18 +1165,7 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
       }
     for (x=0; x < (ssize_t) geometry->width; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait source_traits=GetPixelChannelTraits(source_image,channel);
-        if (IsChannelNotCopied(traits,source_traits) != MagickFalse)
-          continue;
-        SetPixelChannel(image,channel,p[i],q);
-      }
+      CopyPixelChannels(image,source_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(source_image);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
