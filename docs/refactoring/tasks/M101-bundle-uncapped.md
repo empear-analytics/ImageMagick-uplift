@@ -95,6 +95,28 @@ take seven to nine arguments. distort.c's best-fit bounds: each case writes `min
 `max` through macros defined mid-function that name the caller's locals. property.c and
 colorspace.c tables: Recipe F left the score flat (above).
 
+### Sweep (2026-10-28, 00:20): where the night ends
+
+MagickCore against the morning's sweep: **mean 4.86 → 4.97; red 46 → 44, yellow 38 → 40,
+optimal 3 → 4**; 31 files up, none down. Largest moves: splay-tree.c 4.91 → 5.94, paint.c
+3.33 → 4.14, version.c 9.28 → 10.00, matrix.c 6.76 → 7.45, pixel.c 1.10 → 1.73, shear.c
+2.18 → 2.72, policy.c 3.85 → 4.39, quantum-import.c 1.41 → 1.88, quantum-export.c 1.57 →
+2.04, annotate.c 2.33 → 2.77. Brain Methods in the built MagickCore files: 44 → about 25.
+Whole catalogue at `a055db34e`: 15,906 cases, 1 diverged (`gaps/c5651ffad8`, the known
+Mac artifact).
+
+**What is left needs a decision or a new recipe, not more of the same.**
+- pixel.c's five fixed-map extractions: one commit for all five (1.73 → 1.80), the open
+  question carried over from #54.
+- Recipe S (split file) for the largest files, which needs the owner's go-ahead per file.
+- Blocks inside parallel loops that write the shared `status` together with private
+  accumulators (effect.c's blur family, MeanShiftImage, vision.c's moments, StatisticImage):
+  a Recipe T and K combination would cover them, but each such block reads eight or more
+  values of row context, so the helpers would carry Excess Arguments.
+- Duplicated per-format blocks (quantum-import.c, enhance.c's row helpers, the
+  TransparentPaint pair) differ in an expression, not a value, so Recipe D does not reach
+  them, and merging them left the score flat where tried.
+
 ### Sweep (2026-10-27, 22:35)
 
 MagickCore with `cs-mcp` 1.5.13, against the morning's sweep at `dbeddd910` (before
