@@ -4395,9 +4395,18 @@ static MagickBooleanType ImportLongPixel(Image *image,
 }
 
 static MagickBooleanType ImportLongLongPixel(Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,const void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const MagickSizeType
     *magick_restrict p;
 
@@ -5208,7 +5217,7 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
     }
     case LongLongPixel:
     {
-      status=ImportLongLongPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportLongLongPixel(image,&roi,&buffer,exception);
       break;
     }
     case QuantumPixel:
