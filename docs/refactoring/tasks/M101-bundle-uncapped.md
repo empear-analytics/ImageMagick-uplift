@@ -56,7 +56,6 @@ case reach and the oracle run.
 | constitute.c | FindFallbackEncoder, SyncEndianFromMagickInfo (WriteImage) | O, E | 13,088 cases, 251 on the fallback path | 4.52 → 4.65 |
 | fx.c | ExecuteRPN's six HSL-qualifier tests → existing IsHslChannelQualifier | P (several sites) | 767 cases | 1.93 → 2.15 |
 | fx.c | TranslateExpression's two user-symbol tests → IsUnassignedUserSymbolRead | P (several sites) | 821 cases | 2.15 → 2.28, no Complex Conditional left |
-
 | image.c | GetFilenameOption (InterpretImageFilename's %[name] lookup) | E | 12,656 cases | 2.20 → 2.24 |
 | image.c | CopyPixelChannels (CopyImagePixels' channel loop, inside OpenMP) | E | 54 cases; Brain Method gone | 2.24 → 2.49 |
 | threshold.c | RangeThresholdValue (RangeThresholdImage's ladder) | E | 13 cases | 2.08 → 2.12 |
