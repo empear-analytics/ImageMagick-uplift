@@ -1,0 +1,60 @@
+mutate: 242 mutants in MagickCore/splay-tree\.c$, 23 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15540 cases in 31s
+  mutants: 25/242 (1s)
+  mutants: 50/242 (1s)
+  mutants: 75/242 (2s)
+  mutants: 100/242 (3s)
+  mutants: 125/242 (5s)
+  mutants: 150/242 (131s)
+  mutants: 175/242 (132s)
+  mutants: 200/242 (133s)
+  mutants: 225/242 (134s)
+  mutants: 242/242 (263s)
+
+mutate: 242 mutants, 263s
+  killed 230, survived 12 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 95.0%   overall: 95.0%
+
+  function                           total killed survived no-cov
+  DeleteNodeByValueFromSplayTree        25     21        4      0
+  RemoveNodeByValueFromSplayTree        22     18        4      0
+  AddValueToSplayTree                   21     21        0      0
+  DeleteNodeFromSplayTree               20     20        0      0
+  Splay                                 20     20        0      0
+  RemoveNodeFromSplayTree               18     17        1      0
+  RelinquishSplayTreeNodes              16     16        0      0
+  GetValueFromSplayTree                 12     12        0      0
+  LinkSplayTreeNodes                    11     11        0      0
+  SplaySplayTree                        11     11        0      0
+  IterateOverSplayTree                  10      9        1      0
+  CloneSplayTree                         9      9        0      0
+  GetNextKeyInSplayTree                  8      8        0      0
+  GetNextValueInSplayTree                8      8        0      0
+  DestroySplayTree                       5      5        0      0
+  ResetSplayTree                         5      4        1      0
+  CompareNodeKey                         5      5        0      0
+  BalanceSplayTree                       4      3        1      0
+  GetRootValueFromSplayTree              4      4        0      0
+  ResetSplayTreeIterator                 3      3        0      0
+  GetFirstSplayTreeNode                  2      2        0      0
+  GetSuccessorNode                       2      2        0      0
+  GetNumberOfNodesInSplayTree            1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  splay-tree.c:286:25 cxx_le_to_lt               if (splay_tree->nodes <= 2)
+    x  splay-tree.c:511:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  splay-tree.c:540:9 cxx_remove_void_call       SplaySplayTree(splay_tree,key);
+    x  splay-tree.c:542:33 cxx_ne_to_eq               if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
+       splay-tree.c:549:13 cxx_remove_void_call       UnlockSemaphoreInfo(splay_tree->semaphore);
+       splay-tree.c:1086:10 cxx_post_inc_to_post_dec   i++;
+    x  splay-tree.c:1209:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  splay-tree.c:1233:9 cxx_remove_void_call       SplaySplayTree(splay_tree,key);
+    x  splay-tree.c:1235:33 cxx_ne_to_eq               if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
+       splay-tree.c:1242:13 cxx_remove_void_call       UnlockSemaphoreInfo(splay_tree->semaphore);
+    x  splay-tree.c:1314:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  splay-tree.c:1384:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-splay-tree.json

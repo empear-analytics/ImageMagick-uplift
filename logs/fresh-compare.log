@@ -1,0 +1,76 @@
+mutate: 683 mutants in MagickCore/compare\.c$, 38 functions
+mutate: baseline over 165 cases in 1s
+  mutants: 25/683 (0s)
+  mutants: 50/683 (0s)
+  mutants: 75/683 (1s)
+  mutants: 100/683 (1s)
+  mutants: 125/683 (1s)
+  mutants: 150/683 (1s)
+  mutants: 175/683 (1s)
+  mutants: 200/683 (2s)
+  mutants: 225/683 (2s)
+  mutants: 250/683 (2s)
+  mutants: 275/683 (2s)
+  mutants: 300/683 (2s)
+  mutants: 325/683 (3s)
+  mutants: 350/683 (3s)
+  mutants: 375/683 (3s)
+  mutants: 400/683 (3s)
+  mutants: 425/683 (3s)
+  mutants: 450/683 (4s)
+  mutants: 475/683 (4s)
+  mutants: 500/683 (4s)
+  mutants: 525/683 (4s)
+  mutants: 550/683 (5s)
+  mutants: 575/683 (5s)
+  mutants: 600/683 (5s)
+  mutants: 625/683 (5s)
+  mutants: 650/683 (6s)
+  mutants: 675/683 (6s)
+  mutants: 683/683 (133s)
+
+mutate: 683 mutants, 133s
+  killed 660, survived 0 (0 capped), no coverage 23, errors 0
+  mutation score on reached code: 100.0%   overall: 96.6%
+
+  function                           total killed survived no-cov
+  GetSSIMSimularity                     74     74        0      0
+  GetPHASESimilarity                    58     58        0      0
+  SimilarityImage                       49     49        0      0
+  GetDPCSimilarity                      33     33        0      0
+  GetNCCSimilarity                      33     33        0      0
+  GetMEPPSimilarity                     32     32        0      0
+  CompareImages                         31     31        0      0
+  GetAESimilarity                       28     28        0      0
+  GetFUZZSimilarity                     25     25        0      0
+  GetPASimilarity                       24     24        0      0
+  IsImagesEqual                         23      0        0     23
+  GetMAESimilarity                      22     22        0      0
+  GetMSESimilarity                      22     22        0      0
+  GetPDCSimilarity                      20     20        0      0
+  AccumulateFUZZPixel                   17     17        0      0
+  AccumulatePAPixel                     16     16        0      0
+  AccumulatePDCPixel                    16     16        0      0
+  AccumulateCorrelationPixel            14     14        0      0
+  AccumulateMEPPPixel                   14     14        0      0
+  AccumulateAEPixel                     13     13        0      0
+  AccumulateMAEPixel                    12     12        0      0
+  AccumulateMSEPixel                    12     12        0      0
+  GetPHASHSimilarity                    11     11        0      0
+  GetImageDistortions                   10     10        0      0
+  GetPSNRSimilarity                      9      9        0      0
+  GetDSSIMSimilarity                     9      9        0      0
+  AddPHashDifferences                    8      8        0      0
+  NormalizeChannelSimilarity             7      7        0      0
+  NormalizePHashSimilarity               7      7        0      0
+  GetImageDistortion                     6      6        0      0
+  GetRMSESimilarity                      5      5        0      0
+  ConvertSimilarityToDistortion          5      5        0      0
+  GetSimilarityMetric                    5      5        0      0
+  IsPhaseRowMissing                      4      4        0      0
+  IsCompareRowMissing                    3      3        0      0
+  SetImageColorMetric                    3      3        0      0
+  ConvertSimilarityToDistortionValue     2      2        0      0
+  GetEdgeCorrelationSurface              1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-compare.json

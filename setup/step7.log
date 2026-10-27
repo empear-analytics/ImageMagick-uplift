@@ -6732,3 +6732,9 @@ nohup: ignoring input
 19:45 fresh list:   killed 148, survived 3 (0 capped), no coverage 17, errors 0
 19:50 fresh linked-list:   killed 110, survived 6 (0 capped), no coverage 0, errors 0
 19:52 fresh histogram:   killed 195, survived 0 (0 capped), no coverage 0, errors 0
+19:52 pushed
+19:55 fresh compare:   killed 660, survived 0 (0 capped), no coverage 23, errors 0
+19:57 fresh channel:   killed 233, survived 1 (0 capped), no coverage 2, errors 0
+20:00 fresh token:   killed 196, survived 1 (0 capped), no coverage 0, errors 0
+20:05 fresh splay-tree:   killed 230, survived 12 (0 capped), no coverage 0, errors 0
+20:08 fresh blob:   killed 624, survived 7 (0 capped), no coverage 3, errors 0

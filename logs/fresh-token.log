@@ -1,0 +1,37 @@
+mutate: 197 mutants in MagickCore/token\.c$, 13 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/197 (1s)
+  mutants: 50/197 (1s)
+  mutants: 75/197 (2s)
+  mutants: 100/197 (3s)
+  mutants: 125/197 (6s)
+  mutants: 150/197 (10s)
+  mutants: 175/197 (10s)
+  mutants: 197/197 (140s)
+
+mutate: 197 mutants, 140s
+  killed 196, survived 1 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 99.5%   overall: 99.5%
+
+  function                           total killed survived no-cov
+  GetNextToken                          79     79        0      0
+  GlobExpression_                       52     52        0      0
+  Tokenizer                             23     23        0      0
+  MatchCharacterClass                   12     12        0      0
+  StoreToken                             7      7        0      0
+  IsTokenDelimiter                       6      6        0      0
+  IsSingleCharToken                      5      5        0      0
+  StripURLReference                      3      2        1      0
+  IsEscapedQuote                         3      3        0      0
+  sindex                                 3      3        0      0
+  IsGlob                                 2      2        0      0
+  DestroyTokenInfo                       1      1        0      0
+  HandleWhiteSpace                       1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  token.c:166:53 cxx_sub_to_add             (void) memmove(token,token+5,(size_t) (q-token-4));
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-token.json

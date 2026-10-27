@@ -1,0 +1,37 @@
+mutate: 236 mutants in MagickCore/channel\.c$, 13 functions
+mutate: baseline over 1481 cases in 1s
+  mutants: 25/236 (0s)
+  mutants: 50/236 (1s)
+  mutants: 75/236 (1s)
+  mutants: 100/236 (1s)
+  mutants: 125/236 (1s)
+  mutants: 150/236 (2s)
+  mutants: 175/236 (2s)
+  mutants: 200/236 (2s)
+  mutants: 225/236 (3s)
+  mutants: 236/236 (131s)
+
+mutate: 236 mutants, 131s
+  killed 233, survived 1 (0 capped), no coverage 2, errors 0
+  mutation score on reached code: 99.6%   overall: 98.7%
+
+  function                           total killed survived no-cov
+  SetImageAlphaChannel                  71     71        0      0
+  CombineImages                         43     43        0      0
+  ChannelFxImage                        36     36        0      0
+  SeparateImage                         19     19        0      0
+  ChannelImage                          15     15        0      0
+  FlattenPixelInfo                      15     14        1      0
+  SeparateImages                         9      9        0      0
+  SeparatePixelChannel                   6      6        0      0
+  ScaleColorChannels                     6      6        0      0
+  SetTransparentPixelsToBackground       6      6        0      0
+  FlattenRowOverBackground               4      4        0      0
+  SetShapeAlphaPixels                    4      4        0      0
+  GetImageAlphaChannel                   2      0        0      2
+
+  survivors (equivalent, or a gap in the catalogue):
+       channel.c:987:42 cxx_mul_to_div             composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-channel.json

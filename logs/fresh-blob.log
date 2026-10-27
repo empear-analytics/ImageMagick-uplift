@@ -1,0 +1,121 @@
+mutate: 634 mutants in MagickCore/blob\.c$, 73 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/634 (1s)
+  mutants: 50/634 (1s)
+  mutants: 75/634 (1s)
+  mutants: 100/634 (2s)
+  mutants: 125/634 (2s)
+  mutants: 150/634 (2s)
+  mutants: 175/634 (3s)
+  mutants: 200/634 (3s)
+  mutants: 225/634 (3s)
+  mutants: 250/634 (4s)
+  mutants: 275/634 (4s)
+  mutants: 300/634 (5s)
+  mutants: 325/634 (5s)
+  mutants: 350/634 (6s)
+  mutants: 375/634 (6s)
+  mutants: 400/634 (7s)
+  mutants: 425/634 (7s)
+  mutants: 450/634 (8s)
+  mutants: 475/634 (9s)
+  mutants: 500/634 (9s)
+  mutants: 525/634 (10s)
+  mutants: 550/634 (10s)
+  mutants: 575/634 (10s)
+  mutants: 600/634 (11s)
+  mutants: 625/634 (11s)
+  mutants: 634/634 (134s)
+
+mutate: 634 mutants, 134s
+  killed 624, survived 7 (0 capped), no coverage 3, errors 0
+  mutation score on reached code: 98.9%   overall: 98.4%
+
+  function                           total killed survived no-cov
+  OpenBlob                              56     56        0      0
+  WriteBlob                             47     47        0      0
+  ReadBlob                              46     46        0      0
+  FileToBlob                            44     44        0      0
+  CloseBlob                             40     40        0      0
+  SetBlobExtent                         32     32        0      0
+  ImageToFile                           23     23        0      0
+  ReadBlobString                        23     23        0      0
+  SeekBlob                              21     21        0      0
+  InjectImageBlob                       18     18        0      0
+  ImagesToBlob                          15     15        0      0
+  ImageToBlob                           14     14        0      0
+  CustomStreamToImage                   13     13        0      0
+  FileToImage                           13     11        2      0
+  ImageToCustomStream                   13     13        0      0
+  ImagesToCustomStream                  13     13        0      0
+  WriteBlobStream                       11     11        0      0
+  BlobToFile                            10     10        0      0
+  BlobToImage                           10     10        0      0
+  PingBlob                              10     10        0      0
+  IsBlobOffsetOverflow                  10     10        0      0
+  DestroyBlob                            9      9        0      0
+  DiscardBlobBytes                       9      9        0      0
+  DisassociateBlob                       8      8        0      0
+  IsBlobSeekable                         8      8        0      0
+  GetBlobSize                            7      7        0      0
+  ReadBlobByte                           7      7        0      0
+  SyncBlobStream                         6      6        0      0
+  CloneBlobInfo                          5      5        0      0
+  IsWrittenBlobFailure                   5      5        0      0
+  EOFBlob                                4      4        0      0
+  IsUnseekableBlobFile                   4      4        0      0
+  GetBlobError                           4      4        0      0
+  ReadBlobStream                         4      4        0      0
+  ReferenceBlob                          4      4        0      0
+  IsWriteBlobMode                        4      4        0      0
+  WriteBlobByte                          4      4        0      0
+  DetachBlob                             3      3        0      0
+  SetStreamBuffering                     3      3        0      0
+  IsStandardStreamName                   3      3        0      0
+  IsSharedListFilename                   3      3        0      0
+  IsGzipMagick                           3      3        0      0
+  IsCompressedSVGExtension               3      3        0      0
+  SyncBlob                               3      3        0      0
+  ThrowBlobException                     2      0        0      2
+  ResetDisassociatedBlobStorage          2      2        0      0
+  DuplicateBlob                          2      0        2      0
+  MapBlob                                2      2        0      0
+  MSBOrderLong                           2      1        1      0
+  MSBOrderShort                          2      1        1      0
+  ReadBlobLong                           2      2        0      0
+  ReadBlobLongLong                       2      2        0      0
+  ReadBlobShort                          2      2        0      0
+  TellBlob                               2      2        0      0
+  AttachBlob                             1      1        0      0
+  AttachCustomStream                     1      0        0      1
+  DestroyCustomStreamInfo                1      1        0      0
+  ErrorBlob                              1      0        1      0
+  GetBlobProperties                      1      1        0      0
+  GetBlobStreamHandler                   1      1        0      0
+  IsBlobExempt                           1      1        0      0
+  IsBlobTemporary                        1      1        0      0
+  ReadBlobLSBLong                        1      1        0      0
+  ReadBlobLSBShort                       1      1        0      0
+  ReadBlobMSBLong                        1      1        0      0
+  ReadBlobMSBLongLong                    1      1        0      0
+  ReadBlobMSBShort                       1      1        0      0
+  SetBlobExempt                          1      1        0      0
+  UnmapBlob                              1      1        0      0
+  WriteBlobLong                          1      1        0      0
+  WriteBlobLongLong                      1      1        0      0
+  WriteBlobShort                         1      1        0      0
+  WriteBlobSignedLong                    1      1        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+    x  blob.c:1260:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  blob.c:1262:3 cxx_remove_void_call       DestroyBlob(image);
+    x  blob.c:1379:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  blob.c:1707:24 cxx_ne_to_eq               if (IsEventLogging() != MagickFalse)
+    x  blob.c:1727:32 cxx_eq_to_ne               if ((fstat(file,&file_stats) == 0) && (file_stats.st_size > 0))
+    x  blob.c:3183:17 cxx_lt_to_le               while (buffer < q)
+    x  blob.c:3232:12 cxx_lt_to_le               while (p < q)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-blob.json
