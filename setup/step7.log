@@ -6668,3 +6668,13 @@ indexes failed
 17:11 resweep client:   killed 3, survived 2 (2 capped), no coverage 0, errors 0
 17:11 resweep image-view:   killed 0, survived 0 (0 capped), no coverage 0, errors 0
 17:12 pushed
+17:12 pushed
+== resweep pass done Mon Oct 12 17:12:23 UTC 2026, at 26e4e9dad
+nohup: ignoring input
+== night3 Mon Oct 26 19:24:54 UTC 2026: step 1, checkout and indexes
+9b6666e3f erdc: night3.sh, fresh mutation of the refactored files
+19:31 indexes at 9b6666e3f
+== night3 Mon Oct 26 19:31:22 UTC 2026: step 2, Mull build
+/home/jovyan/imagemagick-mutation/ImageMagick/build-oracle/mull-fresh/utilities/magick
+== night3 Mon Oct 26 19:41:57 UTC 2026: step 3, mutation per file
+19:50 fresh log:   killed 143, survived 89 (49 capped), no coverage 24, errors 0
