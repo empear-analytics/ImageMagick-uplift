@@ -989,6 +989,21 @@ static void GetMatrixRange(const MatrixInfo *matrix_info,double *min_value,
   }
 }
 
+static void GetMatrixScale(const double max_value,double *min_value,
+  double *scale_factor)
+{
+  if ((*min_value == 0.0) && (max_value == 0.0))
+    *scale_factor=0;
+  else
+    if (*min_value == max_value)
+      {
+        *scale_factor=(double) QuantumRange/(*min_value);
+        *min_value=0;
+      }
+    else
+      *scale_factor=(double) QuantumRange/(max_value-(*min_value));
+}
+
 MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
   ExceptionInfo *exception)
 {
@@ -1019,16 +1034,7 @@ MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
     Determine range of matrix.
   */
   GetMatrixRange(matrix_info,&min_value,&max_value);
-  if ((min_value == 0.0) && (max_value == 0.0))
-    scale_factor=0;
-  else
-    if (min_value == max_value)
-      {
-        scale_factor=(double) QuantumRange/min_value;
-        min_value=0;
-      }
-    else
-      scale_factor=(double) QuantumRange/(max_value-min_value);
+  GetMatrixScale(max_value,&min_value,&scale_factor);
   /*
     Convert matrix to image.
   */
