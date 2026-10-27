@@ -131,6 +131,18 @@ typedef struct _GraphemeInfo
     cluster;
 } GraphemeInfo;
 
+typedef struct _FreetypeTarget
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  const char
+    *encoding;
+} FreetypeTarget;
+
 typedef struct _RenderTarget
 {
   Image
@@ -154,8 +166,8 @@ static MagickBooleanType
     ExceptionInfo *),
   RenderPostscript(Image *,const DrawInfo *,const PointInfo *,TypeMetric *,
     ExceptionInfo *),
-  RenderFreetype(Image *,const DrawInfo *,const char *,const PointInfo *,
-    TypeMetric *,ExceptionInfo *),
+  RenderFreetype(const FreetypeTarget *,const PointInfo *,TypeMetric *,
+    ExceptionInfo *),
   RenderX11(Image *,const DrawInfo *,const PointInfo *,TypeMetric *,
     ExceptionInfo *);
 
@@ -1029,8 +1041,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
     {
       if (*draw_info->font == '@')
         {
-          status=RenderFreetype(image,draw_info,draw_info->encoding,offset,
-            metrics,exception);
+          const FreetypeTarget freetype = { image, draw_info,
+            draw_info->encoding };
+          status=RenderFreetype(&freetype,offset,metrics,exception);
           return(status);
         }
       if (*draw_info->font == '-')
@@ -1039,8 +1052,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
         return(RenderPostscript(image,draw_info,offset,metrics,exception));
       if (IsPathAccessible(draw_info->font) != MagickFalse)
         {
-          status=RenderFreetype(image,draw_info,draw_info->encoding,offset,
-            metrics,exception);
+          const FreetypeTarget freetype = { image, draw_info,
+            draw_info->encoding };
+          status=RenderFreetype(&freetype,offset,metrics,exception);
           return(status);
         }
       type_info=GetTypeInfo(draw_info->font,exception);
@@ -1096,8 +1110,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
           */
           annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
           annotate_info->font=font;
-          status=RenderFreetype(image,annotate_info,annotate_info->encoding,
-            offset,metrics,exception);
+          const FreetypeTarget freetype = { image, annotate_info,
+            annotate_info->encoding };
+          status=RenderFreetype(&freetype,offset,metrics,exception);
           annotate_info=DestroyDrawInfo(annotate_info);
           return(status);
         }
@@ -1121,8 +1136,8 @@ static MagickBooleanType RenderType(const RenderTarget *target,
     }
   if (type_info == (const TypeInfo *) NULL)
     {
-      status=RenderFreetype(image,draw_info,draw_info->encoding,offset,metrics,
-        exception);
+      const FreetypeTarget freetype = { image, draw_info, draw_info->encoding };
+      status=RenderFreetype(&freetype,offset,metrics,exception);
       return(status);
     }
   annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
@@ -1131,8 +1146,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
     (void) CloneString(&annotate_info->metrics,type_info->metrics);
   if (type_info->glyphs != (char *) NULL)
     (void) CloneString(&annotate_info->font,type_info->glyphs);
-  status=RenderFreetype(image,annotate_info,type_info->encoding,offset,metrics,
-    exception);
+  const FreetypeTarget freetype = { image, annotate_info,
+    type_info->encoding };
+  status=RenderFreetype(&freetype,offset,metrics,exception);
   annotate_info=DestroyDrawInfo(annotate_info);
   return(status);
 }
@@ -1153,17 +1169,12 @@ static MagickBooleanType RenderType(const RenderTarget *target,
 %
 %  The format of the RenderFreetype method is:
 %
-%      MagickBooleanType RenderFreetype(Image *image,DrawInfo *draw_info,
-%        const char *encoding,const PointInfo *offset,TypeMetric *metrics,
-%        ExceptionInfo *exception)
+%      MagickBooleanType RenderFreetype(const FreetypeTarget *target,
+%        const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 %
 %  A description of each parameter follows:
 %
-%    o image: the image.
-%
-%    o draw_info: the draw info.
-%
-%    o encoding: the font encoding.
+%    o target: the image, the draw info and the font encoding.
 %
 %    o offset: (x,y) location of text relative to image.
 %
@@ -1569,10 +1580,18 @@ static inline MagickBooleanType IsVisibleStroke(const DrawInfo *draw_info,
     (status != MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
-static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
-  const char *encoding,const PointInfo *offset,TypeMetric *metrics,
-  ExceptionInfo *exception)
+static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
+  const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
+  Image
+    *image = target->image;
+
+  const DrawInfo
+    *draw_info = target->draw_info;
+
+  const char
+    *encoding = target->encoding;
+
 #if !defined(FT_OPEN_PATHNAME)
 #define FT_OPEN_PATHNAME  ft_open_pathname
 #endif
@@ -2205,11 +2224,15 @@ static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
   return(status);
 }
 #else
-static MagickBooleanType RenderFreetype(Image *image,const DrawInfo *draw_info,
-  const char *magick_unused(encoding),const PointInfo *offset,
-  TypeMetric *metrics,ExceptionInfo *exception)
+static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
+  const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
-  magick_unreferenced(encoding);
+  Image
+    *image = target->image;
+
+  const DrawInfo
+    *draw_info = target->draw_info;
+
   (void) ThrowMagickException(exception,GetMagickModule(),
     MissingDelegateWarning,"DelegateLibrarySupportNotBuiltIn","'%s' (Freetype)",
     draw_info->font != (char *) NULL ? draw_info->font : "none");
