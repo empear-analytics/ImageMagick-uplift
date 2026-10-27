@@ -94,6 +94,18 @@ typedef struct _ShearRegion
     x_offset,
     y_offset;
 } ShearRegion;
+
+typedef struct _CropToFitRegion
+{
+  double
+    x_shear,
+    y_shear,
+    width,
+    height;
+
+  MagickBooleanType
+    rotate;
+} CropToFitRegion;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -112,24 +124,30 @@ typedef struct _ShearRegion
 %  The format of the CropToFitImage method is:
 %
 %      MagickBooleanType CropToFitImage(Image **image,
-%        const double x_shear,const double x_shear,
-%        const double width,const double height,
-%        const MagickBooleanType rotate,ExceptionInfo *exception)
+%        const CropToFitRegion *region,ExceptionInfo *exception)
 %
 %  A description of each parameter follows.
 %
 %    o image: the image.
 %
-%    o x_shear, y_shear, width, height: Defines a region of the image to crop.
+%    o region: the x_shear, y_shear, width and height that define the region
+%      of the image to crop, and whether the image was rotated.
 %
 %    o exception: return any errors or warnings in this structure.
 %
 */
 static MagickBooleanType CropToFitImage(Image **image,
-  const double x_shear,const double y_shear,
-  const double width,const double height,
-  const MagickBooleanType rotate,ExceptionInfo *exception)
+  const CropToFitRegion *region,ExceptionInfo *exception)
 {
+  const double
+    x_shear = region->x_shear,
+    y_shear = region->y_shear,
+    width = region->width,
+    height = region->height;
+
+  const MagickBooleanType
+    rotate = region->rotate;
+
   Image
     *crop_image;
 
@@ -1705,8 +1723,9 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
       shear_image=DestroyImage(shear_image);
       return((Image *) NULL);
     }
-  status=CropToFitImage(&shear_image,shear.x,shear.y,(MagickRealType)
-    image->columns,(MagickRealType) image->rows,MagickFalse,exception);
+  const CropToFitRegion crop_region = { shear.x, shear.y, (MagickRealType)
+    image->columns, (MagickRealType) image->rows, MagickFalse };
+  status=CropToFitImage(&shear_image,&crop_region,exception);
   shear_image->alpha_trait=image->alpha_trait;
   shear_image->compose=image->compose;
   shear_image->page.width=0;
@@ -1865,8 +1884,9 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
       rotate_image=DestroyImage(rotate_image);
       return((Image *) NULL);
     }
-  status=CropToFitImage(&rotate_image,shear.x,shear.y,(MagickRealType) width,
-    (MagickRealType) height,MagickTrue,exception);
+  const CropToFitRegion crop_region = { shear.x, shear.y, (MagickRealType)
+    width, (MagickRealType) height, MagickTrue };
+  status=CropToFitImage(&rotate_image,&crop_region,exception);
   rotate_image->alpha_trait=image->alpha_trait;
   rotate_image->compose=image->compose;
   rotate_image->page.width=0;
