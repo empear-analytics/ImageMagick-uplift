@@ -1731,6 +1731,24 @@ static inline MagickBooleanType IsIntegerSpecifierAt(const char *cursor)
     MagickTrue : MagickFalse);
 }
 
+static const char *GetFilenameOption(const ImageInfo *image_info,
+  Image *image,const char *pattern,ExceptionInfo *exception)
+{
+  const char
+    *option = (const char *) NULL;
+
+  if (image != NULL)
+    {
+      option=GetImageProperty(image,pattern,exception);
+      if (option == (const char *) NULL)
+        option=GetImageArtifact(image,pattern);
+    }
+  if ((option == (const char *) NULL) &&
+      (image_info != (ImageInfo *) NULL))
+    option=GetImageOption(image_info,pattern);
+  return(option);
+}
+
 MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
   Image *image,const char *format,int value,char *filename,
   ExceptionInfo *exception)
@@ -1836,15 +1854,7 @@ MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
           continue;
         (void) CopyMagickString(pattern,cursor+1,extent+1);
         pattern[extent]='\0';
-        if (image != NULL)
-          {
-            option=GetImageProperty(image,pattern,exception);
-            if (option == (const char *) NULL)
-              option=GetImageArtifact(image,pattern);
-          }
-        if ((option == (const char *) NULL) &&
-            (image_info != (ImageInfo *) NULL))
-          option=GetImageOption(image_info,pattern);
+        option=GetFilenameOption(image_info,image,pattern,exception);
         if (option == (const char *) NULL)
           continue;
         option_length=strlen(option);
