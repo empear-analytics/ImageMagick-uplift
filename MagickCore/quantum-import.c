@@ -2713,9 +2713,17 @@ static void ImportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   MagickBooleanType
     range_exception;
 
@@ -4547,7 +4555,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case IndexQuantum:
     {
-      ImportIndexQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportIndexQuantum(image,quantum_info,&span,exception);
       break;
     }
     case IndexAlphaQuantum:
