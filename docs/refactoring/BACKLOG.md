@@ -145,7 +145,7 @@ needs before refactoring:
 | 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.70, in progress (Complex Conditional gone; GetTypeInfoByFamily's scoring and exact pass extracted, [M91](tasks/M91-hoist-types-2.md)), [M32](tasks/M32-type.md) [M99](tasks/M99-bundle-arguments.md) |
 | 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | 5.13 (guard level; rest is #if-built or Recipe B), [M51](tasks/M51-resample.md) |
 | 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | 5.02 (lock helpers reused in Relinquish, [M88](tasks/M88-reuse.md); env blocks are two-value), [M52](tasks/M52-resource.md) |
-| 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | 4.91 (helpers reused after fresh mutation, [M88](tasks/M88-reuse.md)), [M53](tasks/M53-splay-tree.md) |
+| 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | 5.12 (helpers reused after fresh mutation, [M88](tasks/M88-reuse.md); CompareNodeKey reused in six functions, [M101](tasks/M101-bundle-uncapped.md)), [M53](tasks/M53-splay-tree.md) |
 | 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | 5.09, in progress (Complex Conditional gone), [M33](tasks/M33-locale.md) [M99](tasks/M99-bundle-arguments.md) |
 | 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | 5.02 (rest returns from inside or is #if-built), [M54](tasks/M54-token.md) |
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | 5.16 (rest interleaves Winsock/MSVC #if), [M72](tasks/M72-distribute-cache.md) |
