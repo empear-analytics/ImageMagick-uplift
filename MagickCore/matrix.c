@@ -772,6 +772,26 @@ static void CopyBackMatrix(double **matrix,long double **hp_matrix,
   return(MagickFalse); \
 }
 
+static void FindPivot(long double **hp_matrix,const ssize_t *pivots,
+  const size_t rank,long double *max,ssize_t *row,ssize_t *column)
+{
+  ssize_t
+    j,
+    k;
+
+  *column=(-1);
+  *row=(-1);
+  for (j=0; j < (ssize_t) rank; j++)
+    if (pivots[j] != 1)
+      for (k=0; k < (ssize_t) rank; k++)
+        if ((pivots[k] == 0) && (fabsl(hp_matrix[j][k]) > *max))
+          {
+            *max=fabsl(hp_matrix[j][k]);
+            *row=j;
+            *column=k;
+          }
+}
+
 static void SwapMatrixRows(long double **hp_matrix,const size_t rank,
   const ssize_t row,const ssize_t column)
 {
@@ -872,24 +892,11 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     long double
       max = 0.0;
 
-    ssize_t
-      k;
-
     /*
       Partial pivoting: find the largest absolute value in the unreduced
       submatrix.
     */
-    column=(-1);
-    row=(-1);
-    for (j=0; j < (ssize_t) rank; j++)
-      if (pivots[j] != 1)
-        for (k=0; k < (ssize_t) rank; k++)
-          if ((pivots[k] == 0) && (fabsl(hp_matrix[j][k]) > max))
-            {
-              max=fabsl(hp_matrix[j][k]);
-              row=j;
-              column=k;
-            }
+    FindPivot(hp_matrix,pivots,rank,&max,&row,&column);
     if (IsSingularPivot(column,row,max) != MagickFalse)
       ThrowGaussJordanException();  /* Singular or nearly singular matrix */
     pivots[column]++;
