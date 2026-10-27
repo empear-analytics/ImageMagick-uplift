@@ -135,7 +135,7 @@ needs before refactoring:
 | 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | 2.10, in progress (Complex Conditional gone), [M43](tasks/M43-vision.md) [M99](tasks/M99-bundle-arguments.md) |
 | 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.20, in progress (Complex Conditional gone; second pass [M78](tasks/M78-image.md)), [M36](tasks/M36-image.md) [M93](tasks/M93-near-threshold-2.md) [M94](tasks/M94-near-threshold-3.md) [M95](tasks/M95-near-threshold-4.md) |
 | 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | 2.21, in progress (8 predicates; one POSIX-only site left), [M44](tasks/M44-blob.md) |
-| 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | 2.33, in progress (6 predicates; Raqm-only and one 5-argument site left), [M45](tasks/M45-annotate.md) |
+| 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | 2.53, in progress (6 predicates; Raqm-only and one 5-argument site left; Recipe B on RenderType), [M45](tasks/M45-annotate.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | 2.60, in progress (ProfileImage #if-built; SyncExifProfile hoisted, M84), [M69](tasks/M69-profile.md) [M92](tasks/M92-near-threshold.md) |
 | 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.60, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) [M99](tasks/M99-bundle-arguments.md) |
 | 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | 3.79, in progress (Complex Conditional gone; scan loops need Recipe B), [M46](tasks/M46-layer.md) [M92](tasks/M92-near-threshold.md) |
@@ -154,7 +154,7 @@ needs before refactoring:
 | 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | 6.45 (rest is prologue duplication and a &list loop), [M58](tasks/M58-list.md) [M92](tasks/M92-near-threshold.md) |
 | 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | 6.90 (Passkey twins need D with mutation data), [M71](tasks/M71-cipher.md) |
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |
-| 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.54 (Recipe H applied, M84), [M61](tasks/M61-signature.md) |
+| 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.62 (Recipe H applied, M84; Recipe F on the K table, M101), [M61](tasks/M61-signature.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 7.56 | `MagickCore/quantum.c` | 1110 | 90% | 69% | 8.32, [M62](tasks/M62-quantum.md) |
 | 7.59 | `MagickCore/linked-list.c` | 1040 | 40% | 69% | 9.02 (interior-insert bug reported), [M59](tasks/M59-linked-list.md) [M92](tasks/M92-near-threshold.md) |
 | 7.68 | `MagickCore/random.c` | 996 | 62% | 24% | 8.06 (entropy gathering is #if-built), [M63](tasks/M63-random.md) |
@@ -163,7 +163,7 @@ needs before refactoring:
 | 8.55 | `MagickCore/registry.c` | 537 | 68% | 48% | 8.79, [M66](tasks/M66-registry.md) |
 | 8.81 | `MagickCore/timer.c` | 664 | 89% | 52% | plateau 8.81 (prologue duplication only), [M67](tasks/M67-timer.md) |
 | 9.09 | `MagickCore/artifact.c` | 491 | 80% | 60% | open |
-| 9.28 | `MagickCore/version.c` | 697 | 10% | 50% | open |
+| 9.28 | `MagickCore/version.c` | 697 | 10% | 50% | **10.00** (Recipe F on GetMagickDelegates), [M101](tasks/M101-bundle-uncapped.md) |
 | 10.00 | `MagickCore/client.c` | 163 | 100% | 60% | open |
 | 10.00 | `MagickCore/monitor.c` | 263 | 100% | 33% | open |
 | 10.00 | `MagickCore/thread.c` | 250 | 100% | 50% | open |
