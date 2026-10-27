@@ -80,6 +80,20 @@
 #include "MagickCore/thread-private.h"
 #include "MagickCore/threshold.h"
 #include "MagickCore/transform.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _ShearRegion
+{
+  size_t
+    width,
+    height;
+
+  ssize_t
+    x_offset,
+    y_offset;
+} ShearRegion;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1143,8 +1157,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
 %  The format of the XShearImage method is:
 %
 %      MagickBooleanType XShearImage(Image *image,const double degrees,
-%        const size_t width,const size_t height,
-%        const ssize_t x_offset,const ssize_t y_offset,ExceptionInfo *exception)
+%        const ShearRegion *region,ExceptionInfo *exception)
 %
 %  A description of each parameter follows.
 %
@@ -1153,17 +1166,24 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
 %    o degrees: A double representing the shearing angle along the X
 %      axis.
 %
-%    o width, height, x_offset, y_offset: Defines a region of the image
-%      to shear.
+%    o region: the width, height, x_offset and y_offset that define the
+%      region of the image to shear.
 %
 %    o exception: return any errors or warnings in this structure.
 %
 */
 static MagickBooleanType XShearImage(Image *image,const double degrees,
-  const size_t width,const size_t height,const ssize_t x_offset,
-  const ssize_t y_offset,ExceptionInfo *exception)
+  const ShearRegion *region,ExceptionInfo *exception)
 {
 #define XShearImageTag  "XShear/Image"
+
+  const size_t
+    width = region->width,
+    height = region->height;
+
+  const ssize_t
+    x_offset = region->x_offset,
+    y_offset = region->y_offset;
 
   typedef enum
   {
@@ -1663,8 +1683,9 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   */
   if (shear_image->alpha_trait == UndefinedPixelTrait)
     (void) SetImageAlphaChannel(shear_image,OpaqueAlphaChannel,exception);
-  status=XShearImage(shear_image,shear.x,image->columns,image->rows,bounds.x,
-    (ssize_t) (shear_image->rows-image->rows)/2,exception);
+  const ShearRegion first_pass = { image->columns, image->rows, bounds.x,
+    (ssize_t) (shear_image->rows-image->rows)/2 };
+  status=XShearImage(shear_image,shear.x,&first_pass,exception);
   if (status == MagickFalse)
     {
       shear_image=DestroyImage(shear_image);
@@ -1812,8 +1833,9 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   /*
     Rotate the image.
   */
-  status=XShearImage(rotate_image,shear.x,width,height,bounds.x,(ssize_t)
-    (rotate_image->rows-height)/2,exception);
+  const ShearRegion first_pass = { width, height, bounds.x, (ssize_t)
+    (rotate_image->rows-height)/2 };
+  status=XShearImage(rotate_image,shear.x,&first_pass,exception);
   if (status == MagickFalse)
     {
       rotate_image=DestroyImage(rotate_image);
@@ -1826,9 +1848,10 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
       rotate_image=DestroyImage(rotate_image);
       return((Image *) NULL);
     }
-  status=XShearImage(rotate_image,shear.x,bounds.width,bounds.height,(ssize_t)
-    (rotate_image->columns-bounds.width)/2,(ssize_t) (rotate_image->rows-
-    bounds.height)/2,exception);
+  const ShearRegion third_pass = { bounds.width, bounds.height, (ssize_t)
+    (rotate_image->columns-bounds.width)/2, (ssize_t) (rotate_image->rows-
+    bounds.height)/2 };
+  status=XShearImage(rotate_image,shear.x,&third_pass,exception);
   if (status == MagickFalse)
     {
       rotate_image=DestroyImage(rotate_image);
