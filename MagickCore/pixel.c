@@ -4854,10 +4854,19 @@ static MagickBooleanType ImportQuantumPixel(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static MagickBooleanType ImportShortPixel(Image *image,const RectangleInfo *roi,
-  const char *magick_restrict map,const QuantumType *quantum_map,
-  const void *pixels,ExceptionInfo *exception)
+static MagickBooleanType ImportShortPixel(Image *image,
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const unsigned short
     *magick_restrict p;
 
@@ -5236,7 +5245,7 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
     }
     case ShortPixel:
     {
-      status=ImportShortPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportShortPixel(image,&roi,&buffer,exception);
       break;
     }
     default:
