@@ -64,6 +64,12 @@ case reach and the oracle run.
 | effect.c | GetSurfaceShade, ShadePixelChannels (ShadeImage) | E (2 commits) | 17 cases; Brain Method gone | 1.48 → 1.59 |
 | paint.c | SetUpdatableFillChannels (OpaquePaintImage) | E | 36 cases; Brain Method gone | 3.33 → 3.82 |
 | paint.c | SetMaskedFillChannels (FloodfillPaintImage) | E | 41 cases | 3.82 → 3.87 |
+| paint.c | OilPaintImage's macros | H | IDENTICAL preprocessed text (M47's blocker) | flat at 3.87 |
+| paint.c | GetMostFrequentOffset, SetOilPaintChannels (OilPaintImage) | E (2 commits) | 15 cases; Brain Method and Deep Nesting gone | 3.87 → 4.14 |
+| feature.c | GetHoughLine, GetHoughMaxima (HoughLineImage) | E (2 commits) | 19 cases; nesting 7 → 4 | 1.94 → 2.01 |
+| feature.c | GetCannyGradient (CannyEdgeImage) | K | 12 cases; Brain Method gone | 2.01 → 2.21 |
+| quantize.c | ReduceKmeansPixels (KmeansImage) | E | 22 cases | 2.09 → 2.14 |
+| visual-effects.c | AnnotatePolaroidCaption (PolaroidImage) | O | 5 cases with captions; Brain Method gone | 2.41 → 2.63 |
 
 The pattern of the night: a public function's Brain Method often sits in one per-pixel
 channel loop inside its parallel row loop that writes only through `q`. Moved out by
@@ -72,7 +78,7 @@ the function loses Brain Method and Deep Nesting, and the file gains 0.1 to 0.5.
 Refused: the blur loops in effect.c (MotionBlur, SelectiveBlur, Bilateral) and
 MeanShiftImage, which write the shared `status` and accumulators in the same block
 (neither K nor T covers that); StatisticImage, whose accumulation writes five values;
-AdaptiveThresholdImage's sliding window (extracted, flat, reverted).
+AdaptiveThresholdImage's sliding window (extracted, flat, reverted). Also flat and reverted: HoughLineImage's vote loop, KmeansImage's centroid update and per-pixel accumulation (its depth-5 nesting is the nearest-centroid search, which writes `k` and `min_distance` inside the parallel loop), cache.c's constant virtual pixel, SparseColorImage's final scaling (its depth-6 cases need eight or nine arguments), compare.c's SimilarityImage channel loop (the file's findings sit in its FFTW-only region). Not attempted: IsEquivalentImage (the match test writes six variables), ProfileImage (LCMS `#if` code).
 
 Most of these were left by earlier tasks (M17, M21, M38, M48) only because the
 recipe needed the oracle level and the function's mutation score was below the gate.
