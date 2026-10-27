@@ -131,12 +131,13 @@ delegate.c WaitForDelegateInput (InvokeDelegate, E, 2.60 → 2.61).
 | splay-tree.c | CompareNodeKey reused for the root-key comparison in six functions (M53's leftover, which waited for the oracle level) | D (6 commits) | 12 to 15,549 cases each | 4.91 → 5.12 |
 | splay-tree.c | RelinquishNodeContents (value and key release; three copies in RelinquishSplayTreeNodes, then AddValueToSplayTree, DeleteNodeByValueFromSplayTree, DeleteNodeFromSplayTree) | E, D (4 commits) | 12 to 15,549 cases each | 5.12 → 5.94 |
 | stream.c | AcquireStreamRegion, the buffer sizing that ends GetVirtualPixelStream and QueueAuthenticPixelsStream | E (step 7), D | 13 and 306 cases | 3.10 → 3.13 |
+| geometry.c | SetPageGeometryDefaults (ParseGravityGeometry) | E | 579 cases | 3.44 → 3.45 |
 | layer.c | FindDifferingPixel, the four edge scans of CompareImagesBounds | E | 67 cases | 3.79 → 3.94 |
 | vision.c | CountPerimeterPattern, the 2x2 pattern count PerimeterThreshold and CircularityThreshold share | D | 4 cases; Deep Nesting gone in both | 2.10 → 2.35 |
 
 Whole catalogue at `f08adb1b0`: 15,906 cases, 1 diverged (`gaps/c5651ffad8`, the known Mac artifact). Brain Methods in MagickCore (built files): 27 left, from 44 in the morning.
 
-Found with a scan for identical runs of four or five lines within a file (the repeated blocks behind Code Duplication); the splay-tree, stream.c and layer.c steps came from it. Flat and reverted: quantum-import.c's half-float RGB triple across nine functions.
+Found with a scan for identical runs of four or five lines within a file (the repeated blocks behind Code Duplication); the splay-tree, stream.c and layer.c steps came from it. Flat and reverted: quantum-import.c's half-float RGB triple across nine functions; geometry.c's reuse of SetPageGeometryDefaults in ParsePageGeometry (the commit `ae29733d9` names that reuse as its next step; it was tried and left flat, so not kept).
 
 **Recipe O amendment (`bf8fe8636`):** inside a parallel loop body, a selection may move
 when every variable it writes is declared in that body, it writes nothing declared
