@@ -95,6 +95,25 @@ take seven to nine arguments. distort.c's best-fit bounds: each case writes `min
 `max` through macros defined mid-function that name the caller's locals. property.c and
 colorspace.c tables: Recipe F left the score flat (above).
 
+### Sweep (2026-10-27, 22:35)
+
+MagickCore with `cs-mcp` 1.5.13, against the morning's sweep at `dbeddd910` (before
+M100's pixel.c and draw.c steps, which this table includes): **mean 4.86 → 4.95; red 46
+→ 44 files, yellow 38 → 40, optimal 3 → 4** (version.c). 27 files moved, none down:
+paint.c 3.33 → 4.14 and policy.c 3.85 → 4.39 leave the red band; matrix.c 6.76 → 7.45;
+pixel.c 1.10 → 1.73; shear.c 2.18 → 2.72; annotate.c 2.33 → 2.77; color.c 3.16 → 3.55;
+fx.c 1.93 → 2.28; quantum-import.c 1.41 → 1.73; quantum-export.c 1.57 → 1.87; image.c 2.20 →
+2.49; feature.c 1.94 → 2.21; visual-effects.c 2.41 → 2.63; distort.c 2.29 → 2.49;
+constitute.c 4.45 → 4.65; effect.c 1.40 → 1.59; configure.c 6.01 → 6.19; morphology.c 2.04 →
+2.20; draw.c 1.79 → 1.90; composite.c 1.92 → 2.02; threshold.c 2.08 → 2.16; signature.c
+8.54 → 8.62; transform.c 2.65 → 2.71; quantize.c 2.09 → 2.14; geometry.c 3.40 → 3.44;
+delegate.c 2.60 → 2.61.
+
+Later in the night also: composite.c CopySourceChannels and SetVirtualCompositeChannels
+(CompositeImage, E ×2, 1.92 → 2.02), geometry.c ParseGeometryXOffset (GetGeometry, O; the
+matching y helper was refused: CodeScene counts the pair as duplication, 3.44 → 3.36),
+delegate.c WaitForDelegateInput (InvokeDelegate, E, 2.60 → 2.61).
+
 ### Open: an intermittent divergence on write-mask cases
 
 `resize/6ee45e9cfa` and `resize/6efddf0c0a` (rose under a write mask, `-scale`, written
