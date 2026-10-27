@@ -71,7 +71,34 @@
 #include "MagickCore/string_.h"
 #include "MagickCore/transform.h"
 #include "MagickCore/utility.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _ExportPixelBuffer
+{
+  const char
+    *magick_restrict map;
+
+  const QuantumType
+    *quantum_map;
+
+  void
+    *pixels;
+} ExportPixelBuffer;
 
+typedef struct _ImportPixelBuffer
+{
+  const char
+    *magick_restrict map;
+
+  const QuantumType
+    *quantum_map;
+
+  const void
+    *pixels;
+} ImportPixelBuffer;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -702,9 +729,18 @@ static MagickBooleanType ExportCharRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportCharPixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -993,9 +1029,18 @@ static MagickBooleanType ExportDoubleRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportDoublePixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -1284,9 +1329,18 @@ static MagickBooleanType ExportFloatRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportFloatPixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -1575,9 +1629,18 @@ static MagickBooleanType ExportLongRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportLongPixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -1867,9 +1930,18 @@ static MagickBooleanType ExportLongLongRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportLongLongPixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -2159,9 +2231,18 @@ static MagickBooleanType ExportQuantumRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportQuantumPixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -2453,9 +2534,18 @@ static MagickBooleanType ExportShortRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportShortPixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -2686,41 +2776,42 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
   roi.height=height;
   roi.x=x;
   roi.y=y;
+  const ExportPixelBuffer buffer = { map, quantum_map, pixels };
   switch (type)
   {
     case CharPixel:
     {
-      status=ExportCharPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportCharPixel(image,&roi,&buffer,exception);
       break;
     }
     case DoublePixel:
     {
-      status=ExportDoublePixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportDoublePixel(image,&roi,&buffer,exception);
       break;
     }
     case FloatPixel:
     {
-      status=ExportFloatPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportFloatPixel(image,&roi,&buffer,exception);
       break;
     }
     case LongPixel:
     {
-      status=ExportLongPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportLongPixel(image,&roi,&buffer,exception);
       break;
     }
     case LongLongPixel:
     {
-      status=ExportLongLongPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportLongLongPixel(image,&roi,&buffer,exception);
       break;
     }
     case QuantumPixel:
     {
-      status=ExportQuantumPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportQuantumPixel(image,&roi,&buffer,exception);
       break;
     }
     case ShortPixel:
     {
-      status=ExportShortPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportShortPixel(image,&roi,&buffer,exception);
       break;
     }
     default:
@@ -3355,10 +3446,19 @@ static MagickBooleanType ImportCharRGBPPixels(Image *image,const RectangleInfo *
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static MagickBooleanType ImportCharPixel(Image *image,const RectangleInfo *roi,
-  const char *magick_restrict map,const QuantumType *quantum_map,
-  const void *pixels,ExceptionInfo *exception)
+static MagickBooleanType ImportCharPixel(Image *image,
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const unsigned char
     *magick_restrict p;
 
@@ -3678,9 +3778,18 @@ static MagickBooleanType ImportDoubleRGBPPixels(Image *image,const RectangleInfo
 }
 
 static MagickBooleanType ImportDoublePixel(Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,const void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const double
     *magick_restrict p;
 
@@ -3777,10 +3886,19 @@ static MagickBooleanType ImportDoublePixel(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static MagickBooleanType ImportFloatPixel(Image *image,const RectangleInfo *roi,
-  const char *magick_restrict map,const QuantumType *quantum_map,
-  const void *pixels,ExceptionInfo *exception)
+static MagickBooleanType ImportFloatPixel(Image *image,
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const float
     *magick_restrict p;
 
@@ -4046,10 +4164,19 @@ static MagickBooleanType ImportFloatPixel(Image *image,const RectangleInfo *roi,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static MagickBooleanType ImportLongPixel(Image *image,const RectangleInfo *roi,
-  const char *magick_restrict map,const QuantumType *quantum_map,
-  const void *pixels,ExceptionInfo *exception)
+static MagickBooleanType ImportLongPixel(Image *image,
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const unsigned int
     *magick_restrict p;
 
@@ -4268,9 +4395,18 @@ static MagickBooleanType ImportLongPixel(Image *image,const RectangleInfo *roi,
 }
 
 static MagickBooleanType ImportLongLongPixel(Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,const void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const MagickSizeType
     *magick_restrict p;
 
@@ -4489,9 +4625,18 @@ static MagickBooleanType ImportLongLongPixel(Image *image,
 }
 
 static MagickBooleanType ImportQuantumPixel(Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,const void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -4709,10 +4854,19 @@ static MagickBooleanType ImportQuantumPixel(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static MagickBooleanType ImportShortPixel(Image *image,const RectangleInfo *roi,
-  const char *magick_restrict map,const QuantumType *quantum_map,
-  const void *pixels,ExceptionInfo *exception)
+static MagickBooleanType ImportShortPixel(Image *image,
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const unsigned short
     *magick_restrict p;
 
@@ -5056,41 +5210,42 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   roi.height=height;
   roi.x=x;
   roi.y=y;
+  const ImportPixelBuffer buffer = { map, quantum_map, pixels };
   switch (type)
   {
     case CharPixel:
     {
-      status=ImportCharPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportCharPixel(image,&roi,&buffer,exception);
       break;
     }
     case DoublePixel:
     {
-      status=ImportDoublePixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportDoublePixel(image,&roi,&buffer,exception);
       break;
     }
     case FloatPixel:
     {
-      status=ImportFloatPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportFloatPixel(image,&roi,&buffer,exception);
       break;
     }
     case LongPixel:
     {
-      status=ImportLongPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportLongPixel(image,&roi,&buffer,exception);
       break;
     }
     case LongLongPixel:
     {
-      status=ImportLongLongPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportLongLongPixel(image,&roi,&buffer,exception);
       break;
     }
     case QuantumPixel:
     {
-      status=ImportQuantumPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportQuantumPixel(image,&roi,&buffer,exception);
       break;
     }
     case ShortPixel:
     {
-      status=ImportShortPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportShortPixel(image,&roi,&buffer,exception);
       break;
     }
     default:

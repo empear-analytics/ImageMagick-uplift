@@ -185,6 +185,19 @@ typedef struct _PathInfo
   PathInfoCode
     code;
 } PathInfo;
+
+typedef struct _FillAlphaSample
+{
+  double
+    mid;
+
+  MagickBooleanType
+    fill;
+
+  ssize_t
+    x,
+    y;
+} FillAlphaSample;
 
 /*
   Forward declarations.
@@ -5047,10 +5060,19 @@ static inline MagickBooleanType IsFillAlphaSkipped(const MagickBooleanType fill,
     (subpath_alpha >= 1.0)) ? MagickTrue : MagickFalse);
 }
 
-static double GetFillAlpha(PolygonInfo *polygon_info,const double mid,
-  const MagickBooleanType fill,const FillRule fill_rule,const ssize_t x,
-  const ssize_t y,double *stroke_alpha)
+static double GetFillAlpha(PolygonInfo *polygon_info,
+  const FillAlphaSample *sample,const FillRule fill_rule,double *stroke_alpha)
 {
+  const double
+    mid = sample->mid;
+
+  const MagickBooleanType
+    fill = sample->fill;
+
+  const ssize_t
+    x = sample->x,
+    y = sample->y;
+
   double
     alpha,
     beta,
@@ -5453,8 +5475,9 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
       /*
         Fill and/or stroke.
       */
-      fill_alpha=GetFillAlpha(polygon_info[id],mid,fill,draw_info->fill_rule,
-        x,y,&stroke_alpha);
+      const FillAlphaSample sample = { mid, fill, x, y };
+      fill_alpha=GetFillAlpha(polygon_info[id],&sample,draw_info->fill_rule,
+        &stroke_alpha);
       if (draw_info->stroke_antialias == MagickFalse)
         {
           fill_alpha=fill_alpha >= AntialiasThreshold ? 1.0 : 0.0;

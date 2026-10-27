@@ -96,11 +96,11 @@ needs before refactoring:
 
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
-| 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | 1.10, in progress (fixed-map blocks moved out of 9 of 14 Export/Import functions), [M39](tasks/M39-pixel.md) [M94](tasks/M94-near-threshold-3.md) |
+| 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | 1.73, in progress (fixed-map blocks moved out of 9 of 14 Export/Import functions; Recipe B on all 14, fresh mutation ready; the other 5 extractions wait on an owner decision, see M100), [M39](tasks/M39-pixel.md) [M94](tasks/M94-near-threshold-3.md) [M100](tasks/M100-pixel-buffer.md) |
 | 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | 1.93, in progress (Complex Conditional 42 -> 8 sites; the rest are repeats; ExecuteRPN's Brain Method gone with Recipe B), [M38](tasks/M38-fx.md) [M99](tasks/M99-bundle-arguments.md) |
 | 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | 1.41, in progress (Recipe B span on 12 helpers; Gray, RGB, Index and the rest gate not ready), [M99](tasks/M99-bundle-arguments.md) |
 | 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | 1.57, in progress (plateau 1.24 for E; Recipe B span on 6 helpers, Gray, RGB and RGBA gate not ready), [M70](tasks/M70-quantum-export.md) [M99](tasks/M99-bundle-arguments.md) |
-| 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | 1.79, in progress (Complex Conditional gone: 20 sites, 22 predicates; DrawPolygonPrimitive bounds, [M91](tasks/M91-hoist-types-2.md)), [M37](tasks/M37-draw.md) |
+| 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | 1.90, in progress (Complex Conditional gone: 20 sites, 22 predicates; DrawPolygonPrimitive bounds, [M91](tasks/M91-hoist-types-2.md); GetFillAlpha Recipe B, [M100](tasks/M100-pixel-buffer.md)), [M37](tasks/M37-draw.md) |
 | 1.33 | `MagickCore/composite.c` | 3815 | 86% | 74% | 1.92, in progress (Complex Conditional gone; three Brain Methods gone with Recipe B), [M20](tasks/M20-composite.md) [M94](tasks/M94-near-threshold-3.md) [M99](tasks/M99-bundle-arguments.md) |
 | 1.38 | `MagickCore/effect.c` | 4405 | 89% | 75% | 1.40, in progress (Complex Conditional gone; parallel loops need K/T, the adaptive pair B), [M26](tasks/M26-effect.md) |
 | 1.74 | `MagickCore/distort.c` | 3466 | 68% | 76% | 2.29, in progress (Complex Conditional gone; the rest needs Recipe B, O or K), [M22](tasks/M22-distort.md) |

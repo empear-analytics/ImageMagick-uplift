@@ -4,8 +4,11 @@
 # numbers predate the campaign. Copy it to ~/imagemagick-mutation/setup/ and run it
 # under the step7 lock:
 #
-#   nohup flock ~/imagemagick-mutation/setup/step7.lock ~/imagemagick-mutation/setup/night3.sh \
-#     >> ~/imagemagick-mutation/setup/step7.log 2>&1 &
+#   cd ~/imagemagick-mutation/setup && \
+#   nohup flock step7.lock bash -c 'ulimit -v 4194304; exec ./night3.sh' >> step7.log 2>&1 &
+#
+# The 4 GB per-process cap and 16 jobs keep runaway mutants inside the container's 64 GB
+# limit: on 2026-10-26, with 28 jobs and no cap, the run died silently in morphology.c.
 #
 # 1. Check out the campaign tip (campaign/M99 while it is open, else main) and
 #    rebuild the indexes. casemap.py and linecov.py both: a stale line profile makes
@@ -17,7 +20,7 @@
 # will not finish in one night, and the next night simply resumes it.
 SETUP=~/imagemagick-mutation/setup
 cd ~/imagemagick-mutation/ImageMagick && . $SETUP/sysroot.env
-export ORACLE_JOBS=28
+export ORACLE_JOBS=16
 W=build-oracle/work
 FILES="log morphology geometry enhance visual-effects segment identify property image fx draw color statistic distort xml-tree profile constitute transform quantize montage cache pixel attribute option mime feature composite type delegate compress threshold string policy list linked-list histogram compare channel token splay-tree blob annotate vision utility signature resource matrix layer effect stream resample decorate colorspace shear registry random quantum paint magick locale gem exception colormap cipher semaphore magic fourier distribute-cache configure coder"
 push() { $SETUP/push-results.sh > /dev/null 2>&1 && echo "$(date +%H:%M) pushed" || echo "$(date +%H:%M) push failed"; }
