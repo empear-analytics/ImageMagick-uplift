@@ -536,11 +536,7 @@ MagickExport MagickBooleanType DeleteNodeByValueFromSplayTree(
         key=splay_tree->root->key;
         SplaySplayTree(splay_tree,key);
         splay_tree->key=(void *) NULL;
-        if (splay_tree->compare != (int (*)(const void *,const void *)) NULL)
-          compare=splay_tree->compare(splay_tree->root->key,key);
-        else
-          compare=(splay_tree->root->key > key) ? 1 :
-            ((splay_tree->root->key < key) ? -1 : 0);
+        compare=CompareNodeKey(splay_tree,splay_tree->root,key);
         if (compare != 0)
           {
             UnlockSemaphoreInfo(splay_tree->semaphore);
