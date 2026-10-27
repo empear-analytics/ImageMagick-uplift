@@ -72,6 +72,21 @@
 #include "MagickCore/utility.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _QuantumPixelSpan
+{
+  MagickSizeType
+    number_pixels;
+
+  const Quantum
+    *magick_restrict p;
+
+  unsigned char
+    *magick_restrict q;
+} QuantumPixelSpan;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -355,9 +370,17 @@ static void ExportAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -656,9 +679,17 @@ static void ExportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -903,9 +934,17 @@ static void ExportBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportBGROQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -1163,9 +1202,17 @@ static void ExportBlackQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   Quantum
     cbcr[4];
 
@@ -2617,11 +2664,18 @@ static void ExportIndexAlphaQuantum(const Image *image,
   }
 }
 
-static void ExportMultispectralQuantum(const Image *image,
-  QuantumInfo *quantum_info,const MagickSizeType number_pixels,
-  const Quantum *magick_restrict p,unsigned char *magick_restrict q,
-  ExceptionInfo *exception)
+static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   ssize_t
     i,
     x;
@@ -3412,9 +3466,17 @@ static void ExportRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -3761,6 +3823,8 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
   q=pixels;
   ResetQuantumState(quantum_info);
   extent=GetQuantumExtent(image,quantum_info,quantum_type);
+  const QuantumPixelSpan span = { number_pixels, p, q };
+
   switch (quantum_type)
   {
     case AlphaQuantum:
@@ -3770,17 +3834,17 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case BGRQuantum:
     {
-      ExportBGRQuantum(image,quantum_info,number_pixels,p,q);
+      ExportBGRQuantum(image,quantum_info,&span);
       break;
     }
     case BGRAQuantum:
     {
-      ExportBGRAQuantum(image,quantum_info,number_pixels,p,q);
+      ExportBGRAQuantum(image,quantum_info,&span);
       break;
     }
     case BGROQuantum:
     {
-      ExportBGROQuantum(image,quantum_info,number_pixels,p,q);
+      ExportBGROQuantum(image,quantum_info,&span);
       break;
     }
     case BlackQuantum:
@@ -3806,7 +3870,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case MultispectralQuantum:
     {
-      ExportMultispectralQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ExportMultispectralQuantum(image,quantum_info,&span,exception);
       break;
     }
     case CMYKOQuantum:
@@ -3816,7 +3880,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case CbYCrYQuantum:
     {
-      ExportCbYCrYQuantum(image,quantum_info,number_pixels,p,q);
+      ExportCbYCrYQuantum(image,quantum_info,&span);
       break;
     }
     case GrayQuantum:
@@ -3871,7 +3935,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case RGBOQuantum:
     {
-      ExportRGBOQuantum(image,quantum_info,number_pixels,p,q);
+      ExportRGBOQuantum(image,quantum_info,&span);
       break;
     }
     default:

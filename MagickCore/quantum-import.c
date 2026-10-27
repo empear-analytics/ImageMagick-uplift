@@ -72,6 +72,21 @@
 #include "MagickCore/utility.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _QuantumPixelSpan
+{
+  MagickSizeType
+    number_pixels;
+
+  const unsigned char
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+} QuantumPixelSpan;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -437,9 +452,17 @@ static void ImportPixelChannel(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   if (image->alpha_trait == UndefinedPixelTrait)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
@@ -450,9 +473,17 @@ static void ImportAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -796,9 +827,17 @@ static void ImportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -1061,9 +1100,17 @@ static void ImportBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportBGROQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -1326,9 +1373,17 @@ static void ImportBGROQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportBlackQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   if (image->colorspace != CMYKColorspace)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
@@ -1434,9 +1489,17 @@ static void ImportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportCMYKQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -1627,9 +1690,17 @@ static void ImportCMYKQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportCMYKAQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -2393,9 +2464,17 @@ static void ImportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -2868,11 +2947,18 @@ static void ImportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
       "InvalidColormapIndex","`%s'",image->filename);
 }
 
-static void ImportIndexAlphaQuantum(const Image *image,
-  QuantumInfo *quantum_info,const MagickSizeType number_pixels,
-  const unsigned char *magick_restrict p,Quantum *magick_restrict q,
-  ExceptionInfo *exception)
+static void ImportIndexAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   MagickBooleanType
     range_exception;
 
@@ -3114,11 +3200,18 @@ static void ImportIndexAlphaQuantum(const Image *image,
       "InvalidColormapIndex","`%s'",image->filename);
 }
 
-static void ImportMultispectralQuantum(const Image *image,
-  QuantumInfo *quantum_info,const MagickSizeType number_pixels,
-  const unsigned char *magick_restrict p,Quantum *magick_restrict q,
-  ExceptionInfo *exception)
+static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -3777,9 +3870,17 @@ static void ImportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -4042,9 +4143,17 @@ static void ImportRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -4352,31 +4461,33 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     return(0);
   ResetQuantumState(quantum_info);
   extent=GetQuantumExtent(image,quantum_info,quantum_type);
+  const QuantumPixelSpan span = { number_pixels, p, q };
+
   switch (quantum_type)
   {
     case AlphaQuantum:
     {
-      ImportAlphaQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
     case BGRQuantum:
     {
-      ImportBGRQuantum(image,quantum_info,number_pixels,p,q);
+      ImportBGRQuantum(image,quantum_info,&span);
       break;
     }
     case BGRAQuantum:
     {
-      ImportBGRAQuantum(image,quantum_info,number_pixels,p,q);
+      ImportBGRAQuantum(image,quantum_info,&span);
       break;
     }
     case BGROQuantum:
     {
-      ImportBGROQuantum(image,quantum_info,number_pixels,p,q);
+      ImportBGROQuantum(image,quantum_info,&span);
       break;
     }
     case BlackQuantum:
     {
-      ImportBlackQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportBlackQuantum(image,quantum_info,&span,exception);
       break;
     }
     case BlueQuantum:
@@ -4387,17 +4498,17 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case CMYKQuantum:
     {
-      ImportCMYKQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportCMYKQuantum(image,quantum_info,&span,exception);
       break;
     }
     case CMYKAQuantum:
     {
-      ImportCMYKAQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportCMYKAQuantum(image,quantum_info,&span,exception);
       break;
     }
     case MultispectralQuantum:
     {
-      ImportMultispectralQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportMultispectralQuantum(image,quantum_info,&span,exception);
       break;
     }
     case CMYKOQuantum:
@@ -4417,7 +4528,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case GrayAlphaQuantum:
     {
-      ImportGrayAlphaQuantum(image,quantum_info,number_pixels,p,q);
+      ImportGrayAlphaQuantum(image,quantum_info,&span);
       break;
     }
     case GreenQuantum:
@@ -4433,7 +4544,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case IndexAlphaQuantum:
     {
-      ImportIndexAlphaQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportIndexAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
     case OpacityQuantum:
@@ -4456,12 +4567,12 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     case RGBAQuantum:
     case CbYCrAQuantum:
     {
-      ImportRGBAQuantum(image,quantum_info,number_pixels,p,q);
+      ImportRGBAQuantum(image,quantum_info,&span);
       break;
     }
     case RGBOQuantum:
     {
-      ImportRGBOQuantum(image,quantum_info,number_pixels,p,q);
+      ImportRGBOQuantum(image,quantum_info,&span);
       break;
     }
     default:

@@ -147,6 +147,21 @@ typedef struct _CannyInfo
     y;
 } CannyInfo;
 
+typedef struct _CannyTrace
+{
+  Image
+    *edge_image;
+
+  CacheView
+    *edge_view;
+
+  MatrixInfo
+    *canny_cache;
+
+  double
+    lower_threshold;
+} CannyTrace;
+
 static inline MagickBooleanType IsAuthenticPixel(const Image *image,
   const ssize_t x,const ssize_t y)
 {
@@ -157,10 +172,21 @@ static inline MagickBooleanType IsAuthenticPixel(const Image *image,
   return(MagickTrue);
 }
 
-static MagickBooleanType TraceEdges(Image *edge_image,CacheView *edge_view,
-  MatrixInfo *canny_cache,const ssize_t x,const ssize_t y,
-  const double lower_threshold,ExceptionInfo *exception)
+static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
+  const ssize_t y,ExceptionInfo *exception)
 {
+  Image
+    *edge_image = trace->edge_image;
+
+  CacheView
+    *edge_view = trace->edge_view;
+
+  MatrixInfo
+    *canny_cache = trace->canny_cache;
+
+  const double
+    lower_threshold = trace->lower_threshold;
+
   CannyInfo
     edge,
     pixel;
@@ -530,6 +556,9 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
     Hysteresis threshold.
   */
   edge_view=AcquireAuthenticCacheView(edge_image,exception);
+  const CannyTrace trace = { edge_image, edge_view, canny_cache,
+    lower_threshold };
+
   for (y=0; y < (ssize_t) edge_image->rows; y++)
   {
     ssize_t
@@ -556,8 +585,7 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
         continue;
       if ((GetPixelIntensity(edge_image,p) == 0.0) &&
           (pixel.intensity >= upper_threshold))
-        status=TraceEdges(edge_image,edge_view,canny_cache,x,y,lower_threshold,
-          exception);
+        status=TraceEdges(&trace,x,y,exception);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {

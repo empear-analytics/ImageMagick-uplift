@@ -175,6 +175,16 @@ typedef struct _ZeroCrossing
   short
     crossings[256];
 } ZeroCrossing;
+
+typedef struct _ClassifySettings
+{
+  double
+    cluster_threshold,
+    weighting_exponent;
+
+  MagickBooleanType
+    verbose;
+} ClassifySettings;
 
 /*
   Constant declarations.
@@ -220,8 +230,7 @@ static void
 %  The format of the Classify method is:
 %
 %      MagickBooleanType Classify(Image *image,short **extrema,
-%        const double cluster_threshold,const double weighting_exponent,
-%        const MagickBooleanType verbose,ExceptionInfo *exception)
+%        const ClassifySettings *settings,ExceptionInfo *exception)
 %
 %  A description of each parameter follows.
 %
@@ -231,13 +240,15 @@ static void
 %      represent the peaks and valleys of the histogram for each color
 %      component.
 %
-%    o cluster_threshold:  This double represents the minimum number of
+%    o settings: the classification settings:
+%
+%      cluster_threshold:  This double represents the minimum number of
 %      pixels contained in a hexahedra before it can be considered valid
 %      (expressed as a percentage).
 %
-%    o weighting_exponent: Specifies the membership weighting exponent.
+%      weighting_exponent: Specifies the membership weighting exponent.
 %
-%    o verbose:  A value greater than zero prints detailed information about
+%      verbose:  A value greater than zero prints detailed information about
 %      the identified classes.
 %
 %    o exception: return any errors or warnings in this structure.
@@ -431,8 +442,7 @@ static Cluster *ClassifyPixelByCluster(const Image *image,Cluster *head,
 }
 
 static MagickBooleanType Classify(Image *image,short **extrema,
-  const double cluster_threshold,const double weighting_exponent,
-  const MagickBooleanType verbose,ExceptionInfo *exception)
+  const ClassifySettings *settings,ExceptionInfo *exception)
 {
 #define SegmentImageTag  "Segment/Image"
 #define ThrowClassifyException(severity,tag,label) \
@@ -450,6 +460,13 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     } \
   ThrowBinaryException(severity,tag,label); \
 }
+
+  const double
+    cluster_threshold = settings->cluster_threshold,
+    weighting_exponent = settings->weighting_exponent;
+
+  const MagickBooleanType
+    verbose = settings->verbose;
 
   CacheView
     *image_view;
@@ -1931,6 +1948,9 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   const double cluster_threshold,const double smooth_threshold,
   ExceptionInfo *exception)
 {
+  const ClassifySettings settings = { cluster_threshold, WeightingExponent,
+    verbose };
+
   ColorspaceType
     previous_colorspace;
 
@@ -1983,8 +2003,7 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   /*
     Classify using the fuzzy c-Means technique.
   */
-  status=Classify(image,extrema,cluster_threshold,WeightingExponent,verbose,
-    exception);
+  status=Classify(image,extrema,&settings,exception);
   (void) TransformImageColorspace(image,previous_colorspace,exception);
   /*
     Relinquish resources.

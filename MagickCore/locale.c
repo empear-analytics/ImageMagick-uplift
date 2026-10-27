@@ -79,6 +79,21 @@
 #define LocaleFilename  "locale.xml"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _LocaleLoadTarget
+{
+  SplayTreeInfo
+    *cache;
+
+  const char
+    *locale;
+
+  ExceptionInfo
+    *exception;
+} LocaleLoadTarget;
+
+/*
   Static declarations.
 */
 static const char
@@ -109,8 +124,8 @@ static volatile locale_t
 */
 static MagickBooleanType
   IsLocaleTreeInstantiated(ExceptionInfo *),
-  LoadLocaleCache(SplayTreeInfo *,const char *,const char *,const char *,
-    const size_t,ExceptionInfo *);
+  LoadLocaleCache(const LocaleLoadTarget *,const char *,const char *,
+    const size_t);
 
 #if defined(MAGICKCORE_LOCALE_SUPPORT)
 /*
@@ -197,6 +212,8 @@ static SplayTreeInfo *AcquireLocaleSplayTree(const char *filename,
 
   cache=NewSplayTree(CompareSplayTreeString,(void *(*)(void *)) NULL,
     DestroyLocaleNode);
+  const LocaleLoadTarget target = { cache, locale, exception };
+
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
     const StringInfo
@@ -209,9 +226,8 @@ static SplayTreeInfo *AcquireLocaleSplayTree(const char *filename,
     option=(const StringInfo *) GetNextValueInLinkedList(options);
     while (option != (const StringInfo *) NULL)
     {
-      (void) LoadLocaleCache(cache,(const char *)
-        GetStringInfoDatum(option),GetStringInfoPath(option),locale,0,
-        exception);
+      (void) LoadLocaleCache(&target,(const char *)
+        GetStringInfoDatum(option),GetStringInfoPath(option),0);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
     }
     options=DestroyLocaleOptions(options);
@@ -221,9 +237,8 @@ static SplayTreeInfo *AcquireLocaleSplayTree(const char *filename,
         option=(const StringInfo *) GetNextValueInLinkedList(options);
         while (option != (const StringInfo *) NULL)
         {
-          (void) LoadLocaleCache(cache,(const char *)
-            GetStringInfoDatum(option),GetStringInfoPath(option),locale,0,
-            exception);
+          (void) LoadLocaleCache(&target,(const char *)
+            GetStringInfoDatum(option),GetStringInfoPath(option),0);
           option=(const StringInfo *) GetNextValueInLinkedList(options);
         }
         options=DestroyLocaleOptions(options);
@@ -233,8 +248,7 @@ static SplayTreeInfo *AcquireLocaleSplayTree(const char *filename,
   magick_unreferenced(filename);
 #endif
   if (GetNumberOfNodesInSplayTree(cache) == 0)
-    (void) LoadLocaleCache(cache,LocaleMap,"built-in",locale,0,
-      exception);
+    (void) LoadLocaleCache(&target,LocaleMap,"built-in",0);
   return(cache);
 }
 
@@ -1108,18 +1122,19 @@ MagickExport MagickBooleanType ListLocaleInfo(FILE *file,
 %
 %  The format of the LoadLocaleCache method is:
 %
-%      MagickBooleanType LoadLocaleCache(SplayTreeInfo *cache,const char *xml,
-%        const char *filename,const size_t depth,ExceptionInfo *exception)
+%      MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
+%        const char *xml,const char *filename,const size_t depth)
 %
 %  A description of each parameter follows:
+%
+%    o target: the cache to load into, the locale to load, and the exception
+%      structure to return any errors or warnings in.
 %
 %    o xml:  The locale list in XML format.
 %
 %    o filename:  The locale list filename.
 %
 %    o depth: depth of <include /> statements.
-%
-%    o exception: return any errors or warnings in this structure.
 %
 */
 
@@ -1186,9 +1201,18 @@ static void GetIncludePath(const char *filename,const char *token,
     (void) ConcatenateMagickString(path,token,MagickPathExtent);
 }
 
-static MagickBooleanType LoadLocaleCache(SplayTreeInfo *cache,const char *xml,
-  const char *filename,const char *locale,const size_t depth,ExceptionInfo *exception)
+static MagickBooleanType LoadLocaleCache(const LocaleLoadTarget *target,
+  const char *xml,const char *filename,const size_t depth)
 {
+  SplayTreeInfo
+    *cache = target->cache;
+
+  const char
+    *locale = target->locale;
+
+  ExceptionInfo
+    *exception = target->exception;
+
   char
     keyword[MagickLocaleExtent],
     message[MagickLocaleExtent],
@@ -1314,6 +1338,9 @@ static MagickBooleanType LoadLocaleCache(SplayTreeInfo *cache,const char *xml,
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
                 {
+                  const LocaleLoadTarget include_target = { cache, locale,
+                    exception };
+
                   char
                     path[MagickPathExtent],
                     *file_xml;
@@ -1323,8 +1350,8 @@ static MagickBooleanType LoadLocaleCache(SplayTreeInfo *cache,const char *xml,
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=(MagickStatusType) LoadLocaleCache(cache,file_xml,
-                        path,locale,depth+1,exception);
+                      status&=(MagickStatusType) LoadLocaleCache(
+                        &include_target,file_xml,path,depth+1);
                       file_xml=DestroyString(file_xml);
                     }
                 }

@@ -171,6 +171,18 @@ static const char
 
 #undef DELEGATE_ESC
 /*
+  Typedef declarations.
+*/
+typedef struct _DelegateLoadTarget
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+} DelegateLoadTarget;
+
+/*
   Global declarations.
 */
 static LinkedListInfo
@@ -184,8 +196,8 @@ static SemaphoreInfo
 */
 static MagickBooleanType
   IsDelegateCacheInstantiated(ExceptionInfo *),
-  LoadDelegateCache(LinkedListInfo *,const char *,const char *,const size_t,
-    ExceptionInfo *);
+  LoadDelegateCache(const DelegateLoadTarget *,const char *,const char *,
+    const size_t);
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -220,6 +232,8 @@ static LinkedListInfo *AcquireDelegateCache(const char *filename,
     *cache;
 
   cache=NewLinkedList(0);
+  const DelegateLoadTarget target = { cache, exception };
+
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
     const StringInfo
@@ -232,8 +246,8 @@ static LinkedListInfo *AcquireDelegateCache(const char *filename,
     option=(const StringInfo *) GetNextValueInLinkedList(options);
     while (option != (const StringInfo *) NULL)
     {
-      (void) LoadDelegateCache(cache,(const char *)
-        GetStringInfoDatum(option),GetStringInfoPath(option),0,exception);
+      (void) LoadDelegateCache(&target,(const char *)
+        GetStringInfoDatum(option),GetStringInfoPath(option),0);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
     }
     options=DestroyConfigureOptions(options);
@@ -242,7 +256,7 @@ static LinkedListInfo *AcquireDelegateCache(const char *filename,
   magick_unreferenced(filename);
 #endif
   if (IsLinkedListEmpty(cache) != MagickFalse)
-    (void) LoadDelegateCache(cache,DelegateMap,"built-in",0,exception);
+    (void) LoadDelegateCache(&target,DelegateMap,"built-in",0);
   return(cache);
 }
 
@@ -2126,19 +2140,19 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
 %
 %  The format of the LoadDelegateCache method is:
 %
-%      MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
-%        const char *xml,const char *filename,const size_t depth,
-%        ExceptionInfo *exception)
+%      MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
+%        const char *xml,const char *filename,const size_t depth)
 %
 %  A description of each parameter follows:
+%
+%    o target: the cache to load into, and the exception structure to
+%      return any errors or warnings in.
 %
 %    o xml:  The delegate list in XML format.
 %
 %    o filename:  The delegate list filename.
 %
 %    o depth: depth of <include /> statements.
-%
-%    o exception: return any errors or warnings in this structure.
 %
 */
 static inline MagickBooleanType IsIncludeElementOpen(const char *token,
@@ -2161,10 +2175,15 @@ static void GetIncludePath(const char *filename,const char *token,
     (void) ConcatenateMagickString(path,token,MagickPathExtent);
 }
 
-static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
-  const char *xml,const char *filename,const size_t depth,
-  ExceptionInfo *exception)
+static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
+  const char *xml,const char *filename,const size_t depth)
 {
+  LinkedListInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
   char
     keyword[MagickPathExtent],
     *token;
@@ -2268,6 +2287,9 @@ static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
                 {
+                  const DelegateLoadTarget include_target = { cache,
+                    exception };
+
                   char
                     path[MagickPathExtent],
                     *file_xml;
@@ -2276,8 +2298,8 @@ static MagickBooleanType LoadDelegateCache(LinkedListInfo *cache,
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=(MagickStatusType) LoadDelegateCache(cache,
-                        file_xml,path,depth+1,exception);
+                      status&=(MagickStatusType) LoadDelegateCache(
+                        &include_target,file_xml,path,depth+1);
                       file_xml=DestroyString(file_xml);
                     }
                 }

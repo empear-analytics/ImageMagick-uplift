@@ -160,6 +160,25 @@ typedef struct _LogMapInfo
     *format;
 } LogMapInfo;
 
+typedef struct _LogLoadTarget
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+} LogLoadTarget;
+
+typedef struct _LogEventLocation
+{
+  const char
+    *module,
+    *function;
+
+  size_t
+    line;
+} LogEventLocation;
+
 /*
   Static declarations.
 */
@@ -235,8 +254,8 @@ static MagickBooleanType
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
 static MagickBooleanType
-  LoadLogCache(LinkedListInfo *,const char *,const char *,const size_t,
-    ExceptionInfo *);
+  LoadLogCache(const LogLoadTarget *,const char *,const char *,
+    const size_t);
 #endif
 
 /*
@@ -284,6 +303,8 @@ static LinkedListInfo *AcquireLogCache(const char *filename,
   status=MagickTrue;
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
+    const LogLoadTarget target = { cache, exception };
+
     const StringInfo
       *option;
 
@@ -294,8 +315,8 @@ static LinkedListInfo *AcquireLogCache(const char *filename,
     option=(const StringInfo *) GetNextValueInLinkedList(options);
     while (option != (const StringInfo *) NULL)
     {
-      status&=(MagickStatusType) LoadLogCache(cache,(const char *)
-        GetStringInfoDatum(option),GetStringInfoPath(option),0,exception);
+      status&=(MagickStatusType) LoadLogCache(&target,(const char *)
+        GetStringInfoDatum(option),GetStringInfoPath(option),0);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
     }
     options=DestroyConfigureOptions(options);
@@ -894,10 +915,13 @@ MagickExport MagickBooleanType ListLogInfo(FILE *file,ExceptionInfo *exception)
 %
 %  The format of the LoadLogCache method is:
 %
-%      MagickBooleanType LoadLogCache(LinkedListInfo *cache,const char *xml,
-%        const char *filename,const size_t depth,ExceptionInfo *exception)
+%      MagickBooleanType LoadLogCache(const LogLoadTarget *target,
+%        const char *xml,const char *filename,const size_t depth)
 %
 %  A description of each parameter follows:
+%
+%    o target: the cache to load into, and the exception structure to
+%      return any errors or warnings in.
 %
 %    o xml:  The log list in XML format.
 %
@@ -905,12 +929,16 @@ MagickExport MagickBooleanType ListLogInfo(FILE *file,ExceptionInfo *exception)
 %
 %    o depth: depth of <include /> statements.
 %
-%    o exception: return any errors or warnings in this structure.
-%
 */
-static MagickBooleanType LoadLogCache(LinkedListInfo *cache,const char *xml,
-  const char *filename,const size_t depth,ExceptionInfo *exception)
+static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
+  const char *xml,const char *filename,const size_t depth)
 {
+  LinkedListInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
   char
     keyword[MagickPathExtent],
     *token;
@@ -1011,6 +1039,8 @@ static MagickBooleanType LoadLogCache(LinkedListInfo *cache,const char *xml,
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
                 {
+                  const LogLoadTarget include_target = { cache, exception };
+
                   char
                     path[MagickPathExtent],
                     *file_xml;
@@ -1026,8 +1056,8 @@ static MagickBooleanType LoadLogCache(LinkedListInfo *cache,const char *xml,
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=(MagickStatusType) LoadLogCache(cache,file_xml,
-                        path,depth+1,exception);
+                      status&=(MagickStatusType) LoadLogCache(
+                        &include_target,file_xml,path,depth+1);
                       file_xml=DestroyString(file_xml);
                     }
                 }
@@ -1362,9 +1392,16 @@ static void FormatLogFilename(const LogInfo *log_info,const ssize_t generation,
   *q='\0';
 }
 
-static char *TranslateEvent(const char *module,const char *function,
-  const size_t line,const char *domain,const char *event)
+static char *TranslateEvent(const LogEventLocation *location,
+  const char *domain,const char *event)
 {
+  const char
+    *module = location->module,
+    *function = location->function;
+
+  const size_t
+    line = location->line;
+
   char
     *text;
 
@@ -1588,6 +1625,8 @@ MagickExport MagickBooleanType LogMagickEventList(const LogEventType type,
   const char *module,const char *function,const size_t line,const char *format,
   va_list operands)
 {
+  const LogEventLocation location = { module, function, line };
+
   char
     event[MagickPathExtent],
     *text;
@@ -1621,7 +1660,7 @@ MagickExport MagickBooleanType LogMagickEventList(const LogEventType type,
   n=vsnprintf(event,MagickPathExtent,format,operands);
   if (n < 0)
     event[MagickPathExtent-1]='\0';
-  text=TranslateEvent(module,function,line,domain,event);
+  text=TranslateEvent(&location,domain,event);
   if (text == (char *) NULL)
     {
       (void) ContinueTimer((TimerInfo *) &log_info->timer);

@@ -722,6 +722,12 @@ typedef struct {
   Quantum * thisPixel;
 } fxRtT;
 
+typedef struct {
+  PixelChannel channel;
+  ssize_t imgx;
+  ssize_t imgy;
+} fxPixelPosT;
+
 struct _FxInfo {
   Image * image;
   size_t ImgListLen;
@@ -3528,8 +3534,11 @@ static inline fxFltType GetIntensity (FxInfo * pfx, ssize_t ImgNum, const fxFltT
 }
 
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
-  const PixelChannel channel, const ssize_t imgx, const ssize_t imgy)
+  const fxPixelPosT * pos)
 {
+  const PixelChannel channel = pos->channel;
+  const ssize_t imgx = pos->imgx;
+  const ssize_t imgy = pos->imgy;
   const Quantum * p = pfxrt->thisPixel;
   fxFltType regA=0, regB=0, regC=0, regD=0, regE=0;
   Image * img = pfx->image;
@@ -4424,7 +4433,9 @@ MagickPrivate MagickBooleanType FxEvaluateChannelExpression (
   pfx->fxrts[id].thisPixel = NULL;
 
 
-  if (!ExecuteRPN (pfx, &pfx->fxrts[id], &ret, channel, x, y)) {
+  const fxPixelPosT pos = { channel, x, y };
+
+  if (!ExecuteRPN (pfx, &pfx->fxrts[id], &ret, &pos)) {
     (void) ThrowMagickException (
       exception, GetMagickModule(), OptionError,
       "ExecuteRPN failed", " ");
@@ -4700,7 +4711,9 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
             continue;
         }
 
-        if (!ExecuteRPN (pfx, &pfx->fxrts[id], &result, channel, x, y)) {
+        const fxPixelPosT pos = { channel, x, y };
+
+        if (!ExecuteRPN (pfx, &pfx->fxrts[id], &result, &pos)) {
           status=MagickFalse;
           break;
         }

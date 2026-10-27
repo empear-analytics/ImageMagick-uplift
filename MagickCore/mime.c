@@ -112,6 +112,15 @@ struct _MimeInfo
   size_t
     signature;
 };
+
+typedef struct _MimeLoadTarget
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+} MimeLoadTarget;
 
 /*
   Static declarations.
@@ -130,8 +139,7 @@ static MagickBooleanType
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
 static MagickBooleanType
- LoadMimeCache(LinkedListInfo *,const char *,const char *,const size_t,
-    ExceptionInfo *);
+ LoadMimeCache(const MimeLoadTarget *,const char *,const char *,const size_t);
 #endif
 
 /*
@@ -169,6 +177,8 @@ MagickExport LinkedListInfo *AcquireMimeCache(const char *filename,
   cache=NewLinkedList(0);
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
+    const MimeLoadTarget target = { cache, exception };
+
     const StringInfo
       *option;
 
@@ -179,8 +189,8 @@ MagickExport LinkedListInfo *AcquireMimeCache(const char *filename,
     option=(const StringInfo *) GetNextValueInLinkedList(options);
     while (option != (const StringInfo *) NULL)
     {
-      (void) LoadMimeCache(cache,(const char *)
-        GetStringInfoDatum(option),GetStringInfoPath(option),0,exception);
+      (void) LoadMimeCache(&target,(const char *)
+        GetStringInfoDatum(option),GetStringInfoPath(option),0);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
     }
     options=DestroyConfigureOptions(options);
@@ -885,10 +895,13 @@ static void GetIncludePath(const char *filename,const char *attribute,
 %
 %  The format of the LoadMimeCache method is:
 %
-%      MagickBooleanType LoadMimeCache(LinkedListInfo *cache,const char *xml,
-%        const char *filename,const size_t depth,ExceptionInfo *exception)
+%      MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
+%        const char *xml,const char *filename,const size_t depth)
 %
 %  A description of each parameter follows:
+%
+%    o target: the cache to load into, and the exception structure to
+%      return any errors or warnings in.
 %
 %    o xml:  The mime list in XML format.
 %
@@ -896,12 +909,16 @@ static void GetIncludePath(const char *filename,const char *attribute,
 %
 %    o depth: depth of <include /> statements.
 %
-%    o exception: return any errors or warnings in this structure.
-%
 */
-static MagickBooleanType LoadMimeCache(LinkedListInfo *cache,const char *xml,
-  const char *filename,const size_t depth,ExceptionInfo *exception)
+static MagickBooleanType LoadMimeCache(const MimeLoadTarget *target,
+  const char *xml,const char *filename,const size_t depth)
 {
+  LinkedListInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
   const char
     *attribute;
 
@@ -941,6 +958,8 @@ static MagickBooleanType LoadMimeCache(LinkedListInfo *cache,const char *xml,
             ConfigureError,"IncludeElementNestedTooDeeply","`%s'",filename);
         else
           {
+            const MimeLoadTarget include_target = { cache, exception };
+
             char
               path[MagickPathExtent],
               *file_xml;
@@ -949,8 +968,8 @@ static MagickBooleanType LoadMimeCache(LinkedListInfo *cache,const char *xml,
             file_xml=FileToXML(path,~0UL);
             if (file_xml != (char *) NULL)
               {
-                status&=(MagickStatusType) LoadMimeCache(cache,file_xml,path,
-                  depth+1,exception);
+                status&=(MagickStatusType) LoadMimeCache(&include_target,
+                  file_xml,path,depth+1);
                 file_xml=DestroyString(file_xml);
               }
           }
