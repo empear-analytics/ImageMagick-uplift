@@ -114,6 +114,18 @@ Later in the night also: composite.c CopySourceChannels and SetVirtualCompositeC
 matching y helper was refused: CodeScene counts the pair as duplication, 3.44 → 3.36),
 delegate.c WaitForDelegateInput (InvokeDelegate, E, 2.60 → 2.61).
 
+### Late night: the quantum entry points
+
+| File | Step | Recipe | Evidence | Code Health |
+|---|---|---|---|---|
+| quantum-import.c | DisassociateQuantumAlpha (ImportQuantumPixels) | E | 13,937 cases (the commit says 13,921, the case count before tonight's new cases); Brain Method, Deep Nesting and Bumpy Road gone | 1.73 → 1.88 |
+| quantum-export.c | AssociateQuantumAlpha (ExportQuantumPixels) | E | 12,782 cases; Brain Method and Deep Nesting gone | 1.87 → 2.03 |
+| quantum-export.c | SwapRedGreenQuantum, the two identical CbYCr swaps | D | 12,782 cases; Bumpy Road gone | 2.03 → 2.04 |
+| delegate.c | WaitForDelegateInput (InvokeDelegate) | E | 12 cases | 2.60 → 2.61 |
+
+Reverted: DistortImage's -verbose printers (BilinearForward flat, Polynomial 2.49 → 2.47);
+the import side's single CbYCr swap (flat).
+
 ### Open: an intermittent divergence on write-mask cases
 
 `resize/6ee45e9cfa` and `resize/6efddf0c0a` (rose under a write mask, `-scale`, written
