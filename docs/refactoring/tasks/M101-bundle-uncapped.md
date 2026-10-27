@@ -6,9 +6,11 @@ also the oracle's baseline). Measured with `cs-mcp` 1.5.13.
 
 ### Report (2026-10-27, Mac, evening)
 
-**quantum-import.c 1.41 → 1.63, quantum-export.c 1.57 → 1.87, morphology.c 2.04 → 2.20,
-distort.c 2.29 → 2.49**, eight Recipe B commits, each losing *Brain Method* with
-*Excess Number of Function Arguments*.
+**quantum-import.c 1.41 → 1.73, quantum-export.c 1.57 → 1.87, morphology.c 2.04 → 2.20,
+distort.c 2.29 → 2.49, configure.c 6.01 → 6.19, transform.c 2.65 → 2.71, shear.c 2.18 →
+2.72**, one Recipe B per commit. Most remove *Brain Method* with *Excess Number of
+Function Arguments*; configure.c, transform.c and shear.c lose their last argument
+finding.
 
 | Function | Bundle | Evidence | Code Health |
 |---|---|---|---|
@@ -22,6 +24,27 @@ distort.c 2.29 → 2.49**, eight Recipe B commits, each losing *Brain Method* wi
 | GenerateCoefficients | number_arguments, arguments, number_values (`CoefficientInput`, new) | oracle, careful (86%, uncapped `q100`) | 2.29 → 2.49 |
 | ImportCbYCrYQuantum | `QuantumPixelSpan` | oracle, ready (100%, uncapped `n100`) | 1.63 → 1.73 |
 | configure.c AddConfigureKey | cache, path (`ConfigureKeyTarget`, new; the literal `"[built-in]"` at all five calls) | oracle, ready (2/2, `n100`), 9 cases | 6.01 → 6.19, the file's last argument finding |
+| transform.c CopyImageRegion | columns, rows, sx, sy, dx, dy (`CopyRegion`, new; one per call, amendment below) | oracle, ready (19/19, `n100`), 26 cases | 2.65 → 2.71, the file's last argument finding |
+| shear.c XShearImage | width, height, x_offset, y_offset (`ShearRegion`, new; one per call) | oracle, careful (88%, `n100`), 43 cases | 2.18 → 2.45 |
+| shear.c YShearImage | the same struct | oracle, careful (78%), 43 cases | 2.45 → 2.67 |
+| shear.c CropToFitImage | x_shear, y_shear, width, height, rotate (`CropToFitRegion`, new) | oracle, careful (89%), 43 cases | 2.67 → 2.72, the file's last argument finding |
+
+**Recipe B amendment: member accesses and casts.** Step 4 refused any initialiser that
+reads a member (`shear.x`, `image->rows`) or casts, which left shear.c and transform.c
+out of reach though every one of their argument findings is on a static function. Such
+an initialiser is now allowed in a struct declared directly before the one call that
+uses it, with no statement between: nothing can run between the two, so the struct holds
+exactly what the call would have read, and the expressions have no side effect, so
+reading them first changes nothing. The calls that need it each get their own struct
+(`first_pass`, `second_pass`, `third_pass`, `crop_region`, `first_region` to
+`fourth_region`).
+
+**New cases: ShearRotateImage.** No case reached ShearRotateImage, where three of the
+changed calls are: `-rotate` is RotateImage, a distortion, and nothing in the library
+calls it. A new `imdriver` command (`shearrotate IMAGE DEGREES OUT`) and sixteen cases
+(eight angles across the quadrants, 45 and 180 degrees, negative angles; rose and
+rose_alpha) now reach it. Commit `e3c0292c2`, before the shear steps; the case map was
+rebuilt (15,900 cases).
 
 **The 200-case cap, not the harness, made these functions "not ready".** M99's capped
 runs gave the six quantum functions 18-51% adjusted and GenerateCoefficients 74%. The
