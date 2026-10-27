@@ -1463,6 +1463,16 @@ static MagickStatusType SetAspectRatioRegion(const Image *image,
   return(flags);
 }
 
+static void SetPageGeometryDefaults(const Image *image,
+  RectangleInfo *region_info)
+{
+  SetGeometry(image,region_info);
+  if (image->page.width != 0)
+    region_info->width=image->page.width;
+  if (image->page.height != 0)
+    region_info->height=image->page.height;
+}
+
 MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
   const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
 {
@@ -1477,11 +1487,7 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",geometry);
   if ((geometry == (char *) NULL) || (*geometry == '\0'))
     return(NoValue);
-  SetGeometry(image,region_info);
-  if (image->page.width != 0)
-    region_info->width=image->page.width;
-  if (image->page.height != 0)
-    region_info->height=image->page.height;
+  SetPageGeometryDefaults(image,region_info);
   flags=ParseAbsoluteGeometry(geometry,region_info);
   if (flags == NoValue)
     {
