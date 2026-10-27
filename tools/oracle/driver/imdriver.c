@@ -1399,6 +1399,28 @@ static int ShearRotateCmd(int argc,char **argv,ExceptionInfo *exception)
   return(status);
 }
 
+/* policy.c: SetMagickSecurityPolicy, which only the API reaches */
+static int SecPolicyCmd(int argc,char **argv,ExceptionInfo *exception)
+{
+  /* secpolicy XML [NAME...]: applies XML as a user security policy, prints the status, the
+     value of each policy NAME, and whether PNG and MIFF may be read */
+  int i;
+  if (argc < 3)
+    return(Fail(exception,"secpolicy: XML [NAME...]"));
+  (void) printf("status %d\n",(int) SetMagickSecurityPolicy(argv[2],exception));
+  for (i=3; i < argc; i++)
+  {
+    char *value=GetPolicyValue(argv[i]);
+    (void) printf("%s %s\n",argv[i],value != (char *) NULL ? value : "(null)");
+    if (value != (char *) NULL)
+      value=DestroyString(value);
+  }
+  (void) printf("PNG %d MIFF %d\n",(int) IsRightsAuthorized(CoderPolicyDomain,ReadPolicyRights,"PNG"),
+    (int) IsRightsAuthorized(CoderPolicyDomain,ReadPolicyRights,"MIFF"));
+  Report(exception);
+  return(0);
+}
+
 /* token.c: GlobExpression over a pattern and expressions */
 static int GlobCmd(int argc,char **argv,ExceptionInfo *exception)
 {
@@ -2895,6 +2917,7 @@ int main(int argc,char **argv)
   else if (strcmp(argv[1],"metrics") == 0) status=MetricsCmd(argc,argv,exception);
   else if (strcmp(argv[1],"memory") == 0) status=MemoryCmd(argc,argv,exception);
   else if (strcmp(argv[1],"pathauth") == 0) status=PathAuthCmd(argc,argv,exception);
+  else if (strcmp(argv[1],"secpolicy") == 0) status=SecPolicyCmd(argc,argv,exception);
   else if (strcmp(argv[1],"nextimage") == 0) status=NextImageCmd(argc,argv,exception);
   else if (strcmp(argv[1],"configure") == 0) status=ConfigureCmd(argc,argv,exception);
   else if (strcmp(argv[1],"logcfg") == 0) status=LogCfgCmd(argc,argv,exception);

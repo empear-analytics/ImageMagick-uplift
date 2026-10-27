@@ -6318,6 +6318,25 @@ GAP_STEP_CASES += [
     ("driver pathauth, symlink follow forbidden", _driver("pathauth", *_PATHAUTH),
      {".config/ImageMagick/policy.xml":
       '<policymap>\n  <policy domain="system" name="symlink" rights="none" pattern="follow"/>\n</policymap>\n'})]
+# policy.c through imdriver: SetMagickSecurityPolicy, which nothing in the command line calls: a
+# coder rule, a resource value, both at once, malformed XML (refused by validation), and an include
+# of a file the case provides and of one that does not exist (LoadPolicyCache's recursion)
+_SECPOLICY_NAMES = ("memory", "width", "max-memory-request")
+GAP_STEP_CASES += [
+    ("driver secpolicy, coder rule", _driver("secpolicy",
+     '<policymap><policy domain="coder" rights="none" pattern="PNG"/></policymap>', *_SECPOLICY_NAMES), {}),
+    ("driver secpolicy, resource values", _driver("secpolicy",
+     '<policymap><policy domain="resource" name="memory" value="256MiB"/>'
+     '<policy domain="resource" name="width" value="8KP"/></policymap>', *_SECPOLICY_NAMES), {}),
+    ("driver secpolicy, coder rule and resource value", _driver("secpolicy",
+     '<policymap><policy domain="coder" rights="none" pattern="{PNG,MIFF}"/>'
+     '<policy domain="system" name="max-memory-request" value="1MiB"/></policymap>', *_SECPOLICY_NAMES), {}),
+    ("driver secpolicy, malformed XML", _driver("secpolicy", '<policymap><policy domain=', *_SECPOLICY_NAMES), {}),
+    ("driver secpolicy, include of a provided file", _driver("secpolicy",
+     '<policymap><include file="inc.xml"/></policymap>', *_SECPOLICY_NAMES),
+     {"inc.xml": '<policymap>\n  <policy domain="resource" name="memory" value="128MiB"/>\n</policymap>\n'}),
+    ("driver secpolicy, include of a missing file", _driver("secpolicy",
+     '<policymap><include file="nosuch.xml"/></policymap>', *_SECPOLICY_NAMES), {})]
 # image.c through imdriver: AcquireNextImage (the next frame is named from image_info when one is
 # given, shares the image's blob) and DisassociateImageStream (the next frame then has a blob of its
 # own, so closing it leaves the image's stream readable). Coders always pass an image_info naming the
