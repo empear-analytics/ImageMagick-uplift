@@ -1,0 +1,55 @@
+mutate: 506 mutants in MagickCore/stream\.c$, 24 functions
+mutate: baseline over 337 cases in 1s
+  mutants: 25/506 (0s)
+  mutants: 50/506 (0s)
+  mutants: 75/506 (1s)
+  mutants: 100/506 (1s)
+  mutants: 125/506 (1s)
+  mutants: 150/506 (1s)
+  mutants: 175/506 (2s)
+  mutants: 200/506 (2s)
+  mutants: 225/506 (2s)
+  mutants: 250/506 (2s)
+  mutants: 275/506 (2s)
+  mutants: 300/506 (2s)
+  mutants: 325/506 (3s)
+  mutants: 350/506 (3s)
+  mutants: 375/506 (3s)
+  mutants: 400/506 (3s)
+  mutants: 425/506 (3s)
+  mutants: 450/506 (4s)
+  mutants: 475/506 (4s)
+  mutants: 500/506 (4s)
+  mutants: 506/506 (4s)
+
+mutate: 506 mutants, 4s
+  killed 501, survived 0 (0 capped), no coverage 5, errors 0
+  mutation score on reached code: 100.0%   overall: 99.0%
+
+  function                           total killed survived no-cov
+  StreamImagePixels                    367    367        0      0
+  QueueAuthenticPixelsStream            21     21        0      0
+  WriteStreamImage                      19     19        0      0
+  GetVirtualPixelStream                 17     17        0      0
+  IsOutsideStreamRegion                 12     12        0      0
+  DestroyPixelStream                    11     11        0      0
+  IsCacheMorphologyChanged              11     11        0      0
+  IsOutsideStreamPixel                  10     10        0      0
+  ReadStream                             6      6        0      0
+  DestroyStreamInfo                      5      5        0      0
+  GetOneAuthenticPixelFromStream         4      4        0      0
+  GetOneVirtualPixelFromStream           4      0        0      4
+  StreamImage                            4      4        0      0
+  SyncAuthenticPixelsStream              3      3        0      0
+  RelinquishStreamPixels                 2      2        0      0
+  AcquireStreamPixels                    2      2        0      0
+  AcquireStreamInfo                      1      1        0      0
+  GetAuthenticMetacontentFromStream      1      1        0      0
+  GetAuthenticPixelsStream               1      1        0      0
+  GetAuthenticPixelsFromStream           1      1        0      0
+  GetVirtualPixelsStream                 1      0        0      1
+  GetVirtualMetacontentFromStream        1      1        0      0
+  ValidatePixelCacheMorphology           1      1        0      0
+  WriteStream                            1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-stream.json

@@ -6744,3 +6744,9 @@ nohup: ignoring input
 20:19 fresh utility:   killed 329, survived 12 (0 capped), no coverage 14, errors 0
 20:20 fresh signature:   killed 81, survived 0 (0 capped), no coverage 2, errors 0
 20:23 fresh resource:   killed 212, survived 0 (0 capped), no coverage 3, errors 0
+20:23 pushed
+20:26 fresh matrix:   killed 217, survived 15 (0 capped), no coverage 0, errors 0
+20:29 fresh layer:   killed 358, survived 69 (0 capped), no coverage 0, errors 0
+20:32 fresh effect:   killed 1189, survived 0 (0 capped), no coverage 0, errors 0
+20:33 fresh stream:   killed 501, survived 0 (0 capped), no coverage 5, errors 0
+20:33 fresh resample:   killed 239, survived 0 (0 capped), no coverage 0, errors 0

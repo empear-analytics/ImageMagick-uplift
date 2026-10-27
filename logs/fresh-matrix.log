@@ -1,0 +1,57 @@
+mutate: 232 mutants in MagickCore/matrix\.c$, 19 functions
+mutate: baseline over 328 cases in 1s
+  mutants: 25/232 (1s)
+  mutants: 50/232 (1s)
+  mutants: 75/232 (3s)
+  mutants: 100/232 (3s)
+  mutants: 125/232 (5s)
+  mutants: 150/232 (6s)
+  mutants: 175/232 (6s)
+  mutants: 200/232 (7s)
+  mutants: 225/232 (11s)
+  mutants: 232/232 (137s)
+
+mutate: 232 mutants, 137s
+  killed 217, survived 15 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 93.5%   overall: 93.5%
+
+  function                           total killed survived no-cov
+  GaussJordanElimination                65     65        0      0
+  MatrixToImage                         32     28        4      0
+  AcquireMatrixInfo                     19     19        0      0
+  NullMatrix                            12     12        0      0
+  AcquireMagickMatrix                   11     11        0      0
+  SetMatrixElement                      11     11        0      0
+  SetMatrixExtent                       10      5        5      0
+  WriteMatrixElements                    9      6        3      0
+  ReadMatrixElements                     9      6        3      0
+  LeastSquaresAddTerms                   9      9        0      0
+  DestroyMatrixInfo                      8      8        0      0
+  GetMatrixElement                       6      6        0      0
+  CopyBackMatrix                         6      6        0      0
+  EdgeX                                  5      5        0      0
+  EdgeY                                  5      5        0      0
+  IsMatrixMemoryAvailable                4      4        0      0
+  IsSingularPivot                        4      4        0      0
+  RelinquishMagickMatrix                 4      4        0      0
+  IsPivotMemoryMissing                   3      3        0      0
+
+  survivors (equivalent, or a gap in the catalogue):
+       matrix.c:148:7 cxx_remove_void_call       UnlockSemaphoreInfo(matrix_info->semaphore);
+    x  matrix.c:152:15 cxx_lt_to_le               for (i=0; i < (MagickOffsetType) length; i+=count)
+    x  matrix.c:156:15 cxx_le_to_lt               if (count <= 0)
+    x  matrix.c:176:31 cxx_ge_to_gt               if ((MagickSizeType) offset >= length)
+    x  matrix.c:178:35 cxx_sub_to_add             extent=(MagickOffsetType) length-1;
+    x  matrix.c:181:32 cxx_ne_to_eq               if (matrix_info->synchronize != MagickFalse)
+       matrix.c:182:52 cxx_add_to_sub             (void) posix_fallocate(matrix_info->file,offset+1,extent-offset);
+       matrix.c:182:61 cxx_sub_to_add             (void) posix_fallocate(matrix_info->file,offset+1,extent-offset);
+       matrix.c:499:7 cxx_remove_void_call       UnlockSemaphoreInfo(matrix_info->semaphore);
+    x  matrix.c:503:15 cxx_lt_to_le               for (i=0; i < (MagickOffsetType) length; i+=count)
+    x  matrix.c:507:15 cxx_le_to_lt               if (count <= 0)
+    x  matrix.c:945:15 cxx_lt_to_le               for (y=0; y < (ssize_t) matrix_info->rows; y++)
+    x  matrix.c:950:17 cxx_lt_to_le               for (x=0; x < (ssize_t) matrix_info->columns; x++)
+    x  matrix.c:957:17 cxx_lt_to_le               if (value < min_value)
+    x  matrix.c:960:19 cxx_gt_to_ge               if (value > max_value)
+  (x: the oracle executes this line; c: capped, not every reaching case ran)
+
+  full results: build-oracle/work/mutation-fresh-matrix.json

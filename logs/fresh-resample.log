@@ -1,0 +1,34 @@
+mutate: 239 mutants in MagickCore/resample\.c$, 14 functions
+mutate: baseline over 793 cases in 1s
+  mutants: 25/239 (0s)
+  mutants: 50/239 (2s)
+  mutants: 75/239 (2s)
+  mutants: 100/239 (3s)
+  mutants: 125/239 (3s)
+  mutants: 150/239 (3s)
+  mutants: 175/239 (3s)
+  mutants: 200/239 (3s)
+  mutants: 225/239 (4s)
+  mutants: 239/239 (4s)
+
+mutate: 239 mutants, 4s
+  killed 239, survived 0 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 100.0%   overall: 100.0%
+
+  function                           total killed survived no-cov
+  ResamplePixelColor                    68     68        0      0
+  ClampUpAxes                           39     39        0      0
+  ScaleResampleFilter                   31     31        0      0
+  IsAreaOutsideCorner                   28     28        0      0
+  IsAreaOutsideDitherCorner             28     28        0      0
+  SetResampleFilter                     15     15        0      0
+  IsAreaOutsideImage                    14     14        0      0
+  IsResampleUnweighted                   5      5        0      0
+  AcquireResampleFilter                  3      3        0      0
+  BlendCheckerTileAverage                2      2        0      0
+  ResetPixelAccumulator                  2      2        0      0
+  SetResampleFilterVirtualPixelMetho     2      2        0      0
+  DestroyResampleFilter                  1      1        0      0
+  SetResampleFilterInterpolateMethod     1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-resample.json

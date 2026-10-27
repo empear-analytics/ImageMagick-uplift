@@ -1,0 +1,88 @@
+mutate: 1189 mutants in MagickCore/effect\.c$, 28 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 609 cases in 31s
+  mutants: 25/1189 (1s)
+  mutants: 50/1189 (1s)
+  mutants: 75/1189 (2s)
+  mutants: 100/1189 (3s)
+  mutants: 125/1189 (4s)
+  mutants: 150/1189 (5s)
+  mutants: 175/1189 (5s)
+  mutants: 200/1189 (6s)
+  mutants: 225/1189 (7s)
+  mutants: 250/1189 (7s)
+  mutants: 275/1189 (8s)
+  mutants: 300/1189 (8s)
+  mutants: 325/1189 (8s)
+  mutants: 350/1189 (9s)
+  mutants: 375/1189 (9s)
+  mutants: 400/1189 (10s)
+  mutants: 425/1189 (10s)
+  mutants: 450/1189 (10s)
+  mutants: 475/1189 (11s)
+  mutants: 500/1189 (11s)
+  mutants: 525/1189 (12s)
+  mutants: 550/1189 (12s)
+  mutants: 575/1189 (13s)
+  mutants: 600/1189 (14s)
+  mutants: 625/1189 (15s)
+  mutants: 650/1189 (16s)
+  mutants: 675/1189 (17s)
+  mutants: 700/1189 (18s)
+  mutants: 725/1189 (20s)
+  mutants: 750/1189 (24s)
+  mutants: 775/1189 (26s)
+  mutants: 800/1189 (27s)
+  mutants: 825/1189 (27s)
+  mutants: 850/1189 (28s)
+  mutants: 875/1189 (30s)
+  mutants: 900/1189 (33s)
+  mutants: 925/1189 (35s)
+  mutants: 950/1189 (38s)
+  mutants: 975/1189 (40s)
+  mutants: 1000/1189 (45s)
+  mutants: 1025/1189 (52s)
+  mutants: 1050/1189 (53s)
+  mutants: 1075/1189 (54s)
+  mutants: 1100/1189 (56s)
+  mutants: 1125/1189 (57s)
+  mutants: 1150/1189 (60s)
+  mutants: 1175/1189 (62s)
+  mutants: 1189/1189 (188s)
+
+mutate: 1189 mutants, 188s
+  killed 1189, survived 0 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 100.0%   overall: 100.0%
+
+  function                           total killed survived no-cov
+  SelectiveBlurImage                   113    113        0      0
+  AdaptiveSharpenImage                 109    109        0      0
+  AdaptiveBlurImage                    108    108        0      0
+  BilateralBlurImage                   108    108        0      0
+  LocalContrastImage                    98     98        0      0
+  PreviewImage                          87     87        0      0
+  RotationalBlurImage                   67     67        0      0
+  ShadeImage                            66     66        0      0
+  Hull                                  65     65        0      0
+  DespeckleImage                        61     61        0      0
+  KuwaharaImage                         60     60        0      0
+  MotionBlurImage                       55     55        0      0
+  EmbossImage                           41     41        0      0
+  SharpenImage                          37     37        0      0
+  UnsharpMaskImage                      29     29        0      0
+  SpreadImage                           19     19        0      0
+  GetMotionBlurKernel                   15     15        0      0
+  EdgeImage                             12     12        0      0
+  AcquireBilateralTLS                    9      9        0      0
+  BlurGaussian                           8      8        0      0
+  GetAdaptiveKernelIndex                 5      5        0      0
+  BlurDistance                           5      5        0      0
+  DestroyBilateralTLS                    4      4        0      0
+  IsSelectiveRowMissing                  3      3        0      0
+  BlurImage                              2      2        0      0
+  ConvolveKernelGeometry                 1      1        0      0
+  GaussianBlurImage                      1      1        0      0
+  GetMeanLuma                            1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-effect.json
