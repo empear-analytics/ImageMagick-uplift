@@ -934,6 +934,29 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline void SetUpdatableFillChannels(const Image *image,
+  const PixelInfo *conform_fill,Quantum *magick_restrict q)
+{
+  PixelTrait
+    traits;
+
+  traits=GetPixelChannelTraits(image,RedPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelRed(image,(Quantum) conform_fill->red,q);
+  traits=GetPixelChannelTraits(image,GreenPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelGreen(image,(Quantum) conform_fill->green,q);
+  traits=GetPixelChannelTraits(image,BluePixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelBlue(image,(Quantum) conform_fill->blue,q);
+  traits=GetPixelChannelTraits(image,BlackPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelBlack(image,(Quantum) conform_fill->black,q);
+  traits=GetPixelChannelTraits(image,AlphaPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelAlpha(image,(Quantum) conform_fill->alpha,q);
+}
+
 MagickExport MagickBooleanType OpaquePaintImage(Image *image,
   const PixelInfo *target,const PixelInfo *fill,const MagickBooleanType invert,
   ExceptionInfo *exception)
@@ -1002,26 +1025,7 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
     {
       GetPixelInfoPixel(image,q,&pixel);
       if (IsFuzzyEquivalencePixelInfo(&pixel,&conform_target) != invert)
-        {
-          PixelTrait
-            traits;
-
-          traits=GetPixelChannelTraits(image,RedPixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelRed(image,(Quantum) conform_fill.red,q);
-          traits=GetPixelChannelTraits(image,GreenPixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelGreen(image,(Quantum) conform_fill.green,q);
-          traits=GetPixelChannelTraits(image,BluePixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelBlue(image,(Quantum) conform_fill.blue,q);
-          traits=GetPixelChannelTraits(image,BlackPixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelBlack(image,(Quantum) conform_fill.black,q);
-          traits=GetPixelChannelTraits(image,AlphaPixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelAlpha(image,(Quantum) conform_fill.alpha,q);
-        }
+        SetUpdatableFillChannels(image,&conform_fill,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
