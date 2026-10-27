@@ -179,6 +179,33 @@ static ThresholdMap
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SumThresholdWindow(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t i,const size_t width,
+  const size_t height,double *channel_bias,double *channel_sum)
+{
+  const Quantum
+    *magick_restrict pixels;
+
+  ssize_t
+    u,
+    v;
+
+  pixels=p;
+  *channel_bias=0.0;
+  *channel_sum=0.0;
+  for (v=0; v < (ssize_t) height; v++)
+  {
+    for (u=0; u < (ssize_t) width; u++)
+    {
+      if (u == (ssize_t) (width-1))
+        *channel_bias+=(double) pixels[i];
+      *channel_sum+=(double) pixels[i];
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
+  }
+}
+
 MagickExport Image *AdaptiveThresholdImage(const Image *image,
   const size_t width,const size_t height,const double bias,
   ExceptionInfo *exception)
@@ -252,7 +279,6 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
     ssize_t
       center,
       i,
-      u,
       v,
       x;
 
@@ -284,20 +310,8 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
           SetPixelChannel(threshold_image,channel,p[center+i],q);
           continue;
         }
-      pixels=p;
-      channel_bias[channel]=0.0;
-      channel_sum[channel]=0.0;
-      for (v=0; v < (ssize_t) height; v++)
-      {
-        for (u=0; u < (ssize_t) width; u++)
-        {
-          if (u == (ssize_t) (width-1))
-            channel_bias[channel]+=(double) pixels[i];
-          channel_sum[channel]+=(double) pixels[i];
-          pixels+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-      }
+      SumThresholdWindow(image,p,i,width,height,&channel_bias[channel],
+        &channel_sum[channel]);
     }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
