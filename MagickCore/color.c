@@ -2569,6 +2569,15 @@ static MagickBooleanType QueryColorFromCSSName(const char *name,
   return(status);
 }
 
+static void SetDeviceColorspace(const char *name,char *colorspace,
+  double *scale,MagickBooleanType *icc_color)
+{
+  (void) CopyMagickString(colorspace,colorspace+7,MagickPathExtent);
+  if (strchr(name,'%') == (char *) NULL)
+    *scale=(double) QuantumRange;
+  *icc_color=MagickTrue;
+}
+
 static MagickBooleanType QueryColorFunction(const char *name,
   const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2600,12 +2609,7 @@ static MagickBooleanType QueryColorFunction(const char *name,
   scale=(double) ScaleCharToQuantum(1);
   icc_color=MagickFalse;
   if (LocaleNCompare(colorspace,"device-",7) == 0)
-    {
-      (void) CopyMagickString(colorspace,colorspace+7,MagickPathExtent);
-      if (strchr(name,'%') == (char *) NULL)
-        scale=(double) QuantumRange;
-      icc_color=MagickTrue;
-    }
+    SetDeviceColorspace(name,colorspace,&scale,&icc_color);
   if ((LocaleCompare(colorspace,"color") == 0) ||
       (LocaleCompare(colorspace,"icc-color") == 0))
     {
