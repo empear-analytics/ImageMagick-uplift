@@ -71,6 +71,21 @@
 #include "MagickCore/string_.h"
 #include "MagickCore/transform.h"
 #include "MagickCore/utility.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _ExportPixelBuffer
+{
+  const char
+    *magick_restrict map;
+
+  const QuantumType
+    *quantum_map;
+
+  void
+    *pixels;
+} ExportPixelBuffer;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -702,9 +717,18 @@ static MagickBooleanType ExportCharRGBPPixels(const Image *image,
 }
 
 static MagickBooleanType ExportCharPixel(const Image *image,
-  const RectangleInfo *roi,const char *magick_restrict map,
-  const QuantumType *quantum_map,void *pixels,ExceptionInfo *exception)
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
   const Quantum
     *magick_restrict p;
 
@@ -2686,11 +2710,12 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
   roi.height=height;
   roi.x=x;
   roi.y=y;
+  const ExportPixelBuffer buffer = { map, quantum_map, pixels };
   switch (type)
   {
     case CharPixel:
     {
-      status=ExportCharPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ExportCharPixel(image,&roi,&buffer,exception);
       break;
     }
     case DoublePixel:
