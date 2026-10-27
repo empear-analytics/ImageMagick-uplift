@@ -3796,6 +3796,48 @@ static inline double GetSurfaceShade(const PrimaryInfo *normal,
   return(shade);
 }
 
+static inline void ShadePixelChannels(const Image *linear_image,
+  const Image *shade_image,const Quantum *magick_restrict center,
+  Quantum *magick_restrict q,const MagickBooleanType gray,const double shade)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
+  {
+    PixelChannel
+      channel;
+
+    PixelTrait
+      shade_traits,
+      traits;
+
+    channel=GetPixelChannelChannel(linear_image,i);
+    traits=GetPixelChannelTraits(linear_image,channel);
+    shade_traits=GetPixelChannelTraits(shade_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (shade_traits == UndefinedPixelTrait))
+      continue;
+    if ((shade_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(shade_image,channel,center[i],q);
+        continue;
+      }
+    if ((traits & UpdatePixelTrait) == 0)
+      {
+        SetPixelChannel(shade_image,channel,center[i],q);
+        continue;
+      }
+    if (gray != MagickFalse)
+      {
+        SetPixelChannel(shade_image,channel,ClampToQuantum(shade),q);
+        continue;
+      }
+    SetPixelChannel(shade_image,channel,ClampToQuantum(QuantumScale*
+      shade*(double) center[i]),q);
+  }
+}
+
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   const double azimuth,const double elevation,ExceptionInfo *exception)
 {
@@ -3904,9 +3946,6 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
     normal.z=2.0*(double) QuantumRange;  /* constant Z of surface normal */
     for (x=0; x < (ssize_t) linear_image->columns; x++)
     {
-      ssize_t
-        i;
-
       /*
         Determine the surface normal and compute shading.
       */
@@ -3928,39 +3967,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
         GetShadeIntensity(linear_image,pre)-
         GetShadeIntensity(linear_image,pre+GetPixelChannels(linear_image)));
       shade=GetSurfaceShade(&normal,&light);
-      for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
-      {
-        PixelChannel
-          channel;
-
-        PixelTrait
-          shade_traits,
-          traits;
-
-        channel=GetPixelChannelChannel(linear_image,i);
-        traits=GetPixelChannelTraits(linear_image,channel);
-        shade_traits=GetPixelChannelTraits(shade_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (shade_traits == UndefinedPixelTrait))
-          continue;
-        if ((shade_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(shade_image,channel,center[i],q);
-            continue;
-          }
-        if ((traits & UpdatePixelTrait) == 0)
-          {
-            SetPixelChannel(shade_image,channel,center[i],q);
-            continue;
-          }
-        if (gray != MagickFalse)
-          {
-            SetPixelChannel(shade_image,channel,ClampToQuantum(shade),q);
-            continue;
-          }
-        SetPixelChannel(shade_image,channel,ClampToQuantum(QuantumScale*
-          shade*(double) center[i]),q);
-      }
+      ShadePixelChannels(linear_image,shade_image,center,q,gray,shade);
       p+=(ptrdiff_t) GetPixelChannels(linear_image);
       q+=(ptrdiff_t) GetPixelChannels(shade_image);
     }
