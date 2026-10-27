@@ -2457,6 +2457,30 @@ static inline Quantum RangeThresholdValue(const double pixel,
             return((Quantum) 0);
 }
 
+static inline void RangeThresholdChannels(const Image *image,
+  const double low_black,const double low_white,const double high_white,
+  const double high_black,Quantum *magick_restrict q)
+{
+  double
+    pixel;
+
+  ssize_t
+    i;
+
+  pixel=GetPixelIntensity(image,q);
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if (image->channel_mask != AllChannels)
+      pixel=(double) q[i];
+    q[i]=RangeThresholdValue(pixel,low_black,low_white,high_white,
+      high_black);
+  }
+}
+
 MagickExport MagickBooleanType RangeThresholdImage(Image *image,
   const double low_black,const double low_white,const double high_white,
   const double high_black,ExceptionInfo *exception)
@@ -2511,24 +2535,8 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      double
-        pixel;
-
-      ssize_t
-        i;
-
-      pixel=GetPixelIntensity(image,q);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (image->channel_mask != AllChannels)
-          pixel=(double) q[i];
-        q[i]=RangeThresholdValue(pixel,low_black,low_white,high_white,
-          high_black);
-      }
+      RangeThresholdChannels(image,low_black,low_white,high_white,high_black,
+        q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
