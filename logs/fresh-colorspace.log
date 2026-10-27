@@ -1,0 +1,52 @@
+mutate: 648 mutants in MagickCore/colorspace\.c$, 14 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 4493 cases in 31s
+  mutants: 25/648 (0s)
+  mutants: 50/648 (1s)
+  mutants: 75/648 (1s)
+  mutants: 100/648 (1s)
+  mutants: 125/648 (1s)
+  mutants: 150/648 (2s)
+  mutants: 175/648 (2s)
+  mutants: 200/648 (2s)
+  mutants: 225/648 (2s)
+  mutants: 250/648 (2s)
+  mutants: 275/648 (3s)
+  mutants: 300/648 (3s)
+  mutants: 325/648 (3s)
+  mutants: 350/648 (3s)
+  mutants: 375/648 (3s)
+  mutants: 400/648 (4s)
+  mutants: 425/648 (4s)
+  mutants: 450/648 (5s)
+  mutants: 475/648 (5s)
+  mutants: 500/648 (6s)
+  mutants: 525/648 (7s)
+  mutants: 550/648 (7s)
+  mutants: 575/648 (8s)
+  mutants: 600/648 (9s)
+  mutants: 625/648 (9s)
+  mutants: 648/648 (135s)
+
+mutate: 648 mutants, 135s
+  killed 647, survived 0 (0 capped), no coverage 1, errors 0
+  mutation score on reached code: 100.0%   overall: 99.8%
+
+  function                           total killed survived no-cov
+  TransformsRGBImage                   253    253        0      0
+  sRGBTransformImage                   231    231        0      0
+  ConvertHSLToRGB                       41     41        0      0
+  ConvertGenericToRGB                   31     31        0      0
+  ConvertRGBToGeneric                   31     31        0      0
+  ConvertRGBToHSL                       26     26        0      0
+  TransformImageColorspace               7      7        0      0
+  SetImageGray                           6      6        0      0
+  SetImageColorspace                     5      5        0      0
+  SetImageMonochrome                     5      5        0      0
+  RoundToYCC                             5      5        0      0
+  IsTransformMapMissing                  3      3        0      0
+  IsLinearGammaColorspace                3      3        0      0
+  GetImageColorspaceType                 1      0        0      1
+
+  full results: build-oracle/work/mutation-fresh-colorspace.json

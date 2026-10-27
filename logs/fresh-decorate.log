@@ -1,0 +1,27 @@
+mutate: 280 mutants in MagickCore/decorate\.c$, 5 functions
+mutate: baseline over 150 cases in 1s
+  mutants: 25/280 (0s)
+  mutants: 50/280 (0s)
+  mutants: 75/280 (1s)
+  mutants: 100/280 (1s)
+  mutants: 125/280 (1s)
+  mutants: 150/280 (1s)
+  mutants: 175/280 (1s)
+  mutants: 200/280 (2s)
+  mutants: 225/280 (2s)
+  mutants: 250/280 (2s)
+  mutants: 275/280 (3s)
+  mutants: 280/280 (131s)
+
+mutate: 280 mutants, 131s
+  killed 280, survived 0 (0 capped), no coverage 0, errors 0
+  mutation score on reached code: 100.0%   overall: 100.0%
+
+  function                           total killed survived no-cov
+  FrameImage                           188    188        0      0
+  RaiseImage                            76     76        0      0
+  BlendPixelChannels                     7      7        0      0
+  BorderImage                            5      5        0      0
+  SetFramePixels                         4      4        0      0
+
+  full results: build-oracle/work/mutation-fresh-decorate.json

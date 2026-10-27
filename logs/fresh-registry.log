@@ -1,0 +1,24 @@
+mutate: 41 mutants in MagickCore/registry\.c$, 10 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/41 (1s)
+  mutants: 41/41 (1s)
+
+mutate: 41 mutants, 1s
+  killed 39, survived 0 (0 capped), no coverage 2, errors 0
+  mutation score on reached code: 100.0%   overall: 95.1%
+
+  function                           total killed survived no-cov
+  SetImageRegistry                      10     10        0      0
+  RegistryComponentTerminus              7      7        0      0
+  InstantiateRegistry                    6      6        0      0
+  GetImageRegistry                       5      5        0      0
+  DefineImageRegistry                    3      3        0      0
+  ResetImageRegistryIterator             3      3        0      0
+  DeleteImageRegistry                    2      2        0      0
+  GetNextImageRegistry                   2      2        0      0
+  RemoveImageRegistry                    2      0        0      2
+  RegistryComponentGenesis               1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-registry.json

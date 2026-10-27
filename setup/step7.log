@@ -6750,3 +6750,9 @@ nohup: ignoring input
 20:32 fresh effect:   killed 1189, survived 0 (0 capped), no coverage 0, errors 0
 20:33 fresh stream:   killed 501, survived 0 (0 capped), no coverage 5, errors 0
 20:33 fresh resample:   killed 239, survived 0 (0 capped), no coverage 0, errors 0
+20:33 pushed
+20:35 fresh decorate:   killed 280, survived 0 (0 capped), no coverage 0, errors 0
+20:38 fresh colorspace:   killed 647, survived 0 (0 capped), no coverage 1, errors 0
+20:41 fresh shear:   killed 506, survived 0 (0 capped), no coverage 45, errors 0
+20:42 fresh registry:   killed 39, survived 0 (0 capped), no coverage 2, errors 0
+20:42 fresh random:   killed 109, survived 0 (0 capped), no coverage 7, errors 0

@@ -1,0 +1,30 @@
+mutate: 116 mutants in MagickCore/random\.c$, 13 functions
+  baseline: 2/2 (30s)
+mutate: 2 case(s) time out unmutated and are left out: opencl/2124a0eb45 opencl/a8cc3ebf48
+mutate: baseline over 15876 cases in 31s
+  mutants: 25/116 (0s)
+  mutants: 50/116 (0s)
+  mutants: 75/116 (1s)
+  mutants: 100/116 (1s)
+  mutants: 116/116 (1s)
+
+mutate: 116 mutants, 1s
+  killed 109, survived 0 (0 capped), no coverage 7, errors 0
+  mutation score on reached code: 100.0%   overall: 94.0%
+
+  function                           total killed survived no-cov
+  GenerateEntropicChaos                 49     49        0      0
+  AcquireRandomInfo                     18     18        0      0
+  SetRandomKey                          15     15        0      0
+  DestroyRandomInfo                      7      7        0      0
+  RefillRandomReservoir                  6      6        0      0
+  ReadRandom                             4      0        0      4
+  IncrementRandomNonce                   4      4        0      0
+  SeedFromSecretKey                      3      3        0      0
+  GetRandomValue                         3      0        0      3
+  RandomComponentTerminus                3      3        0      0
+  GetPseudoRandomValue                   2      2        0      0
+  GetRandomKey                           1      1        0      0
+  RandomComponentGenesis                 1      1        0      0
+
+  full results: build-oracle/work/mutation-fresh-random.json

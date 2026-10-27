@@ -1,0 +1,45 @@
+mutate: 551 mutants in MagickCore/shear\.c$, 12 functions
+mutate: baseline over 118 cases in 1s
+  mutants: 25/551 (0s)
+  mutants: 50/551 (1s)
+  mutants: 75/551 (1s)
+  mutants: 100/551 (2s)
+  mutants: 125/551 (2s)
+  mutants: 150/551 (3s)
+  mutants: 175/551 (3s)
+  mutants: 200/551 (3s)
+  mutants: 225/551 (4s)
+  mutants: 250/551 (4s)
+  mutants: 275/551 (4s)
+  mutants: 300/551 (5s)
+  mutants: 325/551 (5s)
+  mutants: 350/551 (6s)
+  mutants: 375/551 (6s)
+  mutants: 400/551 (7s)
+  mutants: 425/551 (8s)
+  mutants: 450/551 (9s)
+  mutants: 475/551 (10s)
+  mutants: 500/551 (10s)
+  mutants: 525/551 (10s)
+  mutants: 550/551 (137s)
+  mutants: 551/551 (138s)
+
+mutate: 551 mutants, 138s
+  killed 506, survived 0 (0 capped), no coverage 45, errors 0
+  mutation score on reached code: 100.0%   overall: 91.8%
+
+  function                           total killed survived no-cov
+  IntegralRotateImage                  129    129        0      0
+  RadonProjection                       75     75        0      0
+  XShearImage                           65     65        0      0
+  YShearImage                           65     65        0      0
+  RadonTransform                        45     45        0      0
+  ShearRotateImage                      45      0        0     45
+  CropToFitImage                        35     35        0      0
+  GetImageBackgroundColor               31     31        0      0
+  ShearImage                            27     27        0      0
+  DeskewImage                           19     19        0      0
+  FindDeskewSkew                         9      9        0      0
+  IsPixelBelowThreshold                  6      6        0      0
+
+  full results: build-oracle/work/mutation-fresh-shear.json
