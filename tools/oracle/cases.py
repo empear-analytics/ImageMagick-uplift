@@ -6936,6 +6936,13 @@ def _windrv_cases():
             for filt, scale in (("Point", "0"), ("Gaussian", "1"), ("Gaussian", "3")):
                 yield _windrv("resample %s %s %s %s margin 40" % (name, vp, filt, scale),
                               ("resample", img(name), vp, filt, scale, "margin=40"))
+    # shear.c: ShearRotateImage, which only the API reaches: angles in each quadrant (the
+    # integral rotation before the three shears), exactly 45 and 180 degrees, and negative
+    # angles, on an opaque and a translucent image
+    for name in ("rose", "rose_alpha"):
+        for degrees in ("17", "45", "-33", "95", "180", "212.5", "310", "-100"):
+            yield _windrv("shearrotate %s %s" % (name, degrees),
+                          ("shearrotate", img(name), degrees, "out.miff"), ["out.miff"])
     # timer.c: -bench (AcquireTimerInfo) and -duration (ContinueTimer) in magick-cli.c; the
     # oracle masks the report's timings (owner's decision, 2026-10-04). A duration far longer
     # than the run keeps every iteration, so the output is the same each time.

@@ -1375,6 +1375,30 @@ static int ResampleCmd(int argc,char **argv,ExceptionInfo *exception)
   return(0);
 }
 
+/* shear.c: ShearRotateImage, which neither the command line (-rotate is RotateImage, a
+   distortion) nor any other library function calls */
+static int ShearRotateCmd(int argc,char **argv,ExceptionInfo *exception)
+{
+  /* shearrotate IMAGE DEGREES OUT */
+  Image *image, *rotate_image;
+  int status;
+
+  if (argc < 5)
+    return(Fail(exception,"shearrotate: IMAGE DEGREES OUT"));
+  image=Read(argv[2],exception);
+  if (image == (Image *) NULL)
+    return(Fail(exception,"read"));
+  rotate_image=ShearRotateImage(image,atof(argv[3]),exception);
+  image=DestroyImage(image);
+  if (rotate_image == (Image *) NULL)
+    return(Fail(exception,"shearrotate"));
+  (void) printf("%.20gx%.20g%+.20g%+.20g\n",(double) rotate_image->columns,
+    (double) rotate_image->rows,(double) rotate_image->page.x,(double) rotate_image->page.y);
+  status=Write(rotate_image,argv[4],exception);
+  rotate_image=DestroyImage(rotate_image);
+  return(status);
+}
+
 /* token.c: GlobExpression over a pattern and expressions */
 static int GlobCmd(int argc,char **argv,ExceptionInfo *exception)
 {
@@ -2859,6 +2883,7 @@ int main(int argc,char **argv)
   else if (strcmp(argv[1],"quantum") == 0) status=QuantumCmd(argc,argv,exception);
   else if (strcmp(argv[1],"matrix") == 0) status=MatrixCmd(argc,argv,exception);
   else if (strcmp(argv[1],"resample") == 0) status=ResampleCmd(argc,argv,exception);
+  else if (strcmp(argv[1],"shearrotate") == 0) status=ShearRotateCmd(argc,argv,exception);
   else if (strcmp(argv[1],"glob") == 0) status=GlobCmd(argc,argv,exception);
   else if (strcmp(argv[1],"tokenize") == 0) status=TokenizeCmd(argc,argv,exception);
   else if (strcmp(argv[1],"color") == 0) status=ColorCmd(argc,argv,exception);
