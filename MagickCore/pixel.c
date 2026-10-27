@@ -4164,10 +4164,19 @@ static MagickBooleanType ImportFloatPixel(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static MagickBooleanType ImportLongPixel(Image *image,const RectangleInfo *roi,
-  const char *magick_restrict map,const QuantumType *quantum_map,
-  const void *pixels,ExceptionInfo *exception)
+static MagickBooleanType ImportLongPixel(Image *image,
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
 {
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
   const unsigned int
     *magick_restrict p;
 
@@ -5194,7 +5203,7 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
     }
     case LongPixel:
     {
-      status=ImportLongPixel(image,&roi,map,quantum_map,pixels,exception);
+      status=ImportLongPixel(image,&roi,&buffer,exception);
       break;
     }
     case LongLongPixel:
