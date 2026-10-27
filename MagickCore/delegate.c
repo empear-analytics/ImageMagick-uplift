@@ -1797,6 +1797,19 @@ static inline MagickBooleanType IsTwoStepDelegate(
     (delegate_info->decode != (char *) NULL)))) ? MagickTrue : MagickFalse);
 }
 
+static void WaitForDelegateInput(const Image *image)
+{
+  ssize_t
+    count;
+
+  /*
+    Wait for input file to 'disappear', or maximum 2 seconds.
+  */
+  count=20;
+  while ((count-- > 0) && (access_utf8(image->filename,F_OK) == 0))
+    (void) MagickDelay(100);  /* sleep 0.1 seconds */
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -1978,17 +1991,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         if (ExternalDelegateCommand(delegate_info->spawn,image_info->verbose,command,(char *) NULL,exception) != 0)
           status=MagickFalse;
         if (delegate_info->spawn != MagickFalse)
-          {
-            ssize_t
-              count;
-
-            /*
-              Wait for input file to 'disappear', or maximum 2 seconds.
-            */
-            count=20;
-            while ((count-- > 0) && (access_utf8(image->filename,F_OK) == 0))
-              (void) MagickDelay(100);  /* sleep 0.1 seconds */
-          }
+          WaitForDelegateInput(image);
         command=DestroyString(command);
       }
     if (IsPathAccessible(input_filename) != MagickFalse)
