@@ -206,6 +206,52 @@ static void SumThresholdWindow(const Image *image,
   }
 }
 
+static void AdaptiveThresholdPixel(const Image *image,
+  const Image *threshold_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q,const ssize_t center,const size_t width,
+  const size_t height,const MagickSizeType number_pixels,const double bias,
+  double *channel_bias,double *channel_sum)
+{
+  const Quantum
+    *magick_restrict pixels;
+
+  ssize_t
+    i,
+    v;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      mean;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait threshold_traits=GetPixelChannelTraits(threshold_image,
+      channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (threshold_traits == UndefinedPixelTrait))
+      continue;
+    if ((threshold_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(threshold_image,channel,p[center+i],q);
+        continue;
+      }
+    channel_sum[channel]-=channel_bias[channel];
+    channel_bias[channel]=0.0;
+    pixels=p;
+    for (v=0; v < (ssize_t) height; v++)
+    {
+      channel_bias[channel]+=(double) pixels[i];
+      pixels+=(width-1)*GetPixelChannels(image);
+      channel_sum[channel]+=(double) pixels[i];
+      pixels+=(ptrdiff_t) GetPixelChannels(image)*(image->columns+1);
+    }
+    mean=(double) (channel_sum[channel]/number_pixels+bias);
+    SetPixelChannel(threshold_image,channel,(Quantum) ((double)
+      p[center+i] <= mean ? 0 : QuantumRange),q);
+  }
+}
+
 MagickExport Image *AdaptiveThresholdImage(const Image *image,
   const size_t width,const size_t height,const double bias,
   ExceptionInfo *exception)
@@ -270,8 +316,7 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
       channel_sum[MaxPixelChannels];
 
     const Quantum
-      *magick_restrict p,
-      *magick_restrict pixels;
+      *magick_restrict p;
 
     Quantum
       *magick_restrict q;
@@ -279,7 +324,6 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
     ssize_t
       center,
       i,
-      v,
       x;
 
     if (status == MagickFalse)
@@ -315,37 +359,8 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
     }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          mean;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait threshold_traits=GetPixelChannelTraits(threshold_image,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (threshold_traits == UndefinedPixelTrait))
-          continue;
-        if ((threshold_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(threshold_image,channel,p[center+i],q);
-            continue;
-          }
-        channel_sum[channel]-=channel_bias[channel];
-        channel_bias[channel]=0.0;
-        pixels=p;
-        for (v=0; v < (ssize_t) height; v++)
-        {
-          channel_bias[channel]+=(double) pixels[i];
-          pixels+=(width-1)*GetPixelChannels(image);
-          channel_sum[channel]+=(double) pixels[i];
-          pixels+=(ptrdiff_t) GetPixelChannels(image)*(image->columns+1);
-        }
-        mean=(double) (channel_sum[channel]/number_pixels+bias);
-        SetPixelChannel(threshold_image,channel,(Quantum) ((double)
-          p[center+i] <= mean ? 0 : QuantumRange),q);
-      }
+      AdaptiveThresholdPixel(image,threshold_image,p,q,center,width,height,
+        number_pixels,bias,channel_bias,channel_sum);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(threshold_image);
     }
