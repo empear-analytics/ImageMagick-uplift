@@ -869,6 +869,206 @@ static void ImportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void Import10BitBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  pixel=0;
+  if (quantum_info->pack == MagickFalse)
+    {
+      ssize_t
+        i;
+
+      size_t
+        quantum;
+
+      ssize_t
+        n;
+
+      n=0;
+      quantum=0;
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        for (i=0; i < 4; i++)
+        {
+          switch (n % 3)
+          {
+            case 0:
+            {
+              p=PushLongPixel(quantum_info->endian,p,&pixel);
+              quantum=(size_t) (ScaleShortToQuantum((unsigned short)
+                (((pixel >> 22) & 0x3ff) << 6)));
+              break;
+            }
+            case 1:
+            {
+              quantum=(size_t) (ScaleShortToQuantum((unsigned short)
+                (((pixel >> 12) & 0x3ff) << 6)));
+              break;
+            }
+            case 2:
+            {
+              quantum=(size_t) (ScaleShortToQuantum((unsigned short)
+                (((pixel >> 2) & 0x3ff) << 6)));
+              break;
+            }
+          }
+          switch (i)
+          {
+            case 0: SetPixelRed(image,(Quantum) quantum,q); break;
+            case 1: SetPixelGreen(image,(Quantum) quantum,q); break;
+            case 2: SetPixelBlue(image,(Quantum) quantum,q); break;
+            case 3: SetPixelAlpha(image,(Quantum) quantum,q); break;
+          }
+          n++;
+        }
+        p+=(ptrdiff_t) quantum_info->pad;
+        q+=(ptrdiff_t) GetPixelChannels(image);
+      }
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushQuantumPixel(quantum_info,p,&pixel);
+    SetPixelRed(image,ScaleShortToQuantum((unsigned short) (pixel << 6)),q);
+    p=PushQuantumPixel(quantum_info,p,&pixel);
+    SetPixelGreen(image,ScaleShortToQuantum((unsigned short) (pixel << 6)),
+      q);
+    p=PushQuantumPixel(quantum_info,p,&pixel);
+    SetPixelBlue(image,ScaleShortToQuantum((unsigned short) (pixel << 6)),
+      q);
+    p=PushQuantumPixel(quantum_info,p,&pixel);
+    SetPixelAlpha(image,ScaleShortToQuantum((unsigned short) (pixel << 6)),
+      q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void Import16BitBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        p=PushShortPixel(quantum_info->endian,p,&pixel);
+        SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+          HalfToSinglePrecision(pixel)),q);
+        p=PushShortPixel(quantum_info->endian,p,&pixel);
+        SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+          HalfToSinglePrecision(pixel)),q);
+        p=PushShortPixel(quantum_info->endian,p,&pixel);
+        SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+          HalfToSinglePrecision(pixel)),q);
+        p=PushShortPixel(quantum_info->endian,p,&pixel);
+        SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
+          HalfToSinglePrecision(pixel)),q);
+        p+=(ptrdiff_t) quantum_info->pad;
+        q+=(ptrdiff_t) GetPixelChannels(image);
+      }
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushShortPixel(quantum_info->endian,p,&pixel);
+    SetPixelBlue(image,ScaleShortToQuantum(pixel),q);
+    p=PushShortPixel(quantum_info->endian,p,&pixel);
+    SetPixelGreen(image,ScaleShortToQuantum(pixel),q);
+    p=PushShortPixel(quantum_info->endian,p,&pixel);
+    SetPixelRed(image,ScaleShortToQuantum(pixel),q);
+    p=PushShortPixel(quantum_info->endian,p,&pixel);
+    SetPixelAlpha(image,ScaleShortToQuantum(pixel),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void Import32BitBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      float
+        pixel;
+
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+        SetPixelRed(image,ClampToQuantum(pixel),q);
+        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+        SetPixelGreen(image,ClampToQuantum(pixel),q);
+        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+        SetPixelBlue(image,ClampToQuantum(pixel),q);
+        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+        SetPixelAlpha(image,ClampToQuantum(pixel),q);
+        p+=(ptrdiff_t) quantum_info->pad;
+        q+=(ptrdiff_t) GetPixelChannels(image);
+      }
+      return;
+    }
+  else
+    {
+      unsigned int
+        pixel;
+
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        p=PushLongPixel(quantum_info->endian,p,&pixel);
+        SetPixelBlue(image,ScaleLongToQuantum(pixel),q);
+        p=PushLongPixel(quantum_info->endian,p,&pixel);
+        SetPixelGreen(image,ScaleLongToQuantum(pixel),q);
+        p=PushLongPixel(quantum_info->endian,p,&pixel);
+        SetPixelRed(image,ScaleLongToQuantum(pixel),q);
+        p=PushLongPixel(quantum_info->endian,p,&pixel);
+        SetPixelAlpha(image,ScaleLongToQuantum(pixel),q);
+        p+=(ptrdiff_t) quantum_info->pad;
+        q+=(ptrdiff_t) GetPixelChannels(image);
+      }
+      return;
+    }
+}
+
 static void ImportBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -913,163 +1113,18 @@ static void ImportBGRAQuantum(const Image *image,QuantumInfo *quantum_info,
     }
     case 10:
     {
-      unsigned int
-        pixel;
-
-      pixel=0;
-      if (quantum_info->pack == MagickFalse)
-        {
-          ssize_t
-            i;
-
-          size_t
-            quantum;
-
-          ssize_t
-            n;
-
-          n=0;
-          quantum=0;
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            for (i=0; i < 4; i++)
-            {
-              switch (n % 3)
-              {
-                case 0:
-                {
-                  p=PushLongPixel(quantum_info->endian,p,&pixel);
-                  quantum=(size_t) (ScaleShortToQuantum((unsigned short)
-                    (((pixel >> 22) & 0x3ff) << 6)));
-                  break;
-                }
-                case 1:
-                {
-                  quantum=(size_t) (ScaleShortToQuantum((unsigned short)
-                    (((pixel >> 12) & 0x3ff) << 6)));
-                  break;
-                }
-                case 2:
-                {
-                  quantum=(size_t) (ScaleShortToQuantum((unsigned short)
-                    (((pixel >> 2) & 0x3ff) << 6)));
-                  break;
-                }
-              }
-              switch (i)
-              {
-                case 0: SetPixelRed(image,(Quantum) quantum,q); break;
-                case 1: SetPixelGreen(image,(Quantum) quantum,q); break;
-                case 2: SetPixelBlue(image,(Quantum) quantum,q); break;
-                case 3: SetPixelAlpha(image,(Quantum) quantum,q); break;
-              }
-              n++;
-            }
-            p+=(ptrdiff_t) quantum_info->pad;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushQuantumPixel(quantum_info,p,&pixel);
-        SetPixelRed(image,ScaleShortToQuantum((unsigned short) (pixel << 6)),q);
-        p=PushQuantumPixel(quantum_info,p,&pixel);
-        SetPixelGreen(image,ScaleShortToQuantum((unsigned short) (pixel << 6)),
-          q);
-        p=PushQuantumPixel(quantum_info,p,&pixel);
-        SetPixelBlue(image,ScaleShortToQuantum((unsigned short) (pixel << 6)),
-          q);
-        p=PushQuantumPixel(quantum_info,p,&pixel);
-        SetPixelAlpha(image,ScaleShortToQuantum((unsigned short) (pixel << 6)),
-          q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      Import10BitBGRAQuantum(image,quantum_info,span);
       break;
     }
     case 16:
     {
-      unsigned short
-        pixel;
-
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            p=PushShortPixel(quantum_info->endian,p,&pixel);
-            SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-              HalfToSinglePrecision(pixel)),q);
-            p=PushShortPixel(quantum_info->endian,p,&pixel);
-            SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-              HalfToSinglePrecision(pixel)),q);
-            p=PushShortPixel(quantum_info->endian,p,&pixel);
-            SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-              HalfToSinglePrecision(pixel)),q);
-            p=PushShortPixel(quantum_info->endian,p,&pixel);
-            SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
-              HalfToSinglePrecision(pixel)),q);
-            p+=(ptrdiff_t) quantum_info->pad;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushShortPixel(quantum_info->endian,p,&pixel);
-        SetPixelBlue(image,ScaleShortToQuantum(pixel),q);
-        p=PushShortPixel(quantum_info->endian,p,&pixel);
-        SetPixelGreen(image,ScaleShortToQuantum(pixel),q);
-        p=PushShortPixel(quantum_info->endian,p,&pixel);
-        SetPixelRed(image,ScaleShortToQuantum(pixel),q);
-        p=PushShortPixel(quantum_info->endian,p,&pixel);
-        SetPixelAlpha(image,ScaleShortToQuantum(pixel),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      Import16BitBGRAQuantum(image,quantum_info,span);
       break;
     }
     case 32:
     {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          float
-            pixel;
-
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-            SetPixelRed(image,ClampToQuantum(pixel),q);
-            p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-            SetPixelGreen(image,ClampToQuantum(pixel),q);
-            p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-            SetPixelBlue(image,ClampToQuantum(pixel),q);
-            p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-            SetPixelAlpha(image,ClampToQuantum(pixel),q);
-            p+=(ptrdiff_t) quantum_info->pad;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
-          break;
-        }
-      else
-        {
-          unsigned int
-            pixel;
-
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            p=PushLongPixel(quantum_info->endian,p,&pixel);
-            SetPixelBlue(image,ScaleLongToQuantum(pixel),q);
-            p=PushLongPixel(quantum_info->endian,p,&pixel);
-            SetPixelGreen(image,ScaleLongToQuantum(pixel),q);
-            p=PushLongPixel(quantum_info->endian,p,&pixel);
-            SetPixelRed(image,ScaleLongToQuantum(pixel),q);
-            p=PushLongPixel(quantum_info->endian,p,&pixel);
-            SetPixelAlpha(image,ScaleLongToQuantum(pixel),q);
-            p+=(ptrdiff_t) quantum_info->pad;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
-          break;
-        }
+      Import32BitBGRAQuantum(image,quantum_info,span);
+      break;
     }
     case 24:
     {
