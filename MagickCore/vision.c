@@ -968,6 +968,31 @@ static void NormalizeObjectStatistics(const Image *component_image,
   }
 }
 
+static void PrintObjectsHeader(const Image *image,const char **metrics,
+  const ssize_t n)
+{
+  const char
+    *artifact;
+
+  ssize_t
+    j;
+
+  artifact=GetImageArtifact(image,
+    "connected-components:exclude-header");
+  if (IsStringTrue(artifact) == MagickFalse)
+    {
+      (void) fprintf(stdout,"Objects (");
+      artifact=GetImageArtifact(image,
+        "connected-components:exclude-ids");
+      if (IsStringTrue(artifact) == MagickFalse)
+        (void) fprintf(stdout,"id: ");
+      (void) fprintf(stdout,"bounding-box centroid area mean-color");
+      for (j=0; j <= n; j++)
+        (void) fprintf(stdout," %s",metrics[j]);
+      (void) fprintf(stdout,"):\n");
+    }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1746,20 +1771,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           ssize_t
             j;
 
-          artifact=GetImageArtifact(image,
-            "connected-components:exclude-header");
-          if (IsStringTrue(artifact) == MagickFalse)
-            {
-              (void) fprintf(stdout,"Objects (");
-              artifact=GetImageArtifact(image,
-                "connected-components:exclude-ids");
-              if (IsStringTrue(artifact) == MagickFalse)
-                (void) fprintf(stdout,"id: ");
-              (void) fprintf(stdout,"bounding-box centroid area mean-color");
-              for (j=0; j <= n; j++)
-                (void) fprintf(stdout," %s",metrics[j]);
-              (void) fprintf(stdout,"):\n");
-            }
+          PrintObjectsHeader(image,metrics,n);
           for (i=0; i < (ssize_t) component_image->colors; i++)
             if (object[i].census > 0.0)
               {
