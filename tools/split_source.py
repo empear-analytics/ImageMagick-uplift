@@ -133,6 +133,17 @@ for mname in defined(rest):
     if re.search(r"\b%s\b" % mname, region): sys.exit("refused: macro %s used in the region" % mname)
 for mname in defined(region):
     if re.search(r"\b%s\b" % mname, rest): sys.exit("refused: macro %s used outside" % mname)
+# a type the original defines and keeps must not be used by the region
+types = set(re.findall(r"^typedef\s+(?:struct|enum|union)\s+(\w+)", rest, re.M)) | \
+    set(re.findall(r"^\}\s*(\w+)\s*;", rest, re.M)) | \
+    {t.lstrip("_") for t in re.findall(r"^struct\s+(\w+)\s*$", rest, re.M)}
+for tname in sorted(types):
+    if re.search(r"\b%s\b" % tname, region): sys.exit("refused: type %s defined outside the region and used in it" % tname)
+# a non-static function the region calls must be declared in a header
+headers = "\n".join(open(h).read() for h in glob.glob(os.path.join(os.path.dirname(path), "*.h")))
+for n in sorted(names - moved - static):
+    if any(n in calls[m] for m in moved) and not re.search(r"\b%s\s*\(" % n, headers):
+        sys.exit("refused: %s is called from the region but declared in no header" % n)
 # header: the original's, with the new name's banner and the given title
 hend = L.index("*/")
 hdr = L[:hend + 1]
@@ -156,6 +167,8 @@ inc_a = L.index("  Include declarations.") - 1
 inc_b = max(k for k in range(len(L)) if L[k].startswith("#include") and k < first[1])
 # carry a trailing #endif etc. that closes a conditional include
 while L[inc_b + 1].startswith("#"): inc_b += 1
+if defined("\n".join(L[inc_a:inc_b + 1])):
+    sys.exit("refused: the include block defines macros %s; both files would define them" % sorted(defined("\n".join(L[inc_a:inc_b + 1]))))
 text = "\n".join(hdr) + "\n\n" + "\n".join(L[inc_a:inc_b + 1]) + "\n\n" + region + "\n"
 dst_new = os.path.join(out, os.path.basename(new)) if out else new
 dst_old = os.path.join(out, os.path.basename(path)) if out else path
