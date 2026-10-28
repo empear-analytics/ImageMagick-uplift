@@ -709,6 +709,10 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
     border_info,
     bounds;
 
+  ShearRegion
+    first_pass,
+    second_pass;
+
   /*
     Compute image size.
   */
@@ -734,16 +738,20 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
   */
   if (shear_image->alpha_trait == UndefinedPixelTrait)
     (void) SetImageAlphaChannel(shear_image,OpaqueAlphaChannel,exception);
-  const ShearRegion first_pass = { image->columns, image->rows, bounds.x,
-    (ssize_t) (shear_image->rows-image->rows)/2 };
+  first_pass.width=image->columns;
+  first_pass.height=image->rows;
+  first_pass.x_offset=bounds.x;
+  first_pass.y_offset=(ssize_t) (shear_image->rows-image->rows)/2;
   status=XShearImage(shear_image,shear.x,&first_pass,exception);
   if (status == MagickFalse)
     {
       shear_image=DestroyImage(shear_image);
       return((Image *) NULL);
     }
-  const ShearRegion second_pass = { bounds.width, image->rows, (ssize_t)
-    (shear_image->columns-bounds.width)/2, bounds.y };
+  second_pass.width=bounds.width;
+  second_pass.height=image->rows;
+  second_pass.x_offset=(ssize_t) (shear_image->columns-bounds.width)/2;
+  second_pass.y_offset=bounds.y;
   status=YShearImage(shear_image,shear.y,&second_pass,exception);
   if (status == MagickFalse)
     {
@@ -756,6 +764,9 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
 MagickExport Image *ShearImage(const Image *image,const double x_shear,
   const double y_shear,ExceptionInfo *exception)
 {
+  CropToFitRegion
+    crop_region;
+
   Image
     *integral_image,
     *shear_image;
@@ -796,8 +807,11 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   shear_image=ShearIntegralImage(image,integral_image,shear,exception);
   if (shear_image == (Image *) NULL)
     return((Image *) NULL);
-  const CropToFitRegion crop_region = { shear.x, shear.y, (MagickRealType)
-    image->columns, (MagickRealType) image->rows, MagickFalse };
+  crop_region.x_shear=shear.x;
+  crop_region.y_shear=shear.y;
+  crop_region.width=(MagickRealType) image->columns;
+  crop_region.height=(MagickRealType) image->rows;
+  crop_region.rotate=MagickFalse;
   status=CropToFitImage(&shear_image,&crop_region,exception);
   shear_image->alpha_trait=image->alpha_trait;
   shear_image->compose=image->compose;
