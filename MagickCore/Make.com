@@ -80,6 +80,7 @@ $call Make opencl.c
 $call Make option.c
 $call Make paint.c
 $call Make pixel.c
+$call Make pixel-import.c
 $call Make pixel-export.c
 $call Make policy.c
 $call Make prepress.c
