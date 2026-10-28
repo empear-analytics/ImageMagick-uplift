@@ -957,6 +957,8 @@ MagickExport MagickBooleanType GetTypeMetrics(Image *image,
   PointInfo
     offset;
 
+  RenderTarget target;
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -970,7 +972,8 @@ MagickExport MagickBooleanType GetTypeMetrics(Image *image,
   (void) memset(metrics,0,sizeof(*metrics));
   offset.x=0.0;
   offset.y=0.0;
-  const RenderTarget target = { image, annotate_info };
+  target.image=image;
+  target.draw_info=annotate_info;
   status=RenderType(&target,&offset,metrics,exception);
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),"Metrics: text: %s; "
