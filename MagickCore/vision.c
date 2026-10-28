@@ -916,6 +916,22 @@ static ssize_t GetObjectSortOrder(const Image *image)
   return(order);
 }
 
+static size_t GetGreatestAdjacentObject(const CCObjectInfo *object,
+  const size_t *neighbors,const size_t count)
+{
+  size_t
+    id;
+
+  ssize_t
+    j;
+
+  id=0;
+  for (j=0; j < (ssize_t) count; j++)
+    if (IsGreaterAdjacentObject(object,neighbors,j,id) != MagickFalse)
+      id=neighbors[j];
+  return(id);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1587,10 +1603,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     /*
       Merge with object of greatest adjacent area.
     */
-    id=0;
-    for (j=0; j < (ssize_t) count; j++)
-      if (IsGreaterAdjacentObject(object,neighbors,j,id) != MagickFalse)
-        id=neighbors[j];
+    id=GetGreatestAdjacentObject(object,neighbors,count);
     for (j=0; j < (ssize_t) count; j++)
       object[neighbors[j]].census=0.0;
     object[i].area=0.0;
