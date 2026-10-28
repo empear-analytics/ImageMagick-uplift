@@ -1359,6 +1359,15 @@ static MagickBooleanType CopyImageRegion(Image *destination,const Image *source,
   return(status);
 }
 
+static ssize_t WrapRollOffset(ssize_t offset,const size_t extent)
+{
+  while (offset < 0)
+    offset+=(ssize_t) extent;
+  while (offset >= (ssize_t) extent)
+    offset-=(ssize_t) extent;
+  return(offset);
+}
+
 MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   const ssize_t y_offset,ExceptionInfo *exception)
 {
@@ -1387,14 +1396,8 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
     return((Image *) NULL);
   offset.x=x_offset;
   offset.y=y_offset;
-  while (offset.x < 0)
-    offset.x+=(ssize_t) image->columns;
-  while (offset.x >= (ssize_t) image->columns)
-    offset.x-=(ssize_t) image->columns;
-  while (offset.y < 0)
-    offset.y+=(ssize_t) image->rows;
-  while (offset.y >= (ssize_t) image->rows)
-    offset.y-=(ssize_t) image->rows;
+  offset.x=WrapRollOffset(offset.x,image->columns);
+  offset.y=WrapRollOffset(offset.y,image->rows);
   /*
     Roll image.
   */
