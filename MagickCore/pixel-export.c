@@ -2273,6 +2273,8 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
   size_t
     length;
 
+  ExportPixelBuffer buffer;
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -2388,7 +2390,9 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
   roi.height=height;
   roi.x=x;
   roi.y=y;
-  const ExportPixelBuffer buffer = { map, quantum_map, pixels };
+  buffer.map=map;
+  buffer.quantum_map=quantum_map;
+  buffer.pixels=pixels;
   switch (type)
   {
     case CharPixel:
