@@ -85,8 +85,8 @@ needs before refactoring:
 | 2.30 | `MagickCore/segment.c` | 1934 | 79% | 86% | 4.05, in progress (second pass M80, D in M87) (Complex Conditional gone; Brain Method left in GetImageDynamicThreshold; Classify's gone with Recipe B), [M10](tasks/M10-segment.md) [M92](tasks/M92-near-threshold.md) [M99](tasks/M99-bundle-arguments.md) |
 | 2.57 | `MagickCore/colorspace.c` | 2899 | 90% | 92% | 2.80, plateau for the current catalogue (Complex Conditional gone; the transforms are case-per-pragma switches), [M06](tasks/M06-colorspace.md) |
 | 3.08 | `MagickCore/fourier.c` | 1626 | 92% | 86% | 3.27 on the Mac (`ComplexImages` only, [M12](tasks/M12-fourier.md)); the FFTW-only functions still wait for the Linux machine |
-| 3.28 | `MagickCore/channel.c` | 1394 | 65% | 81% | 4.04, in progress (out of the Red band), [M16](tasks/M16-channel.md) |
-| 5.78 | `MagickCore/decorate.c` | 901 | 98% | 94% | 6.74, in progress (fill and blend loops deduplicated), [M11](tasks/M11-decorate.md) |
+| 3.28 | `MagickCore/channel.c` | 1394 | 65% | 81% | 6.93 after `SetImageAlphaChannel` and `CombineImages` split to `channel-alpha.c` (6.96) and `channel-combine.c` (8.22, M101); before that 4.04, [M16](tasks/M16-channel.md) |
+| 5.78 | `MagickCore/decorate.c` | 901 | 98% | 94% | 7.73 after `RaiseImage` split to `decorate-raise.c` (8.67, M101), in progress (fill and blend loops deduplicated), [M11](tasks/M11-decorate.md) |
 | 5.92 | `MagickCore/matrix.c` | 1146 | 75% | 80% | 7.45, in progress (Complex Conditional gone; GaussJordanElimination and MatrixToImage split with H, E and O), [M17](tasks/M17-matrix.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 6.96 | `MagickCore/magick.c` | 1866 | 68% | 81% | 7.69, in progress (the flag accessors duplicate each other but log their own names), [M18](tasks/M18-magick.md) |
 | 8.81 | `MagickCore/semaphore.c` | 482 | 100% | 80% | 9.38, plateau for the current catalogue, [M19](tasks/M19-semaphore.md) |
@@ -115,7 +115,7 @@ needs before refactoring:
 | 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | 3.76, in progress (Throw* blocks pinned by __func__; StripMagickString return bug reported), [M49](tasks/M49-string.md) [M92](tasks/M92-near-threshold.md) |
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
 | 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | 5.31 (Recipe H applied, M84; LZWEncodeImage's type hoisted, M91; Huffman/LZW bit macros need O/K), [M68](tasks/M68-compress.md) |
-| 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 6.19, in progress (Complex Conditional gone; no argument findings left; string helpers tip String Heavy), [M34](tasks/M34-configure.md) [M99](tasks/M99-bundle-arguments.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 6.47 after `GetConfigurePaths` split to `configure-paths.c` (8.95, M101), in progress (Complex Conditional gone; no argument findings left; string helpers tip String Heavy), [M34](tasks/M34-configure.md) [M99](tasks/M99-bundle-arguments.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | 6.39 (tree descent returns from inside), [M56](tasks/M56-histogram.md) [M92](tasks/M92-near-threshold.md) |
 | 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | 6.61 (guard level; the tile loop keeps multi-output blocks), [M57](tasks/M57-montage.md) |
 | 6.87 | `MagickCore/memory.c` | 1713 | 60% | 71% | plateau 6.87 (uncompiled branches), [M60](tasks/M60-memory.md) |
@@ -147,7 +147,7 @@ needs before refactoring:
 | 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | 5.02 (lock helpers reused in Relinquish, [M88](tasks/M88-reuse.md); env blocks are two-value), [M52](tasks/M52-resource.md) |
 | 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | 5.94 (helpers reused after fresh mutation, [M88](tasks/M88-reuse.md); CompareNodeKey reused in six functions, RelinquishNodeContents in four, [M101](tasks/M101-bundle-uncapped.md)), [M53](tasks/M53-splay-tree.md) |
 | 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | 5.09, in progress (Complex Conditional gone), [M33](tasks/M33-locale.md) [M99](tasks/M99-bundle-arguments.md) |
-| 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | 5.02 (rest returns from inside or is #if-built), [M54](tasks/M54-token.md) |
+| 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | 7.82 after `GlobExpression` and `GetNextToken` split to `token-glob.c` (7.59) and `token-next.c` (7.99, M101); before that 5.02 (rest returns from inside or is #if-built), [M54](tasks/M54-token.md) |
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | 5.16 (rest interleaves Winsock/MSVC #if), [M72](tasks/M72-distribute-cache.md) |
 | 5.10 | `MagickCore/mime.c` | 1107 | 2% | 100% | 6.85, [M73](tasks/M73-mime.md) [M92](tasks/M92-near-threshold.md) [M99](tasks/M99-bundle-arguments.md) |
 | 5.88 | `MagickCore/exception.c` | 1158 | 88% | 66% | 6.16 (severity table needs a lookup recipe; ThrowException repeat-test bug reported), [M55](tasks/M55-exception.md) |

@@ -253,6 +253,25 @@ A third scan of the same files finds no family above 0.2 except in files left ab
 less than 0.2 (enhance.c's ten, effect.c's six, image.c's five, the X11 files) were not
 made.
 
+**Yellow files.** The same scan over the 47 MagickCore files scoring 4 to 9.5 found six
+with a family worth 0.2 or more:
+
+| Commit | Family moved | Original | New file |
+|---|---|---|---|
+| `f31d03fa6` | `SetImageAlphaChannel` and its statics | channel.c 4.04 → 5.13 | channel-alpha.c 6.96 |
+| `c629d08d0` | `CombineImages` | channel.c 5.13 → 6.93 | channel-combine.c 8.22 |
+| `e4193e021` | `RaiseImage` and its static | decorate.c 6.74 → 7.73 | decorate-raise.c 8.67 |
+| `aee929162` | `GlobExpression` and its statics | token.c 5.02 → 6.49 | token-glob.c 7.59 |
+| `5d2502f8e` | `GetNextToken` and its statics | token.c 6.49 → 7.82 | token-next.c 7.99 |
+| `f697c21ca` | `GetConfigurePaths` | configure.c 6.19 → 6.47 | configure-paths.c 8.95 |
+
+`GetConfigurePaths` and `GetNextToken` reach 15,903 cases and `GlobExpression` 228; in each
+the only divergence was `gaps/c5651ffad8`, the known artifact, which diverges on the
+unchanged tree too (rerun at `e4193e021`). Left: resource.c's `SetMagickResourceLimit`
+(5.02 → 5.94 dry), which uses the file-scope `resource_info` that resource.c keeps (the
+tool now refuses such a family), and module.c's `InvokeDynamicImageFilter` (6.46 → 6.94
+dry), which no case reaches.
+
 ### Sweep (2026-10-28, 00:20): where the night ends
 
 MagickCore against the morning's sweep: **mean 4.86 → 4.97; red 46 → 44, yellow 38 → 40,
