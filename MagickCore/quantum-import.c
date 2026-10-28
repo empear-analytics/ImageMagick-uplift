@@ -2096,6 +2096,43 @@ static void ImportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ImportFloat16BitCMYKQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushShortPixel(quantum_info->endian,p,&pixel);
+    SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+      HalfToSinglePrecision(pixel)),q);
+    p=PushShortPixel(quantum_info->endian,p,&pixel);
+    SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+      HalfToSinglePrecision(pixel)),q);
+    p=PushShortPixel(quantum_info->endian,p,&pixel);
+    SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+      HalfToSinglePrecision(pixel)),q);
+    p=PushShortPixel(quantum_info->endian,p,&pixel);
+    SetPixelBlack(image,ClampToQuantum((double) QuantumRange*(double)
+      HalfToSinglePrecision(pixel)),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void Import16BitCMYKQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -2116,23 +2153,7 @@ static void Import16BitCMYKQuantum(const Image *image,QuantumInfo *quantum_info,
 
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushShortPixel(quantum_info->endian,p,&pixel);
-        SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-          HalfToSinglePrecision(pixel)),q);
-        p=PushShortPixel(quantum_info->endian,p,&pixel);
-        SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-          HalfToSinglePrecision(pixel)),q);
-        p=PushShortPixel(quantum_info->endian,p,&pixel);
-        SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-          HalfToSinglePrecision(pixel)),q);
-        p=PushShortPixel(quantum_info->endian,p,&pixel);
-        SetPixelBlack(image,ClampToQuantum((double) QuantumRange*(double)
-          HalfToSinglePrecision(pixel)),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportFloat16BitCMYKQuantum(image,quantum_info,span);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
