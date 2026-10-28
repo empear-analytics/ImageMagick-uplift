@@ -316,6 +316,14 @@ it could not be reproduced to bisect. If it reappears, keep the candidate's outp
 (`build-oracle/work/runs/cand/`) and bisect quantum-import.c and quantum-export.c first:
 the case reads and writes MIFF through both, and both changed today.
 
+**It is in the unchanged code (2026-10-28, midday).** The whole catalogue at `4acdcfc46`
+had `resize/6ee45e9cfa` diverge again, and alone it diverged in 3 of 10 uncached runs. A
+candidate built from the baseline's own commit, `de54d27df`, diverged from the baseline
+binary in 11 of 20 runs; `a6646ddf1` in 0 of 20 and `f77ec9ad8` (`ScaleImage` moved) in 6
+of 20. The same source differs from itself between builds and runs, so the refactoring
+does not cause it: the case reads something the code does not set, as suspected above.
+Where is still open; a divergence on this case alone is not evidence against a step.
+
 ### ERDC (night)
 
 The fresh reports after profile.c are unusable: transform, quantize, montage and cache
