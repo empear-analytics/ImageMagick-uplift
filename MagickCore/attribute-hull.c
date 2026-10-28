@@ -215,7 +215,7 @@ static double GetMinimumBoxAngle(PointInfo *bounding_box)
   return(angle);
 }
 
-static void MoveBoxToOrigin(PointInfo *bounding_box)
+static PointInfo MoveBoxToOrigin(PointInfo *bounding_box)
 {
   PointInfo
     point;
@@ -236,6 +236,7 @@ static void MoveBoxToOrigin(PointInfo *bounding_box)
     bounding_box[i].x-=point.x;
     bounding_box[i].y-=point.y;
   }
+  return(point);
 }
 
 static void SetMinimumBoundingBoxProperties(Image *image,
@@ -407,7 +408,7 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
       /*
         Find smallest perpendicular distance from edge to origin.
       */
-      MoveBoxToOrigin(bounding_box);
+      point=MoveBoxToOrigin(bounding_box);
       for (i=0; i < 4; i++)
       {
         double
