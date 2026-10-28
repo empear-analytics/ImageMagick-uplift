@@ -718,11 +718,12 @@ merges code, not parameters.
    with no statement between.
 5. Declare the local among the declarations at the top of the block that holds its
    calls (the loop body, for a struct per iteration), never after a statement: the
-   macOS CI job compiles with `-Wdeclaration-after-statement -Werror`. When nothing
-   between there and the last call writes an identifier of the initialiser, and it has
-   no member access or cast, declare it `const` with the initialiser. Otherwise declare
-   it there without `const` or initialiser, and fill it directly before its one call,
-   `name.member=expr;` for every member in declaration order, with no statement between.
+   macOS CI job compiles with `-Wdeclaration-after-statement -Werror`. Nothing may
+   write an identifier of the initialiser between the point where the struct takes its
+   values and its last call. Where that point can be the declaration, and the
+   initialiser has no member access or cast, declare it `const` with the initialiser.
+   Otherwise declare it without `const` or initialiser, and fill it at that point,
+   `name.member=expr;` for every member in declaration order, with nothing between.
 6. A struct declared outside a `#pragma omp` region and read inside it is `const`, and
    none of its members point to data the region writes through the struct.
 7. At each call, replace the group with `&name`, and check by reading that every member
@@ -1351,4 +1352,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-28 | NEW | J | Extract Accumulating Block Returning the Loop Status: a block in a parallel loop body that writes `status=MagickFalse` (without reading it) and two to four of the iteration's accumulators moves to a `static MagickBooleanType` function that returns its status and takes the accumulators by pointer (Recipes T and K together) | `vision.c`'s four moment-threshold functions share the first moment pass; one helper used by all four measures 2.35 → 2.59. On `MotionBlurImage`'s kernel loops it was flat or worse (9 to 11 arguments) | owner |
 | 2026-10-28 | AMEND | J | Step 5: an array accumulator goes as a pointer with its uses unchanged, as Recipe K already allows | `PerimeterThreshold`'s row loop counts into `pattern[4]`, the object's own array, and writes `status=MagickFalse` | mandate (2026-10-24) |
 | 2026-10-28 | AMEND | S | Scope: any MagickCore file whose family splits cleanly, not only the approved list; a split may lower MagickCore's per-file mean (the new file starts red) when it raises the original file; *Careful*'s new-file gate procedure confirmed | statistic.c's `StatisticImage` family (dry run 2.29 → 2.61); the per-file mean dip of the first three splits (4.97 → 4.96, line-weighted 3.149 → 3.200) | owner |
-| 2026-10-28 | AMEND | B | Step 5: the struct is declared among the declarations at the top of the block holding its calls, `const` with its initialiser where its operands are final there, otherwise filled member by member directly before its one call; `tools/ci_warnings.sh` joins the verification loop | `Main`'s macOS arm64 job (`-Wdeclaration-after-statement -Werror`) has failed on every merge since #31: 40 structs declared after statements in 20 files, as step 4's "directly before the call" placed them | mandate (2026-10-24) |
+| 2026-10-28 | AMEND | B | Step 5: the struct is declared among the declarations at the top of the block holding its calls, `const` with its initialiser where its operands are final there, otherwise filled member by member where it takes its values; `tools/ci_warnings.sh` joins the verification loop | `Main`'s macOS arm64 job (`-Wdeclaration-after-statement -Werror`) has failed on every merge since #31: 40 structs declared after statements in 20 files, as step 4's "directly before the call" placed them | mandate (2026-10-24) |
