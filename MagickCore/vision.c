@@ -951,6 +951,23 @@ static void ResetObjectStatistics(const Image *component_image,
   }
 }
 
+static void NormalizeObjectStatistics(const Image *component_image,
+  CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+  {
+    object[i].bounding_box.width=(size_t) ((ssize_t)
+      object[i].bounding_box.width-(object[i].bounding_box.x-1));
+    object[i].bounding_box.height=(size_t) ((ssize_t)
+      object[i].bounding_box.height-(object[i].bounding_box.y-1));
+    object[i].centroid.x=object[i].centroid.x/object[i].area;
+    object[i].centroid.y=object[i].centroid.y/object[i].area;
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1716,15 +1733,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           p+=(ptrdiff_t) GetPixelChannels(component_image);
         }
       }
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-      {
-        object[i].bounding_box.width=(size_t) ((ssize_t)
-          object[i].bounding_box.width-(object[i].bounding_box.x-1));
-        object[i].bounding_box.height=(size_t) ((ssize_t)
-          object[i].bounding_box.height-(object[i].bounding_box.y-1));
-        object[i].centroid.x=object[i].centroid.x/object[i].area;
-        object[i].centroid.y=object[i].centroid.y/object[i].area;
-      }
+      NormalizeObjectStatistics(component_image,object);
       component_view=DestroyCacheView(component_view);
       order=GetObjectSortOrder(image);
       key=GetObjectSortKey(image);
