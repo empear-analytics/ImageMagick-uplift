@@ -192,27 +192,23 @@ static inline double getFeretDiameter(PointInfo *p,PointInfo *q,PointInfo *v)
   return((q->x-p->x)*(v->y-p->y)-(v->x-p->x)*(q->y-p->y))/sqrt(distance);
 }
 
-static double GetMinimumBoxAngle(PointInfo *bounding_box)
+static void GetMinimumBoxAngle(PointInfo *bounding_box,double *angle,
+  double *distance)
 {
-  double
-    angle,
-    distance;
-
   ssize_t
     i;
 
-  distance=hypot(bounding_box[0].x,bounding_box[0].y);
-  angle=getAngle(&bounding_box[0],&bounding_box[1]);
+  *distance=hypot(bounding_box[0].x,bounding_box[0].y);
+  *angle=getAngle(&bounding_box[0],&bounding_box[1]);
   for (i=1; i < 4; i++)
   {
     double d = hypot(bounding_box[i].x,bounding_box[i].y);
-    if (d < distance)
+    if (d < *distance)
       {
-        distance=d;
-        angle=getAngle(&bounding_box[i],&bounding_box[(i+1) % 4]);
+        *distance=d;
+        *angle=getAngle(&bounding_box[i],&bounding_box[(i+1) % 4]);
       }
   }
-  return(angle);
 }
 
 static PointInfo MoveBoxToOrigin(PointInfo *bounding_box)
@@ -392,7 +388,7 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   /*
     Find smallest angle to origin.
   */
-  angle=GetMinimumBoxAngle(bounding_box);
+  GetMinimumBoxAngle(bounding_box,&angle,&distance);
   artifact=GetImageArtifact(image,"minimum-bounding-box:orientation");
   if (artifact != (const char *) NULL)
     {
