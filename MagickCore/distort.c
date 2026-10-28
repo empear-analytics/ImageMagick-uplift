@@ -3279,11 +3279,12 @@ MagickExport Image *SparseColorImage(const Image *image,
   { DistortMethod
       distort_method;
 
+    const CoefficientInput input = { number_arguments, arguments,
+      number_colors };
+
     distort_method=(DistortMethod) method;
     if ( distort_method >= SentinelDistortion )
       distort_method = ShepardsDistortion; /* Pretend to be Shepards */
-    const CoefficientInput input = { number_arguments, arguments,
-      number_colors };
     coeff = GenerateCoefficients(image, &distort_method, &input, exception);
     if ( coeff == (double *) NULL )
       return((Image *) NULL);
