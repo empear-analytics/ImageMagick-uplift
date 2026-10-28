@@ -3828,6 +3828,8 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
   unsigned char
     *magick_restrict q;
 
+  QuantumPixelSpan span;
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(quantum_info != (QuantumInfo *) NULL);
@@ -3857,7 +3859,9 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
   q=pixels;
   ResetQuantumState(quantum_info);
   extent=GetQuantumExtent(image,quantum_info,quantum_type);
-  const QuantumPixelSpan span = { number_pixels, p, q };
+  span.number_pixels=number_pixels;
+  span.p=p;
+  span.q=q;
 
   switch (quantum_type)
   {
