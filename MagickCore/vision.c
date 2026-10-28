@@ -856,6 +856,24 @@ static void SetObjectMergeByIds(CCObjectInfo *object,const size_t colors,
   }
 }
 
+static MagickBooleanType SetEquivalencePathRoot(MatrixInfo *equivalences,
+  const ssize_t ox,const ssize_t root)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    obj;
+
+  status=GetMatrixElement(equivalences,ox,0,&obj);
+  while (obj != root)
+  {
+    status=GetMatrixElement(equivalences,ox,0,&obj);
+    status=SetMatrixElement(equivalences,ox,0,&root);
+  }
+  return(status);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1050,19 +1068,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
             root=oy;
           }
         ox=offset;
-        status=GetMatrixElement(equivalences,ox,0,&obj);
-        while (obj != root)
-        {
-          status=GetMatrixElement(equivalences,ox,0,&obj);
-          status=SetMatrixElement(equivalences,ox,0,&root);
-        }
+        status=SetEquivalencePathRoot(equivalences,ox,root);
         oy=offset+neighbor_offset;
-        status=GetMatrixElement(equivalences,oy,0,&obj);
-        while (obj != root)
-        {
-          status=GetMatrixElement(equivalences,oy,0,&obj);
-          status=SetMatrixElement(equivalences,oy,0,&root);
-        }
+        status=SetEquivalencePathRoot(equivalences,oy,root);
         status=SetMatrixElement(equivalences,y*(ssize_t) image->columns+x,0,
           &root);
         p+=(ptrdiff_t) GetPixelChannels(image);
