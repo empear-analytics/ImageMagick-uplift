@@ -269,6 +269,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/semaphore.h \
   MagickCore/semaphore-private.h \
   MagickCore/shear.c \
+  MagickCore/shear-rotate.c \
   MagickCore/shear-deskew.c \
   MagickCore/shear.h \
   MagickCore/signature.c \
