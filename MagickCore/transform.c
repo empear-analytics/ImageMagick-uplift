@@ -1373,6 +1373,12 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
 {
 #define RollImageTag  "Roll/Image"
 
+  CopyRegion
+    first_region,
+    fourth_region,
+    second_region,
+    third_region;
+
   Image
     *roll_image;
 
@@ -1401,25 +1407,38 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   /*
     Roll image.
   */
-  const CopyRegion first_region = { (size_t) offset.x, (size_t) offset.y,
-    (ssize_t) image->columns-offset.x, (ssize_t) image->rows-offset.y, 0, 0 };
+  first_region.columns=(size_t) offset.x;
+  first_region.rows=(size_t) offset.y;
+  first_region.sx=(ssize_t) image->columns-offset.x;
+  first_region.sy=(ssize_t) image->rows-offset.y;
+  first_region.dx=0;
+  first_region.dy=0;
   status=CopyImageRegion(roll_image,image,&first_region,exception);
   (void) SetImageProgress(image,RollImageTag,0,3);
-  const CopyRegion second_region = { (size_t) ((ssize_t) image->columns-
-    offset.x), (size_t) offset.y, 0, (ssize_t) image->rows-offset.y, offset.x,
-    0 };
+  second_region.columns=(size_t) ((ssize_t) image->columns-offset.x);
+  second_region.rows=(size_t) offset.y;
+  second_region.sx=0;
+  second_region.sy=(ssize_t) image->rows-offset.y;
+  second_region.dx=offset.x;
+  second_region.dy=0;
   status&=(MagickStatusType) CopyImageRegion(roll_image,image,&second_region,
     exception);
   (void) SetImageProgress(image,RollImageTag,1,3);
-  const CopyRegion third_region = { (size_t) offset.x, (size_t) ((ssize_t)
-    image->rows-offset.y), (ssize_t) image->columns-offset.x, 0, 0,
-    offset.y };
+  third_region.columns=(size_t) offset.x;
+  third_region.rows=(size_t) ((ssize_t) image->rows-offset.y);
+  third_region.sx=(ssize_t) image->columns-offset.x;
+  third_region.sy=0;
+  third_region.dx=0;
+  third_region.dy=offset.y;
   status&=(MagickStatusType) CopyImageRegion(roll_image,image,&third_region,
     exception);
   (void) SetImageProgress(image,RollImageTag,2,3);
-  const CopyRegion fourth_region = { (size_t) ((ssize_t) image->columns-
-    offset.x), (size_t) ((ssize_t) image->rows-offset.y), 0, 0, offset.x,
-    offset.y };
+  fourth_region.columns=(size_t) ((ssize_t) image->columns-offset.x);
+  fourth_region.rows=(size_t) ((ssize_t) image->rows-offset.y);
+  fourth_region.sx=0;
+  fourth_region.sy=0;
+  fourth_region.dx=offset.x;
+  fourth_region.dy=offset.y;
   status&=(MagickStatusType) CopyImageRegion(roll_image,image,&fourth_region,
     exception);
   (void) SetImageProgress(image,RollImageTag,3,3);
