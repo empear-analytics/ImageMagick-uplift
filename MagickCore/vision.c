@@ -805,6 +805,17 @@ static void MergeObjectsOutsideRange(CCObjectInfo *object,const size_t colors,
       object[i].merge=MagickTrue;
 }
 
+static void SetObjectMergeByColor(CCObjectInfo *object,const size_t colors,
+  const PixelInfo *pixel,const MagickBooleanType merge)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) colors; i++)
+    if (IsFuzzyEquivalencePixelInfo(&object[i].color,pixel) != MagickFalse)
+      object[i].merge=merge;
+}
+
 static void SetObjectMergeByIds(CCObjectInfo *object,const size_t colors,
   const char *artifact,const MagickBooleanType merge)
 {
@@ -1220,9 +1231,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
           MagickPathExtent));
         (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-        for (i=0; i < (ssize_t) component_image->colors; i++)
-          if (IsFuzzyEquivalencePixelInfo(&object[i].color,&pixel) != MagickFalse)
-            object[i].merge=MagickFalse;
+        SetObjectMergeByColor(object,component_image->colors,&pixel,MagickFalse);
         if (*q == '\0')
           break;
         p=q+1;
@@ -1302,9 +1311,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
           MagickPathExtent));
         (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-        for (i=0; i < (ssize_t) component_image->colors; i++)
-          if (IsFuzzyEquivalencePixelInfo(&object[i].color,&pixel) != MagickFalse)
-            object[i].merge=MagickTrue;
+        SetObjectMergeByColor(object,component_image->colors,&pixel,MagickTrue);
         if (*q == '\0')
           break;
         p=q+1;
