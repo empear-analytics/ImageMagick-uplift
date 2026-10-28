@@ -3522,6 +3522,35 @@ static void Export16BitGrayAlphaQuantum(const Image *image,
   }
 }
 
+static void ExportFloat32BitGrayAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    float
+      float_pixel;
+
+    float_pixel=(float) GetPixelLuma(image,p);
+    q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
+    float_pixel=(float) (GetPixelAlpha(image,p));
+    q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
 static void Export32BitGrayAlphaQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
@@ -3542,18 +3571,7 @@ static void Export32BitGrayAlphaQuantum(const Image *image,
 
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        float
-          float_pixel;
-
-        float_pixel=(float) GetPixelLuma(image,p);
-        q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
-        float_pixel=(float) (GetPixelAlpha(image,p));
-        q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportFloat32BitGrayAlphaQuantum(image,quantum_info,span);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
