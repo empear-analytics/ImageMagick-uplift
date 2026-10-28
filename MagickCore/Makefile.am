@@ -98,6 +98,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/cache-view.c \
   MagickCore/cache-view.h \
   MagickCore/channel.c \
+  MagickCore/channel-alpha.c \
   MagickCore/channel.h \
   MagickCore/cipher.c \
   MagickCore/cipher.h \

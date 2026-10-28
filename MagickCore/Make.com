@@ -35,6 +35,7 @@ $call Make blob.c
 $call Make cache.c
 $call Make cache-view.c
 $call Make channel.c
+$call Make channel-alpha.c
 $call Make cipher.c
 $call Make client.c
 $call Make coder.c
