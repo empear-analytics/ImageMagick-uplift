@@ -3702,7 +3702,40 @@ static void ExportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
-static void ExportRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
+static void Export8BitRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned char
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToChar(GetPixelRed(image,p));
+    q=PopCharPixel(pixel,q);
+    pixel=ScaleQuantumToChar(GetPixelGreen(image,p));
+    q=PopCharPixel(pixel,q);
+    pixel=ScaleQuantumToChar(GetPixelBlue(image,p));
+    q=PopCharPixel(pixel,q);
+    pixel=ScaleQuantumToChar(GetPixelAlpha(image,p));
+    q=PopCharPixel(pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export10BitRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
   const MagickSizeType
@@ -3720,238 +3753,304 @@ static void ExportRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
   ssize_t
     x;
 
+  unsigned int
+    pixel;
+
+  range=GetQuantumRange(quantum_info->depth);
+  if (quantum_info->pack == MagickFalse)
+    {
+      ssize_t
+        i;
+
+      size_t
+        quantum;
+
+      ssize_t
+        n;
+
+      n=0;
+      quantum=0;
+      pixel=0;
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        for (i=0; i < 4; i++)
+        {
+          switch (i)
+          {
+            case 0: quantum=(size_t) GetPixelRed(image,p); break;
+            case 1: quantum=(size_t) GetPixelGreen(image,p); break;
+            case 2: quantum=(size_t) GetPixelBlue(image,p); break;
+            case 3: quantum=(size_t) GetPixelAlpha(image,p); break;
+          }
+          switch (n % 3)
+          {
+            case 0:
+            {
+              pixel|=(size_t) (ScaleQuantumToAny((Quantum) quantum,
+                range) << 22);
+              break;
+            }
+            case 1:
+            {
+              pixel|=(size_t) (ScaleQuantumToAny((Quantum) quantum,
+                range) << 12);
+              break;
+            }
+            case 2:
+            {
+              pixel|=(size_t) (ScaleQuantumToAny((Quantum) quantum,
+                range) << 2);
+              q=PopLongPixel(quantum_info->endian,pixel,q);
+              pixel=0;
+              break;
+            }
+          }
+          n++;
+        }
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) quantum_info->pad;
+      }
+      return;
+    }
+  if (quantum_info->quantum == 32UL)
+    {
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        pixel=(unsigned int) ScaleQuantumToAny(GetPixelRed(image,p),range);
+        q=PopQuantumLongPixel(quantum_info,pixel,q);
+        pixel=(unsigned int) ScaleQuantumToAny(GetPixelGreen(image,p),
+          range);
+        q=PopQuantumLongPixel(quantum_info,pixel,q);
+        pixel=(unsigned int) ScaleQuantumToAny(GetPixelBlue(image,p),range);
+        q=PopQuantumLongPixel(quantum_info,pixel,q);
+        pixel=(unsigned int) ScaleQuantumToAny(GetPixelAlpha(image,p),
+          range);
+        q=PopQuantumLongPixel(quantum_info,pixel,q);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) quantum_info->pad;
+      }
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=(unsigned int) ScaleQuantumToAny(GetPixelRed(image,p),range);
+    q=PopQuantumPixel(quantum_info,pixel,q);
+    pixel=(unsigned int) ScaleQuantumToAny(GetPixelGreen(image,p),range);
+    q=PopQuantumPixel(quantum_info,pixel,q);
+    pixel=(unsigned int) ScaleQuantumToAny(GetPixelBlue(image,p),range);
+    q=PopQuantumPixel(quantum_info,pixel,q);
+    pixel=(unsigned int) ScaleQuantumToAny(GetPixelAlpha(image,p),range);
+    q=PopQuantumPixel(quantum_info,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export16BitRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelRed(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelGreen(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelBlue(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelAlpha(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) quantum_info->pad;
+      }
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToShort(GetPixelRed(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToShort(GetPixelGreen(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToShort(GetPixelBlue(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToShort(GetPixelAlpha(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export32BitRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        float
+          float_pixel;
+
+        q=PopQuantumFloatPixel(quantum_info,(float) GetPixelRed(image,p),q);
+        q=PopQuantumFloatPixel(quantum_info,(float) GetPixelGreen(image,p),q);
+        q=PopQuantumFloatPixel(quantum_info,(float) GetPixelBlue(image,p),q);
+        float_pixel=(float) GetPixelAlpha(image,p);
+        q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) quantum_info->pad;
+      }
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToLong(GetPixelRed(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToLong(GetPixelGreen(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToLong(GetPixelBlue(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToLong(GetPixelAlpha(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export64BitFloatRGBAQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  double
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    q=PopQuantumDoublePixel(quantum_info,(double) GetPixelRed(image,p),q);
+    q=PopQuantumDoublePixel(quantum_info,(double) GetPixelGreen(image,p),q);
+    q=PopQuantumDoublePixel(quantum_info,(double) GetPixelBlue(image,p),q);
+    pixel=(double) GetPixelAlpha(image,p);
+    q=PopQuantumDoublePixel(quantum_info,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportAnyDepthRGBAQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  QuantumAny
+    range;
+
+  ssize_t
+    x;
+
+  range=GetQuantumRange(quantum_info->depth);
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelRed(image,p),
+      range),q);
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelGreen(image,p),
+      range),q);
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelBlue(image,p),
+      range),q);
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelAlpha(image,p),
+      range),q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
   switch (quantum_info->depth)
   {
     case 8:
     {
-      unsigned char
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToChar(GetPixelRed(image,p));
-        q=PopCharPixel(pixel,q);
-        pixel=ScaleQuantumToChar(GetPixelGreen(image,p));
-        q=PopCharPixel(pixel,q);
-        pixel=ScaleQuantumToChar(GetPixelBlue(image,p));
-        q=PopCharPixel(pixel,q);
-        pixel=ScaleQuantumToChar(GetPixelAlpha(image,p));
-        q=PopCharPixel(pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export8BitRGBAQuantum(image,quantum_info,span);
       break;
     }
     case 10:
     {
-      unsigned int
-        pixel;
-
-      range=GetQuantumRange(quantum_info->depth);
-      if (quantum_info->pack == MagickFalse)
-        {
-          ssize_t
-            i;
-
-          size_t
-            quantum;
-
-          ssize_t
-            n;
-
-          n=0;
-          quantum=0;
-          pixel=0;
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            for (i=0; i < 4; i++)
-            {
-              switch (i)
-              {
-                case 0: quantum=(size_t) GetPixelRed(image,p); break;
-                case 1: quantum=(size_t) GetPixelGreen(image,p); break;
-                case 2: quantum=(size_t) GetPixelBlue(image,p); break;
-                case 3: quantum=(size_t) GetPixelAlpha(image,p); break;
-              }
-              switch (n % 3)
-              {
-                case 0:
-                {
-                  pixel|=(size_t) (ScaleQuantumToAny((Quantum) quantum,
-                    range) << 22);
-                  break;
-                }
-                case 1:
-                {
-                  pixel|=(size_t) (ScaleQuantumToAny((Quantum) quantum,
-                    range) << 12);
-                  break;
-                }
-                case 2:
-                {
-                  pixel|=(size_t) (ScaleQuantumToAny((Quantum) quantum,
-                    range) << 2);
-                  q=PopLongPixel(quantum_info->endian,pixel,q);
-                  pixel=0;
-                  break;
-                }
-              }
-              n++;
-            }
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      if (quantum_info->quantum == 32UL)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            pixel=(unsigned int) ScaleQuantumToAny(GetPixelRed(image,p),range);
-            q=PopQuantumLongPixel(quantum_info,pixel,q);
-            pixel=(unsigned int) ScaleQuantumToAny(GetPixelGreen(image,p),
-              range);
-            q=PopQuantumLongPixel(quantum_info,pixel,q);
-            pixel=(unsigned int) ScaleQuantumToAny(GetPixelBlue(image,p),range);
-            q=PopQuantumLongPixel(quantum_info,pixel,q);
-            pixel=(unsigned int) ScaleQuantumToAny(GetPixelAlpha(image,p),
-              range);
-            q=PopQuantumLongPixel(quantum_info,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelRed(image,p),range);
-        q=PopQuantumPixel(quantum_info,pixel,q);
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelGreen(image,p),range);
-        q=PopQuantumPixel(quantum_info,pixel,q);
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelBlue(image,p),range);
-        q=PopQuantumPixel(quantum_info,pixel,q);
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelAlpha(image,p),range);
-        q=PopQuantumPixel(quantum_info,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export10BitRGBAQuantum(image,quantum_info,span);
       break;
     }
     case 16:
     {
-      unsigned short
-        pixel;
-
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelRed(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelGreen(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelBlue(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelAlpha(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToShort(GetPixelRed(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToShort(GetPixelGreen(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToShort(GetPixelBlue(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToShort(GetPixelAlpha(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export16BitRGBAQuantum(image,quantum_info,span);
       break;
     }
     case 32:
     {
-      unsigned int
-        pixel;
-
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            float
-              float_pixel;
-
-            q=PopQuantumFloatPixel(quantum_info,(float) GetPixelRed(image,p),q);
-            q=PopQuantumFloatPixel(quantum_info,(float) GetPixelGreen(image,p),q);
-            q=PopQuantumFloatPixel(quantum_info,(float) GetPixelBlue(image,p),q);
-            float_pixel=(float) GetPixelAlpha(image,p);
-            q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToLong(GetPixelRed(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToLong(GetPixelGreen(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToLong(GetPixelBlue(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToLong(GetPixelAlpha(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export32BitRGBAQuantum(image,quantum_info,span);
       break;
     }
     case 64:
     {
       if (quantum_info->format == FloatingPointQuantumFormat)
         {
-          double
-            pixel;
-
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            q=PopQuantumDoublePixel(quantum_info,(double) GetPixelRed(image,p),q);
-            q=PopQuantumDoublePixel(quantum_info,(double) GetPixelGreen(image,p),q);
-            q=PopQuantumDoublePixel(quantum_info,(double) GetPixelBlue(image,p),q);
-            pixel=(double) GetPixelAlpha(image,p);
-            q=PopQuantumDoublePixel(quantum_info,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
+          Export64BitFloatRGBAQuantum(image,quantum_info,span);
           break;
         }
       magick_fallthrough;
     }
     default:
     {
-      range=GetQuantumRange(quantum_info->depth);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelRed(image,p),
-          range),q);
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelGreen(image,p),
-          range),q);
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelBlue(image,p),
-          range),q);
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelAlpha(image,p),
-          range),q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportAnyDepthRGBAQuantum(image,quantum_info,span);
       break;
     }
   }
