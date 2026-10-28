@@ -1522,6 +1522,21 @@ static inline Quantum PerceptibleThreshold(const Quantum quantum,
   return((Quantum) (sign*epsilon));
 }
 
+static void PerceptiblePixel(const Image *image,const double epsilon,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) != 0)
+      q[i]=PerceptibleThreshold(q[i],epsilon);
+  }
+}
+
 MagickExport MagickBooleanType PerceptibleImage(Image *image,
   const double epsilon,ExceptionInfo *exception)
 {
@@ -1598,16 +1613,7 @@ MagickExport MagickBooleanType PerceptibleImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) != 0)
-          q[i]=PerceptibleThreshold(q[i],epsilon);
-      }
+      PerceptiblePixel(image,epsilon,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
