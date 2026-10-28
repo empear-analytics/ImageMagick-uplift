@@ -1550,6 +1550,43 @@ static void Export10BitBGROQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ExportFloat16BitBGROQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=SinglePrecisionToHalf(QuantumScale*(double)
+      GetPixelBlue(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=SinglePrecisionToHalf(QuantumScale*(double)
+      GetPixelGreen(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=SinglePrecisionToHalf(QuantumScale*(double)
+      GetPixelRed(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=SinglePrecisionToHalf(QuantumScale*(double)
+      GetPixelOpacity(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
 static void Export16BitBGROQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -1570,23 +1607,7 @@ static void Export16BitBGROQuantum(const Image *image,QuantumInfo *quantum_info,
 
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=SinglePrecisionToHalf(QuantumScale*(double)
-          GetPixelBlue(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=SinglePrecisionToHalf(QuantumScale*(double)
-          GetPixelGreen(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=SinglePrecisionToHalf(QuantumScale*(double)
-          GetPixelRed(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=SinglePrecisionToHalf(QuantumScale*(double)
-          GetPixelOpacity(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportFloat16BitBGROQuantum(image,quantum_info,span);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
