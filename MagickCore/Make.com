@@ -28,6 +28,7 @@ $call Make animate.c
 $call Make annotate.c
 $call Make artifact.c
 $call Make attribute.c
+$call Make attribute-hull.c
 $call Make attribute-bounds.c
 $call Make attribute-depth.c
 $call Make blob.c
