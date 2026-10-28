@@ -2860,9 +2860,17 @@ static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
 }
 
 static void ExportOpacityQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -4004,7 +4012,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case OpacityQuantum:
     {
-      ExportOpacityQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ExportOpacityQuantum(image,quantum_info,&span,exception);
       break;
     }
     case RGBQuantum:
