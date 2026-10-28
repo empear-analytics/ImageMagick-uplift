@@ -1245,6 +1245,8 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
   ssize_t
     i;
 
+  const CompositePlacement placement = { MagickTrue, x_offset, y_offset };
+
   /*
     Saliency blend composite operator.
   */
@@ -1303,22 +1305,19 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
       *convolve_image,
       *sum_image;
 
+    const BlendSumWeights difference = { 1.0, -1.0 };
+    const CompositePlacement origin = { MagickTrue, 0, 0 };
+
     convolve_image=ConvolveImage(relax_image,kernel_info,exception);
     if (convolve_image == (Image *) NULL)
       break;
     relax_image=DestroyImage(relax_image);
     relax_image=convolve_image;
-    const BlendSumWeights
-      difference = { 1.0, -1.0 };
-
     sum_image=BlendSumImage(relax_image,divergent_image,&difference,exception);
     if (sum_image == (Image *) NULL)
       break;
     relax_image=DestroyImage(relax_image);
     relax_image=sum_image;
-    const CompositePlacement
-      origin = { MagickTrue, 0, 0 };
-
     status=CompositeOverImage(relax_image,crop_image,&origin,exception);
     if (status == MagickFalse)
       break;
@@ -1346,9 +1345,6 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
   /*
     Composite relaxed over the background image.
   */
-  const CompositePlacement
-    placement = { MagickTrue, x_offset, y_offset };
-
   status=CompositeOverImage(image,relax_image,&placement,exception);
   relax_image=DestroyImage(relax_image);
   return(status);
