@@ -402,6 +402,68 @@ static void Export8BitBGRQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ExportUnpacked10BitBGRQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,QuantumAny range)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=(unsigned int) (
+      ScaleQuantumToAny(GetPixelRed(image,p),range) << 22 |
+      ScaleQuantumToAny(GetPixelGreen(image,p),range) << 12 |
+      ScaleQuantumToAny(GetPixelBlue(image,p),range) << 2);
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportLong10BitBGRQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,QuantumAny range)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=(unsigned int) ScaleQuantumToAny(GetPixelRed(image,p),range);
+    q=PopQuantumLongPixel(quantum_info,pixel,q);
+    pixel=(unsigned int) ScaleQuantumToAny(GetPixelGreen(image,p),
+      range);
+    q=PopQuantumLongPixel(quantum_info,pixel,q);
+    pixel=(unsigned int) ScaleQuantumToAny(GetPixelBlue(image,p),range);
+    q=PopQuantumLongPixel(quantum_info,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
 static void Export10BitBGRQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -426,32 +488,12 @@ static void Export10BitBGRQuantum(const Image *image,QuantumInfo *quantum_info,
   range=GetQuantumRange(quantum_info->depth);
   if (quantum_info->pack == MagickFalse)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=(unsigned int) (
-          ScaleQuantumToAny(GetPixelRed(image,p),range) << 22 |
-          ScaleQuantumToAny(GetPixelGreen(image,p),range) << 12 |
-          ScaleQuantumToAny(GetPixelBlue(image,p),range) << 2);
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportUnpacked10BitBGRQuantum(image,quantum_info,span,range);
       return;
     }
   if (quantum_info->quantum == 32UL)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelRed(image,p),range);
-        q=PopQuantumLongPixel(quantum_info,pixel,q);
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelGreen(image,p),
-          range);
-        q=PopQuantumLongPixel(quantum_info,pixel,q);
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelBlue(image,p),range);
-        q=PopQuantumLongPixel(quantum_info,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportLong10BitBGRQuantum(image,quantum_info,span,range);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
