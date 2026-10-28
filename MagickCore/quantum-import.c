@@ -3958,9 +3958,17 @@ static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
 }
 
 static void ImportOpacityQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,ExceptionInfo* exception)
+  const QuantumPixelSpan *span,ExceptionInfo* exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -5367,7 +5375,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case OpacityQuantum:
     {
-      ImportOpacityQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportOpacityQuantum(image,quantum_info,&span,exception);
       break;
     }
     case RedQuantum:
