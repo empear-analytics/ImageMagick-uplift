@@ -900,6 +900,22 @@ static ssize_t GetObjectSortKey(const Image *image)
   return(key);
 }
 
+static ssize_t GetObjectSortOrder(const Image *image)
+{
+  const char
+    *artifact;
+
+  ssize_t
+    order;
+
+  order=1;
+  artifact=GetImageArtifact(image,"connected-components:sort-order");
+  if (artifact != (const char *) NULL)
+    if (LocaleCompare(artifact,"decreasing") == 0)
+      order=(-1);
+  return(order);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1688,11 +1704,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         object[i].centroid.y=object[i].centroid.y/object[i].area;
       }
       component_view=DestroyCacheView(component_view);
-      order=1;
-      artifact=GetImageArtifact(image,"connected-components:sort-order");
-      if (artifact != (const char *) NULL)
-        if (LocaleCompare(artifact,"decreasing") == 0)
-          order=(-1);
+      order=GetObjectSortOrder(image);
       key=GetObjectSortKey(image);
       for (i=0; i < (ssize_t) component_image->colors; i++)
          object[i].key=order*key;
