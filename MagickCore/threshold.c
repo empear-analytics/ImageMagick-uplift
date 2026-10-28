@@ -507,6 +507,27 @@ static void ClampPixelChannels(const Image *image,Quantum *magick_restrict q)
   }
 }
 
+static MagickBooleanType ClampImageColormap(Image *image,
+  ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  PixelInfo
+    *magick_restrict q;
+
+  q=image->colormap;
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    q->red=(double) ClampPixel(q->red);
+    q->green=(double) ClampPixel(q->green);
+    q->blue=(double) ClampPixel(q->blue);
+    q->alpha=(double) ClampPixel(q->alpha);
+    q++;
+  }
+  return(SyncImage(image,exception));
+}
+
 MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
 {
 #define ClampImageTag  "Clamp/Image"
@@ -528,24 +549,7 @@ MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (image->storage_class == PseudoClass)
-    {
-      ssize_t
-        i;
-
-      PixelInfo
-        *magick_restrict q;
-
-      q=image->colormap;
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        q->red=(double) ClampPixel(q->red);
-        q->green=(double) ClampPixel(q->green);
-        q->blue=(double) ClampPixel(q->blue);
-        q->alpha=(double) ClampPixel(q->alpha);
-        q++;
-      }
-      return(SyncImage(image,exception));
-    }
+    return(ClampImageColormap(image,exception));
   /*
     Clamp image.
   */
