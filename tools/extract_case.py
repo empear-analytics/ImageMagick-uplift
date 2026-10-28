@@ -304,11 +304,28 @@ def drop_unused(rest, skip, declarations):
     return rest
 
 
+def check_new_name(lines, new_name):
+    if any(re.match(r"static \w+ %s\(" % re.escape(new_name), line)
+           for line in lines):
+        raise Refused("%s already exists" % new_name)
+
+
+def check_not_moved(moved):
+    """A case that is already one call and its break has nothing to move."""
+    code = [line.strip() for line in moved if line.strip()]
+    if code[-1:] == ["break;"]:
+        code.pop()
+    if len(code) == 1:
+        raise Refused("already a single call: %s" % code[0])
+
+
 def extract(lines, function, label, new_name):
+    check_new_name(lines, new_name)
     start, end = find_function(lines, function)
     signature, declarations, (first, last) = split_prologue(lines, start, end)
     first_line, close, indent = find_case(lines, first, last, label)
     moved = lines[first_line:close]
+    check_not_moved(moved)
     body = [line[indent - 2:] if line.strip() else line
             for line in convert_breaks(moved, indent)]
     helper, names = build_helper(new_name, signature, declarations, body)
