@@ -3,21 +3,26 @@
 
     tools/extract_case.py FILE FUNCTION LABEL NEW_NAME [--dry-run]
 
-Moves the body of `case LABEL:` of the `switch` that ends FUNCTION into a new
-static function NEW_NAME, directly above FUNCTION, with FUNCTION's own
-parameters, and leaves a call followed by `break;` in its place.
+Moves the body of `case LABEL:` (or `default:`) of the `switch` that ends
+FUNCTION into a new static function NEW_NAME, directly above FUNCTION, and
+leaves a call followed by `break;` in its place. A case that is only
+`if (C) { ... break; }` and falls through keeps its test: the block's
+contents move instead.
 
-The move is legal only when the case body sees exactly the values the
+The move is legal only when the moved code sees exactly the values the
 function's locals had on entry, so the script refuses unless:
 
-- FUNCTION's body is its declarations, then `assert` lines only, then the
-  `switch`, which is its last statement;
-- no case falls through into LABEL, and LABEL does not fall through;
+- FUNCTION's body is its declarations, `assert` lines and guard clauses that
+  only report and return, then the `switch`, which is its last statement;
+- every case falling into LABEL is such a test, its condition free of
+  assignments and calls, so the path that falls through writes nothing;
+- LABEL does not fall through, except past a test as above;
 - every `break;` that leaves the case is outside any loop or inner `switch`
   (those become `return;`, and the case's last one is dropped).
 
-The new function declares the locals the case body uses, with their
-initialisers (copied from FUNCTION); FUNCTION drops those it no longer uses.
+The new function takes the parameters, and declares the locals, that the
+moved code uses, locals with their initialisers (copied from FUNCTION);
+FUNCTION drops the locals it no longer uses.
 """
 
 import argparse
@@ -101,22 +106,75 @@ def split_prologue(lines, start, end):
     return lines[start:brace], declarations, (i, end - 1)
 
 
+CALL = re.compile(r"\b(?!if\b)[A-Za-z_]\w*\s*\(")
+
+
+def opener_of(label):
+    if label == "default":
+        return "    default:\n"
+    return "    case %s:\n" % label
+
+
+def guard_branch(body):
+    """For a case body that is `if (C) { ... break; }` followed by
+    magick_fallthrough, with C free of assignments and calls, the line
+    range of the block's contents (without its break); otherwise None."""
+    if body[-3:] != ["          break;\n", "        }\n",
+                     "      magick_fallthrough;\n"]:
+        return None
+    if not body[0].startswith("      if ("):
+        return None
+    brace = body.index("        {\n")
+    condition = "".join(body[:brace]).strip()[2:]
+    if ASSIGNMENT.search(condition) or CALL.search(condition):
+        return None
+    if body.index("        }\n", brace) != len(body) - 2:
+        return None
+    return brace + 1, len(body) - 3
+
+
+def previous_case(lines, at):
+    """Opening line of the case before the one at AT."""
+    i = at - 2
+    while not (lines[i].startswith("    case ") and lines[i + 1] == "    {\n"):
+        i -= 1
+    return i
+
+
+def falls_in_cleanly(lines, at):
+    """Every case that falls into the one at AT only tests and breaks."""
+    while lines[at - 2] == "      magick_fallthrough;\n":
+        before = previous_case(lines, at)
+        if guard_branch(lines[before + 2:at - 1]) is None:
+            raise Refused("a case falling into line %d writes" % (at + 1))
+        at = before
+    return True
+
+
 def case_checks(lines, at, close, label):
     """(failed, reason) pairs for the case whose braces end at CLOSE."""
-    inside = "".join(lines[at:close])
     return [
         (lines[at - 1].strip() not in ("}", "{"),
          "case %s shares its body with another label" % label),
-        (lines[at - 2].strip() == "magick_fallthrough;",
-         "the case before %s falls through into it" % label),
         (lines[at + 1] != "    {\n", "case %s has no braces" % label),
-        ("magick_fallthrough" in inside, "case %s falls through" % label),
+        (not falls_in_cleanly(lines, at), "unreachable"),
     ]
 
 
+def movable_part(lines, at, close, label):
+    """(first line, end line, indent) of what moves out of the case."""
+    branch = guard_branch(lines[at + 2:close])
+    if branch:
+        return at + 2 + branch[0], at + 2 + branch[1], 10
+    if "magick_fallthrough" in "".join(lines[at:close]):
+        raise Refused("case %s falls through" % label)
+    return at + 2, close, 6
+
+
 def find_case(lines, first, last, label):
-    """Line range of `case LABEL:`'s braces, with a fallthrough check."""
-    opener = "    case %s:\n" % label
+    """Line range of the part of `case LABEL:` to move: the whole body,
+    or the guarded block of a case that tests and falls through."""
+    opener = opener_of(label)
     if opener not in lines[first:last]:
         raise Refused("no case %s" % label)
     at = lines.index(opener, first)
@@ -125,7 +183,7 @@ def find_case(lines, first, last, label):
                if failed]
     if reasons:
         raise Refused(reasons[0])
-    return at, close
+    return movable_part(lines, at, close, label)
 
 
 def header_kind(text, pending):
@@ -148,17 +206,17 @@ def convert_break(line, stack, pending):
     return line.replace("break;", "return;")
 
 
-def drop_final_return(out):
+def drop_final_return(out, indent):
     """The case's own last break ends the new function anyway."""
     while out and out[-1].strip() == "":
         out.pop()
     last = out[-1] if out else ""
-    if last == "      return;\n":
+    if last == " " * indent + "return;\n":
         out.pop()
     return out
 
 
-def convert_breaks(body):
+def convert_breaks(body, indent):
     """Turn the case-level breaks into returns; refuse ambiguous ones."""
     stack, pending, out = [], None, []
     for line in body:
@@ -174,7 +232,7 @@ def convert_breaks(body):
         else:
             pending = header_kind(text, pending)
         out.append(line)
-    return drop_final_return(out)
+    return drop_final_return(out, indent)
 
 
 def uses(text, name):
@@ -249,12 +307,15 @@ def drop_unused(rest, skip, declarations):
 def extract(lines, function, label, new_name):
     start, end = find_function(lines, function)
     signature, declarations, (first, last) = split_prologue(lines, start, end)
-    at, close = find_case(lines, first, last, label)
-    body = [line[4:] if line.strip() else line
-            for line in convert_breaks(lines[at + 2:close])]
+    first_line, close, indent = find_case(lines, first, last, label)
+    moved = lines[first_line:close]
+    body = [line[indent - 2:] if line.strip() else line
+            for line in convert_breaks(moved, indent)]
     helper, names = build_helper(new_name, signature, declarations, body)
-    call = "      %s(%s);\n" % (new_name, ",".join(names))
-    rest = lines[start:at + 2] + [call, "      break;\n"] + lines[close:end + 1]
+    pad = " " * indent
+    call = "%s%s(%s);\n" % (pad, new_name, ",".join(names))
+    rest = (lines[start:first_line] + [call, pad + "break;\n"] +
+            lines[close + (indent == 10):end + 1])
     rest = drop_unused(rest, len(signature), declarations)
     return lines[:start] + helper + rest + lines[end + 1:]
 
