@@ -1,0 +1,69 @@
+on:
+  push:
+    branches:
+    - main
+    - ci/oracle-coverage
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oracle-coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+name: Oracle coverage
+jobs:
+  coverage:
+    name: Oracle line coverage to CodeScene
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+
+    steps:
+    # Full history: the oracle builds its baseline from origin/main in a worktree.
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7.0.1
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+
+    # The delegate libraries of docs/refactoring/PORTING.md, without X11, OpenCL and
+    # bubblewrap (the oracle's default build has none of them), plus the external
+    # programs the Mac's delegate cases reach.
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          build-essential clang lld llvm git python3 pkg-config \
+          libpng-dev libjpeg-dev libtiff-dev libwebp-dev libopenjp2-7-dev libjxl-dev \
+          libheif-dev libraw-dev libjbig-dev libdjvulibre-dev libfftw3-dev liblqr-1-0-dev \
+          librsvg2-dev libxml2-dev libzip-dev liblzma-dev libzstd-dev libbz2-dev \
+          libfreetype-dev libfontconfig-dev liblcms2-dev \
+          ghostscript inkscape
+
+    - name: Build the coverage binary
+      run: |
+        start=$(date +%s)
+        tools/oracle/build.sh cov
+        echo "cov build: $(( $(date +%s) - start ))s"
+
+    - name: Run the oracle catalogue
+      run: python3 tools/oracle/linecov.py
+
+    - name: Convert the coverage for CodeScene
+      run: python3 tools/oracle/lcov4codescene.py
+
+    - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a #v7.0.1
+      with:
+        name: oracle-coverage
+        path: build-oracle/oracle-codescene.lcov
+        retention-days: 14
+
+    # Only main: CodeScene analyses main, and matches the upload to it by commit.
+    # No --verbose: cs-coverage prints the bearer token in verbose output.
+    - name: Upload to CodeScene
+      if: github.ref == 'refs/heads/main'
+      env:
+        CS_ACCESS_TOKEN: ${{ secrets.CS_ACCESS_TOKEN }}
+      run: |
+        curl -fsSL https://downloads.codescene.io/enterprise/cli/install-cs-coverage-tool.sh | sh -s -- -y 1.0.114
+        ~/.local/bin/cs-coverage upload --format lcov --metric line-coverage build-oracle/oracle-codescene.lcov
