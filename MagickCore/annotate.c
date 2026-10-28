@@ -1093,6 +1093,8 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   MagickBooleanType
     status;
 
+  FreetypeTarget freetype;
+
   type_info=(const TypeInfo *) NULL;
   if (draw_info->font != (char *) NULL)
     {
@@ -1138,8 +1140,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
           */
           annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
           annotate_info->font=font;
-          const FreetypeTarget freetype = { image, annotate_info,
-            annotate_info->encoding };
+          freetype.image=image;
+          freetype.draw_info=annotate_info;
+          freetype.encoding=annotate_info->encoding;
           status=RenderFreetype(&freetype,offset,metrics,exception);
           annotate_info=DestroyDrawInfo(annotate_info);
           return(status);
@@ -1160,8 +1163,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
     (void) CloneString(&annotate_info->metrics,type_info->metrics);
   if (type_info->glyphs != (char *) NULL)
     (void) CloneString(&annotate_info->font,type_info->glyphs);
-  const FreetypeTarget freetype = { image, annotate_info,
-    type_info->encoding };
+  freetype.image=image;
+  freetype.draw_info=annotate_info;
+  freetype.encoding=type_info->encoding;
   status=RenderFreetype(&freetype,offset,metrics,exception);
   annotate_info=DestroyDrawInfo(annotate_info);
   return(status);
