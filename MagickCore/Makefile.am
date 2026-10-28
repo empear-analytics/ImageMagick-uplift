@@ -251,6 +251,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/resample.h \
   MagickCore/resample-private.h \
   MagickCore/resize.c \
+  MagickCore/resize-image.c \
   MagickCore/magnify.c \
   MagickCore/resize.h \
   MagickCore/resize-private.h \

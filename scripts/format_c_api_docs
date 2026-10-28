@@ -65,6 +65,7 @@ if ( ! GetOptions(
 	 'stream.c',
 	 'transform.c',
 	 'resize.c',
+	 'resize-image.c',
 	 'magnify.c',
    'version.c');
 
