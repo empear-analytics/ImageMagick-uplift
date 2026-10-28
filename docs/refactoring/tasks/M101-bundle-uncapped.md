@@ -272,6 +272,12 @@ unchanged tree too (rerun at `e4193e021`). Left: resource.c's `SetMagickResource
 tool now refuses such a family), and module.c's `InvokeDynamicImageFilter` (6.46 → 6.94
 dry), which no case reaches.
 
+**Sweep after the splits** (`5d2502f8e`, cs-mcp 1.5.13): MagickCore's per-file mean 4.96
+→ 5.69 since `bcc48ab84` this morning, files 99 → 124, red 46 → 41, yellow 41 → 69; the
+line-weighted mean 3.20 → 3.50. Most split-off files score yellow, so after the first
+three splits the per-file mean rises too. The scans stop at families worth 0.2 or more;
+smaller ones remain (enhance.c's ten, effect.c's six, image.c's five, the X11 files).
+
 ### Sweep (2026-10-28, 00:20): where the night ends
 
 MagickCore against the morning's sweep: **mean 4.86 → 4.97; red 46 → 44, yellow 38 → 40,
