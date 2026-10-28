@@ -105,8 +105,9 @@ guard alone.
 Run all four, in this order:
 
 ```bash
-# 1. it still builds
+# 1. it still builds, also under ImageMagick's own CI warnings (macOS -Werror, MSVC)
 tools/oracle/build.sh cand
+tools/ci_warnings.sh <the file you changed>
 
 # 2. no constant was removed or altered (add --calls after an extract or split)
 python3 tools/refactor_guard.py <the file you changed>
