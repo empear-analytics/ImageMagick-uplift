@@ -3571,6 +3571,34 @@ static void Import32BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
     }
 }
 
+static void ImportMinIsWhite8BitGrayQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned char
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushCharPixel(p,&pixel);
+    SetPixelGray(image,QuantumRange-ScaleCharToQuantum(pixel),q);
+    SetPixelAlpha(image,OpaqueAlpha,q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void Import8BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -3591,14 +3619,7 @@ static void Import8BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
 
   if (quantum_info->min_is_white != MagickFalse)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushCharPixel(p,&pixel);
-        SetPixelGray(image,QuantumRange-ScaleCharToQuantum(pixel),q);
-        SetPixelAlpha(image,OpaqueAlpha,q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportMinIsWhite8BitGrayQuantum(image,quantum_info,span);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
