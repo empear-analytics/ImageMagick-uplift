@@ -4402,6 +4402,13 @@ static void ResetScalePixel(const Image *image,double *pixel)
     pixel[i]=0.0;
 }
 
+static inline MagickBooleanType IsScaleColumnPending(
+  const Image *scale_image,const MagickBooleanType next_column,const ssize_t t)
+{
+  return(((next_column == MagickFalse) &&
+    (t < (ssize_t) scale_image->columns)) ? MagickTrue : MagickFalse);
+}
+
 static void AccumulateScalePixel(const Image *image,const PointInfo span,
   const double *scanline,const ssize_t x,const ssize_t t,double *pixel,
   double *scale_scanline)
@@ -4477,7 +4484,7 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
         pixel[i]+=span.x*
           scanline[(x-1)*(ssize_t) GetPixelChannels(image)+i];
     }
-  if ((next_column == MagickFalse) && (t < (ssize_t) scale_image->columns))
+  if (IsScaleColumnPending(scale_image,next_column,t) != MagickFalse)
     for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
 }
