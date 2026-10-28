@@ -932,6 +932,25 @@ static size_t GetGreatestAdjacentObject(const CCObjectInfo *object,
   return(id);
 }
 
+static void ResetObjectStatistics(const Image *component_image,
+  CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+  {
+    object[i].bounding_box.width=0;
+    object[i].bounding_box.height=0;
+    object[i].bounding_box.x=(ssize_t) component_image->columns;
+    object[i].bounding_box.y=(ssize_t) component_image->rows;
+    object[i].centroid.x=0;
+    object[i].centroid.y=0;
+    object[i].census=object[i].area == 0.0 ? 0.0 : 1.0;
+    object[i].area=0;
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1658,17 +1677,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Report statistics on each unique object.
       */
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-      {
-        object[i].bounding_box.width=0;
-        object[i].bounding_box.height=0;
-        object[i].bounding_box.x=(ssize_t) component_image->columns;
-        object[i].bounding_box.y=(ssize_t) component_image->rows;
-        object[i].centroid.x=0;
-        object[i].centroid.y=0;
-        object[i].census=object[i].area == 0.0 ? 0.0 : 1.0;
-        object[i].area=0;
-      }
+      ResetObjectStatistics(component_image,object);
       component_view=AcquireVirtualCacheView(component_image,exception);
       for (y=0; y < (ssize_t) component_image->rows; y++)
       {
