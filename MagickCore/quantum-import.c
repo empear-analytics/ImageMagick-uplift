@@ -4250,8 +4250,101 @@ static void Import32BitMultispectralQuantum(const Image *image,
     }
 }
 
-static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span,ExceptionInfo *exception)
+static void Import8BitMultispectralQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    i,
+    x;
+
+  unsigned char
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    for (i=0; i < (ssize_t) GetImageChannels(image); i++)
+    {
+      p=PushCharPixel(p,&pixel);
+      q[i]=ScaleCharToQuantum(pixel);
+    }
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void Import24BitFloatMultispectralQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    i,
+    x;
+
+  float
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    for (i=0; i < (ssize_t) GetImageChannels(image); i++)
+    {
+      p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
+      q[i]=ClampToQuantum(pixel);
+    }
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void Import64BitFloatMultispectralQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    i,
+    x;
+
+  double
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    for (i=0; i < (ssize_t) GetImageChannels(image); i++)
+    {
+      p=PushDoublePixel(quantum_info,p,&pixel);
+      q[i]=ClampToQuantum(pixel);
+    }
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void ImportAnyDepthMultispectralQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   const MagickSizeType
     number_pixels = span->number_pixels;
@@ -4269,6 +4362,33 @@ static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
     i,
     x;
 
+  unsigned int
+    pixel = 0;
+
+  range=GetQuantumRange(quantum_info->depth);
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    for (i=0; i < (ssize_t) GetImageChannels(image); i++)
+    {
+      p=PushQuantumPixel(quantum_info,p,&pixel);
+      q[i]=ScaleAnyToQuantum(pixel,range);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   if (image->number_meta_channels == 0)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
@@ -4285,19 +4405,7 @@ static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
   {
     case 8:
     {
-      unsigned char
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        for (i=0; i < (ssize_t) GetImageChannels(image); i++)
-        {
-          p=PushCharPixel(p,&pixel);
-          q[i]=ScaleCharToQuantum(pixel);
-        }
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      Import8BitMultispectralQuantum(image,quantum_info,span);
       break;
     }
     case 16:
@@ -4314,19 +4422,7 @@ static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
     {
       if (quantum_info->format == FloatingPointQuantumFormat)
         {
-          float
-            pixel;
-
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            for (i=0; i < (ssize_t) GetImageChannels(image); i++)
-            {
-              p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
-              q[i]=ClampToQuantum(pixel);
-            }
-            p+=(ptrdiff_t) quantum_info->pad;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          Import24BitFloatMultispectralQuantum(image,quantum_info,span);
           break;
         }
       magick_fallthrough;
@@ -4335,38 +4431,14 @@ static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
     {
       if (quantum_info->format == FloatingPointQuantumFormat)
         {
-          double
-            pixel;
-
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            for (i=0; i < (ssize_t) GetImageChannels(image); i++)
-            {
-              p=PushDoublePixel(quantum_info,p,&pixel);
-              q[i]=ClampToQuantum(pixel);
-            }
-            p+=(ptrdiff_t) quantum_info->pad;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          Import64BitFloatMultispectralQuantum(image,quantum_info,span);
           break;
         }
       magick_fallthrough;
     }
     default:
     {
-      unsigned int
-        pixel = 0;
-
-      range=GetQuantumRange(quantum_info->depth);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        for (i=0; i < (ssize_t) GetImageChannels(image); i++)
-        {
-          p=PushQuantumPixel(quantum_info,p,&pixel);
-          q[i]=ScaleAnyToQuantum(pixel,range);
-        }
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportAnyDepthMultispectralQuantum(image,quantum_info,span);
       break;
     }
   }
