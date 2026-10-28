@@ -2159,8 +2159,8 @@ static void ExportCMYKAQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
-static void ExportCMYKOQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span,ExceptionInfo *exception)
+static void Export8BitCMYKOQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
 {
   const MagickSizeType
     number_pixels = span->number_pixels;
@@ -2174,6 +2174,215 @@ static void ExportCMYKOQuantum(const Image *image,QuantumInfo *quantum_info,
   ssize_t
     x;
 
+  unsigned char
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToChar(GetPixelRed(image,p));
+    q=PopCharPixel(pixel,q);
+    pixel=ScaleQuantumToChar(GetPixelGreen(image,p));
+    q=PopCharPixel(pixel,q);
+    pixel=ScaleQuantumToChar(GetPixelBlue(image,p));
+    q=PopCharPixel(pixel,q);
+    pixel=ScaleQuantumToChar(GetPixelBlack(image,p));
+    q=PopCharPixel(pixel,q);
+    pixel=ScaleQuantumToChar(GetPixelOpacity(image,p));
+    q=PopCharPixel(pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export16BitCMYKOQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelRed(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelGreen(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelBlue(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelBlack(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelOpacity(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) quantum_info->pad;
+      }
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToShort(GetPixelRed(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToShort(GetPixelGreen(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToShort(GetPixelBlue(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToShort(GetPixelBlack(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToShort(GetPixelOpacity(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export32BitCMYKOQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        float
+          float_pixel;
+
+        q=PopQuantumFloatPixel(quantum_info,(float) GetPixelRed(image,p),q);
+        q=PopQuantumFloatPixel(quantum_info,(float) GetPixelGreen(image,p),
+          q);
+        q=PopQuantumFloatPixel(quantum_info,(float) GetPixelBlue(image,p),
+          q);
+        q=PopQuantumFloatPixel(quantum_info,(float) GetPixelBlack(image,p),
+          q);
+        float_pixel=(float) (GetPixelOpacity(image,p));
+        q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) quantum_info->pad;
+      }
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToLong(GetPixelRed(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToLong(GetPixelGreen(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToLong(GetPixelBlue(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToLong(GetPixelBlack(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToLong(GetPixelOpacity(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export64BitFloatCMYKOQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  double
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    q=PopQuantumDoublePixel(quantum_info,(double)
+      GetPixelRed(image,p),q);
+    q=PopQuantumDoublePixel(quantum_info,(double)
+      GetPixelGreen(image,p),q);
+    q=PopQuantumDoublePixel(quantum_info,(double)
+      GetPixelBlue(image,p),q);
+    q=PopQuantumDoublePixel(quantum_info,(double)
+      GetPixelBlack(image,p),q);
+    pixel=(double) (GetPixelOpacity(image,p));
+    q=PopQuantumDoublePixel(quantum_info,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportAnyDepthCMYKOQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  QuantumAny
+    range;
+
+  range=GetQuantumRange(quantum_info->depth);
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelRed(image,p),
+      range),q);
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelGreen(image,p),
+      range),q);
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelBlue(image,p),
+      range),q);
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelBlack(image,p),
+      range),q);
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(
+      GetPixelOpacity(image,p),range),q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportCMYKOQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
+{
   if (image->colorspace != CMYKColorspace)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
@@ -2184,162 +2393,31 @@ static void ExportCMYKOQuantum(const Image *image,QuantumInfo *quantum_info,
   {
     case 8:
     {
-      unsigned char
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToChar(GetPixelRed(image,p));
-        q=PopCharPixel(pixel,q);
-        pixel=ScaleQuantumToChar(GetPixelGreen(image,p));
-        q=PopCharPixel(pixel,q);
-        pixel=ScaleQuantumToChar(GetPixelBlue(image,p));
-        q=PopCharPixel(pixel,q);
-        pixel=ScaleQuantumToChar(GetPixelBlack(image,p));
-        q=PopCharPixel(pixel,q);
-        pixel=ScaleQuantumToChar(GetPixelOpacity(image,p));
-        q=PopCharPixel(pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export8BitCMYKOQuantum(image,quantum_info,span);
       break;
     }
     case 16:
     {
-      unsigned short
-        pixel;
-
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelRed(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelGreen(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelBlue(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelBlack(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelOpacity(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToShort(GetPixelRed(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToShort(GetPixelGreen(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToShort(GetPixelBlue(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToShort(GetPixelBlack(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToShort(GetPixelOpacity(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export16BitCMYKOQuantum(image,quantum_info,span);
       break;
     }
     case 32:
     {
-      unsigned int
-        pixel;
-
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            float
-              float_pixel;
-
-            q=PopQuantumFloatPixel(quantum_info,(float) GetPixelRed(image,p),q);
-            q=PopQuantumFloatPixel(quantum_info,(float) GetPixelGreen(image,p),
-              q);
-            q=PopQuantumFloatPixel(quantum_info,(float) GetPixelBlue(image,p),
-              q);
-            q=PopQuantumFloatPixel(quantum_info,(float) GetPixelBlack(image,p),
-              q);
-            float_pixel=(float) (GetPixelOpacity(image,p));
-            q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToLong(GetPixelRed(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToLong(GetPixelGreen(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToLong(GetPixelBlue(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToLong(GetPixelBlack(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToLong(GetPixelOpacity(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export32BitCMYKOQuantum(image,quantum_info,span);
       break;
     }
     case 64:
     {
       if (quantum_info->format == FloatingPointQuantumFormat)
         {
-          double
-            pixel;
-
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            q=PopQuantumDoublePixel(quantum_info,(double)
-              GetPixelRed(image,p),q);
-            q=PopQuantumDoublePixel(quantum_info,(double)
-              GetPixelGreen(image,p),q);
-            q=PopQuantumDoublePixel(quantum_info,(double)
-              GetPixelBlue(image,p),q);
-            q=PopQuantumDoublePixel(quantum_info,(double)
-              GetPixelBlack(image,p),q);
-            pixel=(double) (GetPixelOpacity(image,p));
-            q=PopQuantumDoublePixel(quantum_info,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
+          Export64BitFloatCMYKOQuantum(image,quantum_info,span);
           break;
         }
       magick_fallthrough;
     }
     default:
     {
-      QuantumAny
-        range;
-
-      range=GetQuantumRange(quantum_info->depth);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelRed(image,p),
-          range),q);
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelGreen(image,p),
-          range),q);
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelBlue(image,p),
-          range),q);
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelBlack(image,p),
-          range),q);
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(
-          GetPixelOpacity(image,p),range),q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportAnyDepthCMYKOQuantum(image,quantum_info,span);
       break;
     }
   }
