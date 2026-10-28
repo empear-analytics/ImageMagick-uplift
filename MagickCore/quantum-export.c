@@ -1323,9 +1323,17 @@ static void ExportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportCMYKQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   ssize_t
     x;
 
@@ -3898,7 +3906,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case CMYKQuantum:
     {
-      ExportCMYKQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ExportCMYKQuantum(image,quantum_info,&span,exception);
       break;
     }
     case CMYKAQuantum:
