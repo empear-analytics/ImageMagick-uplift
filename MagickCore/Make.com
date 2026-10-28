@@ -119,6 +119,7 @@ $call Make thread.c
 $call Make timer.c
 $call Make token.c
 $call Make transform.c
+$call Make transform-tiles.c
 $call Make threshold.c
 $call Make threshold-auto.c
 $call Make type.c

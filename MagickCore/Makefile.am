@@ -300,6 +300,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/token.h \
   MagickCore/token-private.h \
   MagickCore/transform.c \
+  MagickCore/transform-tiles.c \
   MagickCore/transform.h \
   MagickCore/threshold.c \
   MagickCore/threshold-auto.c \

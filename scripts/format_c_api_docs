@@ -66,6 +66,7 @@ if ( ! GetOptions(
 	 'signature.c',
 	 'stream.c',
 	 'transform.c',
+	 'transform-tiles.c',
 	 'resize.c',
 	 'resize-scale.c',
 	 'resize-image.c',
