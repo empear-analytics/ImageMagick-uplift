@@ -172,6 +172,13 @@ static inline MagickBooleanType IsAuthenticPixel(const Image *image,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsUntracedEdgePixel(const Image *edge_image,
+  const Quantum *q,const CannyInfo pixel,const double lower_threshold)
+{
+  return(((GetPixelIntensity(edge_image,q) == 0.0) &&
+    (pixel.intensity >= lower_threshold)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   const ssize_t y,ExceptionInfo *exception)
 {
@@ -243,8 +250,8 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
         status=GetMatrixElement(canny_cache,edge.x+u,edge.y+v,&pixel);
         if (status == MagickFalse)
           return(MagickFalse);
-        if ((GetPixelIntensity(edge_image,q) == 0.0) &&
-            (pixel.intensity >= lower_threshold))
+        if (IsUntracedEdgePixel(edge_image,q,pixel,lower_threshold) !=
+            MagickFalse)
           {
             *q=QuantumRange;
             status=SyncCacheViewAuthenticPixels(edge_view,exception);
