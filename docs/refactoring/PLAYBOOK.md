@@ -396,8 +396,23 @@ is worth it.
 2. No function may change linkage: a `static` stays `static` and must travel with every
    caller. A split that would need one widened is refused.
 3. The public function keeps its declaration in the header it already has.
+4. List the new file wherever the original is listed: `tools/register_source.py` does it
+   for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
+   generates), `MagickCore/Make.com` and `scripts/format_c_api_docs`.
+   `tools/split_source.py` does steps 1 and 2 and refuses a family that would need a
+   linkage change or a file-level macro on both sides; `--out` scores a split first.
 
-**Evidence level:** oracle.
+**Careful:**
+
+- The pre-commit gate requires a new file to score 10.0, which a split-off family never
+  does: it carries the original's findings with it. Commit after the gate has reported
+  only that failure (its check that the original does not lose health has then passed),
+  with `--no-verify`, run `tools/check_trailers.py` on the message by hand, and say so in
+  the message. The Windows build configuration outside this repository still needs the
+  file; say that too.
+
+**Evidence level:** oracle, with `refactor_guard.py --combined` and `--combined --calls`
+over the pair.
 
 **Provenance:** founding recipe (2026-09-29).
 
@@ -1208,3 +1223,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-27 | AMEND | rule | *Two levels of evidence*: a function some case executes is oracle-verified for every recipe; no mutation run (readiness gate) before a step. Guard level stays for code no case reaches | The harness was built under mutation guidance and is finished; the 3SX and Jellyfin campaigns refactored without per-step mutation runs, and today's uncapped runs only confirmed it | owner |
 | 2026-10-27 | AMEND | O | Inside a parallel loop body: allowed when every variable the block writes is declared in that body and it writes nothing declared outside it (`status` included) and has no `#pragma omp` line, Recipe K's condition. Each thread's call then writes only that thread's variables, as the block did | `KmeansImage`'s nearest-centroid search (`k`, `min_distance`), `CannyEdgeImage`'s neighbour selection (`alpha_pixel`, `beta_pixel`), `DrawGradientImage`'s repeat offset (`offset`, `repeat`, `antialias`): selections over iteration-private variables, refused only by step 1 | mandate (2026-10-24) |
 | 2026-10-28 | AMEND | rule 1 | One commit may apply the same recipe to several functions when each step alone lowers the score and only the set raises it | pixel.c's five fixed-map Recipe E extractions: each alone 1.73 → 1.71 (the file passes a size threshold), all five 1.80; the pre-commit safeguard refuses the single steps (M100) | owner |
+| 2026-10-28 | AMEND | S | Step 4 (register the file; the two tools); *Careful*: how a split meets the pre-commit gate's new-file rule; evidence names the combined guards. Wording of what `magnify.c` (2026-10-24) and pixel.c's and resize.c's splits did | `MagnifyImage`, `ExportImagePixels`, `ImportImagePixels`, `ResizeImage` | mandate (2026-10-24) |
