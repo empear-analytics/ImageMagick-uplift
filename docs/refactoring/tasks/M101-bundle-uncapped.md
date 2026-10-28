@@ -146,8 +146,11 @@ instance is vision.c: the four moment-threshold functions share a first moment p
 writes `status=MagickFalse` and the object's own `M00`, `M10` and `M01`. J extracted it from
 `MajorAxisThreshold` (`2de73eed9`, 2.35 → 2.45), and Recipe D put the same call in
 `MinorAxisThreshold`, `EccentricityThreshold` and `AngleThreshold` (`e943876c7`,
-`548e9bff5`, `444ddfbd2`): **vision.c 2.35 → 2.59**. Each step reached its function's
-cases (2, 2, 2 and 4, all verbose connected-components output), 0 diverged. The
+`548e9bff5`, `444ddfbd2`): 2.35 → 2.59. Amended for array accumulators (`312716201`), J then
+moved PerimeterThreshold's pattern-counting row loop to its own helper (`369afb5c9`), and
+PerimeterThreshold has no findings left: **vision.c 2.35 → 2.66**. CircularityThreshold
+holds the same loop, but the call there measures 2.62, so it was not made. Each step reached its function's
+cases (2, 2, 2, 4 and 2, all verbose connected-components output), 0 diverged. The
 second moment pass, also in all four, starts with `if (status == MagickFalse) continue;`:
 it reads the shared status, which neither T nor J allows, and stays.
 
@@ -167,7 +170,8 @@ The other targets named last night do not write `status` in their accumulating b
 2.29 → 2.32); `SelectiveBlurImage`, `BilateralBlurImage` and `MeanShiftImage` have
 Recipe K's shape, but their blocks also advance three or more pointers.
 
-Whole catalogue at `f8fc17c71`: 15,906 cases, 3 diverged: `gaps/c5651ffad8` (the known
+Whole catalogue at `911987a09`: 15,906 cases, 1 diverged (`gaps/c5651ffad8`). Earlier, at
+`f8fc17c71`, 3 diverged: `gaps/c5651ffad8` (the known
 artifact) and the two hough matrix-on-disk cases, which timed out under load and passed
 when rerun alone.
 
