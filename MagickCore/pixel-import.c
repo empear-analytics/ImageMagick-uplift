@@ -2483,6 +2483,8 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   size_t
     length;
 
+  ImportPixelBuffer buffer;
+
   /*
     Allocate image structure.
   */
@@ -2590,7 +2592,9 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   roi.height=height;
   roi.x=x;
   roi.y=y;
-  const ImportPixelBuffer buffer = { map, quantum_map, pixels };
+  buffer.map=map;
+  buffer.quantum_map=quantum_map;
+  buffer.pixels=pixels;
   switch (type)
   {
     case CharPixel:
