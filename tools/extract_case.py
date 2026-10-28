@@ -56,12 +56,33 @@ def read_declaration(lines, i):
     return lines[i:j]
 
 
+ASSIGNMENT = re.compile(r"[^=!<>]=[^=]|\+\+|--")
+
+
+def guard_length(lines, i):
+    """Length of an `if` block at I that ends in `return;` and assigns
+    nothing, or 0."""
+    if not lines[i].startswith("  if ("):
+        return 0
+    brace = lines.index("    {\n", i)
+    close = lines.index("    }\n", brace)
+    block = "".join(lines[i:close])
+    if lines[close - 1] != "      return;\n" or ASSIGNMENT.search(block):
+        return 0
+    return close + 1 - i
+
+
 def prologue_entry(lines, i):
-    """The declaration group at I, [] for an assert or a blank line."""
+    """(declaration group or [], lines taken) for the line at I: a
+    declaration, an assert, a blank line or a guard clause."""
     if lines[i].startswith("  assert(") or lines[i] == "\n":
-        return []
+        return [], 1
+    taken = guard_length(lines, i)
+    if taken:
+        return [], taken
     if is_declaration(lines, i):
-        return read_declaration(lines, i)
+        group = read_declaration(lines, i)
+        return group, len(group)
     raise Refused("statement before the switch: %s" % lines[i].strip())
 
 
@@ -71,10 +92,10 @@ def split_prologue(lines, start, end):
     declarations = []
     i = brace + 1
     while lines[i] != "  switch (quantum_info->depth)\n":
-        entry = prologue_entry(lines, i)
+        entry, taken = prologue_entry(lines, i)
         if entry:
             declarations.append(entry)
-        i += max(len(entry), 1)
+        i += taken
     if lines[end - 1] != "  }\n":
         raise Refused("the switch is not the last statement")
     return lines[start:brace], declarations, (i, end - 1)
@@ -177,10 +198,52 @@ def find_run(lines, run):
     raise Refused("declaration not found")
 
 
-def parameter_names(signature):
-    text = "".join(signature)
-    params = text[text.index("(") + 1:text.rindex(")")]
-    return [IDENT.findall(param)[-1] for param in params.split(",")]
+def parameters(signature):
+    """(declaration, name) for each parameter of SIGNATURE."""
+    text = " ".join(line.strip() for line in signature)
+    text = text[text.index("(") + 1:text.rindex(")")]
+    return [(param.strip(), IDENT.findall(param)[-1])
+            for param in text.split(",")]
+
+
+def format_signature(name, declarations):
+    """ImageMagick's layout: wrapped at 80 columns, continued by two
+    spaces."""
+    lines, line = [], "static void %s(" % name
+    for index, declaration in enumerate(declarations):
+        last = index == len(declarations) - 1
+        piece = declaration + (")" if last else ",")
+        if len(line) + len(piece) > 80:
+            lines.append(line + "\n")
+            line = "  "
+        line += piece
+    return lines + [line + "\n"]
+
+
+def uses_group(text, group):
+    return any(uses(text, name) for name in declared_names(group))
+
+
+def build_helper(new_name, signature, declarations, body):
+    """The new function's lines and the parameter names to call it with."""
+    body_text = "".join(body)
+    helper_decls = [g for g in declarations if uses_group(body_text, g)]
+    used_text = body_text + "".join(sum(helper_decls, []))
+    params = [p for p in parameters(signature) if uses(used_text, p[1])]
+    helper = format_signature(new_name, [p[0] for p in params]) + ["{\n"]
+    for group in helper_decls:
+        helper += group + ["\n"]
+    return helper + body + ["}\n", "\n"], [p[1] for p in params]
+
+
+def drop_unused(rest, skip, declarations):
+    """Remove the declaration groups REST no longer uses after line SKIP."""
+    for group in declarations:
+        remaining = "".join(rest[skip:]).replace("".join(group), "")
+        if not uses_group(remaining, group):
+            index = find_run(rest, group)
+            del rest[index:index + len(group) + 1]
+    return rest
 
 
 def extract(lines, function, label, new_name):
@@ -189,22 +252,10 @@ def extract(lines, function, label, new_name):
     at, close = find_case(lines, first, last, label)
     body = [line[4:] if line.strip() else line
             for line in convert_breaks(lines[at + 2:close])]
-    body_text = "".join(body)
-    helper_decls = [group for group in declarations
-                    if any(uses(body_text, n) for n in declared_names(group))]
-    helper = [signature[0].replace(function, new_name, 1)]
-    helper += signature[1:] + ["{\n"]
-    for group in helper_decls:
-        helper += group + ["\n"]
-    helper += body + ["}\n", "\n"]
-    call = "      %s(%s);\n" % (new_name, ",".join(parameter_names(signature)))
+    helper, names = build_helper(new_name, signature, declarations, body)
+    call = "      %s(%s);\n" % (new_name, ",".join(names))
     rest = lines[start:at + 2] + [call, "      break;\n"] + lines[close:end + 1]
-    rest_text = "".join(rest[len(signature):])
-    for group in declarations:
-        if not any(uses(rest_text.replace("".join(group), ""), n)
-                   for n in declared_names(group)):
-            index = find_run(rest, group)
-            del rest[index:index + len(group) + 1]
+    rest = drop_unused(rest, len(signature), declarations)
     return lines[:start] + helper + rest + lines[end + 1:]
 
 
