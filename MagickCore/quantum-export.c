@@ -2122,9 +2122,17 @@ static void ExportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -3952,7 +3960,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     }
     case GrayAlphaQuantum:
     {
-      ExportGrayAlphaQuantum(image,quantum_info,number_pixels,p,q);
+      ExportGrayAlphaQuantum(image,quantum_info,&span);
       break;
     }
     case GreenQuantum:
