@@ -95,6 +95,189 @@ take seven to nine arguments. distort.c's best-fit bounds: each case writes `min
 `max` through macros defined mid-function that name the caller's locals. property.c and
 colorspace.c tables: Recipe F left the score flat (above).
 
+### Morning (2026-10-28): the owner's three answers
+
+The owner answered the night's questions: "1 and 2 are ok, go ahead! you can try 3."
+
+**1. pixel.c's five fixed-map extractions in one commit** (rule 1 amended, `fda56c183`):
+`99af5d46d`, pixel.c 1.73 → 1.80.
+
+**2. Recipe S for the largest files.** Three splits, each verbatim, each static moving
+with its only caller:
+
+| Commit | Family | Original | New file |
+|---|---|---|---|
+| `fe5a33124` | `ExportImagePixels`, `ExportPixelBuffer`, 56 statics | pixel.c 1.80 → 1.89 | pixel-export.c 3.11 |
+| `f8fc17c71` | `ImportImagePixels`, `ImportPixelBuffer`, 58 statics | pixel.c 1.89 → 2.36 | pixel-import.c 3.12 |
+| `6343c01e0` | `ResizeImage`, `ContributionInfo`, 11 statics | resize.c 2.89 → 3.55 | resize-image.c 6.29 |
+
+Each passed the combined guards over the pair and the oracle on every case that reaches
+the moved public function (135, 129 and 911 cases, 0 diverged); the builds are clean and
+nm shows each public function exported from its new object. As for magnify.c, the
+pre-commit gate's rule that a new file score 10.0 was skipped (the gate's check of the
+original passed) and the trailer check was run by hand; Recipe S now says so (`bcc48ab84`).
+The Windows build configuration outside this repository still needs the three files.
+`tools/register_source.py` lists a new file in the four build lists;
+`tools/split_source.py` finds and moves a family and reproduces the resize.c split byte
+for byte.
+
+The other approved files do not split cleanly, by the tool's rules:
+- draw.c (`DrawPrimitive` reaches two statics other functions call), morphology.c,
+  cache.c and fx.c: the large families share statics, which would have to widen.
+- compare.c: the metric functions serve both `CompareImages` and `SimilarityImage`.
+- blob.c (`OpenBlob`, macro `_O_BINARY`) and property.c (`GetMagickProperty`, macro
+  `cmsUInt32Number`): a file-level macro would be needed on both sides.
+- quantum-import.c: one public function is the whole file.
+- enhance.c: `ModulateImage`, `ContrastStretchImage` and `EqualizeImage` split cleanly,
+  but enhance.c moves by 0.07 at most, so none was made.
+
+Outside the approved list, statistic.c's `StatisticImage` family splits cleanly
+(2.29 → 2.61 measured on the dry run, before the two steps below), and so would
+colorspace.c's, but for a macro. They wait for the owner.
+
+**The split costs the per-file mean.** A split-off family keeps its findings, so the new
+file is usually red: MagickCore's mean is 4.96 at `bcc48ab84` against 4.97 at `a055db34e`,
+with red 44 → 46, although no file went down. Weighted by lines, it rose from 3.149 to
+3.200. The splits pay off for the file split, not for the per-file mean.
+
+**3. Shared status plus accumulators: Recipe J** (`3f7696c06`, Recipes T and K together:
+the helper returns the block's status and takes the accumulators by pointer). Its
+instance is vision.c: the four moment-threshold functions share a first moment pass that
+writes `status=MagickFalse` and the object's own `M00`, `M10` and `M01`. J extracted it from
+`MajorAxisThreshold` (`2de73eed9`, 2.35 → 2.45), and Recipe D put the same call in
+`MinorAxisThreshold`, `EccentricityThreshold` and `AngleThreshold` (`e943876c7`,
+`548e9bff5`, `444ddfbd2`): 2.35 → 2.59. Amended for array accumulators (`312716201`), J then
+moved PerimeterThreshold's pattern-counting row loop to its own helper (`369afb5c9`), and
+PerimeterThreshold has no findings left: **vision.c 2.35 → 2.66**. CircularityThreshold
+holds the same loop, but the call there measures 2.62, so it was not made. Each step reached its function's
+cases (2, 2, 2, 4 and 2, all verbose connected-components output), 0 diverged. The
+second moment pass, also in all four, starts with `if (status == MagickFalse) continue;`:
+it reads the shared status, which neither T nor J allows, and stays.
+
+The first try, `MotionBlurImage`, did not pay. Its two kernel loops write
+`status=MagickFalse` and one or two of the channel's sums, but the helpers need nine to
+eleven arguments. Measured, not committed:
+
+| Extraction | effect.c (1.59) | MotionBlurImage's Brain Method |
+|---|---|---|
+| plain kernel loop (`pixel` by pointer, 9 arguments) | 1.61 | stays |
+| blended kernel loop (`pixel`, `gamma`, 11 arguments) | 1.57 | stays |
+| both | 1.57 (the two helpers duplicate each other) | stays |
+| Recipe T on the whole column loop | 1.58 | moves to the helper |
+
+The other targets named last night do not write `status` in their accumulating blocks:
+`StatisticImage` took Recipe E twice instead (`517fe1865`, flat, then `7c283e05c`,
+2.29 → 2.32); `SelectiveBlurImage`, `BilateralBlurImage` and `MeanShiftImage` have
+Recipe K's shape, but their blocks also advance three or more pointers.
+
+**Later in the morning.** threshold.c's `AdaptiveThresholdImage`: Recipe K on its per-pixel
+channel loop, whose accumulators are the row's own `channel_bias` and `channel_sum` arrays
+(`7c51b9302`, **threshold.c 2.38 → 2.65**, its Brain Method gone; 12 cases, 0 diverged). The same
+move on `SelectiveBlurImage` measured 1.59 → 1.60 with the Brain Method moving into the
+helper, and K on its two window sums after it stayed at 1.60: not committed. color.c's
+`IsEquivalentImage` and image.c's `InterpretImageFilename` were read and left: their
+blocks write two or more outer variables. Also measured and left: `BilateralBlurImage`'s per-pixel channel loop
+(effect.c 1.59 → 1.51, a second Brain Method in the helper). `MeanShiftImage` was read and
+left: its block assigns `status` from a call, which neither T nor J allows.
+
+Whole catalogue at `7c51b9302`: 15,906 cases, 1 diverged (`gaps/c5651ffad8`), as at `911987a09`. Earlier, at
+`f8fc17c71`, 3 diverged: `gaps/c5651ffad8` (the known
+artifact) and the two hough matrix-on-disk cases, which timed out under load and passed
+when rerun alone.
+
+### Midday (2026-10-28): splits beyond the approved list
+
+The owner answered the three remaining questions ("of course" to each): statistic.c may
+be split, more splits are wanted although each new file starts red or yellow and lowers
+the per-file mean, and a split commits past the pre-commit gate's new-file rule
+(`eb4ed9640`). A scan dry-ran every clean family of 150 lines or more in each red file
+and scored both sides; the splits made are those that raise the original by about 0.25
+or more:
+
+| Commit | Family moved | Original | New file |
+|---|---|---|---|
+| `154982200` | `StatisticImage`, PixelList types, 14 statics | statistic.c 2.32 → 2.61 | statistic-image.c 6.56 |
+| `9b578080f` | `GetImageFeatures`, `FeatureStatistics`, 5 statics | feature.c 2.30 → 3.90 | feature-texture.c 5.18 |
+| `5ed3581d2` | `DeskewImage` and its statics | shear.c 2.72 → 4.68 | shear-deskew.c 6.80 |
+| `a6646ddf1` | `GetGeometry`, `ParseGeometry` and their statics | geometry.c 3.45 → 6.90 | geometry-parse.c 4.49 |
+| `f77ec9ad8` | `ScaleImage` and its statics | resize.c 3.55 → 4.52 | resize-scale.c 6.66 |
+| `bc7ea9777` | `GetImageDepth`, `SetImageDepth` and their statics | attribute.c 2.97 → 3.87 | attribute-depth.c 6.37 |
+| `4ef25efe7` | `GetImageMoments` | statistic.c 2.61 → 2.97 | statistic-moments.c 8.00 |
+| `94444f901` | `AutoThresholdImage` and its statics | threshold.c 2.65 → 3.05 | threshold-auto.c 7.42 |
+| `1e1ccff65` | `MergeImageLayers` | layer.c 3.94 → 4.27 | layer-merge.c 9.08 |
+| `a6fb42c3f` | `CropImageToTiles` and its statics | transform.c 2.71 → 2.97 | transform-tiles.c 8.17 |
+
+Each commit records the moved statics, the combined guards (literals and call sites
+unchanged over the pair), the exported symbol and the oracle on every case reaching the
+moved public functions, 0 diverged (`GetGeometry` 12,952 and `ParseGeometry` 14,721
+cases; `SetImageDepth` 10,840). Families were paired only where they belong together
+(the two geometry parsers, the depth getter and setter): pairing raises the original
+more but leaves the new file lower.
+
+Tried and left:
+- color.c's `QueryColorCompliance` (3.55 → 4.35 dry): it calls `GetColorCompliance`,
+  which is `MagickExport` but declared in no header, so the new file would not compile
+  without a new declaration. `tools/split_source.py` does not detect this; the build did.
+- fourier.c's `ComplexImages` (3.27 → 3.65 dry): the include block carries the FFTW
+  macro definitions (`cabs`, `carg`, `cimag`, `creal`), which the copied header would
+  define in both files; the literal guard flagged them.
+- threshold.c's `OrderedDitherImage` (3.05 → 3.43 dry): it uses `struct _ThresholdMap`,
+  which threshold.c defines and keeps for `GetThresholdMap` and its readers.
+
+The three left were accepted by `tools/split_source.py` and failed at the build or the
+guard; the tool now refuses each kind with its reason (`2c8c839f6`).
+
+**Second round.** A rescan of the changed files found families that now raise their file
+by 0.2 or more:
+
+| Commit | Family moved | Original | New file |
+|---|---|---|---|
+| `b7df7b86a` | `IntegralRotateImage` | shear.c 4.68 → 6.46 | shear-rotate.c 7.05 |
+| `d112476b0` | `GetImageBoundingBox`, `CensusInfo` and its statics | attribute.c 3.87 → 5.19 | attribute-bounds.c 7.51 |
+| `a1bb1314f` | `GetImageMinimumBoundingBox`, `CaliperInfo` and its statics | attribute.c 5.19 → 5.64 | attribute-hull.c 8.49 |
+| `59ba5fb1a` | `FunctionImage` and its statics | statistic.c 2.97 → 3.23 | statistic-function.c 8.70 |
+| `a2413bce4` | `PosterizeImage` and its statics | quantize.c 2.36 → 2.58 | quantize-posterize.c 8.18 |
+| `3055af531` | `InterpretImageFilename` and its statics | image.c 2.49 → 2.71 | image-filename.c 7.32 |
+| `7503478c6` | `SampleImage` and its statics | resize.c 4.52 → 4.78 | resize-sample.c 9.10 |
+| `caa3018a8` | `ParseMetaGeometry` and its statics | geometry.c 6.90 → 7.40 | geometry-meta.c 8.73 |
+| `2d052c5c1` | `AdaptiveThresholdImage` and its statics | threshold.c 3.05 → 3.28 | threshold-adaptive.c 8.76 |
+
+Oracle on each family's cases, 0 diverged (`InterpretImageFilename` 12,656 cases,
+`ParseMetaGeometry` 1,587). One batch failed for a build reason, not a code one: a step
+reset by `git reset --hard` restored threshold.c within the same second its object had
+been built from the split version, so make kept the stale object and the next five
+builds failed to link `OrderedDitherImage`. Touching the restored file fixed it.
+
+A third scan of the same files finds no family above 0.2 except in files left above
+(image.c's are 0.06 at most). The families that split cleanly but move their file by
+less than 0.2 (enhance.c's ten, effect.c's six, image.c's five, the X11 files) were not
+made.
+
+**Yellow files.** The same scan over the 47 MagickCore files scoring 4 to 9.5 found six
+with a family worth 0.2 or more:
+
+| Commit | Family moved | Original | New file |
+|---|---|---|---|
+| `f31d03fa6` | `SetImageAlphaChannel` and its statics | channel.c 4.04 → 5.13 | channel-alpha.c 6.96 |
+| `c629d08d0` | `CombineImages` | channel.c 5.13 → 6.93 | channel-combine.c 8.22 |
+| `e4193e021` | `RaiseImage` and its static | decorate.c 6.74 → 7.73 | decorate-raise.c 8.67 |
+| `aee929162` | `GlobExpression` and its statics | token.c 5.02 → 6.49 | token-glob.c 7.59 |
+| `5d2502f8e` | `GetNextToken` and its statics | token.c 6.49 → 7.82 | token-next.c 7.99 |
+| `f697c21ca` | `GetConfigurePaths` | configure.c 6.19 → 6.47 | configure-paths.c 8.95 |
+
+`GetConfigurePaths` and `GetNextToken` reach 15,903 cases and `GlobExpression` 228; in each
+the only divergence was `gaps/c5651ffad8`, the known artifact, which diverges on the
+unchanged tree too (rerun at `e4193e021`). Left: resource.c's `SetMagickResourceLimit`
+(5.02 → 5.94 dry), which uses the file-scope `resource_info` that resource.c keeps (the
+tool now refuses such a family), and module.c's `InvokeDynamicImageFilter` (6.46 → 6.94
+dry), which no case reaches.
+
+**Sweep after the splits** (`5d2502f8e`, cs-mcp 1.5.13): MagickCore's per-file mean 4.96
+→ 5.69 since `bcc48ab84` this morning, files 99 → 124, red 46 → 41, yellow 41 → 69; the
+line-weighted mean 3.20 → 3.50. Most split-off files score yellow, so after the first
+three splits the per-file mean rises too. The scans stop at families worth 0.2 or more;
+smaller ones remain (enhance.c's ten, effect.c's six, image.c's five, the X11 files).
+
 ### Sweep (2026-10-28, 00:20): where the night ends
 
 MagickCore against the morning's sweep: **mean 4.86 → 4.97; red 46 → 44, yellow 38 → 40,
@@ -184,6 +367,14 @@ fits a read of uninitialised memory whose content depends on the run's surroundi
 it could not be reproduced to bisect. If it reappears, keep the candidate's output
 (`build-oracle/work/runs/cand/`) and bisect quantum-import.c and quantum-export.c first:
 the case reads and writes MIFF through both, and both changed today.
+
+**It is in the unchanged code (2026-10-28, midday).** The whole catalogue at `4acdcfc46`
+had `resize/6ee45e9cfa` diverge again, and alone it diverged in 3 of 10 uncached runs. A
+candidate built from the baseline's own commit, `de54d27df`, diverged from the baseline
+binary in 11 of 20 runs; `a6646ddf1` in 0 of 20 and `f77ec9ad8` (`ScaleImage` moved) in 6
+of 20. The same source differs from itself between builds and runs, so the refactoring
+does not cause it: the case reads something the code does not set, as suspected above.
+Where is still open; a divergence on this case alone is not evidence against a step.
 
 ### ERDC (night)
 

@@ -1,0 +1,551 @@
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%                  RRRR   EEEEE  SSSSS  IIIII  ZZZZZ  EEEEE                   %
+%                  R   R  E      SS       I       ZZ  E                       %
+%                  RRRR   EEE     SSS     I     ZZZ   EEE                     %
+%                  R R    E         SS    I    ZZ     E                       %
+%                  R  R   EEEEE  SSSSS  IIIII  ZZZZZ  EEEEE                   %
+%                                                                             %
+%                      SSSSS   CCCC   AAA   L      EEEEE                      %
+%                      SS     C      A   A  L      E                          %
+%                       SSS   C      AAAAA  L      EEE                        %
+%                         SS  C      A   A  L      E                          %
+%                      SSSSS   CCCC  A   A  LLLLL  EEEEE                      %
+%                                                                             %
+%                                                                             %
+%                        MagickCore Image Scale Method                        %
+%                                                                             %
+%                              Software Design                                %
+%                                   Cristy                                    %
+%                                 July 1992                                   %
+%                                                                             %
+%                                                                             %
+%  Copyright @ 1999 ImageMagick Studio LLC, a non-profit organization         %
+%  dedicated to making software imaging solutions freely available.           %
+%                                                                             %
+%  You may not use this file except in compliance with the License.  You may  %
+%  obtain a copy of the License at                                            %
+%                                                                             %
+%    https://imagemagick.org/license/                                         %
+%                                                                             %
+%  Unless required by applicable law or agreed to in writing, software        %
+%  distributed under the License is distributed on an "AS IS" BASIS,          %
+%  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.   %
+%  See the License for the specific language governing permissions and        %
+%  limitations under the License.                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%
+*/
+
+/*
+  Include declarations.
+*/
+#include "MagickCore/studio.h"
+#include "MagickCore/accelerate-private.h"
+#include "MagickCore/artifact.h"
+#include "MagickCore/blob.h"
+#include "MagickCore/cache.h"
+#include "MagickCore/cache-view.h"
+#include "MagickCore/channel.h"
+#include "MagickCore/color.h"
+#include "MagickCore/color-private.h"
+#include "MagickCore/colorspace.h"
+#include "MagickCore/colorspace-private.h"
+#include "MagickCore/distort.h"
+#include "MagickCore/draw.h"
+#include "MagickCore/exception.h"
+#include "MagickCore/exception-private.h"
+#include "MagickCore/gem.h"
+#include "MagickCore/image.h"
+#include "MagickCore/image-private.h"
+#include "MagickCore/list.h"
+#include "MagickCore/memory_.h"
+#include "MagickCore/memory-private.h"
+#include "MagickCore/magick.h"
+#include "MagickCore/pixel-accessor.h"
+#include "MagickCore/property.h"
+#include "MagickCore/monitor.h"
+#include "MagickCore/monitor-private.h"
+#include "MagickCore/nt-base-private.h"
+#include "MagickCore/option.h"
+#include "MagickCore/pixel.h"
+#include "MagickCore/profile-private.h"
+#include "MagickCore/quantum-private.h"
+#include "MagickCore/resample.h"
+#include "MagickCore/resample-private.h"
+#include "MagickCore/resize.h"
+#include "MagickCore/resize-private.h"
+#include "MagickCore/resource_.h"
+#include "MagickCore/string_.h"
+#include "MagickCore/string-private.h"
+#include "MagickCore/thread-private.h"
+#include "MagickCore/token.h"
+#include "MagickCore/utility.h"
+#include "MagickCore/utility-private.h"
+#include "MagickCore/version.h"
+#if defined(MAGICKCORE_LQR_DELEGATE)
+#include <lqr.h>
+#endif
+
+/*
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%   S c a l e I m a g e                                                       %
+%                                                                             %
+%                                                                             %
+%                                                                             %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+%  ScaleImage() changes the size of an image to the given dimensions.
+%
+%  The format of the ScaleImage method is:
+%
+%      Image *ScaleImage(const Image *image,const size_t columns,
+%        const size_t rows,ExceptionInfo *exception)
+%
+%  A description of each parameter follows:
+%
+%    o image: the image.
+%
+%    o columns: the number of columns in the scaled image.
+%
+%    o rows: the number of rows in the scaled image.
+%
+%    o exception: return any errors or warnings in this structure.
+%
+*/
+static void ImportScaleScanline(const Image *image,const Quantum *p,
+  double alpha,double *x_vector)
+{
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelWriteMask(image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    if (image->alpha_trait != UndefinedPixelTrait)
+      alpha=QuantumScale*(double) GetPixelAlpha(image,p);
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & BlendPixelTrait) == 0)
+        {
+          x_vector[x*(ssize_t) GetPixelChannels(image)+i]=(double) p[i];
+          continue;
+        }
+      x_vector[x*(ssize_t) GetPixelChannels(image)+i]=alpha*(double) p[i];
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void ExportScaleScanline(const Image *image,const Image *scale_image,
+  const double *scanline,double alpha,Quantum *q)
+{
+  PixelTrait
+    scale_traits;
+
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) scale_image->columns; x++)
+  {
+    if (GetPixelWriteMask(scale_image,q) <= (QuantumRange/2))
+      {
+        q+=(ptrdiff_t) GetPixelChannels(scale_image);
+        continue;
+      }
+    if (image->alpha_trait != UndefinedPixelTrait)
+      {
+        alpha=QuantumScale*scanline[x*(ssize_t) GetPixelChannels(image)+
+          GetPixelChannelOffset(image,AlphaPixelChannel)];
+        alpha=MagickSafeReciprocal(alpha);
+      }
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      scale_traits=GetPixelChannelTraits(scale_image,channel);
+      if ((traits == UndefinedPixelTrait) ||
+          (scale_traits == UndefinedPixelTrait))
+        continue;
+      if ((traits & BlendPixelTrait) == 0)
+        {
+          SetPixelChannel(scale_image,channel,ClampToQuantum(
+            scanline[x*(ssize_t) GetPixelChannels(image)+i]),q);
+          continue;
+        }
+      SetPixelChannel(scale_image,channel,ClampToQuantum(alpha*scanline[
+        x*(ssize_t) GetPixelChannels(image)+i]),q);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(scale_image);
+  }
+}
+
+static void ResetScalePixel(const Image *image,double *pixel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    pixel[i]=0.0;
+}
+
+static void ScaleScanlineX(const Image *image,const Image *scale_image,
+  const double *scanline,double *scale_scanline)
+{
+  double
+    pixel[CompositePixelChannel];
+
+  MagickBooleanType
+    next_column;
+
+  PointInfo
+    scale,
+    span;
+
+  ssize_t
+    i,
+    t,
+    x;
+
+  ResetScalePixel(image,pixel);
+  next_column=MagickFalse;
+  span.x=1.0;
+  t=0;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    scale.x=(double) scale_image->columns/(double) image->columns;
+    while (scale.x >= span.x)
+    {
+      if (next_column != MagickFalse)
+        {
+          ResetScalePixel(image,pixel);
+          t++;
+        }
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,i);
+        PixelTrait traits = GetPixelChannelTraits(image,channel);
+        if (traits == UndefinedPixelTrait)
+          continue;
+        pixel[i]+=span.x*scanline[x*(ssize_t) GetPixelChannels(image)+i];
+        scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
+      }
+      scale.x-=span.x;
+      span.x=1.0;
+      next_column=MagickTrue;
+    }
+    if (scale.x > 0)
+      {
+        if (next_column != MagickFalse)
+          {
+            ResetScalePixel(image,pixel);
+            next_column=MagickFalse;
+            t++;
+          }
+        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+          pixel[i]+=scale.x*scanline[x*(ssize_t)
+            GetPixelChannels(image)+i];
+        span.x-=scale.x;
+      }
+  }
+  if (span.x > 0)
+    {
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+        pixel[i]+=span.x*
+          scanline[(x-1)*(ssize_t) GetPixelChannels(image)+i];
+    }
+  if ((next_column == MagickFalse) && (t < (ssize_t) scale_image->columns))
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
+}
+
+static void AccumulateScaleScanline(const Image *image,const PointInfo scale,
+  const double *x_vector,double *y_vector)
+{
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      y_vector[x*(ssize_t) GetPixelChannels(image)+i]+=scale.y*
+        x_vector[x*(ssize_t) GetPixelChannels(image)+i];
+}
+
+static void BlendScaleScanline(const Image *image,const PointInfo span,
+  const double *x_vector,double *y_vector,double *scanline)
+{
+  double
+    pixel[CompositePixelChannel];
+
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      pixel[i]=y_vector[x*(ssize_t) GetPixelChannels(image)+i]+span.y*
+        x_vector[x*(ssize_t) GetPixelChannels(image)+i];
+      scanline[x*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
+      y_vector[x*(ssize_t) GetPixelChannels(image)+i]=0.0;
+    }
+  }
+}
+
+static inline MagickBooleanType IsScaleBufferMissing(const double *scanline,
+  const double *scale_scanline,const double *x_vector,const double *y_vector)
+{
+  return(((scanline == (double *) NULL) || (scale_scanline == (double *) NULL) ||
+    (x_vector == (double *) NULL) || (y_vector == (double *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsScaleRowPending(const Image *image,
+  const MagickBooleanType next_row,const ssize_t number_rows)
+{
+  return(((next_row != MagickFalse) &&
+    (number_rows < (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
+}
+
+MagickExport Image *ScaleImage(const Image *image,const size_t columns,
+  const size_t rows,ExceptionInfo *exception)
+{
+#define ScaleImageTag  "Scale/Image"
+
+  CacheView
+    *image_view,
+    *scale_view;
+
+  double
+    alpha,
+    *scale_scanline,
+    *scanline,
+    *x_vector,
+    *y_vector;
+
+  Image
+    *scale_image;
+
+  MagickBooleanType
+    next_row,
+    proceed,
+    status;
+
+  PointInfo
+    scale,
+    span;
+
+  ssize_t
+    n,
+    number_rows,
+    y;
+
+  /*
+    Initialize scaled image attributes.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if ((columns == 0) || (rows == 0))
+    ThrowImageException(ImageError,"NegativeOrZeroImageSize");
+  if ((columns == image->columns) && (rows == image->rows))
+    return(CloneImage(image,0,0,MagickTrue,exception));
+  scale_image=CloneImage(image,columns,rows,MagickTrue,exception);
+  if (scale_image == (Image *) NULL)
+    return((Image *) NULL);
+  if (SetImageStorageClass(scale_image,DirectClass,exception) == MagickFalse)
+    {
+      scale_image=DestroyImage(scale_image);
+      return((Image *) NULL);
+    }
+  /*
+    Allocate memory.
+  */
+  x_vector=(double *) AcquireQuantumMemory((size_t) image->columns,
+    MaxPixelChannels*sizeof(*x_vector));
+  scanline=x_vector;
+  if (image->rows != scale_image->rows)
+    scanline=(double *) AcquireQuantumMemory((size_t) image->columns,
+      MaxPixelChannels*sizeof(*scanline));
+  scale_scanline=(double *) AcquireQuantumMemory((size_t) scale_image->columns,
+    MaxPixelChannels*sizeof(*scale_scanline));
+  y_vector=(double *) AcquireQuantumMemory((size_t) image->columns,
+    MaxPixelChannels*sizeof(*y_vector));
+  if (IsScaleBufferMissing(scanline,scale_scanline,x_vector,y_vector) !=
+      MagickFalse)
+    {
+      if ((image->rows != scale_image->rows) && (scanline != (double *) NULL))
+        scanline=(double *) RelinquishMagickMemory(scanline);
+      if (scale_scanline != (double *) NULL)
+        scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
+      if (x_vector != (double *) NULL)
+        x_vector=(double *) RelinquishMagickMemory(x_vector);
+      if (y_vector != (double *) NULL)
+        y_vector=(double *) RelinquishMagickMemory(y_vector);
+      scale_image=DestroyImage(scale_image);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  /*
+    Scale image.
+  */
+  number_rows=0;
+  next_row=MagickTrue;
+  span.y=1.0;
+  scale.y=(double) scale_image->rows/(double) image->rows;
+  (void) memset(y_vector,0,(size_t) MaxPixelChannels*image->columns*
+    sizeof(*y_vector));
+  n=0;
+  status=MagickTrue;
+  image_view=AcquireVirtualCacheView(image,exception);
+  scale_view=AcquireAuthenticCacheView(scale_image,exception);
+  for (y=0; y < (ssize_t) scale_image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    Quantum
+      *magick_restrict q;
+
+    if (status == MagickFalse)
+      break;
+    q=QueueCacheViewAuthenticPixels(scale_view,0,y,scale_image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        break;
+      }
+    alpha=1.0;
+    if (scale_image->rows == image->rows)
+      {
+        /*
+          Read a new scanline.
+        */
+        p=GetCacheViewVirtualPixels(image_view,0,n++,image->columns,1,
+          exception);
+        if (p == (const Quantum *) NULL)
+          {
+            status=MagickFalse;
+            break;
+          }
+        ImportScaleScanline(image,p,alpha,x_vector);
+      }
+    else
+      {
+        /*
+          Scale Y direction.
+        */
+        while (scale.y < span.y)
+        {
+          if (IsScaleRowPending(image,next_row,number_rows) != MagickFalse)
+            {
+              /*
+                Read a new scanline.
+              */
+              p=GetCacheViewVirtualPixels(image_view,0,n++,image->columns,1,
+                exception);
+              if (p == (const Quantum *) NULL)
+                {
+                  status=MagickFalse;
+                  break;
+                }
+              ImportScaleScanline(image,p,alpha,x_vector);
+              number_rows++;
+            }
+          AccumulateScaleScanline(image,scale,x_vector,y_vector);
+          span.y-=scale.y;
+          scale.y=(double) scale_image->rows/(double) image->rows;
+          next_row=MagickTrue;
+        }
+        if (IsScaleRowPending(image,next_row,number_rows) != MagickFalse)
+          {
+            /*
+              Read a new scanline.
+            */
+            p=GetCacheViewVirtualPixels(image_view,0,n++,image->columns,1,
+              exception);
+            if (p == (const Quantum *) NULL)
+              {
+                status=MagickFalse;
+                break;
+              }
+            ImportScaleScanline(image,p,alpha,x_vector);
+            number_rows++;
+            next_row=MagickFalse;
+          }
+        BlendScaleScanline(image,span,x_vector,y_vector,scanline);
+        scale.y-=span.y;
+        if (scale.y <= 0)
+          {
+            scale.y=(double) scale_image->rows/(double) image->rows;
+            next_row=MagickTrue;
+          }
+        span.y=1.0;
+      }
+    if (scale_image->columns == image->columns)
+      {
+        /*
+          Transfer scanline to scaled image.
+        */
+        ExportScaleScanline(image,scale_image,scanline,alpha,q);
+      }
+    else
+      {
+        /*
+          Scale X direction.
+        */
+        ScaleScanlineX(image,scale_image,scanline,scale_scanline);
+      /*
+        Transfer scanline to scaled image.
+      */
+      ExportScaleScanline(image,scale_image,scale_scanline,alpha,q);
+    }
+    if (SyncCacheViewAuthenticPixels(scale_view,exception) == MagickFalse)
+      {
+        status=MagickFalse;
+        break;
+      }
+    proceed=SetImageProgress(image,ScaleImageTag,(MagickOffsetType) y,
+      image->rows);
+    if (proceed == MagickFalse)
+      {
+        status=MagickFalse;
+        break;
+      }
+  }
+  scale_view=DestroyCacheView(scale_view);
+  image_view=DestroyCacheView(image_view);
+  /*
+    Free allocated memory.
+  */
+  y_vector=(double *) RelinquishMagickMemory(y_vector);
+  scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
+  if (scale_image->rows != image->rows)
+    scanline=(double *) RelinquishMagickMemory(scanline);
+  x_vector=(double *) RelinquishMagickMemory(x_vector);
+  scale_image->type=image->type;
+  if (status == MagickFalse)
+    scale_image=DestroyImage(scale_image);
+  return(scale_image);
+}

@@ -226,6 +226,42 @@ static void CountPerimeterPattern(const Image *component_image,
         pattern[3]++;
 }
 
+static MagickBooleanType CountObjectPerimeterPatterns(
+  const Image *component_image,CacheView *component_view,
+  const RectangleInfo bounding_box,const ssize_t i,size_t *pattern,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  for (y=(-1); y < (ssize_t) bounding_box.height; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x;
+
+    p=GetCacheViewVirtualPixels(component_view,bounding_box.x-1,
+      bounding_box.y+y,bounding_box.width+2,2,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        break;
+      }
+    for (x=(-1); x < (ssize_t) bounding_box.width; x++)
+    {
+      CountPerimeterPattern(component_image,p,bounding_box.width,i,pattern);
+      p+=(ptrdiff_t) GetPixelChannels(component_image);
+    }
+  }
+  return(status);
+}
+
 static void PerimeterThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -251,9 +287,6 @@ static void PerimeterThreshold(const Image *component_image,
     size_t
       pattern[4] = { 1, 0, 0, 0 };
 
-    ssize_t
-      y;
-
     /*
       Compute perimeter of each object.
     */
@@ -261,27 +294,9 @@ static void PerimeterThreshold(const Image *component_image,
       continue;
     component_view=AcquireAuthenticCacheView(component_image,exception);
     bounding_box=object[i].bounding_box;
-    for (y=(-1); y < (ssize_t) bounding_box.height; y++)
-    {
-      const Quantum
-        *magick_restrict p;
-
-      ssize_t
-        x;
-
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x-1,
-        bounding_box.y+y,bounding_box.width+2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (x=(-1); x < (ssize_t) bounding_box.width; x++)
-      {
-        CountPerimeterPattern(component_image,p,bounding_box.width,i,pattern);
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
-    }
+    if (CountObjectPerimeterPatterns(component_image,component_view,
+          bounding_box,i,pattern,exception) == MagickFalse)
+      status=MagickFalse;
     component_view=DestroyCacheView(component_view);
     object[i].metric[metric_index]=ceil(MagickSQ1_2*pattern[1]+1.0*pattern[2]+
       MagickSQ1_2*pattern[3]+MagickSQ2*pattern[0]-0.5);
@@ -352,6 +367,44 @@ static void CircularityThreshold(const Image *component_image,
   }
 }
 
+static MagickBooleanType GetObjectCentroidSums(const Image *component_image,
+  CacheView *component_view,const RectangleInfo bounding_box,const ssize_t i,
+  double *M00,double *M10,double *M01,ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict p;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x,
+    y;
+
+  status=MagickTrue;
+  for (y=0; y < (ssize_t) bounding_box.height; y++)
+  {
+    p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
+      bounding_box.y+y,bounding_box.width,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        break;
+      }
+    for (x=0; x < (ssize_t) bounding_box.width; x++)
+    {
+      if ((ssize_t) GetPixelIndex(component_image,p) == i)
+        {
+          (*M00)++;
+          *M10+=x;
+          *M01+=y;
+        }
+      p+=(ptrdiff_t) GetPixelChannels(component_image);
+    }
+  }
+  return(status);
+}
+
 static void MajorAxisThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -401,26 +454,9 @@ static void MajorAxisThreshold(const Image *component_image,
       continue;
     component_view=AcquireAuthenticCacheView(component_image,exception);
     bounding_box=object[i].bounding_box;
-    for (y=0; y < (ssize_t) bounding_box.height; y++)
-    {
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-        bounding_box.y+y,bounding_box.width,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        if ((ssize_t) GetPixelIndex(component_image,p) == i)
-          {
-            M00++;
-            M10+=x;
-            M01+=y;
-          }
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
-    }
+    if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
+          &M00,&M10,&M01,exception) == MagickFalse)
+      status=MagickFalse;
     centroid.x=M10*MagickSafeReciprocal(M00);
     centroid.y=M01*MagickSafeReciprocal(M00);
     for (y=0; y < (ssize_t) bounding_box.height; y++)
@@ -500,26 +536,9 @@ static void MinorAxisThreshold(const Image *component_image,
       continue;
     component_view=AcquireAuthenticCacheView(component_image,exception);
     bounding_box=object[i].bounding_box;
-    for (y=0; y < (ssize_t) bounding_box.height; y++)
-    {
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-        bounding_box.y+y,bounding_box.width,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        if ((ssize_t) GetPixelIndex(component_image,p) == i)
-          {
-            M00++;
-            M10+=x;
-            M01+=y;
-          }
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
-    }
+    if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
+          &M00,&M10,&M01,exception) == MagickFalse)
+      status=MagickFalse;
     centroid.x=M10*MagickSafeReciprocal(M00);
     centroid.y=M01*MagickSafeReciprocal(M00);
     for (y=0; y < (ssize_t) bounding_box.height; y++)
@@ -600,26 +619,9 @@ static void EccentricityThreshold(const Image *component_image,
       continue;
     component_view=AcquireAuthenticCacheView(component_image,exception);
     bounding_box=object[i].bounding_box;
-    for (y=0; y < (ssize_t) bounding_box.height; y++)
-    {
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-        bounding_box.y+y,bounding_box.width,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        if ((ssize_t) GetPixelIndex(component_image,p) == i)
-          {
-            M00++;
-            M10+=x;
-            M01+=y;
-          }
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
-    }
+    if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
+          &M00,&M10,&M01,exception) == MagickFalse)
+      status=MagickFalse;
     centroid.x=M10*MagickSafeReciprocal(M00);
     centroid.y=M01*MagickSafeReciprocal(M00);
     for (y=0; y < (ssize_t) bounding_box.height; y++)
@@ -703,26 +705,9 @@ static void AngleThreshold(const Image *component_image,
       continue;
     component_view=AcquireAuthenticCacheView(component_image,exception);
     bounding_box=object[i].bounding_box;
-    for (y=0; y < (ssize_t) bounding_box.height; y++)
-    {
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-        bounding_box.y+y,bounding_box.width,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        if ((ssize_t) GetPixelIndex(component_image,p) == i)
-          {
-            M00++;
-            M10+=x;
-            M01+=y;
-          }
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
-    }
+    if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
+          &M00,&M10,&M01,exception) == MagickFalse)
+      status=MagickFalse;
     centroid.x=M10*MagickSafeReciprocal(M00);
     centroid.y=M01*MagickSafeReciprocal(M00);
     for (y=0; y < (ssize_t) bounding_box.height; y++)

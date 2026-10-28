@@ -85,6 +85,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/artifact.c \
   MagickCore/artifact.h \
   MagickCore/attribute.c \
+  MagickCore/attribute-hull.c \
+  MagickCore/attribute-bounds.c \
+  MagickCore/attribute-depth.c \
   MagickCore/attribute.h \
   MagickCore/blob.c \
   MagickCore/blob.h \
@@ -95,6 +98,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/cache-view.c \
   MagickCore/cache-view.h \
   MagickCore/channel.c \
+  MagickCore/channel-combine.c \
+  MagickCore/channel-alpha.c \
   MagickCore/channel.h \
   MagickCore/cipher.c \
   MagickCore/cipher.h \
@@ -120,10 +125,12 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/compress.c \
   MagickCore/compress.h \
   MagickCore/configure.c \
+  MagickCore/configure-paths.c \
   MagickCore/configure.h \
   MagickCore/constitute.c \
   MagickCore/constitute.h \
   MagickCore/decorate.c \
+  MagickCore/decorate-raise.c \
   MagickCore/decorate.h \
   MagickCore/delegate.c \
   MagickCore/delegate.h \
@@ -149,6 +156,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/exception.h \
   MagickCore/exception-private.h \
   MagickCore/feature.c \
+  MagickCore/feature-texture.c \
   MagickCore/feature.h \
   MagickCore/fourier.c \
   MagickCore/fourier.h \
@@ -159,6 +167,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/gem.h \
   MagickCore/gem-private.h \
   MagickCore/geometry.c \
+  MagickCore/geometry-meta.c \
+  MagickCore/geometry-parse.c \
   MagickCore/geometry.h \
   MagickCore/geometry-private.h \
   MagickCore/histogram.c \
@@ -166,11 +176,13 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/identify.c \
   MagickCore/identify.h \
   MagickCore/image.c \
+  MagickCore/image-filename.c \
   MagickCore/image.h \
   MagickCore/image-private.h \
   MagickCore/image-view.c \
   MagickCore/image-view.h \
   MagickCore/layer.c \
+  MagickCore/layer-merge.c \
   MagickCore/layer.h \
   MagickCore/linked-list.c \
   MagickCore/linked-list.h \
@@ -220,6 +232,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/paint.c \
   MagickCore/paint.h \
   MagickCore/pixel.c \
+  MagickCore/pixel-import.c \
+  MagickCore/pixel-export.c \
   MagickCore/pixel.h \
   MagickCore/pixel-accessor.h \
   MagickCore/pixel-private.h \
@@ -234,6 +248,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
   MagickCore/quantize.c \
+  MagickCore/quantize-posterize.c \
   MagickCore/quantize.h \
   MagickCore/quantum.c \
   MagickCore/quantum.h \
@@ -249,6 +264,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/resample.h \
   MagickCore/resample-private.h \
   MagickCore/resize.c \
+  MagickCore/resize-sample.c \
+  MagickCore/resize-scale.c \
+  MagickCore/resize-image.c \
   MagickCore/magnify.c \
   MagickCore/resize.h \
   MagickCore/resize-private.h \
@@ -261,6 +279,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/semaphore.h \
   MagickCore/semaphore-private.h \
   MagickCore/shear.c \
+  MagickCore/shear-rotate.c \
+  MagickCore/shear-deskew.c \
   MagickCore/shear.h \
   MagickCore/signature.c \
   MagickCore/signature.h \
@@ -270,6 +290,9 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/static.c \
   MagickCore/static.h \
   MagickCore/statistic.c \
+  MagickCore/statistic-function.c \
+  MagickCore/statistic-moments.c \
+  MagickCore/statistic-image.c \
   MagickCore/statistic.h \
   MagickCore/statistic-private.h \
   MagickCore/stream.c \
@@ -286,11 +309,16 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/timer.h \
   MagickCore/timer-private.h \
   MagickCore/token.c \
+  MagickCore/token-next.c \
+  MagickCore/token-glob.c \
   MagickCore/token.h \
   MagickCore/token-private.h \
   MagickCore/transform.c \
+  MagickCore/transform-tiles.c \
   MagickCore/transform.h \
   MagickCore/threshold.c \
+  MagickCore/threshold-adaptive.c \
+  MagickCore/threshold-auto.c \
   MagickCore/threshold.h \
   MagickCore/type.c \
   MagickCore/type.h \

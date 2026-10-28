@@ -18,6 +18,11 @@ OpenMP, compiled differently on every platform. Every recipe added since is list
 ## The three rules
 
 1. **One recipe, one function, one commit.** Never combine two recipes in one commit.
+   One exception (owner's decision, 2026-10-28): when the same recipe applied to each of
+   several functions on its own lowers the score (a file-size threshold, say) and the
+   pre-commit safeguard refuses it, but the set together raises it, the set may go in
+   one commit. Each function's change must still be the recipe's mechanical step, and
+   the commit message lists them.
 2. **Re-measure after every commit.** If the Code Health score improved, keep the step. If
    it fell, revert. If it did not move, keep the step only when it is part of a plan: the
    review (`python3 tools/ch.py --review <file>`) shows the targeted function left a smell
@@ -391,8 +396,23 @@ is worth it.
 2. No function may change linkage: a `static` stays `static` and must travel with every
    caller. A split that would need one widened is refused.
 3. The public function keeps its declaration in the header it already has.
+4. List the new file wherever the original is listed: `tools/register_source.py` does it
+   for `MagickCore/Makefile.am`, `Makefile.in` (by hand, mirroring what automake
+   generates), `MagickCore/Make.com` and `scripts/format_c_api_docs`.
+   `tools/split_source.py` does steps 1 and 2 and refuses a family that would need a
+   linkage change or a file-level macro on both sides; `--out` scores a split first.
 
-**Evidence level:** oracle.
+**Careful:**
+
+- The pre-commit gate requires a new file to score 10.0, which a split-off family never
+  does: it carries the original's findings with it. Commit after the gate has reported
+  only that failure (its check that the original does not lose health has then passed),
+  with `--no-verify`, run `tools/check_trailers.py` on the message by hand, and say so in
+  the message (the owner approved this, 2026-10-28). The Windows build configuration outside this repository still needs the
+  file; say that too.
+
+**Evidence level:** oracle, with `refactor_guard.py --combined` and `--combined --calls`
+over the pair.
 
 **Provenance:** founding recipe (2026-09-29).
 
@@ -869,6 +889,119 @@ Claude Code (Claude Opus 5.5) during task M02, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe J - Extract Accumulating Block Returning the Loop Status
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Complex
+Method*, *Large Method* or *Code Duplication*, and the block that would fix it sits in a
+parallel loop body, adds into two to four of the iteration's own accumulators, and also
+writes the loop's shared `status` (`status=MagickFalse;` when a cache read fails).
+
+**Not covered by:** Recipe T, which passes the block's other variables by value and so
+cannot return accumulators; Recipe K, whose step 2 refuses a block that writes `status`;
+Recipe E, whose OpenMP rule refuses both.
+
+**How:**
+
+1. The block contains no `#pragma omp` line, no `return` or `goto`, and no `continue` or
+   `break` that leaves it.
+2. The only variable declared outside the loop body that the block writes is `status`,
+   and only as `status=MagickFalse;`. The block does not read `status`.
+3. The block's accumulators are variables declared in the loop body, at most four, each
+   read after the block. Every other loop-body variable it writes is declared in the
+   block or is not read after it before being written again (a pixel pointer `p`, the
+   counters `x` and `y`): those are declared in the new function instead.
+4. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. It declares a local `status`, set to `MagickTrue` first; every
+   `status=MagickFalse;` stays as it is; the function ends with `return(status);`.
+5. Pass every variable the block only reads by value, pointers included. Pass each
+   scalar accumulator as a pointer, written `*v` (or `(*v)++`) at every use in the
+   block, and each array accumulator as a pointer whose uses do not change, as in
+   Recipe K.
+6. Where the block stood, write `if (Helper(...,&v,...) == MagickFalse)
+   status=MagickFalse;`, and check every argument against its parameter by reading.
+
+**Before:**
+
+```c
+    bounding_box=object[i].bounding_box;
+    for (y=0; y < (ssize_t) bounding_box.height; y++)
+    {
+      p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
+        bounding_box.y+y,bounding_box.width,1,exception);
+      if (p == (const Quantum *) NULL)
+        {
+          status=MagickFalse;
+          break;
+        }
+      for (x=0; x < (ssize_t) bounding_box.width; x++)
+      {
+        if ((ssize_t) GetPixelIndex(component_image,p) == i)
+          {
+            M00++;
+            M10+=x;
+            M01+=y;
+          }
+        p+=(ptrdiff_t) GetPixelChannels(component_image);
+      }
+    }
+    centroid.x=M10*MagickSafeReciprocal(M00);
+```
+
+**After:**
+
+```c
+static MagickBooleanType GetObjectCentroidSums(const Image *component_image,
+  CacheView *component_view,const RectangleInfo bounding_box,const ssize_t i,
+  double *M00,double *M10,double *M01,ExceptionInfo *exception)
+{
+  ...
+  status=MagickTrue;
+  for (y=0; y < (ssize_t) bounding_box.height; y++)
+  {
+    ...
+        {
+          status=MagickFalse;
+          break;
+        }
+    ...
+          (*M00)++;
+          *M10+=x;
+          *M01+=y;
+    ...
+  }
+  return(status);
+}
+...
+    if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
+          &M00,&M10,&M01,exception) == MagickFalse)
+      status=MagickFalse;
+```
+
+**Careful:**
+
+- The write to the shared `status` moves to the end of the block, as in Recipe T, whose
+  argument holds unchanged: the block does not read `status`, and OpenMP orders this
+  unsynchronised write against no other thread.
+- The accumulators are each iteration's own, as in Recipe K; `(*v)++` and `*v+=x` are the
+  same operations on the same objects, in the same order.
+- A `break` of a loop inside the block after `status=MagickFalse;` stays inside the new
+  function and ends the same loop. A block that tests `status`, such as a second pass
+  starting `if (status == MagickFalse) continue;`, is not this recipe.
+- Keep it to accumulations that are worth it: on `MotionBlurImage`'s kernel loops, where
+  the helper needs nine to eleven arguments, the plain loop gained 0.02 and the blended
+  one lost 0.02, and the Brain Method stayed; none was committed.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 checked by
+reading: the oracle runs single-threaded.
+
+**Provenance:** 2026-10-28, from `vision.c`'s `MajorAxisThreshold`, whose first moment
+pass (`M00`, `M10`, `M01`) recurs in `MinorAxisThreshold`, `EccentricityThreshold` and
+`AngleThreshold`; tried first on `MotionBlurImage`. The owner's "you can try 3" of the same
+day, on blocks that write `status` and accumulators. Added by Claude Code (Claude Opus 5.5)
+during task M101.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -1202,3 +1335,8 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-27 | NEW | F | Hoist Function-Local Static Data: a `static` declaration whose initialiser is data (a table, an `#if`-assembled string) and which nothing writes moves to directly above the function, proven by unchanged machine code and the same data (`tools/obj_same_code.sh`) | `GetMagickDelegates` (version.c's only finding: 130 lines, 124 of them one string); the same shape in `GetEXIFProperty`, `TransformsRGBImage`, `TransformSignature`, `AcquireResizeFilter` | mandate (2026-10-24) |
 | 2026-10-27 | AMEND | rule | *Two levels of evidence*: a function some case executes is oracle-verified for every recipe; no mutation run (readiness gate) before a step. Guard level stays for code no case reaches | The harness was built under mutation guidance and is finished; the 3SX and Jellyfin campaigns refactored without per-step mutation runs, and today's uncapped runs only confirmed it | owner |
 | 2026-10-27 | AMEND | O | Inside a parallel loop body: allowed when every variable the block writes is declared in that body and it writes nothing declared outside it (`status` included) and has no `#pragma omp` line, Recipe K's condition. Each thread's call then writes only that thread's variables, as the block did | `KmeansImage`'s nearest-centroid search (`k`, `min_distance`), `CannyEdgeImage`'s neighbour selection (`alpha_pixel`, `beta_pixel`), `DrawGradientImage`'s repeat offset (`offset`, `repeat`, `antialias`): selections over iteration-private variables, refused only by step 1 | mandate (2026-10-24) |
+| 2026-10-28 | AMEND | rule 1 | One commit may apply the same recipe to several functions when each step alone lowers the score and only the set raises it | pixel.c's five fixed-map Recipe E extractions: each alone 1.73 → 1.71 (the file passes a size threshold), all five 1.80; the pre-commit safeguard refuses the single steps (M100) | owner |
+| 2026-10-28 | AMEND | S | Step 4 (register the file; the two tools); *Careful*: how a split meets the pre-commit gate's new-file rule; evidence names the combined guards. Wording of what `magnify.c` (2026-10-24) and pixel.c's and resize.c's splits did | `MagnifyImage`, `ExportImagePixels`, `ImportImagePixels`, `ResizeImage` | mandate (2026-10-24) |
+| 2026-10-28 | NEW | J | Extract Accumulating Block Returning the Loop Status: a block in a parallel loop body that writes `status=MagickFalse` (without reading it) and two to four of the iteration's accumulators moves to a `static MagickBooleanType` function that returns its status and takes the accumulators by pointer (Recipes T and K together) | `vision.c`'s four moment-threshold functions share the first moment pass; one helper used by all four measures 2.35 → 2.59. On `MotionBlurImage`'s kernel loops it was flat or worse (9 to 11 arguments) | owner |
+| 2026-10-28 | AMEND | J | Step 5: an array accumulator goes as a pointer with its uses unchanged, as Recipe K already allows | `PerimeterThreshold`'s row loop counts into `pattern[4]`, the object's own array, and writes `status=MagickFalse` | mandate (2026-10-24) |
+| 2026-10-28 | AMEND | S | Scope: any MagickCore file whose family splits cleanly, not only the approved list; a split may lower MagickCore's per-file mean (the new file starts red) when it raises the original file; *Careful*'s new-file gate procedure confirmed | statistic.c's `StatisticImage` family (dry run 2.29 → 2.61); the per-file mean dip of the first three splits (4.97 → 4.96, line-weighted 3.149 → 3.200) | owner |
