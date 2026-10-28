@@ -794,6 +794,17 @@ static inline MagickBooleanType IsGreaterAdjacentObject(
     (neighbors[j] < id))) ? MagickTrue : MagickFalse);
 }
 
+static void MergeObjectsOutsideRange(CCObjectInfo *object,const size_t colors,
+  const ssize_t n,const CCThresholdRange *range)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) colors; i++)
+    if (IsMetricOutsideRange(object,i,n,range) != MagickFalse)
+      object[i].merge=MagickTrue;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1338,9 +1349,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="perimeter";
       PerimeterThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:circularity-threshold");
   if (artifact != (const char *) NULL)
@@ -1356,9 +1365,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="circularity";
       CircularityThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:diameter-threshold");
   if (artifact != (const char *) NULL)
@@ -1394,9 +1401,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="major-axis";
       MajorAxisThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:minor-axis-threshold");
   if (artifact != (const char *) NULL)
@@ -1412,9 +1417,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="minor-axis";
       MinorAxisThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:eccentricity-threshold");
   if (artifact != (const char *) NULL)
@@ -1430,9 +1433,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="eccentricity";
       EccentricityThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:angle-threshold");
   if (artifact != (const char *) NULL)
@@ -1448,9 +1449,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="angle";
       AngleThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   /*
     Merge any object not within the min and max area threshold.
