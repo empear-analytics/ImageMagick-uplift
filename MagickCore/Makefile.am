@@ -241,6 +241,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/profile.h \
   MagickCore/profile-private.h \
   MagickCore/quantize.c \
+  MagickCore/quantize-posterize.c \
   MagickCore/quantize.h \
   MagickCore/quantum.c \
   MagickCore/quantum.h \

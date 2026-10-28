@@ -93,6 +93,7 @@ $call Make property.c
 $call Make PreRvIcccm.c
 $call Make profile.c
 $call Make quantize.c
+$call Make quantize-posterize.c
 $call Make quantum.c
 $call Make quantum-export.c
 $call Make quantum-import.c

@@ -59,6 +59,7 @@ if ( ! GetOptions(
 	 'pixel-wand.c',
 	 'profile.c',
 	 'quantize.c',
+	 'quantize-posterize.c',
 	 'registry.c',
    'resource.c',
 	 'segment.c',
