@@ -54,6 +54,7 @@ $call Make effect.c
 $call Make enhance.c
 $call Make exception.c
 $call Make feature.c
+$call Make feature-texture.c
 $call Make fourier.c
 $call Make fx.c
 $call Make gem.c

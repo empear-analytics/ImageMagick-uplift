@@ -149,6 +149,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/exception.h \
   MagickCore/exception-private.h \
   MagickCore/feature.c \
+  MagickCore/feature-texture.c \
   MagickCore/feature.h \
   MagickCore/fourier.c \
   MagickCore/fourier.h \
