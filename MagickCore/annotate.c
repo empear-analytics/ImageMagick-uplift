@@ -354,6 +354,8 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   (void) memset(&metrics,0,sizeof(metrics));
   for (i=0; textlist[i] != (char *) NULL; i++)
   {
+    const RenderTarget target = { image, annotate };
+
     if (*textlist[i] == '\0')
       continue;
     /*
@@ -563,7 +565,6 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       default:
         break;
     }
-    const RenderTarget target = { image, annotate };
     status=RenderType(&target,&offset,&metrics,exception);
     if (status == MagickFalse)
       break;
