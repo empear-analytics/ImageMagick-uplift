@@ -357,9 +357,17 @@ static void ExportPixelChannel(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ExportAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   if (image->alpha_trait == UndefinedPixelTrait)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
@@ -3923,7 +3931,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
   {
     case AlphaQuantum:
     {
-      ExportAlphaQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ExportAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
     case BGRQuantum:
