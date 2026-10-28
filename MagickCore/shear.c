@@ -696,50 +696,19 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport Image *ShearImage(const Image *image,const double x_shear,
-  const double y_shear,ExceptionInfo *exception)
+static Image *ShearIntegralImage(const Image *image,Image *integral_image,
+  const PointInfo shear,ExceptionInfo *exception)
 {
   Image
-    *integral_image,
     *shear_image;
 
   MagickBooleanType
     status;
 
-  PointInfo
-    shear;
-
   RectangleInfo
     border_info,
     bounds;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((x_shear != 0.0) && (fmod(x_shear,90.0) == 0.0))
-    ThrowImageException(ImageError,"AngleIsDiscontinuous");
-  if ((y_shear != 0.0) && (fmod(y_shear,90.0) == 0.0))
-    ThrowImageException(ImageError,"AngleIsDiscontinuous");
-  /*
-    Initialize shear angle.
-  */
-  integral_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (integral_image == (Image *) NULL)
-    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  shear.x=(-tan(DegreesToRadians(fmod(x_shear,360.0))));
-  shear.y=tan(DegreesToRadians(fmod(y_shear,360.0)));
-  if ((shear.x == 0.0) && (shear.y == 0.0))
-    return(integral_image);
-  if (SetImageStorageClass(integral_image,DirectClass,exception) == MagickFalse)
-    {
-      integral_image=DestroyImage(integral_image);
-      return(integral_image);
-    }
-  if (integral_image->alpha_trait == UndefinedPixelTrait)
-    (void) SetImageAlphaChannel(integral_image,OpaqueAlphaChannel,exception);
   /*
     Compute image size.
   */
@@ -781,6 +750,52 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
       shear_image=DestroyImage(shear_image);
       return((Image *) NULL);
     }
+  return(shear_image);
+}
+
+MagickExport Image *ShearImage(const Image *image,const double x_shear,
+  const double y_shear,ExceptionInfo *exception)
+{
+  Image
+    *integral_image,
+    *shear_image;
+
+  MagickBooleanType
+    status;
+
+  PointInfo
+    shear;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if ((x_shear != 0.0) && (fmod(x_shear,90.0) == 0.0))
+    ThrowImageException(ImageError,"AngleIsDiscontinuous");
+  if ((y_shear != 0.0) && (fmod(y_shear,90.0) == 0.0))
+    ThrowImageException(ImageError,"AngleIsDiscontinuous");
+  /*
+    Initialize shear angle.
+  */
+  integral_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (integral_image == (Image *) NULL)
+    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+  shear.x=(-tan(DegreesToRadians(fmod(x_shear,360.0))));
+  shear.y=tan(DegreesToRadians(fmod(y_shear,360.0)));
+  if ((shear.x == 0.0) && (shear.y == 0.0))
+    return(integral_image);
+  if (SetImageStorageClass(integral_image,DirectClass,exception) == MagickFalse)
+    {
+      integral_image=DestroyImage(integral_image);
+      return(integral_image);
+    }
+  if (integral_image->alpha_trait == UndefinedPixelTrait)
+    (void) SetImageAlphaChannel(integral_image,OpaqueAlphaChannel,exception);
+  shear_image=ShearIntegralImage(image,integral_image,shear,exception);
+  if (shear_image == (Image *) NULL)
+    return((Image *) NULL);
   const CropToFitRegion crop_region = { shear.x, shear.y, (MagickRealType)
     image->columns, (MagickRealType) image->rows, MagickFalse };
   status=CropToFitImage(&shear_image,&crop_region,exception);
