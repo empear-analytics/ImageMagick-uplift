@@ -301,6 +301,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/transform.c \
   MagickCore/transform.h \
   MagickCore/threshold.c \
+  MagickCore/threshold-auto.c \
   MagickCore/threshold.h \
   MagickCore/type.c \
   MagickCore/type.h \
