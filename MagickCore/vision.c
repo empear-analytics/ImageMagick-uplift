@@ -805,6 +805,46 @@ static void MergeObjectsOutsideRange(CCObjectInfo *object,const size_t colors,
       object[i].merge=MagickTrue;
 }
 
+static void SetObjectMergeByIds(CCObjectInfo *object,const size_t colors,
+  const char *artifact,const MagickBooleanType merge)
+{
+  char
+    *c,
+    *d;
+
+  ssize_t
+    first,
+    last,
+    step;
+
+  for (c=(char *) artifact; *c != '\0'; )
+  {
+    while ((isspace((int) ((unsigned char) *c)) != 0) || (*c == ','))
+      c++;
+    d=c;
+    first=(ssize_t) strtol(c,&d,10);
+    if (d == c)
+      break;
+    c=d;
+    if (first < 0)
+      first+=(ssize_t) colors;
+    last=first;
+    while (isspace((int) ((unsigned char) *c)) != 0)
+      c++;
+    if (*c == '-')
+      {
+        last=(ssize_t) strtol(c+1,&c,10);
+        if (last < 0)
+          last+=(ssize_t) colors;
+      }
+    step=(ssize_t) (first > last ? -1 : 1);
+    for ( ; first != (last+step); first+=step)
+      if ((first >= 0) &&
+          (first < (ssize_t) colors))
+        object[first].merge=merge;
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -817,10 +857,6 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 
   CCObjectInfo
     *object;
-
-  char
-    *c,
-    *d;
 
   const char
     *artifact,
@@ -852,11 +888,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } },
     dx,
     dy,
-    first,
     i,
-    last,
     n,
-    step,
     y;
 
   /*
@@ -1205,32 +1238,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       */
       for (i=0; i < (ssize_t) component_image->colors; i++)
         object[i].merge=MagickTrue;
-      for (c=(char *) artifact; *c != '\0'; )
-      {
-        while ((isspace((int) ((unsigned char) *c)) != 0) || (*c == ','))
-          c++;
-        d=c;
-        first=(ssize_t) strtol(c,&d,10);
-        if (d == c)
-          break;
-        c=d;
-        if (first < 0)
-          first+=(ssize_t) component_image->colors;
-        last=first;
-        while (isspace((int) ((unsigned char) *c)) != 0)
-          c++;
-        if (*c == '-')
-          {
-            last=(ssize_t) strtol(c+1,&c,10);
-            if (last < 0)
-              last+=(ssize_t) component_image->colors;
-          }
-        step=(ssize_t) (first > last ? -1 : 1);
-        for ( ; first != (last+step); first+=step)
-          if ((first >= 0) &&
-              (first < (ssize_t) component_image->colors))
-            object[first].merge=MagickFalse;
-      }
+      SetObjectMergeByIds(object,component_image->colors,artifact,MagickFalse);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-top");
   if (artifact != (const char *) NULL)
@@ -1306,34 +1314,11 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   if (artifact == (const char *) NULL)
     artifact=GetImageArtifact(image,"connected-components:remove");
   if (artifact != (const char *) NULL)
-    for (c=(char *) artifact; *c != '\0'; )
     {
       /*
         Remove selected objects based on id, keep others.
       */
-      while ((isspace((int) ((unsigned char) *c)) != 0) || (*c == ','))
-        c++;
-      d=c;
-      first=(ssize_t) strtol(c,&d,10);
-      if (d == c)
-        break;
-      c=d;
-      if (first < 0)
-        first+=(ssize_t) component_image->colors;
-      last=first;
-      while (isspace((int) ((unsigned char) *c)) != 0)
-        c++;
-      if (*c == '-')
-        {
-          last=(ssize_t) strtol(c+1,&c,10);
-          if (last < 0)
-            last+=(ssize_t) component_image->colors;
-        }
-      step=(ssize_t) (first > last ? -1 : 1);
-      for ( ; first != (last+step); first+=step)
-        if ((first >= 0) &&
-            (first < (ssize_t) component_image->colors))
-          object[first].merge=MagickTrue;
+      SetObjectMergeByIds(object,component_image->colors,artifact,MagickTrue);
     }
   artifact=GetImageArtifact(image,"connected-components:perimeter-threshold");
   if (artifact != (const char *) NULL)
