@@ -221,10 +221,37 @@ Tried and left:
 - fourier.c's `ComplexImages` (3.27 → 3.65 dry): the include block carries the FFTW
   macro definitions (`cabs`, `carg`, `cimag`, `creal`), which the copied header would
   define in both files; the literal guard flagged them.
-- Families that split cleanly but move their file by under 0.2 (enhance.c's ten,
-  effect.c's `KuwaharaImage`, `LocalContrastImage`, `ShadeImage`, image.c's five, the X11
-  files) were not made; `InterpretImageFilename` (image.c 2.49 → 2.71) and
-  `PosterizeImage` (quantize.c 2.36 → 2.58) are the next candidates.
+- threshold.c's `OrderedDitherImage` (3.05 → 3.43 dry): it uses `struct _ThresholdMap`,
+  which threshold.c defines and keeps for `GetThresholdMap` and its readers.
+
+The three left were accepted by `tools/split_source.py` and failed at the build or the
+guard; the tool now refuses each kind with its reason (`2c8c839f6`).
+
+**Second round.** A rescan of the changed files found families that now raise their file
+by 0.2 or more:
+
+| Commit | Family moved | Original | New file |
+|---|---|---|---|
+| `b7df7b86a` | `IntegralRotateImage` | shear.c 4.68 → 6.46 | shear-rotate.c 7.05 |
+| `d112476b0` | `GetImageBoundingBox`, `CensusInfo` and its statics | attribute.c 3.87 → 5.19 | attribute-bounds.c 7.51 |
+| `a1bb1314f` | `GetImageMinimumBoundingBox`, `CaliperInfo` and its statics | attribute.c 5.19 → 5.64 | attribute-hull.c 8.49 |
+| `59ba5fb1a` | `FunctionImage` and its statics | statistic.c 2.97 → 3.23 | statistic-function.c 8.70 |
+| `a2413bce4` | `PosterizeImage` and its statics | quantize.c 2.36 → 2.58 | quantize-posterize.c 8.18 |
+| `3055af531` | `InterpretImageFilename` and its statics | image.c 2.49 → 2.71 | image-filename.c 7.32 |
+| `7503478c6` | `SampleImage` and its statics | resize.c 4.52 → 4.78 | resize-sample.c 9.10 |
+| `caa3018a8` | `ParseMetaGeometry` and its statics | geometry.c 6.90 → 7.40 | geometry-meta.c 8.73 |
+| `2d052c5c1` | `AdaptiveThresholdImage` and its statics | threshold.c 3.05 → 3.28 | threshold-adaptive.c 8.76 |
+
+Oracle on each family's cases, 0 diverged (`InterpretImageFilename` 12,656 cases,
+`ParseMetaGeometry` 1,587). One batch failed for a build reason, not a code one: a step
+reset by `git reset --hard` restored threshold.c within the same second its object had
+been built from the split version, so make kept the stale object and the next five
+builds failed to link `OrderedDitherImage`. Touching the restored file fixed it.
+
+A third scan of the same files finds no family above 0.2 except in files left above
+(image.c's are 0.06 at most). The families that split cleanly but move their file by
+less than 0.2 (enhance.c's ten, effect.c's six, image.c's five, the X11 files) were not
+made.
 
 ### Sweep (2026-10-28, 00:20): where the night ends
 
