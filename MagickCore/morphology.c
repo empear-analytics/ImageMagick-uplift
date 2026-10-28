@@ -4147,6 +4147,8 @@ MagickPrivate Image *MorphologyApply(const Image *image,
         kernel_changed = 0;
         changed = 1;
         while ( kernel_loop < kernel_limit && changed > 0 ) {
+          const MorphologyPass pass = { primitive, this_kernel, bias };
+
           kernel_loop++;     /* the iteration of this kernel */
 
           /* Create a clone as the destination image, if not yet defined */
@@ -4161,7 +4163,6 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
           /* APPLY THE MORPHOLOGICAL PRIMITIVE (curr -> work) */
           count++;
-          const MorphologyPass pass = { primitive, this_kernel, bias };
           changed = MorphologyPrimitive(curr_image, work_image, &pass,
                        exception);
           if (verbose != MagickFalse) {

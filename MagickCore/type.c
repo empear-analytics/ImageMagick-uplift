@@ -205,11 +205,14 @@ static SplayTreeInfo *AcquireTypeCache(const char *filename,
   SplayTreeInfo
     *cache;
 
+  TypeLoadTarget target;
+
   cache=NewSplayTree(CompareSplayTreeString,(void *(*)(void *)) NULL,
     DestroyTypeNode);
   if (cache == (SplayTreeInfo *) NULL)
     ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  const TypeLoadTarget target = { cache, exception };
+  target.cache=cache;
+  target.exception=exception;
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {

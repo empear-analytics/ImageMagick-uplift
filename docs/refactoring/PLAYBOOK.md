@@ -710,15 +710,20 @@ merges code, not parameters.
 3. Replace the group with one parameter `const Name *name`, and in the body write
    `name->member` for each use, or declare a `const` local of the old name initialised
    from the member at the top of the body. Change nothing else.
-4. In each caller, declare a `const Name` local initialised from the exact argument
-   expressions, member by member in declaration order. Each expression must be an
-   identifier, a literal, or arithmetic on these (`1.0/scale`), not a call, a
-   dereference or anything with a side effect. Member accesses (`shear.x`,
-   `image->rows`) and casts of these forms are allowed too, but only in a struct
-   declared directly before the one call that uses it, with no statement between.
-5. Nothing may write an identifier in the struct's initialiser between the declaration
-   and the last call that uses the struct; declare it where that holds (inside the loop
-   iteration, or just before a single call).
+4. In each caller, a `Name` local holds the exact argument expressions, member by
+   member in declaration order. Each expression must be an identifier, a literal, or
+   arithmetic on these (`1.0/scale`), not a call, a dereference or anything with a side
+   effect. Member accesses (`shear.x`, `image->rows`) and casts of these forms are
+   allowed too, but only in a struct filled directly before the one call that uses it,
+   with no statement between.
+5. Declare the local among the declarations at the top of the block that holds its
+   calls (the loop body, for a struct per iteration), never after a statement: the
+   macOS CI job compiles with `-Wdeclaration-after-statement -Werror`. Nothing may
+   write an identifier of the initialiser between the point where the struct takes its
+   values and its last call. Where that point can be the declaration, and the
+   initialiser has no member access or cast, declare it `const` with the initialiser.
+   Otherwise declare it without `const` or initialiser, and fill it at that point,
+   `name.member=expr;` for every member in declaration order, with nothing between.
 6. A struct declared outside a `#pragma omp` region and read inside it is `const`, and
    none of its members point to data the region writes through the struct.
 7. At each call, replace the group with `&name`, and check by reading that every member
@@ -784,6 +789,11 @@ static inline void CopyPixels(const MagnifyPixels *magnify,
   writes the object through another pointer, so the value is the one the call would
   have read. The expression has no call and no side effect, so evaluating it first
   changes nothing, whatever order the call's arguments were evaluated in.
+- A struct filled member by member holds what the `const` initialiser would have: the
+  same expressions, evaluated in the same order, directly before the call. Nothing
+  checks that every member is assigned (an unassigned one is read uninitialised), so
+  count them against the typedef. Not `const`, it may not be read inside an OpenMP
+  region (step 6).
 - An arithmetic member (`1.0/scale`) is computed once, at the declaration, instead of at
   every call. Step 5 keeps its operands unchanged until the last call, so each call
   receives the value it computed before; the member has the parameter's type, so the
@@ -1296,7 +1306,9 @@ and you do not add one, record it here: the file, its score, and the smells left
 
 After every commit, as [`AGENTS.md`](../../AGENTS.md) sets out:
 
-1. `tools/oracle/build.sh cand`
+1. `tools/oracle/build.sh cand`, then `tools/ci_warnings.sh <file>`: the oracle builds
+   accept what ImageMagick's own CI rejects (a declaration after a statement, a variable
+   MSVC cannot prove initialised)
 2. `python3 tools/refactor_guard.py <file>` (with `--calls` after Recipe E or S;
    always with `--calls` at the guard-verified level)
 3. `python3 tools/oracle/oracle.py run --function <Function>` (at the guard-verified
@@ -1340,3 +1352,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-28 | NEW | J | Extract Accumulating Block Returning the Loop Status: a block in a parallel loop body that writes `status=MagickFalse` (without reading it) and two to four of the iteration's accumulators moves to a `static MagickBooleanType` function that returns its status and takes the accumulators by pointer (Recipes T and K together) | `vision.c`'s four moment-threshold functions share the first moment pass; one helper used by all four measures 2.35 → 2.59. On `MotionBlurImage`'s kernel loops it was flat or worse (9 to 11 arguments) | owner |
 | 2026-10-28 | AMEND | J | Step 5: an array accumulator goes as a pointer with its uses unchanged, as Recipe K already allows | `PerimeterThreshold`'s row loop counts into `pattern[4]`, the object's own array, and writes `status=MagickFalse` | mandate (2026-10-24) |
 | 2026-10-28 | AMEND | S | Scope: any MagickCore file whose family splits cleanly, not only the approved list; a split may lower MagickCore's per-file mean (the new file starts red) when it raises the original file; *Careful*'s new-file gate procedure confirmed | statistic.c's `StatisticImage` family (dry run 2.29 → 2.61); the per-file mean dip of the first three splits (4.97 → 4.96, line-weighted 3.149 → 3.200) | owner |
+| 2026-10-28 | AMEND | B | Step 5: the struct is declared among the declarations at the top of the block holding its calls, `const` with its initialiser where its operands are final there, otherwise filled member by member where it takes its values; `tools/ci_warnings.sh` joins the verification loop | `Main`'s macOS arm64 job (`-Wdeclaration-after-statement -Werror`) has failed on every merge since #31: 40 structs declared after statements in 20 files, as step 4's "directly before the call" placed them | mandate (2026-10-24) |

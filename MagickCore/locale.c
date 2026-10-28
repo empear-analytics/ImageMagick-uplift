@@ -210,9 +210,13 @@ static SplayTreeInfo *AcquireLocaleSplayTree(const char *filename,
   SplayTreeInfo
     *cache;
 
+  LocaleLoadTarget target;
+
   cache=NewSplayTree(CompareSplayTreeString,(void *(*)(void *)) NULL,
     DestroyLocaleNode);
-  const LocaleLoadTarget target = { cache, locale, exception };
+  target.cache=cache;
+  target.locale=locale;
+  target.exception=exception;
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {

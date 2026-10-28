@@ -700,8 +700,12 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
   ssize_t
     i;
 
+  ChannelMomentsReport report;
+
   scale=(double) ((1UL << image->depth)-1);
-  const ChannelMomentsReport report = { file, scale, channel_moments };
+  report.file=file;
+  report.scale=scale;
+  report.channel_moments=channel_moments;
 
   (void) FormatLocaleFile(file,"  Channel Hu moments:\n");
   switch (colorspace)
@@ -1224,6 +1228,8 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       StatisticType
         statistic_type;
 
+      ChannelLocationsReport report;
+
       /*
         Display minimum, maximum, or mean pixel locations.
       */
@@ -1236,8 +1242,11 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       channel_statistics=GetLocationStatistics(image,statistic_type,exception);
       if (channel_statistics == (ChannelStatistics *) NULL)
         return(MagickFalse);
-      const ChannelLocationsReport report = { file, image, statistic_type,
-        locations, channel_statistics };
+      report.file=file;
+      report.image=image;
+      report.type=statistic_type;
+      report.locations=locations;
+      report.channel_statistics=channel_statistics;
 
       (void) FormatLocaleFile(file,"Channel %s locations:\n",locate);
       switch (colorspace)
@@ -1463,6 +1472,8 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     image->number_channels,(double) image->number_meta_channels);
   if (channel_statistics != (ChannelStatistics *) NULL)
     {
+      ChannelStatisticsReport report;
+
       /*
         Detail channel depth and extrema.
       */
@@ -1471,8 +1482,9 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       if (image->depth <= MAGICKCORE_QUANTUM_DEPTH)
         scale=(double) (QuantumRange/((size_t) QuantumRange >> ((size_t)
           MAGICKCORE_QUANTUM_DEPTH-image->depth)));
-      const ChannelStatisticsReport report = { file, 1.0/scale,
-        channel_statistics };
+      report.file=file;
+      report.scale=1.0/scale;
+      report.channel_statistics=channel_statistics;
 
       (void) FormatLocaleFile(file,"  Channel statistics:\n");
       (void) FormatLocaleFile(file,"    Pixels: %.17g\n",(double)

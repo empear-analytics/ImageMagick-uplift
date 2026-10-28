@@ -570,6 +570,10 @@ static Image *BlendDivergentImage(const Image *alpha_image,
     *magnitude_alpha = (Image *) NULL,
     *magnitude_beta = (Image *) NULL;
 
+  BlendMagnitudePair magnitudes;
+
+  const BlendSumWeights quarter_sum = { 0.25, 1.0 };
+
   /*
     Create X and Y gradient images for alpha image and the magnitude.
   */
@@ -615,9 +619,8 @@ static Image *BlendDivergentImage(const Image *alpha_image,
   /*
     Select alpha or beta gradient for larger of two magnitudes.
   */
-  const BlendMagnitudePair
-    magnitudes = { magnitude_alpha, magnitude_beta };
-
+  magnitudes.alpha_image=magnitude_alpha;
+  magnitudes.beta_image=magnitude_beta;
   dx_image=BlendMaxMagnitudeImage(&magnitudes,dx_alpha,dx_beta,exception);
   if (dx_image == (Image *) NULL)
     {
@@ -649,9 +652,6 @@ static Image *BlendDivergentImage(const Image *alpha_image,
       FreeDivergentResources();
       return((Image *) NULL);
     }
-  const BlendSumWeights
-    quarter_sum = { 0.25, 1.0 };
-
   divergent_image=BlendSumImage(dx_divergent,dy_divergent,&quarter_sum,
     exception);
   dy_divergent=DestroyImage(dy_divergent);
@@ -1245,6 +1245,8 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
   ssize_t
     i;
 
+  const CompositePlacement placement = { MagickTrue, x_offset, y_offset };
+
   /*
     Saliency blend composite operator.
   */
@@ -1303,22 +1305,19 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
       *convolve_image,
       *sum_image;
 
+    const BlendSumWeights difference = { 1.0, -1.0 };
+    const CompositePlacement origin = { MagickTrue, 0, 0 };
+
     convolve_image=ConvolveImage(relax_image,kernel_info,exception);
     if (convolve_image == (Image *) NULL)
       break;
     relax_image=DestroyImage(relax_image);
     relax_image=convolve_image;
-    const BlendSumWeights
-      difference = { 1.0, -1.0 };
-
     sum_image=BlendSumImage(relax_image,divergent_image,&difference,exception);
     if (sum_image == (Image *) NULL)
       break;
     relax_image=DestroyImage(relax_image);
     relax_image=sum_image;
-    const CompositePlacement
-      origin = { MagickTrue, 0, 0 };
-
     status=CompositeOverImage(relax_image,crop_image,&origin,exception);
     if (status == MagickFalse)
       break;
@@ -1346,9 +1345,6 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
   /*
     Composite relaxed over the background image.
   */
-  const CompositePlacement
-    placement = { MagickTrue, x_offset, y_offset };
-
   status=CompositeOverImage(image,relax_image,&placement,exception);
   relax_image=DestroyImage(relax_image);
   return(status);
@@ -1385,6 +1381,10 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
   ssize_t
     i;
 
+  const BlendSumWeights difference = { 1.0, -1.0 };
+  const BlendSumWeights sum = { 1.0, 1.0 };
+  const CompositePlacement placement = { MagickTrue, x_offset, y_offset };
+
   /*
     Seamless blend composite operator.
   */
@@ -1393,9 +1393,6 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
     return(MagickFalse);
   DisableCompositeClampUnlessSpecified(crop_image);
   (void) ResetImagePage(crop_image,"0x0+0+0");
-  const BlendSumWeights
-    difference = { 1.0, -1.0 };
-
   sum_image=BlendSumImage(crop_image,source_image,&difference,exception);
   crop_image=DestroyImage(crop_image);
   if (sum_image == (Image *) NULL)
@@ -1446,14 +1443,13 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
     Image
       *convolve_image;
 
+    const CompositePlacement origin = { MagickTrue, 0, 0 };
+
     convolve_image=ConvolveImage(relax_image,kernel_info,exception);
     if (convolve_image == (Image *) NULL)
       break;
     relax_image=DestroyImage(relax_image);
     relax_image=convolve_image;
-    const CompositePlacement
-      origin = { MagickTrue, 0, 0 };
-
     status=CompositeOverImage(relax_image,mean_image,&origin,exception);
     if (status == MagickFalse)
       break;
@@ -1481,18 +1477,12 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
   /*
     Composite the foreground image over the background image.
   */
-  const BlendSumWeights
-    sum = { 1.0, 1.0 };
-
   foreground_image=BlendSumImage(source_image,relax_image,&sum,exception);
   relax_image=DestroyImage(relax_image);
   if (foreground_image == (Image *) NULL)
     return(MagickFalse);
   (void) SetImageMask(foreground_image,ReadPixelMask,(const Image *) NULL,
     exception);
-  const CompositePlacement
-    placement = { MagickTrue, x_offset, y_offset };
-
   status=CompositeOverImage(image,foreground_image,&placement,exception);
   foreground_image=DestroyImage(foreground_image);
   return(status);

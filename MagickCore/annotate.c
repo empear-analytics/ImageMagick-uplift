@@ -354,6 +354,8 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   (void) memset(&metrics,0,sizeof(metrics));
   for (i=0; textlist[i] != (char *) NULL; i++)
   {
+    const RenderTarget target = { image, annotate };
+
     if (*textlist[i] == '\0')
       continue;
     /*
@@ -563,7 +565,6 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       default:
         break;
     }
-    const RenderTarget target = { image, annotate };
     status=RenderType(&target,&offset,&metrics,exception);
     if (status == MagickFalse)
       break;
@@ -956,6 +957,8 @@ MagickExport MagickBooleanType GetTypeMetrics(Image *image,
   PointInfo
     offset;
 
+  RenderTarget target;
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
@@ -969,7 +972,8 @@ MagickExport MagickBooleanType GetTypeMetrics(Image *image,
   (void) memset(metrics,0,sizeof(*metrics));
   offset.x=0.0;
   offset.y=0.0;
-  const RenderTarget target = { image, annotate_info };
+  target.image=image;
+  target.draw_info=annotate_info;
   status=RenderType(&target,&offset,metrics,exception);
   if (draw_info->debug != MagickFalse)
     (void) LogMagickEvent(AnnotateEvent,GetMagickModule(),"Metrics: text: %s; "
@@ -985,6 +989,59 @@ MagickExport MagickBooleanType GetTypeMetrics(Image *image,
   return(status);
 }
 
+static const TypeInfo *GetDefaultTypeInfo(const DrawInfo *draw_info,
+  const TypeInfo *type_info)
+{
+  ExceptionInfo
+    *sans_exception;
+
+  /*
+    Search for a default font.
+  */
+  sans_exception=AcquireExceptionInfo();
+  if (type_info == (const TypeInfo *) NULL)
+    type_info=GetTypeInfoByFamily((const char *) NULL,draw_info->style,
+      draw_info->stretch,draw_info->weight,sans_exception);
+  if (type_info == (const TypeInfo *) NULL)
+    type_info=GetTypeInfo("*",sans_exception);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  return(type_info);
+}
+
+static const TypeInfo *GetTypeInfoByFamilyList(const DrawInfo *draw_info,
+  const TypeInfo *type_info,ExceptionInfo *exception)
+{
+  char
+    **family;
+
+  int
+    number_families;
+
+  ssize_t
+    i;
+
+  /*
+    Parse font family list.
+  */
+  family=StringToArgv(draw_info->family,&number_families);
+  for (i=1; i < (ssize_t) number_families; i++)
+  {
+    (void) SubstituteString(&family[i],",","");
+    type_info=GetTypeInfoByFamily(family[i],draw_info->style,
+      draw_info->stretch,draw_info->weight,exception);
+    if ((type_info != (const TypeInfo *) NULL) &&
+        (LocaleCompare(family[i],type_info->family) == 0))
+      break;
+  }
+  for (i=0; i < (ssize_t) number_families; i++)
+    family[i]=DestroyString(family[i]);
+  family=(char **) RelinquishMagickMemory(family);
+  if (type_info == (const TypeInfo *) NULL)
+    (void) ThrowMagickException(exception,GetMagickModule(),TypeWarning,
+      "UnableToReadFont","`%s'",draw_info->family);
+  return(type_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1036,6 +1093,8 @@ static MagickBooleanType RenderType(const RenderTarget *target,
   MagickBooleanType
     status;
 
+  FreetypeTarget freetype;
+
   type_info=(const TypeInfo *) NULL;
   if (draw_info->font != (char *) NULL)
     {
@@ -1069,36 +1128,7 @@ static MagickBooleanType RenderType(const RenderTarget *target,
         type_info=GetTypeInfoByFamily(draw_info->family,draw_info->style,
           draw_info->stretch,draw_info->weight,exception);
       if (type_info == (const TypeInfo *) NULL)
-        {
-          char
-            **family;
-
-          int
-            number_families;
-
-          ssize_t
-            i;
-
-          /*
-            Parse font family list.
-          */
-          family=StringToArgv(draw_info->family,&number_families);
-          for (i=1; i < (ssize_t) number_families; i++)
-          {
-            (void) SubstituteString(&family[i],",","");
-            type_info=GetTypeInfoByFamily(family[i],draw_info->style,
-              draw_info->stretch,draw_info->weight,exception);
-            if ((type_info != (const TypeInfo *) NULL) &&
-                (LocaleCompare(family[i],type_info->family) == 0))
-              break;
-          }
-          for (i=0; i < (ssize_t) number_families; i++)
-            family[i]=DestroyString(family[i]);
-          family=(char **) RelinquishMagickMemory(family);
-          if (type_info == (const TypeInfo *) NULL)
-            (void) ThrowMagickException(exception,GetMagickModule(),TypeWarning,
-              "UnableToReadFont","`%s'",draw_info->family);
-        }
+        type_info=GetTypeInfoByFamilyList(draw_info,type_info,exception);
     }
   font=GetPolicyValue("system:font");
   if (font != (char *) NULL)
@@ -1110,8 +1140,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
           */
           annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
           annotate_info->font=font;
-          const FreetypeTarget freetype = { image, annotate_info,
-            annotate_info->encoding };
+          freetype.image=image;
+          freetype.draw_info=annotate_info;
+          freetype.encoding=annotate_info->encoding;
           status=RenderFreetype(&freetype,offset,metrics,exception);
           annotate_info=DestroyDrawInfo(annotate_info);
           return(status);
@@ -1119,21 +1150,7 @@ static MagickBooleanType RenderType(const RenderTarget *target,
       font=DestroyString(font);
     }
   if (type_info == (const TypeInfo *) NULL)
-    {
-      ExceptionInfo
-        *sans_exception;
-
-      /*
-        Search for a default font.
-      */
-      sans_exception=AcquireExceptionInfo();
-      if (type_info == (const TypeInfo *) NULL)
-        type_info=GetTypeInfoByFamily((const char *) NULL,draw_info->style,
-          draw_info->stretch,draw_info->weight,sans_exception);
-      if (type_info == (const TypeInfo *) NULL)
-        type_info=GetTypeInfo("*",sans_exception);
-      sans_exception=DestroyExceptionInfo(sans_exception);
-    }
+    type_info=GetDefaultTypeInfo(draw_info,type_info);
   if (type_info == (const TypeInfo *) NULL)
     {
       const FreetypeTarget freetype = { image, draw_info, draw_info->encoding };
@@ -1146,8 +1163,9 @@ static MagickBooleanType RenderType(const RenderTarget *target,
     (void) CloneString(&annotate_info->metrics,type_info->metrics);
   if (type_info->glyphs != (char *) NULL)
     (void) CloneString(&annotate_info->font,type_info->glyphs);
-  const FreetypeTarget freetype = { image, annotate_info,
-    type_info->encoding };
+  freetype.image=image;
+  freetype.draw_info=annotate_info;
+  freetype.encoding=type_info->encoding;
   status=RenderFreetype(&freetype,offset,metrics,exception);
   annotate_info=DestroyDrawInfo(annotate_info);
   return(status);

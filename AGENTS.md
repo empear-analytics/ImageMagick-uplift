@@ -41,7 +41,9 @@ status, stdout, stderr and every output byte are **identical**. There is no tole
 If you were given a task ID, your instructions are in
 [`docs/refactoring/tasks/`](docs/refactoring/tasks/). Read, in order:
 
-1. Your task file, if you have one
+1. Your task file, if you have one, and
+   [`docs/refactoring/CAMPAIGNS.md`](docs/refactoring/CAMPAIGNS.md) - two campaigns run
+   at once, on two machines; it says which files are yours
 2. [`docs/refactoring/PLAYBOOK.md`](docs/refactoring/PLAYBOOK.md) - the catalogue
    of allowed changes
 3. [`docs/refactoring/README.md`](docs/refactoring/README.md) - campaign rules and scope
@@ -105,8 +107,9 @@ guard alone.
 Run all four, in this order:
 
 ```bash
-# 1. it still builds
+# 1. it still builds, also under ImageMagick's own CI warnings (macOS -Werror, MSVC)
 tools/oracle/build.sh cand
+tools/ci_warnings.sh <the file you changed>
 
 # 2. no constant was removed or altered (add --calls after an extract or split)
 python3 tools/refactor_guard.py <the file you changed>

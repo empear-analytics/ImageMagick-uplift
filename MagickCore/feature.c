@@ -421,6 +421,8 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   ssize_t
     y;
 
+  CannyTrace trace;
+
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
@@ -570,8 +572,10 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
     Hysteresis threshold.
   */
   edge_view=AcquireAuthenticCacheView(edge_image,exception);
-  const CannyTrace trace = { edge_image, edge_view, canny_cache,
-    lower_threshold };
+  trace.edge_image=edge_image;
+  trace.edge_view=edge_view;
+  trace.canny_cache=canny_cache;
+  trace.lower_threshold=lower_threshold;
 
   for (y=0; y < (ssize_t) edge_image->rows; y++)
   {

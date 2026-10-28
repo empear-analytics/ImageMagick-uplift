@@ -1518,6 +1518,9 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
   PolicyInfo
     *p;
 
+  PolicyLoadTarget policy_target;
+  PolicyLoadTarget user_target;
+
   /*
     Load user policies.
   */
@@ -1527,7 +1530,8 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
   if (ValidateSecurityPolicy(policy,PolicyFilename,exception) == MagickFalse)
     return(MagickFalse);
   LockSemaphoreInfo(policy_semaphore);
-  const PolicyLoadTarget policy_target = { policy_cache, exception };
+  policy_target.cache=policy_cache;
+  policy_target.exception=exception;
   status=LoadPolicyCache(&policy_target,policy,"[user-policy]",0);
   UnlockSemaphoreInfo(policy_semaphore);
   if (status == MagickFalse)
@@ -1536,7 +1540,8 @@ MagickExport MagickBooleanType SetMagickSecurityPolicy(const char *policy,
     Synchronize user policies.
   */
   user_policies=NewLinkedList(0);
-  const PolicyLoadTarget user_target = { user_policies, exception };
+  user_target.cache=user_policies;
+  user_target.exception=exception;
   status=LoadPolicyCache(&user_target,policy,"[user-policy]",0);
   if (status == MagickFalse)
     {

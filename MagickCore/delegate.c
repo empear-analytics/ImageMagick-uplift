@@ -231,8 +231,11 @@ static LinkedListInfo *AcquireDelegateCache(const char *filename,
   LinkedListInfo
     *cache;
 
+  DelegateLoadTarget target;
+
   cache=NewLinkedList(0);
-  const DelegateLoadTarget target = { cache, exception };
+  target.cache=cache;
+  target.exception=exception;
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {

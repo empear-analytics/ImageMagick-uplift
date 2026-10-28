@@ -2019,6 +2019,8 @@ static MagickBooleanType DitherImage(Image *image,QCubeInfo *cube_info,
     extent,
     level;
 
+  RiemersmaCurve curve;
+
   artifact=GetImageArtifact(image,"dither:diffusion-amount");
   if (artifact != (const char *) NULL)
     cube_info->diffusion=StringToDoubleInterval(artifact,1.0);
@@ -2038,8 +2040,9 @@ static MagickBooleanType DitherImage(Image *image,QCubeInfo *cube_info,
   cube_info->span=(MagickSizeType) image->columns*image->rows;
   image_view=AcquireAuthenticCacheView(image,exception);
   status=MagickTrue;
-  const RiemersmaCurve
-    curve = { image, image_view, cube_info };
+  curve.image=image;
+  curve.image_view=image_view;
+  curve.cube_info=cube_info;
 
   if (level > 0)
     status=Riemersma(&curve,level,NorthGravity,exception);
