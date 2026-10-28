@@ -4428,6 +4428,8 @@ MagickPrivate MagickBooleanType FxEvaluateChannelExpression (
 
   fxFltType ret;
 
+  const fxPixelPosT pos = { channel, x, y };
+
   assert (pfx != NULL);
   assert (pfx->image != NULL);
   assert (pfx->Images != NULL);
@@ -4436,8 +4438,6 @@ MagickPrivate MagickBooleanType FxEvaluateChannelExpression (
 
   pfx->fxrts[id].thisPixel = NULL;
 
-
-  const fxPixelPosT pos = { channel, x, y };
 
   if (!ExecuteRPN (pfx, &pfx->fxrts[id], &ret, &pos)) {
     (void) ThrowMagickException (
