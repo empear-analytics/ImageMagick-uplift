@@ -627,6 +627,28 @@ MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType IsPixelInColorRange(const Image *image,
+  const PixelInfo *start,const PixelInfo *stop,const Quantum *q)
+{
+  MagickBooleanType
+    foreground = MagickTrue;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if (((double) q[i] < GetPixelInfoChannel(start,channel)) ||
+        ((double) q[i] > GetPixelInfoChannel(stop,channel)))
+      foreground=MagickFalse;
+  }
+  return(foreground);
+}
+
 MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   const PixelInfo *start_color,const PixelInfo *stop_color,
   ExceptionInfo *exception)
@@ -774,19 +796,7 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
       MagickBooleanType
         foreground = MagickTrue;
 
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (((double) q[i] < GetPixelInfoChannel(&start,channel)) ||
-            ((double) q[i] > GetPixelInfoChannel(&stop,channel)))
-          foreground=MagickFalse;
-      }
+      foreground=IsPixelInColorRange(image,&start,&stop,q);
       SetPixelIndex(image,(Quantum) (foreground != MagickFalse ? 1 : 0),q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
