@@ -993,6 +993,37 @@ static void PrintObjectsHeader(const Image *image,const char **metrics,
     }
 }
 
+static void PrintObject(const Image *image,const CCObjectInfo *object,
+  const ssize_t i,const ssize_t n)
+{
+  char
+    mean_color[MagickPathExtent];
+
+  const char
+    *artifact;
+
+  ssize_t
+    j;
+
+  GetColorTuple(&object[i].color,MagickFalse,mean_color);
+  (void) fprintf(stdout,"  ");
+  artifact=GetImageArtifact(image,
+    "connected-components:exclude-ids");
+  if (IsStringTrue(artifact) == MagickFalse)
+    (void) fprintf(stdout,"%.17g: ",(double) object[i].id);
+  (void) fprintf(stdout,
+    "%.17gx%.17g%+.20g%+.20g %.1f,%.1f %.*g %s",(double)
+    object[i].bounding_box.width,(double)
+    object[i].bounding_box.height,(double)
+    object[i].bounding_box.x,(double) object[i].bounding_box.y,
+    object[i].centroid.x,object[i].centroid.y,
+    GetMagickPrecision(),(double) object[i].area,mean_color);
+  for (j=0; j <= n; j++)
+    (void) fprintf(stdout," %.*g",GetMagickPrecision(),
+      object[i].metric[j]);
+  (void) fprintf(stdout,"\n");
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1768,34 +1799,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         CCObjectInfoCompare);
       if (objects == (CCObjectInfo **) NULL)
         {
-          ssize_t
-            j;
-
           PrintObjectsHeader(image,metrics,n);
           for (i=0; i < (ssize_t) component_image->colors; i++)
             if (object[i].census > 0.0)
-              {
-                char
-                  mean_color[MagickPathExtent];
-
-                GetColorTuple(&object[i].color,MagickFalse,mean_color);
-                (void) fprintf(stdout,"  ");
-                artifact=GetImageArtifact(image,
-                  "connected-components:exclude-ids");
-                if (IsStringTrue(artifact) == MagickFalse)
-                  (void) fprintf(stdout,"%.17g: ",(double) object[i].id);
-                (void) fprintf(stdout,
-                  "%.17gx%.17g%+.20g%+.20g %.1f,%.1f %.*g %s",(double)
-                  object[i].bounding_box.width,(double)
-                  object[i].bounding_box.height,(double)
-                  object[i].bounding_box.x,(double) object[i].bounding_box.y,
-                  object[i].centroid.x,object[i].centroid.y,
-                  GetMagickPrecision(),(double) object[i].area,mean_color);
-                for (j=0; j <= n; j++)
-                  (void) fprintf(stdout," %.*g",GetMagickPrecision(),
-                    object[i].metric[j]);
-                (void) fprintf(stdout,"\n");
-              }
+              PrintObject(image,object,i,n);
         }
     }
   if (objects == (CCObjectInfo **) NULL)
