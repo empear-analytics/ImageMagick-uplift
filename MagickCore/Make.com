@@ -66,6 +66,7 @@ $call Make hashmap.c
 $call Make histogram.c
 $call Make identify.c
 $call Make image.c
+$call Make image-filename.c
 $call Make image-view.c
 $call Make layer.c
 $call Make layer-merge.c

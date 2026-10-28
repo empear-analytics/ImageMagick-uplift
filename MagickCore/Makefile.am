@@ -170,6 +170,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/identify.c \
   MagickCore/identify.h \
   MagickCore/image.c \
+  MagickCore/image-filename.c \
   MagickCore/image.h \
   MagickCore/image-private.h \
   MagickCore/image-view.c \

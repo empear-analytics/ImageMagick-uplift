@@ -48,6 +48,7 @@ if ( ! GetOptions(
 	 'exception.c',
 	 'fx.c',
 	 'image.c',
+	 'image-filename.c',
 	 'list.c',
 	 'magick.c',
 	 'magick-wand.c',
