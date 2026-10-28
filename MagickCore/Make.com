@@ -61,6 +61,7 @@ $call Make fourier.c
 $call Make fx.c
 $call Make gem.c
 $call Make geometry.c
+$call Make geometry-meta.c
 $call Make geometry-parse.c
 $call Make hashmap.c
 $call Make histogram.c

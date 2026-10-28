@@ -162,6 +162,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/gem.h \
   MagickCore/gem-private.h \
   MagickCore/geometry.c \
+  MagickCore/geometry-meta.c \
   MagickCore/geometry-parse.c \
   MagickCore/geometry.h \
   MagickCore/geometry-private.h \
