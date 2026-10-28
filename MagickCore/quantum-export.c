@@ -3030,6 +3030,34 @@ static void Export10BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ExportUnpacked12BitGrayQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToShort(ClampToQuantum(GetPixelLuma(image,p)));
+    q=PopShortPixel(quantum_info->endian,(unsigned short) (pixel >> 4),
+      q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
 static void Export12BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -3048,20 +3076,10 @@ static void Export12BitGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   ssize_t
     x;
 
-  unsigned short
-    pixel;
-
   range=GetQuantumRange(quantum_info->depth);
   if (quantum_info->pack == MagickFalse)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToShort(ClampToQuantum(GetPixelLuma(image,p)));
-        q=PopShortPixel(quantum_info->endian,(unsigned short) (pixel >> 4),
-          q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportUnpacked12BitGrayQuantum(image,quantum_info,span);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
