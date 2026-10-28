@@ -185,6 +185,47 @@ Whole catalogue at `7c51b9302`: 15,906 cases, 1 diverged (`gaps/c5651ffad8`), as
 artifact) and the two hough matrix-on-disk cases, which timed out under load and passed
 when rerun alone.
 
+### Midday (2026-10-28): splits beyond the approved list
+
+The owner answered the three remaining questions ("of course" to each): statistic.c may
+be split, more splits are wanted although each new file starts red or yellow and lowers
+the per-file mean, and a split commits past the pre-commit gate's new-file rule
+(`eb4ed9640`). A scan dry-ran every clean family of 150 lines or more in each red file
+and scored both sides; the splits made are those that raise the original by about 0.25
+or more:
+
+| Commit | Family moved | Original | New file |
+|---|---|---|---|
+| `154982200` | `StatisticImage`, PixelList types, 14 statics | statistic.c 2.32 → 2.61 | statistic-image.c 6.56 |
+| `9b578080f` | `GetImageFeatures`, `FeatureStatistics`, 5 statics | feature.c 2.30 → 3.90 | feature-texture.c 5.18 |
+| `5ed3581d2` | `DeskewImage` and its statics | shear.c 2.72 → 4.68 | shear-deskew.c 6.80 |
+| `a6646ddf1` | `GetGeometry`, `ParseGeometry` and their statics | geometry.c 3.45 → 6.90 | geometry-parse.c 4.49 |
+| `f77ec9ad8` | `ScaleImage` and its statics | resize.c 3.55 → 4.52 | resize-scale.c 6.66 |
+| `bc7ea9777` | `GetImageDepth`, `SetImageDepth` and their statics | attribute.c 2.97 → 3.87 | attribute-depth.c 6.37 |
+| `4ef25efe7` | `GetImageMoments` | statistic.c 2.61 → 2.97 | statistic-moments.c 8.00 |
+| `94444f901` | `AutoThresholdImage` and its statics | threshold.c 2.65 → 3.05 | threshold-auto.c 7.42 |
+| `1e1ccff65` | `MergeImageLayers` | layer.c 3.94 → 4.27 | layer-merge.c 9.08 |
+| `a6fb42c3f` | `CropImageToTiles` and its statics | transform.c 2.71 → 2.97 | transform-tiles.c 8.17 |
+
+Each commit records the moved statics, the combined guards (literals and call sites
+unchanged over the pair), the exported symbol and the oracle on every case reaching the
+moved public functions, 0 diverged (`GetGeometry` 12,952 and `ParseGeometry` 14,721
+cases; `SetImageDepth` 10,840). Families were paired only where they belong together
+(the two geometry parsers, the depth getter and setter): pairing raises the original
+more but leaves the new file lower.
+
+Tried and left:
+- color.c's `QueryColorCompliance` (3.55 → 4.35 dry): it calls `GetColorCompliance`,
+  which is `MagickExport` but declared in no header, so the new file would not compile
+  without a new declaration. `tools/split_source.py` does not detect this; the build did.
+- fourier.c's `ComplexImages` (3.27 → 3.65 dry): the include block carries the FFTW
+  macro definitions (`cabs`, `carg`, `cimag`, `creal`), which the copied header would
+  define in both files; the literal guard flagged them.
+- Families that split cleanly but move their file by under 0.2 (enhance.c's ten,
+  effect.c's `KuwaharaImage`, `LocalContrastImage`, `ShadeImage`, image.c's five, the X11
+  files) were not made; `InterpretImageFilename` (image.c 2.49 → 2.71) and
+  `PosterizeImage` (quantize.c 2.36 → 2.58) are the next candidates.
+
 ### Sweep (2026-10-28, 00:20): where the night ends
 
 MagickCore against the morning's sweep: **mean 4.86 → 4.97; red 46 → 44, yellow 38 → 40,
