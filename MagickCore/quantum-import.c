@@ -1710,6 +1710,39 @@ static void Import16BitBGROQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ImportFloat32BitBGROQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  float
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+    SetPixelRed(image,ClampToQuantum(pixel),q);
+    p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+    SetPixelGreen(image,ClampToQuantum(pixel),q);
+    p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+    SetPixelBlue(image,ClampToQuantum(pixel),q);
+    p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+    SetPixelOpacity(image,ClampToQuantum(pixel),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void Import32BitBGROQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -1727,22 +1760,7 @@ static void Import32BitBGROQuantum(const Image *image,QuantumInfo *quantum_info,
 
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      float
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-        SetPixelRed(image,ClampToQuantum(pixel),q);
-        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-        SetPixelGreen(image,ClampToQuantum(pixel),q);
-        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-        SetPixelBlue(image,ClampToQuantum(pixel),q);
-        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-        SetPixelOpacity(image,ClampToQuantum(pixel),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportFloat32BitBGROQuantum(image,quantum_info,span);
       return;
     }
   else
