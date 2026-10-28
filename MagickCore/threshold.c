@@ -1948,6 +1948,25 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void WhiteThresholdPixel(const Image *image,const PixelInfo *threshold,
+  double pixel,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if (image->channel_mask != AllChannels)
+      pixel=(double) q[i];
+    if (pixel > GetPixelInfoChannel(threshold,channel))
+      q[i]=QuantumRange;
+  }
+}
+
 MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
   const char *thresholds,ExceptionInfo *exception)
 {
@@ -2010,21 +2029,8 @@ MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
       double
         pixel;
 
-      ssize_t
-        i;
-
       pixel=GetPixelIntensity(image,q);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (image->channel_mask != AllChannels)
-          pixel=(double) q[i];
-        if (pixel > GetPixelInfoChannel(&threshold,channel))
-          q[i]=QuantumRange;
-      }
+      WhiteThresholdPixel(image,&threshold,pixel,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
