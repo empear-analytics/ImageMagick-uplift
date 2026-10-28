@@ -700,8 +700,12 @@ static void PrintChannelMomentsTable(FILE *file,const Image *image,
   ssize_t
     i;
 
+  ChannelMomentsReport report;
+
   scale=(double) ((1UL << image->depth)-1);
-  const ChannelMomentsReport report = { file, scale, channel_moments };
+  report.file=file;
+  report.scale=scale;
+  report.channel_moments=channel_moments;
 
   (void) FormatLocaleFile(file,"  Channel Hu moments:\n");
   switch (colorspace)
