@@ -128,6 +128,7 @@ $call Make string.c
 $call Make thread.c
 $call Make timer.c
 $call Make token.c
+$call Make token-glob.c
 $call Make transform.c
 $call Make transform-tiles.c
 $call Make threshold.c

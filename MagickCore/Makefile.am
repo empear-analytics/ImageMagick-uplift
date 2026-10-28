@@ -307,6 +307,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/timer.h \
   MagickCore/timer-private.h \
   MagickCore/token.c \
+  MagickCore/token-glob.c \
   MagickCore/token.h \
   MagickCore/token-private.h \
   MagickCore/transform.c \
