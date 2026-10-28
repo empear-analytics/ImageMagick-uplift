@@ -220,6 +220,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/paint.c \
   MagickCore/paint.h \
   MagickCore/pixel.c \
+  MagickCore/pixel-export.c \
   MagickCore/pixel.h \
   MagickCore/pixel-accessor.h \
   MagickCore/pixel-private.h \
