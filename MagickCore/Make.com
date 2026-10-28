@@ -46,6 +46,7 @@ $call Make compare.c
 $call Make composite.c
 $call Make compress.c
 $call Make configure.c
+$call Make configure-paths.c
 $call Make constitute.c
 $call Make decorate.c
 $call Make decorate-raise.c

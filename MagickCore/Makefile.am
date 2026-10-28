@@ -124,6 +124,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/compress.c \
   MagickCore/compress.h \
   MagickCore/configure.c \
+  MagickCore/configure-paths.c \
   MagickCore/configure.h \
   MagickCore/constitute.c \
   MagickCore/constitute.h \
