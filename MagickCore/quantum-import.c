@@ -5480,8 +5480,107 @@ static void Import32BitRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
     }
 }
 
-static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
+static void Import8BitRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned char
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushCharPixel(p,&pixel);
+    SetPixelRed(image,ScaleCharToQuantum(pixel),q);
+    p=PushCharPixel(p,&pixel);
+    SetPixelGreen(image,ScaleCharToQuantum(pixel),q);
+    p=PushCharPixel(p,&pixel);
+    SetPixelBlue(image,ScaleCharToQuantum(pixel),q);
+    p=PushCharPixel(p,&pixel);
+    SetPixelOpacity(image,ScaleCharToQuantum(pixel),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void Import24BitFloatRGBOQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  float
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
+    SetPixelRed(image,ClampToQuantum(pixel),q);
+    p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
+    SetPixelGreen(image,ClampToQuantum(pixel),q);
+    p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
+    SetPixelBlue(image,ClampToQuantum(pixel),q);
+    p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
+    SetPixelOpacity(image,ClampToQuantum(pixel),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void Import64BitFloatRGBOQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  double
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushDoublePixel(quantum_info,p,&pixel);
+    SetPixelRed(image,ClampToQuantum(pixel),q);
+    p=PushDoublePixel(quantum_info,p,&pixel);
+    SetPixelGreen(image,ClampToQuantum(pixel),q);
+    p=PushDoublePixel(quantum_info,p,&pixel);
+    SetPixelBlue(image,ClampToQuantum(pixel),q);
+    p=PushDoublePixel(quantum_info,p,&pixel);
+    SetPixelOpacity(image,ClampToQuantum(pixel),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void ImportAnyDepthRGBOQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   const MagickSizeType
     number_pixels = span->number_pixels;
@@ -5498,28 +5597,34 @@ static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
   ssize_t
     x;
 
+  unsigned int
+    pixel;
+
+  range=GetQuantumRange(quantum_info->depth);
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushQuantumPixel(quantum_info,p,&pixel);
+    SetPixelRed(image,ScaleAnyToQuantum(pixel,range),q);
+    p=PushQuantumPixel(quantum_info,p,&pixel);
+    SetPixelGreen(image,ScaleAnyToQuantum(pixel,range),q);
+    p=PushQuantumPixel(quantum_info,p,&pixel);
+    SetPixelBlue(image,ScaleAnyToQuantum(pixel,range),q);
+    p=PushQuantumPixel(quantum_info,p,&pixel);
+    SetPixelOpacity(image,ScaleAnyToQuantum(pixel,range),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   switch (quantum_info->depth)
   {
     case 8:
     {
-      unsigned char
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushCharPixel(p,&pixel);
-        SetPixelRed(image,ScaleCharToQuantum(pixel),q);
-        p=PushCharPixel(p,&pixel);
-        SetPixelGreen(image,ScaleCharToQuantum(pixel),q);
-        p=PushCharPixel(p,&pixel);
-        SetPixelBlue(image,ScaleCharToQuantum(pixel),q);
-        p=PushCharPixel(p,&pixel);
-        SetPixelOpacity(image,ScaleCharToQuantum(pixel),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      Import8BitRGBOQuantum(image,quantum_info,span);
       break;
     }
     case 10:
@@ -5541,22 +5646,7 @@ static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
     {
       if (quantum_info->format == FloatingPointQuantumFormat)
         {
-          float
-            pixel;
-
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
-            SetPixelRed(image,ClampToQuantum(pixel),q);
-            p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
-            SetPixelGreen(image,ClampToQuantum(pixel),q);
-            p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
-            SetPixelBlue(image,ClampToQuantum(pixel),q);
-            p=PushQuantumFloat24Pixel(quantum_info,p,&pixel);
-            SetPixelOpacity(image,ClampToQuantum(pixel),q);
-            p+=(ptrdiff_t) quantum_info->pad;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          Import24BitFloatRGBOQuantum(image,quantum_info,span);
           break;
         }
       magick_fallthrough;
@@ -5565,44 +5655,14 @@ static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
     {
       if (quantum_info->format == FloatingPointQuantumFormat)
         {
-          double
-            pixel;
-
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            p=PushDoublePixel(quantum_info,p,&pixel);
-            SetPixelRed(image,ClampToQuantum(pixel),q);
-            p=PushDoublePixel(quantum_info,p,&pixel);
-            SetPixelGreen(image,ClampToQuantum(pixel),q);
-            p=PushDoublePixel(quantum_info,p,&pixel);
-            SetPixelBlue(image,ClampToQuantum(pixel),q);
-            p=PushDoublePixel(quantum_info,p,&pixel);
-            SetPixelOpacity(image,ClampToQuantum(pixel),q);
-            p+=(ptrdiff_t) quantum_info->pad;
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          Import64BitFloatRGBOQuantum(image,quantum_info,span);
           break;
         }
       magick_fallthrough;
     }
     default:
     {
-      unsigned int
-        pixel;
-
-      range=GetQuantumRange(quantum_info->depth);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushQuantumPixel(quantum_info,p,&pixel);
-        SetPixelRed(image,ScaleAnyToQuantum(pixel,range),q);
-        p=PushQuantumPixel(quantum_info,p,&pixel);
-        SetPixelGreen(image,ScaleAnyToQuantum(pixel,range),q);
-        p=PushQuantumPixel(quantum_info,p,&pixel);
-        SetPixelBlue(image,ScaleAnyToQuantum(pixel,range),q);
-        p=PushQuantumPixel(quantum_info,p,&pixel);
-        SetPixelOpacity(image,ScaleAnyToQuantum(pixel,range),q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportAnyDepthRGBOQuantum(image,quantum_info,span);
       break;
     }
   }
