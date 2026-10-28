@@ -914,7 +914,9 @@ Recipe E, whose OpenMP rule refuses both.
    caller. It declares a local `status`, set to `MagickTrue` first; every
    `status=MagickFalse;` stays as it is; the function ends with `return(status);`.
 5. Pass every variable the block only reads by value, pointers included. Pass each
-   accumulator as a pointer, written `*v` (or `(*v)++`) at every use in the block.
+   scalar accumulator as a pointer, written `*v` (or `(*v)++`) at every use in the
+   block, and each array accumulator as a pointer whose uses do not change, as in
+   Recipe K.
 6. Where the block stood, write `if (Helper(...,&v,...) == MagickFalse)
    status=MagickFalse;`, and check every argument against its parameter by reading.
 
@@ -1336,3 +1338,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-28 | AMEND | rule 1 | One commit may apply the same recipe to several functions when each step alone lowers the score and only the set raises it | pixel.c's five fixed-map Recipe E extractions: each alone 1.73 → 1.71 (the file passes a size threshold), all five 1.80; the pre-commit safeguard refuses the single steps (M100) | owner |
 | 2026-10-28 | AMEND | S | Step 4 (register the file; the two tools); *Careful*: how a split meets the pre-commit gate's new-file rule; evidence names the combined guards. Wording of what `magnify.c` (2026-10-24) and pixel.c's and resize.c's splits did | `MagnifyImage`, `ExportImagePixels`, `ImportImagePixels`, `ResizeImage` | mandate (2026-10-24) |
 | 2026-10-28 | NEW | J | Extract Accumulating Block Returning the Loop Status: a block in a parallel loop body that writes `status=MagickFalse` (without reading it) and two to four of the iteration's accumulators moves to a `static MagickBooleanType` function that returns its status and takes the accumulators by pointer (Recipes T and K together) | `vision.c`'s four moment-threshold functions share the first moment pass; one helper used by all four measures 2.35 → 2.59. On `MotionBlurImage`'s kernel loops it was flat or worse (9 to 11 arguments) | owner |
+| 2026-10-28 | AMEND | J | Step 5: an array accumulator goes as a pointer with its uses unchanged, as Recipe K already allows | `PerimeterThreshold`'s row loop counts into `pattern[4]`, the object's own array, and writes `status=MagickFalse` | mandate (2026-10-24) |
