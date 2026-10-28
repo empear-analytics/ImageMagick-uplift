@@ -1329,6 +1329,38 @@ static inline MagickBooleanType IsThresholdMapNameCharacter(const char *p)
     (*p != '\0')) ? MagickTrue : MagickFalse);
 }
 
+static void GetDitherLevels(const char *threshold_map,double *levels)
+{
+  char
+    token[MagickPathExtent];
+
+  const char
+    *p;
+
+  ssize_t
+    i;
+
+  for (i=0; i < MaxPixelChannels; i++)
+    levels[i]=2.0;
+  p=strchr((char *) threshold_map,',');
+  if ((p != (char *) NULL) && (isdigit((int) ((unsigned char) *(++p))) != 0))
+    {
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+      for (i=0; (i < MaxPixelChannels); i++)
+        levels[i]=StringToDouble(token,(char **) NULL);
+      for (i=0; (*p != '\0') && (i < MaxPixelChannels); i++)
+      {
+        (void) GetNextToken(p,&p,MagickPathExtent,token);
+        if (*token == ',')
+          (void) GetNextToken(p,&p,MagickPathExtent,token);
+        levels[i]=StringToDouble(token,(char **) NULL);
+      }
+    }
+  for (i=0; i < MaxPixelChannels; i++)
+    if (fabs(levels[i]) >= 1)
+      levels[i]-=1.0;
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1353,7 +1385,6 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
     progress;
 
   ssize_t
-    i,
     y;
 
   ThresholdMap
@@ -1386,25 +1417,7 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
         "InvalidArgument","%s : '%s'","ordered-dither",threshold_map);
       return(MagickFalse);
     }
-  for (i=0; i < MaxPixelChannels; i++)
-    levels[i]=2.0;
-  p=strchr((char *) threshold_map,',');
-  if ((p != (char *) NULL) && (isdigit((int) ((unsigned char) *(++p))) != 0))
-    {
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-      for (i=0; (i < MaxPixelChannels); i++)
-        levels[i]=StringToDouble(token,(char **) NULL);
-      for (i=0; (*p != '\0') && (i < MaxPixelChannels); i++)
-      {
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-        if (*token == ',')
-          (void) GetNextToken(p,&p,MagickPathExtent,token);
-        levels[i]=StringToDouble(token,(char **) NULL);
-      }
-    }
-  for (i=0; i < MaxPixelChannels; i++)
-    if (fabs(levels[i]) >= 1)
-      levels[i]-=1.0;
+  GetDitherLevels(threshold_map,levels);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
   status=MagickTrue;
