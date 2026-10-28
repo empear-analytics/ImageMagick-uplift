@@ -746,6 +746,20 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   return(GetFirstImageInList(image));
 }
 
+typedef struct _HoughCell
+{
+  ssize_t
+    x,
+    y;
+} HoughCell;
+
+typedef struct _HoughWindow
+{
+  size_t
+    width,
+    height;
+} HoughWindow;
+
 static void VoteHoughLines(MatrixInfo *accumulator,const PointInfo *center,
   const ssize_t x,const ssize_t y,const double hough_height)
 {
@@ -769,10 +783,14 @@ static void VoteHoughLines(MatrixInfo *accumulator,const PointInfo *center,
 }
 
 static MagickBooleanType WriteHoughHeader(const Image *image,const int file,
-  const size_t width,const size_t height,const size_t threshold)
+  const HoughWindow *window,const size_t threshold)
 {
   char
     message[MagickPathExtent];
+
+  const size_t
+    width = window->width,
+    height = window->height;
 
   MagickBooleanType
     status;
@@ -794,9 +812,17 @@ static MagickBooleanType WriteHoughHeader(const Image *image,const int file,
   return(status);
 }
 
-static double GetHoughMaxima(const MatrixInfo *accumulator,const ssize_t x,
-  const ssize_t y,const size_t width,const size_t height,double count)
+static double GetHoughMaxima(const MatrixInfo *accumulator,
+  const HoughCell *cell,const HoughWindow *window,double count)
 {
+  const size_t
+    width = window->width,
+    height = window->height;
+
+  const ssize_t
+    x = cell->x,
+    y = cell->y;
+
   double
     maxima;
 
@@ -881,6 +907,9 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
 
   double
     hough_height;
+
+  const HoughWindow
+    window = { width, height };
 
   Image
     *lines_image = NULL;
@@ -992,7 +1021,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       accumulator=DestroyMatrixInfo(accumulator);
       return((Image *) NULL);
     }
-  status=WriteHoughHeader(image,file,width,height,threshold);
+  status=WriteHoughHeader(image,file,&window,threshold);
   line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
   if (threshold != 0)
     line_count=threshold;
@@ -1009,6 +1038,9 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       (void) GetMatrixElement(accumulator,x,y,&count);
       if (count >= (double) line_count)
         {
+          const HoughCell
+            cell = { x, y };
+
           double
             maxima;
 
@@ -1018,7 +1050,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
           /*
             Is point a local maxima?
           */
-          maxima=GetHoughMaxima(accumulator,x,y,width,height,count);
+          maxima=GetHoughMaxima(accumulator,&cell,&window,count);
           (void) GetMatrixElement(accumulator,x,y,&count);
           if (maxima > count)
             continue;
