@@ -273,6 +273,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/static.c \
   MagickCore/static.h \
   MagickCore/statistic.c \
+  MagickCore/statistic-image.c \
   MagickCore/statistic.h \
   MagickCore/statistic-private.h \
   MagickCore/stream.c \
