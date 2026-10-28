@@ -95,6 +95,82 @@ take seven to nine arguments. distort.c's best-fit bounds: each case writes `min
 `max` through macros defined mid-function that name the caller's locals. property.c and
 colorspace.c tables: Recipe F left the score flat (above).
 
+### Morning (2026-10-28): the owner's three answers
+
+The owner answered the night's questions: "1 and 2 are ok, go ahead! you can try 3."
+
+**1. pixel.c's five fixed-map extractions in one commit** (rule 1 amended, `fda56c183`):
+`99af5d46d`, pixel.c 1.73 → 1.80.
+
+**2. Recipe S for the largest files.** Three splits, each verbatim, each static moving
+with its only caller:
+
+| Commit | Family | Original | New file |
+|---|---|---|---|
+| `fe5a33124` | `ExportImagePixels`, `ExportPixelBuffer`, 56 statics | pixel.c 1.80 → 1.89 | pixel-export.c 3.11 |
+| `f8fc17c71` | `ImportImagePixels`, `ImportPixelBuffer`, 58 statics | pixel.c 1.89 → 2.36 | pixel-import.c 3.12 |
+| `6343c01e0` | `ResizeImage`, `ContributionInfo`, 11 statics | resize.c 2.89 → 3.55 | resize-image.c 6.29 |
+
+Each passed the combined guards over the pair and the oracle on every case that reaches
+the moved public function (135, 129 and 911 cases, 0 diverged); the builds are clean and
+nm shows each public function exported from its new object. As for magnify.c, the
+pre-commit gate's rule that a new file score 10.0 was skipped (the gate's check of the
+original passed) and the trailer check was run by hand; Recipe S now says so (`bcc48ab84`).
+The Windows build configuration outside this repository still needs the three files.
+`tools/register_source.py` lists a new file in the four build lists;
+`tools/split_source.py` finds and moves a family and reproduces the resize.c split byte
+for byte.
+
+The other approved files do not split cleanly, by the tool's rules:
+- draw.c (`DrawPrimitive` reaches two statics other functions call), morphology.c,
+  cache.c and fx.c: the large families share statics, which would have to widen.
+- compare.c: the metric functions serve both `CompareImages` and `SimilarityImage`.
+- blob.c (`OpenBlob`, macro `_O_BINARY`) and property.c (`GetMagickProperty`, macro
+  `cmsUInt32Number`): a file-level macro would be needed on both sides.
+- quantum-import.c: one public function is the whole file.
+- enhance.c: `ModulateImage`, `ContrastStretchImage` and `EqualizeImage` split cleanly,
+  but enhance.c moves by 0.07 at most, so none was made.
+
+Outside the approved list, statistic.c's `StatisticImage` family splits cleanly
+(2.29 → 2.61 measured on the dry run, before the two steps below), and so would
+colorspace.c's, but for a macro. They wait for the owner.
+
+**The split costs the per-file mean.** A split-off family keeps its findings, so the new
+file is usually red: MagickCore's mean is 4.96 at `bcc48ab84` against 4.97 at `a055db34e`,
+with red 44 → 46, although no file went down. Weighted by lines, it rose from 3.149 to
+3.200. The splits pay off for the file split, not for the per-file mean.
+
+**3. Shared status plus accumulators: Recipe J** (`3f7696c06`, Recipes T and K together:
+the helper returns the block's status and takes the accumulators by pointer). Its
+instance is vision.c: the four moment-threshold functions share a first moment pass that
+writes `status=MagickFalse` and the object's own `M00`, `M10` and `M01`. J extracted it from
+`MajorAxisThreshold` (`2de73eed9`, 2.35 → 2.45), and Recipe D put the same call in
+`MinorAxisThreshold`, `EccentricityThreshold` and `AngleThreshold` (`e943876c7`,
+`548e9bff5`, `444ddfbd2`): **vision.c 2.35 → 2.59**. Each step reached its function's
+cases (2, 2, 2 and 4, all verbose connected-components output), 0 diverged. The
+second moment pass, also in all four, starts with `if (status == MagickFalse) continue;`:
+it reads the shared status, which neither T nor J allows, and stays.
+
+The first try, `MotionBlurImage`, did not pay. Its two kernel loops write
+`status=MagickFalse` and one or two of the channel's sums, but the helpers need nine to
+eleven arguments. Measured, not committed:
+
+| Extraction | effect.c (1.59) | MotionBlurImage's Brain Method |
+|---|---|---|
+| plain kernel loop (`pixel` by pointer, 9 arguments) | 1.61 | stays |
+| blended kernel loop (`pixel`, `gamma`, 11 arguments) | 1.57 | stays |
+| both | 1.57 (the two helpers duplicate each other) | stays |
+| Recipe T on the whole column loop | 1.58 | moves to the helper |
+
+The other targets named last night do not write `status` in their accumulating blocks:
+`StatisticImage` took Recipe E twice instead (`517fe1865`, flat, then `7c283e05c`,
+2.29 → 2.32); `SelectiveBlurImage`, `BilateralBlurImage` and `MeanShiftImage` have
+Recipe K's shape, but their blocks also advance three or more pointers.
+
+Whole catalogue at `f8fc17c71`: 15,906 cases, 3 diverged: `gaps/c5651ffad8` (the known
+artifact) and the two hough matrix-on-disk cases, which timed out under load and passed
+when rerun alone.
+
 ### Sweep (2026-10-28, 00:20): where the night ends
 
 MagickCore against the morning's sweep: **mean 4.86 → 4.97; red 46 → 44, yellow 38 → 40,
