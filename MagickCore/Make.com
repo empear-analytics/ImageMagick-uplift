@@ -97,6 +97,7 @@ $call Make random.c
 $call Make registry.c
 $call Make resample.c
 $call Make resize.c
+$call Make resize-scale.c
 $call Make resize-image.c
 $call Make magnify.c
 $call Make resource.c
