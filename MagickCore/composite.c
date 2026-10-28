@@ -570,6 +570,10 @@ static Image *BlendDivergentImage(const Image *alpha_image,
     *magnitude_alpha = (Image *) NULL,
     *magnitude_beta = (Image *) NULL;
 
+  BlendMagnitudePair magnitudes;
+
+  const BlendSumWeights quarter_sum = { 0.25, 1.0 };
+
   /*
     Create X and Y gradient images for alpha image and the magnitude.
   */
@@ -615,9 +619,8 @@ static Image *BlendDivergentImage(const Image *alpha_image,
   /*
     Select alpha or beta gradient for larger of two magnitudes.
   */
-  const BlendMagnitudePair
-    magnitudes = { magnitude_alpha, magnitude_beta };
-
+  magnitudes.alpha_image=magnitude_alpha;
+  magnitudes.beta_image=magnitude_beta;
   dx_image=BlendMaxMagnitudeImage(&magnitudes,dx_alpha,dx_beta,exception);
   if (dx_image == (Image *) NULL)
     {
@@ -649,9 +652,6 @@ static Image *BlendDivergentImage(const Image *alpha_image,
       FreeDivergentResources();
       return((Image *) NULL);
     }
-  const BlendSumWeights
-    quarter_sum = { 0.25, 1.0 };
-
   divergent_image=BlendSumImage(dx_divergent,dy_divergent,&quarter_sum,
     exception);
   dy_divergent=DestroyImage(dy_divergent);
