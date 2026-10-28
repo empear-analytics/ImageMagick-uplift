@@ -128,6 +128,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/constitute.c \
   MagickCore/constitute.h \
   MagickCore/decorate.c \
+  MagickCore/decorate-raise.c \
   MagickCore/decorate.h \
   MagickCore/delegate.c \
   MagickCore/delegate.h \

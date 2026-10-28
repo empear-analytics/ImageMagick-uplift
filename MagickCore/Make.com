@@ -48,6 +48,7 @@ $call Make compress.c
 $call Make configure.c
 $call Make constitute.c
 $call Make decorate.c
+$call Make decorate-raise.c
 $call Make delegate.c
 $call Make deprecate.c
 $call Make display.c
