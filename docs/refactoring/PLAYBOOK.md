@@ -18,6 +18,11 @@ OpenMP, compiled differently on every platform. Every recipe added since is list
 ## The three rules
 
 1. **One recipe, one function, one commit.** Never combine two recipes in one commit.
+   One exception (owner's decision, 2026-10-28): when the same recipe applied to each of
+   several functions on its own lowers the score (a file-size threshold, say) and the
+   pre-commit safeguard refuses it, but the set together raises it, the set may go in
+   one commit. Each function's change must still be the recipe's mechanical step, and
+   the commit message lists them.
 2. **Re-measure after every commit.** If the Code Health score improved, keep the step. If
    it fell, revert. If it did not move, keep the step only when it is part of a plan: the
    review (`python3 tools/ch.py --review <file>`) shows the targeted function left a smell
@@ -1202,3 +1207,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-27 | NEW | F | Hoist Function-Local Static Data: a `static` declaration whose initialiser is data (a table, an `#if`-assembled string) and which nothing writes moves to directly above the function, proven by unchanged machine code and the same data (`tools/obj_same_code.sh`) | `GetMagickDelegates` (version.c's only finding: 130 lines, 124 of them one string); the same shape in `GetEXIFProperty`, `TransformsRGBImage`, `TransformSignature`, `AcquireResizeFilter` | mandate (2026-10-24) |
 | 2026-10-27 | AMEND | rule | *Two levels of evidence*: a function some case executes is oracle-verified for every recipe; no mutation run (readiness gate) before a step. Guard level stays for code no case reaches | The harness was built under mutation guidance and is finished; the 3SX and Jellyfin campaigns refactored without per-step mutation runs, and today's uncapped runs only confirmed it | owner |
 | 2026-10-27 | AMEND | O | Inside a parallel loop body: allowed when every variable the block writes is declared in that body and it writes nothing declared outside it (`status` included) and has no `#pragma omp` line, Recipe K's condition. Each thread's call then writes only that thread's variables, as the block did | `KmeansImage`'s nearest-centroid search (`k`, `min_distance`), `CannyEdgeImage`'s neighbour selection (`alpha_pixel`, `beta_pixel`), `DrawGradientImage`'s repeat offset (`offset`, `repeat`, `antialias`): selections over iteration-private variables, refused only by step 1 | mandate (2026-10-24) |
+| 2026-10-28 | AMEND | rule 1 | One commit may apply the same recipe to several functions when each step alone lowers the score and only the set raises it | pixel.c's five fixed-map Recipe E extractions: each alone 1.73 → 1.71 (the file passes a size threshold), all five 1.80; the pre-commit safeguard refuses the single steps (M100) | owner |
