@@ -184,6 +184,8 @@ static LinkedListInfo *AcquireConfigureCache(const char *filename,
   LinkedListInfo
     *cache;
 
+  ConfigureKeyTarget built_in;
+
   /*
     Load external configure map.
   */
@@ -220,7 +222,8 @@ static LinkedListInfo *AcquireConfigureCache(const char *filename,
   /*
     Load built-in configure.
   */
-  const ConfigureKeyTarget built_in = { cache, "[built-in]" };
+  built_in.cache=cache;
+  built_in.path="[built-in]";
   AddConfigureKey(&built_in,"NAME","ImageMagick",MagickTrue);
   /*
     Load runtime configuration.
