@@ -5,10 +5,12 @@
 # under the step7 lock:
 #
 #   cd ~/imagemagick-mutation/setup && \
-#   nohup flock step7.lock bash -c 'ulimit -v 4194304; exec ./night3.sh' >> step7.log 2>&1 &
+#   nohup flock step7.lock ./night3.sh >> step7.log 2>&1 &
 #
-# The 4 GB per-process cap and 16 jobs keep runaway mutants inside the container's 64 GB
-# limit: on 2026-10-26, with 28 jobs and no cap, the run died silently in morphology.c.
+# The 4 GB per-process cap on the mutation step and 16 jobs keep runaway mutants inside
+# the container's 64 GB limit: on 2026-10-26, with 28 jobs and no cap, the run died
+# silently in morphology.c. The cap covers only step 3: on 2026-10-27, set for the whole
+# script, it made the Mull build fail within a minute.
 #
 # 1. Check out the campaign tip (campaign/M99 while it is open, else main) and
 #    rebuild the indexes. casemap.py and linecov.py both: a stale line profile makes
@@ -47,8 +49,9 @@ echo "== night3 $(date): step 3, mutation per file"
 n=0
 for f in $FILES; do
   [ -f $W/mutation-fresh-$f.json ] && continue
-  python3 -u tools/oracle/mutate.py --file "MagickCore/$f\\.c\$" --bin $BIN --name fresh-$f \
-    --max-cases 200 > build-oracle/fresh-$f.log 2>&1
+  ( ulimit -v 4194304
+    exec python3 -u tools/oracle/mutate.py --file "MagickCore/$f\\.c\$" --bin $BIN \
+      --name fresh-$f --max-cases 200 ) > build-oracle/fresh-$f.log 2>&1
   echo "$(date +%H:%M) fresh $f: $(grep -E 'killed [0-9]' build-oracle/fresh-$f.log || echo failed, see build-oracle/fresh-$f.log)"
   n=$((n+1)); [ $((n % 5)) = 0 ] && push
 done

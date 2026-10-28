@@ -235,6 +235,31 @@ static MagickStatusType SetPercentGeometrySize(MagickStatusType flags,
   return(flags);
 }
 
+static void ParseGeometryXOffset(char **p,MagickStatusType *flags,ssize_t *x)
+{
+  char
+    *q;
+
+  /*
+    Parse x value.
+  */
+  while ((**p == '+') || (**p == '-'))
+  {
+    if (**p == '-')
+      *flags^=XNegative;  /* negate sign */
+    (*p)++;
+  }
+  q=(*p);
+  if (x != (ssize_t *) NULL)
+    *x=CastDoubleToSsizeT(StringToDouble(*p,p));
+  if (*p != q)
+    {
+      *flags|=XValue;
+      if (((*flags & XNegative) != 0) && (x != (ssize_t *) NULL))
+        *x=CastDoubleToSsizeT(-1.0**x);
+    }
+}
+
 MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
   ssize_t *y,size_t *width,size_t *height)
 {
@@ -413,26 +438,7 @@ MagickExport MagickStatusType GetGeometry(const char *geometry,ssize_t *x,
         }
     }
   if ((*p == '+') || (*p == '-'))
-    {
-      /*
-        Parse x value.
-      */
-      while ((*p == '+') || (*p == '-'))
-      {
-        if (*p == '-')
-          flags^=XNegative;  /* negate sign */
-        p++;
-      }
-      q=p;
-      if (x != (ssize_t *) NULL)
-        *x=CastDoubleToSsizeT(StringToDouble(p,&p));
-      if (p != q)
-        {
-          flags|=XValue;
-          if (((flags & XNegative) != 0) && (x != (ssize_t *) NULL))
-            *x=CastDoubleToSsizeT(-1.0**x);
-        }
-    }
+    ParseGeometryXOffset(&p,&flags,x);
   if ((*p == '+') || (*p == '-'))
     {
       /*
@@ -1457,6 +1463,16 @@ static MagickStatusType SetAspectRatioRegion(const Image *image,
   return(flags);
 }
 
+static void SetPageGeometryDefaults(const Image *image,
+  RectangleInfo *region_info)
+{
+  SetGeometry(image,region_info);
+  if (image->page.width != 0)
+    region_info->width=image->page.width;
+  if (image->page.height != 0)
+    region_info->height=image->page.height;
+}
+
 MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
   const char *geometry,RectangleInfo *region_info,ExceptionInfo *exception)
 {
@@ -1471,11 +1487,7 @@ MagickExport MagickStatusType ParseGravityGeometry(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",geometry);
   if ((geometry == (char *) NULL) || (*geometry == '\0'))
     return(NoValue);
-  SetGeometry(image,region_info);
-  if (image->page.width != 0)
-    region_info->width=image->page.width;
-  if (image->page.height != 0)
-    region_info->height=image->page.height;
+  SetPageGeometryDefaults(image,region_info);
   flags=ParseAbsoluteGeometry(geometry,region_info);
   if (flags == NoValue)
     {

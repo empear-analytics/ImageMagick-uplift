@@ -76,10 +76,10 @@ needs before refactoring:
 | 1.39 | `MagickCore/resize.c` | 4704 | 97% | 88% | plateau at 2.89 (Recipe T on `SampleImage`; OpenMP-bound nesting, survivor lines); magnify family split to `magnify.c`, plateau at 6.57 (from 6.21), [M01](tasks/M01-resize.md) |
 | 1.46 | `MagickCore/compare.c` | 4987 | 88% | 86% | 1.83, in progress (was a plateau at 1.77; FFTW-only region holds most categories; SSIM and PHASE loops write five sums; near-threshold steps in M94 and M96), [M02](tasks/M02-compare.md) [M94](tasks/M94-near-threshold-3.md) [M96](tasks/M96-near-threshold-5.md) [M97](tasks/M97-compare-similarity.md) |
 | 1.53 | `MagickCore/enhance.c` | 4596 | 78% | 86% | 2.90, in progress (Brain Method, Deep Nesting, Complex Conditional gone; ColorDecisionListImage and HaldClutImage after Recipe L, [M90](tasks/M90-hoist-types.md)), [M03](tasks/M03-enhance.md) [M92](tasks/M92-near-threshold.md) |
-| 1.53 | `MagickCore/morphology.c` | 4764 | 81% | 80% | 2.04, in progress (Complex Conditional gone; Brain Method left in `MorphologyPrimitive` and `MorphologyApply`, which need oracle-level evidence first), [M04](tasks/M04-morphology.md) [M92](tasks/M92-near-threshold.md) |
-| 1.55 | `MagickCore/visual-effects.c` | 3789 | 86% | 83% | 2.41, in progress (Complex Conditional gone; Recipe B next for the six-argument pixel helpers), [M05](tasks/M05-visual-effects.md) |
+| 1.53 | `MagickCore/morphology.c` | 4764 | 81% | 80% | 2.20, in progress (Complex Conditional gone; Recipe B on `MorphologyPrimitive`; Brain Method left in `MorphologyApply`, which is `MagickPrivate`), [M04](tasks/M04-morphology.md) [M92](tasks/M92-near-threshold.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 1.55 | `MagickCore/visual-effects.c` | 3789 | 86% | 83% | 2.63, in progress (PolaroidImage's caption annotation extracted (O); Complex Conditional gone; Recipe B next for the six-argument pixel helpers), [M05](tasks/M05-visual-effects.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 1.73 | `MagickCore/geometry.c` | 1831 | 65% | 85% | 3.40, in progress (Complex Conditional gone; ParseGeometry and GetGeometry parse with flags and cursor together), [M14](tasks/M14-geometry.md) [M92](tasks/M92-near-threshold.md) |
-| 1.89 | `MagickCore/threshold.c` | 2648 | 87% | 85% | 2.08, in progress (Complex Conditional gone; the pixel drivers duplicate each other once thinned), [M08](tasks/M08-threshold.md) [M93](tasks/M93-near-threshold-2.md) |
+| 1.89 | `MagickCore/threshold.c` | 2648 | 87% | 85% | 2.38, in progress (Complex Conditional gone; the pixel drivers duplicate each other once thinned; RangeThreshold's ladder and per-pixel work and AdaptiveThreshold's first window extracted), [M08](tasks/M08-threshold.md) [M93](tasks/M93-near-threshold-2.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 1.92 | `MagickCore/statistic.c` | 3158 | 97% | 89% | 2.29, in progress (Complex Conditional gone; Recipe B next), [M07](tasks/M07-statistic.md) [M92](tasks/M92-near-threshold.md) [M94](tasks/M94-near-threshold-3.md) |
 | 2.16 | `MagickCore/identify.c` | 1705 | 68% | 85% | 3.37, in progress (Complex Conditional gone; IdentifyImage 1,143 -> 696 lines), [M15](tasks/M15-identify.md) [M92](tasks/M92-near-threshold.md) [M99](tasks/M99-bundle-arguments.md) |
 | 2.30 | `MagickCore/segment.c` | 1934 | 79% | 86% | 4.05, in progress (second pass M80, D in M87) (Complex Conditional gone; Brain Method left in GetImageDynamicThreshold; Classify's gone with Recipe B), [M10](tasks/M10-segment.md) [M92](tasks/M92-near-threshold.md) [M99](tasks/M99-bundle-arguments.md) |
@@ -87,7 +87,7 @@ needs before refactoring:
 | 3.08 | `MagickCore/fourier.c` | 1626 | 92% | 86% | 3.27 on the Mac (`ComplexImages` only, [M12](tasks/M12-fourier.md)); the FFTW-only functions still wait for the Linux machine |
 | 3.28 | `MagickCore/channel.c` | 1394 | 65% | 81% | 4.04, in progress (out of the Red band), [M16](tasks/M16-channel.md) |
 | 5.78 | `MagickCore/decorate.c` | 901 | 98% | 94% | 6.74, in progress (fill and blend loops deduplicated), [M11](tasks/M11-decorate.md) |
-| 5.92 | `MagickCore/matrix.c` | 1146 | 75% | 80% | 6.76, in progress (Complex Conditional gone; the rest needs oracle evidence the file lacks), [M17](tasks/M17-matrix.md) |
+| 5.92 | `MagickCore/matrix.c` | 1146 | 75% | 80% | 7.45, in progress (Complex Conditional gone; GaussJordanElimination and MatrixToImage split with H, E and O), [M17](tasks/M17-matrix.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 6.96 | `MagickCore/magick.c` | 1866 | 68% | 81% | 7.69, in progress (the flag accessors duplicate each other but log their own names), [M18](tasks/M18-magick.md) |
 | 8.81 | `MagickCore/semaphore.c` | 482 | 100% | 80% | 9.38, plateau for the current catalogue, [M19](tasks/M19-semaphore.md) |
 | 8.88 | `MagickCore/colormap.c` | 388 | 100% | 89% | 9.36, plateau for the current catalogue, [M13](tasks/M13-colormap.md) |
@@ -97,25 +97,25 @@ needs before refactoring:
 | Code Health | File | Lines | Mutants reached | Killed, executed lines | Status |
 | ---: | --- | ---: | ---: | ---: | --- |
 | 1.08 | `MagickCore/pixel.c` | 6532 | 35% | 86% | 1.73, in progress (fixed-map blocks moved out of 9 of 14 Export/Import functions; Recipe B on all 14, fresh mutation ready; the other 5 extractions wait on an owner decision, see M100), [M39](tasks/M39-pixel.md) [M94](tasks/M94-near-threshold-3.md) [M100](tasks/M100-pixel-buffer.md) |
-| 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | 1.93, in progress (Complex Conditional 42 -> 8 sites; the rest are repeats; ExecuteRPN's Brain Method gone with Recipe B), [M38](tasks/M38-fx.md) [M99](tasks/M99-bundle-arguments.md) |
-| 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | 1.41, in progress (Recipe B span on 12 helpers; Gray, RGB, Index and the rest gate not ready), [M99](tasks/M99-bundle-arguments.md) |
-| 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | 1.57, in progress (plateau 1.24 for E; Recipe B span on 6 helpers, Gray, RGB and RGBA gate not ready), [M70](tasks/M70-quantum-export.md) [M99](tasks/M99-bundle-arguments.md) |
+| 1.14 | `MagickCore/fx.c` | 4536 | 71% | 77% | 2.28, in progress (Complex Conditional gone: the eight repeats reuse two predicates; ExecuteRPN's Brain Method gone with Recipe B), [M38](tasks/M38-fx.md) [M99](tasks/M99-bundle-arguments.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 1.15 | `MagickCore/quantum-import.c` | 4518 | 38% | 82% | 1.73, in progress (Recipe B span on 16 helpers, Gray, RGB, Index and CbYCrY after an uncapped run), [M99](tasks/M99-bundle-arguments.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 1.24 | `MagickCore/quantum-export.c` | 3901 | 32% | 81% | 1.87, in progress (plateau 1.24 for E; Recipe B span on 9 helpers, Gray, RGB and RGBA after an uncapped run), [M70](tasks/M70-quantum-export.md) [M99](tasks/M99-bundle-arguments.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 1.28 | `MagickCore/draw.c` | 7976 | 76% | 74% | 1.90, in progress (Complex Conditional gone: 20 sites, 22 predicates; DrawPolygonPrimitive bounds, [M91](tasks/M91-hoist-types-2.md); GetFillAlpha Recipe B, [M100](tasks/M100-pixel-buffer.md)), [M37](tasks/M37-draw.md) |
 | 1.33 | `MagickCore/composite.c` | 3815 | 86% | 74% | 1.92, in progress (Complex Conditional gone; three Brain Methods gone with Recipe B), [M20](tasks/M20-composite.md) [M94](tasks/M94-near-threshold-3.md) [M99](tasks/M99-bundle-arguments.md) |
-| 1.38 | `MagickCore/effect.c` | 4405 | 89% | 75% | 1.40, in progress (Complex Conditional gone; parallel loops need K/T, the adaptive pair B), [M26](tasks/M26-effect.md) |
-| 1.74 | `MagickCore/distort.c` | 3466 | 68% | 76% | 2.29, in progress (Complex Conditional gone; the rest needs Recipe B, O or K), [M22](tasks/M22-distort.md) |
-| 1.82 | `MagickCore/quantize.c` | 4150 | 85% | 79% | 2.09, in progress (Complex Conditional gone; the rest is parallel loops; Riemersma helpers bundled with Recipe B), [M25](tasks/M25-quantize.md) [M92](tasks/M92-near-threshold.md) [M94](tasks/M94-near-threshold-3.md) [M96](tasks/M96-near-threshold-5.md) [M99](tasks/M99-bundle-arguments.md) |
-| 1.99 | `MagickCore/transform.c` | 2599 | 78% | 77% | 2.65, in progress (Complex Conditional gone; one channel-loop helper for eleven copies), [M24](tasks/M24-transform.md) |
-| 2.05 | `MagickCore/shear.c` | 1830 | 82% | 80% | 2.18, in progress (Complex Conditional gone; the shears need Recipe B), [M09](tasks/M09-shear.md) [M96](tasks/M96-near-threshold-5.md) |
-| 2.25 | `MagickCore/color.c` | 2792 | 70% | 77% | 3.16, in progress (Complex Conditional and Code Duplication gone; `QueryColorCompliance` cc 90 → 32), [M21](tasks/M21-color.md) |
-| 2.45 | `MagickCore/stream.c` | 2832 | 78% | 74% | 3.10, in progress (Complex Conditional gone; StreamImagePixels needs a break-to-return recipe), [M28](tasks/M28-stream.md) |
+| 1.38 | `MagickCore/effect.c` | 4405 | 89% | 75% | 1.59, in progress (Complex Conditional gone; UnsharpMask and Shade lose Brain Method by their channel loops; the blur loops write status and accumulators together, which neither K nor T takes), [M26](tasks/M26-effect.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 1.74 | `MagickCore/distort.c` | 3466 | 68% | 76% | 2.49, in progress (Complex Conditional gone; Recipe B on `GenerateCoefficients`; the rest needs Recipe O or K), [M22](tasks/M22-distort.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 1.82 | `MagickCore/quantize.c` | 4150 | 85% | 79% | 2.14, in progress (KmeansImage's thread reduction extracted; Complex Conditional gone; the rest is parallel loops; Riemersma helpers bundled with Recipe B), [M25](tasks/M25-quantize.md) [M92](tasks/M92-near-threshold.md) [M94](tasks/M94-near-threshold-3.md) [M96](tasks/M96-near-threshold-5.md) [M99](tasks/M99-bundle-arguments.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 1.99 | `MagickCore/transform.c` | 2599 | 78% | 77% | 2.71, in progress (Complex Conditional gone; one channel-loop helper for eleven copies; no argument findings left), [M24](tasks/M24-transform.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 2.05 | `MagickCore/shear.c` | 1830 | 82% | 80% | 2.72, in progress (Complex Conditional gone; Recipe B on both shears and CropToFitImage, no argument findings left), [M09](tasks/M09-shear.md) [M96](tasks/M96-near-threshold-5.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 2.25 | `MagickCore/color.c` | 2792 | 70% | 77% | 3.55, in progress (Complex Conditional and Code Duplication gone; `QueryColorCompliance` cc 90 → 32; LoadColorCache bundled, QueryColorFunction's prefix blocks extracted), [M21](tasks/M21-color.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 2.45 | `MagickCore/stream.c` | 2832 | 78% | 74% | 3.13, in progress (Complex Conditional gone; StreamImagePixels needs a break-to-return recipe; the shared buffer sizing extracted), [M28](tasks/M28-stream.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 2.58 | `MagickCore/attribute.c` | 2444 | 75% | 73% | 2.97, in progress (Complex Conditional: one site left, in a parallel loop), [M27](tasks/M27-attribute.md) |
-| 3.06 | `MagickCore/paint.c` | 1299 | 85% | 74% | 3.33, in progress (Complex Conditional gone; OilPaint blocked by a local macro), [M47](tasks/M47-paint.md) |
+| 3.06 | `MagickCore/paint.c` | 1299 | 85% | 74% | 3.87, in progress (Complex Conditional gone; OilPaint blocked by a local macro; OpaquePaint's and Floodfill's fill writes extracted), [M47](tasks/M47-paint.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 3.26 | `MagickCore/utility.c` | 2087 | 28% | 73% | 3.65, in progress (Complex Conditional gone; rest is multi-output or platform #if), [M50](tasks/M50-utility.md) |
 | 3.49 | `MagickCore/string.c` | 2683 | 69% | 75% | 3.76, in progress (Throw* blocks pinned by __func__; StripMagickString return bug reported), [M49](tasks/M49-string.md) [M92](tasks/M92-near-threshold.md) |
 | 4.00 | `MagickCore/option.c` | 3549 | 76% | 71% | 5.54, in progress (Complex Conditional gone; the token lookup deduplicated), [M23](tasks/M23-option.md) |
 | 4.94 | `MagickCore/compress.c` | 1298 | 15% | 83% | 5.31 (Recipe H applied, M84; LZWEncodeImage's type hoisted, M91; Huffman/LZW bit macros need O/K), [M68](tasks/M68-compress.md) |
-| 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 6.01, in progress (Complex Conditional gone; string helpers tip String Heavy), [M34](tasks/M34-configure.md) [M99](tasks/M99-bundle-arguments.md) |
+| 5.03 | `MagickCore/configure.c` | 1360 | 20% | 75% | 6.19, in progress (Complex Conditional gone; no argument findings left; string helpers tip String Heavy), [M34](tasks/M34-configure.md) [M99](tasks/M99-bundle-arguments.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 5.97 | `MagickCore/histogram.c` | 1246 | 90% | 78% | 6.39 (tree descent returns from inside), [M56](tasks/M56-histogram.md) [M92](tasks/M92-near-threshold.md) |
 | 6.01 | `MagickCore/montage.c` | 898 | 90% | 75% | 6.61 (guard level; the tile loop keeps multi-output blocks), [M57](tasks/M57-montage.md) |
 | 6.87 | `MagickCore/memory.c` | 1713 | 60% | 71% | plateau 6.87 (uncompiled branches), [M60](tasks/M60-memory.md) |
@@ -130,22 +130,22 @@ needs before refactoring:
 | ---: | --- | ---: | ---: | ---: | --- |
 | 1.45 | `MagickCore/cache.c` | 6108 | 62% | 65% | 2.16, in progress (Complex Conditional gone: 13 predicates), [M40](tasks/M40-cache.md) [M93](tasks/M93-near-threshold-2.md) [M96](tasks/M96-near-threshold-5.md) |
 | 1.48 | `MagickCore/property.c` | 4879 | 41% | 61% | 2.07, in progress (Complex Conditional gone: GetEXIFProperty's macros hoisted, [M85](tasks/M85-property.md); its types hoisted, [M90](tasks/M90-hoist-types.md)), [M41](tasks/M41-property.md) [M95](tasks/M95-near-threshold-4.md) |
-| 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | 1.94, in progress (GetImageFeatures unblocked by Recipe L; its parallel texture regions need Recipe B, [M90](tasks/M90-hoist-types.md); TraceEdges bundled), [M35](tasks/M35-feature.md) [M93](tasks/M93-near-threshold-2.md) [M99](tasks/M99-bundle-arguments.md) |
+| 1.60 | `MagickCore/feature.c` | 2340 | 95% | 68% | 2.30, in progress (CannyEdgeImage's gradient (K) and neighbours (O), HoughLineImage's line, maxima, header and vote extracted; GetImageFeatures unblocked by Recipe L; its parallel texture regions need Recipe B, [M90](tasks/M90-hoist-types.md); TraceEdges bundled), [M35](tasks/M35-feature.md) [M93](tasks/M93-near-threshold-2.md) [M99](tasks/M99-bundle-arguments.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 1.61 | `MagickCore/xml-tree.c` | 2347 | 35% | 57% | 2.29, in progress (17 predicates; 4 sites left: 3 with side effects, 1 repeat), [M42](tasks/M42-xml-tree.md) [M92](tasks/M92-near-threshold.md) [M94](tasks/M94-near-threshold-3.md) [M95](tasks/M95-near-threshold-4.md) |
-| 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | 2.10, in progress (Complex Conditional gone), [M43](tasks/M43-vision.md) [M99](tasks/M99-bundle-arguments.md) |
-| 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.20, in progress (Complex Conditional gone; second pass [M78](tasks/M78-image.md)), [M36](tasks/M36-image.md) [M93](tasks/M93-near-threshold-2.md) [M94](tasks/M94-near-threshold-3.md) [M95](tasks/M95-near-threshold-4.md) |
+| 1.62 | `MagickCore/vision.c` | 1838 | 28% | 55% | 2.35, in progress (Complex Conditional gone; the perimeter pattern count shared by two thresholds merged, M101), [M43](tasks/M43-vision.md) [M99](tasks/M99-bundle-arguments.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 1.66 | `MagickCore/image.c` | 4364 | 79% | 65% | 2.49, in progress (Complex Conditional gone; second pass [M78](tasks/M78-image.md); CopyImagePixels' channel loop and InterpretImageFilename's option lookup extracted [M101](tasks/M101-bundle-uncapped.md)), [M36](tasks/M36-image.md) [M93](tasks/M93-near-threshold-2.md) [M94](tasks/M94-near-threshold-3.md) [M95](tasks/M95-near-threshold-4.md) |
 | 1.85 | `MagickCore/blob.c` | 6756 | 50% | 56% | 2.21, in progress (8 predicates; one POSIX-only site left), [M44](tasks/M44-blob.md) |
-| 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | 2.33, in progress (6 predicates; Raqm-only and one 5-argument site left), [M45](tasks/M45-annotate.md) |
+| 2.06 | `MagickCore/annotate.c` | 2507 | 75% | 67% | 2.77, in progress (6 predicates; Raqm-only and one 5-argument site left; Recipe B on RenderType and RenderFreetype, no Brain Method left), [M45](tasks/M45-annotate.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 2.12 | `MagickCore/profile.c` | 2996 | 23% | 17% | 2.60, in progress (ProfileImage #if-built; SyncExifProfile hoisted, M84), [M69](tasks/M69-profile.md) [M92](tasks/M92-near-threshold.md) |
 | 2.15 | `MagickCore/delegate.c` | 2373 | 65% | 46% | 2.60, in progress (Complex Conditional gone), [M29](tasks/M29-delegate.md) [M99](tasks/M99-bundle-arguments.md) |
-| 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | 3.79, in progress (Complex Conditional gone; scan loops need Recipe B), [M46](tasks/M46-layer.md) [M92](tasks/M92-near-threshold.md) |
+| 3.04 | `MagickCore/layer.c` | 2097 | 62% | 56% | 3.94, in progress (Complex Conditional gone; CompareImagesBounds' four scans share one helper), [M46](tasks/M46-layer.md) [M92](tasks/M92-near-threshold.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 3.32 | `MagickCore/log.c` | 1977 | 35% | 14% | 4.18, in progress (new two-string helpers trigger String Heavy Function Arguments; TranslateEvent bundled), [M30](tasks/M30-log.md) [M99](tasks/M99-bundle-arguments.md) |
-| 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | 4.45 (guard level, not ready; ReadImage and WriteImage left), [M48](tasks/M48-constitute.md) |
-| 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | 3.85, in progress (Complex Conditional: one sizeof site left), [M31](tasks/M31-policy.md) |
+| 3.33 | `MagickCore/constitute.c` | 1618 | 78% | 55% | 4.65, in progress (ReadImage's property triple and WriteImage's encode blocks merged, its fallback and endian blocks extracted), [M48](tasks/M48-constitute.md) [M101](tasks/M101-bundle-uncapped.md) |
+| 3.56 | `MagickCore/policy.c` | 1618 | 35% | 36% | 4.39, in progress (Complex Conditional: one sizeof site left; LoadPolicyCache bundled, no Brain Method left), [M31](tasks/M31-policy.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 3.60 | `MagickCore/type.c` | 1418 | 75% | 30% | 4.70, in progress (Complex Conditional gone; GetTypeInfoByFamily's scoring and exact pass extracted, [M91](tasks/M91-hoist-types-2.md)), [M32](tasks/M32-type.md) [M99](tasks/M99-bundle-arguments.md) |
 | 4.09 | `MagickCore/resample.c` | 1463 | 98% | 69% | 5.13 (guard level; rest is #if-built or Recipe B), [M51](tasks/M51-resample.md) |
 | 4.27 | `MagickCore/resource.c` | 1598 | 70% | 39% | 5.02 (lock helpers reused in Relinquish, [M88](tasks/M88-reuse.md); env blocks are two-value), [M52](tasks/M52-resource.md) |
-| 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | 4.91 (helpers reused after fresh mutation, [M88](tasks/M88-reuse.md)), [M53](tasks/M53-splay-tree.md) |
+| 4.32 | `MagickCore/splay-tree.c` | 1631 | 60% | 58% | 5.94 (helpers reused after fresh mutation, [M88](tasks/M88-reuse.md); CompareNodeKey reused in six functions, RelinquishNodeContents in four, [M101](tasks/M101-bundle-uncapped.md)), [M53](tasks/M53-splay-tree.md) |
 | 4.38 | `MagickCore/locale.c` | 1716 | 72% | 62% | 5.09, in progress (Complex Conditional gone), [M33](tasks/M33-locale.md) [M99](tasks/M99-bundle-arguments.md) |
 | 4.58 | `MagickCore/token.c` | 1068 | 60% | 67% | 5.02 (rest returns from inside or is #if-built), [M54](tasks/M54-token.md) |
 | 5.01 | `MagickCore/distribute-cache.c` | 2072 | 0% | – | 5.16 (rest interleaves Winsock/MSVC #if), [M72](tasks/M72-distribute-cache.md) |
@@ -154,7 +154,7 @@ needs before refactoring:
 | 6.23 | `MagickCore/list.c` | 1504 | 80% | 62% | 6.45 (rest is prologue duplication and a &list loop), [M58](tasks/M58-list.md) [M92](tasks/M92-near-threshold.md) |
 | 6.28 | `MagickCore/cipher.c` | 1195 | 0% | – | 6.90 (Passkey twins need D with mutation data), [M71](tasks/M71-cipher.md) |
 | 6.46 | `MagickCore/module.c` | 1712 | 0% | – | open |
-| 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.54 (Recipe H applied, M84), [M61](tasks/M61-signature.md) |
+| 7.08 | `MagickCore/signature.c` | 818 | 85% | 68% | 8.62 (Recipe H applied, M84; Recipe F on the K table, M101), [M61](tasks/M61-signature.md) [M101](tasks/M101-bundle-uncapped.md) |
 | 7.56 | `MagickCore/quantum.c` | 1110 | 90% | 69% | 8.32, [M62](tasks/M62-quantum.md) |
 | 7.59 | `MagickCore/linked-list.c` | 1040 | 40% | 69% | 9.02 (interior-insert bug reported), [M59](tasks/M59-linked-list.md) [M92](tasks/M92-near-threshold.md) |
 | 7.68 | `MagickCore/random.c` | 996 | 62% | 24% | 8.06 (entropy gathering is #if-built), [M63](tasks/M63-random.md) |
@@ -163,7 +163,7 @@ needs before refactoring:
 | 8.55 | `MagickCore/registry.c` | 537 | 68% | 48% | 8.79, [M66](tasks/M66-registry.md) |
 | 8.81 | `MagickCore/timer.c` | 664 | 89% | 52% | plateau 8.81 (prologue duplication only), [M67](tasks/M67-timer.md) |
 | 9.09 | `MagickCore/artifact.c` | 491 | 80% | 60% | open |
-| 9.28 | `MagickCore/version.c` | 697 | 10% | 50% | open |
+| 9.28 | `MagickCore/version.c` | 697 | 10% | 50% | **10.00** (Recipe F on GetMagickDelegates), [M101](tasks/M101-bundle-uncapped.md) |
 | 10.00 | `MagickCore/client.c` | 163 | 100% | 60% | open |
 | 10.00 | `MagickCore/monitor.c` | 263 | 100% | 33% | open |
 | 10.00 | `MagickCore/thread.c` | 250 | 100% | 50% | open |

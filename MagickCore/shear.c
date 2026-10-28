@@ -80,6 +80,32 @@
 #include "MagickCore/thread-private.h"
 #include "MagickCore/threshold.h"
 #include "MagickCore/transform.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _ShearRegion
+{
+  size_t
+    width,
+    height;
+
+  ssize_t
+    x_offset,
+    y_offset;
+} ShearRegion;
+
+typedef struct _CropToFitRegion
+{
+  double
+    x_shear,
+    y_shear,
+    width,
+    height;
+
+  MagickBooleanType
+    rotate;
+} CropToFitRegion;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -98,24 +124,30 @@
 %  The format of the CropToFitImage method is:
 %
 %      MagickBooleanType CropToFitImage(Image **image,
-%        const double x_shear,const double x_shear,
-%        const double width,const double height,
-%        const MagickBooleanType rotate,ExceptionInfo *exception)
+%        const CropToFitRegion *region,ExceptionInfo *exception)
 %
 %  A description of each parameter follows.
 %
 %    o image: the image.
 %
-%    o x_shear, y_shear, width, height: Defines a region of the image to crop.
+%    o region: the x_shear, y_shear, width and height that define the region
+%      of the image to crop, and whether the image was rotated.
 %
 %    o exception: return any errors or warnings in this structure.
 %
 */
 static MagickBooleanType CropToFitImage(Image **image,
-  const double x_shear,const double y_shear,
-  const double width,const double height,
-  const MagickBooleanType rotate,ExceptionInfo *exception)
+  const CropToFitRegion *region,ExceptionInfo *exception)
 {
+  const double
+    x_shear = region->x_shear,
+    y_shear = region->y_shear,
+    width = region->width,
+    height = region->height;
+
+  const MagickBooleanType
+    rotate = region->rotate;
+
   Image
     *crop_image;
 
@@ -1143,8 +1175,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
 %  The format of the XShearImage method is:
 %
 %      MagickBooleanType XShearImage(Image *image,const double degrees,
-%        const size_t width,const size_t height,
-%        const ssize_t x_offset,const ssize_t y_offset,ExceptionInfo *exception)
+%        const ShearRegion *region,ExceptionInfo *exception)
 %
 %  A description of each parameter follows.
 %
@@ -1153,17 +1184,24 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
 %    o degrees: A double representing the shearing angle along the X
 %      axis.
 %
-%    o width, height, x_offset, y_offset: Defines a region of the image
-%      to shear.
+%    o region: the width, height, x_offset and y_offset that define the
+%      region of the image to shear.
 %
 %    o exception: return any errors or warnings in this structure.
 %
 */
 static MagickBooleanType XShearImage(Image *image,const double degrees,
-  const size_t width,const size_t height,const ssize_t x_offset,
-  const ssize_t y_offset,ExceptionInfo *exception)
+  const ShearRegion *region,ExceptionInfo *exception)
 {
 #define XShearImageTag  "XShear/Image"
+
+  const size_t
+    width = region->width,
+    height = region->height;
+
+  const ssize_t
+    x_offset = region->x_offset,
+    y_offset = region->y_offset;
 
   typedef enum
   {
@@ -1358,8 +1396,7 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
 %  The format of the YShearImage method is:
 %
 %      MagickBooleanType YShearImage(Image *image,const double degrees,
-%        const size_t width,const size_t height,
-%        const ssize_t x_offset,const ssize_t y_offset,ExceptionInfo *exception)
+%        const ShearRegion *region,ExceptionInfo *exception)
 %
 %  A description of each parameter follows.
 %
@@ -1368,17 +1405,24 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
 %    o degrees: A double representing the shearing angle along the Y
 %      axis.
 %
-%    o width, height, x_offset, y_offset: Defines a region of the image
-%      to shear.
+%    o region: the width, height, x_offset and y_offset that define the
+%      region of the image to shear.
 %
 %    o exception: return any errors or warnings in this structure.
 %
 */
 static MagickBooleanType YShearImage(Image *image,const double degrees,
-  const size_t width,const size_t height,const ssize_t x_offset,
-  const ssize_t y_offset,ExceptionInfo *exception)
+  const ShearRegion *region,ExceptionInfo *exception)
 {
 #define YShearImageTag  "YShear/Image"
+
+  const size_t
+    width = region->width,
+    height = region->height;
+
+  const ssize_t
+    x_offset = region->x_offset,
+    y_offset = region->y_offset;
 
   typedef enum
   {
@@ -1663,22 +1707,25 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   */
   if (shear_image->alpha_trait == UndefinedPixelTrait)
     (void) SetImageAlphaChannel(shear_image,OpaqueAlphaChannel,exception);
-  status=XShearImage(shear_image,shear.x,image->columns,image->rows,bounds.x,
-    (ssize_t) (shear_image->rows-image->rows)/2,exception);
+  const ShearRegion first_pass = { image->columns, image->rows, bounds.x,
+    (ssize_t) (shear_image->rows-image->rows)/2 };
+  status=XShearImage(shear_image,shear.x,&first_pass,exception);
   if (status == MagickFalse)
     {
       shear_image=DestroyImage(shear_image);
       return((Image *) NULL);
     }
-  status=YShearImage(shear_image,shear.y,bounds.width,image->rows,(ssize_t)
-    (shear_image->columns-bounds.width)/2,bounds.y,exception);
+  const ShearRegion second_pass = { bounds.width, image->rows, (ssize_t)
+    (shear_image->columns-bounds.width)/2, bounds.y };
+  status=YShearImage(shear_image,shear.y,&second_pass,exception);
   if (status == MagickFalse)
     {
       shear_image=DestroyImage(shear_image);
       return((Image *) NULL);
     }
-  status=CropToFitImage(&shear_image,shear.x,shear.y,(MagickRealType)
-    image->columns,(MagickRealType) image->rows,MagickFalse,exception);
+  const CropToFitRegion crop_region = { shear.x, shear.y, (MagickRealType)
+    image->columns, (MagickRealType) image->rows, MagickFalse };
+  status=CropToFitImage(&shear_image,&crop_region,exception);
   shear_image->alpha_trait=image->alpha_trait;
   shear_image->compose=image->compose;
   shear_image->page.width=0;
@@ -1812,30 +1859,34 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   /*
     Rotate the image.
   */
-  status=XShearImage(rotate_image,shear.x,width,height,bounds.x,(ssize_t)
-    (rotate_image->rows-height)/2,exception);
+  const ShearRegion first_pass = { width, height, bounds.x, (ssize_t)
+    (rotate_image->rows-height)/2 };
+  status=XShearImage(rotate_image,shear.x,&first_pass,exception);
   if (status == MagickFalse)
     {
       rotate_image=DestroyImage(rotate_image);
       return((Image *) NULL);
     }
-  status=YShearImage(rotate_image,shear.y,bounds.width,height,(ssize_t)
-    (rotate_image->columns-bounds.width)/2,bounds.y,exception);
+  const ShearRegion second_pass = { bounds.width, height, (ssize_t)
+    (rotate_image->columns-bounds.width)/2, bounds.y };
+  status=YShearImage(rotate_image,shear.y,&second_pass,exception);
   if (status == MagickFalse)
     {
       rotate_image=DestroyImage(rotate_image);
       return((Image *) NULL);
     }
-  status=XShearImage(rotate_image,shear.x,bounds.width,bounds.height,(ssize_t)
-    (rotate_image->columns-bounds.width)/2,(ssize_t) (rotate_image->rows-
-    bounds.height)/2,exception);
+  const ShearRegion third_pass = { bounds.width, bounds.height, (ssize_t)
+    (rotate_image->columns-bounds.width)/2, (ssize_t) (rotate_image->rows-
+    bounds.height)/2 };
+  status=XShearImage(rotate_image,shear.x,&third_pass,exception);
   if (status == MagickFalse)
     {
       rotate_image=DestroyImage(rotate_image);
       return((Image *) NULL);
     }
-  status=CropToFitImage(&rotate_image,shear.x,shear.y,(MagickRealType) width,
-    (MagickRealType) height,MagickTrue,exception);
+  const CropToFitRegion crop_region = { shear.x, shear.y, (MagickRealType)
+    width, (MagickRealType) height, MagickTrue };
+  status=CropToFitImage(&rotate_image,&crop_region,exception);
   rotate_image->alpha_trait=image->alpha_trait;
   rotate_image->compose=image->compose;
   rotate_image->page.width=0;

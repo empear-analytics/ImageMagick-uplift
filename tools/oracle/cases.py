@@ -6318,6 +6318,25 @@ GAP_STEP_CASES += [
     ("driver pathauth, symlink follow forbidden", _driver("pathauth", *_PATHAUTH),
      {".config/ImageMagick/policy.xml":
       '<policymap>\n  <policy domain="system" name="symlink" rights="none" pattern="follow"/>\n</policymap>\n'})]
+# policy.c through imdriver: SetMagickSecurityPolicy, which nothing in the command line calls: a
+# coder rule, a resource value, both at once, malformed XML (refused by validation), and an include
+# of a file the case provides and of one that does not exist (LoadPolicyCache's recursion)
+_SECPOLICY_NAMES = ("memory", "width", "max-memory-request")
+GAP_STEP_CASES += [
+    ("driver secpolicy, coder rule", _driver("secpolicy",
+     '<policymap><policy domain="coder" rights="none" pattern="PNG"/></policymap>', *_SECPOLICY_NAMES), {}),
+    ("driver secpolicy, resource values", _driver("secpolicy",
+     '<policymap><policy domain="resource" name="memory" value="256MiB"/>'
+     '<policy domain="resource" name="width" value="8KP"/></policymap>', *_SECPOLICY_NAMES), {}),
+    ("driver secpolicy, coder rule and resource value", _driver("secpolicy",
+     '<policymap><policy domain="coder" rights="none" pattern="{PNG,MIFF}"/>'
+     '<policy domain="system" name="max-memory-request" value="1MiB"/></policymap>', *_SECPOLICY_NAMES), {}),
+    ("driver secpolicy, malformed XML", _driver("secpolicy", '<policymap><policy domain=', *_SECPOLICY_NAMES), {}),
+    ("driver secpolicy, include of a provided file", _driver("secpolicy",
+     '<policymap><include file="inc.xml"/></policymap>', *_SECPOLICY_NAMES),
+     {"inc.xml": '<policymap>\n  <policy domain="resource" name="memory" value="128MiB"/>\n</policymap>\n'}),
+    ("driver secpolicy, include of a missing file", _driver("secpolicy",
+     '<policymap><include file="nosuch.xml"/></policymap>', *_SECPOLICY_NAMES), {})]
 # image.c through imdriver: AcquireNextImage (the next frame is named from image_info when one is
 # given, shares the image's blob) and DisassociateImageStream (the next frame then has a blob of its
 # own, so closing it leaves the image's stream readable). Coders always pass an image_info naming the
@@ -6936,6 +6955,13 @@ def _windrv_cases():
             for filt, scale in (("Point", "0"), ("Gaussian", "1"), ("Gaussian", "3")):
                 yield _windrv("resample %s %s %s %s margin 40" % (name, vp, filt, scale),
                               ("resample", img(name), vp, filt, scale, "margin=40"))
+    # shear.c: ShearRotateImage, which only the API reaches: angles in each quadrant (the
+    # integral rotation before the three shears), exactly 45 and 180 degrees, and negative
+    # angles, on an opaque and a translucent image
+    for name in ("rose", "rose_alpha"):
+        for degrees in ("17", "45", "-33", "95", "180", "212.5", "310", "-100"):
+            yield _windrv("shearrotate %s %s" % (name, degrees),
+                          ("shearrotate", img(name), degrees, "out.miff"), ["out.miff"])
     # timer.c: -bench (AcquireTimerInfo) and -duration (ContinueTimer) in magick-cli.c; the
     # oracle masks the report's timings (owner's decision, 2026-10-04). A duration far longer
     # than the run keeps every iteration, so the output is the same each time.

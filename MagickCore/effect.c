@@ -3770,6 +3770,74 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline double GetSurfaceShade(const PrimaryInfo *normal,
+  const PrimaryInfo *light)
+{
+  double
+    distance,
+    normal_distance,
+    shade;
+
+  if ((fabs(normal->x) <= MagickEpsilon) &&
+      (fabs(normal->y) <= MagickEpsilon))
+    shade=light->z;
+  else
+    {
+      shade=0.0;
+      distance=normal->x*light->x+normal->y*light->y+normal->z*light->z;
+      if (distance > MagickEpsilon)
+        {
+          normal_distance=normal->x*normal->x+normal->y*normal->y+
+            normal->z*normal->z;
+          if (normal_distance > (MagickEpsilon*MagickEpsilon))
+            shade=distance/sqrt((double) normal_distance);
+        }
+    }
+  return(shade);
+}
+
+static inline void ShadePixelChannels(const Image *linear_image,
+  const Image *shade_image,const Quantum *magick_restrict center,
+  Quantum *magick_restrict q,const MagickBooleanType gray,const double shade)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
+  {
+    PixelChannel
+      channel;
+
+    PixelTrait
+      shade_traits,
+      traits;
+
+    channel=GetPixelChannelChannel(linear_image,i);
+    traits=GetPixelChannelTraits(linear_image,channel);
+    shade_traits=GetPixelChannelTraits(shade_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (shade_traits == UndefinedPixelTrait))
+      continue;
+    if ((shade_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(shade_image,channel,center[i],q);
+        continue;
+      }
+    if ((traits & UpdatePixelTrait) == 0)
+      {
+        SetPixelChannel(shade_image,channel,center[i],q);
+        continue;
+      }
+    if (gray != MagickFalse)
+      {
+        SetPixelChannel(shade_image,channel,ClampToQuantum(shade),q);
+        continue;
+      }
+    SetPixelChannel(shade_image,channel,ClampToQuantum(QuantumScale*
+      shade*(double) center[i]),q);
+  }
+}
+
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   const double azimuth,const double elevation,ExceptionInfo *exception)
 {
@@ -3844,8 +3912,6 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   for (y=0; y < (ssize_t) linear_image->rows; y++)
   {
     double
-      distance,
-      normal_distance,
       shade;
 
     PrimaryInfo
@@ -3880,9 +3946,6 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
     normal.z=2.0*(double) QuantumRange;  /* constant Z of surface normal */
     for (x=0; x < (ssize_t) linear_image->columns; x++)
     {
-      ssize_t
-        i;
-
       /*
         Determine the surface normal and compute shading.
       */
@@ -3903,54 +3966,8 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
         GetShadeIntensity(linear_image,pre-GetPixelChannels(linear_image))-
         GetShadeIntensity(linear_image,pre)-
         GetShadeIntensity(linear_image,pre+GetPixelChannels(linear_image)));
-      if ((fabs(normal.x) <= MagickEpsilon) &&
-          (fabs(normal.y) <= MagickEpsilon))
-        shade=light.z;
-      else
-        {
-          shade=0.0;
-          distance=normal.x*light.x+normal.y*light.y+normal.z*light.z;
-          if (distance > MagickEpsilon)
-            {
-              normal_distance=normal.x*normal.x+normal.y*normal.y+
-                normal.z*normal.z;
-              if (normal_distance > (MagickEpsilon*MagickEpsilon))
-                shade=distance/sqrt((double) normal_distance);
-            }
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
-      {
-        PixelChannel
-          channel;
-
-        PixelTrait
-          shade_traits,
-          traits;
-
-        channel=GetPixelChannelChannel(linear_image,i);
-        traits=GetPixelChannelTraits(linear_image,channel);
-        shade_traits=GetPixelChannelTraits(shade_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (shade_traits == UndefinedPixelTrait))
-          continue;
-        if ((shade_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(shade_image,channel,center[i],q);
-            continue;
-          }
-        if ((traits & UpdatePixelTrait) == 0)
-          {
-            SetPixelChannel(shade_image,channel,center[i],q);
-            continue;
-          }
-        if (gray != MagickFalse)
-          {
-            SetPixelChannel(shade_image,channel,ClampToQuantum(shade),q);
-            continue;
-          }
-        SetPixelChannel(shade_image,channel,ClampToQuantum(QuantumScale*
-          shade*(double) center[i]),q);
-      }
+      shade=GetSurfaceShade(&normal,&light);
+      ShadePixelChannels(linear_image,shade_image,center,q,gray,shade);
       p+=(ptrdiff_t) GetPixelChannels(linear_image);
       q+=(ptrdiff_t) GetPixelChannels(shade_image);
     }
@@ -4281,6 +4298,45 @@ MagickExport Image *SpreadImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline void UnsharpPixelChannels(const Image *image,
+  const Image *unsharp_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q,const double quantum_threshold,const double gain)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      pixel;
+
+    PixelChannel
+      channel;
+
+    PixelTrait
+      traits,
+      unsharp_traits;
+
+    channel=GetPixelChannelChannel(image,i);
+    traits=GetPixelChannelTraits(image,channel);
+    unsharp_traits=GetPixelChannelTraits(unsharp_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (unsharp_traits == UndefinedPixelTrait))
+      continue;
+    if ((unsharp_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(unsharp_image,channel,p[i],q);
+        continue;
+      }
+    pixel=(double) p[i]-(double) GetPixelChannel(unsharp_image,channel,q);
+    if (fabs(2.0*pixel) < quantum_threshold)
+      pixel=(double) p[i];
+    else
+      pixel=(double) p[i]+gain*pixel;
+    SetPixelChannel(unsharp_image,channel,ClampToQuantum(pixel),q);
+  }
+}
+
 MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
   const double sigma,const double gain,const double threshold,
   ExceptionInfo *exception)
@@ -4358,39 +4414,7 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits,
-          unsharp_traits;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        unsharp_traits=GetPixelChannelTraits(unsharp_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (unsharp_traits == UndefinedPixelTrait))
-          continue;
-        if ((unsharp_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(unsharp_image,channel,p[i],q);
-            continue;
-          }
-        pixel=(double) p[i]-(double) GetPixelChannel(unsharp_image,channel,q);
-        if (fabs(2.0*pixel) < quantum_threshold)
-          pixel=(double) p[i];
-        else
-          pixel=(double) p[i]+gain*pixel;
-        SetPixelChannel(unsharp_image,channel,ClampToQuantum(pixel),q);
-      }
+      UnsharpPixelChannels(image,unsharp_image,p,q,quantum_threshold,gain);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(unsharp_image);
     }

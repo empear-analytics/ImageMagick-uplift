@@ -296,6 +296,92 @@ static CannyInfo SetCannyOrientation(CannyInfo pixel,const double dx,
   return(pixel);
 }
 
+static void GetCannyNeighbors(const MatrixInfo *canny_cache,const ssize_t x,
+  const ssize_t y,const int orientation,CannyInfo *alpha_pixel,
+  CannyInfo *beta_pixel)
+{
+  switch (orientation)
+  {
+    case 0:
+    default:
+    {
+      /*
+        0 degrees, north and south.
+      */
+      (void) GetMatrixElement(canny_cache,x,y-1,alpha_pixel);
+      (void) GetMatrixElement(canny_cache,x,y+1,beta_pixel);
+      break;
+    }
+    case 1:
+    {
+      /*
+        45 degrees, northwest and southeast.
+      */
+      (void) GetMatrixElement(canny_cache,x-1,y-1,alpha_pixel);
+      (void) GetMatrixElement(canny_cache,x+1,y+1,beta_pixel);
+      break;
+    }
+    case 2:
+    {
+      /*
+        90 degrees, east and west.
+      */
+      (void) GetMatrixElement(canny_cache,x-1,y,alpha_pixel);
+      (void) GetMatrixElement(canny_cache,x+1,y,beta_pixel);
+      break;
+    }
+    case 3:
+    {
+      /*
+        135 degrees, northeast and southwest.
+      */
+      (void) GetMatrixElement(canny_cache,x+1,y-1,beta_pixel);
+      (void) GetMatrixElement(canny_cache,x-1,y+1,alpha_pixel);
+      break;
+    }
+  }
+}
+
+static void GetCannyGradient(const Image *edge_image,
+  const Quantum *magick_restrict p,double *dx,double *dy)
+{
+  const Quantum
+    *magick_restrict kernel_pixels;
+
+  ssize_t
+    v;
+
+  static double
+    Gx[2][2] =
+    {
+      { -1.0,  +1.0 },
+      { -1.0,  +1.0 }
+    },
+    Gy[2][2] =
+    {
+      { +1.0, +1.0 },
+      { -1.0, -1.0 }
+    };
+
+  kernel_pixels=p;
+  for (v=0; v < 2; v++)
+  {
+    ssize_t
+      u;
+
+    for (u=0; u < 2; u++)
+    {
+      double
+        intensity;
+
+      intensity=GetPixelIntensity(edge_image,kernel_pixels+u);
+      *dx+=0.5*Gx[v][u]*intensity;
+      *dy+=0.5*Gy[v][u]*intensity;
+    }
+    kernel_pixels+=edge_image->columns+1;
+  }
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -401,44 +487,10 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
         dx,
         dy;
 
-      const Quantum
-        *magick_restrict kernel_pixels;
-
-      ssize_t
-        v;
-
-      static double
-        Gx[2][2] =
-        {
-          { -1.0,  +1.0 },
-          { -1.0,  +1.0 }
-        },
-        Gy[2][2] =
-        {
-          { +1.0, +1.0 },
-          { -1.0, -1.0 }
-        };
-
       (void) memset(&pixel,0,sizeof(pixel));
       dx=0.0;
       dy=0.0;
-      kernel_pixels=p;
-      for (v=0; v < 2; v++)
-      {
-        ssize_t
-          u;
-
-        for (u=0; u < 2; u++)
-        {
-          double
-            intensity;
-
-          intensity=GetPixelIntensity(edge_image,kernel_pixels+u);
-          dx+=0.5*Gx[v][u]*intensity;
-          dy+=0.5*Gy[v][u]*intensity;
-        }
-        kernel_pixels+=edge_image->columns+1;
-      }
+      GetCannyGradient(edge_image,p,&dx,&dy);
       pixel.magnitude=hypot(dx,dy);
       pixel.orientation=0;
       pixel=SetCannyOrientation(pixel,dx,dy);
@@ -486,46 +538,8 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
         pixel;
 
       (void) GetMatrixElement(canny_cache,x,y,&pixel);
-      switch (pixel.orientation)
-      {
-        case 0:
-        default:
-        {
-          /*
-            0 degrees, north and south.
-          */
-          (void) GetMatrixElement(canny_cache,x,y-1,&alpha_pixel);
-          (void) GetMatrixElement(canny_cache,x,y+1,&beta_pixel);
-          break;
-        }
-        case 1:
-        {
-          /*
-            45 degrees, northwest and southeast.
-          */
-          (void) GetMatrixElement(canny_cache,x-1,y-1,&alpha_pixel);
-          (void) GetMatrixElement(canny_cache,x+1,y+1,&beta_pixel);
-          break;
-        }
-        case 2:
-        {
-          /*
-            90 degrees, east and west.
-          */
-          (void) GetMatrixElement(canny_cache,x-1,y,&alpha_pixel);
-          (void) GetMatrixElement(canny_cache,x+1,y,&beta_pixel);
-          break;
-        }
-        case 3:
-        {
-          /*
-            135 degrees, northeast and southwest.
-          */
-          (void) GetMatrixElement(canny_cache,x+1,y-1,&beta_pixel);
-          (void) GetMatrixElement(canny_cache,x-1,y+1,&alpha_pixel);
-          break;
-        }
-      }
+      GetCannyNeighbors(canny_cache,x,y,pixel.orientation,&alpha_pixel,
+        &beta_pixel);
       pixel.intensity=pixel.magnitude;
       if ((pixel.magnitude < alpha_pixel.magnitude) ||
           (pixel.magnitude < beta_pixel.magnitude))
@@ -1914,6 +1928,124 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   return(GetFirstImageInList(image));
 }
 
+static void VoteHoughLines(MatrixInfo *accumulator,const PointInfo *center,
+  const ssize_t x,const ssize_t y,const double hough_height)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < 180; i++)
+  {
+    double
+      count,
+      radius;
+
+    radius=(((double) x-center->x)*cos(DegreesToRadians((double) i)))+
+      (((double) y-center->y)*sin(DegreesToRadians((double) i)));
+    (void) GetMatrixElement(accumulator,i,(ssize_t)
+      MagickRound(radius+hough_height),&count);
+    count++;
+    (void) SetMatrixElement(accumulator,i,(ssize_t)
+      MagickRound(radius+hough_height),&count);
+  }
+}
+
+static MagickBooleanType WriteHoughHeader(const Image *image,const int file,
+  const size_t width,const size_t height,const size_t threshold)
+{
+  char
+    message[MagickPathExtent];
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  (void) FormatLocaleString(message,MagickPathExtent,
+    "# Hough line transform: %.17gx%.17g%+.20g\n",(double) width,
+    (double) height,(double) threshold);
+  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
+    status=MagickFalse;
+  (void) FormatLocaleString(message,MagickPathExtent,
+    "viewbox 0 0 %.17g %.17g\n",(double) image->columns,(double) image->rows);
+  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
+    status=MagickFalse;
+  (void) FormatLocaleString(message,MagickPathExtent,
+    "# x1,y1 x2,y2 # count angle distance\n");
+  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
+    status=MagickFalse;
+  return(status);
+}
+
+static double GetHoughMaxima(const MatrixInfo *accumulator,const ssize_t x,
+  const ssize_t y,const size_t width,const size_t height,double count)
+{
+  double
+    maxima;
+
+  ssize_t
+    v;
+
+  maxima=count;
+  for (v=(-((ssize_t) height/2)); v <= (((ssize_t) height/2)); v++)
+  {
+    ssize_t
+      u;
+
+    for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
+    {
+      if ((u != 0) || (v !=0))
+        {
+          (void) GetMatrixElement(accumulator,x+u,y+v,&count);
+          if (count > maxima)
+            {
+              maxima=count;
+              break;
+            }
+        }
+    }
+    if (u < (ssize_t) (width/2))
+      break;
+  }
+  return(maxima);
+}
+
+static SegmentInfo GetHoughLine(const Image *image,const ssize_t x,
+  const ssize_t y,const size_t accumulator_height)
+{
+  SegmentInfo
+    line;
+
+  if ((x >= 45) && (x <= 135))
+    {
+      /*
+        y = (r-x cos(t))/sin(t)
+      */
+      line.x1=0.0;
+      line.y1=((double) (y-(accumulator_height/2.0))-((line.x1-
+        (image->columns/2.0))*cos(DegreesToRadians((double) x))))/
+        sin(DegreesToRadians((double) x))+(image->rows/2.0);
+      line.x2=(double) image->columns;
+      line.y2=((double) (y-(accumulator_height/2.0))-((line.x2-
+        (image->columns/2.0))*cos(DegreesToRadians((double) x))))/
+        sin(DegreesToRadians((double) x))+(image->rows/2.0);
+    }
+  else
+    {
+      /*
+        x = (r-y cos(t))/sin(t)
+      */
+      line.y1=0.0;
+      line.x1=((double) (y-(accumulator_height/2.0))-((line.y1-
+        (image->rows/2.0))*sin(DegreesToRadians((double) x))))/
+        cos(DegreesToRadians((double) x))+(image->columns/2.0);
+      line.y2=(double) image->rows;
+      line.x2=((double) (y-(accumulator_height/2.0))-((line.y2-
+        (image->rows/2.0))*sin(DegreesToRadians((double) x))))/
+        cos(DegreesToRadians((double) x))+(image->columns/2.0);
+    }
+  return(line);
+}
+
 MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const size_t height,const size_t threshold,ExceptionInfo *exception)
 {
@@ -2010,25 +2142,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       if (GetPixelIntensity(image,p) > ((double) QuantumRange/2.0))
-        {
-          ssize_t
-            i;
-
-          for (i=0; i < 180; i++)
-          {
-            double
-              count,
-              radius;
-
-            radius=(((double) x-center.x)*cos(DegreesToRadians((double) i)))+
-              (((double) y-center.y)*sin(DegreesToRadians((double) i)));
-            (void) GetMatrixElement(accumulator,i,(ssize_t)
-              MagickRound(radius+hough_height),&count);
-            count++;
-            (void) SetMatrixElement(accumulator,i,(ssize_t)
-              MagickRound(radius+hough_height),&count);
-          }
-        }
+        VoteHoughLines(accumulator,&center,x,y,hough_height);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -2060,19 +2174,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       accumulator=DestroyMatrixInfo(accumulator);
       return((Image *) NULL);
     }
-  (void) FormatLocaleString(message,MagickPathExtent,
-    "# Hough line transform: %.17gx%.17g%+.20g\n",(double) width,
-    (double) height,(double) threshold);
-  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
-    status=MagickFalse;
-  (void) FormatLocaleString(message,MagickPathExtent,
-    "viewbox 0 0 %.17g %.17g\n",(double) image->columns,(double) image->rows);
-  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
-    status=MagickFalse;
-  (void) FormatLocaleString(message,MagickPathExtent,
-    "# x1,y1 x2,y2 # count angle distance\n");
-  if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
-    status=MagickFalse;
+  status=WriteHoughHeader(image,file,width,height,threshold);
   line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
   if (threshold != 0)
     line_count=threshold;
@@ -2095,64 +2197,14 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
           SegmentInfo
             line;
 
-          ssize_t
-            v;
-
           /*
             Is point a local maxima?
           */
-          maxima=count;
-          for (v=(-((ssize_t) height/2)); v <= (((ssize_t) height/2)); v++)
-          {
-            ssize_t
-              u;
-
-            for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
-            {
-              if ((u != 0) || (v !=0))
-                {
-                  (void) GetMatrixElement(accumulator,x+u,y+v,&count);
-                  if (count > maxima)
-                    {
-                      maxima=count;
-                      break;
-                    }
-                }
-            }
-            if (u < (ssize_t) (width/2))
-              break;
-          }
+          maxima=GetHoughMaxima(accumulator,x,y,width,height,count);
           (void) GetMatrixElement(accumulator,x,y,&count);
           if (maxima > count)
             continue;
-          if ((x >= 45) && (x <= 135))
-            {
-              /*
-                y = (r-x cos(t))/sin(t)
-              */
-              line.x1=0.0;
-              line.y1=((double) (y-(accumulator_height/2.0))-((line.x1-
-                (image->columns/2.0))*cos(DegreesToRadians((double) x))))/
-                sin(DegreesToRadians((double) x))+(image->rows/2.0);
-              line.x2=(double) image->columns;
-              line.y2=((double) (y-(accumulator_height/2.0))-((line.x2-
-                (image->columns/2.0))*cos(DegreesToRadians((double) x))))/
-                sin(DegreesToRadians((double) x))+(image->rows/2.0);
-            }
-          else
-            {
-              /*
-                x = (r-y cos(t))/sin(t)
-              */
-              line.y1=0.0;
-              line.x1=((double) (y-(accumulator_height/2.0))-((line.y1-
-                (image->rows/2.0))*sin(DegreesToRadians((double) x))))/
-                cos(DegreesToRadians((double) x))+(image->columns/2.0);
-              line.y2=(double) image->rows;
-              line.x2=((double) (y-(accumulator_height/2.0))-((line.y2-
-                (image->rows/2.0))*sin(DegreesToRadians((double) x))))/
-                cos(DegreesToRadians((double) x))+(image->columns/2.0);
-            }
+          line=GetHoughLine(image,x,y,accumulator_height);
           (void) FormatLocaleString(message,MagickPathExtent,
             "line %g,%g %g,%g  # %g %g %g\n",line.x1,line.y1,line.x2,line.y2,
             maxima,(double) x,(double) y);

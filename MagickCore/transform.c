@@ -71,6 +71,22 @@
 #include "MagickCore/thread-private.h"
 #include "MagickCore/transform.h"
 #include "MagickCore/transform-private.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _CopyRegion
+{
+  size_t
+    columns,
+    rows;
+
+  ssize_t
+    sx,
+    sy,
+    dx,
+    dy;
+} CopyRegion;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1474,9 +1490,19 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
 %
 */
 
-static MagickBooleanType CopyImageRegion(Image *destination,const Image *source,  const size_t columns,const size_t rows,const ssize_t sx,const ssize_t sy,
-  const ssize_t dx,const ssize_t dy,ExceptionInfo *exception)
+static MagickBooleanType CopyImageRegion(Image *destination,const Image *source,
+  const CopyRegion *region,ExceptionInfo *exception)
 {
+  const size_t
+    columns = region->columns,
+    rows = region->rows;
+
+  const ssize_t
+    sx = region->sx,
+    sy = region->sy,
+    dx = region->dx,
+    dy = region->dy;
+
   CacheView
     *source_view,
     *destination_view;
@@ -1589,21 +1615,27 @@ MagickExport Image *RollImage(const Image *image,const ssize_t x_offset,
   /*
     Roll image.
   */
-  status=CopyImageRegion(roll_image,image,(size_t) offset.x,
-    (size_t) offset.y,(ssize_t) image->columns-offset.x,(ssize_t) image->rows-
-    offset.y,0,0,exception);
+  const CopyRegion first_region = { (size_t) offset.x, (size_t) offset.y,
+    (ssize_t) image->columns-offset.x, (ssize_t) image->rows-offset.y, 0, 0 };
+  status=CopyImageRegion(roll_image,image,&first_region,exception);
   (void) SetImageProgress(image,RollImageTag,0,3);
-  status&=(MagickStatusType) CopyImageRegion(roll_image,image,(size_t)
-    ((ssize_t) image->columns-offset.x),(size_t) offset.y,0,(ssize_t)
-    image->rows-offset.y,offset.x,0,exception);
+  const CopyRegion second_region = { (size_t) ((ssize_t) image->columns-
+    offset.x), (size_t) offset.y, 0, (ssize_t) image->rows-offset.y, offset.x,
+    0 };
+  status&=(MagickStatusType) CopyImageRegion(roll_image,image,&second_region,
+    exception);
   (void) SetImageProgress(image,RollImageTag,1,3);
-  status&=(MagickStatusType) CopyImageRegion(roll_image,image,(size_t)
-    offset.x,(size_t) ((ssize_t) image->rows-offset.y),(ssize_t)
-    image->columns-offset.x,0,0,offset.y,exception);
+  const CopyRegion third_region = { (size_t) offset.x, (size_t) ((ssize_t)
+    image->rows-offset.y), (ssize_t) image->columns-offset.x, 0, 0,
+    offset.y };
+  status&=(MagickStatusType) CopyImageRegion(roll_image,image,&third_region,
+    exception);
   (void) SetImageProgress(image,RollImageTag,2,3);
-  status&=(MagickStatusType) CopyImageRegion(roll_image,image,(size_t)
-    ((ssize_t) image->columns-offset.x),(size_t) ((ssize_t) image->rows-
-    offset.y),0,0,offset.x,offset.y,exception);
+  const CopyRegion fourth_region = { (size_t) ((ssize_t) image->columns-
+    offset.x), (size_t) ((ssize_t) image->rows-offset.y), 0, 0, offset.x,
+    offset.y };
+  status&=(MagickStatusType) CopyImageRegion(roll_image,image,&fourth_region,
+    exception);
   (void) SetImageProgress(image,RollImageTag,3,3);
   roll_image->type=image->type;
   if (status == MagickFalse)

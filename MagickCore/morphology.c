@@ -84,6 +84,21 @@
 #include "MagickCore/token.h"
 #include "MagickCore/utility.h"
 #include "MagickCore/utility-private.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _MorphologyPass
+{
+  MorphologyMethod
+    method;
+
+  const KernelInfo
+    *kernel;
+
+  double
+    bias;
+} MorphologyPass;
 
 /*
   Other global definitions used by module.
@@ -2768,10 +2783,18 @@ static void CalcKernelMetaData(KernelInfo *kernel)
 %
 */
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
-  const MorphologyMethod method,const KernelInfo *kernel,const double bias,
-  ExceptionInfo *exception)
+  const MorphologyPass *pass,ExceptionInfo *exception)
 {
 #define MorphologyTag  "Morphology/Image"
+
+  const MorphologyMethod
+    method = pass->method;
+
+  const KernelInfo
+    *kernel = pass->kernel;
+
+  const double
+    bias = pass->bias;
 
   CacheView
     *image_view,
@@ -4138,8 +4161,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
           /* APPLY THE MORPHOLOGICAL PRIMITIVE (curr -> work) */
           count++;
-          changed = MorphologyPrimitive(curr_image, work_image, primitive,
-                       this_kernel, bias, exception);
+          const MorphologyPass pass = { primitive, this_kernel, bias };
+          changed = MorphologyPrimitive(curr_image, work_image, &pass,
+                       exception);
           if (verbose != MagickFalse) {
             if ( kernel_loop > 1 )
               (void) FormatLocaleFile(stderr, "\n"); /* add end-of-line from previous */

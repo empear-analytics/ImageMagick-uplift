@@ -746,9 +746,6 @@ static void CopyBackMatrix(double **matrix,long double **hp_matrix,
       matrix[i][j]=(double)hp_matrix[i][j];
 }
 
-MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
-  double **vectors,const size_t rank,const size_t number_vectors)
-{
 #define GaussJordanSwap(x,y) \
 { \
   double temp = (x); \
@@ -774,6 +771,85 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     columns=(ssize_t *) RelinquishMagickMemory(columns); \
   return(MagickFalse); \
 }
+
+static void FindPivot(long double **hp_matrix,const ssize_t *pivots,
+  const size_t rank,long double *max,ssize_t *row,ssize_t *column)
+{
+  ssize_t
+    j,
+    k;
+
+  *column=(-1);
+  *row=(-1);
+  for (j=0; j < (ssize_t) rank; j++)
+    if (pivots[j] != 1)
+      for (k=0; k < (ssize_t) rank; k++)
+        if ((pivots[k] == 0) && (fabsl(hp_matrix[j][k]) > *max))
+          {
+            *max=fabsl(hp_matrix[j][k]);
+            *row=j;
+            *column=k;
+          }
+}
+
+static void SwapMatrixRows(long double **hp_matrix,const size_t rank,
+  const ssize_t row,const ssize_t column)
+{
+  ssize_t
+    k;
+
+  for (k=0; k < (ssize_t) rank; k++)
+    GaussJordanSwapLD(hp_matrix[row][k],hp_matrix[column][k]);
+}
+
+static void SwapVectorEntries(double **vectors,const size_t number_vectors,
+  const ssize_t row,const ssize_t column)
+{
+  ssize_t
+    k;
+
+  for (k=0; k < (ssize_t) number_vectors; k++)
+    GaussJordanSwap(vectors[k][row],vectors[k][column]);
+}
+
+static void EliminateColumn(long double **hp_matrix,double **vectors,
+  const size_t rank,const size_t number_vectors,const ssize_t column)
+{
+  long double
+    scale;
+
+  ssize_t
+    j,
+    k;
+
+  for (j=0; j < (ssize_t) rank; j++)
+    if (j != column)
+      {
+        scale=hp_matrix[j][column];
+        hp_matrix[j][column]=0.0;
+        for (k=0; k < (ssize_t) rank; k++)
+          hp_matrix[j][k]-=scale*hp_matrix[column][k];
+        for (k=0; k < (ssize_t) number_vectors; k++)
+          vectors[k][j]-=(double)(scale*(long double) vectors[k][column]);
+      }
+}
+
+static void UnscrambleColumns(long double **hp_matrix,const size_t rank,
+  const ssize_t *columns,const ssize_t *rows)
+{
+  ssize_t
+    i,
+    j;
+
+  for (j=(ssize_t) rank-1; j >= 0; j--)
+    if (columns[j] != rows[j])
+      for (i=0; i < (ssize_t) rank; i++)
+        GaussJordanSwapLD(hp_matrix[i][columns[j]],hp_matrix[i][rows[j]]);
+}
+
+MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
+  double **vectors,const size_t rank,const size_t number_vectors)
+{
 
   long double
     **hp_matrix = (long double **) NULL,
@@ -816,33 +892,18 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
     long double
       max = 0.0;
 
-    ssize_t
-      k;
-
     /*
       Partial pivoting: find the largest absolute value in the unreduced
       submatrix.
     */
-    column=(-1);
-    row=(-1);
-    for (j=0; j < (ssize_t) rank; j++)
-      if (pivots[j] != 1)
-        for (k=0; k < (ssize_t) rank; k++)
-          if ((pivots[k] == 0) && (fabsl(hp_matrix[j][k]) > max))
-            {
-              max=fabsl(hp_matrix[j][k]);
-              row=j;
-              column=k;
-            }
+    FindPivot(hp_matrix,pivots,rank,&max,&row,&column);
     if (IsSingularPivot(column,row,max) != MagickFalse)
       ThrowGaussJordanException();  /* Singular or nearly singular matrix */
     pivots[column]++;
     if (row != column)
       {
-        for (k=0; k < (ssize_t) rank; k++)
-          GaussJordanSwapLD(hp_matrix[row][k],hp_matrix[column][k]);
-        for (k=0; k < (ssize_t) number_vectors; k++)
-          GaussJordanSwap(vectors[k][row],vectors[k][column]);
+        SwapMatrixRows(hp_matrix,rank,row,column);
+        SwapVectorEntries(vectors,number_vectors,row,column);
       }
     rows[i]=row;
     columns[i]=column;
@@ -854,21 +915,9 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
       hp_matrix[column][j]*=scale;
     for (j=0; j < (ssize_t) number_vectors; j++)
       vectors[j][column]*=(double) scale;
-    for (j=0; j < (ssize_t) rank; j++)
-      if (j != column)
-        {
-          scale=hp_matrix[j][column];
-          hp_matrix[j][column]=0.0;
-          for (k=0; k < (ssize_t) rank; k++)
-            hp_matrix[j][k]-=scale*hp_matrix[column][k];
-          for (k=0; k < (ssize_t) number_vectors; k++)
-            vectors[k][j]-=(double)(scale*(long double) vectors[k][column]);
-        }
+    EliminateColumn(hp_matrix,vectors,rank,number_vectors,column);
   }
-  for (j=(ssize_t) rank-1; j >= 0; j--)
-    if (columns[j] != rows[j])
-      for (i=0; i < (ssize_t) rank; i++)
-        GaussJordanSwapLD(hp_matrix[i][columns[j]],hp_matrix[i][rows[j]]);
+  UnscrambleColumns(hp_matrix,rank,columns,rows);
   /*
     Copy back the result to the original matrix.
   */
@@ -911,6 +960,50 @@ MagickPrivate MagickBooleanType GaussJordanElimination(double **matrix,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void GetMatrixRange(const MatrixInfo *matrix_info,double *min_value,
+  double *max_value)
+{
+  ssize_t
+    y;
+
+  (void) GetMatrixElement(matrix_info,0,0,min_value);
+  *max_value=(*min_value);
+  for (y=0; y < (ssize_t) matrix_info->rows; y++)
+  {
+    ssize_t
+      x;
+
+    for (x=0; x < (ssize_t) matrix_info->columns; x++)
+    {
+      double
+        value;
+
+      if (GetMatrixElement(matrix_info,x,y,&value) == MagickFalse)
+        continue;
+      if (value < *min_value)
+        *min_value=value;
+      else
+        if (value > *max_value)
+          *max_value=value;
+    }
+  }
+}
+
+static void GetMatrixScale(const double max_value,double *min_value,
+  double *scale_factor)
+{
+  if ((*min_value == 0.0) && (max_value == 0.0))
+    *scale_factor=0;
+  else
+    if (*min_value == max_value)
+      {
+        *scale_factor=(double) QuantumRange/(*min_value);
+        *min_value=0;
+      }
+    else
+      *scale_factor=(double) QuantumRange/(max_value-(*min_value));
+}
+
 MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
   ExceptionInfo *exception)
 {
@@ -940,37 +1033,8 @@ MagickExport Image *MatrixToImage(const MatrixInfo *matrix_info,
   /*
     Determine range of matrix.
   */
-  (void) GetMatrixElement(matrix_info,0,0,&min_value);
-  max_value=min_value;
-  for (y=0; y < (ssize_t) matrix_info->rows; y++)
-  {
-    ssize_t
-      x;
-
-    for (x=0; x < (ssize_t) matrix_info->columns; x++)
-    {
-      double
-        value;
-
-      if (GetMatrixElement(matrix_info,x,y,&value) == MagickFalse)
-        continue;
-      if (value < min_value)
-        min_value=value;
-      else
-        if (value > max_value)
-          max_value=value;
-    }
-  }
-  if ((min_value == 0.0) && (max_value == 0.0))
-    scale_factor=0;
-  else
-    if (min_value == max_value)
-      {
-        scale_factor=(double) QuantumRange/min_value;
-        min_value=0;
-      }
-    else
-      scale_factor=(double) QuantumRange/(max_value-min_value);
+  GetMatrixRange(matrix_info,&min_value,&max_value);
+  GetMatrixScale(max_value,&min_value,&scale_factor);
   /*
     Convert matrix to image.
   */

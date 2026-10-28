@@ -109,6 +109,22 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline void SetMaskedFillChannels(const Image *image,
+  const PixelInfo *fill_color,Quantum *magick_restrict q)
+{
+  if ((image->channel_mask & RedChannel) != 0)
+    SetPixelRed(image,(Quantum) fill_color->red,q);
+  if ((image->channel_mask & GreenChannel) != 0)
+    SetPixelGreen(image,(Quantum) fill_color->green,q);
+  if ((image->channel_mask & BlueChannel) != 0)
+    SetPixelBlue(image,(Quantum) fill_color->blue,q);
+  if ((image->channel_mask & BlackChannel) != 0)
+    SetPixelBlack(image,(Quantum) fill_color->black,q);
+  if (((image->channel_mask & AlphaChannel) != 0) &&
+      ((image->alpha_trait & BlendPixelTrait) != 0))
+    SetPixelAlpha(image,(Quantum) fill_color->alpha,q);
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -359,17 +375,7 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
             fill_color;
 
           GetFillColor(draw_info,x,y,&fill_color,exception);
-          if ((image->channel_mask & RedChannel) != 0)
-            SetPixelRed(image,(Quantum) fill_color.red,q);
-          if ((image->channel_mask & GreenChannel) != 0)
-            SetPixelGreen(image,(Quantum) fill_color.green,q);
-          if ((image->channel_mask & BlueChannel) != 0)
-            SetPixelBlue(image,(Quantum) fill_color.blue,q);
-          if ((image->channel_mask & BlackChannel) != 0)
-            SetPixelBlack(image,(Quantum) fill_color.black,q);
-          if (((image->channel_mask & AlphaChannel) != 0) &&
-              ((image->alpha_trait & BlendPixelTrait) != 0))
-            SetPixelAlpha(image,(Quantum) fill_color.alpha,q);
+          SetMaskedFillChannels(image,&fill_color,q);
         }
       p+=(ptrdiff_t) GetPixelChannels(floodplane_image);
       q+=(ptrdiff_t) GetPixelChannels(image);
@@ -713,12 +719,72 @@ static size_t **AcquireHistogramTLS(const size_t count)
   return(histogram);
 }
 
-MagickExport Image *OilPaintImage(const Image *image,const double radius,
-  const double sigma,ExceptionInfo *exception)
-{
 #define NumberPaintBins  256
 #define OilPaintImageTag  "OilPaint/Image"
 
+static ssize_t GetMostFrequentOffset(const Image *linear_image,
+  const Quantum *magick_restrict p,size_t *histogram,const size_t width)
+{
+  size_t
+    count;
+
+  ssize_t
+    j,
+    k,
+    n,
+    u,
+    v;
+
+  k=0;
+  j=0;
+  count=0;
+  (void) memset(histogram,0,NumberPaintBins* sizeof(*histogram));
+  for (v=0; v < (ssize_t) width; v++)
+  {
+    for (u=0; u < (ssize_t) width; u++)
+    {
+      n=(ssize_t) ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(
+        linear_image,p+(ssize_t) GetPixelChannels(linear_image)*(u+k))));
+      histogram[n]++;
+      if (histogram[n] > count)
+        {
+          j=k+u;
+          count=histogram[n];
+        }
+    }
+    k+=(ssize_t) (linear_image->columns+width);
+  }
+  return(j);
+}
+
+static inline void SetOilPaintChannels(const Image *linear_image,
+  const Image *paint_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q,const ssize_t center,const ssize_t j)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(linear_image,i);
+    PixelTrait traits = GetPixelChannelTraits(linear_image,channel);
+    PixelTrait paint_traits=GetPixelChannelTraits(paint_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (paint_traits == UndefinedPixelTrait))
+      continue;
+    if ((paint_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(paint_image,channel,p[center+i],q);
+        continue;
+      }
+    SetPixelChannel(paint_image,channel,p[j*(ssize_t)
+      GetPixelChannels(linear_image)+i],q);
+  }
+}
+
+MagickExport Image *OilPaintImage(const Image *image,const double radius,
+  const double sigma,ExceptionInfo *exception)
+{
   CacheView
     *image_view,
     *paint_view;
@@ -816,56 +882,13 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
     for (x=0; x < (ssize_t) linear_image->columns; x++)
     {
       ssize_t
-        i,
-        u;
-
-      size_t
-        count;
-
-      ssize_t
-        j,
-        k,
-        n,
-        v;
+        j;
 
       /*
         Assign most frequent color.
       */
-      k=0;
-      j=0;
-      count=0;
-      (void) memset(histogram,0,NumberPaintBins* sizeof(*histogram));
-      for (v=0; v < (ssize_t) width; v++)
-      {
-        for (u=0; u < (ssize_t) width; u++)
-        {
-          n=(ssize_t) ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(
-            linear_image,p+(ssize_t) GetPixelChannels(linear_image)*(u+k))));
-          histogram[n]++;
-          if (histogram[n] > count)
-            {
-              j=k+u;
-              count=histogram[n];
-            }
-        }
-        k+=(ssize_t) (linear_image->columns+width);
-      }
-      for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(linear_image,i);
-        PixelTrait traits = GetPixelChannelTraits(linear_image,channel);
-        PixelTrait paint_traits=GetPixelChannelTraits(paint_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (paint_traits == UndefinedPixelTrait))
-          continue;
-        if ((paint_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(paint_image,channel,p[center+i],q);
-            continue;
-          }
-        SetPixelChannel(paint_image,channel,p[j*(ssize_t)
-          GetPixelChannels(linear_image)+i],q);
-      }
+      j=GetMostFrequentOffset(linear_image,p,histogram,width);
+      SetOilPaintChannels(linear_image,paint_image,p,q,center,j);
       p+=(ptrdiff_t) GetPixelChannels(linear_image);
       q+=(ptrdiff_t) GetPixelChannels(paint_image);
     }
@@ -934,6 +957,29 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline void SetUpdatableFillChannels(const Image *image,
+  const PixelInfo *conform_fill,Quantum *magick_restrict q)
+{
+  PixelTrait
+    traits;
+
+  traits=GetPixelChannelTraits(image,RedPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelRed(image,(Quantum) conform_fill->red,q);
+  traits=GetPixelChannelTraits(image,GreenPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelGreen(image,(Quantum) conform_fill->green,q);
+  traits=GetPixelChannelTraits(image,BluePixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelBlue(image,(Quantum) conform_fill->blue,q);
+  traits=GetPixelChannelTraits(image,BlackPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelBlack(image,(Quantum) conform_fill->black,q);
+  traits=GetPixelChannelTraits(image,AlphaPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelAlpha(image,(Quantum) conform_fill->alpha,q);
+}
+
 MagickExport MagickBooleanType OpaquePaintImage(Image *image,
   const PixelInfo *target,const PixelInfo *fill,const MagickBooleanType invert,
   ExceptionInfo *exception)
@@ -1002,26 +1048,7 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
     {
       GetPixelInfoPixel(image,q,&pixel);
       if (IsFuzzyEquivalencePixelInfo(&pixel,&conform_target) != invert)
-        {
-          PixelTrait
-            traits;
-
-          traits=GetPixelChannelTraits(image,RedPixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelRed(image,(Quantum) conform_fill.red,q);
-          traits=GetPixelChannelTraits(image,GreenPixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelGreen(image,(Quantum) conform_fill.green,q);
-          traits=GetPixelChannelTraits(image,BluePixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelBlue(image,(Quantum) conform_fill.blue,q);
-          traits=GetPixelChannelTraits(image,BlackPixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelBlack(image,(Quantum) conform_fill.black,q);
-          traits=GetPixelChannelTraits(image,AlphaPixelChannel);
-          if ((traits & UpdatePixelTrait) != 0)
-            SetPixelAlpha(image,(Quantum) conform_fill.alpha,q);
-        }
+        SetUpdatableFillChannels(image,&conform_fill,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)

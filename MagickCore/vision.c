@@ -175,6 +175,57 @@ static inline MagickBooleanType IsDiagonalPair(const Quantum *pixels,
     MagickFalse);
 }
 
+static void CountPerimeterPattern(const Image *component_image,
+  const Quantum *magick_restrict p,const size_t width,const ssize_t i,
+  size_t *pattern)
+{
+  Quantum
+    pixels[4];
+
+  size_t
+    foreground;
+
+  ssize_t
+    v;
+
+  /*
+    An Algorithm for Calculating Objects’ Shape Features in Binary
+    Images, Lifeng He, Yuyan Chao.
+  */
+  foreground=0;
+  for (v=0; v < 2; v++)
+  {
+    ssize_t
+      u;
+
+    for (u=0; u < 2; u++)
+    {
+      ssize_t
+        offset;
+
+      offset=v*((ssize_t) width+2)*
+        (ssize_t) GetPixelChannels(component_image)+u*
+        (ssize_t) GetPixelChannels(component_image);
+      pixels[2*v+u]=GetPixelIndex(component_image,p+offset);
+      if ((ssize_t) pixels[2*v+u] == i)
+        foreground++;
+    }
+  }
+  if (foreground == 1)
+    pattern[1]++;
+  else
+    if (foreground == 2)
+      {
+        if (IsDiagonalPair(pixels,i) != MagickFalse)
+          pattern[0]++;  /* diagonal */
+        else
+          pattern[2]++;
+      }
+    else
+      if (foreground == 3)
+        pattern[3]++;
+}
+
 static void PerimeterThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -227,51 +278,7 @@ static void PerimeterThreshold(const Image *component_image,
         }
       for (x=(-1); x < (ssize_t) bounding_box.width; x++)
       {
-        Quantum
-          pixels[4];
-
-        size_t
-          foreground;
-
-        ssize_t
-          v;
-
-        /*
-          An Algorithm for Calculating Objects’ Shape Features in Binary
-          Images, Lifeng He, Yuyan Chao.
-        */
-        foreground=0;
-        for (v=0; v < 2; v++)
-        {
-          ssize_t
-            u;
-
-          for (u=0; u < 2; u++)
-          {
-            ssize_t
-              offset;
-
-            offset=v*((ssize_t) bounding_box.width+2)*
-              (ssize_t) GetPixelChannels(component_image)+u*
-              (ssize_t) GetPixelChannels(component_image);
-            pixels[2*v+u]=GetPixelIndex(component_image,p+offset);
-            if ((ssize_t) pixels[2*v+u] == i)
-              foreground++;
-          }
-        }
-        if (foreground == 1)
-          pattern[1]++;
-        else
-          if (foreground == 2)
-            {
-              if (IsDiagonalPair(pixels,i) != MagickFalse)
-                pattern[0]++;  /* diagonal */
-              else
-                pattern[2]++;
-            }
-          else
-            if (foreground == 3)
-              pattern[3]++;
+        CountPerimeterPattern(component_image,p,bounding_box.width,i,pattern);
         p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }
@@ -333,51 +340,7 @@ static void CircularityThreshold(const Image *component_image,
         }
       for (x=(-1); x < (ssize_t) bounding_box.width; x++)
       {
-        Quantum
-          pixels[4];
-
-        ssize_t
-          v;
-
-        size_t
-          foreground;
-
-        /*
-          An Algorithm for Calculating Objects’ Shape Features in Binary
-          Images, Lifeng He, Yuyan Chao.
-        */
-        foreground=0;
-        for (v=0; v < 2; v++)
-        {
-          ssize_t
-            u;
-
-          for (u=0; u < 2; u++)
-          {
-            ssize_t
-              offset;
-
-            offset=v*((ssize_t) bounding_box.width+2)*
-              (ssize_t) GetPixelChannels(component_image)+u*
-              (ssize_t) GetPixelChannels(component_image);
-            pixels[2*v+u]=GetPixelIndex(component_image,p+offset);
-            if ((ssize_t) pixels[2*v+u] == i)
-              foreground++;
-          }
-        }
-        if (foreground == 1)
-          pattern[1]++;
-        else
-          if (foreground == 2)
-            {
-              if (IsDiagonalPair(pixels,i) != MagickFalse)
-                pattern[0]++;  /* diagonal */
-              else
-                pattern[2]++;
-            }
-          else
-            if (foreground == 3)
-              pattern[3]++;
+        CountPerimeterPattern(component_image,p,bounding_box.width,i,pattern);
         p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
     }

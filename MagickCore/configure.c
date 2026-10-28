@@ -84,6 +84,15 @@ typedef struct _ConfigureLoadTarget
     *exception;
 } ConfigureLoadTarget;
 
+typedef struct _ConfigureKeyTarget
+{
+  LinkedListInfo
+    *cache;
+
+  const char
+    *path;
+} ConfigureKeyTarget;
+
 /*
   Static declarations.
 */
@@ -132,9 +141,15 @@ static MagickBooleanType
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static inline void AddConfigureKey(LinkedListInfo *cache,const char *path,
+static inline void AddConfigureKey(const ConfigureKeyTarget *target,
   const char *name,const char *value,MagickBooleanType exempt)
 {
+  LinkedListInfo
+    *cache = target->cache;
+
+  const char
+    *path = target->path;
+
   ConfigureInfo
     *configure_info;
 
@@ -205,19 +220,20 @@ static LinkedListInfo *AcquireConfigureCache(const char *filename,
   /*
     Load built-in configure.
   */
-  AddConfigureKey(cache,"[built-in]","NAME","ImageMagick",MagickTrue);
+  const ConfigureKeyTarget built_in = { cache, "[built-in]" };
+  AddConfigureKey(&built_in,"NAME","ImageMagick",MagickTrue);
   /*
     Load runtime configuration.
   */
-  AddConfigureKey(cache,"[built-in]","QuantumDepth",GetMagickQuantumDepth(
+  AddConfigureKey(&built_in,"QuantumDepth",GetMagickQuantumDepth(
     (size_t *)NULL),MagickTrue);
-  AddConfigureKey(cache,"[built-in]","FEATURES",GetMagickFeatures(),
+  AddConfigureKey(&built_in,"FEATURES",GetMagickFeatures(),
     MagickTrue);
-  AddConfigureKey(cache,"[built-in]","DELEGATES",GetMagickDelegates(),
+  AddConfigureKey(&built_in,"DELEGATES",GetMagickDelegates(),
     MagickTrue);
   (void) AcquireUniqueFilename(path);
   GetPathComponent(path,HeadPath,head_path);
-  AddConfigureKey(cache,"[built-in]","MAGICK_TEMPORARY_PATH",head_path,
+  AddConfigureKey(&built_in,"MAGICK_TEMPORARY_PATH",head_path,
     MagickFalse);
   return(cache);
 }

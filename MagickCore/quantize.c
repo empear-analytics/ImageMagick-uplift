@@ -2570,6 +2570,74 @@ static void SeedKmeansRandomColors(Image *image,ssize_t n,
   random_info=DestroyRandomInfo(random_info);
 }
 
+static void ReduceKmeansPixels(const Image *image,KmeansInfo **kmeans_pixels,
+  const size_t number_threads)
+{
+  ssize_t
+    j;
+
+  for (j=1; j < (ssize_t) number_threads; j++)
+  {
+    ssize_t
+      k;
+
+    for (k=0; k < (ssize_t) image->colors; k++)
+    {
+      kmeans_pixels[0][k].red+=kmeans_pixels[j][k].red;
+      kmeans_pixels[0][k].green+=kmeans_pixels[j][k].green;
+      kmeans_pixels[0][k].blue+=kmeans_pixels[j][k].blue;
+      if (image->alpha_trait != UndefinedPixelTrait)
+        kmeans_pixels[0][k].alpha+=kmeans_pixels[j][k].alpha;
+      if (image->colorspace == CMYKColorspace)
+        kmeans_pixels[0][k].black+=kmeans_pixels[j][k].black;
+      kmeans_pixels[0][k].count+=kmeans_pixels[j][k].count;
+      kmeans_pixels[0][k].distortion+=kmeans_pixels[j][k].distortion;
+    }
+  }
+}
+
+static void FindNearestKmeansColor(const Image *image,
+  const Quantum *magick_restrict q,ssize_t *k,double *min_distance)
+{
+  ssize_t
+    i;
+
+  *k=0;
+  *min_distance=KmeansMetric(image,q,image->colormap+0);
+  for (i=1; i < (ssize_t) image->colors; i++)
+  {
+    double
+      distance;
+
+    if (*min_distance <= MagickEpsilon)
+      break;
+    distance=KmeansMetric(image,q,image->colormap+i);
+    if (distance < *min_distance)
+      {
+        *min_distance=distance;
+        *k=i;
+      }
+  }
+}
+
+static inline void AccumulateKmeansPixel(const Image *image,
+  const Quantum *magick_restrict q,const double min_distance,
+  KmeansInfo *kmeans_pixel)
+{
+  kmeans_pixel->red+=QuantumScale*(double) GetPixelRed(image,q);
+  kmeans_pixel->green+=QuantumScale*(double)
+    GetPixelGreen(image,q);
+  kmeans_pixel->blue+=QuantumScale*(double) GetPixelBlue(image,q);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    kmeans_pixel->alpha+=QuantumScale*(double)
+      GetPixelAlpha(image,q);
+  if (image->colorspace == CMYKColorspace)
+    kmeans_pixel->black+=QuantumScale*(double)
+      GetPixelBlack(image,q);
+  kmeans_pixel->count++;
+  kmeans_pixel->distortion+=min_distance;
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -2716,40 +2784,13 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
           min_distance;
 
         ssize_t
-          i,
           k;
 
         /*
           Assign each pixel whose mean has the least squared color distance.
         */
-        k=0;
-        min_distance=KmeansMetric(image,q,image->colormap+0);
-        for (i=1; i < (ssize_t) image->colors; i++)
-        {
-          double
-            distance;
-
-          if (min_distance <= MagickEpsilon)
-            break;
-          distance=KmeansMetric(image,q,image->colormap+i);
-          if (distance < min_distance)
-            {
-              min_distance=distance;
-              k=i;
-            }
-        }
-        kmeans_pixels[id][k].red+=QuantumScale*(double) GetPixelRed(image,q);
-        kmeans_pixels[id][k].green+=QuantumScale*(double)
-          GetPixelGreen(image,q);
-        kmeans_pixels[id][k].blue+=QuantumScale*(double) GetPixelBlue(image,q);
-        if (image->alpha_trait != UndefinedPixelTrait)
-          kmeans_pixels[id][k].alpha+=QuantumScale*(double)
-            GetPixelAlpha(image,q);
-        if (image->colorspace == CMYKColorspace)
-          kmeans_pixels[id][k].black+=QuantumScale*(double)
-            GetPixelBlack(image,q);
-        kmeans_pixels[id][k].count++;
-        kmeans_pixels[id][k].distortion+=min_distance;
+        FindNearestKmeansColor(image,q,&k,&min_distance);
+        AccumulateKmeansPixel(image,q,min_distance,kmeans_pixels[id]+k);
         SetPixelIndex(image,(Quantum) k,q);
         q+=(ptrdiff_t) GetPixelChannels(image);
       }
@@ -2761,24 +2802,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     /*
       Reduce sums to [0] entry.
     */
-    for (j=1; j < (ssize_t) number_threads; j++)
-    {
-      ssize_t
-        k;
-
-      for (k=0; k < (ssize_t) image->colors; k++)
-      {
-        kmeans_pixels[0][k].red+=kmeans_pixels[j][k].red;
-        kmeans_pixels[0][k].green+=kmeans_pixels[j][k].green;
-        kmeans_pixels[0][k].blue+=kmeans_pixels[j][k].blue;
-        if (image->alpha_trait != UndefinedPixelTrait)
-          kmeans_pixels[0][k].alpha+=kmeans_pixels[j][k].alpha;
-        if (image->colorspace == CMYKColorspace)
-          kmeans_pixels[0][k].black+=kmeans_pixels[j][k].black;
-        kmeans_pixels[0][k].count+=kmeans_pixels[j][k].count;
-        kmeans_pixels[0][k].distortion+=kmeans_pixels[j][k].distortion;
-      }
-    }
+    ReduceKmeansPixels(image,kmeans_pixels,number_threads);
     /*
       Calculate the new means (centroids) of the pixels in the new clusters.
     */

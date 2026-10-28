@@ -85,12 +85,12 @@ the function is at, then decide:
 
 ```bash
 python3 tools/oracle/casemap.py <Function>     # which cases execute it
-python3 tools/oracle/mutate.py --file <file> --function <Function> --max-cases 0
-python3 tools/oracle/gate.py build-oracle/work/mutation-<name>.json --file <file>.c
 ```
 
-- **ready** or **careful**: oracle-verified; the whole playbook applies.
-- **not ready**, or no case executes it: guard-verified; only recipes E, G and P,
+- **some case executes it**: oracle-verified; the whole playbook applies. Do not run
+  mutation testing first (owner's decision, 2026-10-27): the harness is finished, and
+  its cases are the protection.
+- **no case executes it**: guard-verified; only recipes E, G and P,
   with `refactor_guard.py --calls` reporting `OK`, and every argument of every call you
   add checked against its parameter by reading.
 

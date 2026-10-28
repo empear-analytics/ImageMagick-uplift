@@ -1079,6 +1079,24 @@ static inline MagickBooleanType IsChannelNotCopied(const PixelTrait traits,
     (source_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
 }
 
+static inline void CopyPixelChannels(const Image *image,
+  const Image *source_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait source_traits=GetPixelChannelTraits(source_image,channel);
+    if (IsChannelNotCopied(traits,source_traits) != MagickFalse)
+      continue;
+    SetPixelChannel(image,channel,p[i],q);
+  }
+}
+
 MagickExport MagickBooleanType CopyImagePixels(Image *image,
   const Image *source_image,const RectangleInfo *geometry,
   const OffsetInfo *offset,ExceptionInfo *exception)
@@ -1147,18 +1165,7 @@ MagickExport MagickBooleanType CopyImagePixels(Image *image,
       }
     for (x=0; x < (ssize_t) geometry->width; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait source_traits=GetPixelChannelTraits(source_image,channel);
-        if (IsChannelNotCopied(traits,source_traits) != MagickFalse)
-          continue;
-        SetPixelChannel(image,channel,p[i],q);
-      }
+      CopyPixelChannels(image,source_image,p,q);
       p+=(ptrdiff_t) GetPixelChannels(source_image);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
@@ -1731,6 +1738,24 @@ static inline MagickBooleanType IsIntegerSpecifierAt(const char *cursor)
     MagickTrue : MagickFalse);
 }
 
+static const char *GetFilenameOption(const ImageInfo *image_info,
+  Image *image,const char *pattern,ExceptionInfo *exception)
+{
+  const char
+    *option = (const char *) NULL;
+
+  if (image != NULL)
+    {
+      option=GetImageProperty(image,pattern,exception);
+      if (option == (const char *) NULL)
+        option=GetImageArtifact(image,pattern);
+    }
+  if ((option == (const char *) NULL) &&
+      (image_info != (ImageInfo *) NULL))
+    option=GetImageOption(image_info,pattern);
+  return(option);
+}
+
 MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
   Image *image,const char *format,int value,char *filename,
   ExceptionInfo *exception)
@@ -1836,15 +1861,7 @@ MagickExport size_t InterpretImageFilename(const ImageInfo *image_info,
           continue;
         (void) CopyMagickString(pattern,cursor+1,extent+1);
         pattern[extent]='\0';
-        if (image != NULL)
-          {
-            option=GetImageProperty(image,pattern,exception);
-            if (option == (const char *) NULL)
-              option=GetImageArtifact(image,pattern);
-          }
-        if ((option == (const char *) NULL) &&
-            (image_info != (ImageInfo *) NULL))
-          option=GetImageOption(image_info,pattern);
+        option=GetFilenameOption(image_info,image,pattern,exception);
         if (option == (const char *) NULL)
           continue;
         option_length=strlen(option);

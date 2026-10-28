@@ -72,6 +72,21 @@
 #include "MagickCore/thread-private.h"
 #include "MagickCore/token.h"
 #include "MagickCore/transform.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _CoefficientInput
+{
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_values;
+} CoefficientInput;
 
 /*
   Numerous internal routines for image distortions.
@@ -435,9 +450,17 @@ static void SetAffineSingleCoefficients(double *coeff,const double *arguments,
 }
 
 static double *GenerateCoefficients(const Image *image,
-  DistortMethod *method,const size_t number_arguments,const double *arguments,
-  size_t number_values,ExceptionInfo *exception)
+  DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
+  const size_t
+    number_arguments = input->number_arguments;
+
+  const double
+    *arguments = input->arguments;
+
+  size_t
+    number_values = input->number_values;
+
   double
     *coeff;
 
@@ -1971,8 +1994,8 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     Note that some distortions are mapped to other distortions,
     and as such do not require specific code after this point.
   */
-  coeff = GenerateCoefficients(image, &method, number_arguments,
-      arguments, 0, exception);
+  const CoefficientInput input = { number_arguments, arguments, 0 };
+  coeff = GenerateCoefficients(image, &method, &input, exception);
   if ( coeff == (double *) NULL )
     return((Image *) NULL);
 
@@ -3258,8 +3281,9 @@ MagickExport Image *SparseColorImage(const Image *image,
     distort_method=(DistortMethod) method;
     if ( distort_method >= SentinelDistortion )
       distort_method = ShepardsDistortion; /* Pretend to be Shepards */
-    coeff = GenerateCoefficients(image, &distort_method, number_arguments,
-                arguments, number_colors, exception);
+    const CoefficientInput input = { number_arguments, arguments,
+      number_colors };
+    coeff = GenerateCoefficients(image, &distort_method, &input, exception);
     if ( coeff == (double *) NULL )
       return((Image *) NULL);
     /*

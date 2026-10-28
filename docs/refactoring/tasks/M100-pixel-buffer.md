@@ -83,11 +83,8 @@ keeps the file-level finding, so B there would leave the score flat.
 
 ### Harness notes
 
-- **ERDC has not pushed since 2026-10-12.** `origin/erdc-results` is at 295d1bd16
-  (measured at 26e4e9dad). `night3.sh`'s fresh reports, which the remaining Recipe B
-  steps in quantum-import.c, quantum-export.c and distort.c wait for, do not exist yet.
-  Only the owner can start it on ERDC (command at the top of
-  `tools/oracle/erdc/night3.sh`).
+- **ERDC has not pushed since 2026-10-12.** Restarted the same evening; see
+  [M101](M101-bundle-uncapped.md).
 - **Homebrew moved fontconfig and pango.** Build directories configured before the
   upgrade keep the old Cellar include paths, so a source change to a file that includes
   them (type.c here) breaks the build. `linecov.py` failed on type.c this way. Fixed for
@@ -95,6 +92,5 @@ keeps the file-level finding, so B there would leave the score flat.
   directories still carry the old paths and need the same before reuse.
 - **Uncapped quantum run.** A Mac run of the not-ready quantum functions at HEAD (Mull
   build `q100`, `--max-cases 4000`) costs about 90 s per surviving mutant
-  (ImportIndexQuantum: 2,725 cases), roughly ten hours for the six functions. It was
-  started, then paused after 15 mutants for the pixel.c work; it resumes from
-  `build-oracle/work/mutation-q100-*.partial.jsonl`.
+  (ImportIndexQuantum: 2,725 cases), roughly ten hours for the six functions. It finished at
+  about 18:00; see [M101](M101-bundle-uncapped.md).

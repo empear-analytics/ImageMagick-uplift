@@ -92,20 +92,19 @@ The oracle only proves what its cases reach and check. Before starting on a func
 find out which level it is at, and say in the commit message which one verified it
 (`Verified: oracle` or `Verified: guard`).
 
-**Oracle-verified.** The function passes the readiness gate:
+**Oracle-verified.** Some case executes the function:
 
 ```bash
 python3 tools/oracle/casemap.py <Function>              # some case executes it
-python3 tools/oracle/mutate.py --file <file> --function <Function> --max-cases 0
-python3 tools/oracle/gate.py build-oracle/work/mutation-<name>.json --file <file>.c
 ```
 
-A verdict of **ready** (90% or more of the killable mutants killed) allows every recipe
-in this catalogue. **Careful** (75-90%) allows them too, but read the unmatched and
-unreached survivors of the function first (`classify.py ... --kind unmatched`) and keep
-clear of the lines they sit on, or add a case that kills them.
+That allows every recipe in this catalogue. **No mutation run is needed before a step**
+(owner's decision, 2026-10-27): the harness was built under mutation guidance, and its
+cases are the protection now. The mutation reports already in `build-oracle/work/` may
+still be read, for instance to see which lines of a function no case checks, but do not
+start new runs (`mutate.py`, Mull builds, `night3.sh`) to gate a step.
 
-**Guard-verified.** The function is **not ready**, or no case executes it. It may still
+**Guard-verified.** No case executes the function. It may still
 be refactored, as an earlier campaign refactored a program with no tests at all, but only with the
 recipes whose guard fingerprint is exact: **E, G and P**. The proof is the build
 and `refactor_guard.py` reporting `OK` with `--calls`; a `WARN` stops the commit.
@@ -413,7 +412,11 @@ needs two copies of the block.
 **How:**
 
 1. The block must lie outside every OpenMP region: not in a parallel loop, not under
-   `#pragma omp single`, `critical` or `atomic`. Inside one, use Recipe E or skip it.
+   `#pragma omp single`, `critical` or `atomic`. Inside a parallel loop body it may
+   move only when every variable it writes is declared inside that body (so each
+   thread has its own), it writes nothing declared outside it, `status` included, and
+   it contains no `#pragma omp` line: the condition Recipe K rests on. Otherwise use
+   Recipe E or skip it.
 2. List the caller's variables the block writes. Each must be a plain local of the
    caller (not a parameter, not a global, not a `static`) whose address is not taken
    elsewhere, so no two out-parameters can name the same object.
@@ -690,7 +693,9 @@ merges code, not parameters.
 4. In each caller, declare a `const Name` local initialised from the exact argument
    expressions, member by member in declaration order. Each expression must be an
    identifier, a literal, or arithmetic on these (`1.0/scale`), not a call, a
-   dereference or anything with a side effect.
+   dereference or anything with a side effect. Member accesses (`shear.x`,
+   `image->rows`) and casts of these forms are allowed too, but only in a struct
+   declared directly before the one call that uses it, with no statement between.
 5. Nothing may write an identifier in the struct's initialiser between the declaration
    and the last call that uses the struct; declare it where that holds (inside the loop
    iteration, or just before a single call).
@@ -754,6 +759,11 @@ static inline void CopyPixels(const MagnifyPixels *magnify,
   calls (`q+=...`) cannot be a member.
 - Pointer members point to the same buffers the arguments did, so writes through them
   land where they always did.
+- A member access or cast is read at the declaration instead of in the call. Declared
+  directly before its one call, nothing can run between the two, not even a call that
+  writes the object through another pointer, so the value is the one the call would
+  have read. The expression has no call and no side effect, so evaluating it first
+  changes nothing, whatever order the call's arguments were evaluated in.
 - An arithmetic member (`1.0/scale`) is computed once, at the declaration, instead of at
   every call. Step 5 keeps its operands unchanged until the last call, so each call
   receives the value it computed before; the member has the parameter's type, so the
@@ -1032,6 +1042,98 @@ M90, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe F - Hoist Function-Local Static Data
+
+**Use when:** CodeScene reports *Large Method* (or the function's length tips *Complex
+Method* or *Bumpy Road Ahead* over a threshold), and much of the body is one `static`
+declaration whose initialiser is data, not logic: a lookup table, a string assembled from
+literals under `#if` lines (`GetMagickDelegates`: 124 of 130 lines), a set of
+coefficients.
+
+**Not covered by:** Recipe L, which moves a type and refuses anything with a storage class
+or an initialiser; Recipe H, which moves preprocessor lines only; Recipe E, which moves
+statements, never declarations. No other recipe moves a variable.
+
+**How:**
+
+1. Take one declaration in the function's opening run of declarations (before its first
+   statement) with storage class `static` and an initialiser made only of literals,
+   constant expressions, the `#if` lines inside it, and the addresses of other file-scope
+   data.
+2. The variable is never written: its type is `const`, or it is a pointer to `const` that
+   no statement assigns. A static the function updates (a counter, a cache, a flag set
+   once) does not move.
+3. Move the declaration with its initialiser and the `#if` lines inside it, unchanged
+   except that lines indented under the declaration lose two spaces, to directly above the function's
+   signature, below its comment banner and below any hoisted macro or type it uses.
+4. Keep the name unless `grep` finds it at file scope in this file or in a header the file
+   includes; then prefix it with a word from the function's name and rename the uses in
+   the function.
+5. Build without warnings: a later function with a local of the same name now shadows
+   the file-scope variable, and the build's warnings say so; rename as in step 4.
+6. Run `sh tools/obj_same_code.sh <file>`. It must print `SAME CODE`: every function's
+   machine code is unchanged, and the strings and data are the same, though the compiler
+   may lay them out in another order.
+
+**Before:**
+
+```c
+MagickExport const char *GetMagickDelegates(void)
+{
+  static const char
+    *delegates=""
+#if defined(MAGICKCORE_AUTOTRACE_DELEGATE)
+  " autotrace"
+#endif
+  ...
+  ;
+  if (*delegates == '\0')
+    return(delegates);
+  return(delegates+1);
+}
+```
+
+**After:**
+
+```c
+static const char
+  *delegates=""
+#if defined(MAGICKCORE_AUTOTRACE_DELEGATE)
+  " autotrace"
+#endif
+  ...
+  ;
+
+MagickExport const char *GetMagickDelegates(void)
+{
+  if (*delegates == '\0')
+    return(delegates);
+  return(delegates+1);
+}
+```
+
+**Careful:**
+
+- A `static` local already has static storage duration and is initialised once, before
+  the program runs; at file scope it keeps both, so only its visibility widens, to the
+  rest of the file below it. Step 2 makes that harmless: nothing else writes it.
+- `tools/obj_same_code.sh` compares the machine code before the linker fills in data
+  addresses, so it cannot tell which of two hoisted tables an instruction reads. Two
+  tables from one function, or a rename in step 4, are checked by reading that each use
+  names the table it named before; the oracle covers the rest.
+- The step changes nothing but the function's length. Rule 2 keeps it only if the score
+  rises or a finding leaves the function.
+
+**Evidence level:** oracle, with `tools/obj_same_code.sh` printing `SAME CODE`.
+
+**Provenance:** 2026-10-27, from `version.c`'s `GetMagickDelegates`, whose only finding,
+*Large Method* (130 lines), is a 124-line `#if`-assembled string; the same shape holds
+`GetEXIFProperty`'s tag table (304 lines), `TransformsRGBImage`'s colour tables (236),
+`TransformSignature`'s constants and `AcquireResizeFilter`'s mapping table. Added by
+Claude Code (Claude Opus 5.5) during task M101, under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -1096,3 +1198,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-26 | NEW | L | Hoist Function-Local Types: a `typedef` at the top of a function body moves to directly above the function, renamed when its name is already declared at file scope, proven by an identical object file (`tools/obj_identical.sh`); the extractions it unblocks follow | `GetImageFeatures`' local `ChannelStatistics` (M35) pins every block of a cc-180 function; it shadows the public type of the same name. A trial rename compiled to the same object file; a planted `<` to `<=` was caught | mandate (2026-10-24) |
 | 2026-10-26 | AMEND | P | Several sites: one predicate may replace the same expression at several sites, at guard level, when a script confirms each site equals the body with arguments substituted and every argument is free of side effects; `--calls` shows +1 per extra site and one fewer of each inner callee per replaced copy. Decided by Claude Code under the owner's delegation of 2026-10-26 | PR #16's open question; `GetDelegateList` (decode/encode) | owner |
 | 2026-10-26 | AMEND | B | Arithmetic members: an initialiser may be arithmetic on identifiers and literals (`1.0/scale`), computed once at the declaration; step 5 keeps its operands unchanged until the last call | `identify.c`'s `PrintChannelStatistics`: all 15 calls pass `file`, `1.0/scale` and `channel_statistics` | mandate (2026-10-24) |
+| 2026-10-27 | AMEND | B | Member accesses and casts: an initialiser may read a member (`a.b`, `p->b`) or cast an allowed expression, when the struct is declared directly before the one call that uses it, with no statement between | `shear.c`'s XShearImage, YShearImage and CropToFitImage (`shear.x`, `bounds.width`, `(ssize_t) (image->rows-height)/2`), `transform.c`'s CopyImageRegion, `channel.c`'s FlattenPixelInfo: the last argument findings of two files, refused only by step 4 | mandate (2026-10-24) |
+| 2026-10-27 | NEW | F | Hoist Function-Local Static Data: a `static` declaration whose initialiser is data (a table, an `#if`-assembled string) and which nothing writes moves to directly above the function, proven by unchanged machine code and the same data (`tools/obj_same_code.sh`) | `GetMagickDelegates` (version.c's only finding: 130 lines, 124 of them one string); the same shape in `GetEXIFProperty`, `TransformsRGBImage`, `TransformSignature`, `AcquireResizeFilter` | mandate (2026-10-24) |
+| 2026-10-27 | AMEND | rule | *Two levels of evidence*: a function some case executes is oracle-verified for every recipe; no mutation run (readiness gate) before a step. Guard level stays for code no case reaches | The harness was built under mutation guidance and is finished; the 3SX and Jellyfin campaigns refactored without per-step mutation runs, and today's uncapped runs only confirmed it | owner |
+| 2026-10-27 | AMEND | O | Inside a parallel loop body: allowed when every variable the block writes is declared in that body and it writes nothing declared outside it (`status` included) and has no `#pragma omp` line, Recipe K's condition. Each thread's call then writes only that thread's variables, as the block did | `KmeansImage`'s nearest-centroid search (`k`, `min_distance`), `CannyEdgeImage`'s neighbour selection (`alpha_pixel`, `beta_pixel`), `DrawGradientImage`'s repeat offset (`offset`, `repeat`, `antialias`): selections over iteration-private variables, refused only by step 1 | mandate (2026-10-24) |

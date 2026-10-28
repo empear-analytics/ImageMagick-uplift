@@ -97,6 +97,15 @@ typedef struct _ColormapInfo
   const ssize_t
     compliance;
 } ColormapInfo;
+
+typedef struct _ColorLoadTarget
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+} ColorLoadTarget;
 
 /*
   Static declarations.
@@ -801,8 +810,8 @@ static MagickBooleanType
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
 static MagickBooleanType
-  LoadColorCache(LinkedListInfo *,const char *,const char *,const size_t,
-    ExceptionInfo *);
+  LoadColorCache(const ColorLoadTarget *,const char *,const char *,
+    const size_t);
 #endif
 
 /*
@@ -850,6 +859,8 @@ static LinkedListInfo *AcquireColorCache(const char *filename,
   status=MagickTrue;
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
   {
+    const ColorLoadTarget target = { cache, exception };
+
     const StringInfo
       *option;
 
@@ -860,8 +871,8 @@ static LinkedListInfo *AcquireColorCache(const char *filename,
     option=(const StringInfo *) GetNextValueInLinkedList(options);
     while (option != (const StringInfo *) NULL)
     {
-      status&=(MagickStatusType) LoadColorCache(cache,(const char *)
-        GetStringInfoDatum(option),GetStringInfoPath(option),0,exception);
+      status&=(MagickStatusType) LoadColorCache(&target,(const char *)
+        GetStringInfoDatum(option),GetStringInfoPath(option),0);
       option=(const StringInfo *) GetNextValueInLinkedList(options);
     }
     options=DestroyConfigureOptions(options);
@@ -1984,18 +1995,19 @@ MagickExport MagickBooleanType ListColorInfo(FILE *file,
 %
 %  The format of the LoadColorCache method is:
 %
-%      MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
-%        const char *filename,const size_t depth,ExceptionInfo *exception)
+%      MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
+%        const char *xml,const char *filename,const size_t depth)
 %
 %  A description of each parameter follows:
+%
+%    o target: the cache to load into, and the exception structure to
+%      return any errors or warnings in.
 %
 %    o xml:  The color list in XML format.
 %
 %    o filename:  The color list filename.
 %
 %    o depth: depth of <include /> statements.
-%
-%    o exception: return any errors or warnings in this structure.
 %
 */
 static inline MagickBooleanType IsIncludeElementOpen(const char *token,
@@ -2092,9 +2104,15 @@ static ColorInfo *AcquireColorInfo(const char *filename)
   return(color_info);
 }
 
-static MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
-  const char *filename,const size_t depth,ExceptionInfo *exception)
+static MagickBooleanType LoadColorCache(const ColorLoadTarget *target,
+  const char *xml,const char *filename,const size_t depth)
 {
+  LinkedListInfo
+    *cache = target->cache;
+
+  ExceptionInfo
+    *exception = target->exception;
+
   char
     keyword[MagickPathExtent],
     *token;
@@ -2198,6 +2216,8 @@ static MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
                   ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
               else
                 {
+                  const ColorLoadTarget include_target = { cache, exception };
+
                   char
                     path[MagickPathExtent],
                     *file_xml;
@@ -2206,8 +2226,8 @@ static MagickBooleanType LoadColorCache(LinkedListInfo *cache,const char *xml,
                   file_xml=FileToXML(path,~0UL);
                   if (file_xml != (char *) NULL)
                     {
-                      status&=(MagickStatusType) LoadColorCache(cache,file_xml,
-                        path,depth+1,exception);
+                      status&=(MagickStatusType) LoadColorCache(
+                        &include_target,file_xml,path,depth+1);
                       file_xml=DestroyString(file_xml);
                     }
                 }
@@ -2549,6 +2569,31 @@ static MagickBooleanType QueryColorFromCSSName(const char *name,
   return(status);
 }
 
+static void SetDeviceColorspace(const char *name,char *colorspace,
+  double *scale,MagickBooleanType *icc_color)
+{
+  (void) CopyMagickString(colorspace,colorspace+7,MagickPathExtent);
+  if (strchr(name,'%') == (char *) NULL)
+    *scale=(double) QuantumRange;
+  *icc_color=MagickTrue;
+}
+
+static void SetICCColorspace(const char *name,char *colorspace,ssize_t *i,
+  double *scale,MagickBooleanType *icc_color)
+{
+  ssize_t
+    j;
+
+  (void) CopyMagickString(colorspace,name+(*i)+2,MagickPathExtent);
+  for (j=0; colorspace[j] != '\0'; j++)
+    if ((colorspace[j] == ' ') || (colorspace[j] == ','))
+      break;
+  colorspace[j--]='\0';
+  *i+=j+3;
+  *scale=(double) QuantumRange;
+  *icc_color=MagickTrue;
+}
+
 static MagickBooleanType QueryColorFunction(const char *name,
   const char *q,PixelInfo *color,ExceptionInfo *exception)
 {
@@ -2580,27 +2625,10 @@ static MagickBooleanType QueryColorFunction(const char *name,
   scale=(double) ScaleCharToQuantum(1);
   icc_color=MagickFalse;
   if (LocaleNCompare(colorspace,"device-",7) == 0)
-    {
-      (void) CopyMagickString(colorspace,colorspace+7,MagickPathExtent);
-      if (strchr(name,'%') == (char *) NULL)
-        scale=(double) QuantumRange;
-      icc_color=MagickTrue;
-    }
+    SetDeviceColorspace(name,colorspace,&scale,&icc_color);
   if ((LocaleCompare(colorspace,"color") == 0) ||
       (LocaleCompare(colorspace,"icc-color") == 0))
-    {
-      ssize_t
-        j;
-
-      (void) CopyMagickString(colorspace,name+i+2,MagickPathExtent);
-      for (j=0; colorspace[j] != '\0'; j++)
-        if ((colorspace[j] == ' ') || (colorspace[j] == ','))
-          break;
-      colorspace[j--]='\0';
-      i+=j+3;
-      scale=(double) QuantumRange;
-      icc_color=MagickTrue;
-    }
+    SetICCColorspace(name,colorspace,&i,&scale,&icc_color);
   LocaleLower(colorspace);
   color->alpha_trait=UndefinedPixelTrait;
   if ((i > 0) && (colorspace[i] == 'a'))

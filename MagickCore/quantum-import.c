@@ -1394,9 +1394,17 @@ static void ImportBlackQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -2118,9 +2126,17 @@ static void ImportCMYKOQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -2713,9 +2729,17 @@ static void ImportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,ExceptionInfo *exception)
+  const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   MagickBooleanType
     range_exception;
 
@@ -3524,9 +3548,17 @@ static void ImportOpacityQuantum(const Image *image,QuantumInfo *quantum_info,
 }
 
 static void ImportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q)
+  const QuantumPixelSpan *span)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -4415,6 +4447,45 @@ static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void DisassociateQuantumAlpha(const Image *image,CacheView *image_view,
+  const MagickSizeType number_pixels)
+{
+  double
+    gamma,
+    Sa;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  /*
+    Disassociate alpha.
+  */
+  q=GetAuthenticPixelQueue(image);
+  if (image_view != (CacheView *) NULL)
+    q=GetCacheViewAuthenticPixelQueue(image_view);
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    ssize_t
+      i;
+
+    Sa=QuantumScale*(double) GetPixelAlpha(image,q);
+    gamma=MagickSafeReciprocal(Sa);
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((channel == AlphaPixelChannel) ||
+          ((traits & UpdatePixelTrait) == 0))
+        continue;
+      q[i]=ClampToQuantum(gamma*(double) q[i]);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport size_t ImportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,const unsigned char *magick_restrict pixels,
@@ -4518,12 +4589,12 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case CbYCrYQuantum:
     {
-      ImportCbYCrYQuantum(image,quantum_info,number_pixels,p,q);
+      ImportCbYCrYQuantum(image,quantum_info,&span);
       break;
     }
     case GrayQuantum:
     {
-      ImportGrayQuantum(image,quantum_info,number_pixels,p,q);
+      ImportGrayQuantum(image,quantum_info,&span);
       break;
     }
     case GrayAlphaQuantum:
@@ -4539,7 +4610,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     case IndexQuantum:
     {
-      ImportIndexQuantum(image,quantum_info,number_pixels,p,q,exception);
+      ImportIndexQuantum(image,quantum_info,&span,exception);
       break;
     }
     case IndexAlphaQuantum:
@@ -4561,7 +4632,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     case RGBQuantum:
     case CbYCrQuantum:
     {
-      ImportRGBQuantum(image,quantum_info,number_pixels,p,q);
+      ImportRGBQuantum(image,quantum_info,&span);
       break;
     }
     case RGBAQuantum:
@@ -4595,35 +4666,6 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       }
     }
   if (quantum_info->alpha_type == AssociatedQuantumAlpha)
-    {
-      double
-        gamma,
-        Sa;
-
-      /*
-        Disassociate alpha.
-      */
-      q=GetAuthenticPixelQueue(image);
-      if (image_view != (CacheView *) NULL)
-        q=GetCacheViewAuthenticPixelQueue(image_view);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        ssize_t
-          i;
-
-        Sa=QuantumScale*(double) GetPixelAlpha(image,q);
-        gamma=MagickSafeReciprocal(Sa);
-        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-        {
-          PixelChannel channel = GetPixelChannelChannel(image,i);
-          PixelTrait traits = GetPixelChannelTraits(image,channel);
-          if ((channel == AlphaPixelChannel) ||
-              ((traits & UpdatePixelTrait) == 0))
-            continue;
-          q[i]=ClampToQuantum(gamma*(double) q[i]);
-        }
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
-    }
+    DisassociateQuantumAlpha(image,image_view,number_pixels);
   return(extent);
 }
