@@ -5087,6 +5087,37 @@ static void ImportIndexAlphaQuantum(const Image *image,QuantumInfo *quantum_info
       "InvalidColormapIndex","`%s'",image->filename);
 }
 
+static void ImportFloat16BitMultispectralQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    i,
+    x;
+
+  unsigned short
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    for (i=0; i < (ssize_t) GetImageChannels(image); i++)
+    {
+      p=PushShortPixel(quantum_info->endian,p,&pixel);
+      q[i]=ClampToQuantum((double) QuantumRange*(double)HalfToSinglePrecision(pixel));
+    }
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void Import16BitMultispectralQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
@@ -5108,16 +5139,7 @@ static void Import16BitMultispectralQuantum(const Image *image,
 
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        for (i=0; i < (ssize_t) GetImageChannels(image); i++)
-        {
-          p=PushShortPixel(quantum_info->endian,p,&pixel);
-          q[i]=ClampToQuantum((double) QuantumRange*(double)HalfToSinglePrecision(pixel));
-        }
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportFloat16BitMultispectralQuantum(image,quantum_info,span);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
