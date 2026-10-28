@@ -4707,6 +4707,7 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
         PixelChannel channel = GetPixelChannelChannel (image, i);
         PixelTrait traits = GetPixelChannelTraits (image, channel);
         PixelTrait fx_traits = GetPixelChannelTraits (fx_image, channel);
+        const fxPixelPosT pos = { channel, x, y };
         if ((traits == UndefinedPixelTrait) ||
             (fx_traits == UndefinedPixelTrait))
           continue;
@@ -4714,8 +4715,6 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
             SetPixelChannel (fx_image, channel, p[i], q);
             continue;
         }
-
-        const fxPixelPosT pos = { channel, x, y };
 
         if (!ExecuteRPN (pfx, &pfx->fxrts[id], &result, &pos)) {
           status=MagickFalse;
