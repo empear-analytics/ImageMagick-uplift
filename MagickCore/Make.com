@@ -113,6 +113,7 @@ $call Make signature.c
 $call Make splay-tree.c
 $call Make static.c
 $call Make statistic.c
+$call Make statistic-function.c
 $call Make statistic-moments.c
 $call Make statistic-image.c
 $call Make stream.c
