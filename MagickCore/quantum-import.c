@@ -5512,7 +5512,7 @@ static void Import16BitOpacityQuantum(const Image *image,
   }
 }
 
-static void Import32BitOpacityQuantum(const Image *image,
+static void ImportFloat32BitOpacityQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   const MagickSizeType
@@ -5527,32 +5527,56 @@ static void Import32BitOpacityQuantum(const Image *image,
   ssize_t
     x;
 
+  float
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+    SetPixelOpacity(image,ClampToQuantum(pixel),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void ImportInteger32BitOpacityQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushLongPixel(quantum_info->endian,p,&pixel);
+    SetPixelOpacity(image,ScaleLongToQuantum(pixel),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void Import32BitOpacityQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      float
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-        SetPixelOpacity(image,ClampToQuantum(pixel),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportFloat32BitOpacityQuantum(image,quantum_info,span);
       return;
     }
   else
     {
-      unsigned int
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushLongPixel(quantum_info->endian,p,&pixel);
-        SetPixelOpacity(image,ScaleLongToQuantum(pixel),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportInteger32BitOpacityQuantum(image,quantum_info,span);
       return;
     }
 }
