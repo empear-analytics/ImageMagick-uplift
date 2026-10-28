@@ -174,6 +174,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/image-view.c \
   MagickCore/image-view.h \
   MagickCore/layer.c \
+  MagickCore/layer-merge.c \
   MagickCore/layer.h \
   MagickCore/linked-list.c \
   MagickCore/linked-list.h \
