@@ -23,11 +23,21 @@ function's locals had on entry, so the script refuses unless:
 The new function takes the parameters, and declares the locals, that the
 moved code uses, locals with their initialisers (copied from FUNCTION);
 FUNCTION drops the locals it no longer uses.
+
+With --returns FLAG, FUNCTION may set FLAG to a constant directly before the
+switch and read it after; nothing else is read after the switch. A moved case
+that uses FLAG becomes a function returning it, which declares FLAG with that
+constant as its value on entry (step 3 of Recipe E: the single value the
+block produces); the call assigns the result to FLAG.
 """
 
 import argparse
+import collections
 import re
 import sys
+
+Source = collections.namedtuple("Source", "signature declarations")
+Request = collections.namedtuple("Request", "function label new_name flag")
 
 IDENT = re.compile(r"[A-Za-z_]\w*")
 LOOP = re.compile(r"(for|while|switch|do)\b")
@@ -77,10 +87,21 @@ def guard_length(lines, i):
     return close + 1 - i
 
 
-def prologue_entry(lines, i):
+def flag_assignment(line, flag):
+    """The value FLAG is set to by LINE, `  FLAG=VALUE;`, or None."""
+    match = re.match(r"  (\w+)=(\w+);\n$", line)
+    if flag and match and match.group(1) == flag:
+        return match.group(2)
+    return None
+
+
+def prologue_entry(lines, i, flag=None):
     """(declaration group or [], lines taken) for the line at I: a
-    declaration, an assert, a blank line or a guard clause."""
+    declaration, an assert, a blank line, a guard clause or FLAG's
+    assignment."""
     if lines[i].startswith("  assert(") or lines[i] == "\n":
+        return [], 1
+    if flag_assignment(lines[i], flag):
         return [], 1
     taken = guard_length(lines, i)
     if taken:
@@ -91,19 +112,43 @@ def prologue_entry(lines, i):
     raise Refused("statement before the switch: %s" % lines[i].strip())
 
 
-def split_prologue(lines, start, end):
-    """Signature, declaration groups and the switch's line range."""
+def flag_value(lines, first, last, flag):
+    """FLAG's value on entering the switch at FIRST: assigned by the last
+    statement before it, a constant."""
+    value = flag_assignment(lines[first - 1], flag) if flag else None
+    if flag and not value:
+        raise Refused("%s is not set directly before the switch" % flag)
+    return value
+
+
+def all_names(declarations):
+    return [name for group in declarations for name in declared_names(group)]
+
+
+def check_tail(tail, flag, declarations):
+    """After the switch, only FLAG may be read."""
+    if tail and not flag:
+        raise Refused("the switch is not the last statement")
+    read = [name for name in all_names(declarations) if uses(tail, name)]
+    if set(read) - {flag}:
+        raise Refused("a local other than %s is read after the switch" % flag)
+
+
+def split_prologue(lines, start, end, flag=None):
+    """Signature, declaration groups, the switch's line range and FLAG's
+    value on entering it."""
     brace = lines.index("{\n", start)
     declarations = []
     i = brace + 1
     while lines[i] != "  switch (quantum_info->depth)\n":
-        entry, taken = prologue_entry(lines, i)
+        entry, taken = prologue_entry(lines, i, flag)
         if entry:
             declarations.append(entry)
         i += taken
-    if lines[end - 1] != "  }\n":
-        raise Refused("the switch is not the last statement")
-    return lines[start:brace], declarations, (i, end - 1)
+    close = lines.index("  }\n", i)
+    check_tail("".join(lines[close + 1:end]), flag, declarations)
+    value = flag_value(lines, i, close, flag)
+    return lines[start:brace], declarations, (i, close), value
 
 
 CALL = re.compile(r"\b(?!if\b)[A-Za-z_]\w*\s*\(")
@@ -197,26 +242,26 @@ def header_kind(text, pending):
     return pending
 
 
-def convert_break(line, stack, pending):
-    """A break that leaves the case becomes a return."""
+def convert_break(line, stack, pending, ret):
+    """A break that leaves the case becomes the return RET."""
     if "loop" in stack:
         return line
     if pending == "loop":
         raise Refused("brace-less loop with a break")
-    return line.replace("break;", "return;")
+    return line.replace("break;", ret)
 
 
-def drop_final_return(out, indent):
+def drop_final_return(out, indent, ret):
     """The case's own last break ends the new function anyway."""
     while out and out[-1].strip() == "":
         out.pop()
     last = out[-1] if out else ""
-    if last == " " * indent + "return;\n":
+    if last == " " * indent + ret + "\n":
         out.pop()
     return out
 
 
-def convert_breaks(body, indent):
+def convert_breaks(body, indent, ret="return;"):
     """Turn the case-level breaks into returns; refuse ambiguous ones."""
     stack, pending, out = [], None, []
     for line in body:
@@ -227,12 +272,12 @@ def convert_breaks(body, indent):
         elif text == "}":
             stack.pop()
         elif text == "break;":
-            line = convert_break(line, stack, pending)
+            line = convert_break(line, stack, pending, ret)
             pending = None
         else:
             pending = header_kind(text, pending)
         out.append(line)
-    return drop_final_return(out, indent)
+    return drop_final_return(out, indent, ret)
 
 
 def uses(text, name):
@@ -264,10 +309,10 @@ def parameters(signature):
             for param in text.split(",")]
 
 
-def format_signature(name, declarations):
+def format_signature(name, declarations, kind="void"):
     """ImageMagick's layout: wrapped at 80 columns, continued by two
     spaces."""
-    lines, line = [], "static void %s(" % name
+    lines, line = [], "static %s %s(" % (kind, name)
     for index, declaration in enumerate(declarations):
         last = index == len(declarations) - 1
         piece = declaration + (")" if last else ",")
@@ -282,16 +327,53 @@ def uses_group(text, group):
     return any(uses(text, name) for name in declared_names(group))
 
 
-def build_helper(new_name, signature, declarations, body):
-    """The new function's lines and the parameter names to call it with."""
+def initialised(group, flag, value):
+    """GROUP with FLAG declared as starting from VALUE."""
+    if flag not in declared_names(group):
+        return group
+    if group[1:] != ["    %s;\n" % flag]:
+        raise Refused("%s is declared together with other names" % flag)
+    return [group[0], "    %s = %s;\n" % (flag, value)]
+
+
+def build_helper(new_name, source, body, flag=None):
+    """The new function's lines and the parameter names to call it with.
+    FLAG is (name, value on entry, type) when the helper returns it."""
     body_text = "".join(body)
-    helper_decls = [g for g in declarations if uses_group(body_text, g)]
+    helper_decls = [g for g in source.declarations
+                    if uses_group(body_text, g)]
     used_text = body_text + "".join(sum(helper_decls, []))
-    params = [p for p in parameters(signature) if uses(used_text, p[1])]
-    helper = format_signature(new_name, [p[0] for p in params]) + ["{\n"]
+    params = [p for p in parameters(source.signature)
+              if uses(used_text, p[1])]
+    kind = flag[2] if flag else "void"
+    helper = format_signature(new_name, [p[0] for p in params], kind)
+    helper.append("{\n")
     for group in helper_decls:
+        if flag:
+            group = initialised(group, flag[0], flag[1])
         helper += group + ["\n"]
     return helper + body + ["}\n", "\n"], [p[1] for p in params]
+
+
+def format_call(pad, target, new_name, names):
+    """The call, assigned to TARGET if any, wrapped at 80 columns."""
+    head = "%s%s%s(" % (pad, target + "=" if target else "", new_name)
+    lines, line = [], head
+    for index, name in enumerate(names):
+        piece = name + (");" if index == len(names) - 1 else ",")
+        if len(line) + len(piece) > 80:
+            lines.append(line + "\n")
+            line = pad + "  "
+        line += piece
+    return lines + [line + "\n"]
+
+
+def flag_of(declarations, flag, value, moved):
+    """(name, value on entry, type) when the moved code uses FLAG."""
+    if not flag or not uses("".join(moved), flag):
+        return None
+    group = [g for g in declarations if flag in declared_names(g)]
+    return flag, value, group[0][0].strip()
 
 
 def drop_unused(rest, skip, declarations):
@@ -319,19 +401,30 @@ def check_not_moved(moved):
         raise Refused("already a single call: %s" % code[0])
 
 
-def extract(lines, function, label, new_name):
-    check_new_name(lines, new_name)
-    start, end = find_function(lines, function)
-    signature, declarations, (first, last) = split_prologue(lines, start, end)
-    first_line, close, indent = find_case(lines, first, last, label)
+def moved_body(moved, indent, flag):
+    """The moved lines as the new function's body: dedented, breaks turned
+    into returns (of FLAG when the function returns it)."""
+    ret = "return(%s);" % flag[0] if flag else "return;"
+    body = [line[indent - 2:] if line.strip() else line
+            for line in convert_breaks(moved, indent, ret)]
+    return body + (["  %s\n" % ret] if flag else [])
+
+
+def extract(lines, request):
+    check_new_name(lines, request.new_name)
+    start, end = find_function(lines, request.function)
+    signature, declarations, (first, last), value = split_prologue(
+        lines, start, end, request.flag)
+    first_line, close, indent = find_case(lines, first, last, request.label)
     moved = lines[first_line:close]
     check_not_moved(moved)
-    body = [line[indent - 2:] if line.strip() else line
-            for line in convert_breaks(moved, indent)]
-    helper, names = build_helper(new_name, signature, declarations, body)
+    flag = flag_of(declarations, request.flag, value, moved)
+    body = moved_body(moved, indent, flag)
+    helper, names = build_helper(request.new_name,
+                                 Source(signature, declarations), body, flag)
     pad = " " * indent
-    call = "%s%s(%s);\n" % (pad, new_name, ",".join(names))
-    rest = (lines[start:first_line] + [call, pad + "break;\n"] +
+    call = format_call(pad, flag[0] if flag else "", request.new_name, names)
+    rest = (lines[start:first_line] + call + [pad + "break;\n"] +
             lines[close + (indent == 10):end + 1])
     rest = drop_unused(rest, len(signature), declarations)
     return lines[:start] + helper + rest + lines[end + 1:]
@@ -344,11 +437,16 @@ def main():
     parser.add_argument("label")
     parser.add_argument("new_name")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--returns", metavar="FLAG",
+                        help="a local set to a constant directly before the "
+                        "switch and read after it; the new function starts "
+                        "from that constant and returns the flag")
     args = parser.parse_args()
     with open(args.file) as handle:
         lines = handle.readlines()
     try:
-        result = extract(lines, args.function, args.label, args.new_name)
+        result = extract(lines, Request(args.function, args.label,
+                                        args.new_name, args.returns))
     except Refused as reason:
         print("REFUSED: %s" % reason)
         return 1
