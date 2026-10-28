@@ -1964,6 +1964,8 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   PixelInfo
     invalid;  /* the color to assign when distort result is invalid */
 
+  const CoefficientInput input = { number_arguments, arguments, 0 };
+
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
@@ -1994,7 +1996,6 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
     Note that some distortions are mapped to other distortions,
     and as such do not require specific code after this point.
   */
-  const CoefficientInput input = { number_arguments, arguments, 0 };
   coeff = GenerateCoefficients(image, &method, &input, exception);
   if ( coeff == (double *) NULL )
     return((Image *) NULL);
