@@ -61,6 +61,7 @@ if ( ! GetOptions(
    'resource.c',
 	 'segment.c',
 	 'shear.c',
+	 'shear-deskew.c',
 	 'signature.c',
 	 'stream.c',
 	 'transform.c',

@@ -102,6 +102,7 @@ $call Make resource.c
 $call Make segment.c
 $call Make semaphore.c
 $call Make shear.c
+$call Make shear-deskew.c
 $call Make signature.c
 $call Make splay-tree.c
 $call Make static.c
