@@ -129,6 +129,7 @@ $call Make token.c
 $call Make transform.c
 $call Make transform-tiles.c
 $call Make threshold.c
+$call Make threshold-adaptive.c
 $call Make threshold-auto.c
 $call Make type.c
 $call Make utility.c
