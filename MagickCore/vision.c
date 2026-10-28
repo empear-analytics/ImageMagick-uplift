@@ -521,26 +521,9 @@ static void MinorAxisThreshold(const Image *component_image,
       continue;
     component_view=AcquireAuthenticCacheView(component_image,exception);
     bounding_box=object[i].bounding_box;
-    for (y=0; y < (ssize_t) bounding_box.height; y++)
-    {
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-        bounding_box.y+y,bounding_box.width,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        if ((ssize_t) GetPixelIndex(component_image,p) == i)
-          {
-            M00++;
-            M10+=x;
-            M01+=y;
-          }
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
-    }
+    if (GetObjectCentroidSums(component_image,component_view,bounding_box,i,
+          &M00,&M10,&M01,exception) == MagickFalse)
+      status=MagickFalse;
     centroid.x=M10*MagickSafeReciprocal(M00);
     centroid.y=M01*MagickSafeReciprocal(M00);
     for (y=0; y < (ssize_t) bounding_box.height; y++)
