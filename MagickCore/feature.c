@@ -761,8 +761,12 @@ typedef struct _HoughWindow
 } HoughWindow;
 
 static void VoteHoughLines(MatrixInfo *accumulator,const PointInfo *center,
-  const ssize_t x,const ssize_t y,const double hough_height)
+  const HoughCell *cell,const double hough_height)
 {
+  const ssize_t
+    x = cell->x,
+    y = cell->y;
+
   ssize_t
     i;
 
@@ -988,8 +992,11 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
+      const HoughCell
+        cell = { x, y };
+
       if (GetPixelIntensity(image,p) > ((double) QuantumRange/2.0))
-        VoteHoughLines(accumulator,&center,x,y,hough_height);
+        VoteHoughLines(accumulator,&center,&cell,hough_height);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
