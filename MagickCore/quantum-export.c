@@ -2611,8 +2611,261 @@ static void ExportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
-static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
+static void Export1BitGrayAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  double
+    threshold;
+
+  unsigned char
+    black,
+    pixel,
+    white;
+
+  ssize_t
+    bit;
+
+  black=0x00;
+  white=0x01;
+  if (quantum_info->min_is_white != MagickFalse)
+    {
+      black=0x01;
+      white=0x00;
+    }
+  threshold=(double) QuantumRange/2.0;
+  for (x=((ssize_t) number_pixels-3); x > 0; x-=4)
+  {
+    *q='\0';
+    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 7;
+    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
+      0x00 : 0x01);
+    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 6);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 5;
+    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
+      0x00 : 0x01);
+    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 4);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 3;
+    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
+      0x00 : 0x01);
+    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 2);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 1;
+    pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
+      0x00 : 0x01);
+    *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 0);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q++;
+  }
+  if ((number_pixels % 4) != 0)
+    {
+      *q='\0';
+      for (bit=0; bit <= (ssize_t) (number_pixels % 4); bit+=2)
+      {
+        *q|=(GetPixelLuma(image,p) > threshold ? black : white) <<
+          (7-bit);
+        pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
+          0x00 : 0x01);
+        *q|=(((int) pixel != 0 ? 0x00 : 0x01) << (unsigned char)
+          (7-bit-1));
+        p+=(ptrdiff_t) GetPixelChannels(image);
+      }
+      q++;
+    }
+}
+
+static void Export4BitGrayAlphaQuantum(const Image *image,
   const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned char
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels ; x++)
+  {
+    pixel=ScaleQuantumToChar(ClampToQuantum(GetPixelLuma(image,p)));
+    *q=(((pixel >> 4) & 0xf) << 4);
+    pixel=(unsigned char) (16.0*QuantumScale*(double)
+      GetPixelAlpha(image,p)+0.5);
+    *q|=pixel & 0xf;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q++;
+  }
+}
+
+static void Export8BitGrayAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned char
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToChar(ClampToQuantum(GetPixelLuma(image,p)));
+    q=PopCharPixel(pixel,q);
+    pixel=ScaleQuantumToChar(GetPixelAlpha(image,p));
+    q=PopCharPixel(pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export16BitGrayAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelLuma(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        pixel=SinglePrecisionToHalf(QuantumScale*(double)
+          GetPixelAlpha(image,p));
+        q=PopShortPixel(quantum_info->endian,pixel,q);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) quantum_info->pad;
+      }
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToShort(ClampToQuantum(GetPixelLuma(image,p)));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToShort(GetPixelAlpha(image,p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export32BitGrayAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      for (x=0; x < (ssize_t) number_pixels; x++)
+      {
+        float
+          float_pixel;
+
+        float_pixel=(float) GetPixelLuma(image,p);
+        q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
+        float_pixel=(float) (GetPixelAlpha(image,p));
+        q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) quantum_info->pad;
+      }
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToLong(ClampToQuantum(GetPixelLuma(image,p)));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    pixel=ScaleQuantumToLong(GetPixelAlpha(image,p));
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export64BitFloatGrayAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    double
+      pixel;
+
+    pixel=GetPixelLuma(image,p);
+    q=PopQuantumDoublePixel(quantum_info,pixel,q);
+    pixel=(double) (GetPixelAlpha(image,p));
+    q=PopQuantumDoublePixel(quantum_info,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportAnyDepthGrayAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   const MagickSizeType
     number_pixels = span->number_pixels;
@@ -2629,199 +2882,60 @@ static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
   ssize_t
     x;
 
+  range=GetQuantumRange(quantum_info->depth);
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(ClampToQuantum(
+      GetPixelLuma(image,p)),range),q);
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelAlpha(image,p),
+      range),q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
   switch (quantum_info->depth)
   {
     case 1:
     {
-      double
-        threshold;
-
-      unsigned char
-        black,
-        pixel,
-        white;
-
-      ssize_t
-        bit;
-
-      black=0x00;
-      white=0x01;
-      if (quantum_info->min_is_white != MagickFalse)
-        {
-          black=0x01;
-          white=0x00;
-        }
-      threshold=(double) QuantumRange/2.0;
-      for (x=((ssize_t) number_pixels-3); x > 0; x-=4)
-      {
-        *q='\0';
-        *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 7;
-        pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-          0x00 : 0x01);
-        *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 6);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 5;
-        pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-          0x00 : 0x01);
-        *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 4);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 3;
-        pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-          0x00 : 0x01);
-        *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 2);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        *q|=(GetPixelLuma(image,p) > threshold ? black : white) << 1;
-        pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-          0x00 : 0x01);
-        *q|=(((int) pixel != 0 ? 0x00 : 0x01) << 0);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q++;
-      }
-      if ((number_pixels % 4) != 0)
-        {
-          *q='\0';
-          for (bit=0; bit <= (ssize_t) (number_pixels % 4); bit+=2)
-          {
-            *q|=(GetPixelLuma(image,p) > threshold ? black : white) <<
-              (7-bit);
-            pixel=(unsigned char) (GetPixelAlpha(image,p) == OpaqueAlpha ?
-              0x00 : 0x01);
-            *q|=(((int) pixel != 0 ? 0x00 : 0x01) << (unsigned char)
-              (7-bit-1));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
-          q++;
-        }
+      Export1BitGrayAlphaQuantum(image,quantum_info,span);
       break;
     }
     case 4:
     {
-      unsigned char
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels ; x++)
-      {
-        pixel=ScaleQuantumToChar(ClampToQuantum(GetPixelLuma(image,p)));
-        *q=(((pixel >> 4) & 0xf) << 4);
-        pixel=(unsigned char) (16.0*QuantumScale*(double)
-          GetPixelAlpha(image,p)+0.5);
-        *q|=pixel & 0xf;
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q++;
-      }
+      Export4BitGrayAlphaQuantum(image,span);
       break;
     }
     case 8:
     {
-      unsigned char
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToChar(ClampToQuantum(GetPixelLuma(image,p)));
-        q=PopCharPixel(pixel,q);
-        pixel=ScaleQuantumToChar(GetPixelAlpha(image,p));
-        q=PopCharPixel(pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export8BitGrayAlphaQuantum(image,quantum_info,span);
       break;
     }
     case 16:
     {
-      unsigned short
-        pixel;
-
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelLuma(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            pixel=SinglePrecisionToHalf(QuantumScale*(double)
-              GetPixelAlpha(image,p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToShort(ClampToQuantum(GetPixelLuma(image,p)));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToShort(GetPixelAlpha(image,p));
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export16BitGrayAlphaQuantum(image,quantum_info,span);
       break;
     }
     case 32:
     {
-      unsigned int
-        pixel;
-
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            float
-              float_pixel;
-
-            float_pixel=(float) GetPixelLuma(image,p);
-            q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
-            float_pixel=(float) (GetPixelAlpha(image,p));
-            q=PopQuantumFloatPixel(quantum_info,float_pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToLong(ClampToQuantum(GetPixelLuma(image,p)));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        pixel=ScaleQuantumToLong(GetPixelAlpha(image,p));
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export32BitGrayAlphaQuantum(image,quantum_info,span);
       break;
     }
     case 64:
     {
       if (quantum_info->format == FloatingPointQuantumFormat)
         {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            double
-              pixel;
-
-            pixel=GetPixelLuma(image,p);
-            q=PopQuantumDoublePixel(quantum_info,pixel,q);
-            pixel=(double) (GetPixelAlpha(image,p));
-            q=PopQuantumDoublePixel(quantum_info,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
+          Export64BitFloatGrayAlphaQuantum(image,quantum_info,span);
           break;
         }
       magick_fallthrough;
     }
     default:
     {
-      range=GetQuantumRange(quantum_info->depth);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(ClampToQuantum(
-          GetPixelLuma(image,p)),range),q);
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(GetPixelAlpha(image,p),
-          range),q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportAnyDepthGrayAlphaQuantum(image,quantum_info,span);
       break;
     }
   }
