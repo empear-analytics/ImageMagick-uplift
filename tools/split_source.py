@@ -139,6 +139,14 @@ types = set(re.findall(r"^typedef\s+(?:struct|enum|union)\s+(\w+)", rest, re.M))
     {t.lstrip("_") for t in re.findall(r"^struct\s+(\w+)\s*$", rest, re.M)}
 for tname in sorted(types):
     if re.search(r"\b%s\b" % tname, region): sys.exit("refused: type %s defined outside the region and used in it" % tname)
+# a file-scope variable the original keeps must not be used by the region
+for k, line in enumerate(rest_lines):
+    if not re.match(r"^static\b", line) or "(" in line: continue
+    e = k
+    while e < len(rest_lines) and ";" not in rest_lines[e] and "=" not in rest_lines[e]: e += 1
+    decl = " ".join(rest_lines[k:e + 1]).split("=")[0]
+    for vname in re.findall(r"(\w+)\s*(?:\[[^\]]*\])?\s*(?:,|;|$)", decl.strip()):
+        if re.search(r"\b%s\b" % vname, region): sys.exit("refused: file-scope variable %s defined outside the region and used in it" % vname)
 # a non-static function the region calls must be declared in a header
 headers = "\n".join(open(h).read() for h in glob.glob(os.path.join(os.path.dirname(path), "*.h")))
 for n in sorted(names - moved - static):
