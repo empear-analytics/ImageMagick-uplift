@@ -176,7 +176,9 @@ channel loop, whose accumulators are the row's own `channel_bias` and `channel_s
 move on `SelectiveBlurImage` measured 1.59 → 1.60 with the Brain Method moving into the
 helper, and K on its two window sums after it stayed at 1.60: not committed. color.c's
 `IsEquivalentImage` and image.c's `InterpretImageFilename` were read and left: their
-blocks write two or more outer variables.
+blocks write two or more outer variables. Also measured and left: `BilateralBlurImage`'s per-pixel channel loop
+(effect.c 1.59 → 1.51, a second Brain Method in the helper). `MeanShiftImage` was read and
+left: its block assigns `status` from a call, which neither T nor J allows.
 
 Whole catalogue at `7c51b9302`: 15,906 cases, 1 diverged (`gaps/c5651ffad8`), as at `911987a09`. Earlier, at
 `f8fc17c71`, 3 diverged: `gaps/c5651ffad8` (the known
