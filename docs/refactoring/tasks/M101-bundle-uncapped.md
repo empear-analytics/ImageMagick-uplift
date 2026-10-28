@@ -170,7 +170,15 @@ The other targets named last night do not write `status` in their accumulating b
 2.29 → 2.32); `SelectiveBlurImage`, `BilateralBlurImage` and `MeanShiftImage` have
 Recipe K's shape, but their blocks also advance three or more pointers.
 
-Whole catalogue at `911987a09`: 15,906 cases, 1 diverged (`gaps/c5651ffad8`). Earlier, at
+**Later in the morning.** threshold.c's `AdaptiveThresholdImage`: Recipe K on its per-pixel
+channel loop, whose accumulators are the row's own `channel_bias` and `channel_sum` arrays
+(`7c51b9302`, **threshold.c 2.38 → 2.65**, its Brain Method gone; 12 cases, 0 diverged). The same
+move on `SelectiveBlurImage` measured 1.59 → 1.60 with the Brain Method moving into the
+helper, and K on its two window sums after it stayed at 1.60: not committed. color.c's
+`IsEquivalentImage` and image.c's `InterpretImageFilename` were read and left: their
+blocks write two or more outer variables.
+
+Whole catalogue at `7c51b9302`: 15,906 cases, 1 diverged (`gaps/c5651ffad8`), as at `911987a09`. Earlier, at
 `f8fc17c71`, 3 diverged: `gaps/c5651ffad8` (the known
 artifact) and the two hough matrix-on-disk cases, which timed out under load and passed
 when rerun alone.
