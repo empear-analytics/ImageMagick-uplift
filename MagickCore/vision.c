@@ -874,6 +874,32 @@ static MagickBooleanType SetEquivalencePathRoot(MatrixInfo *equivalences,
   return(status);
 }
 
+static ssize_t GetObjectSortKey(const Image *image)
+{
+  const char
+    *artifact;
+
+  ssize_t
+    key;
+
+  key=0;
+  artifact=GetImageArtifact(image,"connected-components:sort");
+  if (artifact != (const char *) NULL)
+    {
+      if (LocaleCompare(artifact,"area") == 0)
+        key=1;
+      if (LocaleCompare(artifact,"width") == 0)
+        key=2;
+      if (LocaleCompare(artifact,"height") == 0)
+        key=3;
+      if (LocaleCompare(artifact,"x") == 0)
+        key=4;
+      if (LocaleCompare(artifact,"y") == 0)
+        key=5;
+    }
+  return(key);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1667,21 +1693,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       if (artifact != (const char *) NULL)
         if (LocaleCompare(artifact,"decreasing") == 0)
           order=(-1);
-      key=0;
-      artifact=GetImageArtifact(image,"connected-components:sort");
-      if (artifact != (const char *) NULL)
-        {
-          if (LocaleCompare(artifact,"area") == 0)
-            key=1;
-          if (LocaleCompare(artifact,"width") == 0)
-            key=2;
-          if (LocaleCompare(artifact,"height") == 0)
-            key=3;
-          if (LocaleCompare(artifact,"x") == 0)
-            key=4;
-          if (LocaleCompare(artifact,"y") == 0)
-            key=5;
-        }
+      key=GetObjectSortKey(image);
       for (i=0; i < (ssize_t) component_image->colors; i++)
          object[i].key=order*key;
       qsort((void *) object,component_image->colors,sizeof(*object),
