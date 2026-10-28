@@ -171,7 +171,10 @@ blocks of nested logic). Each bump is a missing function.
 2. Cut it into a new `static` function directly above the current one.
 3. Pass in every variable it reads as a parameter. Return the single value it produces.
 4. If the block writes to more than one outer variable, **skip it** and move to the next
-   bump. Do not invent an out-parameter struct.
+   bump. Do not invent an out-parameter struct. A variable that nothing after the block
+   reads does not count (a block that runs to the end of the function, step 7, advancing
+   the row pointers `p` and `q`): the new function declares it, with the initialiser it
+   had, when no statement between that declaration and the block writes it.
 5. If the block is inside an OpenMP loop, check the rule above before you cut.
 6. If the block can throw - `ThrowBinaryException`, `ThrowImageException` and friends
    expand to a `return` - the new function must return a status the caller checks, and
@@ -1353,3 +1356,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-28 | AMEND | J | Step 5: an array accumulator goes as a pointer with its uses unchanged, as Recipe K already allows | `PerimeterThreshold`'s row loop counts into `pattern[4]`, the object's own array, and writes `status=MagickFalse` | mandate (2026-10-24) |
 | 2026-10-28 | AMEND | S | Scope: any MagickCore file whose family splits cleanly, not only the approved list; a split may lower MagickCore's per-file mean (the new file starts red) when it raises the original file; *Careful*'s new-file gate procedure confirmed | statistic.c's `StatisticImage` family (dry run 2.29 → 2.61); the per-file mean dip of the first three splits (4.97 → 4.96, line-weighted 3.149 → 3.200) | owner |
 | 2026-10-28 | AMEND | B | Step 5: the struct is declared among the declarations at the top of the block holding its calls, `const` with its initialiser where its operands are final there, otherwise filled member by member where it takes its values; `tools/ci_warnings.sh` joins the verification loop | `Main`'s macOS arm64 job (`-Wdeclaration-after-statement -Werror`) has failed on every merge since #31: 40 structs declared after statements in 20 files, as step 4's "directly before the call" placed them | mandate (2026-10-24) |
+| 2026-10-28 | AMEND | E | Step 4: a variable the block writes but nothing after it reads is not counted; the new function declares it with its initialiser, when nothing between that declaration and the block writes it (Recipes T and J already say "or is not read after it"); `tools/extract_case.py` applies it to one case of a function's closing `switch` | quantum-import.c's `Import*Quantum`: each depth case advances the span's `p` and `q` to the end of the function; extracting the cases raised the file 1.88 → 2.34, the fallthrough chains (24, 64, default) 2.34 → 2.59 in a probe | mandate (2026-10-24) |
