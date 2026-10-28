@@ -3019,6 +3019,72 @@ static inline MagickBooleanType IsPixelListStatistic(const StatisticType type)
     (type == NonpeakStatistic)) ? MagickTrue : MagickFalse);
 }
 
+static Quantum GetStatisticPixel(const StatisticType type,
+  PixelList **magick_restrict pixel_list,const int id,const double area,
+  const double minimum,const double maximum,const double sum,
+  const double sum_squared)
+{
+  Quantum
+    pixel;
+
+  switch (type)
+  {
+    case ContrastStatistic:
+    {
+      pixel=ClampToQuantum(MagickAbsoluteValue((maximum-minimum)*
+        MagickSafeReciprocal(maximum+minimum)));
+      break;
+    }
+    case GradientStatistic:
+    {
+      pixel=ClampToQuantum(MagickAbsoluteValue(maximum-minimum));
+      break;
+    }
+    case MaximumStatistic:
+    {
+      pixel=ClampToQuantum(maximum);
+      break;
+    }
+    case MeanStatistic:
+    default:
+    {
+      pixel=ClampToQuantum(sum/area);
+      break;
+    }
+    case MedianStatistic:
+    {
+      GetMedianPixelList(pixel_list[id],&pixel);
+      break;
+    }
+    case MinimumStatistic:
+    {
+      pixel=ClampToQuantum(minimum);
+      break;
+    }
+    case ModeStatistic:
+    {
+      GetModePixelList(pixel_list[id],&pixel);
+      break;
+    }
+    case NonpeakStatistic:
+    {
+      GetNonpeakPixelList(pixel_list[id],&pixel);
+      break;
+    }
+    case RootMeanSquareStatistic:
+    {
+      pixel=ClampToQuantum(sqrt(sum_squared/area));
+      break;
+    }
+    case StandardDeviationStatistic:
+    {
+      pixel=ClampToQuantum(sqrt(sum_squared/area-(sum/area*sum/area)));
+      break;
+    }
+  }
+  return(pixel);
+}
+
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
@@ -3175,61 +3241,8 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
           }
           pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
         }
-        switch (type)
-        {
-          case ContrastStatistic:
-          {
-            pixel=ClampToQuantum(MagickAbsoluteValue((maximum-minimum)*
-              MagickSafeReciprocal(maximum+minimum)));
-            break;
-          }
-          case GradientStatistic:
-          {
-            pixel=ClampToQuantum(MagickAbsoluteValue(maximum-minimum));
-            break;
-          }
-          case MaximumStatistic:
-          {
-            pixel=ClampToQuantum(maximum);
-            break;
-          }
-          case MeanStatistic:
-          default:
-          {
-            pixel=ClampToQuantum(sum/area);
-            break;
-          }
-          case MedianStatistic:
-          {
-            GetMedianPixelList(pixel_list[id],&pixel);
-            break;
-          }
-          case MinimumStatistic:
-          {
-            pixel=ClampToQuantum(minimum);
-            break;
-          }
-          case ModeStatistic:
-          {
-            GetModePixelList(pixel_list[id],&pixel);
-            break;
-          }
-          case NonpeakStatistic:
-          {
-            GetNonpeakPixelList(pixel_list[id],&pixel);
-            break;
-          }
-          case RootMeanSquareStatistic:
-          {
-            pixel=ClampToQuantum(sqrt(sum_squared/area));
-            break;
-          }
-          case StandardDeviationStatistic:
-          {
-            pixel=ClampToQuantum(sqrt(sum_squared/area-(sum/area*sum/area)));
-            break;
-          }
-        }
+        pixel=GetStatisticPixel(type,pixel_list,id,area,minimum,maximum,sum,
+          sum_squared);
         SetPixelChannel(statistic_image,channel,pixel,q);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
