@@ -767,6 +767,13 @@ static Image *BlendDivergentImage(const Image *alpha_image,
   return(divergent_image);
 }
 
+static inline MagickBooleanType IsBlendRowPairMissing(const Quantum *p,
+  const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void ClearMaskedAlphaRow(const Image *image,const Image *mask_image,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -824,7 +831,7 @@ static MagickBooleanType BlendMaskAlphaChannel(Image *image,
       continue;
     p=GetCacheViewVirtualPixels(mask_view,0,y,image->columns,1,exception);
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsBlendRowPairMissing(p,q) != MagickFalse)
       {
         status=MagickFalse;
         continue;
