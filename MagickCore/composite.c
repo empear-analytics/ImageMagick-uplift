@@ -1600,9 +1600,7 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
       (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
     if (residual < residual_threshold)
       {
-        if (verbose != MagickFalse)
-          (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double)
-            residual);
+        ReportBlendResidual(verbose,i,residual);
         break;
       }
     if (residual_image != (Image *) NULL)
