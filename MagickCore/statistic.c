@@ -507,6 +507,42 @@ static void ScaleEvaluateProduct(const Image *image,
   }
 }
 
+static void NormalizeEvaluatePixels(const Image *image,
+  const MagickEvaluateOperator op,const size_t number_images,
+  PixelChannels *evaluate_pixel)
+{
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    switch (op)
+    {
+      case MeanEvaluateOperator:
+      {
+        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+          evaluate_pixel[x].channel[i]/=(double) number_images;
+        break;
+      }
+      case MultiplyEvaluateOperator:
+      {
+        ScaleEvaluateProduct(image,number_images,evaluate_pixel,x);
+        break;
+      }
+      case RootMeanSquareEvaluateOperator:
+      {
+        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+          evaluate_pixel[x].channel[i]=sqrt(evaluate_pixel[x].channel[i]/
+            number_images);
+        break;
+      }
+      default:
+        break;
+    }
+  }
+}
+
 static void SetEvaluateMedianPixel(const Image *image,
   const PixelChannels *evaluate_pixel,const size_t number_images,
   Quantum *magick_restrict q)
@@ -814,32 +850,7 @@ MagickExport Image *EvaluateImages(const Image *images,
           }
           next=GetNextImageInList(next);
         }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          switch (op)
-          {
-            case MeanEvaluateOperator:
-            {
-              for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-                evaluate_pixel[x].channel[i]/=(double) number_images;
-              break;
-            }
-            case MultiplyEvaluateOperator:
-            {
-              ScaleEvaluateProduct(image,number_images,evaluate_pixel,x);
-              break;
-            }
-            case RootMeanSquareEvaluateOperator:
-            {
-              for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-                evaluate_pixel[x].channel[i]=sqrt(evaluate_pixel[x].channel[i]/
-                  number_images);
-              break;
-            }
-            default:
-              break;
-          }
-        }
+        NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
         SetEvaluatePixels(image,evaluate_pixel,q);
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
         if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
