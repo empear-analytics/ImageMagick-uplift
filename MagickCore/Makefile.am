@@ -300,6 +300,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/stream.h \
   MagickCore/stream-private.h \
   MagickCore/string.c \
+  MagickCore/string-argv.c \
   MagickCore/string-si.c \
   MagickCore/string_.h \
   MagickCore/string-private.h \
