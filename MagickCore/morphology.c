@@ -3466,6 +3466,17 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   Because of this 're-use of results' this function can not make use of multi-
   threaded, parallel processing.
 */
+static double MinimizeKernelDistance(const MagickRealType *magick_restrict k,
+  const Quantum *magick_restrict pixels,const ssize_t i,double pixel)
+{
+  if (!IsNaN(*k))
+    {
+      if (((double) pixels[i]+(*k)) < pixel)
+        pixel=(double) pixels[i]+(*k);
+    }
+  return(pixel);
+}
+
 static ssize_t MorphologyPrimitiveDirect(Image *image,
   const MorphologyMethod method,const KernelInfo *kernel,
   ExceptionInfo *exception)
@@ -3599,11 +3610,7 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
             {
               for (u=0; u < (ssize_t) kernel->width; u++)
               {
-                if (!IsNaN(*k))
-                  {
-                    if (((double) pixels[i]+(*k)) < pixel)
-                      pixel=(double) pixels[i]+(*k);
-                  }
+                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
                 k--;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
               }
@@ -3630,11 +3637,7 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
             {
               for (u=0; u < (ssize_t) kernel->width; u++)
               {
-                if (!IsNaN(*k))
-                  {
-                    if (((double) pixels[i]+(*k)) < pixel)
-                      pixel=(double) pixels[i]+(*k);
-                  }
+                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
                 k--;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
               }
@@ -3763,11 +3766,7 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
             {
               for (u=0; u < (ssize_t) kernel->width; u++)
               {
-                if (!IsNaN(*k))
-                  {
-                    if (((double) pixels[i]+(*k)) < pixel)
-                      pixel=(double) pixels[i]+(*k);
-                  }
+                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
                 k--;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
               }
@@ -3794,11 +3793,7 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
             {
               for (u=0; u < (ssize_t) kernel->width; u++)
               {
-                if (!IsNaN(*k))
-                  {
-                    if (((double) pixels[i]+(*k)) < pixel)
-                      pixel=(double) pixels[i]+(*k);
-                  }
+                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
                 k--;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
               }
