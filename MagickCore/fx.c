@@ -3008,6 +3008,63 @@ static inline MagickBooleanType IsUnassignedUserSymbolRead(
     MagickTrue : MagickFalse);
 }
 
+static void FlushUnaryPrefixOperators (FxInfo * pfx)
+{
+  while (TopOprIsUnaryPrefix (pfx)) {
+    OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
+    (void) AddElement (pfx, (fxFltType) 0, (int) op);
+    pfx->usedOprStack--;
+  }
+}
+
+static MagickBooleanType AddFinalCopyFrom (FxInfo * pfx,
+  MagickBooleanType NewUserSymbol, int UserSymNdx0)
+{
+  ElementT * pel;
+  if (NewUserSymbol) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "NewUserSymbol", "'%s' needs assignment operator at '%s'",
+      pfx->token, SetShortExp(pfx));
+    return MagickFalse;
+  }
+  (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx0);
+  pel = &pfx->Elements[pfx->usedElements-1];
+  pel->do_push = MagickTrue;
+  return MagickTrue;
+}
+
+static MagickBooleanType AddAssignmentCopyTo (FxInfo * pfx, int UserSymNdx0)
+{
+  if (UserSymNdx0 < 0) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Assignment to unknown user symbol at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  /* Adjust last element, by deletion and add.
+  */
+  pfx->usedElements--;
+  (void) AddAddressingElement (pfx, rCopyTo, UserSymNdx0);
+  return MagickTrue;
+}
+
+static MagickBooleanType SetInPlaceTarget (FxInfo * pfx, int UserSymNdx0)
+{
+  if (UserSymNdx0 < 0) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Operator-in-place to unknown user symbol at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  /* Modify latest element.
+  */
+  pfx->Elements[pfx->usedElements-1].element_index = UserSymNdx0;
+  return MagickTrue;
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3102,11 +3159,7 @@ static MagickBooleanType TranslateExpression (
     }
 
     if (UserSymbol) {
-      while (TopOprIsUnaryPrefix (pfx)) {
-        OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
-        (void) AddElement (pfx, (fxFltType) 0, (int) op);
-        pfx->usedOprStack--;
-      }
+      FlushUnaryPrefixOperators (pfx);
     }
 
     if (!ProcessTernaryOpr (pfx, &ternary)) return MagickFalse;
@@ -3161,17 +3214,7 @@ static MagickBooleanType TranslateExpression (
 
   if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
       MagickFalse) {
-    ElementT * pel;
-    if (NewUserSymbol) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "NewUserSymbol", "'%s' needs assignment operator at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx0);
-    pel = &pfx->Elements[pfx->usedElements-1];
-    pel->do_push = MagickTrue;
+    if (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)) return MagickFalse;
   }
 
   if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
@@ -3189,29 +3232,10 @@ static MagickBooleanType TranslateExpression (
     pfx->usedOprStack--;
     (void) AddElement (pfx, (fxFltType) 0, (int) op);
     if (op == oAssign) {
-      if (UserSymNdx0 < 0) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Assignment to unknown user symbol at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      /* Adjust last element, by deletion and add.
-      */
-      pfx->usedElements--;
-      (void) AddAddressingElement (pfx, rCopyTo, UserSymNdx0);
+      if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
       break;
     } else if (OprInPlace ((int) op)) {
-      if (UserSymNdx0 < 0) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Operator-in-place to unknown user symbol at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      /* Modify latest element.
-      */
-      pfx->Elements[pfx->usedElements-1].element_index = UserSymNdx0;
+      if (!SetInPlaceTarget (pfx, UserSymNdx0)) return MagickFalse;
       break;
     }
   }
