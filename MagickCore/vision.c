@@ -1991,6 +1991,35 @@ static void IntegratePixelChannel(Quantum *q,
 }
 
 
+static void IntegrateRow(Image *integral_image,const Quantum *p,Quantum *q,
+  const ssize_t y)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) integral_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(integral_image); i++)
+    {
+      IntegralChannel
+        integral_channel;
+
+      integral_channel.integral_image=integral_image;
+      integral_channel.p=p;
+      integral_channel.x=x;
+      integral_channel.y=y;
+      integral_channel.i=i;
+      IntegratePixelChannel(q,&integral_channel);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(integral_image);
+    q+=(ptrdiff_t) GetPixelChannels(integral_image);
+  }
+}
+
+
 MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
 {
 #define IntegralImageTag  "Integral/Image"
@@ -2046,9 +2075,6 @@ MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(integral_view,0,y-1,integral_image->columns,1,
@@ -2060,26 +2086,7 @@ MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) integral_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(integral_image); i++)
-      {
-        IntegralChannel
-          integral_channel;
-
-        integral_channel.integral_image=integral_image;
-        integral_channel.p=p;
-        integral_channel.x=x;
-        integral_channel.y=y;
-        integral_channel.i=i;
-        IntegratePixelChannel(q,&integral_channel);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(integral_image);
-      q+=(ptrdiff_t) GetPixelChannels(integral_image);
-    }
+    IntegrateRow(integral_image,p,q,y);
     sync=SyncCacheViewAuthenticPixels(integral_view,exception);
     if (sync == MagickFalse)
       status=MagickFalse;
