@@ -4205,6 +4205,21 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void NegatePixelChannels(const Image *image,Quantum *q)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[j]=QuantumRange-q[j];
+  }
+}
+
 static void NegateGrayImageRow(const Image *image,Quantum *q)
 {
   ssize_t
@@ -4212,22 +4227,12 @@ static void NegateGrayImageRow(const Image *image,Quantum *q)
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    ssize_t
-      j;
-
     if (IsPixelGray(image,q) == MagickFalse)
       {
         q+=(ptrdiff_t) GetPixelChannels(image);
         continue;
       }
-    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-    {
-      PixelChannel channel = GetPixelChannelChannel(image,j);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      if ((traits & UpdatePixelTrait) == 0)
-        continue;
-      q[j]=QuantumRange-q[j];
-    }
+    NegatePixelChannels(image,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
