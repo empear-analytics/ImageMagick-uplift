@@ -1943,6 +1943,54 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _IntegralChannel
+{
+  Image
+    *integral_image;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x,
+    y,
+    i;
+} IntegralChannel;
+
+static void IntegratePixelChannel(Quantum *q,
+  const IntegralChannel *integral_channel)
+{
+  Image
+    *const integral_image = integral_channel->integral_image;
+
+  const Quantum
+    *const p = integral_channel->p;
+
+  const ssize_t
+    x = integral_channel->x,
+    y = integral_channel->y,
+    i = integral_channel->i;
+
+  double
+    sum;
+
+  PixelTrait traits = GetPixelChannelTraits(integral_image,
+    (PixelChannel) i);
+  if (traits == UndefinedPixelTrait)
+    return;
+  if ((traits & CopyPixelTrait) != 0)
+    return;
+  sum=(double) q[i];
+  if (x > 0)
+    sum+=(double) (q-GetPixelChannels(integral_image))[i];
+  if (y > 0)
+    sum+=(double) p[i];
+  if ((x > 0) && (y > 0))
+    sum-=(double) (p-GetPixelChannels(integral_image))[i];
+  q[i]=ClampToQuantum(sum);
+}
+
+
 MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
 {
 #define IntegralImageTag  "Integral/Image"
@@ -2019,23 +2067,15 @@ MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
 
       for (i=0; i < (ssize_t) GetPixelChannels(integral_image); i++)
       {
-        double
-          sum;
+        IntegralChannel
+          integral_channel;
 
-        PixelTrait traits = GetPixelChannelTraits(integral_image,
-          (PixelChannel) i);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        if ((traits & CopyPixelTrait) != 0)
-          continue;
-        sum=(double) q[i];
-        if (x > 0)
-          sum+=(double) (q-GetPixelChannels(integral_image))[i];
-        if (y > 0)
-          sum+=(double) p[i];
-        if ((x > 0) && (y > 0))
-          sum-=(double) (p-GetPixelChannels(integral_image))[i];
-        q[i]=ClampToQuantum(sum);
+        integral_channel.integral_image=integral_image;
+        integral_channel.p=p;
+        integral_channel.x=x;
+        integral_channel.y=y;
+        integral_channel.i=i;
+        IntegratePixelChannel(q,&integral_channel);
       }
       p+=(ptrdiff_t) GetPixelChannels(integral_image);
       q+=(ptrdiff_t) GetPixelChannels(integral_image);
