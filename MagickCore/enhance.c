@@ -4017,6 +4017,52 @@ static void ModulateColor(const ModulateInfo *modulate_info,double *red,
   }
 }
 
+static void ParseModulatePercents(const char *modulate,
+  double *percent_brightness,double *percent_saturation,double *percent_hue)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  flags=ParseGeometry(modulate,&geometry_info);
+  if ((flags & RhoValue) != 0)
+    *percent_brightness=geometry_info.rho;
+  if ((flags & SigmaValue) != 0)
+    *percent_saturation=geometry_info.sigma;
+  if ((flags & XiValue) != 0)
+    *percent_hue=geometry_info.xi;
+}
+
+static void GetModulateColorspace(const Image *image,
+  ColorspaceType *colorspace,IlluminantType *illuminant)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"modulate:colorspace");
+  if (artifact != (const char *) NULL)
+    *colorspace=(ColorspaceType) ParseCommandOption(MagickColorspaceOptions,
+      MagickFalse,artifact);
+  artifact=GetImageArtifact(image,"color:illuminant");
+  if (artifact != (const char *) NULL)
+    {
+      ssize_t
+        illuminant_type;
+
+      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
+        artifact);
+      if (illuminant_type < 0)
+        {
+          *illuminant=UndefinedIlluminant;
+          *colorspace=UndefinedColorspace;
+        }
+      else
+        *illuminant=(IlluminantType) illuminant_type;
+    }
+}
+
 MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ExceptionInfo *exception)
 {
@@ -4028,16 +4074,10 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ColorspaceType
     colorspace = UndefinedColorspace;
 
-  const char
-    *artifact;
-
   double
     percent_brightness = 100.0,
     percent_hue = 100.0,
     percent_saturation = 100.0;
-
-  GeometryInfo
-    geometry_info;
 
   IlluminantType
     illuminant = D65Illuminant;
@@ -4047,9 +4087,6 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
 
   MagickOffsetType
     progress;
-
-  MagickStatusType
-    flags;
 
   ssize_t
     i;
@@ -4068,33 +4105,9 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
     return(MagickFalse);
   if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
     (void) SetImageColorspace(image,sRGBColorspace,exception);
-  flags=ParseGeometry(modulate,&geometry_info);
-  if ((flags & RhoValue) != 0)
-    percent_brightness=geometry_info.rho;
-  if ((flags & SigmaValue) != 0)
-    percent_saturation=geometry_info.sigma;
-  if ((flags & XiValue) != 0)
-    percent_hue=geometry_info.xi;
-  artifact=GetImageArtifact(image,"modulate:colorspace");
-  if (artifact != (const char *) NULL)
-    colorspace=(ColorspaceType) ParseCommandOption(MagickColorspaceOptions,
-      MagickFalse,artifact);
-  artifact=GetImageArtifact(image,"color:illuminant");
-  if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        illuminant_type;
-
-      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
-        artifact);
-      if (illuminant_type < 0)
-        {
-          illuminant=UndefinedIlluminant;
-          colorspace=UndefinedColorspace;
-        }
-      else
-        illuminant=(IlluminantType) illuminant_type;
-    }
+  ParseModulatePercents(modulate,&percent_brightness,&percent_saturation,
+    &percent_hue);
+  GetModulateColorspace(image,&colorspace,&illuminant);
   if (image->storage_class == PseudoClass)
     for (i=0; i < (ssize_t) image->colors; i++)
     {
