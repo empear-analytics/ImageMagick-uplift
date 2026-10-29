@@ -3342,6 +3342,108 @@ static inline MagickBooleanType IsCompressedSVGExtension(const char *extension)
     (LocaleCompare(extension,"svgz") == 0)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType CanMapBlobFile(
+  const MagickInfo *magick_info,const size_t length)
+{
+  return(((magick_info != (const MagickInfo *) NULL) &&
+    (GetMagickBlobSupport(magick_info) != MagickFalse) &&
+    (AcquireMagickResource(MapResource,length) != MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
+static void MapBlobFile(const ImageInfo *image_info,
+  BlobInfo *magick_restrict blob_info)
+{
+  const MagickInfo
+    *magick_info;
+
+  ExceptionInfo
+    *sans_exception;
+
+  size_t
+    length;
+
+  sans_exception=AcquireExceptionInfo();
+  magick_info=GetMagickInfo(image_info->magick,sans_exception);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  length=(size_t) blob_info->properties.st_size;
+  if (CanMapBlobFile(magick_info,length) != MagickFalse)
+    {
+      void
+        *blob;
+
+      blob=MapBlob(fileno(blob_info->file_info.file),ReadMode,0,
+        length);
+      if (blob == (void *) NULL)
+        RelinquishMagickResource(MapResource,length);
+      else
+        {
+          /*
+            Format supports blobs-- use memory-mapped I/O.
+          */
+          if (image_info->file != (FILE *) NULL)
+            blob_info->exempt=MagickFalse;
+          else
+            {
+              (void) fclose(blob_info->file_info.file);
+              blob_info->file_info.file=(FILE *) NULL;
+            }
+          AttachBlob(blob_info,blob,length);
+          blob_info->mapped=MagickTrue;
+        }
+    }
+}
+
+static void GetBlobModeFlags(const BlobMode mode,int *flags,
+  const char **type)
+{
+  switch (mode)
+  {
+    case ReadBlobMode:
+    {
+      *flags=O_RDONLY | O_CLOEXEC;
+      *type="r";
+      break;
+    }
+    case ReadBinaryBlobMode:
+    {
+      *flags=O_RDONLY | O_CLOEXEC | O_BINARY;
+      *type="rb";
+      break;
+    }
+    case WriteBlobMode:
+    {
+      *flags=O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC;
+      *type="w";
+      break;
+    }
+    case WriteBinaryBlobMode:
+    {
+      *flags=O_RDWR | O_CLOEXEC | O_CREAT | O_TRUNC | O_BINARY;
+      *type="w+b";
+      break;
+    }
+    case AppendBlobMode:
+    {
+      *flags=O_WRONLY | O_CLOEXEC | O_CREAT | O_APPEND;
+      *type="a";
+      break;
+    }
+    case AppendBinaryBlobMode:
+    {
+      *flags=O_RDWR | O_CLOEXEC | O_CREAT | O_APPEND | O_BINARY;
+      *type="a+b";
+      break;
+    }
+    default:
+    {
+      *flags=O_RDONLY | O_CLOEXEC;
+      *type="r";
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -3391,51 +3493,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
     }
   (void) DetachBlob(blob_info);
   blob_info->mode=mode;
-  switch (mode)
-  {
-    case ReadBlobMode:
-    {
-      flags=O_RDONLY | O_CLOEXEC;
-      type="r";
-      break;
-    }
-    case ReadBinaryBlobMode:
-    {
-      flags=O_RDONLY | O_CLOEXEC | O_BINARY;
-      type="rb";
-      break;
-    }
-    case WriteBlobMode:
-    {
-      flags=O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC;
-      type="w";
-      break;
-    }
-    case WriteBinaryBlobMode:
-    {
-      flags=O_RDWR | O_CLOEXEC | O_CREAT | O_TRUNC | O_BINARY;
-      type="w+b";
-      break;
-    }
-    case AppendBlobMode:
-    {
-      flags=O_WRONLY | O_CLOEXEC | O_CREAT | O_APPEND;
-      type="a";
-      break;
-    }
-    case AppendBinaryBlobMode:
-    {
-      flags=O_RDWR | O_CLOEXEC | O_CREAT | O_APPEND | O_BINARY;
-      type="a+b";
-      break;
-    }
-    default:
-    {
-      flags=O_RDONLY | O_CLOEXEC;
-      type="r";
-      break;
-    }
-  }
+  GetBlobModeFlags(mode,&flags,&type);
   if (*type != 'r')
     blob_info->synchronize=image_info->synchronize;
   if (image_info->stream != (StreamHandler) NULL)
@@ -3631,48 +3689,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
               }
 #endif
             if (blob_info->type == FileStream)
-              {
-                const MagickInfo
-                  *magick_info;
-
-                ExceptionInfo
-                  *sans_exception;
-
-                size_t
-                  length;
-
-                sans_exception=AcquireExceptionInfo();
-                magick_info=GetMagickInfo(image_info->magick,sans_exception);
-                sans_exception=DestroyExceptionInfo(sans_exception);
-                length=(size_t) blob_info->properties.st_size;
-                if ((magick_info != (const MagickInfo *) NULL) &&
-                    (GetMagickBlobSupport(magick_info) != MagickFalse) &&
-                    (AcquireMagickResource(MapResource,length) != MagickFalse))
-                  {
-                    void
-                      *blob;
-
-                    blob=MapBlob(fileno(blob_info->file_info.file),ReadMode,0,
-                      length);
-                    if (blob == (void *) NULL)
-                      RelinquishMagickResource(MapResource,length);
-                    else
-                      {
-                        /*
-                          Format supports blobs-- use memory-mapped I/O.
-                        */
-                        if (image_info->file != (FILE *) NULL)
-                          blob_info->exempt=MagickFalse;
-                        else
-                          {
-                            (void) fclose(blob_info->file_info.file);
-                            blob_info->file_info.file=(FILE *) NULL;
-                          }
-                        AttachBlob(blob_info,blob,length);
-                        blob_info->mapped=MagickTrue;
-                      }
-                  }
-              }
+              MapBlobFile(image_info,blob_info);
           }
       }
     else
@@ -3905,6 +3922,64 @@ MagickExport Image *PingBlob(const ImageInfo *image_info,const void *blob,
 %      file.
 %
 */
+static ssize_t ReadBlobFile(BlobInfo *magick_restrict blob_info,
+  const size_t length,unsigned char *q,ssize_t count)
+{
+  int
+    c;
+
+  switch (length)
+  {
+    default:
+    {
+      count=(ssize_t) fread(q,1,length,blob_info->file_info.file);
+      break;
+    }
+    case 4:
+    {
+      c=getc(blob_info->file_info.file);
+      if (c == EOF)
+        break;
+      *q++=(unsigned char) c;
+      count++;
+      magick_fallthrough;
+    }
+    case 3:
+    {
+      c=getc(blob_info->file_info.file);
+      if (c == EOF)
+        break;
+      *q++=(unsigned char) c;
+      count++;
+      magick_fallthrough;
+    }
+    case 2:
+    {
+      c=getc(blob_info->file_info.file);
+      if (c == EOF)
+        break;
+      *q++=(unsigned char) c;
+      count++;
+      magick_fallthrough;
+    }
+    case 1:
+    {
+      c=getc(blob_info->file_info.file);
+      if (c == EOF)
+        break;
+      *q++=(unsigned char) c;
+      count++;
+      magick_fallthrough;
+    }
+    case 0:
+      break;
+  }
+  if ((count != (ssize_t) length) &&
+      (ferror(blob_info->file_info.file) != 0))
+    ThrowBlobException(blob_info);
+  return(count);
+}
+
 MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
 {
   BlobInfo
@@ -3937,55 +4012,7 @@ MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
     case FileStream:
     case PipeStream:
     {
-      switch (length)
-      {
-        default:
-        {
-          count=(ssize_t) fread(q,1,length,blob_info->file_info.file);
-          break;
-        }
-        case 4:
-        {
-          c=getc(blob_info->file_info.file);
-          if (c == EOF)
-            break;
-          *q++=(unsigned char) c;
-          count++;
-          magick_fallthrough;
-        }
-        case 3:
-        {
-          c=getc(blob_info->file_info.file);
-          if (c == EOF)
-            break;
-          *q++=(unsigned char) c;
-          count++;
-          magick_fallthrough;
-        }
-        case 2:
-        {
-          c=getc(blob_info->file_info.file);
-          if (c == EOF)
-            break;
-          *q++=(unsigned char) c;
-          count++;
-          magick_fallthrough;
-        }
-        case 1:
-        {
-          c=getc(blob_info->file_info.file);
-          if (c == EOF)
-            break;
-          *q++=(unsigned char) c;
-          count++;
-          magick_fallthrough;
-        }
-        case 0:
-          break;
-      }
-      if ((count != (ssize_t) length) &&
-          (ferror(blob_info->file_info.file) != 0))
-        ThrowBlobException(blob_info);
+      count=ReadBlobFile(blob_info,length,q,count);
       break;
     }
     case ZipStream:
