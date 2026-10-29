@@ -1549,6 +1549,16 @@ static void MergeAllObjects(const Image *component_image,CCObjectInfo *object)
     object[i].merge=MagickTrue;
 }
 
+static void SetObjectMeanColors(Image *component_image,
+  const CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+    component_image->colormap[i]=object[i].color;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2119,8 +2129,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Replace object with mean color.
       */
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        component_image->colormap[i]=object[i].color;
+      SetObjectMeanColors(component_image,object);
     }
   (void) SyncImage(component_image,exception);
   artifact=GetImageArtifact(image,"connected-components:verbose");
