@@ -1103,6 +1103,15 @@ static MagickBooleanType InverseQuadrantSwap(const size_t width,
   return(RollFourier(center,height,0L,(ssize_t) height/-2L,destination));
 }
 
+static inline MagickBooleanType IsFourierMemoryMissing(
+  const MemoryInfo *magnitude_info,const MemoryInfo *phase_info,
+  const MemoryInfo *inverse_info)
+{
+  return(((magnitude_info == (MemoryInfo *) NULL) ||
+    (phase_info == (MemoryInfo *) NULL) ||
+    (inverse_info == (MemoryInfo *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   const Image *magnitude_image,const Image *phase_image,
   fftw_complex *fourier_pixels,ExceptionInfo *exception)
@@ -1141,9 +1150,8 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
     sizeof(*phase_pixels));
   inverse_info=AcquireVirtualMemory(fourier_info->width,(fourier_info->height/2+
     1)*sizeof(*inverse_pixels));
-  if ((magnitude_info == (MemoryInfo *) NULL) ||
-      (phase_info == (MemoryInfo *) NULL) ||
-      (inverse_info == (MemoryInfo *) NULL))
+  if (IsFourierMemoryMissing(magnitude_info,phase_info,inverse_info) !=
+      MagickFalse)
     {
       if (magnitude_info != (MemoryInfo *) NULL)
         magnitude_info=RelinquishVirtualMemory(magnitude_info);
