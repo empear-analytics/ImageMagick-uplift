@@ -637,6 +637,20 @@ static Image *CropOutsideImage(const Image *image,
   return(crop_image);
 }
 
+static RectangleInfo ClampCropExtent(const Image *image,
+  const RectangleInfo *geometry,RectangleInfo page)
+{
+  if ((page.x+(ssize_t) page.width) > (ssize_t) image->columns)
+    page.width=(size_t) ((ssize_t) image->columns-page.x);
+  if ((geometry->width != 0) && (page.width > geometry->width))
+    page.width=geometry->width;
+  if ((page.y+(ssize_t) page.height) > (ssize_t) image->rows)
+    page.height=CastDoubleToSizeT((double) image->rows-page.y);
+  if ((geometry->height != 0) && (page.height > geometry->height))
+    page.height=geometry->height;
+  return(page);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -699,14 +713,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
     }
   ClipCropOffset(&page.x,&page.width,bounding_box.x);
   ClipCropOffset(&page.y,&page.height,bounding_box.y);
-  if ((page.x+(ssize_t) page.width) > (ssize_t) image->columns)
-    page.width=(size_t) ((ssize_t) image->columns-page.x);
-  if ((geometry->width != 0) && (page.width > geometry->width))
-    page.width=geometry->width;
-  if ((page.y+(ssize_t) page.height) > (ssize_t) image->rows)
-    page.height=CastDoubleToSizeT((double) image->rows-page.y);
-  if ((geometry->height != 0) && (page.height > geometry->height))
-    page.height=geometry->height;
+  page=ClampCropExtent(image,geometry,page);
   bounding_box.x+=page.x;
   bounding_box.y+=page.y;
   if ((page.width == 0) || (page.height == 0))
