@@ -696,9 +696,77 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *ShearIntegralImage(const Image *image,Image *integral_image,
+  const PointInfo shear,ExceptionInfo *exception)
+{
+  Image
+    *shear_image;
+
+  MagickBooleanType
+    status;
+
+  RectangleInfo
+    border_info,
+    bounds;
+
+  ShearRegion
+    first_pass,
+    second_pass;
+
+  /*
+    Compute image size.
+  */
+  bounds.width=(size_t) ((ssize_t) image->columns+CastDoubleToSsizeT(floor(
+    fabs(shear.x)*image->rows+0.5)));
+  bounds.x=CastDoubleToSsizeT(ceil((double) image->columns+((fabs(shear.x)*
+    image->rows)-image->columns)/2.0-0.5));
+  bounds.y=CastDoubleToSsizeT(ceil((double) image->rows+((fabs(shear.y)*
+    bounds.width)-image->rows)/2.0-0.5));
+  /*
+    Surround image with border.
+  */
+  integral_image->border_color=integral_image->background_color;
+  integral_image->compose=CopyCompositeOp;
+  border_info.width=(size_t) bounds.x;
+  border_info.height=(size_t) bounds.y;
+  shear_image=BorderImage(integral_image,&border_info,image->compose,exception);
+  integral_image=DestroyImage(integral_image);
+  if (shear_image == (Image *) NULL)
+    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+  /*
+    Shear the image.
+  */
+  if (shear_image->alpha_trait == UndefinedPixelTrait)
+    (void) SetImageAlphaChannel(shear_image,OpaqueAlphaChannel,exception);
+  first_pass.width=image->columns;
+  first_pass.height=image->rows;
+  first_pass.x_offset=bounds.x;
+  first_pass.y_offset=(ssize_t) (shear_image->rows-image->rows)/2;
+  status=XShearImage(shear_image,shear.x,&first_pass,exception);
+  if (status == MagickFalse)
+    {
+      shear_image=DestroyImage(shear_image);
+      return((Image *) NULL);
+    }
+  second_pass.width=bounds.width;
+  second_pass.height=image->rows;
+  second_pass.x_offset=(ssize_t) (shear_image->columns-bounds.width)/2;
+  second_pass.y_offset=bounds.y;
+  status=YShearImage(shear_image,shear.y,&second_pass,exception);
+  if (status == MagickFalse)
+    {
+      shear_image=DestroyImage(shear_image);
+      return((Image *) NULL);
+    }
+  return(shear_image);
+}
+
 MagickExport Image *ShearImage(const Image *image,const double x_shear,
   const double y_shear,ExceptionInfo *exception)
 {
+  CropToFitRegion
+    crop_region;
+
   Image
     *integral_image,
     *shear_image;
@@ -708,10 +776,6 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
 
   PointInfo
     shear;
-
-  RectangleInfo
-    border_info,
-    bounds;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -740,49 +804,14 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
     }
   if (integral_image->alpha_trait == UndefinedPixelTrait)
     (void) SetImageAlphaChannel(integral_image,OpaqueAlphaChannel,exception);
-  /*
-    Compute image size.
-  */
-  bounds.width=(size_t) ((ssize_t) image->columns+CastDoubleToSsizeT(floor(
-    fabs(shear.x)*image->rows+0.5)));
-  bounds.x=CastDoubleToSsizeT(ceil((double) image->columns+((fabs(shear.x)*
-    image->rows)-image->columns)/2.0-0.5));
-  bounds.y=CastDoubleToSsizeT(ceil((double) image->rows+((fabs(shear.y)*
-    bounds.width)-image->rows)/2.0-0.5));
-  /*
-    Surround image with border.
-  */
-  integral_image->border_color=integral_image->background_color;
-  integral_image->compose=CopyCompositeOp;
-  border_info.width=(size_t) bounds.x;
-  border_info.height=(size_t) bounds.y;
-  shear_image=BorderImage(integral_image,&border_info,image->compose,exception);
-  integral_image=DestroyImage(integral_image);
+  shear_image=ShearIntegralImage(image,integral_image,shear,exception);
   if (shear_image == (Image *) NULL)
-    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  /*
-    Shear the image.
-  */
-  if (shear_image->alpha_trait == UndefinedPixelTrait)
-    (void) SetImageAlphaChannel(shear_image,OpaqueAlphaChannel,exception);
-  const ShearRegion first_pass = { image->columns, image->rows, bounds.x,
-    (ssize_t) (shear_image->rows-image->rows)/2 };
-  status=XShearImage(shear_image,shear.x,&first_pass,exception);
-  if (status == MagickFalse)
-    {
-      shear_image=DestroyImage(shear_image);
-      return((Image *) NULL);
-    }
-  const ShearRegion second_pass = { bounds.width, image->rows, (ssize_t)
-    (shear_image->columns-bounds.width)/2, bounds.y };
-  status=YShearImage(shear_image,shear.y,&second_pass,exception);
-  if (status == MagickFalse)
-    {
-      shear_image=DestroyImage(shear_image);
-      return((Image *) NULL);
-    }
-  const CropToFitRegion crop_region = { shear.x, shear.y, (MagickRealType)
-    image->columns, (MagickRealType) image->rows, MagickFalse };
+    return((Image *) NULL);
+  crop_region.x_shear=shear.x;
+  crop_region.y_shear=shear.y;
+  crop_region.width=(MagickRealType) image->columns;
+  crop_region.height=(MagickRealType) image->rows;
+  crop_region.rotate=MagickFalse;
   status=CropToFitImage(&shear_image,&crop_region,exception);
   shear_image->alpha_trait=image->alpha_trait;
   shear_image->compose=image->compose;
