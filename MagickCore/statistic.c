@@ -1830,6 +1830,14 @@ static void ComputeChannelEntropy(const Image *image,const double *histogram,
   }
 }
 
+static void IncreaseChannelDepth(ChannelStatistics *channel_statistics,
+  ChannelStatistics *cs)
+{
+  cs->depth++;
+  if (cs->depth > channel_statistics[CompositePixelChannel].depth)
+    channel_statistics[CompositePixelChannel].depth=cs->depth;
+}
+
 typedef struct _ChannelSample
 {
   const Image
@@ -1969,9 +1977,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
               range) ? MagickTrue : MagickFalse;
             if (status != MagickFalse)
               {
-                cs->depth++;
-                if (cs->depth > channel_statistics[CompositePixelChannel].depth)
-                  channel_statistics[CompositePixelChannel].depth=cs->depth;
+                IncreaseChannelDepth(channel_statistics,cs);
                 i--;
                 continue;
               }
