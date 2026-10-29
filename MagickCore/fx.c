@@ -4724,6 +4724,48 @@ static inline MagickBooleanType IsStatisticsPending(const FxInfo *pfx)
     !pfx->statistics) ? MagickTrue : MagickFalse);
 }
 
+static FxInfo *AllocateFxRuntimes (FxInfo * pfx)
+{
+  size_t number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
+  ssize_t t;
+
+  pfx->fxrts = (fxRtT *)AcquireQuantumMemory (number_threads, sizeof(fxRtT));
+  if (!pfx->fxrts) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), ResourceLimitFatalError,
+      "fxrts", "%lu",
+      (unsigned long) number_threads);
+    (void) DestroyRPN (pfx);
+    pfx->expression = DestroyString (pfx->expression);
+    pfx->pex = NULL;
+    (void) DeInitFx (pfx);
+    pfx = (FxInfo*) RelinquishMagickMemory(pfx);
+    return NULL;
+  }
+  for (t=0; t < (ssize_t) number_threads; t++) {
+    if (!AllocFxRt (pfx, &pfx->fxrts[t])) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), ResourceLimitFatalError,
+        "AllocFxRt t=", "%g",
+        (double) t);
+      {
+        ssize_t t2;
+        for (t2 = t-1; t2 >= 0; t2--) {
+          DestroyFxRt (&pfx->fxrts[t2]);
+        }
+      }
+      pfx->fxrts = (fxRtT *) RelinquishMagickMemory (pfx->fxrts);
+      (void) DestroyRPN (pfx);
+      pfx->expression = DestroyString (pfx->expression);
+      pfx->pex = NULL;
+      (void) DeInitFx (pfx);
+      pfx = (FxInfo*) RelinquishMagickMemory(pfx);
+      return NULL;
+    }
+  }
+  return pfx;
+}
+
 static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
   MagickBooleanType CalcAllStats, ExceptionInfo *exception)
 {
@@ -4805,46 +4847,7 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
     (void) DumpRPN (pfx, stderr);
   }
 
-  {
-    size_t number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
-    ssize_t t;
-
-    pfx->fxrts = (fxRtT *)AcquireQuantumMemory (number_threads, sizeof(fxRtT));
-    if (!pfx->fxrts) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), ResourceLimitFatalError,
-        "fxrts", "%lu",
-        (unsigned long) number_threads);
-      (void) DestroyRPN (pfx);
-      pfx->expression = DestroyString (pfx->expression);
-      pfx->pex = NULL;
-      (void) DeInitFx (pfx);
-      pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-      return NULL;
-    }
-    for (t=0; t < (ssize_t) number_threads; t++) {
-      if (!AllocFxRt (pfx, &pfx->fxrts[t])) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), ResourceLimitFatalError,
-          "AllocFxRt t=", "%g",
-          (double) t);
-        {
-          ssize_t t2;
-          for (t2 = t-1; t2 >= 0; t2--) {
-            DestroyFxRt (&pfx->fxrts[t2]);
-          }
-        }
-        pfx->fxrts = (fxRtT *) RelinquishMagickMemory (pfx->fxrts);
-        (void) DestroyRPN (pfx);
-        pfx->expression = DestroyString (pfx->expression);
-        pfx->pex = NULL;
-        (void) DeInitFx (pfx);
-        pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-        return NULL;
-      }
-    }
-  }
-  return pfx;
+  return (AllocateFxRuntimes (pfx));
 }
 
 FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionInfo *exception)
