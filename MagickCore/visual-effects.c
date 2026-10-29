@@ -135,6 +135,13 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsPixelChannelPairUndefined(
+  const PixelTrait traits,const PixelTrait other_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    (other_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 static void AddNoisePixelChannels(const Image *image,
   const Image *noise_image,const Quantum *magick_restrict p,
   Quantum *magick_restrict q,RandomInfo *magick_restrict random_info,
@@ -148,8 +155,7 @@ static void AddNoisePixelChannels(const Image *image,
     PixelChannel channel = GetPixelChannelChannel(image,i);
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     PixelTrait noise_traits=GetPixelChannelTraits(noise_image,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (noise_traits == UndefinedPixelTrait))
+    if (IsPixelChannelPairUndefined(traits,noise_traits) != MagickFalse)
       continue;
     if ((noise_traits & CopyPixelTrait) != 0)
       {
@@ -992,8 +998,7 @@ static void CopyPixelChannels(const Image *source,
     PixelTrait traits = GetPixelChannelTraits(source,channel);
     PixelTrait destination_traits = GetPixelChannelTraits(destination,
       channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (destination_traits == UndefinedPixelTrait))
+    if (IsPixelChannelPairUndefined(traits,destination_traits) != MagickFalse)
       continue;
     SetPixelChannel(destination,channel,p[i],q);
   }
@@ -1219,8 +1224,7 @@ static void MorphPixelChannels(const Image *morph_image,
     PixelChannel channel = GetPixelChannelChannel(morph_image,i);
     PixelTrait traits = GetPixelChannelTraits(morph_image,channel);
     PixelTrait morph_traits=GetPixelChannelTraits(morph_images,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (morph_traits == UndefinedPixelTrait))
+    if (IsPixelChannelPairUndefined(traits,morph_traits) != MagickFalse)
       continue;
     if ((morph_traits & CopyPixelTrait) != 0)
       {
