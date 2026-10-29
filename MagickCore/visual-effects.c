@@ -3780,6 +3780,99 @@ static MagickBooleanType CopyWaveletChannel(
   return(status);
 }
 
+typedef struct _WaveletReconstruct
+{
+  const Image
+    *image;
+
+  Image
+    *noise_image;
+
+  CacheView
+    *noise_view;
+
+  PixelChannel
+    pixel_channel;
+
+  float
+    *pixels;
+
+  size_t
+    low_pass;
+
+  ExceptionInfo
+    *exception;
+} WaveletReconstruct;
+
+static MagickBooleanType ReconstructWaveletChannel(
+  const WaveletReconstruct *wavelet_reconstruct,MagickBooleanType status)
+{
+  const Image
+    *const image = wavelet_reconstruct->image;
+
+  Image
+    *const noise_image = wavelet_reconstruct->noise_image;
+
+  CacheView
+    *const noise_view = wavelet_reconstruct->noise_view;
+
+  const PixelChannel
+    pixel_channel = wavelet_reconstruct->pixel_channel;
+
+  float
+    *const pixels = wavelet_reconstruct->pixels;
+
+  const size_t
+    low_pass = wavelet_reconstruct->low_pass;
+
+  ExceptionInfo
+    *const exception = wavelet_reconstruct->exception;
+
+  ssize_t
+    i,
+    y;
+
+  i=0;
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    MagickBooleanType
+      sync;
+
+    Quantum
+      *magick_restrict q;
+
+    ssize_t
+      x;
+
+    ssize_t
+      offset;
+
+    q=GetCacheViewAuthenticPixels(noise_view,0,y,noise_image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        break;
+      }
+    offset=GetPixelChannelOffset(noise_image,pixel_channel);
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      MagickRealType
+        pixel;
+
+      pixel=(MagickRealType) pixels[i]+(MagickRealType)
+        pixels[(ssize_t) low_pass+i];
+      q[offset]=ClampToQuantum(pixel);
+      i++;
+      q+=(ptrdiff_t) GetPixelChannels(noise_image);
+    }
+    sync=SyncCacheViewAuthenticPixels(noise_view,exception);
+    if (sync == MagickFalse)
+      status=MagickFalse;
+  }
+  return(status);
+}
+
 static MagickBooleanType ReportWaveletProgress(const Image *image,
   const ssize_t channel,MagickBooleanType status)
 {
@@ -3887,7 +3980,6 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
       low_pass = 0;
 
     ssize_t
-      i,
       level,
       y;
 
@@ -3899,6 +3991,9 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
 
     WaveletChannel
       wavelet_channel;
+
+    WaveletReconstruct
+      wavelet_reconstruct;
 
     if (status == MagickFalse)
       continue;
@@ -3987,44 +4082,14 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
     /*
       Reconstruct image from the thresholded wavelet kernel.
     */
-    i=0;
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      MagickBooleanType
-        sync;
-
-      Quantum
-        *magick_restrict q;
-
-      ssize_t
-        x;
-
-      ssize_t
-        offset;
-
-      q=GetCacheViewAuthenticPixels(noise_view,0,y,noise_image->columns,1,
-        exception);
-      if (q == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      offset=GetPixelChannelOffset(noise_image,pixel_channel);
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        MagickRealType
-          pixel;
-
-        pixel=(MagickRealType) pixels[i]+(MagickRealType)
-          pixels[(ssize_t) low_pass+i];
-        q[offset]=ClampToQuantum(pixel);
-        i++;
-        q+=(ptrdiff_t) GetPixelChannels(noise_image);
-      }
-      sync=SyncCacheViewAuthenticPixels(noise_view,exception);
-      if (sync == MagickFalse)
-        status=MagickFalse;
-    }
+    wavelet_reconstruct.image=image;
+    wavelet_reconstruct.noise_image=noise_image;
+    wavelet_reconstruct.noise_view=noise_view;
+    wavelet_reconstruct.pixel_channel=pixel_channel;
+    wavelet_reconstruct.pixels=pixels;
+    wavelet_reconstruct.low_pass=low_pass;
+    wavelet_reconstruct.exception=exception;
+    status=ReconstructWaveletChannel(&wavelet_reconstruct,status);
     status=ReportWaveletProgress(image,channel,status);
   }
   noise_view=DestroyCacheView(noise_view);
