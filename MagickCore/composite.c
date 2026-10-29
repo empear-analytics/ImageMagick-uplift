@@ -253,6 +253,36 @@ static inline MagickBooleanType IsBlendChannelSkipped(const PixelTrait traits,
     ((other_traits & UpdatePixelTrait) == 0)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _BlendGradients
+{
+  const Image
+    *dx_image,
+    *dy_image;
+} BlendGradients;
+
+static void SetMagnitudePixel(const BlendGradients *gradients,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q,
+  Quantum *magick_restrict r)
+{
+  const Image
+    *dx_image = gradients->dx_image,
+    *dy_image = gradients->dy_image;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(dx_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(dx_image,i);
+    PixelTrait traits = GetPixelChannelTraits(dx_image,channel);
+    PixelTrait dy_traits = GetPixelChannelTraits(dy_image,channel);
+    if (IsBlendChannelSkipped(traits,dy_traits) != MagickFalse)
+      continue;
+    r[i]=ClampToQuantum(hypot((double) p[i],(double)
+      GetPixelChannel(dy_image,channel,q)));
+  }
+}
+
 static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
   ExceptionInfo *exception)
 {
@@ -308,19 +338,12 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
       }
     for (x=0; x < (ssize_t) dx_image->columns; x++)
     {
-      ssize_t
-        i;
+      BlendGradients
+        gradients;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(dx_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(dx_image,i);
-        PixelTrait traits = GetPixelChannelTraits(dx_image,channel);
-        PixelTrait dy_traits = GetPixelChannelTraits(dy_image,channel);
-        if (IsBlendChannelSkipped(traits,dy_traits) != MagickFalse)
-          continue;
-        r[i]=ClampToQuantum(hypot((double) p[i],(double)
-          GetPixelChannel(dy_image,channel,q)));
-      }
+      gradients.dx_image=dx_image;
+      gradients.dy_image=dy_image;
+      SetMagnitudePixel(&gradients,p,q,r);
       p+=(ptrdiff_t) GetPixelChannels(dx_image);
       q+=(ptrdiff_t) GetPixelChannels(dy_image);
       r+=(ptrdiff_t) GetPixelChannels(magnitude_image);
