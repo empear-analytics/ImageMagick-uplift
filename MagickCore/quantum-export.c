@@ -613,6 +613,35 @@ static void Export10BitBGRQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ExportUnpacked12BitSample(const Image *image,
+  const ssize_t index,const QuantumAny range,unsigned int *pixel,
+  const Quantum *magick_restrict *p)
+{
+  switch (index % 3)
+  {
+    default:
+    case 0:
+    {
+      *pixel=(unsigned int) ScaleQuantumToAny(GetPixelRed(image,*p),
+        range);
+      break;
+    }
+    case 1:
+    {
+      *pixel=(unsigned int) ScaleQuantumToAny(GetPixelGreen(image,*p),
+        range);
+      break;
+    }
+    case 2:
+    {
+      *pixel=(unsigned int) ScaleQuantumToAny(GetPixelBlue(image,*p),
+        range);
+      *p+=(ptrdiff_t) GetPixelChannels(image);
+      break;
+    }
+  }
+}
+
 static void ExportUnpacked12BitBGRQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,QuantumAny range)
 {
@@ -636,29 +665,7 @@ static void ExportUnpacked12BitBGRQuantum(const Image *image,
 
   for (x=0; x < (3*(ssize_t) number_pixels-1); x+=2)
   {
-    switch (x % 3)
-    {
-      default:
-      case 0:
-      {
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelRed(image,p),
-          range);
-        break;
-      }
-      case 1:
-      {
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelGreen(image,p),
-          range);
-        break;
-      }
-      case 2:
-      {
-        pixel=(unsigned int) ScaleQuantumToAny(GetPixelBlue(image,p),
-          range);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        break;
-      }
-    }
+    ExportUnpacked12BitSample(image,x,range,&pixel,&p);
     q=PopShortPixel(quantum_info->endian,(unsigned short) (pixel << 4),
       q);
     switch ((x+1) % 3)
