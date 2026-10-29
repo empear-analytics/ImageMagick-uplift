@@ -1816,6 +1816,15 @@ static inline MagickBooleanType IsDashSegmentPending(
     ((n & 0x01) == 0) && (j > 1)) ? MagickTrue : MagickFalse);
 }
 
+static ssize_t GetNextDashIndex(const DrawInfo *draw_info,ssize_t n)
+{
+  if (fabs(draw_info->dash_pattern[n]) >= MagickEpsilon)
+    n++;
+  if (fabs(draw_info->dash_pattern[n]) < MagickEpsilon)
+    n=0;
+  return(n);
+}
+
 static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,Image *image,ExceptionInfo *exception)
 {
@@ -1904,10 +1913,7 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
       continue;
     if (fabs(length) < MagickEpsilon)
       {
-        if (fabs(draw_info->dash_pattern[n]) >= MagickEpsilon)
-          n++;
-        if (fabs(draw_info->dash_pattern[n]) < MagickEpsilon)
-          n=0;
+        n=GetNextDashIndex(draw_info,n);
         length=scale*draw_info->dash_pattern[n];
       }
     for (total_length=0.0; (length >= 0.0) && (maximum_length >= (total_length+length)); )
@@ -1942,10 +1948,7 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
           if (status == MagickFalse)
             break;
         }
-      if (fabs(draw_info->dash_pattern[n]) >= MagickEpsilon)
-        n++;
-      if (fabs(draw_info->dash_pattern[n]) < MagickEpsilon)
-        n=0;
+      n=GetNextDashIndex(draw_info,n);
       length=scale*draw_info->dash_pattern[n];
     }
     length-=(maximum_length-total_length);
@@ -2075,6 +2078,66 @@ static int StopInfoCompare(const void *x,const void *y)
   return(-1);
 }
 
+static PixelInfo GetPadGradientColor(const GradientInfo *gradient,
+  const double offset,PixelInfo composite)
+{
+  double
+    alpha;
+
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i < (ssize_t) gradient->number_stops; i++)
+    if (offset < gradient->stops[i].offset)
+      break;
+  if ((offset < 0.0) || (i == 0))
+    composite=gradient->stops[0].color;
+  else
+    if ((offset > 1.0) || (i == (ssize_t) gradient->number_stops))
+      composite=gradient->stops[gradient->number_stops-1].color;
+    else
+      {
+        j=i;
+        i--;
+        alpha=(offset-gradient->stops[i].offset)/
+          (gradient->stops[j].offset-gradient->stops[i].offset);
+        CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
+          &gradient->stops[j].color,alpha,&composite);
+      }
+  return(composite);
+}
+
+static PixelInfo GetReflectGradientColor(const GradientInfo *gradient,
+  const double offset,PixelInfo composite)
+{
+  double
+    alpha;
+
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i < (ssize_t) gradient->number_stops; i++)
+    if (offset < gradient->stops[i].offset)
+      break;
+  if (i == 0)
+    composite=gradient->stops[0].color;
+  else
+    if (i == (ssize_t) gradient->number_stops)
+      composite=gradient->stops[gradient->number_stops-1].color;
+    else
+      {
+        j=i;
+        i--;
+        alpha=(offset-gradient->stops[i].offset)/
+          (gradient->stops[j].offset-gradient->stops[i].offset);
+        CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
+          &gradient->stops[j].color,alpha,&composite);
+      }
+  return(composite);
+}
+
 MagickExport MagickBooleanType DrawGradientImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -2183,23 +2246,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
               if (gradient->type != RadialGradient)
                 offset*=MagickSafeReciprocal(length);
             }
-          for (i=0; i < (ssize_t) gradient->number_stops; i++)
-            if (offset < gradient->stops[i].offset)
-              break;
-          if ((offset < 0.0) || (i == 0))
-            composite=gradient->stops[0].color;
-          else
-            if ((offset > 1.0) || (i == (ssize_t) gradient->number_stops))
-              composite=gradient->stops[gradient->number_stops-1].color;
-            else
-              {
-                j=i;
-                i--;
-                alpha=(offset-gradient->stops[i].offset)/
-                  (gradient->stops[j].offset-gradient->stops[i].offset);
-                CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
-                  &gradient->stops[j].color,alpha,&composite);
-              }
+          composite=GetPadGradientColor(gradient,offset,composite);
           break;
         }
         case ReflectSpread:
@@ -2217,23 +2264,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
             offset=fmod(offset,1.0);
           else
             offset=1.0-fmod(offset,1.0);
-          for (i=0; i < (ssize_t) gradient->number_stops; i++)
-            if (offset < gradient->stops[i].offset)
-              break;
-          if (i == 0)
-            composite=gradient->stops[0].color;
-          else
-            if (i == (ssize_t) gradient->number_stops)
-              composite=gradient->stops[gradient->number_stops-1].color;
-            else
-              {
-                j=i;
-                i--;
-                alpha=(offset-gradient->stops[i].offset)/
-                  (gradient->stops[j].offset-gradient->stops[i].offset);
-                CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
-                  &gradient->stops[j].color,alpha,&composite);
-              }
+          composite=GetReflectGradientColor(gradient,offset,composite);
           break;
         }
         case RepeatSpread:
@@ -5060,6 +5091,102 @@ static inline MagickBooleanType IsFillAlphaSkipped(const MagickBooleanType fill,
     (subpath_alpha >= 1.0)) ? MagickTrue : MagickFalse);
 }
 
+static double GetEdgeDistance(const EdgeInfo *p,const ssize_t i,
+  const ssize_t x,const ssize_t y)
+{
+  const PointInfo
+    *q;
+
+  double
+    alpha,
+    beta,
+    distance;
+
+  PointInfo
+    delta;
+
+  /*
+    Compute distance between a point and an edge.
+  */
+  q=p->points+i-1;
+  delta.x=(q+1)->x-q->x;
+  delta.y=(q+1)->y-q->y;
+  beta=delta.x*(x-q->x)+delta.y*(y-q->y);  /* segLen*point-cos(theta) */
+  if (beta <= 0.0)
+    {
+      /*
+        Cosine <= 0, point is closest to q.
+      */
+      delta.x=(double) x-q->x;
+      delta.y=(double) y-q->y;
+      distance=delta.x*delta.x+delta.y*delta.y;
+    }
+  else
+    {
+      alpha=delta.x*delta.x+delta.y*delta.y;  /* segLen*segLen */
+      if (beta >= alpha)
+        {
+          /*
+            Point is closest to q+1.
+          */
+          delta.x=(double) x-(q+1)->x;
+          delta.y=(double) y-(q+1)->y;
+          distance=delta.x*delta.x+delta.y*delta.y;
+        }
+      else
+        {
+          /*
+            Point is closest to point between q & q+1.
+          */
+          alpha=MagickSafeReciprocal(alpha);
+          beta=delta.x*(y-q->y)-delta.y*(x-q->x);
+          distance=alpha*beta*beta;
+        }
+    }
+  return(distance);
+}
+
+static ssize_t GetWindingNumber(PolygonInfo *polygon_info,const ssize_t x,
+  const ssize_t y)
+{
+  const PointInfo
+    *q;
+
+  EdgeInfo
+    *p;
+
+  ssize_t
+    i,
+    j,
+    winding_number;
+
+  /*
+    Determine winding number.
+  */
+  winding_number=0;
+  p=polygon_info->edges;
+  for (j=0; j < (ssize_t) polygon_info->number_edges; j++, p++)
+  {
+    if ((double) y <= p->bounds.y1)
+      break;
+    if (((double) y > p->bounds.y2) || ((double) x <= p->bounds.x1))
+      continue;
+    if ((double) x > p->bounds.x2)
+      {
+        winding_number+=p->direction != 0 ? 1 : -1;
+        continue;
+      }
+    i=(ssize_t) MagickMax((double) p->highwater,1.0);
+    for ( ; i < (ssize_t) (p->number_points-1); i++)
+      if ((double) y <= p->points[i].y)
+        break;
+    q=p->points+i-1;
+    if ((((q+1)->x-q->x)*(y-q->y)) <= (((q+1)->y-q->y)*(x-q->x)))
+      winding_number+=p->direction != 0 ? 1 : -1;
+  }
+  return(winding_number);
+}
+
 static double GetFillAlpha(PolygonInfo *polygon_info,
   const FillAlphaSample *sample,const FillRule fill_rule,double *stroke_alpha)
 {
@@ -5079,14 +5206,8 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
     distance,
     subpath_alpha;
 
-  const PointInfo
-    *q;
-
   EdgeInfo
     *p;
-
-  PointInfo
-    delta;
 
   ssize_t
     i,
@@ -5124,44 +5245,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
           p->scanline=(double) y;
           p->highwater=(size_t) i;
         }
-      /*
-        Compute distance between a point and an edge.
-      */
-      q=p->points+i-1;
-      delta.x=(q+1)->x-q->x;
-      delta.y=(q+1)->y-q->y;
-      beta=delta.x*(x-q->x)+delta.y*(y-q->y);  /* segLen*point-cos(theta) */
-      if (beta <= 0.0)
-        {
-          /*
-            Cosine <= 0, point is closest to q.
-          */
-          delta.x=(double) x-q->x;
-          delta.y=(double) y-q->y;
-          distance=delta.x*delta.x+delta.y*delta.y;
-        }
-      else
-        {
-          alpha=delta.x*delta.x+delta.y*delta.y;  /* segLen*segLen */
-          if (beta >= alpha)
-            {
-              /*
-                Point is closest to q+1.
-              */
-              delta.x=(double) x-(q+1)->x;
-              delta.y=(double) y-(q+1)->y;
-              distance=delta.x*delta.x+delta.y*delta.y;
-            }
-          else
-            {
-              /*
-                Point is closest to point between q & q+1.
-              */
-              alpha=MagickSafeReciprocal(alpha);
-              beta=delta.x*(y-q->y)-delta.y*(x-q->x);
-              distance=alpha*beta*beta;
-            }
-        }
+      distance=GetEdgeDistance(p,i,x,y);
       /*
         Compute stroke & subpath opacity.
       */
@@ -5213,30 +5297,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
     return(0.0);
   if (subpath_alpha >= 1.0)
     return(1.0);
-  /*
-    Determine winding number.
-  */
-  winding_number=0;
-  p=polygon_info->edges;
-  for (j=0; j < (ssize_t) polygon_info->number_edges; j++, p++)
-  {
-    if ((double) y <= p->bounds.y1)
-      break;
-    if (((double) y > p->bounds.y2) || ((double) x <= p->bounds.x1))
-      continue;
-    if ((double) x > p->bounds.x2)
-      {
-        winding_number+=p->direction != 0 ? 1 : -1;
-        continue;
-      }
-    i=(ssize_t) MagickMax((double) p->highwater,1.0);
-    for ( ; i < (ssize_t) (p->number_points-1); i++)
-      if ((double) y <= p->points[i].y)
-        break;
-    q=p->points+i-1;
-    if ((((q+1)->x-q->x)*(y-q->y)) <= (((q+1)->y-q->y)*(x-q->x)))
-      winding_number+=p->direction != 0 ? 1 : -1;
-  }
+  winding_number=GetWindingNumber(polygon_info,x,y);
   if (fill_rule != NonZeroRule)
     {
       if ((MagickAbsoluteValue(winding_number) & 0x01) != 0)
@@ -7662,6 +7723,33 @@ static inline MagickBooleanType IsRoundStrokeJoin(const DrawInfo *draw_info,
     (closed_path != MagickFalse))) ? MagickTrue : MagickFalse);
 }
 
+static void GetStrokeSlope(const double dx,const double dy,double *slope,
+  double *inverse_slope)
+{
+  *slope=0.0;
+  *inverse_slope=0.0;
+  if (fabs(dx) < MagickEpsilon)
+    {
+      if (dx >= 0.0)
+        *slope=dy < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
+      else
+        *slope=dy < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+    }
+  else
+    if (fabs(dy) < MagickEpsilon)
+      {
+        if (dy >= 0.0)
+          *inverse_slope=dx < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
+        else
+          *inverse_slope=dx < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+      }
+    else
+      {
+        *slope=dy/dx;
+        *inverse_slope=(-1.0*MagickSafeReciprocal(*slope));
+      }
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -7832,28 +7920,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         ResourceLimitError,"MemoryAllocationFailed","`%s'","");
       return((PrimitiveInfo *) NULL);
     }
-  slope.p=0.0;
-  inverse_slope.p=0.0;
-  if (fabs(dx.p) < MagickEpsilon)
-    {
-      if (dx.p >= 0.0)
-        slope.p=dy.p < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-      else
-        slope.p=dy.p < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-    }
-  else
-    if (fabs(dy.p) < MagickEpsilon)
-      {
-        if (dy.p >= 0.0)
-          inverse_slope.p=dx.p < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-        else
-          inverse_slope.p=dx.p < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-      }
-    else
-      {
-        slope.p=dy.p/dx.p;
-        inverse_slope.p=(-1.0*MagickSafeReciprocal(slope.p));
-      }
+  GetStrokeSlope(dx.p,dy.p,&slope.p,&inverse_slope.p);
   mid=ExpandAffine(&draw_info->affine)*draw_info->stroke_width/2.0;
   miterlimit=(double) (draw_info->miterlimit*draw_info->miterlimit*mid*mid);
   if ((draw_info->linecap == SquareCap) && (closed_path == MagickFalse))
@@ -7899,28 +7966,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     dot_product=dx.q*dx.q+dy.q*dy.q;
     if (dot_product < 0.25)
       continue;
-    slope.q=0.0;
-    inverse_slope.q=0.0;
-    if (fabs(dx.q) < MagickEpsilon)
-      {
-        if (dx.q >= 0.0)
-          slope.q=dy.q < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-        else
-          slope.q=dy.q < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-      }
-    else
-      if (fabs(dy.q) < MagickEpsilon)
-        {
-          if (dy.q >= 0.0)
-            inverse_slope.q=dx.q < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-          else
-            inverse_slope.q=dx.q < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-        }
-      else
-        {
-          slope.q=dy.q/dx.q;
-          inverse_slope.q=(-1.0*MagickSafeReciprocal(slope.q));
-        }
+    GetStrokeSlope(dx.q,dy.q,&slope.q,&inverse_slope.q);
     offset.x=sqrt((double) (mid*mid/(inverse_slope.q*inverse_slope.q+1.0)));
     offset.y=(double) (offset.x*inverse_slope.q);
     dot_product=dy.q*offset.x-dx.q*offset.y;
