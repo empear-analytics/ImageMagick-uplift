@@ -630,6 +630,14 @@ static double *GenerateCoefficients(const Image *image,
          For Distort Images    u,v, x,y  ...
          For Sparse Gradients  x,y, r,g,b  ...
       */
+      double
+        **matrix,
+        **vectors,
+        terms[3];
+
+      MagickBooleanType
+        status;
+
       if ( number_arguments%cp_size != 0 ||
            number_arguments < cp_size ) {
         (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
@@ -642,79 +650,70 @@ static double *GenerateCoefficients(const Image *image,
       if ( number_arguments == cp_size ) {
         /* Only 1 CP Set Given */
         SetAffineSingleCoefficients(coeff,arguments,cp_values,number_values);
+        return(coeff);
       }
-      else {
-        /* 2 or more points (usually 3) given.
-           Solve a least squares simultaneous equation for coefficients.
-        */
-        double
-          **matrix,
-          **vectors,
-          terms[3];
-
-        MagickBooleanType
-          status;
-
-        /* create matrix, and a fake vectors matrix */
-        matrix=AcquireMagickMatrix(3UL,3UL);
-        vectors=(double **) AcquireQuantumMemory(number_values,
-          sizeof(*vectors));
-        if (matrix == (double **) NULL || vectors == (double **) NULL)
-        {
-          matrix  = RelinquishMagickMatrix(matrix, 3UL);
-          vectors = (double **) RelinquishMagickMemory(vectors);
-          coeff   = (double *) RelinquishMagickMemory(coeff);
-          (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed",
-                  "%s", "DistortCoefficients");
-          return((double *) NULL);
-        }
-        /* fake a number_values x3 vectors matrix from coefficients array */
-        for (i=0; i < number_values; i++)
-          vectors[i] = &(coeff[i*3]);
-        /* Add given control point pairs for least squares solving */
-        for (i=0; i < number_arguments; i+=cp_size) {
-          terms[0] = arguments[i+cp_x];  /* x */
-          terms[1] = arguments[i+cp_y];  /* y */
-          terms[2] = 1;                  /* 1 */
-          LeastSquaresAddTerms(matrix,vectors,terms,
-                   &(arguments[i+cp_values]),3UL,number_values);
-        }
-        if ( number_arguments == 2*cp_size ) {
-          /* Only two pairs were given, but we need 3 to solve the affine.
-             Fake extra coordinates by rotating p1 around p0 by 90 degrees.
-               x2 = x0 - (y1-y0)   y2 = y0 + (x1-x0)
-           */
-          terms[0] = arguments[cp_x]
-                   - ( arguments[cp_size+cp_y] - arguments[cp_y] ); /* x2 */
-          terms[1] = arguments[cp_y] +
-                   + ( arguments[cp_size+cp_x] - arguments[cp_x] ); /* y2 */
-          terms[2] = 1;                                             /* 1 */
-          if ( cp_values == 0 ) {
-            /* Image Distortion - rotate the u,v coordinates too */
-            double
-              uv2[2];
-            uv2[0] = arguments[0] - arguments[5] + arguments[1];   /* u2 */
-            uv2[1] = arguments[1] + arguments[4] - arguments[0];   /* v2 */
-            LeastSquaresAddTerms(matrix,vectors,terms,uv2,3UL,2UL);
-          }
-          else {
-            /* Sparse Gradient - use values of p0 for linear gradient */
-            LeastSquaresAddTerms(matrix,vectors,terms,
-                  &(arguments[cp_values]),3UL,number_values);
-          }
-        }
-        /* Solve for LeastSquares Coefficients */
-        status=GaussJordanElimination(matrix,vectors,3UL,number_values);
-        matrix = RelinquishMagickMatrix(matrix, 3UL);
+      /* 2 or more points (usually 3) given.
+         Solve a least squares simultaneous equation for coefficients.
+      */
+      /* create matrix, and a fake vectors matrix */
+      matrix=AcquireMagickMatrix(3UL,3UL);
+      vectors=(double **) AcquireQuantumMemory(number_values,
+        sizeof(*vectors));
+      if (matrix == (double **) NULL || vectors == (double **) NULL)
+      {
+        matrix  = RelinquishMagickMatrix(matrix, 3UL);
         vectors = (double **) RelinquishMagickMemory(vectors);
-        if ( status == MagickFalse ) {
-          coeff = (double *) RelinquishMagickMemory(coeff);
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument","%s : 'Unsolvable Matrix'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method) );
-          return((double *) NULL);
+        coeff   = (double *) RelinquishMagickMemory(coeff);
+        (void) ThrowMagickException(exception,GetMagickModule(),
+                ResourceLimitError,"MemoryAllocationFailed",
+                "%s", "DistortCoefficients");
+        return((double *) NULL);
+      }
+      /* fake a number_values x3 vectors matrix from coefficients array */
+      for (i=0; i < number_values; i++)
+        vectors[i] = &(coeff[i*3]);
+      /* Add given control point pairs for least squares solving */
+      for (i=0; i < number_arguments; i+=cp_size) {
+        terms[0] = arguments[i+cp_x];  /* x */
+        terms[1] = arguments[i+cp_y];  /* y */
+        terms[2] = 1;                  /* 1 */
+        LeastSquaresAddTerms(matrix,vectors,terms,
+                 &(arguments[i+cp_values]),3UL,number_values);
+      }
+      if ( number_arguments == 2*cp_size ) {
+        /* Only two pairs were given, but we need 3 to solve the affine.
+           Fake extra coordinates by rotating p1 around p0 by 90 degrees.
+             x2 = x0 - (y1-y0)   y2 = y0 + (x1-x0)
+         */
+        terms[0] = arguments[cp_x]
+                 - ( arguments[cp_size+cp_y] - arguments[cp_y] ); /* x2 */
+        terms[1] = arguments[cp_y] +
+                 + ( arguments[cp_size+cp_x] - arguments[cp_x] ); /* y2 */
+        terms[2] = 1;                                             /* 1 */
+        if ( cp_values == 0 ) {
+          /* Image Distortion - rotate the u,v coordinates too */
+          double
+            uv2[2];
+          uv2[0] = arguments[0] - arguments[5] + arguments[1];   /* u2 */
+          uv2[1] = arguments[1] + arguments[4] - arguments[0];   /* v2 */
+          LeastSquaresAddTerms(matrix,vectors,terms,uv2,3UL,2UL);
         }
+        else {
+          /* Sparse Gradient - use values of p0 for linear gradient */
+          LeastSquaresAddTerms(matrix,vectors,terms,
+                &(arguments[cp_values]),3UL,number_values);
+        }
+      }
+      /* Solve for LeastSquares Coefficients */
+      status=GaussJordanElimination(matrix,vectors,3UL,number_values);
+      matrix = RelinquishMagickMatrix(matrix, 3UL);
+      vectors = (double **) RelinquishMagickMemory(vectors);
+      if ( status == MagickFalse ) {
+        coeff = (double *) RelinquishMagickMemory(coeff);
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+            "InvalidArgument","%s : 'Unsolvable Matrix'",
+            CommandOptionToMnemonic(MagickDistortOptions, *method) );
+        return((double *) NULL);
       }
       return(coeff);
     }
