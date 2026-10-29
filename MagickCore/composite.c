@@ -908,11 +908,37 @@ static void AccumulateMeanRow(const Image *image,
   }
 }
 
+static MagickBooleanType SumImageChannels(const Image *image,double *mean,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *alpha_view;
+
+  ssize_t
+    y;
+
+  alpha_view=AcquireVirtualCacheView(image,exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    p=GetCacheViewVirtualPixels(alpha_view,0,y,image->columns,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    AccumulateMeanRow(image,p,mean);
+  }
+  alpha_view=DestroyCacheView(alpha_view);
+  if (y < (ssize_t) image->rows)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *BlendMeanImage(Image *image,const Image *mask_image,
   ExceptionInfo *exception)
 {
   CacheView
-    *alpha_view,
     *mask_view,
     *mean_view;
 
@@ -933,20 +959,7 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
     Compute the mean of the image.
   */
   (void) memset(mean,0,MaxPixelChannels*sizeof(*mean));
-  alpha_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    p=GetCacheViewVirtualPixels(alpha_view,0,y,image->columns,1,
-      exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    AccumulateMeanRow(image,p,mean);
-  }
-  alpha_view=DestroyCacheView(alpha_view);
-  if (y < (ssize_t) image->rows)
+  if (SumImageChannels(image,mean,exception) == MagickFalse)
     return((Image *) NULL);
   for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
     mean[j]=(double) QuantumRange*mean[j]/image->columns/
