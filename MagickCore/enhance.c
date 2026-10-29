@@ -1805,6 +1805,19 @@ static ssize_t FindStretchWhiteLevel(const Image *image,
   return(j);
 }
 
+static void RelinquishStretchMemory(double *histogram,Quantum *stretch_map,
+  Quantum *white,Quantum *black)
+{
+  if (histogram != (double *) NULL)
+    histogram=(double *) RelinquishMagickMemory(histogram);
+  if (stretch_map != (Quantum *) NULL)
+    stretch_map=(Quantum *) RelinquishMagickMemory(stretch_map);
+  if (white != (Quantum *) NULL)
+    white=(Quantum *) RelinquishMagickMemory(white);
+  if (black != (Quantum *) NULL)
+    black=(Quantum *) RelinquishMagickMemory(black);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1857,14 +1870,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     sizeof(*histogram));
   if (IsStretchMemoryMissing(black,white,stretch_map,histogram) != MagickFalse)
     {
-      if (histogram != (double *) NULL)
-        histogram=(double *) RelinquishMagickMemory(histogram);
-      if (stretch_map != (Quantum *) NULL)
-        stretch_map=(Quantum *) RelinquishMagickMemory(stretch_map);
-      if (white != (Quantum *) NULL)
-        white=(Quantum *) RelinquishMagickMemory(white);
-      if (black != (Quantum *) NULL)
-        black=(Quantum *) RelinquishMagickMemory(black);
+      RelinquishStretchMemory(histogram,stretch_map,white,black);
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
