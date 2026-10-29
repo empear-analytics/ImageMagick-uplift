@@ -2730,6 +2730,16 @@ static Image *DespeckleThumbnail(Image *thumbnail,const ssize_t i,
   return(thumbnail);
 }
 
+static void SharpenContrastRepeatedly(Image *preview_image,const ssize_t i,
+  ExceptionInfo *exception)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < i; x++)
+    (void) ContrastImage(preview_image,MagickTrue,exception);
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -2886,8 +2896,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
       {
         preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
         if (preview_image != (Image *) NULL)
-          for (x=0; x < i; x++)
-            (void) ContrastImage(preview_image,MagickTrue,exception);
+          SharpenContrastRepeatedly(preview_image,i,exception);
         (void) FormatLocaleString(label,MagickPathExtent,"contrast (%.17g)",
           (double) i+1);
         break;
