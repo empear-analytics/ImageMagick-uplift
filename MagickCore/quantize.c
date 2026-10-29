@@ -2218,6 +2218,14 @@ static QNodeInfo *GetQNodeInfo(QCubeInfo *cube_info,const size_t id,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline double UpdateMaximumError(const double distance,
+  double maximum_error)
+{
+  if (distance > maximum_error)
+    maximum_error=distance;
+  return(maximum_error);
+}
+
 MagickExport MagickBooleanType GetImageQuantizeError(Image *image,
   ExceptionInfo *exception)
 {
@@ -2275,20 +2283,17 @@ MagickExport MagickBooleanType GetImageQuantizeError(Image *image,
         image->colormap[index].red));
       mean_error_per_pixel+=distance;
       mean_error+=distance*distance;
-      if (distance > maximum_error)
-        maximum_error=distance;
+      maximum_error=UpdateMaximumError(distance,maximum_error);
       distance=fabs((double) (alpha*(double) GetPixelGreen(image,p)-beta*
         image->colormap[index].green));
       mean_error_per_pixel+=distance;
       mean_error+=distance*distance;
-      if (distance > maximum_error)
-        maximum_error=distance;
+      maximum_error=UpdateMaximumError(distance,maximum_error);
       distance=fabs((double) (alpha*(double) GetPixelBlue(image,p)-beta*
         image->colormap[index].blue));
       mean_error_per_pixel+=distance;
       mean_error+=distance*distance;
-      if (distance > maximum_error)
-        maximum_error=distance;
+      maximum_error=UpdateMaximumError(distance,maximum_error);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
