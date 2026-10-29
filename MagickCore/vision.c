@@ -136,6 +136,22 @@ typedef struct _CCNeighborDirection
 %
 */
 
+static int CCObjectInfoCompareIncreasing(CCObjectInfo *p,CCObjectInfo *q)
+{
+  if (p->key == 1)
+    return((int) (p->area-(ssize_t) q->area));
+  if (p->key == 2)
+    return((int) (p->bounding_box.width-q->bounding_box.width));
+  if (p->key == 3)
+    return((int) (p->bounding_box.height-q->bounding_box.height));
+  if (p->key == 4)
+    return((int) (p->bounding_box.x-(ssize_t) q->bounding_box.x));
+  if (p->key == 5)
+    return((int) (p->bounding_box.y-(ssize_t) q->bounding_box.y));
+  return((int) (q->area-(ssize_t) p->area));
+}
+
+
 static int CCObjectInfoCompare(const void *x,const void *y)
 {
   CCObjectInfo
@@ -154,17 +170,7 @@ static int CCObjectInfoCompare(const void *x,const void *y)
     return((int) (q->bounding_box.width-p->bounding_box.width));
   if (p->key == -1)
     return((int) (q->area-(ssize_t) p->area));
-  if (p->key == 1)
-    return((int) (p->area-(ssize_t) q->area));
-  if (p->key == 2)
-    return((int) (p->bounding_box.width-q->bounding_box.width));
-  if (p->key == 3)
-    return((int) (p->bounding_box.height-q->bounding_box.height));
-  if (p->key == 4)
-    return((int) (p->bounding_box.x-(ssize_t) q->bounding_box.x));
-  if (p->key == 5)
-    return((int) (p->bounding_box.y-(ssize_t) q->bounding_box.y));
-  return((int) (q->area-(ssize_t) p->area));
+  return(CCObjectInfoCompareIncreasing(p,q));
 }
 
 static inline MagickBooleanType IsDiagonalPair(const Quantum *pixels,
