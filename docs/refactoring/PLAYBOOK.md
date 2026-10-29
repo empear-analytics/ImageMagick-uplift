@@ -1144,6 +1144,136 @@ Added by Claude Code (Claude Opus 5.5) during task W07, under the mandate of 202
 
 ---
 
+## Recipe Q - Extract Accumulating Block Taking an Input Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
+Method*, *Complex Method* or *Large Method*, and the block that would fix it is a
+per-pixel accumulation inside a parallel loop body that meets Recipe K in every respect
+but one: with its inputs as parameters, the new function would take five or more
+arguments (*Excess Number of Function Arguments*, which the pre-commit gate refuses on a
+new function). The typical case is a filter's per-channel weighted sum (`pixel`, `gamma`
+and a cursor), reading the window pointer, the window size, the weights and the channel.
+
+**Not covered by:** Recipe K, which passes every input as a parameter; Recipe N, whose
+block may write only one value or through a pixel pointer, and which keeps written
+variables out of its struct; Recipe J, which also writes `status` and passes its inputs
+as parameters. K then B is two commits, of which the first adds a finding.
+
+**How:**
+
+1. The block meets Recipe K steps 1 to 3: no `#pragma omp` line, no `return`, `goto`, or
+   `continue`/`break` that leaves it; it writes at most four of the parallel loop body's
+   own variables, and nothing declared outside that body.
+2. Split what the block touches in two: the variables it writes (the accumulators and
+   any cursor it advances, such as `n`), and the variables it only reads. Variables it
+   declares and uses alone move with it, as in Recipe K step 3.
+3. Put the read-only variables, scalars and pointers, in a struct as Recipe N steps 2
+   and 3 do: one member per variable, the variable's exact type and name, a top-level
+   `const` or `magick_restrict` left off. A written variable is never a member.
+4. Cut the block into a new `static void` function taking `const Name *name` first, then
+   one pointer per written scalar, in the order the block first writes them. At the
+   top of its body declare one `const` local per member, as Recipe N step 4 does.
+5. In the block's text, write each written scalar `v` as `*v` (`(*v)++` for `v++`) at
+   every use, reads included, as Recipe K step 4 does; nothing else in the text changes.
+6. In the caller, declare the `Name` local at the top of the block holding the call (in
+   the parallel loop body, so each thread fills its own), and directly before the call
+   assign every member from the variable of its name, in declaration order, with nothing
+   between the assignments and the call.
+7. Call it with `&name` and `&v` for each written scalar, at most four parameters in
+   all; check every member and every argument by reading.
+
+**Before:**
+
+```c
+        pixel=0.0;
+        gamma=0.0;
+        n=0;
+        if ((blur_traits & BlendPixelTrait) == 0)
+          {
+            for (v=0; v < (ssize_t) MagickMax(height,1); v++)
+            {
+              for (u=0; u < (ssize_t) MagickMax(width,1); u++)
+              {
+                 r=p-(ssize_t) (GetPixelChannels(image)*MagickMax(width,1)*
+                  (size_t) (mid.y-v)+GetPixelChannels(image)*(size_t)
+                  (mid.x-u));
+                pixel+=weights[id][n]*(double) r[i];
+                gamma+=weights[id][n];
+                n++;
+              }
+            }
+            SetPixelChannel(blur_image,channel,ClampToQuantum(
+              MagickSafeReciprocal(gamma)*pixel),q);
+            continue;
+          }
+```
+
+**After:**
+
+```c
+static void SumBilateralPixels(const BilateralSum *sum,double *pixel,
+  double *gamma,ssize_t *n)
+{
+  const Image
+    *const image = sum->image;
+  ...
+  for (v=0; v < (ssize_t) MagickMax(height,1); v++)
+  {
+    for (u=0; u < (ssize_t) MagickMax(width,1); u++)
+    {
+       r=p-(ssize_t) (GetPixelChannels(image)*MagickMax(width,1)*
+        (size_t) (mid.y-v)+GetPixelChannels(image)*(size_t)
+        (mid.x-u));
+      *pixel+=weights[id][*n]*(double) r[i];
+      *gamma+=weights[id][*n];
+      (*n)++;
+    }
+  }
+}
+...
+        if ((blur_traits & BlendPixelTrait) == 0)
+          {
+            sum.image=image;
+            sum.p=p;
+            ...
+            sum.i=i;
+            SumBilateralPixels(&sum,&pixel,&gamma,&n);
+            SetPixelChannel(blur_image,channel,ClampToQuantum(
+              MagickSafeReciprocal(gamma)*pixel),q);
+            continue;
+          }
+```
+
+**Careful:**
+
+- The two halves keep the arguments of the recipes they come from. The written
+  variables are each thread's own and change through `*v`, the same operations on the
+  same objects in the same order (Recipe K); the read-only ones are copied directly
+  before the call from variables the block does not write, so each holds the value the
+  block would have read (Recipe N).
+- A cursor the block reads before writing (`n`, initialised before the block) is a
+  written variable, passed by pointer, never a member: its value at the call is not one
+  the struct may freeze.
+- More than four written variables, or a write to `status`, is not this recipe: skip the
+  block (Recipe J covers `status` when the inputs fit in parameters).
+- Two blocks that differ only by a line or two (a plain and an alpha-blended sum) become
+  two helpers that CodeScene may report as *Code Duplication*; measure, and keep the step
+  only when no duplication appears.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new
+function, nothing else moved), and steps 1, 3 and 7 checked by reading: the oracle runs
+single-threaded.
+
+**Provenance:** 2026-10-29, from `effect.c`'s `BilateralBlurImage`, whose per-channel
+body holds a plain and an alpha-blended weighted sum (`pixel`, `gamma` and the cursor `n`,
+reading eight variables): Recipe K gives each helper eleven parameters, Recipe N refuses
+the accumulators, and the per-channel body cannot move (Recipe E step 7) while the two
+sums keep it a Bumpy Road. A probe of the three steps (sums, then the body): the
+function leaves Brain Method and Deep, Nested Complexity, 1.72 to 1.89. Added by Claude
+Code (Claude Opus 5.5) during task W07, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -1488,3 +1618,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | NEW | N | Extract Function Taking an Input Struct: an E-legal block whose inputs would give the new function five or more parameters moves to a `static` function taking a `const` struct of the inputs it only reads, filled member by member directly before the call; `const` locals of the old names keep the block text unchanged | `WaveletDenoiseImage`'s threshold loop (six inputs; with Recipe E 2.41 to 2.36 in M05, with the struct 2.84 to 2.90); M05's `SteganoImage` bit switch and M101's `MotionBlurImage` kernel loops refused for the same reason | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | E | Step 3: a block whose single output is an array of the caller's, updated element by element, takes the array as a pointer with its uses unchanged, as Recipe K does for arrays | `BlendMeanImage`'s serial first pass sums each channel into `mean[MaxPixelChannels]`; outside OpenMP, so Recipe K (parallel loop bodies) does not name it, and E's "return the single value" cannot return an array. A probe: the function's last depth-4 site goes, 2.43 to 2.49 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | E | Step 7: a loop's whole body may move even when it `continue`s that loop; each such `continue;` becomes `return;` of the new `void` function, whose call is the whole body, so both end the iteration at the same point | `statistic.c`'s GetImageStatistics entropy pass (W06: moving the outer loop gives the helper a Bumpy Road; moving the inner loop needs six parameters), and the per-channel bodies of `effect.c`'s blur family (W07), both refused for want of this | mandate (2026-10-24) |
+| 2026-10-29 | NEW | Q | Extract Accumulating Block Taking an Input Struct: a Recipe K accumulation whose inputs would give the new function five or more parameters moves to a `static void` function taking a `const` struct of the inputs it only reads (Recipe N) and a pointer per written scalar (Recipe K), at most four parameters | `BilateralBlurImage`'s plain and alpha-blended per-channel sums (`pixel`, `gamma`, `n`; eight inputs): K gives eleven parameters, N refuses accumulators; a probe of the sums and then the per-channel body (Recipe N), 1.72 to 1.89 | mandate (2026-10-24) |
