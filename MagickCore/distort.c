@@ -476,6 +476,16 @@ static void SetPolarSpecialRadius(const Image *image,double *coeff)
   }
 }
 
+static void SetArcOuterRadius(double *coeff,const size_t number_arguments,
+  const double *arguments)
+{
+  if ( number_arguments >= 4 )
+    coeff[3] = arguments[2] - arguments[3];
+  else
+    coeff[3] *= arguments[2]/coeff[2];
+  coeff[2] = arguments[2];
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1344,13 +1354,8 @@ static double *GenerateCoefficients(const Image *image,
       coeff[0] *= Magick2PI;  /* de-normalize back to radians */
       coeff[3] = (double)image->rows-1;
       coeff[2] = (double)image->columns/coeff[1] + coeff[3]/2.0;
-      if ( number_arguments >= 3 ) {
-        if ( number_arguments >= 4 )
-          coeff[3] = arguments[2] - arguments[3];
-        else
-          coeff[3] *= arguments[2]/coeff[2];
-        coeff[2] = arguments[2];
-      }
+      if ( number_arguments >= 3 )
+        SetArcOuterRadius(coeff,number_arguments,arguments);
       coeff[4] = ((double)image->columns-1.0)/2.0;
 
       return(coeff);
