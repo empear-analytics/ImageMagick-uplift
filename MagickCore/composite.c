@@ -1350,6 +1350,14 @@ static MagickBooleanType CompositeOverImage(Image *image,
   return(status);
 }
 
+static void ReportBlendResidual(const MagickBooleanType verbose,
+  const ssize_t i,const double residual)
+{
+  if (verbose != MagickFalse)
+    (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double)
+      residual);
+}
+
 static MagickBooleanType SaliencyBlendImage(Image *image,
   const Image *source_image,const ssize_t x_offset,const ssize_t y_offset,
   const double iterations,const double residual_threshold,const size_t tick,
@@ -1462,9 +1470,7 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
       (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
     if (residual < residual_threshold)
       {
-        if (verbose != MagickFalse)
-          (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double)
-            residual);
+        ReportBlendResidual(verbose,i,residual);
         break;
       }
     residual_image=DestroyImage(residual_image);
