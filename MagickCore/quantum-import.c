@@ -393,7 +393,7 @@ static void Import16BitPixelChannel(const Image *image,
   }
 }
 
-static void Import32BitPixelChannel(const Image *image,
+static void ImportFloat32BitPixelChannel(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,
   Quantum *magick_restrict q)
 {
@@ -406,32 +406,55 @@ static void Import32BitPixelChannel(const Image *image,
   ssize_t
     x;
 
+  float
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+    *q=ClampToQuantum(pixel);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void ImportInteger32BitPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  Quantum *magick_restrict q)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushLongPixel(quantum_info->endian,p,&pixel);
+    *q=ScaleLongToQuantum(pixel);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void Import32BitPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  Quantum *magick_restrict q)
+{
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      float
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-        *q=ClampToQuantum(pixel);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportFloat32BitPixelChannel(image,quantum_info,span,q);
       return;
     }
   else
     {
-      unsigned int
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushLongPixel(quantum_info->endian,p,&pixel);
-        *q=ScaleLongToQuantum(pixel);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportInteger32BitPixelChannel(image,quantum_info,span,q);
       return;
     }
 }
