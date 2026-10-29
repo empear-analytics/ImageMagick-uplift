@@ -505,6 +505,63 @@ static double *SetShepardsPower(const Image *image,double *coeff,
   return(coeff);
 }
 
+typedef struct _AffineThirdPoint
+{
+  double
+    **matrix,
+    **vectors;
+
+  const double
+    *arguments;
+
+  size_t
+    number_values,
+    cp_size,
+    cp_x,
+    cp_y,
+    cp_values;
+} AffineThirdPoint;
+
+static void AddAffineThirdPoint(const AffineThirdPoint *point,double *terms)
+{
+  double
+    **const matrix = point->matrix,
+    **const vectors = point->vectors;
+
+  const double
+    *const arguments = point->arguments;
+
+  const size_t
+    number_values = point->number_values,
+    cp_size = point->cp_size,
+    cp_x = point->cp_x,
+    cp_y = point->cp_y,
+    cp_values = point->cp_values;
+
+  /* Only two pairs were given, but we need 3 to solve the affine.
+     Fake extra coordinates by rotating p1 around p0 by 90 degrees.
+       x2 = x0 - (y1-y0)   y2 = y0 + (x1-x0)
+   */
+  terms[0] = arguments[cp_x]
+           - ( arguments[cp_size+cp_y] - arguments[cp_y] ); /* x2 */
+  terms[1] = arguments[cp_y] +
+           + ( arguments[cp_size+cp_x] - arguments[cp_x] ); /* y2 */
+  terms[2] = 1;                                             /* 1 */
+  if ( cp_values == 0 ) {
+    /* Image Distortion - rotate the u,v coordinates too */
+    double
+      uv2[2];
+    uv2[0] = arguments[0] - arguments[5] + arguments[1];   /* u2 */
+    uv2[1] = arguments[1] + arguments[4] - arguments[0];   /* v2 */
+    LeastSquaresAddTerms(matrix,vectors,terms,uv2,3UL,2UL);
+  }
+  else {
+    /* Sparse Gradient - use values of p0 for linear gradient */
+    LeastSquaresAddTerms(matrix,vectors,terms,
+          &(arguments[cp_values]),3UL,number_values);
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -710,28 +767,18 @@ static double *GenerateCoefficients(const Image *image,
                  &(arguments[i+cp_values]),3UL,number_values);
       }
       if ( number_arguments == 2*cp_size ) {
-        /* Only two pairs were given, but we need 3 to solve the affine.
-           Fake extra coordinates by rotating p1 around p0 by 90 degrees.
-             x2 = x0 - (y1-y0)   y2 = y0 + (x1-x0)
-         */
-        terms[0] = arguments[cp_x]
-                 - ( arguments[cp_size+cp_y] - arguments[cp_y] ); /* x2 */
-        terms[1] = arguments[cp_y] +
-                 + ( arguments[cp_size+cp_x] - arguments[cp_x] ); /* y2 */
-        terms[2] = 1;                                             /* 1 */
-        if ( cp_values == 0 ) {
-          /* Image Distortion - rotate the u,v coordinates too */
-          double
-            uv2[2];
-          uv2[0] = arguments[0] - arguments[5] + arguments[1];   /* u2 */
-          uv2[1] = arguments[1] + arguments[4] - arguments[0];   /* v2 */
-          LeastSquaresAddTerms(matrix,vectors,terms,uv2,3UL,2UL);
-        }
-        else {
-          /* Sparse Gradient - use values of p0 for linear gradient */
-          LeastSquaresAddTerms(matrix,vectors,terms,
-                &(arguments[cp_values]),3UL,number_values);
-        }
+        AffineThirdPoint
+          point;
+
+        point.matrix=matrix;
+        point.vectors=vectors;
+        point.arguments=arguments;
+        point.number_values=number_values;
+        point.cp_size=cp_size;
+        point.cp_x=cp_x;
+        point.cp_y=cp_y;
+        point.cp_values=cp_values;
+        AddAffineThirdPoint(&point,terms);
       }
       /* Solve for LeastSquares Coefficients */
       status=GaussJordanElimination(matrix,vectors,3UL,number_values);
