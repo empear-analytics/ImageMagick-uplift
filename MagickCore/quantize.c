@@ -582,6 +582,52 @@ static void SetMonochromeColormap(Image *image)
     }
 }
 
+static void AssignImageRowColors(Image *image,const QCubeInfo *cube_info,
+  Quantum *magick_restrict q)
+{
+  QCubeInfo
+    cube;
+
+  ssize_t
+    count,
+    x;
+
+  cube=(*cube_info);
+  for (x=0; x < (ssize_t) image->columns; x+=count)
+  {
+    DoublePixelPacket
+      pixel;
+
+    ssize_t
+      i;
+
+    size_t
+      index;
+
+    /*
+      Identify the deepest node containing the pixel's color.
+    */
+    for (count=1; (x+count) < (ssize_t) image->columns; count++)
+    {
+      PixelInfo
+        packet;
+
+      GetPixelInfoPixel(image,q+count*(ssize_t) GetPixelChannels(image),
+        &packet);
+      if (IsPixelEquivalent(image,q,&packet) == MagickFalse)
+        break;
+    }
+    AssociateAlphaPixel(image,&cube,q,&pixel);
+    SearchClosestCubeColor(image,&cube,pixel);
+    index=cube.color_number;
+    for (i=0; i < (ssize_t) count; i++)
+    {
+      SetColormapPixel(image,&cube,index,q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -625,15 +671,8 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        QCubeInfo
-          cube;
-
         Quantum
           *magick_restrict q;
-
-        ssize_t
-          count,
-          x;
 
         if (status == MagickFalse)
           continue;
@@ -644,40 +683,7 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
             status=MagickFalse;
             continue;
           }
-        cube=(*cube_info);
-        for (x=0; x < (ssize_t) image->columns; x+=count)
-        {
-          DoublePixelPacket
-            pixel;
-
-          ssize_t
-            i;
-
-          size_t
-            index;
-
-          /*
-            Identify the deepest node containing the pixel's color.
-          */
-          for (count=1; (x+count) < (ssize_t) image->columns; count++)
-          {
-            PixelInfo
-              packet;
-
-            GetPixelInfoPixel(image,q+count*(ssize_t) GetPixelChannels(image),
-              &packet);
-            if (IsPixelEquivalent(image,q,&packet) == MagickFalse)
-              break;
-          }
-          AssociateAlphaPixel(image,&cube,q,&pixel);
-          SearchClosestCubeColor(image,&cube,pixel);
-          index=cube.color_number;
-          for (i=0; i < (ssize_t) count; i++)
-          {
-            SetColormapPixel(image,&cube,index,q);
-            q+=(ptrdiff_t) GetPixelChannels(image);
-          }
-        }
+        AssignImageRowColors(image,cube_info,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
