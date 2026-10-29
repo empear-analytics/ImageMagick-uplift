@@ -1048,6 +1048,22 @@ static size_t AddAdjacentObject(CCObjectInfo *object,size_t *neighbors,
   return(count);
 }
 
+static void AddObjectPixel(CCObjectInfo *object,const size_t id,
+  const ssize_t x,const ssize_t y)
+{
+  if (x < object[id].bounding_box.x)
+    object[id].bounding_box.x=x;
+  if (x > (ssize_t) object[id].bounding_box.width)
+    object[id].bounding_box.width=(size_t) x;
+  if (y < object[id].bounding_box.y)
+    object[id].bounding_box.y=y;
+  if (y > (ssize_t) object[id].bounding_box.height)
+    object[id].bounding_box.height=(size_t) y;
+  object[id].centroid.x+=x;
+  object[id].centroid.y+=y;
+  object[id].area++;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1795,17 +1811,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
             id;
 
           id=(size_t) GetPixelIndex(component_image,p);
-          if (x < object[id].bounding_box.x)
-            object[id].bounding_box.x=x;
-          if (x > (ssize_t) object[id].bounding_box.width)
-            object[id].bounding_box.width=(size_t) x;
-          if (y < object[id].bounding_box.y)
-            object[id].bounding_box.y=y;
-          if (y > (ssize_t) object[id].bounding_box.height)
-            object[id].bounding_box.height=(size_t) y;
-          object[id].centroid.x+=x;
-          object[id].centroid.y+=y;
-          object[id].area++;
+          AddObjectPixel(object,id,x,y);
           p+=(ptrdiff_t) GetPixelChannels(component_image);
         }
       }
