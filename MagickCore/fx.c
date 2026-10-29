@@ -733,6 +733,11 @@ typedef struct {
   ssize_t imgy;
 } fxImgXYT;
 
+typedef struct {
+  fxFltType fx;
+  fxFltType fy;
+} fxFltXYT;
+
 struct _FxInfo {
   Image * image;
   size_t ImgListLen;
@@ -3526,9 +3531,11 @@ static inline ssize_t ChkImgNum (FxInfo * pfx, fxFltType f)
   ) ? (channel == CompositePixelChannel ? RedPixelChannel: channel) \
     : pel->channel_qual
 
-static fxFltType GetHslFlt (FxInfo * pfx, ssize_t ImgNum, const fxFltType fx, const fxFltType fy,
+static fxFltType GetHslFlt (FxInfo * pfx, ssize_t ImgNum, const fxFltXYT * fxy,
   PixelChannel channel)
 {
+  const fxFltType fx = fxy->fx;
+  const fxFltType fy = fxy->fy;
   Image * img = pfx->Images[ImgNum];
 
   double red, green, blue;
@@ -4181,7 +4188,8 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
 
           if ((int) pel->channel_qual < 0) {
             if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-              regA = GetHslFlt (pfx, ImgNum, fx, fy, pel->channel_qual);
+              const fxFltXYT fxy = { fx, fy };
+              regA = GetHslFlt (pfx, ImgNum, &fxy, pel->channel_qual);
               break;
             } else if (pel->channel_qual == INTENSITY_CHANNEL) {
               regA = GetIntensity (pfx, ImgNum, fx, fy);
@@ -4255,7 +4263,8 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           }
           if ((int) pel->channel_qual < 0) {
             if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-              regA = GetHslFlt (pfx, ImgNum, fx, fy, pel->channel_qual);
+              const fxFltXYT fxy = { fx, fy };
+              regA = GetHslFlt (pfx, ImgNum, &fxy, pel->channel_qual);
               break;
             } else if (pel->channel_qual == INTENSITY_CHANNEL) {
               regA = GetIntensity (pfx, ImgNum, fx, fy);
