@@ -481,6 +481,23 @@ static Image *AcquireImageCanvas(const Image *images,ExceptionInfo *exception)
   return(CloneImage(q,columns,rows,MagickTrue,exception));
 }
 
+static void SetEvaluateMedianPixel(const Image *image,
+  const PixelChannels *evaluate_pixel,const size_t number_images,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=ClampToQuantum(evaluate_pixel[number_images/2].channel[i]);
+  }
+}
+
 static void SetEvaluatePixels(const Image *image,
   const PixelChannels *evaluate_pixel,Quantum *magick_restrict q)
 {
@@ -670,14 +687,7 @@ MagickExport Image *EvaluateImages(const Image *images,
           }
           qsort((void *) evaluate_pixel,number_images,sizeof(*evaluate_pixel),
             IntensityCompare);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            q[i]=ClampToQuantum(evaluate_pixel[number_images/2].channel[i]);
-          }
+          SetEvaluateMedianPixel(image,evaluate_pixel,number_images,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
