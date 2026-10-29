@@ -1512,6 +1512,40 @@ MagickExport Image *ConvolveImage(const Image *image,
 %
 */
 
+static MagickRealType RaiseHullValue(const Quantum *r,const ssize_t i,
+  MagickRealType v)
+{
+  if ((MagickRealType) r[i] >= (v+(double) ScaleCharToQuantum(2)))
+    v+=(double) ScaleCharToQuantum(1);
+  return(v);
+}
+
+static MagickRealType LowerHullValue(const Quantum *r,const ssize_t i,
+  MagickRealType v)
+{
+  if ((MagickRealType) r[i] <= (v-(double) ScaleCharToQuantum(2)))
+    v-=(double) ScaleCharToQuantum(1);
+  return(v);
+}
+
+static MagickRealType RaiseHullEdgeValue(const Quantum *r,const Quantum *s,
+  const ssize_t i,MagickRealType v)
+{
+  if (((MagickRealType) s[i] >= (v+(double) ScaleCharToQuantum(2))) &&
+      ((MagickRealType) r[i] > v))
+    v+=(double) ScaleCharToQuantum(1);
+  return(v);
+}
+
+static MagickRealType LowerHullEdgeValue(const Quantum *r,const Quantum *s,
+  const ssize_t i,MagickRealType v)
+{
+  if (((MagickRealType) s[i] <= (v-(double) ScaleCharToQuantum(2))) &&
+      ((MagickRealType) r[i] < v))
+    v-=(double) ScaleCharToQuantum(1);
+  return(v);
+}
+
 static void Hull(const HullBuffers *hull,const ssize_t x_offset,
   const ssize_t y_offset,const int polarity)
 {
@@ -1563,8 +1597,7 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
       for (x=0; x < (ssize_t) columns; x++)
       {
         v=(MagickRealType) p[i];
-        if ((MagickRealType) r[i] >= (v+(double) ScaleCharToQuantum(2)))
-          v+=(double) ScaleCharToQuantum(1);
+        v=RaiseHullValue(r,i,v);
         q[i]=(Quantum) v;
         i++;
       }
@@ -1572,8 +1605,7 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
       for (x=0; x < (ssize_t) columns; x++)
       {
         v=(MagickRealType) p[i];
-        if ((MagickRealType) r[i] <= (v-(double) ScaleCharToQuantum(2)))
-          v-=(double) ScaleCharToQuantum(1);
+        v=LowerHullValue(r,i,v);
         q[i]=(Quantum) v;
         i++;
       }
@@ -1600,9 +1632,7 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
       for (x=0; x < (ssize_t) columns; x++)
       {
         v=(MagickRealType) q[i];
-        if (((MagickRealType) s[i] >= (v+(double) ScaleCharToQuantum(2))) &&
-            ((MagickRealType) r[i] > v))
-          v+=(double) ScaleCharToQuantum(1);
+        v=RaiseHullEdgeValue(r,s,i,v);
         p[i]=(Quantum) v;
         i++;
       }
@@ -1610,9 +1640,7 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
       for (x=0; x < (ssize_t) columns; x++)
       {
         v=(MagickRealType) q[i];
-        if (((MagickRealType) s[i] <= (v-(double) ScaleCharToQuantum(2))) &&
-            ((MagickRealType) r[i] < v))
-          v-=(double) ScaleCharToQuantum(1);
+        v=LowerHullEdgeValue(r,s,i,v);
         p[i]=(Quantum) v;
         i++;
       }
