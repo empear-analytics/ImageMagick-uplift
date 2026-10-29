@@ -4244,6 +4244,70 @@ static inline double GetSurfaceShade(const PrimaryInfo *normal,
   return(shade);
 }
 
+typedef struct _ShadeChannel
+{
+  const Image
+    *linear_image,
+    *shade_image;
+
+  const Quantum
+    *center;
+
+  MagickBooleanType
+    gray;
+
+  double
+    shade;
+} ShadeChannel;
+
+static inline void ShadePixelChannel(const ShadeChannel *shade_channel,
+  const ssize_t i,Quantum *magick_restrict q)
+{
+  const Image
+    *const linear_image = shade_channel->linear_image,
+    *const shade_image = shade_channel->shade_image;
+
+  const Quantum
+    *const center = shade_channel->center;
+
+  const MagickBooleanType
+    gray = shade_channel->gray;
+
+  const double
+    shade = shade_channel->shade;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    shade_traits,
+    traits;
+
+  channel=GetPixelChannelChannel(linear_image,i);
+  traits=GetPixelChannelTraits(linear_image,channel);
+  shade_traits=GetPixelChannelTraits(shade_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (shade_traits == UndefinedPixelTrait))
+    return;
+  if ((shade_traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(shade_image,channel,center[i],q);
+      return;
+    }
+  if ((traits & UpdatePixelTrait) == 0)
+    {
+      SetPixelChannel(shade_image,channel,center[i],q);
+      return;
+    }
+  if (gray != MagickFalse)
+    {
+      SetPixelChannel(shade_image,channel,ClampToQuantum(shade),q);
+      return;
+    }
+  SetPixelChannel(shade_image,channel,ClampToQuantum(QuantumScale*
+    shade*(double) center[i]),q);
+}
+
 static inline void ShadePixelChannels(const ShadeImages *shading,
   const Quantum *magick_restrict center,Quantum *magick_restrict q,
   const double shade)
@@ -4260,36 +4324,15 @@ static inline void ShadePixelChannels(const ShadeImages *shading,
 
   for (i=0; i < (ssize_t) GetPixelChannels(linear_image); i++)
   {
-    PixelChannel
-      channel;
+    ShadeChannel
+      shade_channel;
 
-    PixelTrait
-      shade_traits,
-      traits;
-
-    channel=GetPixelChannelChannel(linear_image,i);
-    traits=GetPixelChannelTraits(linear_image,channel);
-    shade_traits=GetPixelChannelTraits(shade_image,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (shade_traits == UndefinedPixelTrait))
-      continue;
-    if ((shade_traits & CopyPixelTrait) != 0)
-      {
-        SetPixelChannel(shade_image,channel,center[i],q);
-        continue;
-      }
-    if ((traits & UpdatePixelTrait) == 0)
-      {
-        SetPixelChannel(shade_image,channel,center[i],q);
-        continue;
-      }
-    if (gray != MagickFalse)
-      {
-        SetPixelChannel(shade_image,channel,ClampToQuantum(shade),q);
-        continue;
-      }
-    SetPixelChannel(shade_image,channel,ClampToQuantum(QuantumScale*
-      shade*(double) center[i]),q);
+    shade_channel.linear_image=linear_image;
+    shade_channel.shade_image=shade_image;
+    shade_channel.center=center;
+    shade_channel.gray=gray;
+    shade_channel.shade=shade;
+    ShadePixelChannel(&shade_channel,i,q);
   }
 }
 
