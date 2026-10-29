@@ -1827,17 +1827,7 @@ static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
       /*
         Assign pixel to closest colormap entry.
       */
-      index=(entry != (ssize_t *) NULL) ? (size_t) *entry : p->color_number;
-      if (image->storage_class == PseudoClass)
-        SetPixelIndex(image,(Quantum) index,q);
-      if (cube_info->quantize_info->measure_error == MagickFalse)
-        {
-          SetPixelRed(image,ClampToQuantum(image->colormap[index].red),q);
-          SetPixelGreen(image,ClampToQuantum(image->colormap[index].green),q);
-          SetPixelBlue(image,ClampToQuantum(image->colormap[index].blue),q);
-          if (cube_info->associate_alpha != MagickFalse)
-            SetPixelAlpha(image,ClampToQuantum(image->colormap[index].alpha),q);
-        }
+      index=AssignClosestColormapEntry(image,p,entry,q);
       if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
         return(MagickFalse);
       /*
