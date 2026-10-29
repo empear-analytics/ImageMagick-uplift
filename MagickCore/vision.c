@@ -175,6 +175,25 @@ static inline MagickBooleanType IsDiagonalPair(const Quantum *pixels,
     MagickFalse);
 }
 
+static void AddPerimeterPattern(const Quantum *pixels,const size_t foreground,
+  const ssize_t i,size_t *pattern)
+{
+  if (foreground == 1)
+    pattern[1]++;
+  else
+    if (foreground == 2)
+      {
+        if (IsDiagonalPair(pixels,i) != MagickFalse)
+          pattern[0]++;  /* diagonal */
+        else
+          pattern[2]++;
+      }
+    else
+      if (foreground == 3)
+        pattern[3]++;
+}
+
+
 static void CountPerimeterPattern(const Image *component_image,
   const Quantum *magick_restrict p,const size_t width,const ssize_t i,
   size_t *pattern)
@@ -211,19 +230,7 @@ static void CountPerimeterPattern(const Image *component_image,
         foreground++;
     }
   }
-  if (foreground == 1)
-    pattern[1]++;
-  else
-    if (foreground == 2)
-      {
-        if (IsDiagonalPair(pixels,i) != MagickFalse)
-          pattern[0]++;  /* diagonal */
-        else
-          pattern[2]++;
-      }
-    else
-      if (foreground == 3)
-        pattern[3]++;
+  AddPerimeterPattern(pixels,foreground,i,pattern);
 }
 
 static MagickBooleanType CountObjectPerimeterPatterns(
