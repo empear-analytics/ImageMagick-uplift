@@ -2351,6 +2351,40 @@ static MagickBooleanType FormEqualizeHistogram(const Image *image,
   return(status);
 }
 
+typedef struct _EqualizeChannel
+{
+  Image
+    *image;
+
+  double
+    *map;
+
+  ssize_t
+    i;
+} EqualizeChannel;
+
+static void BuildEqualizeChannelMap(const EqualizeChannel *equalize,
+  const double *black,const double *white,double *equalize_map)
+{
+  Image
+    *const image = equalize->image;
+
+  double
+    *const map = equalize->map;
+
+  const ssize_t
+    i = equalize->i;
+
+  ssize_t
+    j;
+
+  if (black[i] != white[i])
+    for (j=0; j <= (ssize_t) MaxMap; j++)
+      equalize_map[GetPixelChannels(image)*(size_t) j+(size_t) i]=(double)
+        ScaleMapToQuantum((double) ((MaxMap*(map[GetPixelChannels(image)*
+        (size_t) j+(size_t) i]-black[i]))/(white[i]-black[i])));
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2419,16 +2453,15 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   (void) memset(white,0,sizeof(*white));
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    ssize_t
-      j;
+    EqualizeChannel
+      equalize;
 
     black[i]=map[i];
     white[i]=map[GetPixelChannels(image)*MaxMap+(size_t) i];
-    if (black[i] != white[i])
-      for (j=0; j <= (ssize_t) MaxMap; j++)
-        equalize_map[GetPixelChannels(image)*(size_t) j+(size_t) i]=(double)
-          ScaleMapToQuantum((double) ((MaxMap*(map[GetPixelChannels(image)*
-          (size_t) j+(size_t) i]-black[i]))/(white[i]-black[i])));
+    equalize.image=image;
+    equalize.map=map;
+    equalize.i=i;
+    BuildEqualizeChannelMap(&equalize,black,white,equalize_map);
   }
   histogram=(double *) RelinquishMagickMemory(histogram);
   map=(double *) RelinquishMagickMemory(map);
