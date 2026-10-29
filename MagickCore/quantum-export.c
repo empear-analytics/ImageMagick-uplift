@@ -1915,8 +1915,9 @@ static void ExportBlackQuantum(const Image *image,QuantumInfo *quantum_info,
   ExportPixelChannel(image,quantum_info,span,BlackPixelChannel);
 }
 
-static void ExportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
-  const QuantumPixelSpan *span)
+static void ExportUnpacked10BitCbYCrYQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,size_t quantum,
+  ssize_t n)
 {
   const MagickSizeType
     number_pixels = span->number_pixels;
@@ -1937,6 +1938,66 @@ static void ExportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
   unsigned int
     pixel;
 
+  if (quantum_info->pack == MagickFalse)
+    {
+      for (x=0; x < (ssize_t) number_pixels; x+=2)
+      {
+        for (i=0; i < 4; i++)
+        {
+          switch (n % 3)
+          {
+            case 0:
+            {
+              quantum=(size_t) GetPixelRed(image,p);
+              break;
+            }
+            case 1:
+            {
+              quantum=(size_t) GetPixelGreen(image,p);
+              break;
+            }
+            case 2:
+            {
+              quantum=(size_t) GetPixelBlue(image,p);
+              break;
+            }
+          }
+          cbcr[i]=(Quantum) quantum;
+          n++;
+        }
+        pixel=(unsigned int) ((size_t) (cbcr[1]) << 22 | (size_t)
+          (cbcr[0]) << 12 | (size_t) (cbcr[2]) << 2);
+        q=PopLongPixel(quantum_info->endian,pixel,q);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        pixel=(unsigned int) ((size_t) (cbcr[3]) << 22 | (size_t)
+          (cbcr[0]) << 12 | (size_t) (cbcr[2]) << 2);
+        q=PopLongPixel(quantum_info->endian,pixel,q);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) quantum_info->pad;
+      }
+      return;
+    }
+}
+
+static void ExportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const Quantum
+    *magick_restrict p = span->p;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  Quantum
+    cbcr[4];
+
+  ssize_t
+    i,
+    x;
+
   size_t
     quantum;
 
@@ -1949,45 +2010,7 @@ static void ExportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
   {
     case 10:
     {
-      if (quantum_info->pack == MagickFalse)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x+=2)
-          {
-            for (i=0; i < 4; i++)
-            {
-              switch (n % 3)
-              {
-                case 0:
-                {
-                  quantum=(size_t) GetPixelRed(image,p);
-                  break;
-                }
-                case 1:
-                {
-                  quantum=(size_t) GetPixelGreen(image,p);
-                  break;
-                }
-                case 2:
-                {
-                  quantum=(size_t) GetPixelBlue(image,p);
-                  break;
-                }
-              }
-              cbcr[i]=(Quantum) quantum;
-              n++;
-            }
-            pixel=(unsigned int) ((size_t) (cbcr[1]) << 22 | (size_t)
-              (cbcr[0]) << 12 | (size_t) (cbcr[2]) << 2);
-            q=PopLongPixel(quantum_info->endian,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            pixel=(unsigned int) ((size_t) (cbcr[3]) << 22 | (size_t)
-              (cbcr[0]) << 12 | (size_t) (cbcr[2]) << 2);
-            q=PopLongPixel(quantum_info->endian,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
+      ExportUnpacked10BitCbYCrYQuantum(image,quantum_info,span,quantum,n);
       break;
     }
     default:
