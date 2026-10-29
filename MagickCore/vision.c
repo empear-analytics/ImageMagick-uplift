@@ -1382,6 +1382,20 @@ static MagickBooleanType AccumulateObjectStatistics(CCObjectInfo *object,
   return(status);
 }
 
+static void InitializeObjects(const Image *image,CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) MaxColormapSize; i++)
+  {
+    object[i].id=i;
+    object[i].bounding_box.x=(ssize_t) image->columns;
+    object[i].bounding_box.y=(ssize_t) image->rows;
+    GetPixelInfo(image,&object[i].color);
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1474,13 +1488,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   (void) memset(object,0,MaxColormapSize*sizeof(*object));
-  for (i=0; i < (ssize_t) MaxColormapSize; i++)
-  {
-    object[i].id=i;
-    object[i].bounding_box.x=(ssize_t) image->columns;
-    object[i].bounding_box.y=(ssize_t) image->rows;
-    GetPixelInfo(image,&object[i].color);
-  }
+  InitializeObjects(image,object);
   /*
     Find connected components.
   */
