@@ -4026,6 +4026,25 @@ static Quantum *CopyTextureSpan(const TextureSpan *span,const Quantum *p,
 
 #define TextureImageTag  "Texture/Image"
 
+static MagickBooleanType ReportTextureProgress(Image *image,const ssize_t y)
+{
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,TextureImageTag,(MagickOffsetType) y,
+        image->rows);
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
@@ -4155,16 +4174,8 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
     sync=SyncCacheViewAuthenticPixels(image_view,exception);
     if (sync == MagickFalse)
       status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,TextureImageTag,(MagickOffsetType) y,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    if (ReportTextureProgress(image,y) == MagickFalse)
+      status=MagickFalse;
   }
   texture_view=DestroyCacheView(texture_view);
   image_view=DestroyCacheView(image_view);
