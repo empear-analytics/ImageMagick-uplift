@@ -420,6 +420,20 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
 
 #if defined(ENABLE_FFTW_DELEGATE)
 
+static ssize_t RollFourierIndex(const ssize_t y,const ssize_t y_offset,
+  const size_t height)
+{
+  ssize_t
+    v;
+
+  if (y_offset < 0L)
+    v=((y+y_offset) < 0L) ? y+y_offset+(ssize_t) height : y+y_offset;
+  else
+    v=((y+y_offset) > ((ssize_t) height-1L)) ? y+y_offset-(ssize_t) height :
+      y+y_offset;
+  return(v);
+}
+
 static MagickBooleanType RollFourier(const size_t width,const size_t height,
   const ssize_t x_offset,const ssize_t y_offset,double *roll_pixels)
 {
@@ -446,18 +460,10 @@ static MagickBooleanType RollFourier(const size_t width,const size_t height,
   i=0L;
   for (y=0L; y < (ssize_t) height; y++)
   {
-    if (y_offset < 0L)
-      v=((y+y_offset) < 0L) ? y+y_offset+(ssize_t) height : y+y_offset;
-    else
-      v=((y+y_offset) > ((ssize_t) height-1L)) ? y+y_offset-(ssize_t) height :
-        y+y_offset;
+    v=RollFourierIndex(y,y_offset,height);
     for (x=0L; x < (ssize_t) width; x++)
     {
-      if (x_offset < 0L)
-        u=((x+x_offset) < 0L) ? x+x_offset+(ssize_t) width : x+x_offset;
-      else
-        u=((x+x_offset) > ((ssize_t) width-1L)) ? x+x_offset-(ssize_t) width :
-          x+x_offset;
+      u=RollFourierIndex(x,x_offset,width);
       source_pixels[v*(ssize_t) width+u]=roll_pixels[i++];
     }
   }
