@@ -2741,6 +2741,47 @@ static MagickRealType GetGrayscaleIntensity(const Image *image,
   return(intensity);
 }
 
+static void GrayscaleImageRow(const Image *image,
+  const PixelIntensityMethod method,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MagickRealType
+      intensity;
+
+    intensity=GetGrayscaleIntensity(image,method,q);
+    SetPixelGray(image,ClampToQuantum(intensity),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static MagickBooleanType SyncGrayscaleImageClass(Image *image,
+  ExceptionInfo *exception)
+{
+  if (image->storage_class == PseudoClass)
+    {
+      if (SyncImage(image,exception) == MagickFalse)
+        return(MagickFalse);
+      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetGrayscaleImageColorspace(Image *image,
+  const PixelIntensityMethod method,ExceptionInfo *exception)
+{
+  image->intensity=method;
+  image->type=GrayscaleType;
+  if ((method == Rec601LuminancePixelIntensityMethod) ||
+      (method == Rec709LuminancePixelIntensityMethod))
+    return(SetImageColorspace(image,LinearGRAYColorspace,exception));
+  return(SetImageColorspace(image,GRAYColorspace,exception));
+}
+
 MagickExport MagickBooleanType GrayscaleImage(Image *image,
   const PixelIntensityMethod method,ExceptionInfo *exception)
 {
@@ -2762,13 +2803,8 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (image->storage_class == PseudoClass)
-    {
-      if (SyncImage(image,exception) == MagickFalse)
-        return(MagickFalse);
-      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-        return(MagickFalse);
-    }
+  if (SyncGrayscaleImageClass(image,exception) == MagickFalse)
+    return(MagickFalse);
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
   if (AccelerateGrayscaleImage(image,method,exception) != MagickFalse)
     {
@@ -2795,9 +2831,6 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2806,15 +2839,7 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MagickRealType
-        intensity;
-
-      intensity=GetGrayscaleIntensity(image,method,q);
-      SetPixelGray(image,ClampToQuantum(intensity),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    GrayscaleImageRow(image,method,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -2832,12 +2857,7 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
       }
   }
   image_view=DestroyCacheView(image_view);
-  image->intensity=method;
-  image->type=GrayscaleType;
-  if ((method == Rec601LuminancePixelIntensityMethod) ||
-      (method == Rec709LuminancePixelIntensityMethod))
-    return(SetImageColorspace(image,LinearGRAYColorspace,exception));
-  return(SetImageColorspace(image,GRAYColorspace,exception));
+  return(SetGrayscaleImageColorspace(image,method,exception));
 }
 
 /*
