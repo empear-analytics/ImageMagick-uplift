@@ -1116,6 +1116,115 @@ static void SumBilateralBlendedPixels(const BilateralSum *sum,double *pixel,
   }
 }
 
+typedef struct _BilateralChannel
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  size_t
+    width,
+    height;
+
+  OffsetInfo
+    mid;
+
+  double
+    **weights;
+
+  int
+    id;
+} BilateralChannel;
+
+static void BlurBilateralChannel(const BilateralChannel *bilateral_channel,
+  Image *blur_image,const ssize_t i,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = bilateral_channel->image;
+
+  const Quantum
+    *const p = bilateral_channel->p;
+
+  const size_t
+    width = bilateral_channel->width,
+    height = bilateral_channel->height;
+
+  const OffsetInfo
+    mid = bilateral_channel->mid;
+
+  double
+    **const weights = bilateral_channel->weights;
+
+  const int
+    id = bilateral_channel->id;
+
+  BilateralSum
+    sum;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    blur_traits,
+    traits;
+
+  double
+    gamma,
+    pixel;
+
+  ssize_t
+    n;
+
+  channel=GetPixelChannelChannel(image,i);
+  traits=GetPixelChannelTraits(image,channel);
+  blur_traits=GetPixelChannelTraits(blur_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (blur_traits == UndefinedPixelTrait))
+    return;
+  if ((blur_traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(blur_image,channel,p[i],q);
+      return;
+    }
+  pixel=0.0;
+  gamma=0.0;
+  n=0;
+  if ((blur_traits & BlendPixelTrait) == 0)
+    {
+      /*
+        No alpha blending.
+      */
+      sum.image=image;
+      sum.p=p;
+      sum.width=width;
+      sum.height=height;
+      sum.mid=mid;
+      sum.weights=weights;
+      sum.id=id;
+      sum.i=i;
+      SumBilateralPixels(&sum,&pixel,&gamma,&n);
+      SetPixelChannel(blur_image,channel,ClampToQuantum(
+        MagickSafeReciprocal(gamma)*pixel),q);
+      return;
+    }
+  /*
+    Alpha blending.
+  */
+  sum.image=image;
+  sum.p=p;
+  sum.width=width;
+  sum.height=height;
+  sum.mid=mid;
+  sum.weights=weights;
+  sum.id=id;
+  sum.i=i;
+  SumBilateralBlendedPixels(&sum,&pixel,&gamma,&n);
+  SetPixelChannel(blur_image,channel,ClampToQuantum(
+    MagickSafeReciprocal(gamma)*pixel),q);
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1230,13 +1339,8 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
       const Quantum
         *magick_restrict p;
 
-      double
-        gamma,
-        pixel;
-
       ssize_t
-        i,
-        n;
+        i;
 
       /*
         Tonal weighting preserves edges while smoothing in the flat regions.
@@ -1262,62 +1366,17 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
       SetBilateralWeights(&bilateral,weights);
       for (i=0; i < (ssize_t) GetPixelChannels(blur_image); i++)
       {
-        BilateralSum
-          sum;
+        BilateralChannel
+          bilateral_channel;
 
-        PixelChannel
-          channel;
-
-        PixelTrait
-          blur_traits,
-          traits;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        blur_traits=GetPixelChannelTraits(blur_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (blur_traits == UndefinedPixelTrait))
-          continue;
-        if ((blur_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(blur_image,channel,p[i],q);
-            continue;
-          }
-        pixel=0.0;
-        gamma=0.0;
-        n=0;
-        if ((blur_traits & BlendPixelTrait) == 0)
-          {
-            /*
-              No alpha blending.
-            */
-            sum.image=image;
-            sum.p=p;
-            sum.width=width;
-            sum.height=height;
-            sum.mid=mid;
-            sum.weights=weights;
-            sum.id=id;
-            sum.i=i;
-            SumBilateralPixels(&sum,&pixel,&gamma,&n);
-            SetPixelChannel(blur_image,channel,ClampToQuantum(
-              MagickSafeReciprocal(gamma)*pixel),q);
-            continue;
-          }
-        /*
-          Alpha blending.
-        */
-        sum.image=image;
-        sum.p=p;
-        sum.width=width;
-        sum.height=height;
-        sum.mid=mid;
-        sum.weights=weights;
-        sum.id=id;
-        sum.i=i;
-        SumBilateralBlendedPixels(&sum,&pixel,&gamma,&n);
-        SetPixelChannel(blur_image,channel,ClampToQuantum(
-          MagickSafeReciprocal(gamma)*pixel),q);
+        bilateral_channel.image=image;
+        bilateral_channel.p=p;
+        bilateral_channel.width=width;
+        bilateral_channel.height=height;
+        bilateral_channel.mid=mid;
+        bilateral_channel.weights=weights;
+        bilateral_channel.id=id;
+        BlurBilateralChannel(&bilateral_channel,blur_image,i,q);
       }
       q+=(ptrdiff_t) GetPixelChannels(blur_image);
     }
