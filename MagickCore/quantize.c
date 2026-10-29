@@ -1817,34 +1817,7 @@ static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
         pixel.alpha=(double) ClampPixel(pixel.alpha);
       entry=GetCacheEntry(p,&pixel);
       if ((entry == (ssize_t *) NULL) || (*entry < 0))
-        {
-          QNodeInfo
-            *node_info;
-
-          size_t
-            id;
-
-          /*
-            Identify the deepest node containing the pixel's color.
-          */
-          node_info=p->root;
-          for (index=MaxTreeDepth-1; (ssize_t) index > 0; index--)
-          {
-            id=ColorToQNodeId(cube_info,&pixel,index);
-            if (node_info->child[id] == (QNodeInfo *) NULL)
-              break;
-            node_info=node_info->child[id];
-          }
-          /*
-            Find closest color among siblings and their children.
-          */
-          p->target=pixel;
-          p->distance=(double) (4.0*((double) QuantumRange+1.0)*((double)
-            QuantumRange+1.0)+1.0);
-          ClosestColor(image,p,node_info->parent);
-          if (entry != (ssize_t *) NULL)
-            *entry=(ssize_t) p->color_number;
-        }
+        FindClosestCubeColor(image,p,pixel,entry);
       /*
         Assign pixel to closest colormap entry.
       */
