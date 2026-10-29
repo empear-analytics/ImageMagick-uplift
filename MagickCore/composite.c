@@ -1894,6 +1894,28 @@ static MagickRealType GetReflectBlend(const MagickRealType Sc,
   return(blend);
 }
 
+static MagickRealType GetHueAlpha(const MagickRealType Sa,
+  const MagickRealType Da,MagickRealType pixel)
+{
+  if (fabs((double) QuantumRange*Sa-(double) TransparentAlpha) < MagickEpsilon)
+    {
+      pixel=(double) QuantumRange*Da;
+      return(pixel);
+    }
+  if (fabs((double) QuantumRange*Da-(double) TransparentAlpha) < MagickEpsilon)
+    {
+      pixel=(double) QuantumRange*Sa;
+      return(pixel);
+    }
+  if (Sa < Da)
+    {
+      pixel=(double) QuantumRange*Da;
+      return(pixel);
+    }
+  pixel=(double) QuantumRange*Sa;
+  return(pixel);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -2969,22 +2991,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               case RMSECompositeOp:
               case SaturateCompositeOp:
               {
-                if (fabs((double) QuantumRange*Sa-(double) TransparentAlpha) < MagickEpsilon)
-                  {
-                    pixel=(double) QuantumRange*Da;
-                    break;
-                  }
-                if (fabs((double) QuantumRange*Da-(double) TransparentAlpha) < MagickEpsilon)
-                  {
-                    pixel=(double) QuantumRange*Sa;
-                    break;
-                  }
-                if (Sa < Da)
-                  {
-                    pixel=(double) QuantumRange*Da;
-                    break;
-                  }
-                pixel=(double) QuantumRange*Sa;
+                pixel=GetHueAlpha(Sa,Da,pixel);
                 break;
               }
               case CopyAlphaCompositeOp:
