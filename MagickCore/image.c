@@ -2822,6 +2822,19 @@ static void ParseSubimageComponent(ImageInfo *image_info)
     }
 }
 
+static void TestMultipleImageSupport(ImageInfo *image_info,char *component,
+  ExceptionInfo *exception)
+{
+  /*
+    Test for multiple image support (e.g. image%02d.png).
+  */
+  (void) InterpretImageFilename(image_info,(Image *) NULL,
+    image_info->filename,(int) image_info->scene,component,exception);
+  if ((LocaleCompare(component,image_info->filename) != 0) &&
+      (strchr(component,'%') == (char *) NULL))
+    image_info->adjoin=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
@@ -2899,16 +2912,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
       (GetMagickEndianSupport(magick_info) == MagickFalse))
     image_info->endian=UndefinedEndian;
   if ((image_info->adjoin != MagickFalse) && (frames > 1))
-    {
-      /*
-        Test for multiple image support (e.g. image%02d.png).
-      */
-      (void) InterpretImageFilename(image_info,(Image *) NULL,
-        image_info->filename,(int) image_info->scene,component,exception);
-      if ((LocaleCompare(component,image_info->filename) != 0) &&
-          (strchr(component,'%') == (char *) NULL))
-        image_info->adjoin=MagickFalse;
-    }
+    TestMultipleImageSupport(image_info,component,exception);
   if ((image_info->adjoin != MagickFalse) && (frames > 0))
     {
       /*
