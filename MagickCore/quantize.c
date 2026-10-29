@@ -1554,6 +1554,38 @@ static inline ssize_t *GetCacheEntry(QCubeInfo *cube_info,
   return(*block+(offset & ((1L << CacheBlockShift)-1)));
 }
 
+static void FindClosestCubeColor(const Image *image,QCubeInfo *cube,
+  const DoublePixelPacket pixel,ssize_t *entry)
+{
+  QNodeInfo
+    *node_info;
+
+  size_t
+    index,
+    node_id;
+
+  /*
+    Identify the deepest node containing the pixel's color.
+  */
+  node_info=cube->root;
+  for (index=MaxTreeDepth-1; (ssize_t) index > 0; index--)
+  {
+    node_id=ColorToQNodeId(cube,&pixel,index);
+    if (node_info->child[node_id] == (QNodeInfo *) NULL)
+      break;
+    node_info=node_info->child[node_id];
+  }
+  /*
+    Find closest color among siblings and their children.
+  */
+  cube->target=pixel;
+  cube->distance=(double) (4.0*((double) QuantumRange+1.0)*((double)
+    QuantumRange+1.0)+1.0);
+  ClosestColor(image,cube,node_info->parent);
+  if (entry != (ssize_t *) NULL)
+    *entry=(ssize_t) cube->color_number;
+}
+
 static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -1667,34 +1699,7 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
         pixel.alpha=(double) ClampPixel(pixel.alpha);
       entry=GetCacheEntry(&cube,&pixel);
       if ((entry == (ssize_t *) NULL) || (*entry < 0))
-        {
-          QNodeInfo
-            *node_info;
-
-          size_t
-            node_id;
-
-          /*
-            Identify the deepest node containing the pixel's color.
-          */
-          node_info=cube.root;
-          for (index=MaxTreeDepth-1; (ssize_t) index > 0; index--)
-          {
-            node_id=ColorToQNodeId(&cube,&pixel,index);
-            if (node_info->child[node_id] == (QNodeInfo *) NULL)
-              break;
-            node_info=node_info->child[node_id];
-          }
-          /*
-            Find closest color among siblings and their children.
-          */
-          cube.target=pixel;
-          cube.distance=(double) (4.0*((double) QuantumRange+1.0)*((double)
-            QuantumRange+1.0)+1.0);
-          ClosestColor(image,&cube,node_info->parent);
-          if (entry != (ssize_t *) NULL)
-            *entry=(ssize_t) cube.color_number;
-        }
+        FindClosestCubeColor(image,&cube,pixel,entry);
       /*
         Assign pixel to closest colormap entry.
       */
