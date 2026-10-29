@@ -4048,6 +4048,26 @@ static MagickBooleanType SumRotationalBlendedPixels(
   return(status);
 }
 
+static size_t GetRotationalBlurStep(const double radius,
+  const double blur_radius,const size_t n)
+{
+  size_t
+    step;
+
+  if (radius == 0)
+    step=1;
+  else
+    {
+      step=(size_t) (blur_radius/radius);
+      if (step == 0)
+        step=1;
+      else
+        if (step >= n)
+          step=n-1;
+    }
+  return(step);
+}
+
 MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   ExceptionInfo *exception)
 {
@@ -4176,17 +4196,7 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
       center.x=(double) x-blur_center.x;
       center.y=(double) y-blur_center.y;
       radius=hypot((double) center.x,center.y);
-      if (radius == 0)
-        step=1;
-      else
-        {
-          step=(size_t) (blur_radius/radius);
-          if (step == 0)
-            step=1;
-          else
-            if (step >= n)
-              step=n-1;
-        }
+      step=GetRotationalBlurStep(radius,blur_radius,n);
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
         double
