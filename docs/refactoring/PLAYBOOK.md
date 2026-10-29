@@ -391,6 +391,13 @@ same text once the variables each reads or writes are renamed consistently (bloc
 takes those variables as arguments. Check it by script: rename, then compare the text.
 Literals and operators are not renamed; one that differs is a differing value.
 
+A variable the copies write and their callers read afterwards goes to the helper by
+address, exactly as in Recipe O (one pointer per such variable, the helper writing through
+it where each copy wrote the variable); the helper may instead return one of them, as in
+Recipe E step 7's value form. The copies must still be identical under the renaming. Owner
+decision, 2026-10-29: "as you see fit" on the question raised in #70 and #73
+(`ExportUnpacked12BitSample`, `GetStrokeSlope`).
+
 **Evidence level:** oracle.
 
 **Provenance:** founding recipe (2026-09-29).
