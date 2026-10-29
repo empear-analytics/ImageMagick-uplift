@@ -7720,6 +7720,33 @@ static inline MagickBooleanType IsRoundStrokeJoin(const DrawInfo *draw_info,
     (closed_path != MagickFalse))) ? MagickTrue : MagickFalse);
 }
 
+static void GetStrokeSlope(const double dx,const double dy,double *slope,
+  double *inverse_slope)
+{
+  *slope=0.0;
+  *inverse_slope=0.0;
+  if (fabs(dx) < MagickEpsilon)
+    {
+      if (dx >= 0.0)
+        *slope=dy < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
+      else
+        *slope=dy < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+    }
+  else
+    if (fabs(dy) < MagickEpsilon)
+      {
+        if (dy >= 0.0)
+          *inverse_slope=dx < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
+        else
+          *inverse_slope=dx < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
+      }
+    else
+      {
+        *slope=dy/dx;
+        *inverse_slope=(-1.0*MagickSafeReciprocal(*slope));
+      }
+}
+
 static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,ExceptionInfo *exception)
 {
@@ -7890,28 +7917,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
         ResourceLimitError,"MemoryAllocationFailed","`%s'","");
       return((PrimitiveInfo *) NULL);
     }
-  slope.p=0.0;
-  inverse_slope.p=0.0;
-  if (fabs(dx.p) < MagickEpsilon)
-    {
-      if (dx.p >= 0.0)
-        slope.p=dy.p < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-      else
-        slope.p=dy.p < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-    }
-  else
-    if (fabs(dy.p) < MagickEpsilon)
-      {
-        if (dy.p >= 0.0)
-          inverse_slope.p=dx.p < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-        else
-          inverse_slope.p=dx.p < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-      }
-    else
-      {
-        slope.p=dy.p/dx.p;
-        inverse_slope.p=(-1.0*MagickSafeReciprocal(slope.p));
-      }
+  GetStrokeSlope(dx.p,dy.p,&slope.p,&inverse_slope.p);
   mid=ExpandAffine(&draw_info->affine)*draw_info->stroke_width/2.0;
   miterlimit=(double) (draw_info->miterlimit*draw_info->miterlimit*mid*mid);
   if ((draw_info->linecap == SquareCap) && (closed_path == MagickFalse))
@@ -7957,28 +7963,7 @@ static PrimitiveInfo *TraceStrokePolygon(const DrawInfo *draw_info,
     dot_product=dx.q*dx.q+dy.q*dy.q;
     if (dot_product < 0.25)
       continue;
-    slope.q=0.0;
-    inverse_slope.q=0.0;
-    if (fabs(dx.q) < MagickEpsilon)
-      {
-        if (dx.q >= 0.0)
-          slope.q=dy.q < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-        else
-          slope.q=dy.q < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-      }
-    else
-      if (fabs(dy.q) < MagickEpsilon)
-        {
-          if (dy.q >= 0.0)
-            inverse_slope.q=dx.q < 0.0 ? -1.0/MagickEpsilon : 1.0/MagickEpsilon;
-          else
-            inverse_slope.q=dx.q < 0.0 ? 1.0/MagickEpsilon : -1.0/MagickEpsilon;
-        }
-      else
-        {
-          slope.q=dy.q/dx.q;
-          inverse_slope.q=(-1.0*MagickSafeReciprocal(slope.q));
-        }
+    GetStrokeSlope(dx.q,dy.q,&slope.q,&inverse_slope.q);
     offset.x=sqrt((double) (mid*mid/(inverse_slope.q*inverse_slope.q+1.0)));
     offset.y=(double) (offset.x*inverse_slope.q);
     dot_product=dy.q*offset.x-dx.q*offset.y;
