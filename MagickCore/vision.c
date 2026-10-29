@@ -656,6 +656,13 @@ static void EccentricityThreshold(const Image *component_image,
   }
 }
 
+static inline MagickBooleanType IsNegativeAxisDifference(const double M20,
+  const double M02)
+{
+  return(((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void AngleThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -737,7 +744,7 @@ static void AngleThreshold(const Image *component_image,
       MagickSafeReciprocal(M20-M02)));
     if (fabs(M11) < 0.0)
         {
-          if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+          if (IsNegativeAxisDifference(M20,M02) != MagickFalse)
             object[i].metric[metric_index]+=90.0;
         }
       else
@@ -752,7 +759,7 @@ static void AngleThreshold(const Image *component_image,
               }
           }
         else
-          if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+          if (IsNegativeAxisDifference(M20,M02) != MagickFalse)
             object[i].metric[metric_index]+=90.0;
   }
 }
