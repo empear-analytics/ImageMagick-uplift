@@ -1929,6 +1929,19 @@ static MagickRealType GetCopyAlpha(const Image *source_image,
   return(pixel);
 }
 
+static MagickRealType GetFreezeAlpha(const MagickRealType Sa,
+  const MagickRealType Da)
+{
+  MagickRealType
+    pixel;
+
+  pixel=(double) QuantumRange*(1.0-(1.0-Sa)*(1.0-Sa)*
+    MagickSafeReciprocal(Da));
+  if (pixel < 0.0)
+    pixel=0.0;
+  return(pixel);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3040,10 +3053,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               }
               case FreezeCompositeOp:
               {
-                pixel=(double) QuantumRange*(1.0-(1.0-Sa)*(1.0-Sa)*
-                  MagickSafeReciprocal(Da));
-                if (pixel < 0.0)
-                  pixel=0.0;
+                pixel=GetFreezeAlpha(Sa,Da);
                 break;
               }
               case InterpolateCompositeOp:
