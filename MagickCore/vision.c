@@ -1501,6 +1501,17 @@ static void RemoveObjectsByColor(const Image *component_image,
   }
 }
 
+static void AreaThreshold(const Image *component_image,CCObjectInfo *object,
+  const CCThresholdRange range)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+    if (IsAreaOutsideRange(object,i,&range) != MagickFalse)
+      object[i].merge=MagickTrue;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1745,9 +1756,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.min_threshold=min_threshold;
       range.max_threshold=max_threshold;
       range.background_id=background_id;
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsAreaOutsideRange(object,i,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      AreaThreshold(component_image,object,range);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-colors");
   if (artifact != (const char *) NULL)
