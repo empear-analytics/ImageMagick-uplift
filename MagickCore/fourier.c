@@ -572,6 +572,13 @@ static void ScaleForwardFourierPhase(const FourierInfo *fourier_info,
     }
 }
 
+static inline MagickBooleanType IsFourierMemoryPairMissing(
+  const MemoryInfo *magnitude_info,const MemoryInfo *phase_info)
+{
+  return(((magnitude_info == (MemoryInfo *) NULL) ||
+    (phase_info == (MemoryInfo *) NULL)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   Image *image,double *magnitude,double *phase,ExceptionInfo *exception)
 {
@@ -905,8 +912,7 @@ static MagickBooleanType ForwardFourierTransformChannel(const Image *image,
     1)*sizeof(*magnitude_pixels));
   phase_info=AcquireVirtualMemory(fourier_info.width,(fourier_info.height/2+1)*
     sizeof(*phase_pixels));
-  if ((magnitude_info == (MemoryInfo *) NULL) ||
-      (phase_info == (MemoryInfo *) NULL))
+  if (IsFourierMemoryPairMissing(magnitude_info,phase_info) != MagickFalse)
     {
       if (phase_info != (MemoryInfo *) NULL)
         phase_info=RelinquishVirtualMemory(phase_info);
