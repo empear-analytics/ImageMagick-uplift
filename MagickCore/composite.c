@@ -1955,6 +1955,27 @@ static MagickRealType GetReflectAlpha(const MagickRealType Sa,
   return(pixel);
 }
 
+static void SetDissolveFactors(const GeometryInfo geometry_info,
+  const MagickStatusType flags,MagickRealType *source_dissolve,
+  MagickRealType *canvas_dissolve)
+{
+  *source_dissolve=geometry_info.rho/100.0;
+  *canvas_dissolve=1.0;
+  if ((*source_dissolve-MagickEpsilon) < 0.0)
+    *source_dissolve=0.0;
+  if ((*source_dissolve+MagickEpsilon) > 1.0)
+    {
+      *canvas_dissolve=2.0-*source_dissolve;
+      *source_dissolve=1.0;
+    }
+  if ((flags & SigmaValue) != 0)
+    *canvas_dissolve=geometry_info.sigma/100.0;
+  if ((*canvas_dissolve-MagickEpsilon) < 0.0)
+    *canvas_dissolve=0.0;
+  if ((*canvas_dissolve+MagickEpsilon) > 1.0)
+    *canvas_dissolve=1.0;
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -2565,21 +2586,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       if (artifact != (char *) NULL)
         {
           flags=ParseGeometry(artifact,&geometry_info);
-          source_dissolve=geometry_info.rho/100.0;
-          canvas_dissolve=1.0;
-          if ((source_dissolve-MagickEpsilon) < 0.0)
-            source_dissolve=0.0;
-          if ((source_dissolve+MagickEpsilon) > 1.0)
-            {
-              canvas_dissolve=2.0-source_dissolve;
-              source_dissolve=1.0;
-            }
-          if ((flags & SigmaValue) != 0)
-            canvas_dissolve=geometry_info.sigma/100.0;
-          if ((canvas_dissolve-MagickEpsilon) < 0.0)
-            canvas_dissolve=0.0;
-          if ((canvas_dissolve+MagickEpsilon) > 1.0)
-            canvas_dissolve=1.0;
+          SetDissolveFactors(geometry_info,flags,&source_dissolve,
+            &canvas_dissolve);
         }
       break;
     }
