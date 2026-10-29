@@ -1039,6 +1039,15 @@ static void PrintObject(const Image *image,const CCObjectInfo *object,
   (void) fprintf(stdout,"\n");
 }
 
+static size_t AddAdjacentObject(CCObjectInfo *object,size_t *neighbors,
+  const ssize_t j,size_t count)
+{
+  if (object[j].census == 0.0)
+    neighbors[count++]=(size_t) j;
+  object[j].census++;
+  return(count);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1698,11 +1707,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
               }
             j=(ssize_t) GetPixelIndex(component_image,q);
             if (j != i)
-              {
-                if (object[j].census == 0.0)
-                  neighbors[count++]=(size_t) j;
-                object[j].census++;
-              }
+              count=AddAdjacentObject(object,neighbors,j,count);
           }
         p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
