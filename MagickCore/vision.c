@@ -1396,6 +1396,81 @@ static void InitializeObjects(const Image *image,CCObjectInfo *object)
   }
 }
 
+typedef struct _CCEquivalenceRow
+{
+  const Image
+    *image;
+
+  MatrixInfo
+    *equivalences;
+
+  ssize_t
+    y,
+    dx,
+    dy;
+} CCEquivalenceRow;
+
+static MagickBooleanType ResolveRowEquivalences(
+  const CCEquivalenceRow *equivalence_row,const CCNeighborDirection direction,
+  const Quantum *p,MagickBooleanType status)
+{
+  const Image
+    *const image = equivalence_row->image;
+
+  MatrixInfo
+    *const equivalences = equivalence_row->equivalences;
+
+  const ssize_t
+    y = equivalence_row->y,
+    dx = equivalence_row->dx,
+    dy = equivalence_row->dy;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    CCEquivalencePixel
+      equivalence_pixel;
+
+    PixelInfo
+      pixel,
+      target;
+
+    ssize_t
+      neighbor_offset;
+
+    /*
+      Is neighbor an authentic pixel and a different color than the pixel?
+    */
+    GetPixelInfoPixel(image,p,&pixel);
+    if (IsNeighborOutsideImage(image,x,y,&direction) != MagickFalse)
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    neighbor_offset=dy*((ssize_t) GetPixelChannels(image)*(ssize_t)
+      image->columns)+dx*(ssize_t) GetPixelChannels(image);
+    GetPixelInfoPixel(image,p+neighbor_offset,&target);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&target) == MagickFalse)
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    /*
+      Resolve this equivalence.
+    */
+    equivalence_pixel.image=image;
+    equivalence_pixel.x=x;
+    equivalence_pixel.y=y;
+    equivalence_pixel.dx=dx;
+    equivalence_pixel.dy=dy;
+    status=ResolveEquivalence(equivalences,&equivalence_pixel);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(status);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1508,11 +1583,11 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 
     for (y=0; y < (ssize_t) image->rows; y++)
     {
+      CCEquivalenceRow
+        equivalence_row;
+
       const Quantum
         *magick_restrict p;
-
-      ssize_t
-        x;
 
       if (status == MagickFalse)
         continue;
@@ -1523,46 +1598,12 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           continue;
         }
       p+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        CCEquivalencePixel
-          equivalence_pixel;
-
-        PixelInfo
-          pixel,
-          target;
-
-        ssize_t
-          neighbor_offset;
-
-        /*
-          Is neighbor an authentic pixel and a different color than the pixel?
-        */
-        GetPixelInfoPixel(image,p,&pixel);
-        if (IsNeighborOutsideImage(image,x,y,&direction) != MagickFalse)
-          {
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            continue;
-          }
-        neighbor_offset=dy*((ssize_t) GetPixelChannels(image)*(ssize_t)
-          image->columns)+dx*(ssize_t) GetPixelChannels(image);
-        GetPixelInfoPixel(image,p+neighbor_offset,&target);
-        if (IsFuzzyEquivalencePixelInfo(&pixel,&target) == MagickFalse)
-          {
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            continue;
-          }
-        /*
-          Resolve this equivalence.
-        */
-        equivalence_pixel.image=image;
-        equivalence_pixel.x=x;
-        equivalence_pixel.y=y;
-        equivalence_pixel.dx=dx;
-        equivalence_pixel.dy=dy;
-        status=ResolveEquivalence(equivalences,&equivalence_pixel);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      equivalence_row.image=image;
+      equivalence_row.equivalences=equivalences;
+      equivalence_row.y=y;
+      equivalence_row.dx=dx;
+      equivalence_row.dy=dy;
+      status=ResolveRowEquivalences(&equivalence_row,direction,p,status);
     }
   }
   /*
