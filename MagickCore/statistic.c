@@ -1868,6 +1868,20 @@ static void ComputeCompositeStatistics(const Image *image,
   cs_comp->entropy/=channels;
 }
 
+static void ComputeChannelStatisticsMoments(const Image *image,
+  ChannelStatistics *channel_statistics,const ssize_t i)
+{
+  ChannelStatistics
+    *cs;
+
+  PixelChannel channel = GetPixelChannelChannel(image,i);
+  PixelTrait traits = GetPixelChannelTraits(image,channel);
+  if ((traits & UpdatePixelTrait) == 0)
+    return;
+  cs=channel_statistics+(ssize_t) channel;
+  ComputeChannelMoments(cs);
+}
+
 static void ComputeChannelEntropy(const Image *image,const double *histogram,
   ChannelStatistics *channel_statistics,const ssize_t i)
 {
@@ -2106,17 +2120,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     }
   }
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    ChannelStatistics
-      *cs;
-
-    PixelChannel channel = GetPixelChannelChannel(image,i);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    if ((traits & UpdatePixelTrait) == 0)
-      continue;
-    cs=channel_statistics+(ssize_t) channel;
-    ComputeChannelMoments(cs);
-  }
+    ComputeChannelStatisticsMoments(image,channel_statistics,i);
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
     ComputeChannelEntropy(image,histogram,channel_statistics,i);
   histogram=(double *) RelinquishMagickMemory(histogram);
