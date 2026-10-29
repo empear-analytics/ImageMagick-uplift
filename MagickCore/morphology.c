@@ -4103,6 +4103,23 @@ static MagickBooleanType AcquireReflectedKernel(const MorphologyMethod method,
   return(MagickTrue);
 }
 
+static void ReportKernelIteration(const MagickBooleanType verbose,
+  const KernelInfo *this_kernel)
+{
+  if (verbose != MagickFalse) {
+    if ( this_kernel->next != (KernelInfo *) NULL )
+      (void) FormatLocaleFile(stderr, " (re-iterate)");
+    else
+      (void) FormatLocaleFile(stderr, " (done)");
+  }
+}
+
+static void ReportSaveForCompose(const MagickBooleanType verbose)
+{
+  if (verbose != MagickFalse)
+    (void) FormatLocaleFile(stderr, " (save for compose)");
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4471,17 +4488,11 @@ MagickPrivate Image *MorphologyApply(const Image *image,
       if ( kernel->next == (KernelInfo *) NULL )
         rslt_image = curr_image;   /* just return the resulting image */
       else if ( rslt_compose == NoCompositeOp )
-        { if (verbose != MagickFalse) {
-            if ( this_kernel->next != (KernelInfo *) NULL )
-              (void) FormatLocaleFile(stderr, " (re-iterate)");
-            else
-              (void) FormatLocaleFile(stderr, " (done)");
-          }
+        { ReportKernelIteration(verbose,this_kernel);
           rslt_image = curr_image; /* return result, and re-iterate */
         }
       else if ( rslt_image == (Image *) NULL)
-        { if (verbose != MagickFalse)
-            (void) FormatLocaleFile(stderr, " (save for compose)");
+        { ReportSaveForCompose(verbose);
           rslt_image = curr_image;
           curr_image = (Image *) image;  /* continue with original image */
         }
