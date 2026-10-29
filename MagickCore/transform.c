@@ -2021,16 +2021,8 @@ MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
   Swap(page.x,page.y);
   transpose_image->page=page;
   if (status != MagickFalse)
-    {
-      char
-        transform[MagickPathExtent];
-
-      (void) FormatLocaleString(transform,MagickPathExtent,
-        "transpose %.17gx%.17g",(double) image->columns,
-        (double) image->rows);
-      AppendImageProfileProperty(transpose_image,"hdrgm","hdrgm:Transform",
-        transform,exception);
-    }
+    AppendTransformProperty(image,transpose_image,"transpose %.17gx%.17g",
+      exception);
   if (status == MagickFalse)
     transpose_image=DestroyImage(transpose_image);
   return(transpose_image);
