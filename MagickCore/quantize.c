@@ -3078,6 +3078,19 @@ static size_t GetQuantizeTreeDepth(const QuantizeInfo *quantize_info,
   return(depth);
 }
 
+static size_t GetQuantizeMaximumColors(const QuantizeInfo *quantize_info)
+{
+  size_t
+    maximum_colors;
+
+  maximum_colors=quantize_info->number_colors;
+  if (maximum_colors == 0)
+    maximum_colors=MaxColormapSize;
+  if (maximum_colors > MaxColormapSize)
+    maximum_colors=MaxColormapSize;
+  return(maximum_colors);
+}
+
 MagickExport MagickBooleanType QuantizeImage(const QuantizeInfo *quantize_info,
   Image *image,ExceptionInfo *exception)
 {
@@ -3102,11 +3115,7 @@ MagickExport MagickBooleanType QuantizeImage(const QuantizeInfo *quantize_info,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  maximum_colors=quantize_info->number_colors;
-  if (maximum_colors == 0)
-    maximum_colors=MaxColormapSize;
-  if (maximum_colors > MaxColormapSize)
-    maximum_colors=MaxColormapSize;
+  maximum_colors=GetQuantizeMaximumColors(quantize_info);
   type=IdentifyImageGray(image,exception);
   if (IsGrayImageType(type) != MagickFalse)
     (void) SetGrayscaleImage(image,exception);
