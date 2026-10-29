@@ -6,7 +6,7 @@ Measured with `cs-mcp` 1.5.16.
 
 ### Report
 
-**feature.c 3.90 → 4.00** (leaves the Red band), **vision.c 2.66 → 3.05**. One recipe,
+**feature.c 3.90 → 4.02** (leaves the Red band), **vision.c 2.66 → 3.16**. One recipe,
 one function per commit, except where the table says otherwise.
 
 | File | Function | Recipe | Cases | Code Health |
@@ -25,11 +25,21 @@ one function per commit, except where the table says otherwise.
 | vision.c | ConnectedComponentsImage: `NormalizeObjectStatistics` | E | 59 | 3.01 → 3.02 |
 | vision.c | ConnectedComponentsImage: `PrintObjectsHeader` | E | 59 | 3.02 → 3.04 |
 | vision.c | ConnectedComponentsImage: `PrintObject` | E | 59 | 3.04 → 3.05 |
+| feature.c | HoughLineImage: `SetHoughDrawOptions`, after the PR gate | E | 21 | 4.00 → 4.02 |
+| vision.c | SetObjectMergeByIds: `GetNextObjectIdRange`, `GetObjectIndex`, after the PR gate | E | 59 | 3.05 → 3.16 |
 
 `ConnectedComponentsImage` went from cc 202, 46 bumps and 813 lines to cc 142, 27 bumps
 and 659 lines. Every Recipe D duplicate was checked by script, token for token once
 comments are stripped and the one differing value (or the renamed variable) is
 substituted. The whole catalogue: 15,900 cases, 0 diverged.
+
+### CodeScene's PR gate
+
+The first push failed the gate although every file improved. `SetObjectMergeByIds`, a
+Recipe D helper of this batch, had a Bumpy Road (a critical rule). `HoughLineImage` had
+grown six lines from the `HoughCell` locals, which the delta reported as a worsened
+Complex Method. The last two rows of the table fix both. The local pre-commit gate
+checks only that the score does not drop, so it did not catch either.
 
 ### Tried and refused
 
