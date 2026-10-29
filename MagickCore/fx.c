@@ -859,6 +859,17 @@ static MagickBooleanType InitFx (FxInfo * pfx, const Image * img,
   return MagickTrue;
 }
 
+static void DestroyImgViews (FxInfo * pfx)
+{
+  ssize_t i;
+
+  for (i = (ssize_t)GetImageListLength(pfx->image); i > 0; i--) {
+    ImgT * pimg = &pfx->Imgs[i-1];
+    pimg->View = DestroyCacheView (pimg->View);
+  }
+  pfx->Imgs=(ImgT *) RelinquishMagickMemory (pfx->Imgs);
+}
+
 static MagickBooleanType DeInitFx (FxInfo * pfx)
 {
   ssize_t i;
@@ -866,11 +877,7 @@ static MagickBooleanType DeInitFx (FxInfo * pfx)
   if (pfx->Images) pfx->Images = (Image**) RelinquishMagickMemory (pfx->Images);
 
   if (pfx->Imgs) {
-    for (i = (ssize_t)GetImageListLength(pfx->image); i > 0; i--) {
-      ImgT * pimg = &pfx->Imgs[i-1];
-      pimg->View = DestroyCacheView (pimg->View);
-    }
-    pfx->Imgs=(ImgT *) RelinquishMagickMemory (pfx->Imgs);
+    DestroyImgViews (pfx);
   }
   pfx->random_infos = DestroyRandomInfoTLS (pfx->random_infos);
 
