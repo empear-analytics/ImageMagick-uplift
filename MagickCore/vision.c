@@ -816,38 +816,53 @@ static void SetObjectMergeByColor(CCObjectInfo *object,const size_t colors,
       object[i].merge=merge;
 }
 
-static void SetObjectMergeByIds(CCObjectInfo *object,const size_t colors,
-  const char *artifact,const MagickBooleanType merge)
+static inline ssize_t GetObjectIndex(const ssize_t id,const size_t colors)
+{
+  if (id < 0)
+    return(id+(ssize_t) colors);
+  return(id);
+}
+
+static MagickBooleanType GetNextObjectIdRange(char **cursor,
+  const size_t colors,ssize_t *first,ssize_t *last)
 {
   char
     *c,
     *d;
+
+  c=(*cursor);
+  while ((isspace((int) ((unsigned char) *c)) != 0) || (*c == ','))
+    c++;
+  d=c;
+  *first=(ssize_t) strtol(c,&d,10);
+  if (d == c)
+    return(MagickFalse);
+  c=d;
+  *first=GetObjectIndex(*first,colors);
+  *last=(*first);
+  while (isspace((int) ((unsigned char) *c)) != 0)
+    c++;
+  if (*c == '-')
+    *last=GetObjectIndex((ssize_t) strtol(c+1,&c,10),colors);
+  *cursor=c;
+  return(MagickTrue);
+}
+
+static void SetObjectMergeByIds(CCObjectInfo *object,const size_t colors,
+  const char *artifact,const MagickBooleanType merge)
+{
+  char
+    *c;
 
   ssize_t
     first,
     last,
     step;
 
-  for (c=(char *) artifact; *c != '\0'; )
+  c=(char *) artifact;
+  while ((*c != '\0') &&
+         (GetNextObjectIdRange(&c,colors,&first,&last) != MagickFalse))
   {
-    while ((isspace((int) ((unsigned char) *c)) != 0) || (*c == ','))
-      c++;
-    d=c;
-    first=(ssize_t) strtol(c,&d,10);
-    if (d == c)
-      break;
-    c=d;
-    if (first < 0)
-      first+=(ssize_t) colors;
-    last=first;
-    while (isspace((int) ((unsigned char) *c)) != 0)
-      c++;
-    if (*c == '-')
-      {
-        last=(ssize_t) strtol(c+1,&c,10);
-        if (last < 0)
-          last+=(ssize_t) colors;
-      }
     step=(ssize_t) (first > last ? -1 : 1);
     for ( ; first != (last+step); first+=step)
       if ((first >= 0) &&
