@@ -172,6 +172,13 @@ static inline MagickBooleanType IsAuthenticPixel(const Image *image,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsUntracedEdgePixel(const Image *edge_image,
+  const Quantum *q,const CannyInfo pixel,const double lower_threshold)
+{
+  return(((GetPixelIntensity(edge_image,q) == 0.0) &&
+    (pixel.intensity >= lower_threshold)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   const ssize_t y,ExceptionInfo *exception)
 {
@@ -243,8 +250,8 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
         status=GetMatrixElement(canny_cache,edge.x+u,edge.y+v,&pixel);
         if (status == MagickFalse)
           return(MagickFalse);
-        if ((GetPixelIntensity(edge_image,q) == 0.0) &&
-            (pixel.intensity >= lower_threshold))
+        if (IsUntracedEdgePixel(edge_image,q,pixel,lower_threshold) !=
+            MagickFalse)
           {
             *q=QuantumRange;
             status=SyncCacheViewAuthenticPixels(edge_view,exception);
@@ -746,9 +753,27 @@ static Image *RenderHoughLines(const ImageInfo *image_info,const size_t columns,
   return(GetFirstImageInList(image));
 }
 
-static void VoteHoughLines(MatrixInfo *accumulator,const PointInfo *center,
-  const ssize_t x,const ssize_t y,const double hough_height)
+typedef struct _HoughCell
 {
+  ssize_t
+    x,
+    y;
+} HoughCell;
+
+typedef struct _HoughWindow
+{
+  size_t
+    width,
+    height;
+} HoughWindow;
+
+static void VoteHoughLines(MatrixInfo *accumulator,const PointInfo *center,
+  const HoughCell *cell,const double hough_height)
+{
+  const ssize_t
+    x = cell->x,
+    y = cell->y;
+
   ssize_t
     i;
 
@@ -769,10 +794,14 @@ static void VoteHoughLines(MatrixInfo *accumulator,const PointInfo *center,
 }
 
 static MagickBooleanType WriteHoughHeader(const Image *image,const int file,
-  const size_t width,const size_t height,const size_t threshold)
+  const HoughWindow *window,const size_t threshold)
 {
   char
     message[MagickPathExtent];
+
+  const size_t
+    width = window->width,
+    height = window->height;
 
   MagickBooleanType
     status;
@@ -794,9 +823,17 @@ static MagickBooleanType WriteHoughHeader(const Image *image,const int file,
   return(status);
 }
 
-static double GetHoughMaxima(const MatrixInfo *accumulator,const ssize_t x,
-  const ssize_t y,const size_t width,const size_t height,double count)
+static double GetHoughMaxima(const MatrixInfo *accumulator,
+  const HoughCell *cell,const HoughWindow *window,double count)
 {
+  const size_t
+    width = window->width,
+    height = window->height;
+
+  const ssize_t
+    x = cell->x,
+    y = cell->y;
+
   double
     maxima;
 
@@ -864,6 +901,25 @@ static SegmentInfo GetHoughLine(const Image *image,const ssize_t x,
   return(line);
 }
 
+static void SetHoughDrawOptions(const Image *image,ImageInfo *image_info)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"background");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"background",artifact);
+  artifact=GetImageArtifact(image,"fill");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"fill",artifact);
+  artifact=GetImageArtifact(image,"stroke");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"stroke",artifact);
+  artifact=GetImageArtifact(image,"strokewidth");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"strokewidth",artifact);
+}
+
 MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const size_t height,const size_t threshold,ExceptionInfo *exception)
 {
@@ -881,6 +937,9 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
 
   double
     hough_height;
+
+  const HoughWindow
+    window = { width, height };
 
   Image
     *lines_image = NULL;
@@ -959,8 +1018,11 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
+      const HoughCell
+        cell = { x, y };
+
       if (GetPixelIntensity(image,p) > ((double) QuantumRange/2.0))
-        VoteHoughLines(accumulator,&center,x,y,hough_height);
+        VoteHoughLines(accumulator,&center,&cell,hough_height);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -992,7 +1054,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       accumulator=DestroyMatrixInfo(accumulator);
       return((Image *) NULL);
     }
-  status=WriteHoughHeader(image,file,width,height,threshold);
+  status=WriteHoughHeader(image,file,&window,threshold);
   line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
   if (threshold != 0)
     line_count=threshold;
@@ -1009,6 +1071,9 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
       (void) GetMatrixElement(accumulator,x,y,&count);
       if (count >= (double) line_count)
         {
+          const HoughCell
+            cell = { x, y };
+
           double
             maxima;
 
@@ -1018,7 +1083,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
           /*
             Is point a local maxima?
           */
-          maxima=GetHoughMaxima(accumulator,x,y,width,height,count);
+          maxima=GetHoughMaxima(accumulator,&cell,&window,count);
           (void) GetMatrixElement(accumulator,x,y,&count);
           if (maxima > count)
             continue;
@@ -1038,18 +1103,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   image_info=AcquireImageInfo();
   image_info->background_color=image->background_color;
   (void) FormatLocaleString(image_info->filename,MagickPathExtent,"%s",path);
-  artifact=GetImageArtifact(image,"background");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"background",artifact);
-  artifact=GetImageArtifact(image,"fill");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"fill",artifact);
-  artifact=GetImageArtifact(image,"stroke");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"stroke",artifact);
-  artifact=GetImageArtifact(image,"strokewidth");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"strokewidth",artifact);
+  SetHoughDrawOptions(image,image_info);
   lines_image=RenderHoughLines(image_info,image->columns,image->rows,exception);
   artifact=GetImageArtifact(image,"hough-lines:accumulator");
   if ((lines_image != (Image *) NULL) &&

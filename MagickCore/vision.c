@@ -794,6 +794,251 @@ static inline MagickBooleanType IsGreaterAdjacentObject(
     (neighbors[j] < id))) ? MagickTrue : MagickFalse);
 }
 
+static void MergeObjectsOutsideRange(CCObjectInfo *object,const size_t colors,
+  const ssize_t n,const CCThresholdRange *range)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) colors; i++)
+    if (IsMetricOutsideRange(object,i,n,range) != MagickFalse)
+      object[i].merge=MagickTrue;
+}
+
+static void SetObjectMergeByColor(CCObjectInfo *object,const size_t colors,
+  const PixelInfo *pixel,const MagickBooleanType merge)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) colors; i++)
+    if (IsFuzzyEquivalencePixelInfo(&object[i].color,pixel) != MagickFalse)
+      object[i].merge=merge;
+}
+
+static inline ssize_t GetObjectIndex(const ssize_t id,const size_t colors)
+{
+  if (id < 0)
+    return(id+(ssize_t) colors);
+  return(id);
+}
+
+static MagickBooleanType GetNextObjectIdRange(char **cursor,
+  const size_t colors,ssize_t *first,ssize_t *last)
+{
+  char
+    *c,
+    *d;
+
+  c=(*cursor);
+  while ((isspace((int) ((unsigned char) *c)) != 0) || (*c == ','))
+    c++;
+  d=c;
+  *first=(ssize_t) strtol(c,&d,10);
+  if (d == c)
+    return(MagickFalse);
+  c=d;
+  *first=GetObjectIndex(*first,colors);
+  *last=(*first);
+  while (isspace((int) ((unsigned char) *c)) != 0)
+    c++;
+  if (*c == '-')
+    *last=GetObjectIndex((ssize_t) strtol(c+1,&c,10),colors);
+  *cursor=c;
+  return(MagickTrue);
+}
+
+static void SetObjectMergeByIds(CCObjectInfo *object,const size_t colors,
+  const char *artifact,const MagickBooleanType merge)
+{
+  char
+    *c;
+
+  ssize_t
+    first,
+    last,
+    step;
+
+  c=(char *) artifact;
+  while ((*c != '\0') &&
+         (GetNextObjectIdRange(&c,colors,&first,&last) != MagickFalse))
+  {
+    step=(ssize_t) (first > last ? -1 : 1);
+    for ( ; first != (last+step); first+=step)
+      if ((first >= 0) &&
+          (first < (ssize_t) colors))
+        object[first].merge=merge;
+  }
+}
+
+static MagickBooleanType SetEquivalencePathRoot(MatrixInfo *equivalences,
+  const ssize_t ox,const ssize_t root)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    obj;
+
+  status=GetMatrixElement(equivalences,ox,0,&obj);
+  while (obj != root)
+  {
+    status=GetMatrixElement(equivalences,ox,0,&obj);
+    status=SetMatrixElement(equivalences,ox,0,&root);
+  }
+  return(status);
+}
+
+static ssize_t GetObjectSortKey(const Image *image)
+{
+  const char
+    *artifact;
+
+  ssize_t
+    key;
+
+  key=0;
+  artifact=GetImageArtifact(image,"connected-components:sort");
+  if (artifact != (const char *) NULL)
+    {
+      if (LocaleCompare(artifact,"area") == 0)
+        key=1;
+      if (LocaleCompare(artifact,"width") == 0)
+        key=2;
+      if (LocaleCompare(artifact,"height") == 0)
+        key=3;
+      if (LocaleCompare(artifact,"x") == 0)
+        key=4;
+      if (LocaleCompare(artifact,"y") == 0)
+        key=5;
+    }
+  return(key);
+}
+
+static ssize_t GetObjectSortOrder(const Image *image)
+{
+  const char
+    *artifact;
+
+  ssize_t
+    order;
+
+  order=1;
+  artifact=GetImageArtifact(image,"connected-components:sort-order");
+  if (artifact != (const char *) NULL)
+    if (LocaleCompare(artifact,"decreasing") == 0)
+      order=(-1);
+  return(order);
+}
+
+static size_t GetGreatestAdjacentObject(const CCObjectInfo *object,
+  const size_t *neighbors,const size_t count)
+{
+  size_t
+    id;
+
+  ssize_t
+    j;
+
+  id=0;
+  for (j=0; j < (ssize_t) count; j++)
+    if (IsGreaterAdjacentObject(object,neighbors,j,id) != MagickFalse)
+      id=neighbors[j];
+  return(id);
+}
+
+static void ResetObjectStatistics(const Image *component_image,
+  CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+  {
+    object[i].bounding_box.width=0;
+    object[i].bounding_box.height=0;
+    object[i].bounding_box.x=(ssize_t) component_image->columns;
+    object[i].bounding_box.y=(ssize_t) component_image->rows;
+    object[i].centroid.x=0;
+    object[i].centroid.y=0;
+    object[i].census=object[i].area == 0.0 ? 0.0 : 1.0;
+    object[i].area=0;
+  }
+}
+
+static void NormalizeObjectStatistics(const Image *component_image,
+  CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+  {
+    object[i].bounding_box.width=(size_t) ((ssize_t)
+      object[i].bounding_box.width-(object[i].bounding_box.x-1));
+    object[i].bounding_box.height=(size_t) ((ssize_t)
+      object[i].bounding_box.height-(object[i].bounding_box.y-1));
+    object[i].centroid.x=object[i].centroid.x/object[i].area;
+    object[i].centroid.y=object[i].centroid.y/object[i].area;
+  }
+}
+
+static void PrintObjectsHeader(const Image *image,const char **metrics,
+  const ssize_t n)
+{
+  const char
+    *artifact;
+
+  ssize_t
+    j;
+
+  artifact=GetImageArtifact(image,
+    "connected-components:exclude-header");
+  if (IsStringTrue(artifact) == MagickFalse)
+    {
+      (void) fprintf(stdout,"Objects (");
+      artifact=GetImageArtifact(image,
+        "connected-components:exclude-ids");
+      if (IsStringTrue(artifact) == MagickFalse)
+        (void) fprintf(stdout,"id: ");
+      (void) fprintf(stdout,"bounding-box centroid area mean-color");
+      for (j=0; j <= n; j++)
+        (void) fprintf(stdout," %s",metrics[j]);
+      (void) fprintf(stdout,"):\n");
+    }
+}
+
+static void PrintObject(const Image *image,const CCObjectInfo *object,
+  const ssize_t i,const ssize_t n)
+{
+  char
+    mean_color[MagickPathExtent];
+
+  const char
+    *artifact;
+
+  ssize_t
+    j;
+
+  GetColorTuple(&object[i].color,MagickFalse,mean_color);
+  (void) fprintf(stdout,"  ");
+  artifact=GetImageArtifact(image,
+    "connected-components:exclude-ids");
+  if (IsStringTrue(artifact) == MagickFalse)
+    (void) fprintf(stdout,"%.17g: ",(double) object[i].id);
+  (void) fprintf(stdout,
+    "%.17gx%.17g%+.20g%+.20g %.1f,%.1f %.*g %s",(double)
+    object[i].bounding_box.width,(double)
+    object[i].bounding_box.height,(double)
+    object[i].bounding_box.x,(double) object[i].bounding_box.y,
+    object[i].centroid.x,object[i].centroid.y,
+    GetMagickPrecision(),(double) object[i].area,mean_color);
+  for (j=0; j <= n; j++)
+    (void) fprintf(stdout," %.*g",GetMagickPrecision(),
+      object[i].metric[j]);
+  (void) fprintf(stdout,"\n");
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -806,10 +1051,6 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 
   CCObjectInfo
     *object;
-
-  char
-    *c,
-    *d;
 
   const char
     *artifact,
@@ -841,11 +1082,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } },
     dx,
     dy,
-    first,
     i,
-    last,
     n,
-    step,
     y;
 
   /*
@@ -995,19 +1233,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
             root=oy;
           }
         ox=offset;
-        status=GetMatrixElement(equivalences,ox,0,&obj);
-        while (obj != root)
-        {
-          status=GetMatrixElement(equivalences,ox,0,&obj);
-          status=SetMatrixElement(equivalences,ox,0,&root);
-        }
+        status=SetEquivalencePathRoot(equivalences,ox,root);
         oy=offset+neighbor_offset;
-        status=GetMatrixElement(equivalences,oy,0,&obj);
-        while (obj != root)
-        {
-          status=GetMatrixElement(equivalences,oy,0,&obj);
-          status=SetMatrixElement(equivalences,oy,0,&root);
-        }
+        status=SetEquivalencePathRoot(equivalences,oy,root);
         status=SetMatrixElement(equivalences,y*(ssize_t) image->columns+x,0,
           &root);
         p+=(ptrdiff_t) GetPixelChannels(image);
@@ -1176,9 +1404,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
           MagickPathExtent));
         (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-        for (i=0; i < (ssize_t) component_image->colors; i++)
-          if (IsFuzzyEquivalencePixelInfo(&object[i].color,&pixel) != MagickFalse)
-            object[i].merge=MagickFalse;
+        SetObjectMergeByColor(object,component_image->colors,&pixel,MagickFalse);
         if (*q == '\0')
           break;
         p=q+1;
@@ -1194,32 +1420,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       */
       for (i=0; i < (ssize_t) component_image->colors; i++)
         object[i].merge=MagickTrue;
-      for (c=(char *) artifact; *c != '\0'; )
-      {
-        while ((isspace((int) ((unsigned char) *c)) != 0) || (*c == ','))
-          c++;
-        d=c;
-        first=(ssize_t) strtol(c,&d,10);
-        if (d == c)
-          break;
-        c=d;
-        if (first < 0)
-          first+=(ssize_t) component_image->colors;
-        last=first;
-        while (isspace((int) ((unsigned char) *c)) != 0)
-          c++;
-        if (*c == '-')
-          {
-            last=(ssize_t) strtol(c+1,&c,10);
-            if (last < 0)
-              last+=(ssize_t) component_image->colors;
-          }
-        step=(ssize_t) (first > last ? -1 : 1);
-        for ( ; first != (last+step); first+=step)
-          if ((first >= 0) &&
-              (first < (ssize_t) component_image->colors))
-            object[first].merge=MagickFalse;
-      }
+      SetObjectMergeByIds(object,component_image->colors,artifact,MagickFalse);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-top");
   if (artifact != (const char *) NULL)
@@ -1283,9 +1484,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
           MagickPathExtent));
         (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-        for (i=0; i < (ssize_t) component_image->colors; i++)
-          if (IsFuzzyEquivalencePixelInfo(&object[i].color,&pixel) != MagickFalse)
-            object[i].merge=MagickTrue;
+        SetObjectMergeByColor(object,component_image->colors,&pixel,MagickTrue);
         if (*q == '\0')
           break;
         p=q+1;
@@ -1295,34 +1494,11 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   if (artifact == (const char *) NULL)
     artifact=GetImageArtifact(image,"connected-components:remove");
   if (artifact != (const char *) NULL)
-    for (c=(char *) artifact; *c != '\0'; )
     {
       /*
         Remove selected objects based on id, keep others.
       */
-      while ((isspace((int) ((unsigned char) *c)) != 0) || (*c == ','))
-        c++;
-      d=c;
-      first=(ssize_t) strtol(c,&d,10);
-      if (d == c)
-        break;
-      c=d;
-      if (first < 0)
-        first+=(ssize_t) component_image->colors;
-      last=first;
-      while (isspace((int) ((unsigned char) *c)) != 0)
-        c++;
-      if (*c == '-')
-        {
-          last=(ssize_t) strtol(c+1,&c,10);
-          if (last < 0)
-            last+=(ssize_t) component_image->colors;
-        }
-      step=(ssize_t) (first > last ? -1 : 1);
-      for ( ; first != (last+step); first+=step)
-        if ((first >= 0) &&
-            (first < (ssize_t) component_image->colors))
-          object[first].merge=MagickTrue;
+      SetObjectMergeByIds(object,component_image->colors,artifact,MagickTrue);
     }
   artifact=GetImageArtifact(image,"connected-components:perimeter-threshold");
   if (artifact != (const char *) NULL)
@@ -1338,9 +1514,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="perimeter";
       PerimeterThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:circularity-threshold");
   if (artifact != (const char *) NULL)
@@ -1356,9 +1530,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="circularity";
       CircularityThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:diameter-threshold");
   if (artifact != (const char *) NULL)
@@ -1394,9 +1566,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="major-axis";
       MajorAxisThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:minor-axis-threshold");
   if (artifact != (const char *) NULL)
@@ -1412,9 +1582,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="minor-axis";
       MinorAxisThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:eccentricity-threshold");
   if (artifact != (const char *) NULL)
@@ -1430,9 +1598,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="eccentricity";
       EccentricityThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   artifact=GetImageArtifact(image,"connected-components:angle-threshold");
   if (artifact != (const char *) NULL)
@@ -1448,9 +1614,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.background_id=background_id;
       metrics[++n]="angle";
       AngleThreshold(component_image,object,n,exception);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      MergeObjectsOutsideRange(object,component_image->colors,n,&range);
     }
   /*
     Merge any object not within the min and max area threshold.
@@ -1546,10 +1710,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     /*
       Merge with object of greatest adjacent area.
     */
-    id=0;
-    for (j=0; j < (ssize_t) count; j++)
-      if (IsGreaterAdjacentObject(object,neighbors,j,id) != MagickFalse)
-        id=neighbors[j];
+    id=GetGreatestAdjacentObject(object,neighbors,count);
     for (j=0; j < (ssize_t) count; j++)
       object[neighbors[j]].census=0.0;
     object[i].area=0.0;
@@ -1604,17 +1765,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Report statistics on each unique object.
       */
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-      {
-        object[i].bounding_box.width=0;
-        object[i].bounding_box.height=0;
-        object[i].bounding_box.x=(ssize_t) component_image->columns;
-        object[i].bounding_box.y=(ssize_t) component_image->rows;
-        object[i].centroid.x=0;
-        object[i].centroid.y=0;
-        object[i].census=object[i].area == 0.0 ? 0.0 : 1.0;
-        object[i].area=0;
-      }
+      ResetObjectStatistics(component_image,object);
       component_view=AcquireVirtualCacheView(component_image,exception);
       for (y=0; y < (ssize_t) component_image->rows; y++)
       {
@@ -1653,83 +1804,20 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           p+=(ptrdiff_t) GetPixelChannels(component_image);
         }
       }
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-      {
-        object[i].bounding_box.width=(size_t) ((ssize_t)
-          object[i].bounding_box.width-(object[i].bounding_box.x-1));
-        object[i].bounding_box.height=(size_t) ((ssize_t)
-          object[i].bounding_box.height-(object[i].bounding_box.y-1));
-        object[i].centroid.x=object[i].centroid.x/object[i].area;
-        object[i].centroid.y=object[i].centroid.y/object[i].area;
-      }
+      NormalizeObjectStatistics(component_image,object);
       component_view=DestroyCacheView(component_view);
-      order=1;
-      artifact=GetImageArtifact(image,"connected-components:sort-order");
-      if (artifact != (const char *) NULL)
-        if (LocaleCompare(artifact,"decreasing") == 0)
-          order=(-1);
-      key=0;
-      artifact=GetImageArtifact(image,"connected-components:sort");
-      if (artifact != (const char *) NULL)
-        {
-          if (LocaleCompare(artifact,"area") == 0)
-            key=1;
-          if (LocaleCompare(artifact,"width") == 0)
-            key=2;
-          if (LocaleCompare(artifact,"height") == 0)
-            key=3;
-          if (LocaleCompare(artifact,"x") == 0)
-            key=4;
-          if (LocaleCompare(artifact,"y") == 0)
-            key=5;
-        }
+      order=GetObjectSortOrder(image);
+      key=GetObjectSortKey(image);
       for (i=0; i < (ssize_t) component_image->colors; i++)
          object[i].key=order*key;
       qsort((void *) object,component_image->colors,sizeof(*object),
         CCObjectInfoCompare);
       if (objects == (CCObjectInfo **) NULL)
         {
-          ssize_t
-            j;
-
-          artifact=GetImageArtifact(image,
-            "connected-components:exclude-header");
-          if (IsStringTrue(artifact) == MagickFalse)
-            {
-              (void) fprintf(stdout,"Objects (");
-              artifact=GetImageArtifact(image,
-                "connected-components:exclude-ids");
-              if (IsStringTrue(artifact) == MagickFalse)
-                (void) fprintf(stdout,"id: ");
-              (void) fprintf(stdout,"bounding-box centroid area mean-color");
-              for (j=0; j <= n; j++)
-                (void) fprintf(stdout," %s",metrics[j]);
-              (void) fprintf(stdout,"):\n");
-            }
+          PrintObjectsHeader(image,metrics,n);
           for (i=0; i < (ssize_t) component_image->colors; i++)
             if (object[i].census > 0.0)
-              {
-                char
-                  mean_color[MagickPathExtent];
-
-                GetColorTuple(&object[i].color,MagickFalse,mean_color);
-                (void) fprintf(stdout,"  ");
-                artifact=GetImageArtifact(image,
-                  "connected-components:exclude-ids");
-                if (IsStringTrue(artifact) == MagickFalse)
-                  (void) fprintf(stdout,"%.17g: ",(double) object[i].id);
-                (void) fprintf(stdout,
-                  "%.17gx%.17g%+.20g%+.20g %.1f,%.1f %.*g %s",(double)
-                  object[i].bounding_box.width,(double)
-                  object[i].bounding_box.height,(double)
-                  object[i].bounding_box.x,(double) object[i].bounding_box.y,
-                  object[i].centroid.x,object[i].centroid.y,
-                  GetMagickPrecision(),(double) object[i].area,mean_color);
-                for (j=0; j <= n; j++)
-                  (void) fprintf(stdout," %.*g",GetMagickPrecision(),
-                    object[i].metric[j]);
-                (void) fprintf(stdout,"\n");
-              }
+              PrintObject(image,object,i,n);
         }
     }
   if (objects == (CCObjectInfo **) NULL)
