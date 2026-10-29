@@ -4024,11 +4024,11 @@ static Quantum *CopyTextureSpan(const TextureSpan *span,const Quantum *p,
   return(q);
 }
 
+#define TextureImageTag  "Texture/Image"
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
-#define TextureImageTag  "Texture/Image"
-
   CacheView
     *image_view,
     *texture_view;
