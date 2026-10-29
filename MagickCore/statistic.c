@@ -481,6 +481,18 @@ static Image *AcquireImageCanvas(const Image *images,ExceptionInfo *exception)
   return(CloneImage(q,columns,rows,MagickTrue,exception));
 }
 
+static void ClearPolynomialPixels(const Image *image,
+  PixelChannels *polynomial_pixel)
+{
+  ssize_t
+    i,
+    j;
+
+  for (j=0; j < (ssize_t) image->columns; j++)
+    for (i=0; i < MaxPixelChannels; i++)
+      polynomial_pixel[j].channel[i]=0.0;
+}
+
 static void SetEvaluateMedianPixel(const Image *image,
   const PixelChannels *evaluate_pixel,const size_t number_images,
   Quantum *magick_restrict q)
@@ -766,9 +778,7 @@ MagickExport Image *EvaluateImages(const Image *images,
             continue;
           }
         evaluate_pixel=evaluate_pixels[id];
-        for (j=0; j < (ssize_t) image->columns; j++)
-          for (i=0; i < MaxPixelChannels; i++)
-            evaluate_pixel[j].channel[i]=0.0;
+        ClearPolynomialPixels(image,evaluate_pixel);
         next=images;
         for (j=0; j < (ssize_t) number_images; j++)
         {
@@ -2025,17 +2035,6 @@ static void SetPolynomialPixels(const Image *image,
   }
 }
 
-static void ClearPolynomialPixels(const Image *image,
-  PixelChannels *polynomial_pixel)
-{
-  ssize_t
-    i,
-    j;
-
-  for (j=0; j < (ssize_t) image->columns; j++)
-    for (i=0; i < MaxPixelChannels; i++)
-      polynomial_pixel[j].channel[i]=0.0;
-}
 
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
