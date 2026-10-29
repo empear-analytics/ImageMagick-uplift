@@ -1507,6 +1507,99 @@ probe of the work-image clone: nesting 6 to 5, 2.46 to 2.51. Cleanup labels reac
 
 ---
 
+## Recipe W - Extract Block Returning Success for an Early Return
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method*, *Large Method* or
+*Code Duplication*, and the block that would fix it stands in the middle of a function and
+leaves it on failure through `return(R);`, as `xml-tree.c`'s buffer-growing blocks do
+(`return((char *) NULL);` when the reallocation fails).
+
+**Not covered by:** Recipe E, whose step 6 covers only the `return` hidden in the throw
+macros and whose step 7 only a block that ends the function; Recipe V, whose block leaves
+through `goto`; Recipes O, T, K, J, N, Q and U, whose blocks may not contain `return`;
+Recipe D, whose copies are moved whole and so may not leave the caller.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. Every
+   `return` in it is `return(R);` with the same expression `R`; it contains no `goto`,
+   and no `continue` or `break` that leaves it.
+2. `R` is a constant, or reads only what the block writes through a pointer the caller
+   also holds (`*source`), so the caller evaluating `R` after the call gets the value the
+   block's `return` would have returned.
+3. The block writes no plain local of the caller. Writes through pointers it already uses
+   stay as they are; variables it declares move with it.
+4. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. Each `return(R);` becomes `return(MagickFalse);`, and the function ends with
+   `return(MagickTrue);`. Nothing else in the text changes.
+5. Pass what the block reads, at most four parameters. A side-effect-free expression the
+   block only reads (`xml_info->tag`) may go as one value parameter, every occurrence of
+   it in the text becoming that parameter.
+6. Where the block stood, write `if (Helper(...) == MagickFalse) return(R);` with the
+   block's own `R`, and check every argument against its parameter by reading.
+7. Another copy of the block, identical but for the expression of step 5 and its own `R`,
+   may call the same function the same way (Recipe D), one commit per caller.
+
+**Before:**
+
+```c
+  if ((*length+strlen(xml_info->tag)+MagickPathExtent) > *extent)
+    {
+      *extent=(*length)+strlen(xml_info->tag)+MagickPathExtent;
+      *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
+      if (*source == (char *) NULL)
+        return(*source);
+    }
+  *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
+    "<%s",xml_info->tag);
+```
+
+**After:**
+
+```c
+static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
+  size_t *extent,const char *text)
+{
+  if ((*length+strlen(text)+MagickPathExtent) > *extent)
+    {
+      *extent=(*length)+strlen(text)+MagickPathExtent;
+      *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
+      if (*source == (char *) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+...
+  if (ExtendXMLBuffer(source,length,extent,xml_info->tag) == MagickFalse)
+    return(*source);
+  *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
+    "<%s",xml_info->tag);
+```
+
+**Careful:**
+
+- On a failure path the caller returns from the same point as before, with the same
+  value: a constant, or what the block left behind the pointer.
+- On the success path the function returns at the block's end and the caller goes on
+  with the next statement, where the block fell through.
+- A step-5 expression is evaluated once at the call instead of at each use; that is the
+  same value only when nothing in the block can change what it reads. Check it by
+  reading (here the block writes `*extent` and `*source`, and the expression reads
+  neither).
+- The failure paths are mostly allocation failures that no case reaches: the oracle
+  checks the success path; the failure path is checked by reading, each `return(R);`
+  against its `return(MagickFalse);`, and `refactor_guard.py --calls`.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 and 5
+checked by reading.
+
+**Provenance:** 2026-10-29, from `xml-tree.c`'s `XMLTreeTagToXML` (four buffer-growing
+blocks) and `EncodePredefinedEntities` (a fifth), each leaving through `return`; a probe
+of all five: 2.39 to 2.44. Added by Claude Code (Claude Opus 5.5) during task M112, under
+the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -1855,5 +1948,6 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | AMEND | E | Step 7: inside a `switch` case, a block after which the case runs only its closing `break;` may contain `break;` statements of that `switch` when its single output is one variable: the new function takes it by value and returns it, each such `break;` becomes `return(v);`, and the block becomes `v=Helper(...);`, so both reach the case's end with the same value | `fx.c`'s `ExecuteRPN`: its pixel-lookup cases (`fU`, `fU0`, `fUP`, `fS`/`fV`, `fP`/`fSP`/`fVP`) hold its nesting of 8 and each sets `regA` and leaves the `switch` by `break` from inside nested `if`s. A probe removing them: depth 8 to 4, fx.c 2.62 to 2.92 | mandate (2026-10-24) |
 | 2026-10-29 | NEW | U | Extract Function Returning the Loop Status Taking an Input Struct: a Recipe T block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and the written row pointers by value; the caller writes `status=MagickFalse` from its result (Recipe T) | `FxImage`'s per-channel loop inside its parallel row loop (seven inputs and `status`): T gives seven parameters, N refuses the `status` write, the whole column loop is a Complex Method (cc 9). A probe: FxImage leaves Deep, Nested Complexity, fx.c 2.74 to 2.80 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | Q | Step 1: a block in a function with no OpenMP region (a sequential pass) qualifies, its written variables being plain locals of the caller (Recipe O step 2); *Careful* notes the cursors (`k`, `pixels`) such a block advances for the next call | `morphology.c`'s `MorphologyPrimitiveDirect`: its forward pass repeats one kernel-row body (`pixel`, `k`, `pixels` written; `image`, `kernel`, `i` read) in the Distance and Voronoi double loops; the function is sequential (two views of one image), so Recipe K's parallel-body wording refuses it, Recipe E step 4 refuses three outputs and Recipe O wants a selection. A probe of the row helper at both sites: nesting 6 to 5, 2.41 to 2.46 | mandate (2026-10-24) |
+| 2026-10-29 | NEW | W | Extract Block Returning Success for an Early Return: a block outside OpenMP that leaves through `return(R);`, `R` a constant or read through a pointer the caller holds, and writes no caller local, moves to a `static MagickBooleanType` function, each `return(R);` becoming `return(MagickFalse);`; the caller writes `if (Helper(...) == MagickFalse) return(R);`, and identical copies call the same function (D) | `xml-tree.c`'s five buffer-growing blocks in `XMLTreeTagToXML` and `EncodePredefinedEntities`, refused by E (a mid-function `return`) and V (no `goto`). A probe of all five: 2.39 to 2.44 | mandate (2026-10-24) |
 | 2026-10-29 | NEW | V | Extract Block Returning Success for a Cleanup Jump: a block outside OpenMP that leaves through `goto L;` and writes at most one caller local moves to a `static MagickBooleanType` function, each `goto L;` becoming `return(MagickFalse);`, the local passed by pointer; the caller writes `if (Helper(...) == MagickFalse) goto L;` | `MorphologyApply`'s work-image clone inside four nested loops (nesting 6), refused by every extraction recipe for its `goto error_cleanup`; the plateau of the earlier W07 pass on `morphology.c`. A probe: nesting 6 to 5, 2.46 to 2.51 | mandate (2026-10-24) |
 | 2026-10-28 | AMEND | E | Step 4: a variable the block writes but nothing after it reads is not counted; the new function declares it with its initialiser, when nothing between that declaration and the block writes it (Recipes T and J already say "or is not read after it"); `tools/extract_case.py` applies it to one case of a function's closing `switch` | quantum-import.c's `Import*Quantum`: each depth case advances the span's `p` and `q` to the end of the function; extracting the cases raised the file 1.88 → 2.34, the fallthrough chains (24, 64, default) 2.34 → 2.59 in a probe | mandate (2026-10-24) |
