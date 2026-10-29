@@ -4021,6 +4021,54 @@ static void FormatMorphologyStage(char *v_info,const MorphologyStage *stage)
     v_info[0] = '\0';
 }
 
+typedef struct _MorphologyPassReport
+{
+  MorphologyMethod
+    primitive;
+
+  KernelInfo
+    *this_kernel,
+    *rflt_kernel;
+
+  size_t
+    method_loop,
+    kernel_number,
+    kernel_loop,
+    count;
+
+  ssize_t
+    changed;
+} MorphologyPassReport;
+
+static void ReportMorphologyPass(const char *v_info,
+  const MorphologyPassReport *report)
+{
+  const MorphologyMethod
+    primitive = report->primitive;
+
+  KernelInfo
+    *const this_kernel = report->this_kernel,
+    *const rflt_kernel = report->rflt_kernel;
+
+  const size_t
+    method_loop = report->method_loop,
+    kernel_number = report->kernel_number,
+    kernel_loop = report->kernel_loop,
+    count = report->count;
+
+  const ssize_t
+    changed = report->changed;
+
+  if ( kernel_loop > 1 )
+    (void) FormatLocaleFile(stderr, "\n"); /* add end-of-line from previous */
+  (void) (void) FormatLocaleFile(stderr,
+    "%s%s%s:%.17g.%.17g #%.17g => Changed %.17g",
+    v_info,CommandOptionToMnemonic(MagickMorphologyOptions,
+    primitive),(this_kernel == rflt_kernel ) ? "*" : "",
+    (double) (method_loop+kernel_loop-1),(double) kernel_number,
+    (double) count,(double) changed);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4328,14 +4376,18 @@ MagickPrivate Image *MorphologyApply(const Image *image,
           changed = MorphologyPrimitive(curr_image, work_image, &pass,
                        exception);
           if (verbose != MagickFalse) {
-            if ( kernel_loop > 1 )
-              (void) FormatLocaleFile(stderr, "\n"); /* add end-of-line from previous */
-            (void) (void) FormatLocaleFile(stderr,
-              "%s%s%s:%.17g.%.17g #%.17g => Changed %.17g",
-              v_info,CommandOptionToMnemonic(MagickMorphologyOptions,
-              primitive),(this_kernel == rflt_kernel ) ? "*" : "",
-              (double) (method_loop+kernel_loop-1),(double) kernel_number,
-              (double) count,(double) changed);
+            MorphologyPassReport
+              report;
+
+            report.primitive=primitive;
+            report.this_kernel=this_kernel;
+            report.rflt_kernel=rflt_kernel;
+            report.method_loop=method_loop;
+            report.kernel_number=kernel_number;
+            report.kernel_loop=kernel_loop;
+            report.count=count;
+            report.changed=changed;
+            ReportMorphologyPass(v_info,&report);
           }
           if ( changed < 0 )
             goto error_cleanup;
