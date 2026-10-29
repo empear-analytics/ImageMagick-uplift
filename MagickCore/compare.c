@@ -2089,6 +2089,13 @@ static void NormalizePHashSimilarity(const Image *image,
     (double) channel_phash[0].number_colorspaces);
 }
 
+static inline MagickBooleanType IsChannelSkipped(const PixelTrait traits,
+  const PixelTrait reconstruct_traits)
+{
+  return((((traits & UpdatePixelTrait) == 0) ||
+    ((reconstruct_traits & UpdatePixelTrait) == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType GetPHASHSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -2125,8 +2132,7 @@ static MagickBooleanType GetPHASHSimilarity(const Image *image,
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
       channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
+    if (IsChannelSkipped(traits,reconstruct_traits) != MagickFalse)
       continue;
     difference=AddPHashDifferences(channel_phash,reconstruct_phash,i,
       difference);
