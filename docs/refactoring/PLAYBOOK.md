@@ -1401,6 +1401,146 @@ the function leaves Deep, Nested Complexity, fx.c 2.74 to 2.80. Added by Claude 
 
 ---
 
+## Recipe W - Extract Accumulating Block Returning the Loop Status Taking an Input Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
+Method*, *Complex Method* or *Large Method*, and the block that would fix it meets Recipe J
+in every respect but one: with the variables it only reads as parameters, the new
+function would take five or more arguments (*Excess Number of Function Arguments*, which
+the pre-commit gate refuses on a new function). The typical case is a filter's
+per-channel kernel sum that fetches each tap from a cache view (`status=MagickFalse;` when
+the fetch fails) and adds into `pixel` and a kernel cursor `k`, reading the view, the
+offsets, the coordinates, the channel and `exception`.
+
+**Not covered by:** Recipe J, which passes every input as a parameter (nine to eleven
+arguments on `MotionBlurImage`'s kernel loops, M101); Recipe Q, whose block may not write
+`status`; Recipe U, which returns the status but passes no accumulator back; Recipe N,
+which refuses both. J then B is two commits, of which the first adds a finding.
+
+**How:**
+
+1. The block meets Recipe J steps 1 to 3: it lies in one iteration of a parallel loop
+   body with no `#pragma omp` line, no `return` or `goto`, and no `continue` or `break`
+   that leaves it; its only write to a variable declared outside the loop body is
+   `status=MagickFalse;`, and it does not read `status`; it writes at most four of the
+   loop body's own accumulators and cursors, each read after it or read in it before it
+   is written; every other loop-body variable it writes is declared in the block or not
+   read after it before being written again (declared in the new function instead).
+2. Put the variables it only reads, scalars and pointers, none written in the block, in
+   a struct as Recipe N steps 2 and 3 do: one member per variable, the variable's exact
+   type and name, a top-level `const` or `magick_restrict` left off. A written variable
+   is never a member.
+3. Cut the block into a new `static MagickBooleanType` function taking `const Name *name`
+   first, then one pointer per written accumulator or cursor, in the order the block
+   first writes them, at most four parameters in all. At the top of its body declare one
+   `const` local per member, as Recipe N step 4 does, then a local `status` set to
+   `MagickTrue` first, as Recipe J step 4 does.
+4. In the block's text write each written variable `v` as `*v` at every use, reads
+   included (`(*v)++` for `v++`, `(**k)` for `(*k)` where `k` is a pointer cursor), as
+   Recipe K step 4 does; every `status=MagickFalse;` stays; the function ends with
+   `return(status);`. Nothing else in the text changes.
+5. In the caller, declare the `Name` local at the top of the block holding the call, in
+   the parallel loop body, so each thread fills its own.
+6. Directly before the call, assign every member from the variable of its name, in
+   declaration order, with nothing between the assignments and the call.
+7. Where the block stood, write `if (Helper(&name,&v,...) == MagickFalse)
+   status=MagickFalse;`, and check every member and argument by reading.
+
+**Before:**
+
+```c
+        k=kernel;
+        pixel=0.0;
+        if ((blur_traits & BlendPixelTrait) == 0)
+          {
+            for (j=0; j < (ssize_t) width; j++)
+            {
+              r=GetCacheViewVirtualPixels(motion_view,x+offset[j].x,y+
+                offset[j].y,1,1,exception);
+              if (r == (const Quantum *) NULL)
+                {
+                  status=MagickFalse;
+                  continue;
+                }
+              pixel+=(*k)*(double) r[i];
+              k++;
+            }
+            SetPixelChannel(blur_image,channel,ClampToQuantum(pixel),q);
+            continue;
+          }
+```
+
+**After:**
+
+```c
+static MagickBooleanType SumMotionPixels(const MotionSum *sum,double *pixel,
+  MagickRealType **k)
+{
+  CacheView
+    *const motion_view = sum->motion_view;
+  ...
+  status=MagickTrue;
+  for (j=0; j < (ssize_t) width; j++)
+  {
+    r=GetCacheViewVirtualPixels(motion_view,x+offset[j].x,y+
+      offset[j].y,1,1,exception);
+    if (r == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    *pixel+=(**k)*(double) r[i];
+    (*k)++;
+  }
+  return(status);
+}
+...
+        if ((blur_traits & BlendPixelTrait) == 0)
+          {
+            sum.motion_view=motion_view;
+            ...
+            sum.exception=exception;
+            if (SumMotionPixels(&sum,&pixel,&k) == MagickFalse)
+              status=MagickFalse;
+            SetPixelChannel(blur_image,channel,ClampToQuantum(pixel),q);
+            continue;
+          }
+```
+
+**Careful:**
+
+- The three parts keep the arguments of the recipes they come from. The write to the
+  shared `status` moves to the end of the block (Recipe T): the block does not read
+  `status`, and OpenMP orders this unsynchronised write against no other thread. The
+  accumulators and cursors are the iteration's own and change through `*v`, the same
+  operations on the same objects in the same order (Recipe K). The members are copied
+  directly before the call from variables the block does not write (Recipe N).
+- A `continue` of a loop inside the block after `status=MagickFalse;` stays in the new
+  function and skips the same iteration of the same loop; a block that tests `status` is
+  not this recipe.
+- A cursor the block reads before it writes it (`k`, set to `kernel` before the block) is
+  a written variable, passed by pointer, never a member. A pointer cursor becomes a
+  pointer to a pointer: `(*k)` reads as `(**k)` and `k++` as `(*k)++`.
+- Two blocks that differ only by a line or two (a plain and an alpha-blended sum, which
+  share the fetch and the member locals) become helpers CodeScene reports as *Code
+  Duplication*: extracting both measured 2.06 to 2.01 on `MotionBlurImage` and 2.02 to
+  1.95 on `RotationalBlurImage`. Extract one of the pair, and keep the step only when no
+  duplication appears.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 7 checked by reading: the oracle runs
+single-threaded.
+
+**Provenance:** 2026-10-29, from `effect.c`'s `MotionBlurImage`, whose plain kernel sum
+(nesting 6: row, column, channel, blend test, tap loop, fetch test) writes `pixel`, the
+cursor `k` and `status` and reads seven variables: Recipe J gives the helper ten
+parameters (refused in M101), Recipes Q and U refuse the status or the accumulator. A
+probe of the plain sum: nesting 6 to 5, effect.c 2.06 to 2.10. The same shape is
+`RotationalBlurImage`'s plain sum. Added by Claude Code (Claude Opus 5.5) during task
+W08, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe V - Extract Block Returning Success for a Cleanup Jump
 
 **Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
@@ -1846,3 +1986,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | NEW | U | Extract Function Returning the Loop Status Taking an Input Struct: a Recipe T block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and the written row pointers by value; the caller writes `status=MagickFalse` from its result (Recipe T) | `FxImage`'s per-channel loop inside its parallel row loop (seven inputs and `status`): T gives seven parameters, N refuses the `status` write, the whole column loop is a Complex Method (cc 9). A probe: FxImage leaves Deep, Nested Complexity, fx.c 2.74 to 2.80 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | Q | Step 1: a block in a function with no OpenMP region (a sequential pass) qualifies, its written variables being plain locals of the caller (Recipe O step 2); *Careful* notes the cursors (`k`, `pixels`) such a block advances for the next call | `morphology.c`'s `MorphologyPrimitiveDirect`: its forward pass repeats one kernel-row body (`pixel`, `k`, `pixels` written; `image`, `kernel`, `i` read) in the Distance and Voronoi double loops; the function is sequential (two views of one image), so Recipe K's parallel-body wording refuses it, Recipe E step 4 refuses three outputs and Recipe O wants a selection. A probe of the row helper at both sites: nesting 6 to 5, 2.41 to 2.46 | mandate (2026-10-24) |
 | 2026-10-29 | NEW | V | Extract Block Returning Success for a Cleanup Jump: a block outside OpenMP that leaves through `goto L;` and writes at most one caller local moves to a `static MagickBooleanType` function, each `goto L;` becoming `return(MagickFalse);`, the local passed by pointer; the caller writes `if (Helper(...) == MagickFalse) goto L;` | `MorphologyApply`'s work-image clone inside four nested loops (nesting 6), refused by every extraction recipe for its `goto error_cleanup`; the plateau of the earlier W07 pass on `morphology.c`. A probe: nesting 6 to 5, 2.46 to 2.51 | mandate (2026-10-24) |
+| 2026-10-29 | NEW | W | Extract Accumulating Block Returning the Loop Status Taking an Input Struct: a Recipe J block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and a pointer per written accumulator or cursor (Recipe K); the caller writes `status=MagickFalse` from its result (Recipe T) | `MotionBlurImage`'s plain kernel sum (nesting 6; `pixel`, `k` and `status` written, seven inputs): J gives ten parameters (M101), Q and U refuse the status or the accumulator. A probe: nesting 6 to 5, 2.06 to 2.10 | mandate (2026-10-24) |
