@@ -1581,6 +1581,13 @@ Q and U, whose first step refuses a block containing `goto`.
    otherwise skip the block.
 5. Where the block stood, write `if (Helper(...) == MagickFalse) goto L;`, and check
    every argument against its parameter by reading.
+6. A block that leaves the function instead through `return(c);`, where every `return`
+   in the block returns the same constant `c` (a literal, an enum value or a cast null
+   pointer such as `(Image *) NULL`) and contains no `goto`, moves the same way: each
+   `return(c);` becomes `return(MagickFalse);`, one for one, and the caller writes
+   `if (Helper(...) == MagickFalse) return(c);`. Steps 1, 2 and 4 hold as written, with
+   `return(c);` in place of `goto L;`. A block returning a variable, or two different
+   values, is not this recipe.
 
 **Before:**
 
@@ -1635,6 +1642,12 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   against its `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2`.
 - A block that jumps to two labels, or writes two of the caller's variables, is not this
   recipe: skip it.
+- Under step 6 the caller returns the same constant from the same point: every statement
+  the original ran before its `return(c);` has run in the helper, with its writes to `v`
+  landed through the pointer, and the caller runs nothing between the call and its own
+  `return(c);`. A warning the block throws with `GetMagickModule()` now names the helper
+  as its location, which the oracle normalises (`@ warning/LOCATION`); the message text
+  is compared as before.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 2 and 5 checked by reading.
@@ -1644,7 +1657,9 @@ inside its four nested loops (kernel, stage, compound method, kernel iteration) 
 through `goto error_cleanup`, the plateau the earlier W07 pass on the file recorded. A
 probe of the work-image clone: nesting 6 to 5, 2.46 to 2.51. Cleanup labels reached by
 `goto` also occur in `property.c` and `annotate.c`. Added by Claude Code (Claude Opus
-5.5) during task W07, under the mandate of 2026-10-24.
+5.5) during task W07, under the mandate of 2026-10-24. Step 6 (2026-10-29, task W08):
+`MorphologyImage`'s `convolve:scale` setting, which leaves through
+`return((Image *) NULL);` when the kernel clone fails (nesting 4, two bumps).
 
 ---
 
@@ -2000,3 +2015,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | NEW | W | Extract Accumulating Block Returning the Loop Status Taking an Input Struct: a Recipe J block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and a pointer per written accumulator or cursor (Recipe K); the caller writes `status=MagickFalse` from its result (Recipe T) | `MotionBlurImage`'s plain kernel sum (nesting 6; `pixel`, `k` and `status` written, seven inputs): J gives ten parameters (M101), Q and U refuse the status or the accumulator. A probe: nesting 6 to 5, 2.06 to 2.10 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | W | Step 3: instead of the `const` locals, the body may write `name->member` at every use of a member (Recipe B step 3's form); *Careful* names it as the way to extract the second of a plain and a blended sum without the two helpers repeating each other's locals | `MotionBlurImage`'s blended kernel sum beside `SumMotionPixels`: with `const` locals the pair is reported as Code Duplication (2.06 to 2.01); in the member form no duplication, 2.18 to 2.20 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | U | Step 3: the member form of Recipe W step 3. Step 7: a block that is the whole body of a channel loop inside the parallel loop body may contain `continue;` of that loop, each becoming `return(status);`, as Recipe E step 7 does for a `void` function | `MotionBlurImage`'s per-channel body after both kernel sums moved: the channel loop as one helper is a Complex Method (cc 11, its `continue`s counted); the body as a helper (cc 6) called from a channel-loop helper (cc 3) takes the function out of Brain Method and Deep, Nested Complexity, 2.20 to 2.43 in a probe | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | V | Step 6: a block that leaves through `return(c);` of one constant `c` of the caller's return type, in place of `goto L;`, moves the same way; each `return(c);` becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) return(c);`. *Careful* gives the argument and notes the warning location the oracle normalises | `morphology.c`'s `MorphologyImage`: its `convolve:scale` branch (clone the kernel if it is the caller's, `return((Image *) NULL)` when the clone fails, scale it) is its only depth-4 site and both its bumps; Recipe E's step 6 covers only the throw macros' hidden returns and step 4 refuses the status plus `curr_kernel`. A probe: `MorphologyImage` keeps only its public signature's Excess Arguments, 2.55 to 2.62 | mandate (2026-10-24) |
