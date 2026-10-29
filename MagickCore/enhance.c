@@ -2385,6 +2385,17 @@ static void BuildEqualizeChannelMap(const EqualizeChannel *equalize,
         (size_t) j+(size_t) i]-black[i]))/(white[i]-black[i])));
 }
 
+static void RelinquishEqualizeMemory(double *map,double *histogram,
+  double *equalize_map)
+{
+  if (map != (double *) NULL)
+    map=(double *) RelinquishMagickMemory(map);
+  if (histogram != (double *) NULL)
+    histogram=(double *) RelinquishMagickMemory(histogram);
+  if (equalize_map != (double *) NULL)
+    equalize_map=(double *) RelinquishMagickMemory(equalize_map);
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2430,12 +2441,7 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   map=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*sizeof(*map));
   if (IsEqualizeMemoryMissing(equalize_map,histogram,map) != MagickFalse)
     {
-      if (map != (double *) NULL)
-        map=(double *) RelinquishMagickMemory(map);
-      if (histogram != (double *) NULL)
-        histogram=(double *) RelinquishMagickMemory(histogram);
-      if (equalize_map != (double *) NULL)
-        equalize_map=(double *) RelinquishMagickMemory(equalize_map);
+      RelinquishEqualizeMemory(map,histogram,equalize_map);
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
