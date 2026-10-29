@@ -2105,6 +2105,36 @@ static PixelInfo GetPadGradientColor(const GradientInfo *gradient,
   return(composite);
 }
 
+static PixelInfo GetReflectGradientColor(const GradientInfo *gradient,
+  const double offset,PixelInfo composite)
+{
+  double
+    alpha;
+
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i < (ssize_t) gradient->number_stops; i++)
+    if (offset < gradient->stops[i].offset)
+      break;
+  if (i == 0)
+    composite=gradient->stops[0].color;
+  else
+    if (i == (ssize_t) gradient->number_stops)
+      composite=gradient->stops[gradient->number_stops-1].color;
+    else
+      {
+        j=i;
+        i--;
+        alpha=(offset-gradient->stops[i].offset)/
+          (gradient->stops[j].offset-gradient->stops[i].offset);
+        CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
+          &gradient->stops[j].color,alpha,&composite);
+      }
+  return(composite);
+}
+
 MagickExport MagickBooleanType DrawGradientImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -2231,23 +2261,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
             offset=fmod(offset,1.0);
           else
             offset=1.0-fmod(offset,1.0);
-          for (i=0; i < (ssize_t) gradient->number_stops; i++)
-            if (offset < gradient->stops[i].offset)
-              break;
-          if (i == 0)
-            composite=gradient->stops[0].color;
-          else
-            if (i == (ssize_t) gradient->number_stops)
-              composite=gradient->stops[gradient->number_stops-1].color;
-            else
-              {
-                j=i;
-                i--;
-                alpha=(offset-gradient->stops[i].offset)/
-                  (gradient->stops[j].offset-gradient->stops[i].offset);
-                CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
-                  &gradient->stops[j].color,alpha,&composite);
-              }
+          composite=GetReflectGradientColor(gradient,offset,composite);
           break;
         }
         case RepeatSpread:
