@@ -2071,6 +2071,54 @@ static MagickBooleanType ImportQuantumRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ImportQuantumQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,*p,q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,*p,q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,*p,q);
+      break;
+    }
+    case AlphaQuantum:
+    {
+      SetPixelAlpha(image,*p,q);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      SetPixelAlpha(image,*p,q);
+      break;
+    }
+    case BlackQuantum:
+    {
+      SetPixelBlack(image,*p,q);
+      break;
+    }
+    case IndexQuantum:
+    {
+      SetPixelGray(image,*p,q);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ImportQuantumPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -2127,49 +2175,7 @@ static MagickBooleanType ImportQuantumPixel(Image *image,
 
       for (i=0; i < (ssize_t) length; i++)
       {
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            SetPixelRed(image,*p,q);
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            SetPixelGreen(image,*p,q);
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            SetPixelBlue(image,*p,q);
-            break;
-          }
-          case AlphaQuantum:
-          {
-            SetPixelAlpha(image,*p,q);
-            break;
-          }
-          case OpacityQuantum:
-          {
-            SetPixelAlpha(image,*p,q);
-            break;
-          }
-          case BlackQuantum:
-          {
-            SetPixelBlack(image,*p,q);
-            break;
-          }
-          case IndexQuantum:
-          {
-            SetPixelGray(image,*p,q);
-            break;
-          }
-          default:
-            break;
-        }
+        ImportQuantumQuantum(image,quantum_map[i],p,q);
         p++;
       }
       q+=(ptrdiff_t) GetPixelChannels(image);
@@ -2385,6 +2391,54 @@ static MagickBooleanType ImportShortRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ImportShortQuantum(const Image *image,const QuantumType quantum,
+  const unsigned short *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case AlphaQuantum:
+    {
+      SetPixelAlpha(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      SetPixelAlpha(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case BlackQuantum:
+    {
+      SetPixelBlack(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case IndexQuantum:
+    {
+      SetPixelGray(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ImportShortPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -2441,49 +2495,7 @@ static MagickBooleanType ImportShortPixel(Image *image,
 
       for (i=0; i < (ssize_t) length; i++)
       {
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            SetPixelRed(image,ScaleShortToQuantum(*p),q);
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            SetPixelGreen(image,ScaleShortToQuantum(*p),q);
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            SetPixelBlue(image,ScaleShortToQuantum(*p),q);
-            break;
-          }
-          case AlphaQuantum:
-          {
-            SetPixelAlpha(image,ScaleShortToQuantum(*p),q);
-            break;
-          }
-          case OpacityQuantum:
-          {
-            SetPixelAlpha(image,ScaleShortToQuantum(*p),q);
-            break;
-          }
-          case BlackQuantum:
-          {
-            SetPixelBlack(image,ScaleShortToQuantum(*p),q);
-            break;
-          }
-          case IndexQuantum:
-          {
-            SetPixelGray(image,ScaleShortToQuantum(*p),q);
-            break;
-          }
-          default:
-            break;
-        }
+        ImportShortQuantum(image,quantum_map[i],p,q);
         p++;
       }
       q+=(ptrdiff_t) GetPixelChannels(image);
