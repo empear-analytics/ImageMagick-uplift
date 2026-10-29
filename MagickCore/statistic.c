@@ -581,6 +581,70 @@ static void SetEvaluatePixels(const Image *image,
   }
 }
 
+typedef struct _EvaluateRow
+{
+  Image
+    *image;
+
+  const Image
+    *next;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  int
+    id;
+
+  MagickEvaluateOperator
+    op;
+
+  ssize_t
+    j;
+} EvaluateRow;
+
+static void AccumulateEvaluateRow(const EvaluateRow *row,const Quantum **p,
+  PixelChannels *evaluate_pixel)
+{
+  Image
+    *const image = row->image;
+
+  const Image
+    *const next = row->next;
+
+  RandomInfo
+    **magick_restrict const random_info = row->random_info;
+
+  const int
+    id = row->id;
+
+  const MagickEvaluateOperator
+    op = row->op;
+
+  const ssize_t
+    j = row->j;
+
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    for (i=0; i < (ssize_t) GetPixelChannels(next); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(next,channel);
+      PixelTrait evaluate_traits = GetPixelChannelTraits(image,channel);
+      if (((traits & UpdatePixelTrait) == 0) ||
+          ((evaluate_traits & UpdatePixelTrait) == 0))
+        continue;
+      evaluate_pixel[x].channel[i]=ApplyEvaluateOperator(
+        random_info[id],GetPixelChannel(next,channel,p[j]),j == 0 ?
+        AddEvaluateOperator : op,evaluate_pixel[x].channel[i]);
+    }
+    p[j]+=(ptrdiff_t) GetPixelChannels(next);
+  }
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -789,15 +853,14 @@ MagickExport Image *EvaluateImages(const Image *images,
         const Quantum
           **p;
 
+        EvaluateRow
+          row;
+
         PixelChannels
           *evaluate_pixel;
 
         Quantum
           *magick_restrict q;
-
-        ssize_t
-          i,
-          x;
 
         ssize_t
           j;
@@ -832,22 +895,13 @@ MagickExport Image *EvaluateImages(const Image *images,
         next=images;
         for (j=0; j < (ssize_t) number_images; j++)
         {
-          for (x=0; x < (ssize_t) image->columns; x++)
-          {
-            for (i=0; i < (ssize_t) GetPixelChannels(next); i++)
-            {
-              PixelChannel channel = GetPixelChannelChannel(image,i);
-              PixelTrait traits = GetPixelChannelTraits(next,channel);
-              PixelTrait evaluate_traits = GetPixelChannelTraits(image,channel);
-              if (((traits & UpdatePixelTrait) == 0) ||
-                  ((evaluate_traits & UpdatePixelTrait) == 0))
-                continue;
-              evaluate_pixel[x].channel[i]=ApplyEvaluateOperator(
-                random_info[id],GetPixelChannel(next,channel,p[j]),j == 0 ?
-                AddEvaluateOperator : op,evaluate_pixel[x].channel[i]);
-            }
-            p[j]+=(ptrdiff_t) GetPixelChannels(next);
-          }
+          row.image=image;
+          row.next=next;
+          row.random_info=random_info;
+          row.id=id;
+          row.op=op;
+          row.j=j;
+          AccumulateEvaluateRow(&row,p,evaluate_pixel);
           next=GetNextImageInList(next);
         }
         NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
