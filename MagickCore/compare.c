@@ -3317,6 +3317,41 @@ typedef struct
     y;
 } MaximaInfo;
 
+static MaximaInfo FindRowMaxima(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t y,MaximaInfo channel_maxima)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      double
+        pixel;
+
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      pixel=(double) p[i];
+      if (IsNaN(pixel) != 0)
+        pixel=0.0;
+      if (pixel > channel_maxima.maxima)
+        {
+          channel_maxima.maxima=(double) p[i];
+          channel_maxima.x=x;
+          channel_maxima.y=y;
+        }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(channel_maxima);
+}
+
 static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
   RectangleInfo *offset,ExceptionInfo *exception)
 {
@@ -3355,9 +3390,6 @@ static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
     MaximaInfo
       channel_maxima = { -MagickMaximumValue, 0, 0 };
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -3367,32 +3399,7 @@ static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
         continue;
       }
     channel_maxima=maxima_info;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          pixel;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        pixel=(double) p[i];
-        if (IsNaN(pixel) != 0)
-          pixel=0.0;
-        if (pixel > channel_maxima.maxima)
-          {
-            channel_maxima.maxima=(double) p[i];
-            channel_maxima.x=x;
-            channel_maxima.y=y;
-          }
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    channel_maxima=FindRowMaxima(image,p,y,channel_maxima);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_SIMMaximaImage)
 #endif
