@@ -1502,14 +1502,14 @@ MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
 %
 */
 
-static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
-{
 #define SwapPixels(alpha,beta) \
 { \
   Quantum gamma=(alpha); \
   (alpha)=(beta);(beta)=gamma; \
 }
 
+static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
+{
   ssize_t
     low = 0,
     high = (ssize_t) n-1,
