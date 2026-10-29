@@ -3876,6 +3876,69 @@ static fxFltType GetFirstImageValueU (const RpnFirstImageInputs * in,
   return(regA);
 }
 
+static fxFltType GetImageZeroValueU (const RpnFirstImageInputs * in,
+  const fxImgXYT xy, const ssize_t ImgNum, fxFltType regA)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const Quantum
+    *const p = in->p;
+
+  Image
+    *const pimg = in->pimg;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    imgx = in->imgx,
+    imgy = in->imgy;
+
+  if (pel->img_attr_qual == aNull) {
+    if ((int) pel->channel_qual < 0) {
+      if (pel->channel_qual == NO_CHAN_QUAL || pel->channel_qual == THIS_CHANNEL) {
+        RpnFirstImageInputs
+          first_in;
+
+        first_in.pfx=pfx;
+        first_in.pel=pel;
+        first_in.p=p;
+        first_in.pimg=pimg;
+        first_in.channel=channel;
+        first_in.imgx=imgx;
+        first_in.imgy=imgy;
+        regA = GetFirstImageValueU (&first_in, ImgNum, regA);
+      } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
+        regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
+        return(regA);
+      } else if (pel->channel_qual == INTENSITY_CHANNEL) {
+        regA = GetIntensity (pfx, 0, (double) imgx, (double) imgy);
+        return(regA);
+      }
+    } else {
+      RpnFirstImageInputs
+        first_in;
+
+      first_in.pfx=pfx;
+      first_in.pel=pel;
+      first_in.p=p;
+      first_in.pimg=pimg;
+      first_in.channel=channel;
+      first_in.imgx=imgx;
+      first_in.imgy=imgy;
+      regA = GetFirstImageValueU (&first_in, ImgNum, regA);
+    }
+  } else {
+    /* we have an image attribute */
+    regA = ImageStat (pfx, 0, WHICH_ATTR_CHAN, pel->img_attr_qual);
+  }
+  return(regA);
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -4298,44 +4361,18 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           regA = (fxFltType) 0;
           if (ImgNum == 0) {
             Image * pimg = pfx->Images[0];
-            if (pel->img_attr_qual == aNull) {
-              if ((int) pel->channel_qual < 0) {
-                if (pel->channel_qual == NO_CHAN_QUAL || pel->channel_qual == THIS_CHANNEL) {
-                  RpnFirstImageInputs
-                    first_in;
 
-                  first_in.pfx=pfx;
-                  first_in.pel=pel;
-                  first_in.p=p;
-                  first_in.pimg=pimg;
-                  first_in.channel=channel;
-                  first_in.imgx=imgx;
-                  first_in.imgy=imgy;
-                  regA = GetFirstImageValueU (&first_in, ImgNum, regA);
-                } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-                  regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
-                  break;
-                } else if (pel->channel_qual == INTENSITY_CHANNEL) {
-                  regA = GetIntensity (pfx, 0, (double) imgx, (double) imgy);
-                  break;
-                }
-              } else {
-                RpnFirstImageInputs
-                  first_in;
+            RpnFirstImageInputs
+              zero_in;
 
-                first_in.pfx=pfx;
-                first_in.pel=pel;
-                first_in.p=p;
-                first_in.pimg=pimg;
-                first_in.channel=channel;
-                first_in.imgx=imgx;
-                first_in.imgy=imgy;
-                regA = GetFirstImageValueU (&first_in, ImgNum, regA);
-              }
-            } else {
-              /* we have an image attribute */
-              regA = ImageStat (pfx, 0, WHICH_ATTR_CHAN, pel->img_attr_qual);
-            }
+            zero_in.pfx=pfx;
+            zero_in.pel=pel;
+            zero_in.p=p;
+            zero_in.pimg=pimg;
+            zero_in.channel=channel;
+            zero_in.imgx=imgx;
+            zero_in.imgy=imgy;
+            regA = GetImageZeroValueU (&zero_in, xy, ImgNum, regA);
           } else {
             rpn_in.pfx=pfx;
             rpn_in.pel=pel;
