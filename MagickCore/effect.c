@@ -3021,6 +3021,137 @@ static MagickBooleanType SumMotionBlendedPixels(const MotionBlendedSum *sum,
   return(status);
 }
 
+typedef struct _MotionChannel
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  const Quantum
+    *p;
+
+  MagickRealType
+    *kernel;
+
+  CacheView
+    *motion_view;
+
+  OffsetInfo
+    *offset;
+
+  size_t
+    width;
+
+  ssize_t
+    x,
+    y;
+
+  ExceptionInfo
+    *exception;
+} MotionChannel;
+
+static MagickBooleanType BlurMotionChannel(const MotionChannel *motion,
+  const ssize_t i,Quantum *magick_restrict q)
+{
+  double
+    gamma = 0.0,
+    pixel;
+
+  MagickBooleanType
+    status;
+
+  MotionBlendedSum
+    blended_sum;
+
+  MotionSum
+    sum;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    blur_traits,
+    traits;
+
+  MagickRealType
+    *magick_restrict k;
+
+  status=MagickTrue;
+  channel=GetPixelChannelChannel(motion->image,i);
+  traits=GetPixelChannelTraits(motion->image,channel);
+  blur_traits=GetPixelChannelTraits(motion->blur_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (blur_traits == UndefinedPixelTrait))
+    return(status);
+  if ((blur_traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(motion->blur_image,channel,motion->p[i],q);
+      return(status);
+    }
+  k=motion->kernel;
+  pixel=0.0;
+  if ((blur_traits & BlendPixelTrait) == 0)
+    {
+      sum.motion_view=motion->motion_view;
+      sum.offset=motion->offset;
+      sum.width=motion->width;
+      sum.x=motion->x;
+      sum.y=motion->y;
+      sum.i=i;
+      sum.exception=motion->exception;
+      if (SumMotionPixels(&sum,&pixel,&k) == MagickFalse)
+        status=MagickFalse;
+      SetPixelChannel(motion->blur_image,channel,ClampToQuantum(pixel),q);
+      return(status);
+    }
+  blended_sum.image=motion->image;
+  blended_sum.motion_view=motion->motion_view;
+  blended_sum.offset=motion->offset;
+  blended_sum.width=motion->width;
+  blended_sum.x=motion->x;
+  blended_sum.y=motion->y;
+  blended_sum.i=i;
+  blended_sum.exception=motion->exception;
+  if (SumMotionBlendedPixels(&blended_sum,&pixel,&gamma,&k) == MagickFalse)
+    status=MagickFalse;
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(motion->blur_image,channel,ClampToQuantum(gamma*pixel),q);
+  return(status);
+}
+
+static MagickBooleanType BlurMotionPixel(const MotionChannel *pixel_motion,
+  Quantum *magick_restrict q)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    i;
+
+  status=MagickTrue;
+  for (i=0; i < (ssize_t) GetPixelChannels(pixel_motion->image); i++)
+  {
+    MotionChannel
+      motion;
+
+    motion.image=pixel_motion->image;
+    motion.blur_image=pixel_motion->blur_image;
+    motion.p=pixel_motion->p;
+    motion.kernel=pixel_motion->kernel;
+    motion.motion_view=pixel_motion->motion_view;
+    motion.offset=pixel_motion->offset;
+    motion.width=pixel_motion->width;
+    motion.x=pixel_motion->x;
+    motion.y=pixel_motion->y;
+    motion.exception=pixel_motion->exception;
+    if (BlurMotionChannel(&motion,i,q) == MagickFalse)
+      status=MagickFalse;
+  }
+  return(status);
+}
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -3139,71 +3270,21 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
+      MotionChannel
+        pixel_motion;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          gamma = 0.0,
-          pixel;
-
-        MotionBlendedSum
-          blended_sum;
-
-        MotionSum
-          sum;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          blur_traits,
-          traits;
-
-        MagickRealType
-          *magick_restrict k;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        blur_traits=GetPixelChannelTraits(blur_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (blur_traits == UndefinedPixelTrait))
-          continue;
-        if ((blur_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(blur_image,channel,p[i],q);
-            continue;
-          }
-        k=kernel;
-        pixel=0.0;
-        if ((blur_traits & BlendPixelTrait) == 0)
-          {
-            sum.motion_view=motion_view;
-            sum.offset=offset;
-            sum.width=width;
-            sum.x=x;
-            sum.y=y;
-            sum.i=i;
-            sum.exception=exception;
-            if (SumMotionPixels(&sum,&pixel,&k) == MagickFalse)
-              status=MagickFalse;
-            SetPixelChannel(blur_image,channel,ClampToQuantum(pixel),q);
-            continue;
-          }
-        blended_sum.image=image;
-        blended_sum.motion_view=motion_view;
-        blended_sum.offset=offset;
-        blended_sum.width=width;
-        blended_sum.x=x;
-        blended_sum.y=y;
-        blended_sum.i=i;
-        blended_sum.exception=exception;
-        if (SumMotionBlendedPixels(&blended_sum,&pixel,&gamma,&k) == MagickFalse)
-          status=MagickFalse;
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
-      }
+      pixel_motion.image=image;
+      pixel_motion.blur_image=blur_image;
+      pixel_motion.p=p;
+      pixel_motion.kernel=kernel;
+      pixel_motion.motion_view=motion_view;
+      pixel_motion.offset=offset;
+      pixel_motion.width=width;
+      pixel_motion.x=x;
+      pixel_motion.y=y;
+      pixel_motion.exception=exception;
+      if (BlurMotionPixel(&pixel_motion,q) == MagickFalse)
+        status=MagickFalse;
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(blur_image);
     }
