@@ -1606,6 +1606,17 @@ static size_t AssignClosestColormapEntry(Image *image,const QCubeInfo *cube,
   return(index);
 }
 
+static DoublePixelPacket ClampDitherPixel(const QCubeInfo *cube,
+  DoublePixelPacket pixel)
+{
+  pixel.red=(double) ClampPixel(pixel.red);
+  pixel.green=(double) ClampPixel(pixel.green);
+  pixel.blue=(double) ClampPixel(pixel.blue);
+  if (cube->associate_alpha != MagickFalse)
+    pixel.alpha=(double) ClampPixel(pixel.alpha);
+  return(pixel);
+}
+
 static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -1712,11 +1723,7 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
                 pixel.alpha+=3.0*cube_info->diffusion*previous[u-v].alpha/16;
             }
         }
-      pixel.red=(double) ClampPixel(pixel.red);
-      pixel.green=(double) ClampPixel(pixel.green);
-      pixel.blue=(double) ClampPixel(pixel.blue);
-      if (cube.associate_alpha != MagickFalse)
-        pixel.alpha=(double) ClampPixel(pixel.alpha);
+      pixel=ClampDitherPixel(&cube,pixel);
       entry=GetCacheEntry(&cube,&pixel);
       if ((entry == (ssize_t *) NULL) || (*entry < 0))
         FindClosestCubeColor(image,&cube,pixel,entry);
