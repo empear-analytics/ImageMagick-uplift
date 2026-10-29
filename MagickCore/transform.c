@@ -283,11 +283,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   if ((extent.y+(ssize_t) extent.height) > (ssize_t) image->rows)
     extent.height=(size_t) ((ssize_t) image->rows-extent.y);
   ClipChopOffset(&extent.x,&extent.width);
-  if (extent.y < 0)
-    {
-      extent.height-=(size_t) (-extent.y);
-      extent.y=0;
-    }
+  ClipChopOffset(&extent.y,&extent.height);
   if ((extent.width >= image->columns) || (extent.height >= image->rows))
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   chop_image=CloneImage(image,image->columns-extent.width,image->rows-
