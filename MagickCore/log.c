@@ -1628,6 +1628,33 @@ static char *TranslateEvent(const LogEventLocation *location,
   return(text);
 }
 
+static void RotateLogFiles(LogInfo *log_info)
+{
+  ssize_t
+    i;
+
+  /*
+    Close log.
+  */
+  (void) FormatLocaleFile(log_info->file,"</log>\n");
+  (void) FormatLocaleFile(log_info->file,"</logEntries>\n");
+  (void) fclose(log_info->file);
+  for (i=(ssize_t) log_info->generations-1; i > 0; i--)
+  {
+    char
+      new_filename[MagickPathExtent],
+      old_filename[MagickPathExtent];
+
+    /*
+      Rotate logs.
+    */
+    FormatLogFilename(log_info,i-1,old_filename);
+    FormatLogFilename(log_info,i,new_filename);
+    (void) rename_utf8(old_filename,new_filename);
+  }
+  log_info->file=(FILE *) NULL;
+}
+
 MagickExport MagickBooleanType LogMagickEventList(const LogEventType type,
   const char *module,const char *function,const size_t line,const char *format,
   va_list operands)
@@ -1701,31 +1728,7 @@ MagickExport MagickBooleanType LogMagickEventList(const LogEventType type,
       if (log_info->file != (FILE *) NULL)
         (void) fstat(fileno(log_info->file),&file_info);
       if (file_info.st_size > (MagickOffsetType) log_info->limit)
-        {
-          ssize_t
-            i;
-
-          /*
-            Close log.
-          */
-          (void) FormatLocaleFile(log_info->file,"</log>\n");
-          (void) FormatLocaleFile(log_info->file,"</logEntries>\n");
-          (void) fclose(log_info->file);
-          for (i=(ssize_t) log_info->generations-1; i > 0; i--)
-          {
-            char
-              new_filename[MagickPathExtent],
-              old_filename[MagickPathExtent];
-
-            /*
-              Rotate logs.
-            */
-            FormatLogFilename(log_info,i-1,old_filename);
-            FormatLogFilename(log_info,i,new_filename);
-            (void) rename_utf8(old_filename,new_filename);
-          }
-          log_info->file=(FILE *) NULL;
-        }
+        RotateLogFiles(log_info);
       if (log_info->file == (FILE *) NULL)
         {
           char
