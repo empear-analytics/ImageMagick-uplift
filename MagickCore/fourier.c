@@ -1330,40 +1330,7 @@ static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
     for (x=0L; x < (ssize_t) fourier_info->width; x++)
     {
       if (x < (ssize_t) image->columns)
-        switch (fourier_info->channel)
-        {
-          case RedPixelChannel:
-          default:
-          {
-            SetPixelRed(image,ClampToQuantum((double) QuantumRange*
-              source_pixels[i]),q);
-            break;
-          }
-          case GreenPixelChannel:
-          {
-            SetPixelGreen(image,ClampToQuantum((double) QuantumRange*
-              source_pixels[i]),q);
-            break;
-          }
-          case BluePixelChannel:
-          {
-            SetPixelBlue(image,ClampToQuantum((double) QuantumRange*
-              source_pixels[i]),q);
-            break;
-          }
-          case BlackPixelChannel:
-          {
-            SetPixelBlack(image,ClampToQuantum((double) QuantumRange*
-              source_pixels[i]),q);
-            break;
-          }
-          case AlphaPixelChannel:
-          {
-            SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*
-              source_pixels[i]),q);
-            break;
-          }
-        }
+        SetFourierPixel(image,fourier_info->channel,source_pixels[i],q);
       i++;
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
