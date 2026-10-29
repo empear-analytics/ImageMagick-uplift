@@ -3223,6 +3223,34 @@ static void PrintBarycentricSparseFX(const Image *image,const double *coeff)
         coeff[x], coeff[x+1], coeff[x+2]),x+=3;
 }
 
+static void PrintBilinearSparseFX(const Image *image,const double *coeff)
+{
+  ssize_t x=0;
+  (void) FormatLocaleFile(stderr, "Bilinear Sparse Color\n");
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(stderr, "   -channel R -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(stderr, "   -channel G -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(stderr, "   -channel B -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    (void) FormatLocaleFile(stderr, "   -channel K -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->alpha_trait != UndefinedPixelTrait))
+    (void) FormatLocaleFile(stderr, "   -channel A -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+}
+
 static void PrintSparseColorFX(const Image *image,const double *coeff,
   const SparseColorMethod sparse_method)
 {
@@ -3236,30 +3264,7 @@ static void PrintSparseColorFX(const Image *image,const double *coeff,
       }
       case BilinearColorInterpolate:
       {
-        ssize_t x=0;
-        (void) FormatLocaleFile(stderr, "Bilinear Sparse Color\n");
-        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "   -channel R -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "   -channel G -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "   -channel B -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->colorspace == CMYKColorspace))
-          (void) FormatLocaleFile(stderr, "   -channel K -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->alpha_trait != UndefinedPixelTrait))
-          (void) FormatLocaleFile(stderr, "   -channel A -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
+        PrintBilinearSparseFX(image,coeff);
         break;
       }
       default:
