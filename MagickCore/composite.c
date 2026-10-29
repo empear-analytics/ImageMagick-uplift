@@ -561,6 +561,14 @@ static void SumBlendRow(const SumBlendInputs *row,
   }
 }
 
+static Image *FinishBlendImage(Image *sum_image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    sum_image=DestroyImage(sum_image);
+  return(sum_image);
+}
+
 static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
   const BlendSumWeights *weights,ExceptionInfo *exception)
 {
@@ -631,9 +639,7 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
   sum_view=DestroyCacheView(sum_view);
   beta_view=DestroyCacheView(beta_view);
   alpha_view=DestroyCacheView(alpha_view);
-  if (status == MagickFalse)
-    sum_image=DestroyImage(sum_image);
-  return(sum_image);
+  return(FinishBlendImage(sum_image,status));
 }
 
 static Image *BlendDivergentImage(const Image *alpha_image,
