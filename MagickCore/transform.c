@@ -2157,16 +2157,8 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
     page.y=(ssize_t) page.height-(ssize_t) transverse_image->rows-page.y;
   transverse_image->page=page;
   if (status != MagickFalse)
-    {
-      char
-        transform[MagickPathExtent];
-
-      (void) FormatLocaleString(transform,MagickPathExtent,
-        "transverse %.17gx%.17g",(double) image->columns,
-        (double) image->rows);
-      AppendImageProfileProperty(transverse_image,"hdrgm","hdrgm:Transform",
-        transform,exception);
-    }
+    AppendTransformProperty(image,transverse_image,"transverse %.17gx%.17g",
+      exception);
   if (status == MagickFalse)
     transverse_image=DestroyImage(transverse_image);
   return(transverse_image);
