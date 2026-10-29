@@ -902,6 +902,98 @@ static double **AcquireBilateralTLS(const size_t number_threads,
 #define MaxIntensity  (255)
 #define BilateralBlurImageTag  "Blur/Image"
 
+typedef struct _BilateralWeights
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  size_t
+    width,
+    height;
+
+  OffsetInfo
+    mid;
+
+  double
+    *intensity_gaussian,
+    *spatial_gaussian,
+    intensity_sigma,
+    spatial_sigma;
+
+  int
+    id;
+
+  ssize_t
+    x,
+    y;
+} BilateralWeights;
+
+static void SetBilateralWeights(const BilateralWeights *bilateral,
+  double **weights)
+{
+  const Image
+    *const image = bilateral->image;
+
+  const Quantum
+    *const p = bilateral->p;
+
+  const size_t
+    width = bilateral->width,
+    height = bilateral->height;
+
+  const OffsetInfo
+    mid = bilateral->mid;
+
+  double
+    *const intensity_gaussian = bilateral->intensity_gaussian,
+    *const spatial_gaussian = bilateral->spatial_gaussian;
+
+  const double
+    intensity_sigma = bilateral->intensity_sigma,
+    spatial_sigma = bilateral->spatial_sigma;
+
+  const int
+    id = bilateral->id;
+
+  const ssize_t
+    x = bilateral->x,
+    y = bilateral->y;
+
+  const Quantum
+    *r;
+
+  ssize_t
+    n,
+    u,
+    v;
+
+  n=0;
+  for (v=0; v < (ssize_t) MagickMax(height,1); v++)
+  {
+    for (u=0; u < (ssize_t) MagickMax(width,1); u++)
+    {
+      double
+        intensity;
+
+      r=p-(ssize_t) (GetPixelChannels(image)*MagickMax(width,1)*
+        (size_t) (mid.y-v)+GetPixelChannels(image)*(size_t) (mid.x-u));
+      intensity=ScaleQuantumToChar((const Quantum)
+        GetPixelIntensity(image,r))-(double)
+        ScaleQuantumToChar((const Quantum) GetPixelIntensity(image,p));
+      if ((intensity >= -MaxIntensity) && (intensity <= MaxIntensity))
+        weights[id][n]=intensity_gaussian[(ssize_t) intensity+MaxIntensity]*
+          spatial_gaussian[n];
+      else
+        weights[id][n]=BlurGaussian(intensity,intensity_sigma)*
+          BlurGaussian(BlurDistance(x,y,x+u-mid.x,y+v-mid.y),spatial_sigma);
+      n++;
+    }
+  }
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1010,6 +1102,9 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
       }
     for (x=0; x < (ssize_t) blur_image->columns; x++)
     {
+      BilateralWeights
+        bilateral;
+
       const Quantum
         *magick_restrict p,
         *magick_restrict r;
@@ -1033,28 +1128,19 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
         break;
       p+=(ptrdiff_t) (GetPixelChannels(image)*MagickMax(width,1)*(size_t) mid.y+
         GetPixelChannels(image)*(size_t) mid.x);
-      n=0;
-      for (v=0; v < (ssize_t) MagickMax(height,1); v++)
-      {
-        for (u=0; u < (ssize_t) MagickMax(width,1); u++)
-        {
-          double
-            intensity;
-
-          r=p-(ssize_t) (GetPixelChannels(image)*MagickMax(width,1)*
-            (size_t) (mid.y-v)+GetPixelChannels(image)*(size_t) (mid.x-u));
-          intensity=ScaleQuantumToChar((const Quantum)
-            GetPixelIntensity(image,r))-(double)
-            ScaleQuantumToChar((const Quantum) GetPixelIntensity(image,p));
-          if ((intensity >= -MaxIntensity) && (intensity <= MaxIntensity))
-            weights[id][n]=intensity_gaussian[(ssize_t) intensity+MaxIntensity]*
-              spatial_gaussian[n];
-          else
-            weights[id][n]=BlurGaussian(intensity,intensity_sigma)*
-              BlurGaussian(BlurDistance(x,y,x+u-mid.x,y+v-mid.y),spatial_sigma);
-          n++;
-        }
-      }
+      bilateral.image=image;
+      bilateral.p=p;
+      bilateral.width=width;
+      bilateral.height=height;
+      bilateral.mid=mid;
+      bilateral.intensity_gaussian=intensity_gaussian;
+      bilateral.spatial_gaussian=spatial_gaussian;
+      bilateral.intensity_sigma=intensity_sigma;
+      bilateral.spatial_sigma=spatial_sigma;
+      bilateral.id=id;
+      bilateral.x=x;
+      bilateral.y=y;
+      SetBilateralWeights(&bilateral,weights);
       for (i=0; i < (ssize_t) GetPixelChannels(blur_image); i++)
       {
         PixelChannel
