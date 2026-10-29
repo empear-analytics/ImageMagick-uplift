@@ -5088,6 +5088,61 @@ static inline MagickBooleanType IsFillAlphaSkipped(const MagickBooleanType fill,
     (subpath_alpha >= 1.0)) ? MagickTrue : MagickFalse);
 }
 
+static double GetEdgeDistance(const EdgeInfo *p,const ssize_t i,
+  const ssize_t x,const ssize_t y)
+{
+  const PointInfo
+    *q;
+
+  double
+    alpha,
+    beta,
+    distance;
+
+  PointInfo
+    delta;
+
+  /*
+    Compute distance between a point and an edge.
+  */
+  q=p->points+i-1;
+  delta.x=(q+1)->x-q->x;
+  delta.y=(q+1)->y-q->y;
+  beta=delta.x*(x-q->x)+delta.y*(y-q->y);  /* segLen*point-cos(theta) */
+  if (beta <= 0.0)
+    {
+      /*
+        Cosine <= 0, point is closest to q.
+      */
+      delta.x=(double) x-q->x;
+      delta.y=(double) y-q->y;
+      distance=delta.x*delta.x+delta.y*delta.y;
+    }
+  else
+    {
+      alpha=delta.x*delta.x+delta.y*delta.y;  /* segLen*segLen */
+      if (beta >= alpha)
+        {
+          /*
+            Point is closest to q+1.
+          */
+          delta.x=(double) x-(q+1)->x;
+          delta.y=(double) y-(q+1)->y;
+          distance=delta.x*delta.x+delta.y*delta.y;
+        }
+      else
+        {
+          /*
+            Point is closest to point between q & q+1.
+          */
+          alpha=MagickSafeReciprocal(alpha);
+          beta=delta.x*(y-q->y)-delta.y*(x-q->x);
+          distance=alpha*beta*beta;
+        }
+    }
+  return(distance);
+}
+
 static double GetFillAlpha(PolygonInfo *polygon_info,
   const FillAlphaSample *sample,const FillRule fill_rule,double *stroke_alpha)
 {
@@ -5112,9 +5167,6 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
 
   EdgeInfo
     *p;
-
-  PointInfo
-    delta;
 
   ssize_t
     i,
@@ -5152,44 +5204,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
           p->scanline=(double) y;
           p->highwater=(size_t) i;
         }
-      /*
-        Compute distance between a point and an edge.
-      */
-      q=p->points+i-1;
-      delta.x=(q+1)->x-q->x;
-      delta.y=(q+1)->y-q->y;
-      beta=delta.x*(x-q->x)+delta.y*(y-q->y);  /* segLen*point-cos(theta) */
-      if (beta <= 0.0)
-        {
-          /*
-            Cosine <= 0, point is closest to q.
-          */
-          delta.x=(double) x-q->x;
-          delta.y=(double) y-q->y;
-          distance=delta.x*delta.x+delta.y*delta.y;
-        }
-      else
-        {
-          alpha=delta.x*delta.x+delta.y*delta.y;  /* segLen*segLen */
-          if (beta >= alpha)
-            {
-              /*
-                Point is closest to q+1.
-              */
-              delta.x=(double) x-(q+1)->x;
-              delta.y=(double) y-(q+1)->y;
-              distance=delta.x*delta.x+delta.y*delta.y;
-            }
-          else
-            {
-              /*
-                Point is closest to point between q & q+1.
-              */
-              alpha=MagickSafeReciprocal(alpha);
-              beta=delta.x*(y-q->y)-delta.y*(x-q->x);
-              distance=alpha*beta*beta;
-            }
-        }
+      distance=GetEdgeDistance(p,i,x,y);
       /*
         Compute stroke & subpath opacity.
       */
