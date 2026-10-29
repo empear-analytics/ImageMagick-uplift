@@ -651,6 +651,20 @@ static RectangleInfo ClampCropExtent(const Image *image,
   return(page);
 }
 
+static void AppendCropProperty(const Image *image,Image *crop_image,
+  const RectangleInfo page,ExceptionInfo *exception)
+{
+  char
+    transform[MagickPathExtent];
+
+  (void) FormatLocaleString(transform,MagickPathExtent,
+    "crop %.17gx%.17g %.17gx%.17g%+.20g%+.20g",
+    (double) image->columns,(double) image->rows,(double) page.width,
+    (double) page.height,(double) page.x,(double) page.y);
+  AppendImageProfileProperty(crop_image,"hdrgm","hdrgm:Transform",
+    transform,exception);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -791,17 +805,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   image_view=DestroyCacheView(image_view);
   crop_image->type=image->type;
   if (status != MagickFalse)
-    {
-      char
-        transform[MagickPathExtent];
-
-      (void) FormatLocaleString(transform,MagickPathExtent,
-        "crop %.17gx%.17g %.17gx%.17g%+.20g%+.20g",
-        (double) image->columns,(double) image->rows,(double) page.width,
-        (double) page.height,(double) page.x,(double) page.y);
-      AppendImageProfileProperty(crop_image,"hdrgm","hdrgm:Transform",
-        transform,exception);
-    }
+    AppendCropProperty(image,crop_image,page,exception);
   if (status == MagickFalse)
     crop_image=DestroyImage(crop_image);
   return(crop_image);
