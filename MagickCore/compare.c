@@ -3794,6 +3794,33 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
   return(subtract_image);
 }
 
+static void SetUnityRow(const Image *unity_image,
+  const Image *beta_image,const ssize_t y,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) unity_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(unity_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(unity_image,i);
+      PixelTrait traits = GetPixelChannelTraits(unity_image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      if ((x >= (ssize_t) beta_image->columns) ||
+          (y >= (ssize_t) beta_image->rows))
+        q[i]=(Quantum) 0;
+      else
+        q[i]=QuantumRange;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(unity_image);
+  }
+}
+
 static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
   ExceptionInfo *exception)
 {
@@ -3828,9 +3855,6 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,unity_image->columns,1,
@@ -3840,25 +3864,7 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) unity_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(unity_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(unity_image,i);
-        PixelTrait traits = GetPixelChannelTraits(unity_image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if ((x >= (ssize_t) beta_image->columns) ||
-            (y >= (ssize_t) beta_image->rows))
-          q[i]=(Quantum) 0;
-        else
-          q[i]=QuantumRange;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(unity_image);
-    }
+    SetUnityRow(unity_image,beta_image,y,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
