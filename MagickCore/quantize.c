@@ -1127,7 +1127,7 @@ MagickExport QuantizeInfo *CloneQuantizeInfo(const QuantizeInfo *quantize_info)
 %      node in the color cube tree that is to be pruned.
 %
 */
-static void ClosestColor(const Image *image,QCubeInfo *cube_info,
+static void UpdateClosestColor(const Image *image,QCubeInfo *cube_info,
   const QNodeInfo *node_info)
 {
   double
@@ -1142,21 +1142,6 @@ static void ClosestColor(const Image *image,QCubeInfo *cube_info,
   PixelInfo
     *magick_restrict p;
 
-  size_t
-    number_children;
-
-  ssize_t
-    i;
-
-  /*
-    Traverse any children.
-  */
-  number_children=cube_info->associate_alpha == MagickFalse ? 8UL : 16UL;
-  for (i=0; i < (ssize_t) number_children; i++)
-    if (node_info->child[i] != (QNodeInfo *) NULL)
-      ClosestColor(image,cube_info,node_info->child[i]);
-  if (node_info->number_unique == 0)
-    return;
   /*
     Determine if this color is "closest".
   */
@@ -1191,6 +1176,27 @@ static void ClosestColor(const Image *image,QCubeInfo *cube_info,
       cube_info->distance=distance;
       cube_info->color_number=node_info->color_number;
     }
+}
+
+static void ClosestColor(const Image *image,QCubeInfo *cube_info,
+  const QNodeInfo *node_info)
+{
+  size_t
+    number_children;
+
+  ssize_t
+    i;
+
+  /*
+    Traverse any children.
+  */
+  number_children=cube_info->associate_alpha == MagickFalse ? 8UL : 16UL;
+  for (i=0; i < (ssize_t) number_children; i++)
+    if (node_info->child[i] != (QNodeInfo *) NULL)
+      ClosestColor(image,cube_info,node_info->child[i]);
+  if (node_info->number_unique == 0)
+    return;
+  UpdateClosestColor(image,cube_info,node_info);
 }
 
 /*
