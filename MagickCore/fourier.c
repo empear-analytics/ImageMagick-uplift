@@ -1125,6 +1125,27 @@ static MagickBooleanType InverseQuadrantSwap(const size_t width,
   return(RollFourier(center,height,0L,(ssize_t) height/-2L,destination));
 }
 
+static void ScaleInverseFourierPhase(const FourierInfo *fourier_info,
+  double *phase_pixels)
+{
+  ssize_t
+    i,
+    x,
+    y;
+
+  if (fourier_info->modulus != MagickFalse)
+    {
+      i=0L;
+      for (y=0L; y < (ssize_t) fourier_info->height; y++)
+        for (x=0L; x < (ssize_t) fourier_info->width; x++)
+        {
+          phase_pixels[i]-=0.5;
+          phase_pixels[i]*=(2.0*MagickPI);
+          i++;
+        }
+    }
+}
+
 static inline MagickBooleanType IsFourierMemoryMissing(
   const MemoryInfo *magnitude_info,const MemoryInfo *phase_info,
   const MemoryInfo *inverse_info)
@@ -1209,17 +1230,7 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
       p+=(ptrdiff_t) GetPixelChannels(phase_image);
     }
   }
-  if (fourier_info->modulus != MagickFalse)
-    {
-      i=0L;
-      for (y=0L; y < (ssize_t) fourier_info->height; y++)
-        for (x=0L; x < (ssize_t) fourier_info->width; x++)
-        {
-          phase_pixels[i]-=0.5;
-          phase_pixels[i]*=(2.0*MagickPI);
-          i++;
-        }
-    }
+  ScaleInverseFourierPhase(fourier_info,phase_pixels);
   phase_view=DestroyCacheView(phase_view);
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);
   if (status != MagickFalse)
