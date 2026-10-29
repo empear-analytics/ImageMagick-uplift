@@ -449,6 +449,33 @@ static void SetAffineSingleCoefficients(double *coeff,const double *arguments,
   }
 }
 
+static void SetPolarSpecialRadius(const Image *image,double *coeff)
+{
+  /* Use closest edge  if radius == 0 */
+  if ( fabs(coeff[0]) < MagickEpsilon ) {
+    coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
+                       fabs(coeff[3]-image->page.y));
+    coeff[0]=MagickMin(coeff[0],
+                 fabs(coeff[2]-image->page.x-image->columns));
+    coeff[0]=MagickMin(coeff[0],
+                 fabs(coeff[3]-image->page.y-image->rows));
+  }
+  /* furthest diagonal if radius == -1 */
+  if ( fabs(-1.0-coeff[0]) < MagickEpsilon ) {
+    double rx,ry;
+    rx = coeff[2]-image->page.x;
+    ry = coeff[3]-image->page.y;
+    coeff[0] = rx*rx+ry*ry;
+    ry = coeff[3]-image->page.y-image->rows;
+    coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
+    rx = coeff[2]-image->page.x-image->columns;
+    coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
+    ry = coeff[3]-image->page.y;
+    coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
+    coeff[0] = sqrt(coeff[0]);
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1375,31 +1402,8 @@ static double *GenerateCoefficients(const Image *image,
       if ( fabs(coeff[4]-coeff[5]) < MagickEpsilon )
         coeff[5] += Magick2PI; /* same angle is a full circle */
       /* if radius 0 or negative,  its a special value... */
-      if ( coeff[0] < MagickEpsilon ) {
-        /* Use closest edge  if radius == 0 */
-        if ( fabs(coeff[0]) < MagickEpsilon ) {
-          coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
-                             fabs(coeff[3]-image->page.y));
-          coeff[0]=MagickMin(coeff[0],
-                       fabs(coeff[2]-image->page.x-image->columns));
-          coeff[0]=MagickMin(coeff[0],
-                       fabs(coeff[3]-image->page.y-image->rows));
-        }
-        /* furthest diagonal if radius == -1 */
-        if ( fabs(-1.0-coeff[0]) < MagickEpsilon ) {
-          double rx,ry;
-          rx = coeff[2]-image->page.x;
-          ry = coeff[3]-image->page.y;
-          coeff[0] = rx*rx+ry*ry;
-          ry = coeff[3]-image->page.y-image->rows;
-          coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
-          rx = coeff[2]-image->page.x-image->columns;
-          coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
-          ry = coeff[3]-image->page.y;
-          coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
-          coeff[0] = sqrt(coeff[0]);
-        }
-      }
+      if ( coeff[0] < MagickEpsilon )
+        SetPolarSpecialRadius(image,coeff);
       /* IF Rmax <= 0 or Rmin < 0 OR Rmax < Rmin, THEN error */
       if (IsInvalidPolarRadius(coeff) != MagickFalse) {
         (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
