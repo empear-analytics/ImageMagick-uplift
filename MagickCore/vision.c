@@ -1540,6 +1540,15 @@ static void ResetAdjacentCensus(CCObjectInfo *object,const size_t *neighbors,
     object[neighbors[j]].census=0.0;
 }
 
+static void MergeAllObjects(const Image *component_image,CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+    object[i].merge=MagickTrue;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1795,8 +1804,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Keep selected objects based on color, merge others.
       */
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        object[i].merge=MagickTrue;
+      MergeAllObjects(component_image,object);
       for (p=artifact;  ; )
       {
         char
@@ -1828,8 +1836,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Keep selected objects based on id, merge others.
       */
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        object[i].merge=MagickTrue;
+      MergeAllObjects(component_image,object);
       SetObjectMergeByIds(object,component_image->colors,artifact,MagickFalse);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-top");
