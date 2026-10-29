@@ -4859,10 +4859,7 @@ static void Import1BitIndexAlphaQuantum(const Image *image,
   {
     for (bit=0; bit < 8; bit+=2)
     {
-      if (quantum_info->min_is_white == MagickFalse)
-        pixel=(unsigned char) (((*p) & (1 << (7-bit))) == 0 ? 0x00 : 0x01);
-      else
-        pixel=(unsigned char) (((*p) & (1 << (7-bit))) != 0 ? 0x00 : 0x01);
+      pixel=GetColormapBit(quantum_info,p,bit);
       SetPixelGray(image,(Quantum) (pixel == 0 ? 0 : QuantumRange),q);
       SetPixelAlpha(image,((*p) & (1UL << (unsigned char) (6-bit))) == 0 ?
         TransparentAlpha : OpaqueAlpha,q);
@@ -4873,10 +4870,7 @@ static void Import1BitIndexAlphaQuantum(const Image *image,
   if ((number_pixels % 4) != 0)
     for (bit=3; bit >= (ssize_t) (4-(number_pixels % 4)); bit-=2)
     {
-      if (quantum_info->min_is_white == MagickFalse)
-        pixel=(unsigned char) (((*p) & (1 << (7-bit))) == 0 ? 0x00 : 0x01);
-      else
-        pixel=(unsigned char) (((*p) & (1 << (7-bit))) != 0 ? 0x00 : 0x01);
+      pixel=GetColormapBit(quantum_info,p,bit);
       SetPixelIndex(image,(Quantum) (pixel == 0 ? 0 : 1),q);
       SetPixelGray(image,(Quantum) (pixel == 0 ? 0 : QuantumRange),q);
       SetPixelAlpha(image,((*p) & (1UL << (unsigned char) (6-bit))) == 0 ?
