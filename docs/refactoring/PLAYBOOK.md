@@ -1401,6 +1401,102 @@ the function leaves Deep, Nested Complexity, fx.c 2.74 to 2.80. Added by Claude 
 
 ---
 
+## Recipe V - Extract Block Returning Success for a Cleanup Jump
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
+Method*, *Complex Method* or *Large Method*, and the block that would fix it leaves the
+function on failure through `goto <label>;`, to a cleanup label further down, as
+`MorphologyApply`'s image clone does (`goto error_cleanup;` when the clone fails).
+
+**Not covered by:** Recipe E, whose step 6 covers the `return` hidden in the throw
+macros and whose step 7 the `return` of a block that ends the function: a jump to the
+caller's label is neither, and a new function cannot jump to it; Recipes O, T, K, J, N,
+Q and U, whose first step refuses a block containing `goto`.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. Every
+   `goto` in it jumps to one label `L` outside the block; it contains no `return`, and no
+   `continue` or `break` that leaves it.
+2. The block writes at most one variable of the caller, `v`, a plain local (not a
+   parameter, a global or a `static`) whose address is not taken elsewhere. Writes
+   through pointers the block already uses stay as they are; variables it declares move
+   with it.
+3. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. Each `goto L;` becomes `return(MagickFalse);`, one for one, and the function
+   ends with `return(MagickTrue);`. Nothing else in the text changes.
+4. Pass every variable the block only reads by value, and `v` as a pointer, written `*v`
+   at every use, reads included (Recipe O step 5), at most four parameters in all;
+   otherwise skip the block.
+5. Where the block stood, write `if (Helper(...) == MagickFalse) goto L;`, and check
+   every argument against its parameter by reading.
+
+**Before:**
+
+```c
+          kernel_loop++;     /* the iteration of this kernel */
+
+          /* Create a clone as the destination image, if not yet defined */
+          if ( work_image == (Image *) NULL )
+            {
+              work_image=CloneImage(image,0,0,MagickTrue,exception);
+              if (work_image == (Image *) NULL)
+                goto error_cleanup;
+              if (SetImageStorageClass(work_image,DirectClass,exception) == MagickFalse)
+                goto error_cleanup;
+            }
+
+          /* APPLY THE MORPHOLOGICAL PRIMITIVE (curr -> work) */
+```
+
+**After:**
+
+```c
+static MagickBooleanType AcquireWorkImage(const Image *image,
+  Image **work_image,ExceptionInfo *exception)
+{
+  if ( *work_image == (Image *) NULL )
+    {
+      *work_image=CloneImage(image,0,0,MagickTrue,exception);
+      if (*work_image == (Image *) NULL)
+        return(MagickFalse);
+      if (SetImageStorageClass(*work_image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+...
+          /* Create a clone as the destination image, if not yet defined */
+          if (AcquireWorkImage(image,&work_image,exception) == MagickFalse)
+            goto error_cleanup;
+```
+
+**Careful:**
+
+- On a failure path the caller jumps from the same point as before: the block's
+  statements after the jump run in neither version, and every write before it has
+  landed in `v` through the pointer, so the cleanup code at `L` reads the same values
+  (here a `work_image` that is NULL, or a clone it destroys).
+- On the success path the function returns at the block's end and the caller goes on
+  with the next statement, where the block fell through.
+- The failure paths are mostly allocation failures that no case reaches: the oracle
+  checks the success path; the failure path is checked by reading, each `goto L;`
+  against its `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2`.
+- A block that jumps to two labels, or writes two of the caller's variables, is not this
+  recipe: skip it.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 5 checked by reading.
+
+**Provenance:** 2026-10-29, from `morphology.c`'s `MorphologyApply`, whose deepest sites
+inside its four nested loops (kernel, stage, compound method, kernel iteration) leave
+through `goto error_cleanup`, the plateau the earlier W07 pass on the file recorded. A
+probe of the work-image clone: nesting 6 to 5, 2.46 to 2.51. Cleanup labels reached by
+`goto` also occur in `property.c` and `annotate.c`. Added by Claude Code (Claude Opus
+5.5) during task W07, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -1749,3 +1845,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | AMEND | E | Step 7: inside a `switch` case, a block after which the case runs only its closing `break;` may contain `break;` statements of that `switch` when its single output is one variable: the new function takes it by value and returns it, each such `break;` becomes `return(v);`, and the block becomes `v=Helper(...);`, so both reach the case's end with the same value | `fx.c`'s `ExecuteRPN`: its pixel-lookup cases (`fU`, `fU0`, `fUP`, `fS`/`fV`, `fP`/`fSP`/`fVP`) hold its nesting of 8 and each sets `regA` and leaves the `switch` by `break` from inside nested `if`s. A probe removing them: depth 8 to 4, fx.c 2.62 to 2.92 | mandate (2026-10-24) |
 | 2026-10-29 | NEW | U | Extract Function Returning the Loop Status Taking an Input Struct: a Recipe T block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and the written row pointers by value; the caller writes `status=MagickFalse` from its result (Recipe T) | `FxImage`'s per-channel loop inside its parallel row loop (seven inputs and `status`): T gives seven parameters, N refuses the `status` write, the whole column loop is a Complex Method (cc 9). A probe: FxImage leaves Deep, Nested Complexity, fx.c 2.74 to 2.80 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | Q | Step 1: a block in a function with no OpenMP region (a sequential pass) qualifies, its written variables being plain locals of the caller (Recipe O step 2); *Careful* notes the cursors (`k`, `pixels`) such a block advances for the next call | `morphology.c`'s `MorphologyPrimitiveDirect`: its forward pass repeats one kernel-row body (`pixel`, `k`, `pixels` written; `image`, `kernel`, `i` read) in the Distance and Voronoi double loops; the function is sequential (two views of one image), so Recipe K's parallel-body wording refuses it, Recipe E step 4 refuses three outputs and Recipe O wants a selection. A probe of the row helper at both sites: nesting 6 to 5, 2.41 to 2.46 | mandate (2026-10-24) |
+| 2026-10-29 | NEW | V | Extract Block Returning Success for a Cleanup Jump: a block outside OpenMP that leaves through `goto L;` and writes at most one caller local moves to a `static MagickBooleanType` function, each `goto L;` becoming `return(MagickFalse);`, the local passed by pointer; the caller writes `if (Helper(...) == MagickFalse) goto L;` | `MorphologyApply`'s work-image clone inside four nested loops (nesting 6), refused by every extraction recipe for its `goto error_cleanup`; the plateau of the earlier W07 pass on `morphology.c`. A probe: nesting 6 to 5, 2.46 to 2.51 | mandate (2026-10-24) |
