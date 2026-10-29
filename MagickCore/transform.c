@@ -2199,6 +2199,28 @@ static RectangleInfo ClampTrimOffset(const Image *image,
   return(geometry);
 }
 
+static Image *TrimEmptyImage(const Image *image,ExceptionInfo *exception)
+{
+  Image
+    *trim_image;
+
+  /*
+    The image is empty: return a minimal 1x1 transparent placeholder.
+  */
+  trim_image=CloneImage(image,1,1,MagickTrue,exception);
+  if (trim_image != (Image *) NULL)
+    {
+      trim_image->background_color.alpha_trait=BlendPixelTrait;
+      trim_image->background_color.alpha=(MagickRealType) TransparentAlpha;
+      (void) SetImageBackgroundColor(trim_image,exception);
+      trim_image->page.width=image->columns;
+      trim_image->page.height=image->rows;
+      trim_image->page.x=(-1);
+      trim_image->page.y=(-1);
+    }
+  return(trim_image);
+}
+
 MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
 {
   const char
@@ -2216,23 +2238,7 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   geometry=GetImageBoundingBox(image,exception);
   if ((geometry.width == 0) || (geometry.height == 0))
-    {
-      /*
-        The image is empty: return a minimal 1x1 transparent placeholder.
-      */
-      trim_image=CloneImage(image,1,1,MagickTrue,exception);
-      if (trim_image != (Image *) NULL)
-        {
-          trim_image->background_color.alpha_trait=BlendPixelTrait;
-          trim_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-          (void) SetImageBackgroundColor(trim_image,exception);
-          trim_image->page.width=image->columns;
-          trim_image->page.height=image->rows;
-          trim_image->page.x=(-1);
-          trim_image->page.y=(-1);
-        }
-      return(trim_image);
-    }
+    return(TrimEmptyImage(image,exception));
   artifact=GetImageArtifact(image,"trim:minSize");
   if (artifact != (const char *) NULL)
     {
