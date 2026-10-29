@@ -3887,12 +3887,6 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         MorphologyKernelRows
           rows;
 
-        ssize_t
-          u;
-
-        ssize_t
-          v;
-
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
         if (traits == UndefinedPixelTrait)
@@ -3920,17 +3914,10 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
           }
           case VoronoiMorphology:
           {
-            k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            for (v=offset.y; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            rows.image=image;
+            rows.kernel=kernel;
+            rows.i=i;
+            pixel=MinimizeTrailingRowsDistance(&rows,offset,pixels,pixel);
             k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
             row.image=image;
             row.kernel=kernel;
