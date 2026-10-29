@@ -273,6 +273,18 @@ static void ChopPixelRow(const ChopRowImages *images,
   }
 }
 
+static RectangleInfo ClampChopExtent(const Image *image,
+  RectangleInfo extent)
+{
+  if ((extent.x+(ssize_t) extent.width) > (ssize_t) image->columns)
+    extent.width=(size_t) ((ssize_t) image->columns-extent.x);
+  if ((extent.y+(ssize_t) extent.height) > (ssize_t) image->rows)
+    extent.height=(size_t) ((ssize_t) image->rows-extent.y);
+  ClipChopOffset(&extent.x,&extent.width);
+  ClipChopOffset(&extent.y,&extent.height);
+  return(extent);
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
@@ -310,12 +322,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   if (IsChopOutsideImage(image,chop_info) != MagickFalse)
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   extent=(*chop_info);
-  if ((extent.x+(ssize_t) extent.width) > (ssize_t) image->columns)
-    extent.width=(size_t) ((ssize_t) image->columns-extent.x);
-  if ((extent.y+(ssize_t) extent.height) > (ssize_t) image->rows)
-    extent.height=(size_t) ((ssize_t) image->rows-extent.y);
-  ClipChopOffset(&extent.x,&extent.width);
-  ClipChopOffset(&extent.y,&extent.height);
+  extent=ClampChopExtent(image,extent);
   if ((extent.width >= image->columns) || (extent.height >= image->rows))
     ThrowImageException(OptionWarning,"GeometryDoesNotContainImage");
   chop_image=CloneImage(image,image->columns-extent.width,image->rows-
