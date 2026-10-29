@@ -1508,6 +1508,18 @@ MagickExport MagickBooleanType GetImageRange(const Image *image,double *minima,
   (alpha)=(beta);(beta)=gamma; \
 }
 
+static void SetMedianPivot(Quantum *pixels,const ssize_t low,
+  const ssize_t mid,const ssize_t high)
+{
+  if (pixels[mid] > pixels[high])
+    SwapPixels(pixels[mid],pixels[high]);
+  if (pixels[low] > pixels[high])
+    SwapPixels(pixels[low], pixels[high]);
+  if (pixels[mid] > pixels[low])
+    SwapPixels(pixels[mid],pixels[low]);
+  SwapPixels(pixels[mid],pixels[low+1]);
+}
+
 static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
 {
   ssize_t
@@ -1530,13 +1542,7 @@ static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
           SwapPixels(pixels[low],pixels[high]);
         return(median);
       }
-    if (pixels[mid] > pixels[high])
-      SwapPixels(pixels[mid],pixels[high]);
-    if (pixels[low] > pixels[high])
-      SwapPixels(pixels[low], pixels[high]);
-    if (pixels[mid] > pixels[low])
-      SwapPixels(pixels[mid],pixels[low]);
-    SwapPixels(pixels[mid],pixels[low+1]);
+    SetMedianPivot(pixels,low,mid,high);
     for ( ; ; )
     {
       do l++; while (pixels[low] > pixels[l]);
