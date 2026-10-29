@@ -1270,6 +1270,12 @@ MagickExport MagickBooleanType CompressImageColormap(Image *image,
 static void DefineImageColormap(Image *image,QCubeInfo *cube_info,
   QNodeInfo *node_info)
 {
+  double
+    alpha;
+
+  PixelInfo
+    *magick_restrict q;
+
   size_t
     number_children;
 
@@ -1283,21 +1289,33 @@ static void DefineImageColormap(Image *image,QCubeInfo *cube_info,
   for (i=0; i < (ssize_t) number_children; i++)
     if (node_info->child[i] != (QNodeInfo *) NULL)
       DefineImageColormap(image,cube_info,node_info->child[i]);
-  if (node_info->number_unique != 0)
+  if (node_info->number_unique == 0)
+    return;
+  /*
+    Colormap entry is defined by the mean color in this cube.
+  */
+  q=image->colormap+image->colors;
+  alpha=(double) ((MagickOffsetType) node_info->number_unique);
+  alpha=MagickSafeReciprocal(alpha);
+  if (cube_info->associate_alpha == MagickFalse)
+    {
+      q->red=(double) ClampToQuantum(alpha*(double) QuantumRange*
+        node_info->total_color.red);
+      q->green=(double) ClampToQuantum(alpha*(double) QuantumRange*
+        node_info->total_color.green);
+      q->blue=(double) ClampToQuantum(alpha*(double) QuantumRange*
+        node_info->total_color.blue);
+      q->alpha=(double) OpaqueAlpha;
+    }
+  else
     {
       double
-        alpha;
+        opacity;
 
-      PixelInfo
-        *magick_restrict q;
-
-      /*
-        Colormap entry is defined by the mean color in this cube.
-      */
-      q=image->colormap+image->colors;
-      alpha=(double) ((MagickOffsetType) node_info->number_unique);
-      alpha=MagickSafeReciprocal(alpha);
-      if (cube_info->associate_alpha == MagickFalse)
+      opacity=(double) (alpha*(double) QuantumRange*
+        node_info->total_color.alpha);
+      q->alpha=(double) ClampToQuantum(opacity);
+      if (q->alpha == (double) OpaqueAlpha)
         {
           q->red=(double) ClampToQuantum(alpha*(double) QuantumRange*
             node_info->total_color.red);
@@ -1305,47 +1323,28 @@ static void DefineImageColormap(Image *image,QCubeInfo *cube_info,
             node_info->total_color.green);
           q->blue=(double) ClampToQuantum(alpha*(double) QuantumRange*
             node_info->total_color.blue);
-          q->alpha=(double) OpaqueAlpha;
         }
       else
         {
           double
-            opacity;
+            gamma;
 
-          opacity=(double) (alpha*(double) QuantumRange*
-            node_info->total_color.alpha);
-          q->alpha=(double) ClampToQuantum(opacity);
-          if (q->alpha == (double) OpaqueAlpha)
+          gamma=(double) (QuantumScale*q->alpha);
+          gamma=MagickSafeReciprocal(gamma);
+          q->red=(double) ClampToQuantum(alpha*gamma*(double) QuantumRange*
+            node_info->total_color.red);
+          q->green=(double) ClampToQuantum(alpha*gamma*(double)
+            QuantumRange*node_info->total_color.green);
+          q->blue=(double) ClampToQuantum(alpha*gamma*(double) QuantumRange*
+            node_info->total_color.blue);
+          if (node_info->number_unique > cube_info->transparent_pixels)
             {
-              q->red=(double) ClampToQuantum(alpha*(double) QuantumRange*
-                node_info->total_color.red);
-              q->green=(double) ClampToQuantum(alpha*(double) QuantumRange*
-                node_info->total_color.green);
-              q->blue=(double) ClampToQuantum(alpha*(double) QuantumRange*
-                node_info->total_color.blue);
-            }
-          else
-            {
-              double
-                gamma;
-
-              gamma=(double) (QuantumScale*q->alpha);
-              gamma=MagickSafeReciprocal(gamma);
-              q->red=(double) ClampToQuantum(alpha*gamma*(double) QuantumRange*
-                node_info->total_color.red);
-              q->green=(double) ClampToQuantum(alpha*gamma*(double)
-                QuantumRange*node_info->total_color.green);
-              q->blue=(double) ClampToQuantum(alpha*gamma*(double) QuantumRange*
-                node_info->total_color.blue);
-              if (node_info->number_unique > cube_info->transparent_pixels)
-                {
-                  cube_info->transparent_pixels=node_info->number_unique;
-                  cube_info->transparent_index=(ssize_t) image->colors;
-                }
+              cube_info->transparent_pixels=node_info->number_unique;
+              cube_info->transparent_index=(ssize_t) image->colors;
             }
         }
-      node_info->color_number=image->colors++;
     }
+  node_info->color_number=image->colors++;
 }
 
 /*
