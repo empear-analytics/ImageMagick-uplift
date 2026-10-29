@@ -565,6 +565,20 @@ static inline MagickBooleanType IsCropOutsideImage(const Image *image,
     MagickTrue : MagickFalse);
 }
 
+static void CopyPixelRow(const Image *image,const Image *destination,
+  const Quantum *p,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) destination->columns; x++)
+  {
+    CopyPixelChannelsTo(image,destination,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(destination);
+  }
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -714,9 +728,6 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,page.x,page.y+y,crop_image->columns,
@@ -728,12 +739,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) crop_image->columns; x++)
-    {
-      CopyPixelChannelsTo(image,crop_image,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(crop_image);
-    }
+    CopyPixelRow(image,crop_image,p,q);
     if (SyncCacheViewAuthenticPixels(crop_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
