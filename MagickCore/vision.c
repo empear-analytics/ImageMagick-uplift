@@ -1248,6 +1248,20 @@ static ssize_t GetTopObjectIds(const Image *component_image,
   return(top_ids);
 }
 
+static void DiameterThreshold(const Image *component_image,
+  CCObjectInfo *object,const ssize_t n,const CCThresholdRange range)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+  {
+    object[i].metric[n]=ceil(sqrt(4.0*object[i].area/MagickPI)-0.5);
+    if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
+      object[i].merge=MagickTrue;
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1705,12 +1719,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.max_threshold=max_threshold;
       range.background_id=background_id;
       metrics[++n]="diameter";
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-      {
-        object[i].metric[n]=ceil(sqrt(4.0*object[i].area/MagickPI)-0.5);
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
-      }
+      DiameterThreshold(component_image,object,n,range);
     }
   artifact=GetImageArtifact(image,"connected-components:major-axis-threshold");
   if (artifact != (const char *) NULL)
