@@ -1789,6 +1789,17 @@ static inline MagickBooleanType IsColourSpaceNamed(const ssize_t type,
   return((type >= 0 || IsIcc || IsDev) ? MagickTrue : MagickFalse);
 }
 
+static ssize_t ReportColourSpaceWithoutArgs (FxInfo * pfx,
+  ExceptionInfo * dummy_exception)
+{
+  (void) ThrowMagickException (
+    pfx->exception, GetMagickModule(), OptionError,
+    "colorspace but not a valid color with '(...)' at", "'%s'",
+    SetShortExp(pfx));
+  dummy_exception = DestroyExceptionInfo (dummy_exception);
+  return -1;
+}
+
 static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
 /* Finds named colour such as "blue" and colorspace function such as "lab(10,20,30)".
    Returns number of characters to swallow.
@@ -1860,12 +1871,7 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
           return (ssize_t)lenfun;
         }
       } else {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "colorspace but not a valid color with '(...)' at", "'%s'",
-          SetShortExp(pfx));
-        dummy_exception = DestroyExceptionInfo (dummy_exception);
-        return -1;
+        return (ReportColourSpaceWithoutArgs (pfx, dummy_exception));
       }
     }
     if (!IsGray) {
