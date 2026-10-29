@@ -2102,6 +2102,21 @@ static PixelInfo ShadowImageRow(const Image *border_image,
   return(background_color);
 }
 
+static void OffsetShadowPage(Image *shadow_image,
+  const RectangleInfo border_info,const ssize_t x_offset,const ssize_t y_offset)
+{
+  if (shadow_image->page.width == 0)
+    shadow_image->page.width=shadow_image->columns;
+  if (shadow_image->page.height == 0)
+    shadow_image->page.height=shadow_image->rows;
+  shadow_image->page.width=(size_t) ((ssize_t) shadow_image->page.width+
+    x_offset-(ssize_t) border_info.width);
+  shadow_image->page.height=(size_t) ((ssize_t) shadow_image->page.height+
+    y_offset-(ssize_t) border_info.height);
+  shadow_image->page.x+=x_offset-(ssize_t) border_info.width;
+  shadow_image->page.y+=y_offset-(ssize_t) border_info.height;
+}
+
 MagickExport Image *ShadowImage(const Image *image,const double alpha,
   const double sigma,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -2194,16 +2209,7 @@ MagickExport Image *ShadowImage(const Image *image,const double alpha,
   if (shadow_image == (Image *) NULL)
     return((Image *) NULL);
   (void) SetPixelChannelMask(shadow_image,channel_mask);
-  if (shadow_image->page.width == 0)
-    shadow_image->page.width=shadow_image->columns;
-  if (shadow_image->page.height == 0)
-    shadow_image->page.height=shadow_image->rows;
-  shadow_image->page.width=(size_t) ((ssize_t) shadow_image->page.width+
-    x_offset-(ssize_t) border_info.width);
-  shadow_image->page.height=(size_t) ((ssize_t) shadow_image->page.height+
-    y_offset-(ssize_t) border_info.height);
-  shadow_image->page.x+=x_offset-(ssize_t) border_info.width;
-  shadow_image->page.y+=y_offset-(ssize_t) border_info.height;
+  OffsetShadowPage(shadow_image,border_info,x_offset,y_offset);
   return(shadow_image);
 }
 
