@@ -1366,9 +1366,7 @@ static MagickBooleanType InverseFourierTransformChannel(
 
   fourier_info.width=magnitude_image->columns;
   fourier_info.height=magnitude_image->rows;
-  if ((magnitude_image->columns != magnitude_image->rows) ||
-      ((magnitude_image->columns % 2) != 0) ||
-      ((magnitude_image->rows % 2) != 0))
+  if (IsFourierPaddingNeeded(magnitude_image) != MagickFalse)
     {
       size_t extent=magnitude_image->columns < magnitude_image->rows ?
         magnitude_image->rows : magnitude_image->columns;
