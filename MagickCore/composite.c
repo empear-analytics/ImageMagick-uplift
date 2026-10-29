@@ -885,6 +885,29 @@ static void FillMeanRow(const MeanFillInputs *row,const double *mean,
   }
 }
 
+static void AccumulateMeanRow(const Image *image,
+  const Quantum *magick_restrict p,double *mean)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if (traits == UndefinedPixelTrait)
+        continue;
+      mean[i]+=QuantumScale*(double) p[i];
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static Image *BlendMeanImage(Image *image,const Image *mask_image,
   ExceptionInfo *exception)
 {
@@ -916,28 +939,11 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     p=GetCacheViewVirtualPixels(alpha_view,0,y,image->columns,1,
       exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        mean[i]+=QuantumScale*(double) p[i];
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateMeanRow(image,p,mean);
   }
   alpha_view=DestroyCacheView(alpha_view);
   if (y < (ssize_t) image->rows)
