@@ -663,6 +663,46 @@ static inline MagickBooleanType IsNegativeAxisDifference(const double M20,
     MagickFalse);
 }
 
+typedef struct _CCEllipseAngle
+{
+  double
+    M11,
+    M20,
+    M02;
+
+  ssize_t
+    i,
+    metric_index;
+} CCEllipseAngle;
+
+static void AdjustEllipseAngle(CCObjectInfo *object,
+  const CCEllipseAngle *ellipse_angle)
+{
+  const double
+    M11 = ellipse_angle->M11,
+    M20 = ellipse_angle->M20,
+    M02 = ellipse_angle->M02;
+
+  const ssize_t
+    i = ellipse_angle->i,
+    metric_index = ellipse_angle->metric_index;
+
+  if (M11 < 0.0)
+    {
+      if (fabs(M20-M02) >= 0.0)
+        {
+          if ((M20-M02) < 0.0)
+            object[i].metric[metric_index]+=90.0;
+          else
+            object[i].metric[metric_index]+=180.0;
+        }
+    }
+  else
+    if (IsNegativeAxisDifference(M20,M02) != MagickFalse)
+      object[i].metric[metric_index]+=90.0;
+}
+
+
 static void AngleThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -679,6 +719,9 @@ static void AngleThreshold(const Image *component_image,
 #endif
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
+    CCEllipseAngle
+      ellipse_angle;
+
     CacheView
       *component_view;
 
@@ -748,19 +791,14 @@ static void AngleThreshold(const Image *component_image,
             object[i].metric[metric_index]+=90.0;
         }
       else
-        if (M11 < 0.0)
-          {
-            if (fabs(M20-M02) >= 0.0)
-              {
-                if ((M20-M02) < 0.0)
-                  object[i].metric[metric_index]+=90.0;
-                else
-                  object[i].metric[metric_index]+=180.0;
-              }
-          }
-        else
-          if (IsNegativeAxisDifference(M20,M02) != MagickFalse)
-            object[i].metric[metric_index]+=90.0;
+        {
+          ellipse_angle.M11=M11;
+          ellipse_angle.M20=M20;
+          ellipse_angle.M02=M02;
+          ellipse_angle.i=i;
+          ellipse_angle.metric_index=metric_index;
+          AdjustEllipseAngle(object,&ellipse_angle);
+        }
   }
 }
 
