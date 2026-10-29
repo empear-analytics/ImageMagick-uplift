@@ -3394,6 +3394,56 @@ static void MapBlobFile(const ImageInfo *image_info,
     }
 }
 
+static void GetBlobModeFlags(const BlobMode mode,int *flags,
+  const char **type)
+{
+  switch (mode)
+  {
+    case ReadBlobMode:
+    {
+      *flags=O_RDONLY | O_CLOEXEC;
+      *type="r";
+      break;
+    }
+    case ReadBinaryBlobMode:
+    {
+      *flags=O_RDONLY | O_CLOEXEC | O_BINARY;
+      *type="rb";
+      break;
+    }
+    case WriteBlobMode:
+    {
+      *flags=O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC;
+      *type="w";
+      break;
+    }
+    case WriteBinaryBlobMode:
+    {
+      *flags=O_RDWR | O_CLOEXEC | O_CREAT | O_TRUNC | O_BINARY;
+      *type="w+b";
+      break;
+    }
+    case AppendBlobMode:
+    {
+      *flags=O_WRONLY | O_CLOEXEC | O_CREAT | O_APPEND;
+      *type="a";
+      break;
+    }
+    case AppendBinaryBlobMode:
+    {
+      *flags=O_RDWR | O_CLOEXEC | O_CREAT | O_APPEND | O_BINARY;
+      *type="a+b";
+      break;
+    }
+    default:
+    {
+      *flags=O_RDONLY | O_CLOEXEC;
+      *type="r";
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -3443,51 +3493,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
     }
   (void) DetachBlob(blob_info);
   blob_info->mode=mode;
-  switch (mode)
-  {
-    case ReadBlobMode:
-    {
-      flags=O_RDONLY | O_CLOEXEC;
-      type="r";
-      break;
-    }
-    case ReadBinaryBlobMode:
-    {
-      flags=O_RDONLY | O_CLOEXEC | O_BINARY;
-      type="rb";
-      break;
-    }
-    case WriteBlobMode:
-    {
-      flags=O_WRONLY | O_CLOEXEC | O_CREAT | O_TRUNC;
-      type="w";
-      break;
-    }
-    case WriteBinaryBlobMode:
-    {
-      flags=O_RDWR | O_CLOEXEC | O_CREAT | O_TRUNC | O_BINARY;
-      type="w+b";
-      break;
-    }
-    case AppendBlobMode:
-    {
-      flags=O_WRONLY | O_CLOEXEC | O_CREAT | O_APPEND;
-      type="a";
-      break;
-    }
-    case AppendBinaryBlobMode:
-    {
-      flags=O_RDWR | O_CLOEXEC | O_CREAT | O_APPEND | O_BINARY;
-      type="a+b";
-      break;
-    }
-    default:
-    {
-      flags=O_RDONLY | O_CLOEXEC;
-      type="r";
-      break;
-    }
-  }
+  GetBlobModeFlags(mode,&flags,&type);
   if (*type != 'r')
     blob_info->synchronize=image_info->synchronize;
   if (image_info->stream != (StreamHandler) NULL)
