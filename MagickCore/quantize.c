@@ -2719,6 +2719,39 @@ static inline void AccumulateKmeansPixel(const Image *image,
   kmeans_pixel->distortion+=min_distance;
 }
 
+static double UpdateKmeansCentroids(Image *image,KmeansInfo **kmeans_pixels)
+{
+  double
+    distortion;
+
+  ssize_t
+    j;
+
+  distortion=0.0;
+  for (j=0; j < (ssize_t) image->colors; j++)
+  {
+    double
+      gamma;
+
+    gamma=MagickSafeReciprocal((double) kmeans_pixels[0][j].count);
+    image->colormap[j].red=gamma*(double) QuantumRange*
+      kmeans_pixels[0][j].red;
+    image->colormap[j].green=gamma*(double) QuantumRange*
+      kmeans_pixels[0][j].green;
+    image->colormap[j].blue=gamma*(double) QuantumRange*
+      kmeans_pixels[0][j].blue;
+    if (image->alpha_trait != UndefinedPixelTrait)
+      image->colormap[j].alpha=gamma*(double) QuantumRange*
+      kmeans_pixels[0][j].alpha;
+    if (image->colorspace == CMYKColorspace)
+      image->colormap[j].black=gamma*(double) QuantumRange*
+      kmeans_pixels[0][j].black;
+    image->colormap[j].count=(MagickSizeType) kmeans_pixels[0][j].count;
+    distortion+=kmeans_pixels[0][j].distortion;
+  }
+  return(distortion);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -2887,28 +2920,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     /*
       Calculate the new means (centroids) of the pixels in the new clusters.
     */
-    distortion=0.0;
-    for (j=0; j < (ssize_t) image->colors; j++)
-    {
-      double
-        gamma;
-
-      gamma=MagickSafeReciprocal((double) kmeans_pixels[0][j].count);
-      image->colormap[j].red=gamma*(double) QuantumRange*
-        kmeans_pixels[0][j].red;
-      image->colormap[j].green=gamma*(double) QuantumRange*
-        kmeans_pixels[0][j].green;
-      image->colormap[j].blue=gamma*(double) QuantumRange*
-        kmeans_pixels[0][j].blue;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        image->colormap[j].alpha=gamma*(double) QuantumRange*
-        kmeans_pixels[0][j].alpha;
-      if (image->colorspace == CMYKColorspace)
-        image->colormap[j].black=gamma*(double) QuantumRange*
-        kmeans_pixels[0][j].black;
-      image->colormap[j].count=(MagickSizeType) kmeans_pixels[0][j].count;
-      distortion+=kmeans_pixels[0][j].distortion;
-    }
+    distortion=UpdateKmeansCentroids(image,kmeans_pixels);
     if (image->debug != MagickFalse)
       (void) LogMagickEvent(ImageEvent,GetMagickModule(),
         "distortion[%.17g]: %*g %*g\n",(double) n,GetMagickPrecision(),
