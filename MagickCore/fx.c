@@ -4868,6 +4868,78 @@ FxInfo *DestroyFxInfo (FxInfo * pfx)
   return NULL;
 }
 
+typedef struct _FxPixelInputs
+{
+  const Image
+    *image;
+
+  Image
+    *fx_image;
+
+  FxInfo
+    *pfx;
+
+  int
+    id;
+
+  ssize_t
+    x,
+    y;
+} FxPixelInputs;
+
+static MagickBooleanType ApplyFxToPixel (const FxPixelInputs * in,
+  const Quantum *magick_restrict p, Quantum *magick_restrict q)
+{
+  const Image
+    *const image = in->image;
+
+  Image
+    *const fx_image = in->fx_image;
+
+  FxInfo
+    *const pfx = in->pfx;
+
+  const int
+    id = in->id;
+
+  const ssize_t
+    x = in->x,
+    y = in->y;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    i;
+
+  fxFltType
+    result = 0.0;
+
+  status=MagickTrue;
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel (image, i);
+    PixelTrait traits = GetPixelChannelTraits (image, channel);
+    PixelTrait fx_traits = GetPixelChannelTraits (fx_image, channel);
+    const fxPixelPosT pos = { channel, x, y };
+    if ((traits == UndefinedPixelTrait) ||
+        (fx_traits == UndefinedPixelTrait))
+      continue;
+    if ((fx_traits & CopyPixelTrait) != 0) {
+        SetPixelChannel (fx_image, channel, p[i], q);
+        continue;
+    }
+
+    if (!ExecuteRPN (pfx, &pfx->fxrts[id], &result, &pos)) {
+      status=MagickFalse;
+      break;
+    }
+
+    q[i] = ClampToQuantum ((MagickRealType) (QuantumRange*result));
+  }
+  return(status);
+}
+
 /* Following is substitute for FxImage().
 */
 MagickExport Image *FxImage(const Image *image,const char *expression,
@@ -4942,9 +5014,6 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
     ssize_t
       x;
 
-    fxFltType
-      result = 0.0;
-
     if (status == MagickFalse)
       continue;
     p = GetCacheViewVirtualPixels (image_view, 0, y, image->columns, 1, pfx->exception);
@@ -4954,31 +5023,19 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
         continue;
     }
     for (x=0; x < (ssize_t) fx_image->columns; x++) {
-      ssize_t i;
+      FxPixelInputs
+        pixel_in;
 
       pfx->fxrts[id].thisPixel = (Quantum *)p;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel (image, i);
-        PixelTrait traits = GetPixelChannelTraits (image, channel);
-        PixelTrait fx_traits = GetPixelChannelTraits (fx_image, channel);
-        const fxPixelPosT pos = { channel, x, y };
-        if ((traits == UndefinedPixelTrait) ||
-            (fx_traits == UndefinedPixelTrait))
-          continue;
-        if ((fx_traits & CopyPixelTrait) != 0) {
-            SetPixelChannel (fx_image, channel, p[i], q);
-            continue;
-        }
-
-        if (!ExecuteRPN (pfx, &pfx->fxrts[id], &result, &pos)) {
-          status=MagickFalse;
-          break;
-        }
-
-        q[i] = ClampToQuantum ((MagickRealType) (QuantumRange*result));
-      }
+      pixel_in.image=image;
+      pixel_in.fx_image=fx_image;
+      pixel_in.pfx=pfx;
+      pixel_in.id=id;
+      pixel_in.x=x;
+      pixel_in.y=y;
+      if (ApplyFxToPixel (&pixel_in, p, q) == MagickFalse)
+        status=MagickFalse;
       p+=(ptrdiff_t) GetPixelChannels (image);
       q+=(ptrdiff_t) GetPixelChannels (fx_image);
     }
