@@ -509,6 +509,21 @@ static inline size_t ColorToQNodeId(const QCubeInfo *cube_info,
   return(id);
 }
 
+static void SetColormapPixel(Image *image,const QCubeInfo *cube,
+  const size_t index,Quantum *magick_restrict q)
+{
+  if (image->storage_class == PseudoClass)
+    SetPixelIndex(image,(Quantum) index,q);
+  if (cube->quantize_info->measure_error == MagickFalse)
+    {
+      SetPixelRed(image,ClampToQuantum(image->colormap[index].red),q);
+      SetPixelGreen(image,ClampToQuantum(image->colormap[index].green),q);
+      SetPixelBlue(image,ClampToQuantum(image->colormap[index].blue),q);
+      if (cube->associate_alpha != MagickFalse)
+        SetPixelAlpha(image,ClampToQuantum(image->colormap[index].alpha),q);
+    }
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -619,20 +634,7 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
           index=cube.color_number;
           for (i=0; i < (ssize_t) count; i++)
           {
-            if (image->storage_class == PseudoClass)
-              SetPixelIndex(image,(Quantum) index,q);
-            if (cube.quantize_info->measure_error == MagickFalse)
-              {
-                SetPixelRed(image,ClampToQuantum(
-                  image->colormap[index].red),q);
-                SetPixelGreen(image,ClampToQuantum(
-                  image->colormap[index].green),q);
-                SetPixelBlue(image,ClampToQuantum(
-                  image->colormap[index].blue),q);
-                if (cube.associate_alpha != MagickFalse)
-                  SetPixelAlpha(image,ClampToQuantum(
-                    image->colormap[index].alpha),q);
-              }
+            SetColormapPixel(image,&cube,index,q);
             q+=(ptrdiff_t) GetPixelChannels(image);
           }
         }
@@ -1593,16 +1595,7 @@ static size_t AssignClosestColormapEntry(Image *image,const QCubeInfo *cube,
     index;
 
   index=(entry != (ssize_t *) NULL) ? (size_t) *entry : cube->color_number;
-  if (image->storage_class == PseudoClass)
-    SetPixelIndex(image,(Quantum) index,q);
-  if (cube->quantize_info->measure_error == MagickFalse)
-    {
-      SetPixelRed(image,ClampToQuantum(image->colormap[index].red),q);
-      SetPixelGreen(image,ClampToQuantum(image->colormap[index].green),q);
-      SetPixelBlue(image,ClampToQuantum(image->colormap[index].blue),q);
-      if (cube->associate_alpha != MagickFalse)
-        SetPixelAlpha(image,ClampToQuantum(image->colormap[index].alpha),q);
-    }
+  SetColormapPixel(image,cube,index,q);
   return(index);
 }
 
