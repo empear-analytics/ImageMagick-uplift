@@ -4083,6 +4083,26 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireReflectedKernel(const MorphologyMethod method,
+  const KernelInfo *kernel,KernelInfo **reflected_kernel)
+{
+  switch ( method ) {
+    case CorrelateMorphology:
+    case CloseMorphology:
+    case CloseIntensityMorphology:
+    case BottomHatMorphology:
+    case SmoothMorphology:
+      *reflected_kernel = CloneKernelInfo(kernel);
+      if (*reflected_kernel == (KernelInfo *) NULL)
+        return(MagickFalse);
+      RotateKernelInfo(*reflected_kernel,180);
+      break;
+    default:
+      break;
+  }
+  return(MagickTrue);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4235,20 +4255,8 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
   /* Some methods require a reflected kernel to use with primitives.
    * Create the reflected kernel for those methods. */
-  switch ( method ) {
-    case CorrelateMorphology:
-    case CloseMorphology:
-    case CloseIntensityMorphology:
-    case BottomHatMorphology:
-    case SmoothMorphology:
-      reflected_kernel = CloneKernelInfo(kernel);
-      if (reflected_kernel == (KernelInfo *) NULL)
-        goto error_cleanup;
-      RotateKernelInfo(reflected_kernel,180);
-      break;
-    default:
-      break;
-  }
+  if (AcquireReflectedKernel(method,kernel,&reflected_kernel) == MagickFalse)
+    goto error_cleanup;
 
   /* Loops around more primitive morphology methods
   **  erose, dilate, open, close, smooth, edge, etc...
