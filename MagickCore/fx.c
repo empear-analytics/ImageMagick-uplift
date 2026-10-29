@@ -1441,6 +1441,15 @@ static inline MagickBooleanType IsUnqualifiableAttr(const ImgAttrE *pop)
     MagickFalse);
 }
 
+static int MatchXYWHToken (FxInfo * pfx, int ret)
+{
+  if (LocaleCompare ("x", pfx->token)==0) ret=1;
+  else if (LocaleCompare ("y", pfx->token)==0) ret=2;
+  else if (LocaleCompare ("width", pfx->token)==0) ret=3;
+  else if (LocaleCompare ("height", pfx->token)==0) ret=4;
+  return ret;
+}
+
 static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
 /* If ".x" or ".y" or ".width" or ".height" increments *pop and returns 1 to 4 .
    Otherwise returns 0.
@@ -1455,10 +1464,7 @@ static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
   if (!ExpectChar (pfx, '.')) return 0;
 
   (void) GetToken (pfx);
-  if (LocaleCompare ("x", pfx->token)==0) ret=1;
-  else if (LocaleCompare ("y", pfx->token)==0) ret=2;
-  else if (LocaleCompare ("width", pfx->token)==0) ret=3;
-  else if (LocaleCompare ("height", pfx->token)==0) ret=4;
+  ret = MatchXYWHToken (pfx, ret);
 
   if (!ret)
     (void) ThrowMagickException (
