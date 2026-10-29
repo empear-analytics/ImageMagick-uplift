@@ -1225,6 +1225,18 @@ static void PrintImageArtifacts(FILE *file,Image *image)
     }
 }
 
+static void PrintImageColormapEntries(FILE *file,Image *image,ExceptionInfo *exception)
+{
+  if (image->storage_class == PseudoClass)
+    {
+      (void) FormatLocaleFile(file,"  Colormap entries: %.17g\n",(double)
+        image->colors);
+      (void) FormatLocaleFile(file,"  Colormap:\n");
+      if (image->colors <= 1024)
+        PrintImageColormap(file,image,exception);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1737,14 +1749,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
               GetNumberColors(image,(FILE *) NULL,exception));
         }
     }
-  if (image->storage_class == PseudoClass)
-    {
-      (void) FormatLocaleFile(file,"  Colormap entries: %.17g\n",(double)
-        image->colors);
-      (void) FormatLocaleFile(file,"  Colormap:\n");
-      if (image->colors <= 1024)
-        PrintImageColormap(file,image,exception);
-    }
+  PrintImageColormapEntries(file,image,exception);
   if (image->error.mean_error_per_pixel != 0.0)
     (void) FormatLocaleFile(file,"  Mean error per pixel: %g\n",
       image->error.mean_error_per_pixel);
