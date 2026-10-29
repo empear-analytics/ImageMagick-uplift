@@ -3976,6 +3976,22 @@ static void ParseChromaticityPrimary(const char *option,PrimaryInfo *primary)
     primary->y=geometry_info.sigma;
 }
 
+static void SetImageResolutionFromDensity(Image *image,const char *density)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  flags=ParseGeometry(density,&geometry_info);
+  if ((flags & RhoValue) != 0)
+    image->resolution.x=geometry_info.rho;
+  image->resolution.y=image->resolution.x;
+  if ((flags & SigmaValue) != 0)
+    image->resolution.y=geometry_info.sigma;
+}
+
 static MagickStatusType ParsePageGeometryOption(const char *option,
   RectangleInfo *region)
 {
@@ -4083,12 +4099,6 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
   const char
     *option;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
   ResolutionType
     units;
 
@@ -4132,14 +4142,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickFalse,option);
   option=GetImageOption(image_info,"density");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->resolution.x=geometry_info.rho;
-      image->resolution.y=image->resolution.x;
-      if ((flags & SigmaValue) != 0)
-        image->resolution.y=geometry_info.sigma;
-    }
+    SetImageResolutionFromDensity(image,option);
   option=GetImageOption(image_info,"depth");
   if (option != (const char *) NULL)
     image->depth=StringToUnsignedLong(option);
@@ -4228,14 +4231,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       image->units=units;
       option=GetImageOption(image_info,"density");
       if (option != (const char *) NULL)
-        {
-          flags=ParseGeometry(option,&geometry_info);
-          if ((flags & RhoValue) != 0)
-            image->resolution.x=geometry_info.rho;
-          image->resolution.y=image->resolution.x;
-          if ((flags & SigmaValue) != 0)
-            image->resolution.y=geometry_info.sigma;
-        }
+        SetImageResolutionFromDensity(image,option);
     }
   option=GetImageOption(image_info,"virtual-pixel");
   if (option != (const char *) NULL)
