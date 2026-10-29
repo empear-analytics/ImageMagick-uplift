@@ -4102,16 +4102,8 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
               break;
             }
         }
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            MagickBooleanType
-              proceed;
-
-            proceed=SetImageProgress(image,TextureImageTag,(MagickOffsetType) y,
-              image->rows);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
-          }
+        if (ReportTextureProgress(image,y) == MagickFalse)
+          status=MagickFalse;
       }
       (void) SetImageProgress(image,TextureImageTag,(MagickOffsetType)
         image->rows,image->rows);
