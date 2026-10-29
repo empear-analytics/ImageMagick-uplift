@@ -1882,6 +1882,40 @@ static void AccumulateChannelSample(const ChannelSample *sample,
   UpdateWelfordMoments(cs,p,i);
 }
 
+typedef struct _MedianRow
+{
+  const Image
+    *image;
+
+  ssize_t
+    i;
+} MedianRow;
+
+static size_t CollectMedianRow(const MedianRow *row,const Quantum *p,
+  Quantum *median,size_t n)
+{
+  const Image
+    *const image = row->image;
+
+  const ssize_t
+    i = row->i;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelReadMask(image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    median[n++]=p[i];
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(n);
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2029,22 +2063,15 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
           const Quantum
             *magick_restrict p;
 
-          ssize_t
-            x;
+          MedianRow
+            row;
 
           p=GetVirtualPixels(image,0,y,image->columns,1,exception);
           if (p == (const Quantum *) NULL)
             break;
-          for (x=0; x < (ssize_t) image->columns; x++)
-          {
-            if (GetPixelReadMask(image,p) <= (QuantumRange/2))
-              {
-                p+=(ptrdiff_t) GetPixelChannels(image);
-                continue;
-              }
-            median[n++]=p[i];
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          row.image=image;
+          row.i=i;
+          n=CollectMedianRow(&row,p,median,n);
         }
         channel_statistics[channel].median=(double) median[
           GetMedianPixel(median,n)];
