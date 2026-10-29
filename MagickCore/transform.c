@@ -1675,6 +1675,18 @@ static void SplicePixelRow(const SpliceRow *row,
   }
 }
 
+static void SetSpliceBackground(Image *splice_image,
+  ExceptionInfo *exception)
+{
+  if ((IsPixelInfoGray(&splice_image->background_color) == MagickFalse) &&
+      (IsGrayColorspace(splice_image->colorspace) != MagickFalse))
+    (void) SetImageColorspace(splice_image,sRGBColorspace,exception);
+  if ((splice_image->background_color.alpha_trait != UndefinedPixelTrait) &&
+      (splice_image->alpha_trait == UndefinedPixelTrait))
+    (void) SetImageAlpha(splice_image,OpaqueAlpha,exception);
+  (void) SetImageBackgroundColor(splice_image,exception);
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -1720,13 +1732,7 @@ MagickExport Image *SpliceImage(const Image *image,
       splice_image=DestroyImage(splice_image);
       return((Image *) NULL);
     }
-  if ((IsPixelInfoGray(&splice_image->background_color) == MagickFalse) &&
-      (IsGrayColorspace(splice_image->colorspace) != MagickFalse))
-    (void) SetImageColorspace(splice_image,sRGBColorspace,exception);
-  if ((splice_image->background_color.alpha_trait != UndefinedPixelTrait) &&
-      (splice_image->alpha_trait == UndefinedPixelTrait))
-    (void) SetImageAlpha(splice_image,OpaqueAlpha,exception);
-  (void) SetImageBackgroundColor(splice_image,exception);
+  SetSpliceBackground(splice_image,exception);
   /*
     Respect image geometry.
   */
