@@ -1895,6 +1895,27 @@ MagickExport Image *SpliceImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *CropTransformImage(Image **image,Image *transform_image,
+  const char *crop_geometry,ExceptionInfo *exception)
+{
+  Image
+    *crop_image;
+
+  /*
+    Crop image to a user specified size.
+  */
+  crop_image=CropImageToTiles(*image,crop_geometry,exception);
+  if (crop_image == (Image *) NULL)
+    transform_image=CloneImage(*image,0,0,MagickTrue,exception);
+  else
+    {
+      transform_image=DestroyImage(transform_image);
+      transform_image=GetFirstImageInList(crop_image);
+    }
+  *image=transform_image;
+  return(transform_image);
+}
+
 MagickPrivate MagickBooleanType TransformImage(Image **image,
   const char *crop_geometry,const char *image_geometry,ExceptionInfo *exception)
 {
@@ -1911,23 +1932,8 @@ MagickPrivate MagickBooleanType TransformImage(Image **image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",(*image)->filename);
   transform_image=(*image);
   if (crop_geometry != (const char *) NULL)
-    {
-      Image
-        *crop_image;
-
-      /*
-        Crop image to a user specified size.
-      */
-      crop_image=CropImageToTiles(*image,crop_geometry,exception);
-      if (crop_image == (Image *) NULL)
-        transform_image=CloneImage(*image,0,0,MagickTrue,exception);
-      else
-        {
-          transform_image=DestroyImage(transform_image);
-          transform_image=GetFirstImageInList(crop_image);
-        }
-      *image=transform_image;
-    }
+    transform_image=CropTransformImage(image,transform_image,crop_geometry,
+      exception);
   if (transform_image == (Image *) NULL)
     return(MagickFalse);
   /*
