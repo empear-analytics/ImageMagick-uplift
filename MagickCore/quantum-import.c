@@ -337,6 +337,32 @@ static void Import8BitPixelChannel(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ImportFloat16BitPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  Quantum *magick_restrict q)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushShortPixel(quantum_info->endian,p,&pixel);
+    *q=ClampToQuantum((double) QuantumRange*(double)
+      HalfToSinglePrecision(pixel));
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void Import16BitPixelChannel(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,
   Quantum *magick_restrict q)
@@ -355,14 +381,7 @@ static void Import16BitPixelChannel(const Image *image,
 
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushShortPixel(quantum_info->endian,p,&pixel);
-        *q=ClampToQuantum((double) QuantumRange*(double)
-          HalfToSinglePrecision(pixel));
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      ImportFloat16BitPixelChannel(image,quantum_info,span,q);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
