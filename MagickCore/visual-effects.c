@@ -2085,6 +2085,23 @@ MagickExport Image *SepiaToneImage(const Image *image,const double threshold,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static PixelInfo ShadowImageRow(const Image *border_image,
+  PixelInfo background_color,const double alpha,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) border_image->columns; x++)
+  {
+    if (border_image->alpha_trait != UndefinedPixelTrait)
+      background_color.alpha=(double) GetPixelAlpha(border_image,q)*alpha/
+        100.0;
+    SetPixelViaPixelInfo(border_image,&background_color,q);
+    q+=(ptrdiff_t) GetPixelChannels(border_image);
+  }
+  return(background_color);
+}
+
 MagickExport Image *ShadowImage(const Image *image,const double alpha,
   const double sigma,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -2152,9 +2169,6 @@ MagickExport Image *ShadowImage(const Image *image,const double alpha,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=QueueCacheViewAuthenticPixels(image_view,0,y,border_image->columns,1,
@@ -2164,14 +2178,7 @@ MagickExport Image *ShadowImage(const Image *image,const double alpha,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) border_image->columns; x++)
-    {
-      if (border_image->alpha_trait != UndefinedPixelTrait)
-        background_color.alpha=(double) GetPixelAlpha(border_image,q)*alpha/
-          100.0;
-      SetPixelViaPixelInfo(border_image,&background_color,q);
-      q+=(ptrdiff_t) GetPixelChannels(border_image);
-    }
+    background_color=ShadowImageRow(border_image,background_color,alpha,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
