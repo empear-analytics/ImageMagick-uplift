@@ -2686,6 +2686,30 @@ static void FormatQualityLabel(char *label,const char *factor,
         GetBlobSize(thumbnail)));
 }
 
+static Image *WriteAndReadQualityPreview(ImageInfo *preview_info,
+  Image *preview_image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=WriteImage(preview_info,preview_image,exception);
+  if (status != MagickFalse)
+    {
+      Image
+        *quality_image;
+
+      (void) CopyMagickString(preview_info->filename,
+        preview_image->filename,MagickPathExtent);
+      quality_image=ReadImage(preview_info,exception);
+      if (quality_image != (Image *) NULL)
+        {
+          preview_image=DestroyImage(preview_image);
+          preview_image=quality_image;
+        }
+    }
+  return(preview_image);
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -3091,9 +3115,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
         int
           file;
 
-        MagickBooleanType
-          status;
-
         preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
         if (preview_image == (Image *) NULL)
           break;
@@ -3105,21 +3126,8 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           file=close_utf8(file)-1;
         (void) FormatLocaleString(preview_image->filename,MagickPathExtent,
           "jpeg:%s",filename);
-        status=WriteImage(preview_info,preview_image,exception);
-        if (status != MagickFalse)
-          {
-            Image
-              *quality_image;
-
-            (void) CopyMagickString(preview_info->filename,
-              preview_image->filename,MagickPathExtent);
-            quality_image=ReadImage(preview_info,exception);
-            if (quality_image != (Image *) NULL)
-              {
-                preview_image=DestroyImage(preview_image);
-                preview_image=quality_image;
-              }
-          }
+        preview_image=WriteAndReadQualityPreview(preview_info,preview_image,
+          exception);
         (void) RelinquishUniqueFileResource(preview_image->filename);
         FormatQualityLabel(label,factor,preview_image,thumbnail);
         break;
