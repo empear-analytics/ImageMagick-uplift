@@ -1234,6 +1234,20 @@ static void MergeObjectsBelowTop(const Image *component_image,
   }
 }
 
+static ssize_t GetTopObjectIds(const Image *component_image,
+  const char *artifact)
+{
+  ssize_t
+    top_ids;
+
+  top_ids=(ssize_t) StringToLong(artifact);
+  if (top_ids < 0)
+    top_ids=0;
+  if (top_ids >= (ssize_t) component_image->colors)
+    top_ids=(ssize_t) component_image->colors-1;
+  return(top_ids);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1592,11 +1606,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Keep top objects.
       */
-      top_ids=(ssize_t) StringToLong(artifact);
-      if (top_ids < 0)
-        top_ids=0;
-      if (top_ids >= (ssize_t) component_image->colors)
-        top_ids=(ssize_t) component_image->colors-1;
+      top_ids=GetTopObjectIds(component_image,artifact);
       top_objects=(CCObjectInfo *) AcquireQuantumMemory(component_image->colors,
         sizeof(*top_objects));
       if (top_objects == (CCObjectInfo *) NULL)
