@@ -3317,6 +3317,19 @@ typedef struct
     y;
 } MaximaInfo;
 
+static MaximaInfo SeedMaximaInfo(CacheView *image_view,
+  MaximaInfo maxima_info,ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict q;
+
+  q=GetCacheViewVirtualPixels(image_view,maxima_info.x,maxima_info.y,1,1,
+    exception);
+  if (q != (const Quantum *) NULL)
+    maxima_info.maxima=IsNaN((double) q[0]) != 0 ? 0.0 : (double) q[0];
+  return(maxima_info);
+}
+
 static MaximaInfo FindRowMaxima(const Image *image,
   const Quantum *magick_restrict p,const ssize_t y,MaximaInfo channel_maxima)
 {
@@ -3358,9 +3371,6 @@ static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
   CacheView
     *image_view;
 
-  const Quantum
-    *magick_restrict q;
-
   MagickBooleanType
     status = MagickTrue;
 
@@ -3374,10 +3384,7 @@ static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
     Identify the maxima value in the image and its location.
   */
   image_view=AcquireVirtualCacheView(image,exception);
-  q=GetCacheViewVirtualPixels(image_view,maxima_info.x,maxima_info.y,1,1,
-    exception);
-  if (q != (const Quantum *) NULL)
-    maxima_info.maxima=IsNaN((double) q[0]) != 0 ? 0.0 : (double) q[0];
+  maxima_info=SeedMaximaInfo(image_view,maxima_info,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(maxima_info,status) \
     magick_number_threads(image,image,image->rows,1)
