@@ -554,6 +554,34 @@ static void SearchClosestCubeColor(const Image *image,QCubeInfo *cube,
   ClosestColor(image,cube,node_info->parent);
 }
 
+static void SetMonochromeColormap(Image *image)
+{
+  double
+    intensity;
+
+  /*
+    Monochrome image.
+  */
+  intensity=GetPixelInfoLuma(image->colormap+0) < (double)
+    QuantumRange/2.0 ? 0.0 : (double) QuantumRange;
+  if (image->colors > 1)
+    {
+      intensity=0.0;
+      if (GetPixelInfoLuma(image->colormap+0) >
+          GetPixelInfoLuma(image->colormap+1))
+        intensity=(double) QuantumRange;
+    }
+  image->colormap[0].red=intensity;
+  image->colormap[0].green=intensity;
+  image->colormap[0].blue=intensity;
+  if (image->colors > 1)
+    {
+      image->colormap[1].red=(double) QuantumRange-intensity;
+      image->colormap[1].green=(double) QuantumRange-intensity;
+      image->colormap[1].blue=(double) QuantumRange-intensity;
+    }
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -669,32 +697,7 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
     (void) GetImageQuantizeError(image,exception);
   if ((cube_info->quantize_info->number_colors == 2) &&
       (IsGrayColorspace(cube_info->quantize_info->colorspace)))
-    {
-      double
-        intensity;
-
-      /*
-        Monochrome image.
-      */
-      intensity=GetPixelInfoLuma(image->colormap+0) < (double)
-        QuantumRange/2.0 ? 0.0 : (double) QuantumRange;
-      if (image->colors > 1)
-        {
-          intensity=0.0;
-          if (GetPixelInfoLuma(image->colormap+0) >
-              GetPixelInfoLuma(image->colormap+1))
-            intensity=(double) QuantumRange;
-        }
-      image->colormap[0].red=intensity;
-      image->colormap[0].green=intensity;
-      image->colormap[0].blue=intensity;
-      if (image->colors > 1)
-        {
-          image->colormap[1].red=(double) QuantumRange-intensity;
-          image->colormap[1].green=(double) QuantumRange-intensity;
-          image->colormap[1].blue=(double) QuantumRange-intensity;
-        }
-    }
+    SetMonochromeColormap(image);
   (void) SyncImage(image,exception);
   if ((cube_info->quantize_info->colorspace != UndefinedColorspace) &&
       (IssRGBCompatibleColorspace(colorspace) == MagickFalse))
