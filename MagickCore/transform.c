@@ -672,6 +672,26 @@ static void AppendCropProperty(const Image *image,Image *crop_image,
     transform,exception);
 }
 
+static void SetCropPage(const Image *image,
+  const RectangleInfo bounding_box,Image *crop_image)
+{
+  OffsetInfo
+    offset;
+
+  crop_image->page.width=image->page.width;
+  crop_image->page.height=image->page.height;
+  offset.x=bounding_box.x+(ssize_t) bounding_box.width;
+  offset.y=bounding_box.y+(ssize_t) bounding_box.height;
+  if ((offset.x > (ssize_t) image->page.width) ||
+      (offset.y > (ssize_t) image->page.height))
+    {
+      crop_image->page.width=bounding_box.width;
+      crop_image->page.height=bounding_box.height;
+    }
+  crop_image->page.x=bounding_box.x;
+  crop_image->page.y=bounding_box.y;
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -689,9 +709,6 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
 
   MagickOffsetType
     progress;
-
-  OffsetInfo
-    offset;
 
   RectangleInfo
     bounding_box,
@@ -749,18 +766,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   crop_image=CloneImage(image,page.width,page.height,MagickTrue,exception);
   if (crop_image == (Image *) NULL)
     return((Image *) NULL);
-  crop_image->page.width=image->page.width;
-  crop_image->page.height=image->page.height;
-  offset.x=bounding_box.x+(ssize_t) bounding_box.width;
-  offset.y=bounding_box.y+(ssize_t) bounding_box.height;
-  if ((offset.x > (ssize_t) image->page.width) ||
-      (offset.y > (ssize_t) image->page.height))
-    {
-      crop_image->page.width=bounding_box.width;
-      crop_image->page.height=bounding_box.height;
-    }
-  crop_image->page.x=bounding_box.x;
-  crop_image->page.y=bounding_box.y;
+  SetCropPage(image,bounding_box,crop_image);
   /*
     Crop image.
   */
