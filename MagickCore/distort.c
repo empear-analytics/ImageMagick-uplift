@@ -1977,6 +1977,23 @@ static void PrintBarrelFX(const Image *image,const double *coeff,
   (void) FormatLocaleFile(stderr,"       p{ii+xc,jj+yc}' \\\n");
 }
 
+static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
+  MagickBooleanType *viewport_given,ExceptionInfo *exception)
+{
+  { const char *artifact=GetImageArtifact(image,"distort:viewport");
+    *viewport_given = MagickFalse;
+    if ( artifact != (const char *) NULL ) {
+      MagickStatusType flags=ParseAbsoluteGeometry(artifact,geometry);
+      if (flags==NoValue)
+        (void) ThrowMagickException(exception,GetMagickModule(),
+             OptionWarning,"InvalidSetting","'%s' '%s'",
+             "distort:viewport",artifact);
+      else
+        *viewport_given = MagickTrue;
+    }
+  }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -2259,18 +2276,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
      overrides some parts of the current output image geometry.
      This also overrides its default 'bestfit' setting.
   */
-  { const char *artifact=GetImageArtifact(image,"distort:viewport");
-    viewport_given = MagickFalse;
-    if ( artifact != (const char *) NULL ) {
-      MagickStatusType flags=ParseAbsoluteGeometry(artifact,&geometry);
-      if (flags==NoValue)
-        (void) ThrowMagickException(exception,GetMagickModule(),
-             OptionWarning,"InvalidSetting","'%s' '%s'",
-             "distort:viewport",artifact);
-      else
-        viewport_given = MagickTrue;
-    }
-  }
+  GetDistortViewport(image,&geometry,&viewport_given,exception);
 
   /* Verbose output */
   if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
