@@ -1059,9 +1059,6 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -1072,12 +1069,7 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) flip_image->columns; x++)
-    {
-      CopyPixelChannelsTo(image,flip_image,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(flip_image);
-    }
+    CopyPixelRow(image,flip_image,p,q);
     if (SyncCacheViewAuthenticPixels(flip_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
