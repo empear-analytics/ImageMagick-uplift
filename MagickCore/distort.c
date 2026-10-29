@@ -3295,6 +3295,45 @@ static size_t GetSparseColorCount(const Image *image)
   return(number_colors);
 }
 
+typedef struct _SparseControlColor
+{
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  const double
+    *arguments;
+} SparseControlColor;
+
+static void SetSparseControlColor(const SparseControlColor *control,
+  const size_t k,PixelInfo *pixel)
+{
+  const Image
+    *const image = control->image;
+
+  Image
+    *const sparse_image = control->sparse_image;
+
+  const double
+    *const arguments = control->arguments;
+
+  ssize_t x=(ssize_t) k+2;
+  if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel->red=arguments[x++];
+  if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel->green=arguments[x++];
+  if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel->blue=arguments[x++];
+  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    pixel->black=arguments[x++];
+  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel->alpha=arguments[x++];
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3537,19 +3576,13 @@ MagickExport Image *SparseColorImage(const Image *image,
               double distance = fabs((double)i-arguments[ k ])+
                 fabs((double)j-arguments[k+1]);
               if ( distance < minimum ) {
-                ssize_t x=(ssize_t) k+2;
-                if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.red=arguments[x++];
-                if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.green=arguments[x++];
-                if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.blue=arguments[x++];
-                if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                    (image->colorspace == CMYKColorspace))
-                  pixel.black=arguments[x++];
-                if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                    (sparse_image->alpha_trait != UndefinedPixelTrait))
-                  pixel.alpha=arguments[x++];
+                SparseControlColor
+                  control;
+
+                control.image=image;
+                control.sparse_image=sparse_image;
+                control.arguments=arguments;
+                SetSparseControlColor(&control,k,&pixel);
                 minimum = distance;
               }
             }
