@@ -864,6 +864,9 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
 MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   ExceptionInfo *exception)
 {
+  CropToFitRegion
+    crop_region;
+
   Image
     *integral_image,
     *rotate_image;
@@ -880,6 +883,11 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   RectangleInfo
     border_info,
     bounds;
+
+  ShearRegion
+    first_pass,
+    second_pass,
+    third_pass;
 
   size_t
     height,
@@ -946,33 +954,41 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   /*
     Rotate the image.
   */
-  const ShearRegion first_pass = { width, height, bounds.x, (ssize_t)
-    (rotate_image->rows-height)/2 };
+  first_pass.width=width;
+  first_pass.height=height;
+  first_pass.x_offset=bounds.x;
+  first_pass.y_offset=(ssize_t) (rotate_image->rows-height)/2;
   status=XShearImage(rotate_image,shear.x,&first_pass,exception);
   if (status == MagickFalse)
     {
       rotate_image=DestroyImage(rotate_image);
       return((Image *) NULL);
     }
-  const ShearRegion second_pass = { bounds.width, height, (ssize_t)
-    (rotate_image->columns-bounds.width)/2, bounds.y };
+  second_pass.width=bounds.width;
+  second_pass.height=height;
+  second_pass.x_offset=(ssize_t) (rotate_image->columns-bounds.width)/2;
+  second_pass.y_offset=bounds.y;
   status=YShearImage(rotate_image,shear.y,&second_pass,exception);
   if (status == MagickFalse)
     {
       rotate_image=DestroyImage(rotate_image);
       return((Image *) NULL);
     }
-  const ShearRegion third_pass = { bounds.width, bounds.height, (ssize_t)
-    (rotate_image->columns-bounds.width)/2, (ssize_t) (rotate_image->rows-
-    bounds.height)/2 };
+  third_pass.width=bounds.width;
+  third_pass.height=bounds.height;
+  third_pass.x_offset=(ssize_t) (rotate_image->columns-bounds.width)/2;
+  third_pass.y_offset=(ssize_t) (rotate_image->rows-bounds.height)/2;
   status=XShearImage(rotate_image,shear.x,&third_pass,exception);
   if (status == MagickFalse)
     {
       rotate_image=DestroyImage(rotate_image);
       return((Image *) NULL);
     }
-  const CropToFitRegion crop_region = { shear.x, shear.y, (MagickRealType)
-    width, (MagickRealType) height, MagickTrue };
+  crop_region.x_shear=shear.x;
+  crop_region.y_shear=shear.y;
+  crop_region.width=(MagickRealType) width;
+  crop_region.height=(MagickRealType) height;
+  crop_region.rotate=MagickTrue;
   status=CropToFitImage(&rotate_image,&crop_region,exception);
   rotate_image->alpha_trait=image->alpha_trait;
   rotate_image->compose=image->compose;
