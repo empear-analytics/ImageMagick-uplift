@@ -1916,6 +1916,19 @@ static MagickRealType GetHueAlpha(const MagickRealType Sa,
   return(pixel);
 }
 
+static MagickRealType GetCopyAlpha(const Image *source_image,
+  const MagickRealType Si,const MagickRealType Sa)
+{
+  MagickRealType
+    pixel;
+
+  if (source_image->alpha_trait == UndefinedPixelTrait)
+    pixel=Si;
+  else
+    pixel=(double) QuantumRange*Sa;
+  return(pixel);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -2996,10 +3009,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               }
               case CopyAlphaCompositeOp:
               {
-                if (source_image->alpha_trait == UndefinedPixelTrait)
-                  pixel=Si;
-                else
-                  pixel=(double) QuantumRange*Sa;
+                pixel=GetCopyAlpha(source_image,Si,Sa);
                 break;
               }
               case BlurCompositeOp:
