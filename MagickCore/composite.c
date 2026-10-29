@@ -838,6 +838,53 @@ static MagickBooleanType BlendMaskAlphaChannel(Image *image,
   return(status);
 }
 
+typedef struct _MeanFillInputs
+{
+  const Image
+    *mask_image;
+
+  Image
+    *mean_image;
+} MeanFillInputs;
+
+static void FillMeanRow(const MeanFillInputs *row,const double *mean,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *mask_image = row->mask_image;
+
+  Image
+    *mean_image = row->mean_image;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) mean_image->columns; x++)
+  {
+    Quantum
+      alpha = GetPixelAlpha(mask_image,p),
+      mask = GetPixelReadMask(mask_image,p);
+
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(mean_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(mean_image,i);
+      PixelTrait traits = GetPixelChannelTraits(mean_image,channel);
+      if (traits == UndefinedPixelTrait)
+        continue;
+      if (mask <= (QuantumRange/2))
+        q[i]=(Quantum) 0;
+      else
+        if (fabs((double) alpha) >= MagickEpsilon)
+          q[i]=ClampToQuantum(mean[i]);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(mask_image);
+    q+=(ptrdiff_t) GetPixelChannels(mean_image);
+  }
+}
+
 static Image *BlendMeanImage(Image *image,const Image *mask_image,
   ExceptionInfo *exception)
 {
@@ -918,8 +965,8 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    MeanFillInputs
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -931,30 +978,9 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) mean_image->columns; x++)
-    {
-      Quantum
-        alpha = GetPixelAlpha(mask_image,p),
-        mask = GetPixelReadMask(mask_image,p);
-
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(mean_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(mean_image,i);
-        PixelTrait traits = GetPixelChannelTraits(mean_image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        if (mask <= (QuantumRange/2))
-          q[i]=(Quantum) 0;
-        else
-          if (fabs((double) alpha) >= MagickEpsilon)
-            q[i]=ClampToQuantum(mean[i]);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(mask_image);
-      q+=(ptrdiff_t) GetPixelChannels(mean_image);
-    }
+    row.mask_image=mask_image;
+    row.mean_image=mean_image;
+    FillMeanRow(&row,mean,p,q);
     if (SyncCacheViewAuthenticPixels(mean_view,exception) == MagickFalse)
       status=MagickFalse;
   }
