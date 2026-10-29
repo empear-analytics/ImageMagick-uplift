@@ -2668,6 +2668,24 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void FormatQualityLabel(char *label,const char *factor,
+  const Image *preview_image,const Image *thumbnail)
+{
+  if ((GetBlobSize(preview_image)/1024) >= 1024)
+    (void) FormatLocaleString(label,MagickPathExtent,"quality %s\n%gmb ",
+      factor,(double) ((MagickOffsetType) GetBlobSize(preview_image))/
+      1024.0/1024.0);
+  else
+    if (GetBlobSize(preview_image) >= 1024)
+      (void) FormatLocaleString(label,MagickPathExtent,
+        "quality %s\n%gkb ",factor,(double) ((MagickOffsetType)
+        GetBlobSize(preview_image))/1024.0);
+    else
+      (void) FormatLocaleString(label,MagickPathExtent,
+        "quality %s\n%.17gb ",factor,(double) ((MagickOffsetType)
+        GetBlobSize(thumbnail)));
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -3103,19 +3121,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
               }
           }
         (void) RelinquishUniqueFileResource(preview_image->filename);
-        if ((GetBlobSize(preview_image)/1024) >= 1024)
-          (void) FormatLocaleString(label,MagickPathExtent,"quality %s\n%gmb ",
-            factor,(double) ((MagickOffsetType) GetBlobSize(preview_image))/
-            1024.0/1024.0);
-        else
-          if (GetBlobSize(preview_image) >= 1024)
-            (void) FormatLocaleString(label,MagickPathExtent,
-              "quality %s\n%gkb ",factor,(double) ((MagickOffsetType)
-              GetBlobSize(preview_image))/1024.0);
-          else
-            (void) FormatLocaleString(label,MagickPathExtent,
-              "quality %s\n%.17gb ",factor,(double) ((MagickOffsetType)
-              GetBlobSize(thumbnail)));
+        FormatQualityLabel(label,factor,preview_image,thumbnail);
         break;
       }
     }
