@@ -780,6 +780,21 @@ static double GetColorMatrixSum(const Image *image,
   return(sum);
 }
 
+static PixelInfo SetColorMatrixChannel(PixelInfo pixel,const ssize_t h,
+  const double sum)
+{
+  switch (h)
+  {
+    case 0: pixel.red=sum; break;
+    case 1: pixel.green=sum; break;
+    case 2: pixel.blue=sum; break;
+    case 3: pixel.black=sum; break;
+    case 4: pixel.alpha=sum; break;
+    default: break;
+  }
+  return(pixel);
+}
+
 MagickExport Image *ColorMatrixImage(const Image *image,
   const KernelInfo *color_matrix,ExceptionInfo *exception)
 {
@@ -921,15 +936,7 @@ MagickExport Image *ColorMatrixImage(const Image *image,
           sum;
 
         sum=GetColorMatrixSum(image,p,ColorMatrix[h]);
-        switch (h)
-        {
-          case 0: pixel.red=sum; break;
-          case 1: pixel.green=sum; break;
-          case 2: pixel.blue=sum; break;
-          case 3: pixel.black=sum; break;
-          case 4: pixel.alpha=sum; break;
-          default: break;
-        }
+        pixel=SetColorMatrixChannel(pixel,h,sum);
       }
       SetPixelViaPixelInfo(color_image,&pixel,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
