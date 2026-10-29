@@ -1878,6 +1878,30 @@ static void ExportBlackQuantum(const Image *image,QuantumInfo *quantum_info,
   ExportPixelChannel(image,quantum_info,span,BlackPixelChannel);
 }
 
+static size_t ExportCbYCrYSample(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t n,size_t quantum)
+{
+  switch (n % 3)
+  {
+    case 0:
+    {
+      quantum=(size_t) GetPixelRed(image,p);
+      break;
+    }
+    case 1:
+    {
+      quantum=(size_t) GetPixelGreen(image,p);
+      break;
+    }
+    case 2:
+    {
+      quantum=(size_t) GetPixelBlue(image,p);
+      break;
+    }
+  }
+  return(quantum);
+}
+
 static void ExportUnpacked10BitCbYCrYQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,size_t quantum,
   ssize_t n)
@@ -1907,24 +1931,7 @@ static void ExportUnpacked10BitCbYCrYQuantum(const Image *image,
       {
         for (i=0; i < 4; i++)
         {
-          switch (n % 3)
-          {
-            case 0:
-            {
-              quantum=(size_t) GetPixelRed(image,p);
-              break;
-            }
-            case 1:
-            {
-              quantum=(size_t) GetPixelGreen(image,p);
-              break;
-            }
-            case 2:
-            {
-              quantum=(size_t) GetPixelBlue(image,p);
-              break;
-            }
-          }
+          quantum=ExportCbYCrYSample(image,p,n,quantum);
           cbcr[i]=(Quantum) quantum;
           n++;
         }
@@ -1985,24 +1992,7 @@ static void ExportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
       {
         for (i=0; i < 4; i++)
         {
-          switch (n % 3)
-          {
-            case 0:
-            {
-              quantum=(size_t) GetPixelRed(image,p);
-              break;
-            }
-            case 1:
-            {
-              quantum=(size_t) GetPixelGreen(image,p);
-              break;
-            }
-            case 2:
-            {
-              quantum=(size_t) GetPixelBlue(image,p);
-              break;
-            }
-          }
+          quantum=ExportCbYCrYSample(image,p,n,quantum);
           cbcr[i]=(Quantum) quantum;
           n++;
         }
