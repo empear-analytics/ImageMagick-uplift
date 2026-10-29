@@ -667,6 +667,44 @@ static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   return(status);
 }
 
+static double GetFourierPixel(const Image *image,const PixelChannel channel,
+  const Quantum *p)
+{
+  double
+    pixel;
+
+  switch (channel)
+  {
+    case RedPixelChannel:
+    default:
+    {
+      pixel=QuantumScale*(double) GetPixelRed(image,p);
+      break;
+    }
+    case GreenPixelChannel:
+    {
+      pixel=QuantumScale*(double) GetPixelGreen(image,p);
+      break;
+    }
+    case BluePixelChannel:
+    {
+      pixel=QuantumScale*(double) GetPixelBlue(image,p);
+      break;
+    }
+    case BlackPixelChannel:
+    {
+      pixel=QuantumScale*(double) GetPixelBlack(image,p);
+      break;
+    }
+    case AlphaPixelChannel:
+    {
+      pixel=QuantumScale*(double) GetPixelAlpha(image,p);
+      break;
+    }
+  }
+  return(pixel);
+}
+
 static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
   const Image *image,double *magnitude_pixels,double *phase_pixels,
   ExceptionInfo *exception)
@@ -728,35 +766,7 @@ static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
       break;
     for (x=0L; x < (ssize_t) fourier_info->width; x++)
     {
-      switch (fourier_info->channel)
-      {
-        case RedPixelChannel:
-        default:
-        {
-          source_pixels[i]=QuantumScale*(double) GetPixelRed(image,p);
-          break;
-        }
-        case GreenPixelChannel:
-        {
-          source_pixels[i]=QuantumScale*(double) GetPixelGreen(image,p);
-          break;
-        }
-        case BluePixelChannel:
-        {
-          source_pixels[i]=QuantumScale*(double) GetPixelBlue(image,p);
-          break;
-        }
-        case BlackPixelChannel:
-        {
-          source_pixels[i]=QuantumScale*(double) GetPixelBlack(image,p);
-          break;
-        }
-        case AlphaPixelChannel:
-        {
-          source_pixels[i]=QuantumScale*(double) GetPixelAlpha(image,p);
-          break;
-        }
-      }
+      source_pixels[i]=GetFourierPixel(image,fourier_info->channel,p);
       i++;
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
