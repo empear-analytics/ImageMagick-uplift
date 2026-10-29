@@ -2003,6 +2003,93 @@ static inline MagickBooleanType IsCoordFunction(const FunctionE fe)
   return((fe == fU || fe == fV || fe == fS) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType AddEpochSeconds (FxInfo * pfx, fxFltType seconds,
+  ssize_t lenOptArt, OperatorE pushOp)
+{
+  (void) AddElement (pfx, seconds, oNull);
+  pfx->pex += lenOptArt;
+  if (!ExpectChar (pfx, ')')) return MagickFalse;
+  if (!PopOprOpenParen (pfx, pushOp)) return MagickFalse;
+  return MagickTrue;
+}
+
+static void AddFirstArgAddressing (FxInfo * pfx, FunctionE fe)
+{
+  if (fe==fWhile || fe==fIf) {
+    (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx2+1 */
+  } else if (fe==fDo) {
+    (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx2+1 */
+  } else if (fe==fFor) {
+    pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
+  }
+}
+
+static void AddSecondArgAddressing (FxInfo * pfx, FunctionE fe, int ndx0)
+{
+  if (fe==fWhile) {
+    pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
+    (void) AddAddressingElement (pfx, rGotoChk, ndx0);
+  } else if (fe==fDo) {
+    pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
+    (void) AddAddressingElement (pfx, rGotoChk, ndx0 + 1);
+  } else if (fe==fFor) {
+    (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx3 */
+    pfx->Elements[pfx->usedElements-1].do_push = MagickTrue; /* we may need return from for() */
+    (void) AddAddressingElement (pfx, rZerStk, NULL_ADDRESS);
+  } else if (fe==fIf) {
+    (void) AddAddressingElement (pfx, rGoto, NULL_ADDRESS); /* address will be ndx3 */
+  }
+}
+
+static int AddDefaultArgs (FxInfo * pfx, FunctionE fe, int FndArgs)
+{
+  while (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
+    (void) AddElement (pfx, (fxFltType) 0, oNull);
+    FndArgs++;
+  }
+  return FndArgs;
+}
+
+static MagickBooleanType ReportTooManyArgs (FxInfo * pfx, FunctionE fe,
+  const char * funStr, int FndArgs)
+{
+  if (fe==fChannel) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s' expected up to %i arguments, found '%i' at '%s'",
+      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
+  } else {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s' expected %i arguments, found '%i' at '%s'",
+      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
+  }
+  return MagickFalse;
+}
+
+static MagickBooleanType CheckAttrChannelQualifier (FxInfo * pfx,
+  ImgAttrE iaQual, PixelChannel chQual)
+{
+  if (ImgAttrs[iaQual-(int) FirstImgAttr].need_stats == MagickFalse) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Can't have image attribute ", "'%s' with channel qualifier '%s' at '%s'",
+      ImgAttrs[iaQual-(int) FirstImgAttr].str,
+      pfx->token, SetShortExp(pfx));
+    return MagickFalse;
+  } else {
+    if (ChanIsVirtual (chQual)) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Can't have statistical image attribute ", "'%s' with virtual channel qualifier '%s' at '%s'",
+        ImgAttrs[iaQual-(int) FirstImgAttr].str,
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+  }
+  return MagickTrue;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2090,11 +2177,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     }
     if (lenOptArt < 0) return MagickFalse;
     if (lenOptArt > 0) {
-      (void) AddElement (pfx, seconds, oNull);
-      pfx->pex += lenOptArt;
-      if (!ExpectChar (pfx, ')')) return MagickFalse;
-      if (!PopOprOpenParen (pfx, pushOp)) return MagickFalse;
-      return MagickTrue;
+      return (AddEpochSeconds (pfx, seconds, lenOptArt, pushOp));
     }
   }
 
@@ -2139,13 +2222,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
           return MagickFalse;
         }
         ndx1 = pfx->usedElements;
-        if (fe==fWhile || fe==fIf) {
-          (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx2+1 */
-        } else if (fe==fDo) {
-          (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx2+1 */
-        } else if (fe==fFor) {
-          pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
-        }
+        AddFirstArgAddressing (pfx, fe);
         break;
       case 2:
         if (ndx2 != NULL_ADDRESS) {
@@ -2156,19 +2233,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
           return MagickFalse;
         }
         ndx2 = pfx->usedElements;
-        if (fe==fWhile) {
-          pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
-          (void) AddAddressingElement (pfx, rGotoChk, ndx0);
-        } else if (fe==fDo) {
-          pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
-          (void) AddAddressingElement (pfx, rGotoChk, ndx0 + 1);
-        } else if (fe==fFor) {
-          (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx3 */
-          pfx->Elements[pfx->usedElements-1].do_push = MagickTrue; /* we may need return from for() */
-          (void) AddAddressingElement (pfx, rZerStk, NULL_ADDRESS);
-        } else if (fe==fIf) {
-          (void) AddAddressingElement (pfx, rGoto, NULL_ADDRESS); /* address will be ndx3 */
-        }
+        AddSecondArgAddressing (pfx, fe, ndx0);
         break;
       case 3:
         if (ndx3 != NULL_ADDRESS) {
@@ -2201,26 +2266,12 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   }
 
   if (IsDefaultArgsFunction(fe) != MagickFalse) {
-    while (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
-      (void) AddElement (pfx, (fxFltType) 0, oNull);
-      FndArgs++;
-    }
+    FndArgs = AddDefaultArgs (pfx, fe, FndArgs);
   }
 
   if (FndArgs > Functions[fe-(int) FirstFunc].number_args)
   {
-    if (fe==fChannel) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s' expected up to %i arguments, found '%i' at '%s'",
-        funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
-    } else {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s' expected %i arguments, found '%i' at '%s'",
-        funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
-    }
-    return MagickFalse;
+    return (ReportTooManyArgs (pfx, fe, funStr, FndArgs));
   }
   if (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
     (void) ThrowMagickException (
@@ -2325,23 +2376,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   }
 
   if (iaQual != aNull && chQual != NO_CHAN_QUAL) {
-    if (ImgAttrs[iaQual-(int) FirstImgAttr].need_stats == MagickFalse) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Can't have image attribute ", "'%s' with channel qualifier '%s' at '%s'",
-        ImgAttrs[iaQual-(int) FirstImgAttr].str,
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    } else {
-      if (ChanIsVirtual (chQual)) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Can't have statistical image attribute ", "'%s' with virtual channel qualifier '%s' at '%s'",
-          ImgAttrs[iaQual-(int) FirstImgAttr].str,
-          pfx->token, SetShortExp(pfx));
-        return MagickFalse;
-      }
-    }
+    if (!CheckAttrChannelQualifier (pfx, iaQual, chQual)) return MagickFalse;
   }
 
   if (fe==fWhile) {
