@@ -3881,6 +3881,38 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
   return(unity_image);
 }
 
+static void VarianceRow(const Image *variance_image,
+  const Image *beta_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) variance_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(variance_image); i++)
+    {
+      double
+        error;
+
+      PixelChannel channel = GetPixelChannelChannel(variance_image,i);
+      PixelTrait traits = GetPixelChannelTraits(variance_image,channel);
+      PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
+      if (((traits & UpdatePixelTrait) == 0) ||
+          ((beta_traits & UpdatePixelTrait) == 0))
+        continue;
+      error=(double) q[i]-(double) GetPixelChannel(beta_image,channel,p);
+      q[i]=(Quantum) ((double) ClampToQuantum((double) QuantumRange*
+        (sqrt(fabs(QuantumScale*error))/sqrt((double) QuantumRange))));
+    }
+    p+=(ptrdiff_t) GetPixelChannels(beta_image);
+    q+=(ptrdiff_t) GetPixelChannels(variance_image);
+  }
+}
+
 static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
   ExceptionInfo *exception)
 {
@@ -3917,9 +3949,6 @@ static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(beta_view,0,y,beta_image->columns,1,
@@ -3931,29 +3960,7 @@ static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) variance_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(variance_image); i++)
-      {
-        double
-          error;
-
-        PixelChannel channel = GetPixelChannelChannel(variance_image,i);
-        PixelTrait traits = GetPixelChannelTraits(variance_image,channel);
-        PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
-          continue;
-        error=(double) q[i]-(double) GetPixelChannel(beta_image,channel,p);
-        q[i]=(Quantum) ((double) ClampToQuantum((double) QuantumRange*
-          (sqrt(fabs(QuantumScale*error))/sqrt((double) QuantumRange))));
-      }
-      p+=(ptrdiff_t) GetPixelChannels(beta_image);
-      q+=(ptrdiff_t) GetPixelChannels(variance_image);
-    }
+    VarianceRow(variance_image,beta_image,p,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
