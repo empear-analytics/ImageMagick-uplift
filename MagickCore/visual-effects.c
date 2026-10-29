@@ -2117,14 +2117,52 @@ static void OffsetShadowPage(Image *shadow_image,
   shadow_image->page.y+=y_offset-(ssize_t) border_info.height;
 }
 
+static MagickBooleanType ShadowBorderImage(const Image *border_image,
+  const double alpha,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  PixelInfo
+    background_color;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  background_color=border_image->background_color;
+  background_color.alpha_trait=BlendPixelTrait;
+  image_view=AcquireAuthenticCacheView(border_image,exception);
+  for (y=0; y < (ssize_t) border_image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    if (status == MagickFalse)
+      continue;
+    q=QueueCacheViewAuthenticPixels(image_view,0,y,border_image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    background_color=ShadowImageRow(border_image,background_color,alpha,q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      status=MagickFalse;
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
 MagickExport Image *ShadowImage(const Image *image,const double alpha,
   const double sigma,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
 {
 #define ShadowImageTag  "Shadow/Image"
-
-  CacheView
-    *image_view;
 
   ChannelType
     channel_mask;
@@ -2137,14 +2175,8 @@ MagickExport Image *ShadowImage(const Image *image,const double alpha,
   MagickBooleanType
     status;
 
-  PixelInfo
-    background_color;
-
   RectangleInfo
     border_info;
-
-  ssize_t
-    y;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -2175,29 +2207,7 @@ MagickExport Image *ShadowImage(const Image *image,const double alpha,
   /*
     Shadow image.
   */
-  status=MagickTrue;
-  background_color=border_image->background_color;
-  background_color.alpha_trait=BlendPixelTrait;
-  image_view=AcquireAuthenticCacheView(border_image,exception);
-  for (y=0; y < (ssize_t) border_image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(image_view,0,y,border_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    background_color=ShadowImageRow(border_image,background_color,alpha,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  image_view=DestroyCacheView(image_view);
+  status=ShadowBorderImage(border_image,alpha,exception);
   if (status == MagickFalse)
     {
       border_image=DestroyImage(border_image);
