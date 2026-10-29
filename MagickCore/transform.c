@@ -1329,20 +1329,7 @@ static MagickBooleanType CopyImageRegion(Image *destination,const Image *source,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(source,i);
-        PixelTrait source_traits=GetPixelChannelTraits(source,channel);
-        PixelTrait destination_traits=GetPixelChannelTraits(destination,
-          channel);
-        if ((source_traits == UndefinedPixelTrait) ||
-            (destination_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(destination,channel,p[i],q);
-      }
+      CopyPixelChannelsTo(source,destination,p,q);
       p+=(ptrdiff_t) GetPixelChannels(source);
       q+=(ptrdiff_t) GetPixelChannels(destination);
     }
