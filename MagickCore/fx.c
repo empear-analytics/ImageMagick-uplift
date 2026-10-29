@@ -3406,6 +3406,17 @@ static inline fxFltType PopVal (FxInfo * pfx, fxRtT * pfxrt, int addr)
   return pfxrt->ValStack[--pfxrt->usedValStack];
 }
 
+static PixelChannel CheckStatisticsChannel (FxInfo * pfx, PixelChannel channel)
+{
+  if ((channel < 0) || (channel > MaxPixelChannels))
+    {
+      (void) ThrowMagickException(pfx->exception,GetMagickModule(),
+        OptionError,"NoSuchImageChannel","%i",channel);
+      channel=(PixelChannel) 0;
+    }
+  return(channel);
+}
+
 static inline fxFltType ImageStat (
   FxInfo * pfx, ssize_t ImgNum, PixelChannel channel, ImgAttrE ia)
 {
@@ -3421,21 +3432,11 @@ static inline fxFltType ImageStat (
     }
 
   if (pfx->GotStats) {
-    if ((channel < 0) || (channel > MaxPixelChannels))
-      {
-        (void) ThrowMagickException(pfx->exception,GetMagickModule(),
-          OptionError,"NoSuchImageChannel","%i",channel);
-        channel=(PixelChannel) 0;
-      }
+    channel=CheckStatisticsChannel (pfx, channel);
     cs = pfx->statistics[ImgNum];
   } else if (pfx->NeedStats) {
     /* If we need more than one statistic per pixel, this is inefficient. */
-    if ((channel < 0) || (channel > MaxPixelChannels))
-      {
-        (void) ThrowMagickException(pfx->exception,GetMagickModule(),
-          OptionError,"NoSuchImageChannel","%i",channel);
-        channel=(PixelChannel) 0;
-      }
+    channel=CheckStatisticsChannel (pfx, channel);
     cs = CollectOneImgStats (pfx, pfx->Images[ImgNum]);
     NeedRelinq = MagickTrue;
   }
