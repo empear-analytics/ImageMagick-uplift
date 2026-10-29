@@ -656,6 +656,31 @@ static MagickBooleanType CLAHE(const RectangleInfo *clahe_info,
   return(MagickTrue);
 }
 
+static RectangleInfo GetCLAHETileInfo(const Image *image,const size_t width,
+  const size_t height)
+{
+  RectangleInfo
+    tile_info;
+
+  tile_info.width=width;
+  if (tile_info.width == 0)
+    tile_info.width=image->columns >> 3;
+  if (tile_info.width < 2)
+    tile_info.width=2;
+  tile_info.height=height;
+  if (tile_info.height == 0)
+    tile_info.height=image->rows >> 3;
+  if (tile_info.height < 2)
+    tile_info.height=2;
+  tile_info.x=0;
+  if ((image->columns % tile_info.width) != 0)
+    tile_info.x=(ssize_t) (tile_info.width-(image->columns % tile_info.width));
+  tile_info.y=0;
+  if ((image->rows % tile_info.height) != 0)
+    tile_info.y=(ssize_t) (tile_info.height-(image->rows % tile_info.height));
+  return(tile_info);
+}
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
@@ -702,22 +727,7 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   range_info.min=0;
   range_info.max=NumberCLAHEGrays-1;
-  tile_info.width=width;
-  if (tile_info.width == 0)
-    tile_info.width=image->columns >> 3;
-  if (tile_info.width < 2)
-    tile_info.width=2;
-  tile_info.height=height;
-  if (tile_info.height == 0)
-    tile_info.height=image->rows >> 3;
-  if (tile_info.height < 2)
-    tile_info.height=2;
-  tile_info.x=0;
-  if ((image->columns % tile_info.width) != 0)
-    tile_info.x=(ssize_t) (tile_info.width-(image->columns % tile_info.width));
-  tile_info.y=0;
-  if ((image->rows % tile_info.height) != 0)
-    tile_info.y=(ssize_t) (tile_info.height-(image->rows % tile_info.height));
+  tile_info=GetCLAHETileInfo(image,width,height);
   clahe_info.width=(size_t) ((ssize_t) image->columns+tile_info.x);
   clahe_info.height=(size_t) ((ssize_t) image->rows+tile_info.y);
   clahe_info.x=(ssize_t) (clahe_info.width/tile_info.width);
