@@ -1262,6 +1262,24 @@ static void DiameterThreshold(const Image *component_image,
   }
 }
 
+static void NormalizeLabeledObject(const Image *image,CCObjectInfo *object,
+  const ssize_t i)
+{
+  object[i].bounding_box.width=(size_t) ((ssize_t)
+    object[i].bounding_box.width-(object[i].bounding_box.x-1));
+  object[i].bounding_box.height=(size_t) ((ssize_t)
+    object[i].bounding_box.height-(object[i].bounding_box.y-1));
+  object[i].color.red/=(QuantumScale*object[i].area);
+  object[i].color.green/=(QuantumScale*object[i].area);
+  object[i].color.blue/=(QuantumScale*object[i].area);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    object[i].color.alpha/=(QuantumScale*object[i].area);
+  if (image->colorspace == CMYKColorspace)
+    object[i].color.black/=(QuantumScale*object[i].area);
+  object[i].centroid.x/=object[i].area;
+  object[i].centroid.y/=object[i].area;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1524,19 +1542,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   component_image->colors=(size_t) n;
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
-    object[i].bounding_box.width=(size_t) ((ssize_t)
-      object[i].bounding_box.width-(object[i].bounding_box.x-1));
-    object[i].bounding_box.height=(size_t) ((ssize_t)
-      object[i].bounding_box.height-(object[i].bounding_box.y-1));
-    object[i].color.red/=(QuantumScale*object[i].area);
-    object[i].color.green/=(QuantumScale*object[i].area);
-    object[i].color.blue/=(QuantumScale*object[i].area);
-    if (image->alpha_trait != UndefinedPixelTrait)
-      object[i].color.alpha/=(QuantumScale*object[i].area);
-    if (image->colorspace == CMYKColorspace)
-      object[i].color.black/=(QuantumScale*object[i].area);
-    object[i].centroid.x/=object[i].area;
-    object[i].centroid.y/=object[i].area;
+    NormalizeLabeledObject(image,object,i);
     max_threshold+=object[i].area;
     if (object[i].area > object[background_id].area)
       background_id=i;
