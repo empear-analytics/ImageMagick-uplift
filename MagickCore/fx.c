@@ -1579,28 +1579,28 @@ static inline MagickBooleanType IsAttributeWithVirtualChannel(const int op,
 
 static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
 {
-  if (IsChannelQualifiableOperator(op) != MagickFalse)
-  {
-    const ChannelT * pch = &Channels[0];
-    (void) GetToken (pfx);
+  const ChannelT * pch;
+  if (IsChannelQualifiableOperator(op) == MagickFalse)
+    return NO_CHAN_QUAL;
+  pch = &Channels[0];
+  (void) GetToken (pfx);
 
-    while (*pch->str) {
-      if (LocaleCompare (pch->str, pfx->token)==0) {
+  while (*pch->str) {
+    if (LocaleCompare (pch->str, pfx->token)==0) {
 
-        if (IsAttributeWithVirtualChannel(op,pch) != MagickFalse)
-        {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Can't have image attribute with channel qualifier at", "'%s' at '%s'",
-            pfx->token, SetShortExp(pfx));
-          return NO_CHAN_QUAL;
-        }
-
-        pfx->pex += pfx->lenToken;
-        return pch->pixel_channel;
+      if (IsAttributeWithVirtualChannel(op,pch) != MagickFalse)
+      {
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Can't have image attribute with channel qualifier at", "'%s' at '%s'",
+          pfx->token, SetShortExp(pfx));
+        return NO_CHAN_QUAL;
       }
-      pch++;
+
+      pfx->pex += pfx->lenToken;
+      return pch->pixel_channel;
     }
+    pch++;
   }
   return NO_CHAN_QUAL;
 }
