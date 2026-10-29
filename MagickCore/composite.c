@@ -508,6 +508,59 @@ static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
   return(magnitude_image);
 }
 
+typedef struct _SumBlendInputs
+{
+  const Image
+    *alpha_image,
+    *beta_image;
+
+  Image
+    *sum_image;
+
+  double
+    attenuate,
+    sign;
+} SumBlendInputs;
+
+static void SumBlendRow(const SumBlendInputs *row,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q,
+  Quantum *magick_restrict r)
+{
+  const Image
+    *alpha_image = row->alpha_image,
+    *beta_image = row->beta_image;
+
+  Image
+    *sum_image = row->sum_image;
+
+  const double
+    attenuate = row->attenuate,
+    sign = row->sign;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) alpha_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
+      PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
+      PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
+      if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
+        continue;
+      r[i]=ClampToQuantum(attenuate*((double) p[i]+sign*
+        (double) GetPixelChannel(beta_image,channel,q)));
+    }
+    p+=(ptrdiff_t) GetPixelChannels(alpha_image);
+    q+=(ptrdiff_t) GetPixelChannels(beta_image);
+    r+=(ptrdiff_t) GetPixelChannels(sum_image);
+  }
+}
+
 static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
   const BlendSumWeights *weights,ExceptionInfo *exception)
 {
@@ -551,8 +604,8 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
     Quantum
       *magick_restrict r;
 
-    ssize_t
-      x;
+    SumBlendInputs
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -566,25 +619,12 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) alpha_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
-        PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
-        PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
-          continue;
-        r[i]=ClampToQuantum(attenuate*((double) p[i]+sign*
-          (double) GetPixelChannel(beta_image,channel,q)));
-      }
-      p+=(ptrdiff_t) GetPixelChannels(alpha_image);
-      q+=(ptrdiff_t) GetPixelChannels(beta_image);
-      r+=(ptrdiff_t) GetPixelChannels(sum_image);
-    }
+    row.alpha_image=alpha_image;
+    row.beta_image=beta_image;
+    row.sum_image=sum_image;
+    row.attenuate=attenuate;
+    row.sign=sign;
+    SumBlendRow(&row,p,q,r);
     if (SyncCacheViewAuthenticPixels(sum_view,exception) == MagickFalse)
       status=MagickFalse;
   }
