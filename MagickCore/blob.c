@@ -3351,6 +3351,49 @@ static inline MagickBooleanType CanMapBlobFile(
     MagickTrue : MagickFalse);
 }
 
+static void MapBlobFile(const ImageInfo *image_info,
+  BlobInfo *magick_restrict blob_info)
+{
+  const MagickInfo
+    *magick_info;
+
+  ExceptionInfo
+    *sans_exception;
+
+  size_t
+    length;
+
+  sans_exception=AcquireExceptionInfo();
+  magick_info=GetMagickInfo(image_info->magick,sans_exception);
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  length=(size_t) blob_info->properties.st_size;
+  if (CanMapBlobFile(magick_info,length) != MagickFalse)
+    {
+      void
+        *blob;
+
+      blob=MapBlob(fileno(blob_info->file_info.file),ReadMode,0,
+        length);
+      if (blob == (void *) NULL)
+        RelinquishMagickResource(MapResource,length);
+      else
+        {
+          /*
+            Format supports blobs-- use memory-mapped I/O.
+          */
+          if (image_info->file != (FILE *) NULL)
+            blob_info->exempt=MagickFalse;
+          else
+            {
+              (void) fclose(blob_info->file_info.file);
+              blob_info->file_info.file=(FILE *) NULL;
+            }
+          AttachBlob(blob_info,blob,length);
+          blob_info->mapped=MagickTrue;
+        }
+    }
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -3640,46 +3683,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
               }
 #endif
             if (blob_info->type == FileStream)
-              {
-                const MagickInfo
-                  *magick_info;
-
-                ExceptionInfo
-                  *sans_exception;
-
-                size_t
-                  length;
-
-                sans_exception=AcquireExceptionInfo();
-                magick_info=GetMagickInfo(image_info->magick,sans_exception);
-                sans_exception=DestroyExceptionInfo(sans_exception);
-                length=(size_t) blob_info->properties.st_size;
-                if (CanMapBlobFile(magick_info,length) != MagickFalse)
-                  {
-                    void
-                      *blob;
-
-                    blob=MapBlob(fileno(blob_info->file_info.file),ReadMode,0,
-                      length);
-                    if (blob == (void *) NULL)
-                      RelinquishMagickResource(MapResource,length);
-                    else
-                      {
-                        /*
-                          Format supports blobs-- use memory-mapped I/O.
-                        */
-                        if (image_info->file != (FILE *) NULL)
-                          blob_info->exempt=MagickFalse;
-                        else
-                          {
-                            (void) fclose(blob_info->file_info.file);
-                            blob_info->file_info.file=(FILE *) NULL;
-                          }
-                        AttachBlob(blob_info,blob,length);
-                        blob_info->mapped=MagickTrue;
-                      }
-                  }
-              }
+              MapBlobFile(image_info,blob_info);
           }
       }
     else
