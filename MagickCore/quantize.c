@@ -1605,6 +1605,46 @@ static DoublePixelPacket ClampDitherPixel(const QCubeInfo *cube,
   return(pixel);
 }
 
+typedef struct _FloydSteinbergBehind
+{
+  QCubeInfo
+    *cube_info;
+
+  DoublePixelPacket
+    *previous;
+
+  ssize_t
+    x,
+    u,
+    v;
+} FloydSteinbergBehind;
+
+static DoublePixelPacket AddPreviousRowBehindError(
+  const FloydSteinbergBehind *behind,const QCubeInfo *cube,
+  DoublePixelPacket pixel)
+{
+  QCubeInfo
+    *const cube_info = behind->cube_info;
+
+  DoublePixelPacket
+    *const previous = behind->previous;
+
+  const ssize_t
+    x = behind->x,
+    u = behind->u,
+    v = behind->v;
+
+  if (x > 0)
+    {
+      pixel.red+=3.0*cube_info->diffusion*previous[u-v].red/16;
+      pixel.green+=3.0*cube_info->diffusion*previous[u-v].green/16;
+      pixel.blue+=3.0*cube_info->diffusion*previous[u-v].blue/16;
+      if (cube->associate_alpha != MagickFalse)
+        pixel.alpha+=3.0*cube_info->diffusion*previous[u-v].alpha/16;
+    }
+  return(pixel);
+}
+
 static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -1670,6 +1710,9 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
         color,
         pixel;
 
+      FloydSteinbergBehind
+        behind;
+
       ssize_t
         *entry;
 
@@ -1702,14 +1745,12 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
           pixel.blue+=5.0*cube_info->diffusion*previous[u].blue/16;
           if (cube.associate_alpha != MagickFalse)
             pixel.alpha+=5.0*cube_info->diffusion*previous[u].alpha/16;
-          if (x > 0)
-            {
-              pixel.red+=3.0*cube_info->diffusion*previous[u-v].red/16;
-              pixel.green+=3.0*cube_info->diffusion*previous[u-v].green/16;
-              pixel.blue+=3.0*cube_info->diffusion*previous[u-v].blue/16;
-              if (cube.associate_alpha != MagickFalse)
-                pixel.alpha+=3.0*cube_info->diffusion*previous[u-v].alpha/16;
-            }
+          behind.cube_info=cube_info;
+          behind.previous=previous;
+          behind.x=x;
+          behind.u=u;
+          behind.v=v;
+          pixel=AddPreviousRowBehindError(&behind,&cube,pixel);
         }
       pixel=ClampDitherPixel(&cube,pixel);
       entry=GetCacheEntry(&cube,&pixel);
