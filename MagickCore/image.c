@@ -3976,6 +3976,21 @@ static void ParseChromaticityPrimary(const char *option,PrimaryInfo *primary)
     primary->y=geometry_info.sigma;
 }
 
+static MagickStatusType ParsePageGeometryOption(const char *option,
+  RectangleInfo *region)
+{
+  char
+    *geometry;
+
+  MagickStatusType
+    flags;
+
+  geometry=GetPageGeometry(option);
+  flags=ParseAbsoluteGeometry(geometry,region);
+  geometry=DestroyString(geometry);
+  return(flags);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -4175,14 +4190,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickOrientationOptions,MagickFalse,option);
   option=GetImageOption(image_info,"page");
   if (option != (const char *) NULL)
-    {
-      char
-        *geometry;
-
-      geometry=GetPageGeometry(option);
-      flags=ParseAbsoluteGeometry(geometry,&image->page);
-      geometry=DestroyString(geometry);
-    }
+    (void) ParsePageGeometryOption(option,&image->page);
   option=GetImageOption(image_info,"quality");
   if (option != (const char *) NULL)
     image->quality=StringToUnsignedLong(option);
@@ -4200,14 +4208,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickFalse,option);
   option=GetImageOption(image_info,"tile-offset");
   if (option != (const char *) NULL)
-    {
-      char
-        *geometry;
-
-      geometry=GetPageGeometry(option);
-      flags=ParseAbsoluteGeometry(geometry,&image->tile_offset);
-      geometry=DestroyString(geometry);
-    }
+    (void) ParsePageGeometryOption(option,&image->tile_offset);
   option=GetImageOption(image_info,"transparent-color");
   if (option != (const char *) NULL)
     (void) QueryColorCompliance(option,AllCompliance,&image->transparent_color,
