@@ -1597,6 +1597,57 @@ static RectangleInfo ApplySpliceGravity(const Image *image,
   return(splice_geometry);
 }
 
+typedef struct _SpliceRow
+{
+  const Image
+    *image;
+
+  Image
+    *splice_image;
+
+  ssize_t
+    columns;
+} SpliceRow;
+
+static void SplicePixelRow(const SpliceRow *row,
+  const RectangleInfo splice_geometry,const Quantum *p,Quantum *q)
+{
+  const Image
+    *const image = row->image;
+
+  Image
+    *const splice_image = row->splice_image;
+
+  const ssize_t
+    columns = row->columns;
+
+  ssize_t
+    x;
+
+  for (x=0; x < columns; x++)
+  {
+    CopyPixelChannelsTo(image,splice_image,p,q);
+    SetPixelRed(splice_image,GetPixelRed(image,p),q);
+    SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
+    SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
+    SetPixelAlpha(splice_image,GetPixelAlpha(image,p),q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(splice_image);
+  }
+  for ( ; x < (splice_geometry.x+(ssize_t) splice_geometry.width); x++)
+    q+=(ptrdiff_t) GetPixelChannels(splice_image);
+  for ( ; x < (ssize_t) splice_image->columns; x++)
+  {
+    CopyPixelChannelsTo(image,splice_image,p,q);
+    SetPixelRed(splice_image,GetPixelRed(image,p),q);
+    SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
+    SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
+    SetPixelAlpha(splice_image,GetPixelAlpha(image,p),q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(splice_image);
+  }
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -1667,11 +1718,11 @@ MagickExport Image *SpliceImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) splice_geometry.y; y++)
   {
+    SpliceRow
+      row;
+
     const Quantum
       *magick_restrict p;
-
-    ssize_t
-      x;
 
     Quantum
       *magick_restrict q;
@@ -1687,28 +1738,10 @@ MagickExport Image *SpliceImage(const Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < columns; x++)
-    {
-      CopyPixelChannelsTo(image,splice_image,p,q);
-      SetPixelRed(splice_image,GetPixelRed(image,p),q);
-      SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
-      SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
-      SetPixelAlpha(splice_image,GetPixelAlpha(image,p),q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(splice_image);
-    }
-    for ( ; x < (splice_geometry.x+(ssize_t) splice_geometry.width); x++)
-      q+=(ptrdiff_t) GetPixelChannels(splice_image);
-    for ( ; x < (ssize_t) splice_image->columns; x++)
-    {
-      CopyPixelChannelsTo(image,splice_image,p,q);
-      SetPixelRed(splice_image,GetPixelRed(image,p),q);
-      SetPixelGreen(splice_image,GetPixelGreen(image,p),q);
-      SetPixelBlue(splice_image,GetPixelBlue(image,p),q);
-      SetPixelAlpha(splice_image,GetPixelAlpha(image,p),q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(splice_image);
-    }
+    row.image=image;
+    row.splice_image=splice_image;
+    row.columns=columns;
+    SplicePixelRow(&row,splice_geometry,p,q);
     if (SyncCacheViewAuthenticPixels(splice_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
