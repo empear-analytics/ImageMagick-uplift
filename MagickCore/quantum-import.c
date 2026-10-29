@@ -600,6 +600,36 @@ static void ImportAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
   ImportPixelChannel(image,quantum_info,span,AlphaPixelChannel);
 }
 
+static Quantum *ImportUnpacked12BitSample(const Image *image,
+  const ssize_t index,const unsigned short pixel,const QuantumAny range,
+  Quantum *magick_restrict q)
+{
+  switch (index % 3)
+  {
+    default:
+    case 0:
+    {
+      SetPixelRed(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
+        range),q);
+      break;
+    }
+    case 1:
+    {
+      SetPixelGreen(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
+        range),q);
+      break;
+    }
+    case 2:
+    {
+      SetPixelBlue(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
+        range),q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+      break;
+    }
+  }
+  return(q);
+}
+
 static void ImportUnpacked12BitBGRQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,QuantumAny range)
 {
@@ -624,81 +654,15 @@ static void ImportUnpacked12BitBGRQuantum(const Image *image,
   for (x=0; x < (ssize_t) (3*number_pixels-1); x+=2)
   {
     p=PushShortPixel(quantum_info->endian,p,&pixel);
-    switch (x % 3)
-    {
-      default:
-      case 0:
-      {
-        SetPixelRed(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 1:
-      {
-        SetPixelGreen(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 2:
-      {
-        SetPixelBlue(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        break;
-      }
-    }
+    q=ImportUnpacked12BitSample(image,x,pixel,range,q);
     p=PushShortPixel(quantum_info->endian,p,&pixel);
-    switch ((x+1) % 3)
-    {
-      default:
-      case 0:
-      {
-        SetPixelRed(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 1:
-      {
-        SetPixelGreen(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 2:
-      {
-        SetPixelBlue(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        break;
-      }
-    }
+    q=ImportUnpacked12BitSample(image,x+1,pixel,range,q);
     p+=(ptrdiff_t) quantum_info->pad;
   }
   for (bit=0; bit < (ssize_t) (3*number_pixels % 2); bit++)
   {
     p=PushShortPixel(quantum_info->endian,p,&pixel);
-    switch ((x+bit) % 3)
-    {
-      default:
-      case 0:
-      {
-        SetPixelRed(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 1:
-      {
-        SetPixelGreen(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 2:
-      {
-        SetPixelBlue(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        break;
-      }
-    }
+    q=ImportUnpacked12BitSample(image,x+bit,pixel,range,q);
     p+=(ptrdiff_t) quantum_info->pad;
   }
   if (bit != 0)
@@ -4609,7 +4573,7 @@ static MagickBooleanType Import16BitIndexQuantum(const Image *image,
   return(range_exception);
 }
 
-static MagickBooleanType Import32BitIndexQuantum(const Image *image,
+static MagickBooleanType ImportFloat32BitIndexQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   const MagickSizeType
@@ -4627,39 +4591,69 @@ static MagickBooleanType Import32BitIndexQuantum(const Image *image,
   ssize_t
     x;
 
+  float
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+    SetPixelIndex(image,PushColormapIndex(image,(size_t)
+      ClampToQuantum(pixel),&range_exception),q);
+    SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
+      GetPixelIndex(image,q),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(range_exception);
+}
+
+static MagickBooleanType ImportInteger32BitIndexQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  MagickBooleanType
+    range_exception = MagickFalse;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushLongPixel(quantum_info->endian,p,&pixel);
+    SetPixelIndex(image,PushColormapIndex(image,pixel,
+      &range_exception),q);
+    SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
+      GetPixelIndex(image,q),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(range_exception);
+}
+
+static MagickBooleanType Import32BitIndexQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  MagickBooleanType
+    range_exception = MagickFalse;
+
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      float
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-        SetPixelIndex(image,PushColormapIndex(image,(size_t)
-          ClampToQuantum(pixel),&range_exception),q);
-        SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
-          GetPixelIndex(image,q),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
-      return(range_exception);
+      return(ImportFloat32BitIndexQuantum(image,quantum_info,span));
     }
   else
     {
-      unsigned int
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushLongPixel(quantum_info->endian,p,&pixel);
-        SetPixelIndex(image,PushColormapIndex(image,pixel,
-          &range_exception),q);
-        SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
-          GetPixelIndex(image,q),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
-      return(range_exception);
+      return(ImportInteger32BitIndexQuantum(image,quantum_info,span));
     }
   return(range_exception);
 }
@@ -5006,7 +5000,7 @@ static MagickBooleanType Import16BitIndexAlphaQuantum(const Image *image,
   return(range_exception);
 }
 
-static MagickBooleanType Import32BitIndexAlphaQuantum(const Image *image,
+static MagickBooleanType ImportFloat32BitIndexAlphaQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
   const MagickSizeType
@@ -5024,43 +5018,73 @@ static MagickBooleanType Import32BitIndexAlphaQuantum(const Image *image,
   ssize_t
     x;
 
+  float
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+    SetPixelIndex(image,PushColormapIndex(image,(size_t)
+      ClampToQuantum(pixel),&range_exception),q);
+    SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
+      GetPixelIndex(image,q),q);
+    p=PushQuantumFloatPixel(quantum_info,p,&pixel);
+    SetPixelAlpha(image,ClampToQuantum(pixel),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(range_exception);
+}
+
+static MagickBooleanType ImportInteger32BitIndexAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
+  MagickBooleanType
+    range_exception = MagickFalse;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    p=PushLongPixel(quantum_info->endian,p,&pixel);
+    SetPixelIndex(image,PushColormapIndex(image,pixel,
+      &range_exception),q);
+    SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
+      GetPixelIndex(image,q),q);
+    p=PushLongPixel(quantum_info->endian,p,&pixel);
+    SetPixelAlpha(image,ScaleLongToQuantum(pixel),q);
+    p+=(ptrdiff_t) quantum_info->pad;
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(range_exception);
+}
+
+static MagickBooleanType Import32BitIndexAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  MagickBooleanType
+    range_exception = MagickFalse;
+
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      float
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-        SetPixelIndex(image,PushColormapIndex(image,(size_t)
-          ClampToQuantum(pixel),&range_exception),q);
-        SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
-          GetPixelIndex(image,q),q);
-        p=PushQuantumFloatPixel(quantum_info,p,&pixel);
-        SetPixelAlpha(image,ClampToQuantum(pixel),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
-      return(range_exception);
+      return(ImportFloat32BitIndexAlphaQuantum(image,quantum_info,span));
     }
   else
     {
-      unsigned int
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        p=PushLongPixel(quantum_info->endian,p,&pixel);
-        SetPixelIndex(image,PushColormapIndex(image,pixel,
-          &range_exception),q);
-        SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
-          GetPixelIndex(image,q),q);
-        p=PushLongPixel(quantum_info->endian,p,&pixel);
-        SetPixelAlpha(image,ScaleLongToQuantum(pixel),q);
-        p+=(ptrdiff_t) quantum_info->pad;
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
-      return(range_exception);
+      return(ImportInteger32BitIndexAlphaQuantum(image,quantum_info,span));
     }
   return(range_exception);
 }
@@ -5997,81 +6021,15 @@ static void ImportUnpacked12BitRGBQuantum(const Image *image,
   for (x=0; x < (ssize_t) (3*number_pixels-1); x+=2)
   {
     p=PushShortPixel(quantum_info->endian,p,&pixel);
-    switch (x % 3)
-    {
-      default:
-      case 0:
-      {
-        SetPixelRed(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 1:
-      {
-        SetPixelGreen(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 2:
-      {
-        SetPixelBlue(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        break;
-      }
-    }
+    q=ImportUnpacked12BitSample(image,x,pixel,range,q);
     p=PushShortPixel(quantum_info->endian,p,&pixel);
-    switch ((x+1) % 3)
-    {
-      default:
-      case 0:
-      {
-        SetPixelRed(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 1:
-      {
-        SetPixelGreen(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 2:
-      {
-        SetPixelBlue(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        break;
-      }
-    }
+    q=ImportUnpacked12BitSample(image,x+1,pixel,range,q);
     p+=(ptrdiff_t) quantum_info->pad;
   }
   for (bit=0; bit < (ssize_t) (3*number_pixels % 2); bit++)
   {
     p=PushShortPixel(quantum_info->endian,p,&pixel);
-    switch ((x+bit) % 3)
-    {
-      default:
-      case 0:
-      {
-        SetPixelRed(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 1:
-      {
-        SetPixelGreen(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        break;
-      }
-      case 2:
-      {
-        SetPixelBlue(image,ScaleAnyToQuantum((QuantumAny) (pixel >> 4),
-          range),q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        break;
-      }
-    }
+    q=ImportUnpacked12BitSample(image,x+bit,pixel,range,q);
     p+=(ptrdiff_t) quantum_info->pad;
   }
   if (bit != 0)
