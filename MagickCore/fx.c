@@ -2406,6 +2406,118 @@ static inline MagickBooleanType IsHslSymbol(const SymbolE se)
     MagickFalse);
 }
 
+static fxFltType ApplyNumberPrefix (FxInfo * pfx, char * tailptr, fxFltType val)
+{
+  /* Could have "prefix" K, Ki, M etc.
+     See https://en.wikipedia.org/wiki/Metric_prefix
+     and https://en.wikipedia.org/wiki/Binary_prefix
+  */
+  double Pow = 0.0;
+  const char Prefixes[] = "yzafpnum.kMGTPEZY";
+  const char * pSi = strchr (Prefixes, *tailptr);
+  if (pSi && *pSi != '.') Pow = (double) ((pSi - Prefixes) * 3 - 24);
+  else if (*tailptr == 'c') Pow = -2;
+  else if (*tailptr == 'h') Pow =  2;
+  else if (*tailptr == 'k') Pow =  3;
+  if (Pow != 0.0) {
+    if (*(++pfx->pex) == 'i') {
+      val *= pow (2.0, Pow/0.3);
+      pfx->pex++;
+    } else {
+      val *= pow (10.0, Pow);
+    }
+  }
+  return val;
+}
+
+static MagickBooleanType GetParenthesisedOperand (
+  FxInfo * pfx, OperatorE op, MagickBooleanType * needPopAll)
+{
+  char chLimit = '\0';
+  if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
+  pfx->pex++;
+  if (!TranslateExpression (pfx, ")", &chLimit, needPopAll)) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Empty expression in parentheses at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  if (chLimit != ')') {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "'(' but no ')' at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  /* Top of opr stack should be '('. */
+  if (!PopOprOpenParen (pfx, oOpenParen)) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Bug: tos not '(' at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  return MagickTrue;
+}
+
+static MagickBooleanType GetHexColourOperand (FxInfo * pfx)
+{
+  fxFltType v0=0, v1=0, v2=0;
+  ssize_t lenToken = GetHexColour (pfx, &v0, &v1, &v2);
+  if (lenToken < 0) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Bad hex number at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  } else if (lenToken > 0) {
+    (void) AddColourElement (pfx, v0, v1, v2);
+    pfx->pex+=lenToken;
+  }
+  return MagickTrue;
+}
+
+static MagickBooleanType AddImgAttrOperand (FxInfo * pfx, ImgAttrE ia)
+{
+  fxFltType val = 0;
+  (void) AddElement (pfx, val, (int) ia);
+
+  if (ImgAttrs[ia-(int) FirstImgAttr].need_stats != MagickFalse) {
+    if (IsQualifier (pfx)) {
+      PixelChannel chQual = GetChannelQualifier (pfx, (int) ia);
+      ElementT * pel;
+      if (chQual == NO_CHAN_QUAL) {
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Bad channel qualifier at", "'%s'",
+          SetShortExp(pfx));
+        return MagickFalse;
+      }
+      /* Adjust the element */
+      pel = &pfx->Elements[pfx->usedElements-1];
+      pel->channel_qual = chQual;
+    }
+  }
+  return MagickTrue;
+}
+
+static MagickBooleanType AddArtifactOperand (FxInfo * pfx, const char * artifact)
+{
+  char * tailptr;
+  fxFltType val = strtold (artifact, &tailptr);
+  if (pfx->token == tailptr) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Artifact", "'%s' has value '%s', not a number, at '%s'",
+      pfx->token, artifact, SetShortExp(pfx));
+    return MagickFalse;
+  }
+  (void) AddElement (pfx, val, oNull);
+  pfx->pex+=pfx->lenToken;
+  return MagickTrue;
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
   MagickBooleanType * needPopAll)
@@ -2424,32 +2536,7 @@ static MagickBooleanType GetOperand (
     */
     OperatorE op = GetLeadingOp (pfx);
     if (op==oOpenParen) {
-      char chLimit = '\0';
-      if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
-      pfx->pex++;
-      if (!TranslateExpression (pfx, ")", &chLimit, needPopAll)) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Empty expression in parentheses at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      if (chLimit != ')') {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "'(' but no ')' at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      /* Top of opr stack should be '('. */
-      if (!PopOprOpenParen (pfx, oOpenParen)) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Bug: tos not '(' at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      return MagickTrue;
+      return (GetParenthesisedOperand (pfx, op, needPopAll));
     } else if (OprIsUnaryPrefix (op)) {
       MagickBooleanType operand_ok;
       if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
@@ -2493,19 +2580,7 @@ static MagickBooleanType GetOperand (
       (void) GetToken (pfx);
       return MagickTrue;
     } else if (*pfx->pex == '#') {
-      fxFltType v0=0, v1=0, v2=0;
-      ssize_t lenToken = GetHexColour (pfx, &v0, &v1, &v2);
-      if (lenToken < 0) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Bad hex number at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      } else if (lenToken > 0) {
-        (void) AddColourElement (pfx, v0, v1, v2);
-        pfx->pex+=lenToken;
-      }
-      return MagickTrue;
+      return (GetHexColourOperand (pfx));
     }
 
     /* Try a constant number.
@@ -2517,25 +2592,7 @@ static MagickBooleanType GetOperand (
       if (pfx->pex != tailptr) {
         pfx->pex = tailptr;
         if (*tailptr) {
-          /* Could have "prefix" K, Ki, M etc.
-             See https://en.wikipedia.org/wiki/Metric_prefix
-             and https://en.wikipedia.org/wiki/Binary_prefix
-          */
-          double Pow = 0.0;
-          const char Prefixes[] = "yzafpnum.kMGTPEZY";
-          const char * pSi = strchr (Prefixes, *tailptr);
-          if (pSi && *pSi != '.') Pow = (double) ((pSi - Prefixes) * 3 - 24);
-          else if (*tailptr == 'c') Pow = -2;
-          else if (*tailptr == 'h') Pow =  2;
-          else if (*tailptr == 'k') Pow =  3;
-          if (Pow != 0.0) {
-            if (*(++pfx->pex) == 'i') {
-              val *= pow (2.0, Pow/0.3);
-              pfx->pex++;
-            } else {
-              val *= pow (10.0, Pow);
-            }
-          }
+          val = ApplyNumberPrefix (pfx, tailptr, val);
         }
         (void) AddElement (pfx, val, oNull);
         return MagickTrue;
@@ -2610,26 +2667,7 @@ static MagickBooleanType GetOperand (
     {
       ImgAttrE ia = GetImgAttrToken (pfx);
       if (ia != aNull) {
-        fxFltType val = 0;
-        (void) AddElement (pfx, val, (int) ia);
-
-        if (ImgAttrs[ia-(int) FirstImgAttr].need_stats != MagickFalse) {
-          if (IsQualifier (pfx)) {
-            PixelChannel chQual = GetChannelQualifier (pfx, (int) ia);
-            ElementT * pel;
-            if (chQual == NO_CHAN_QUAL) {
-              (void) ThrowMagickException (
-                pfx->exception, GetMagickModule(), OptionError,
-                "Bad channel qualifier at", "'%s'",
-                SetShortExp(pfx));
-              return MagickFalse;
-            }
-            /* Adjust the element */
-            pel = &pfx->Elements[pfx->usedElements-1];
-            pel->channel_qual = chQual;
-          }
-        }
-        return MagickTrue;
+        return (AddImgAttrOperand (pfx, ia));
       }
     }
 
@@ -2672,18 +2710,7 @@ static MagickBooleanType GetOperand (
       const char *artifact;
       artifact = GetImageArtifact (pfx->image, pfx->token);
       if (artifact != (const char *) NULL) {
-        char * tailptr;
-        fxFltType val = strtold (artifact, &tailptr);
-        if (pfx->token == tailptr) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Artifact", "'%s' has value '%s', not a number, at '%s'",
-            pfx->token, artifact, SetShortExp(pfx));
-          return MagickFalse;
-        }
-        (void) AddElement (pfx, val, oNull);
-        pfx->pex+=pfx->lenToken;
-        return MagickTrue;
+        return (AddArtifactOperand (pfx, artifact));
       }
     }
 
