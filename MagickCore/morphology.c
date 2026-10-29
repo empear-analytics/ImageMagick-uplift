@@ -4685,6 +4685,23 @@ static double GetConvolveBias(const Image *image,double bias,
   return(bias);
 }
 
+static MagickBooleanType ScaleConvolveKernel(const char *artifact,
+  const KernelInfo *kernel,KernelInfo **curr_kernel,ExceptionInfo *exception)
+{
+  if (IsGeometry(artifact) == MagickFalse)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+         OptionWarning,"InvalidSetting","'%s' '%s'",
+         "convolve:scale",artifact);
+  else {
+    if ( *curr_kernel == kernel )
+      *curr_kernel = CloneKernelInfo(kernel);
+    if (*curr_kernel == (KernelInfo *) NULL)
+      return(MagickFalse);
+    ScaleGeometryKernelInfo(*curr_kernel, artifact);
+  }
+  return(MagickTrue);
+}
+
 MagickExport Image *MorphologyImage(const Image *image,
   const MorphologyMethod method,const ssize_t iterations,
   const KernelInfo *kernel,ExceptionInfo *exception)
@@ -4725,17 +4742,8 @@ MagickExport Image *MorphologyImage(const Image *image,
       /* Scale kernel according to user wishes */
       artifact = GetImageArtifact(image,"convolve:scale");
       if ( artifact != (const char *) NULL ) {
-        if (IsGeometry(artifact) == MagickFalse)
-          (void) ThrowMagickException(exception,GetMagickModule(),
-               OptionWarning,"InvalidSetting","'%s' '%s'",
-               "convolve:scale",artifact);
-        else {
-          if ( curr_kernel == kernel )
-            curr_kernel = CloneKernelInfo(kernel);
-          if (curr_kernel == (KernelInfo *) NULL)
-            return((Image *) NULL);
-          ScaleGeometryKernelInfo(curr_kernel, artifact);
-        }
+        if (ScaleConvolveKernel(artifact,kernel,&curr_kernel,exception) == MagickFalse)
+          return((Image *) NULL);
       }
     }
 
