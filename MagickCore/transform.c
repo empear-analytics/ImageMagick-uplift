@@ -617,6 +617,26 @@ static void CopyPixelRow(const Image *image,const Image *destination,
   }
 }
 
+static Image *CropOutsideImage(const Image *image,
+  const RectangleInfo bounding_box,ExceptionInfo *exception)
+{
+  Image
+    *crop_image;
+
+  crop_image=CloneImage(image,1,1,MagickTrue,exception);
+  if (crop_image == (Image *) NULL)
+    return((Image *) NULL);
+  crop_image->background_color.alpha_trait=BlendPixelTrait;
+  crop_image->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(crop_image,exception);
+  crop_image->page=bounding_box;
+  crop_image->page.x=(-1);
+  crop_image->page.y=(-1);
+  if (crop_image->dispose == BackgroundDispose)
+    crop_image->dispose=NoneDispose;
+  return(crop_image);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -675,18 +695,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
         "GeometryDoesNotContainImage","(\"%.17gx%.17g%+.20g%+.20g\") `%s'",
         (double) geometry->width,(double) geometry->height,
         (double) geometry->x,(double) geometry->y,image->filename);
-      crop_image=CloneImage(image,1,1,MagickTrue,exception);
-      if (crop_image == (Image *) NULL)
-        return((Image *) NULL);
-      crop_image->background_color.alpha_trait=BlendPixelTrait;
-      crop_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-      (void) SetImageBackgroundColor(crop_image,exception);
-      crop_image->page=bounding_box;
-      crop_image->page.x=(-1);
-      crop_image->page.y=(-1);
-      if (crop_image->dispose == BackgroundDispose)
-        crop_image->dispose=NoneDispose;
-      return(crop_image);
+      return(CropOutsideImage(image,bounding_box,exception));
     }
   ClipCropOffset(&page.x,&page.width,bounding_box.x);
   ClipCropOffset(&page.y,&page.height,bounding_box.y);
