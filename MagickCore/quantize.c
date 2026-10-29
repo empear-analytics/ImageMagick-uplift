@@ -1645,6 +1645,66 @@ static DoublePixelPacket AddPreviousRowBehindError(
   return(pixel);
 }
 
+typedef struct _FloydSteinbergPreviousRow
+{
+  Image
+    *image;
+
+  QCubeInfo
+    *cube_info;
+
+  DoublePixelPacket
+    *previous;
+
+  ssize_t
+    x,
+    u,
+    v;
+} FloydSteinbergPreviousRow;
+
+static DoublePixelPacket AddPreviousRowError(
+  const FloydSteinbergPreviousRow *row,const QCubeInfo *cube,
+  DoublePixelPacket pixel)
+{
+  Image
+    *const image = row->image;
+
+  QCubeInfo
+    *const cube_info = row->cube_info;
+
+  DoublePixelPacket
+    *const previous = row->previous;
+
+  const ssize_t
+    x = row->x,
+    u = row->u,
+    v = row->v;
+
+  FloydSteinbergBehind
+    behind;
+
+  if (x < (ssize_t) (image->columns-1))
+    {
+      pixel.red+=cube_info->diffusion*previous[u+v].red/16;
+      pixel.green+=cube_info->diffusion*previous[u+v].green/16;
+      pixel.blue+=cube_info->diffusion*previous[u+v].blue/16;
+      if (cube->associate_alpha != MagickFalse)
+        pixel.alpha+=cube_info->diffusion*previous[u+v].alpha/16;
+    }
+  pixel.red+=5.0*cube_info->diffusion*previous[u].red/16;
+  pixel.green+=5.0*cube_info->diffusion*previous[u].green/16;
+  pixel.blue+=5.0*cube_info->diffusion*previous[u].blue/16;
+  if (cube->associate_alpha != MagickFalse)
+    pixel.alpha+=5.0*cube_info->diffusion*previous[u].alpha/16;
+  behind.cube_info=cube_info;
+  behind.previous=previous;
+  behind.x=x;
+  behind.u=u;
+  behind.v=v;
+  pixel=AddPreviousRowBehindError(&behind,cube,pixel);
+  return(pixel);
+}
+
 static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -1710,8 +1770,8 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
         color,
         pixel;
 
-      FloydSteinbergBehind
-        behind;
+      FloydSteinbergPreviousRow
+        row;
 
       ssize_t
         *entry;
@@ -1732,25 +1792,13 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
         }
       if (y > 0)
         {
-          if (x < (ssize_t) (image->columns-1))
-            {
-              pixel.red+=cube_info->diffusion*previous[u+v].red/16;
-              pixel.green+=cube_info->diffusion*previous[u+v].green/16;
-              pixel.blue+=cube_info->diffusion*previous[u+v].blue/16;
-              if (cube.associate_alpha != MagickFalse)
-                pixel.alpha+=cube_info->diffusion*previous[u+v].alpha/16;
-            }
-          pixel.red+=5.0*cube_info->diffusion*previous[u].red/16;
-          pixel.green+=5.0*cube_info->diffusion*previous[u].green/16;
-          pixel.blue+=5.0*cube_info->diffusion*previous[u].blue/16;
-          if (cube.associate_alpha != MagickFalse)
-            pixel.alpha+=5.0*cube_info->diffusion*previous[u].alpha/16;
-          behind.cube_info=cube_info;
-          behind.previous=previous;
-          behind.x=x;
-          behind.u=u;
-          behind.v=v;
-          pixel=AddPreviousRowBehindError(&behind,&cube,pixel);
+          row.image=image;
+          row.cube_info=cube_info;
+          row.previous=previous;
+          row.x=x;
+          row.u=u;
+          row.v=v;
+          pixel=AddPreviousRowError(&row,&cube,pixel);
         }
       pixel=ClampDitherPixel(&cube,pixel);
       entry=GetCacheEntry(&cube,&pixel);
