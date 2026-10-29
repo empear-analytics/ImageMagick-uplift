@@ -3685,6 +3685,79 @@ static fxFltType GetElementValue (ElementT * pel, const PixelChannel channel)
   return(regA);
 }
 
+typedef struct _RpnPixelInputs
+{
+  FxInfo
+    *pfx;
+
+  ElementT
+    *pel;
+
+  PixelChannel
+    channel;
+
+  ssize_t
+    imgx,
+    imgy;
+} RpnPixelInputs;
+
+static fxFltType ExecuteFuncP (const RpnPixelInputs * in, fxFltType regA,
+  const fxFltType regB)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    imgx = in->imgx,
+    imgy = in->imgy;
+
+  /* 2 args are: x, y */
+  fxFltType fx, fy;
+  ssize_t ImgNum = pfx->ImgNum;
+  if (pel->operator_index == fVP) ImgNum = 1;
+  if (pel->is_relative) {
+    fx = imgx + regA;
+    fy = imgy + regB;
+  } else {
+    fx = regA;
+    fy = regB;
+  }
+  if ((int) pel->channel_qual < 0) {
+    if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
+      const fxFltXYT fxy = { fx, fy };
+      regA = GetHslFlt (pfx, ImgNum, &fxy, pel->channel_qual);
+      return(regA);
+    } else if (pel->channel_qual == INTENSITY_CHANNEL) {
+      regA = GetIntensity (pfx, ImgNum, fx, fy);
+      return(regA);
+    }
+  }
+
+  {
+    double v;
+
+    if (! InterpolatePixelChannel (pfx->Images[ImgNum], pfx->Imgs[ImgNum].View,
+                                   WHICH_NON_ATTR_CHAN, pfx->Images[ImgNum]->interpolate,
+                                   (double) fx, (double) fy, &v, pfx->exception)
+                                  )
+    {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "fSP or fVP can't get interp", "%lu", (unsigned long) ImgNum);
+      return(regA);
+    }
+    regA = v * (fxFltType)QuantumScale;
+  }
+
+  return(regA);
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -3733,6 +3806,9 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
   for (i=0; i < pfx->usedElements; i++) {
     ElementT
       *pel;
+
+    RpnPixelInputs
+      rpn_in;
 
     if (i < 0) {
       (void) ThrowMagickException (
@@ -4302,44 +4378,12 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
         case fP:
         case fSP:
         case fVP: {
-          /* 2 args are: x, y */
-          fxFltType fx, fy;
-          ssize_t ImgNum = pfx->ImgNum;
-          if (pel->operator_index == fVP) ImgNum = 1;
-          if (pel->is_relative) {
-            fx = imgx + regA;
-            fy = imgy + regB;
-          } else {
-            fx = regA;
-            fy = regB;
-          }
-          if ((int) pel->channel_qual < 0) {
-            if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-              const fxFltXYT fxy = { fx, fy };
-              regA = GetHslFlt (pfx, ImgNum, &fxy, pel->channel_qual);
-              break;
-            } else if (pel->channel_qual == INTENSITY_CHANNEL) {
-              regA = GetIntensity (pfx, ImgNum, fx, fy);
-              break;
-            }
-          }
-
-          {
-            double v;
-
-            if (! InterpolatePixelChannel (pfx->Images[ImgNum], pfx->Imgs[ImgNum].View,
-                                           WHICH_NON_ATTR_CHAN, pfx->Images[ImgNum]->interpolate,
-                                           (double) fx, (double) fy, &v, pfx->exception)
-                                          )
-            {
-              (void) ThrowMagickException (
-                pfx->exception, GetMagickModule(), OptionError,
-                "fSP or fVP can't get interp", "%lu", (unsigned long) ImgNum);
-              break;
-            }
-            regA = v * (fxFltType)QuantumScale;
-          }
-
+          rpn_in.pfx=pfx;
+          rpn_in.pel=pel;
+          rpn_in.channel=channel;
+          rpn_in.imgx=imgx;
+          rpn_in.imgy=imgy;
+          regA = ExecuteFuncP (&rpn_in, regA, regB);
           break;
         }
         case fNull:
