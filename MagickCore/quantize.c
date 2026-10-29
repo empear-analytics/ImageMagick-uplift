@@ -825,6 +825,18 @@ static void TransformClassifyColorspace(const QCubeInfo *cube_info,
         exception);
 }
 
+static void PruneOversizedColorTree(QCubeInfo *cube_info)
+{
+  if (cube_info->nodes > MaxQNodes)
+    {
+      /*
+        Prune one level if the color tree is too large.
+      */
+      PruneLevel(cube_info,cube_info->root);
+      cube_info->depth--;
+    }
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -880,14 +892,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    if (cube_info->nodes > MaxQNodes)
-      {
-        /*
-          Prune one level if the color tree is too large.
-        */
-        PruneLevel(cube_info,cube_info->root);
-        cube_info->depth--;
-      }
+    PruneOversizedColorTree(cube_info);
     for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) count)
     {
       /*
@@ -983,14 +988,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    if (cube_info->nodes > MaxQNodes)
-      {
-        /*
-          Prune one level if the color tree is too large.
-        */
-        PruneLevel(cube_info,cube_info->root);
-        cube_info->depth--;
-      }
+    PruneOversizedColorTree(cube_info);
     for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) count)
     {
       /*
