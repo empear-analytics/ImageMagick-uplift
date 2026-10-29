@@ -1064,6 +1064,54 @@ static void AddObjectPixel(CCObjectInfo *object,const size_t id,
   object[id].area++;
 }
 
+typedef struct _CCObjectPixel
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x,
+    y,
+    id;
+} CCObjectPixel;
+
+static void AddLabeledObjectPixel(CCObjectInfo *object,
+  const CCObjectPixel *object_pixel)
+{
+  const Image
+    *const image = object_pixel->image;
+
+  const Quantum
+    *const p = object_pixel->p;
+
+  const ssize_t
+    x = object_pixel->x,
+    y = object_pixel->y,
+    id = object_pixel->id;
+
+  if (x < object[id].bounding_box.x)
+    object[id].bounding_box.x=x;
+  if (x >= (ssize_t) object[id].bounding_box.width)
+    object[id].bounding_box.width=(size_t) x;
+  if (y < object[id].bounding_box.y)
+    object[id].bounding_box.y=y;
+  if (y >= (ssize_t) object[id].bounding_box.height)
+    object[id].bounding_box.height=(size_t) y;
+  object[id].color.red+=QuantumScale*(double) GetPixelRed(image,p);
+  object[id].color.green+=QuantumScale*(double) GetPixelGreen(image,p);
+  object[id].color.blue+=QuantumScale*(double) GetPixelBlue(image,p);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    object[id].color.alpha+=QuantumScale*(double) GetPixelAlpha(image,p);
+  if (image->colorspace == CMYKColorspace)
+    object[id].color.black+=QuantumScale*(double) GetPixelBlack(image,p);
+  object[id].centroid.x+=x;
+  object[id].centroid.y+=y;
+  object[id].area++;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1295,6 +1343,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       }
     for (x=0; x < (ssize_t) component_image->columns; x++)
     {
+      CCObjectPixel
+        object_pixel;
+
       ssize_t
         id,
         offset;
@@ -1310,24 +1361,12 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
             break;
         }
       status=SetMatrixElement(equivalences,offset,0,&id);
-      if (x < object[id].bounding_box.x)
-        object[id].bounding_box.x=x;
-      if (x >= (ssize_t) object[id].bounding_box.width)
-        object[id].bounding_box.width=(size_t) x;
-      if (y < object[id].bounding_box.y)
-        object[id].bounding_box.y=y;
-      if (y >= (ssize_t) object[id].bounding_box.height)
-        object[id].bounding_box.height=(size_t) y;
-      object[id].color.red+=QuantumScale*(double) GetPixelRed(image,p);
-      object[id].color.green+=QuantumScale*(double) GetPixelGreen(image,p);
-      object[id].color.blue+=QuantumScale*(double) GetPixelBlue(image,p);
-      if (image->alpha_trait != UndefinedPixelTrait)
-        object[id].color.alpha+=QuantumScale*(double) GetPixelAlpha(image,p);
-      if (image->colorspace == CMYKColorspace)
-        object[id].color.black+=QuantumScale*(double) GetPixelBlack(image,p);
-      object[id].centroid.x+=x;
-      object[id].centroid.y+=y;
-      object[id].area++;
+      object_pixel.image=image;
+      object_pixel.p=p;
+      object_pixel.x=x;
+      object_pixel.y=y;
+      object_pixel.id=id;
+      AddLabeledObjectPixel(object,&object_pixel);
       SetPixelIndex(component_image,(Quantum) id,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(component_image);
