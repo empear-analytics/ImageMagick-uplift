@@ -3885,6 +3885,51 @@ static inline MagickBooleanType IsTextureComposited(const Image *image,
     MagickFalse);
 }
 
+typedef struct _TextureSpan
+{
+  Image
+    *image,
+    *texture_image;
+
+  size_t
+    width;
+} TextureSpan;
+
+static Quantum *CopyTextureSpan(const TextureSpan *span,const Quantum *p,
+  Quantum *q)
+{
+  Image
+    *image = span->image,
+    *texture_image = span->texture_image;
+
+  const size_t
+    width = span->width;
+
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) width; j++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(texture_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(texture_image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      PixelTrait texture_traits=GetPixelChannelTraits(texture_image,
+        channel);
+      if ((traits == UndefinedPixelTrait) ||
+          (texture_traits == UndefinedPixelTrait))
+        continue;
+      SetPixelChannel(image,channel,p[i],q);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(texture_image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
@@ -4001,32 +4046,17 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
       }
     for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) texture_image->columns)
     {
-      ssize_t
-        j;
+      TextureSpan
+        span;
 
       p=pixels;
       width=texture_image->columns;
       if ((x+(ssize_t) width) > (ssize_t) image->columns)
         width=image->columns-(size_t) x;
-      for (j=0; j < (ssize_t) width; j++)
-      {
-        ssize_t
-          i;
-
-        for (i=0; i < (ssize_t) GetPixelChannels(texture_image); i++)
-        {
-          PixelChannel channel = GetPixelChannelChannel(texture_image,i);
-          PixelTrait traits = GetPixelChannelTraits(image,channel);
-          PixelTrait texture_traits=GetPixelChannelTraits(texture_image,
-            channel);
-          if ((traits == UndefinedPixelTrait) ||
-              (texture_traits == UndefinedPixelTrait))
-            continue;
-          SetPixelChannel(image,channel,p[i],q);
-        }
-        p+=(ptrdiff_t) GetPixelChannels(texture_image);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      span.image=image;
+      span.texture_image=texture_image;
+      span.width=width;
+      q=CopyTextureSpan(&span,p,q);
     }
     sync=SyncCacheViewAuthenticPixels(image_view,exception);
     if (sync == MagickFalse)
