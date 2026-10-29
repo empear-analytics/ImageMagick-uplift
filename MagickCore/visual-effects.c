@@ -3722,6 +3722,22 @@ static void ThresholdWaveletLevel(float *pixels,
   }
 }
 
+static MagickBooleanType ReportWaveletProgress(const Image *image,
+  const ssize_t channel,MagickBooleanType status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,AddNoiseImageTag,(MagickOffsetType)
+        channel,GetPixelChannels(image));
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -3964,16 +3980,7 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
       if (sync == MagickFalse)
         status=MagickFalse;
     }
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,AddNoiseImageTag,(MagickOffsetType)
-          channel,GetPixelChannels(image));
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    status=ReportWaveletProgress(image,channel,status);
   }
   noise_view=DestroyCacheView(noise_view);
   image_view=DestroyCacheView(image_view);
