@@ -1237,6 +1237,36 @@ static void PrintImageColormapEntries(FILE *file,Image *image,ExceptionInfo *exc
     }
 }
 
+static void PrintImageTimeToLive(FILE *file,const Image *image)
+{
+  int
+    expired;
+
+  if (image->ttl != (time_t) 0)
+    {
+      char
+        iso8601[sizeof("9999-99-99T99:99:99Z")];
+
+      int
+        seconds;
+
+      struct tm
+        timestamp;
+
+      (void) GetMagickUTCTime(&image->ttl,&timestamp);
+      (void) strftime(iso8601,sizeof(iso8601),"%Y-%m-%dT%H:%M:%SZ",&timestamp);
+      seconds=MagickMax((int)(image->ttl-GetMagickTime()),0);
+      expired=' ';
+      if (seconds == 0)
+        expired='*';
+      (void) FormatLocaleFile(file,"  Time-to-live: %g:%02g:%02g:%02g%c %s\n",
+        ceil((double) (seconds/(3600*24))),
+        ceil((double) ((seconds % (24*3600))/3600)),
+        ceil((double) ((seconds % 3600)/60)),
+        ceil((double) ((seconds % 3600) % 60)),expired,iso8601);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1279,9 +1309,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
 
   ImageType
     type;
-
-  int
-    expired;
 
   MagickBooleanType
     ping;
@@ -1877,29 +1904,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         image->rows/elapsed_time+0.5),MagickFalse,"P",MagickPathExtent,buffer);
       (void) FormatLocaleFile(file,"  Pixels per second: %s\n",buffer);
     }
-  if (image->ttl != (time_t) 0)
-    {
-      char
-        iso8601[sizeof("9999-99-99T99:99:99Z")];
-
-      int
-        seconds;
-
-      struct tm
-        timestamp;
-
-      (void) GetMagickUTCTime(&image->ttl,&timestamp);
-      (void) strftime(iso8601,sizeof(iso8601),"%Y-%m-%dT%H:%M:%SZ",&timestamp);
-      seconds=MagickMax((int)(image->ttl-GetMagickTime()),0);
-      expired=' ';
-      if (seconds == 0)
-        expired='*';
-      (void) FormatLocaleFile(file,"  Time-to-live: %g:%02g:%02g:%02g%c %s\n",
-        ceil((double) (seconds/(3600*24))),
-        ceil((double) ((seconds % (24*3600))/3600)),
-        ceil((double) ((seconds % 3600)/60)),
-        ceil((double) ((seconds % 3600) % 60)),expired,iso8601);
-    }
+  PrintImageTimeToLive(file,image);
   (void) FormatLocaleFile(file,"  User time: %0.3fu\n",user_time);
   (void) FormatLocaleFile(file,"  Elapsed time: %lu:%02lu.%03lu\n",
     (unsigned long) (elapsed_time/60.0),(unsigned long) ceil(fmod(elapsed_time,
