@@ -901,6 +901,25 @@ static SegmentInfo GetHoughLine(const Image *image,const ssize_t x,
   return(line);
 }
 
+static void SetHoughDrawOptions(const Image *image,ImageInfo *image_info)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"background");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"background",artifact);
+  artifact=GetImageArtifact(image,"fill");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"fill",artifact);
+  artifact=GetImageArtifact(image,"stroke");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"stroke",artifact);
+  artifact=GetImageArtifact(image,"strokewidth");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"strokewidth",artifact);
+}
+
 MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const size_t height,const size_t threshold,ExceptionInfo *exception)
 {
@@ -1084,18 +1103,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   image_info=AcquireImageInfo();
   image_info->background_color=image->background_color;
   (void) FormatLocaleString(image_info->filename,MagickPathExtent,"%s",path);
-  artifact=GetImageArtifact(image,"background");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"background",artifact);
-  artifact=GetImageArtifact(image,"fill");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"fill",artifact);
-  artifact=GetImageArtifact(image,"stroke");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"stroke",artifact);
-  artifact=GetImageArtifact(image,"strokewidth");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"strokewidth",artifact);
+  SetHoughDrawOptions(image,image_info);
   lines_image=RenderHoughLines(image_info,image->columns,image->rows,exception);
   artifact=GetImageArtifact(image,"hough-lines:accumulator");
   if ((lines_image != (Image *) NULL) &&
