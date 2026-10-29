@@ -2141,6 +2141,63 @@ static void SetPolynomialPixels(const Image *image,
 }
 
 
+typedef struct _PolynomialTerm
+{
+  Image
+    *image;
+
+  const Image
+    *next;
+
+  const double
+    *terms;
+
+  ssize_t
+    j;
+} PolynomialTerm;
+
+static void AccumulatePolynomialRow(const PolynomialTerm *term,
+  const Quantum *p,PixelChannels *polynomial_pixel)
+{
+  Image
+    *const image = term->image;
+
+  const Image
+    *const next = term->next;
+
+  const double
+    *const terms = term->terms;
+
+  const ssize_t
+    j = term->j;
+
+  ssize_t
+    i,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    for (i=0; i < (ssize_t) GetPixelChannels(next); i++)
+    {
+      MagickRealType
+        coefficient,
+        degree;
+
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(next,channel);
+      PixelTrait polynomial_traits = GetPixelChannelTraits(image,channel);
+      if (((traits & UpdatePixelTrait) == 0) ||
+          ((polynomial_traits & UpdatePixelTrait) == 0))
+        continue;
+      coefficient=(MagickRealType) terms[2*j];
+      degree=(MagickRealType) terms[(j << 1)+1];
+      polynomial_pixel[x].channel[i]+=coefficient*
+        pow(QuantumScale*(double) GetPixelChannel(image,channel,p),degree);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(next);
+  }
+}
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
@@ -2214,13 +2271,14 @@ MagickExport Image *PolynomialImage(const Image *images,
     PixelChannels
       *polynomial_pixel;
 
+    PolynomialTerm
+      term;
+
     Quantum
       *magick_restrict q;
 
     ssize_t
-      i,
-      j,
-      x;
+      j;
 
     if (status == MagickFalse)
       continue;
@@ -2248,27 +2306,11 @@ MagickExport Image *PolynomialImage(const Image *images,
           image_view=DestroyCacheView(image_view);
           break;
         }
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        for (i=0; i < (ssize_t) GetPixelChannels(next); i++)
-        {
-          MagickRealType
-            coefficient,
-            degree;
-
-          PixelChannel channel = GetPixelChannelChannel(image,i);
-          PixelTrait traits = GetPixelChannelTraits(next,channel);
-          PixelTrait polynomial_traits = GetPixelChannelTraits(image,channel);
-          if (((traits & UpdatePixelTrait) == 0) ||
-              ((polynomial_traits & UpdatePixelTrait) == 0))
-            continue;
-          coefficient=(MagickRealType) terms[2*j];
-          degree=(MagickRealType) terms[(j << 1)+1];
-          polynomial_pixel[x].channel[i]+=coefficient*
-            pow(QuantumScale*(double) GetPixelChannel(image,channel,p),degree);
-        }
-        p+=(ptrdiff_t) GetPixelChannels(next);
-      }
+      term.image=image;
+      term.next=next;
+      term.terms=terms;
+      term.j=j;
+      AccumulatePolynomialRow(&term,p,polynomial_pixel);
       image_view=DestroyCacheView(image_view);
       next=GetNextImageInList(next);
     }
