@@ -1200,6 +1200,31 @@ static void PrintColorspaceLocations(const Image *image,
   }
 }
 
+static void PrintImageArtifacts(FILE *file,Image *image)
+{
+  const char
+    *artifact,
+    *value;
+
+  ResetImageArtifactIterator(image);
+  artifact=GetNextImageArtifact(image);
+  if (artifact != (const char *) NULL)
+    {
+      /*
+        Display image artifacts.
+      */
+      (void) FormatLocaleFile(file,"  Artifacts:\n");
+      while (artifact != (const char *) NULL)
+      {
+        (void) FormatLocaleFile(file,"    %s: ",artifact);
+        value=GetImageArtifact(image,artifact);
+        if (value != (const char *) NULL)
+          (void) FormatLocaleFile(file,"%s\n",value);
+        artifact=GetNextImageArtifact(image);
+      }
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1809,23 +1834,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     PrintConvexHullAndBoundingBox(file,image,exception);
   PrintImageProfiles(file,image);
   PrintImageProperties(file,image,exception);
-  ResetImageArtifactIterator(image);
-  artifact=GetNextImageArtifact(image);
-  if (artifact != (const char *) NULL)
-    {
-      /*
-        Display image artifacts.
-      */
-      (void) FormatLocaleFile(file,"  Artifacts:\n");
-      while (artifact != (const char *) NULL)
-      {
-        (void) FormatLocaleFile(file,"    %s: ",artifact);
-        value=GetImageArtifact(image,artifact);
-        if (value != (const char *) NULL)
-          (void) FormatLocaleFile(file,"%s\n",value);
-        artifact=GetNextImageArtifact(image);
-      }
-    }
+  PrintImageArtifacts(file,image);
   ResetImageRegistryIterator();
   registry=GetNextImageRegistry();
   if (registry != (const char *) NULL)
