@@ -3987,6 +3987,67 @@ static MagickBooleanType SumRotationalPixels(const RotationalSum *sum,
   return(status);
 }
 
+typedef struct _RotationalBlendedSum
+{
+  const Image
+    *image;
+
+  CacheView
+    *radial_view;
+
+  PointInfo
+    blur_center,
+    center;
+
+  double
+    *cos_theta,
+    *sin_theta;
+
+  size_t
+    n,
+    step;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} RotationalBlendedSum;
+
+static MagickBooleanType SumRotationalBlendedPixels(
+  const RotationalBlendedSum *sum,double *pixel,double *gamma)
+{
+  const Quantum
+    *magick_restrict r;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    j;
+
+  status=MagickTrue;
+  for (j=0; j < (ssize_t) sum->n; j+=(ssize_t) sum->step)
+  {
+    double
+      alpha;
+
+    r=GetCacheViewVirtualPixels(sum->radial_view, (ssize_t) (sum->blur_center.x+
+      sum->center.x*sum->cos_theta[j]-sum->center.y*sum->sin_theta[j]+0.5),
+      (ssize_t) (sum->blur_center.y+sum->center.x*sum->sin_theta[j]+
+      sum->center.y*sum->cos_theta[j]+0.5),1,1,sum->exception);
+    if (r == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    alpha=QuantumScale*(double) GetPixelAlpha(sum->image,r);
+    *pixel+=alpha*(double) r[sum->i];
+    *gamma+=alpha;
+  }
+  return(status);
+}
+
 MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   ExceptionInfo *exception)
 {
@@ -4139,14 +4200,11 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
           blur_traits,
           traits;
 
+        RotationalBlendedSum
+          blended_sum;
+
         RotationalSum
           sum;
-
-        const Quantum
-          *magick_restrict r;
-
-        ssize_t
-          j;
 
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
@@ -4179,24 +4237,18 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
             SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
             continue;
           }
-        for (j=0; j < (ssize_t) n; j+=(ssize_t) step)
-        {
-          double
-            alpha;
-
-          r=GetCacheViewVirtualPixels(radial_view, (ssize_t) (blur_center.x+
-            center.x*cos_theta[j]-center.y*sin_theta[j]+0.5),(ssize_t)
-            (blur_center.y+center.x*sin_theta[j]+center.y*cos_theta[j]+0.5),
-            1,1,exception);
-          if (r == (const Quantum *) NULL)
-            {
-              status=MagickFalse;
-              continue;
-            }
-          alpha=QuantumScale*(double) GetPixelAlpha(image,r);
-          pixel+=alpha*(double) r[i];
-          gamma+=alpha;
-        }
+        blended_sum.image=image;
+        blended_sum.radial_view=radial_view;
+        blended_sum.blur_center=blur_center;
+        blended_sum.center=center;
+        blended_sum.cos_theta=cos_theta;
+        blended_sum.sin_theta=sin_theta;
+        blended_sum.n=n;
+        blended_sum.step=step;
+        blended_sum.i=i;
+        blended_sum.exception=exception;
+        if (SumRotationalBlendedPixels(&blended_sum,&pixel,&gamma) == MagickFalse)
+          status=MagickFalse;
         gamma=MagickSafeReciprocal(gamma);
         SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
       }
