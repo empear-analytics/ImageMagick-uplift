@@ -728,6 +728,11 @@ typedef struct {
   ssize_t imgy;
 } fxPixelPosT;
 
+typedef struct {
+  ssize_t imgx;
+  ssize_t imgy;
+} fxImgXYT;
+
 struct _FxInfo {
   Image * image;
   size_t ImgListLen;
@@ -3554,8 +3559,10 @@ static fxFltType GetHslFlt (FxInfo * pfx, ssize_t ImgNum, const fxFltType fx, co
   return 0.0;
 }
 
-static fxFltType GetHslInt (FxInfo * pfx, ssize_t ImgNum, const ssize_t imgx, const ssize_t imgy, PixelChannel channel)
+static fxFltType GetHslInt (FxInfo * pfx, ssize_t ImgNum, const fxImgXYT * xy, PixelChannel channel)
 {
+  const ssize_t imgx = xy->imgx;
+  const ssize_t imgy = xy->imgy;
   Image * img = pfx->Images[ImgNum];
 
   double hue=0, saturation=0, lightness=0;
@@ -3611,6 +3618,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
   const PixelChannel channel = pos->channel;
   const ssize_t imgx = pos->imgx;
   const ssize_t imgy = pos->imgy;
+  const fxImgXYT xy = { imgx, imgy };
   const Quantum * p = pfxrt->thisPixel;
   fxFltType regA=0, regB=0, regC=0, regD=0, regE=0;
   Image * img = pfx->image;
@@ -4054,7 +4062,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
                     regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
                   }
                 } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-                  regA = GetHslInt (pfx, ImgNum, imgx, imgy, pel->channel_qual);
+                  regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
                   break;
                 } else if (pel->channel_qual == INTENSITY_CHANNEL) {
                   regA = GetIntensity (pfx, 0, (double) imgx, (double) imgy);
@@ -4086,7 +4094,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
               if ((int) pel->channel_qual < 0) {
                 if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse)
                 {
-                  regA = GetHslInt (pfx, ImgNum, imgx, imgy, pel->channel_qual);
+                  regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
                   break;
                 } else if (pel->channel_qual == INTENSITY_CHANNEL)
                 {
@@ -4134,7 +4142,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
               }
 
             } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-              regA = GetHslInt (pfx, 0, imgx, imgy, pel->channel_qual);
+              regA = GetHslInt (pfx, 0, &xy, pel->channel_qual);
               break;
             } else if (pel->channel_qual == INTENSITY_CHANNEL) {
               regA = GetIntensity (pfx, 0, (fxFltType) imgx, (fxFltType) imgy);
@@ -4215,7 +4223,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
 
             if ((int) pel->channel_qual < 0) {
               if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-                regA = GetHslInt (pfx, ImgNum, imgx, imgy, pel->channel_qual);
+                regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
                 break;
               } else if (pel->channel_qual == INTENSITY_CHANNEL) {
                 regA = GetIntensity (pfx, ImgNum, (double) imgx, (double) imgy);
