@@ -3342,6 +3342,15 @@ static inline MagickBooleanType IsCompressedSVGExtension(const char *extension)
     (LocaleCompare(extension,"svgz") == 0)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType CanMapBlobFile(
+  const MagickInfo *magick_info,const size_t length)
+{
+  return(((magick_info != (const MagickInfo *) NULL) &&
+    (GetMagickBlobSupport(magick_info) != MagickFalse) &&
+    (AcquireMagickResource(MapResource,length) != MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -3645,9 +3654,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
                 magick_info=GetMagickInfo(image_info->magick,sans_exception);
                 sans_exception=DestroyExceptionInfo(sans_exception);
                 length=(size_t) blob_info->properties.st_size;
-                if ((magick_info != (const MagickInfo *) NULL) &&
-                    (GetMagickBlobSupport(magick_info) != MagickFalse) &&
-                    (AcquireMagickResource(MapResource,length) != MagickFalse))
+                if (CanMapBlobFile(magick_info,length) != MagickFalse)
                   {
                     void
                       *blob;
