@@ -1130,6 +1130,18 @@ MagickExport QuantizeInfo *CloneQuantizeInfo(const QuantizeInfo *quantize_info)
 static void ClosestColor(const Image *image,QCubeInfo *cube_info,
   const QNodeInfo *node_info)
 {
+  double
+    alpha,
+    beta,
+    distance,
+    pixel;
+
+  DoublePixelPacket
+    *magick_restrict q;
+
+  PixelInfo
+    *magick_restrict p;
+
   size_t
     number_children;
 
@@ -1143,57 +1155,41 @@ static void ClosestColor(const Image *image,QCubeInfo *cube_info,
   for (i=0; i < (ssize_t) number_children; i++)
     if (node_info->child[i] != (QNodeInfo *) NULL)
       ClosestColor(image,cube_info,node_info->child[i]);
-  if (node_info->number_unique != 0)
+  if (node_info->number_unique == 0)
+    return;
+  /*
+    Determine if this color is "closest".
+  */
+  p=image->colormap+node_info->color_number;
+  q=(&cube_info->target);
+  alpha=1.0;
+  beta=1.0;
+  if (cube_info->associate_alpha != MagickFalse)
     {
-      double
-        alpha,
-        beta,
-        distance,
-        pixel;
-
-      DoublePixelPacket
-        *magick_restrict q;
-
-      PixelInfo
-        *magick_restrict p;
-
-      /*
-        Determine if this color is "closest".
-      */
-      p=image->colormap+node_info->color_number;
-      q=(&cube_info->target);
-      alpha=1.0;
-      beta=1.0;
-      if (cube_info->associate_alpha != MagickFalse)
-        {
-          alpha=(MagickRealType) (QuantumScale*p->alpha);
-          beta=(MagickRealType) (QuantumScale*q->alpha);
-        }
-      pixel=alpha*p->red-beta*q->red;
-      distance=pixel*pixel;
-      if (distance <= cube_info->distance)
-        {
-          pixel=alpha*p->green-beta*q->green;
-          distance+=pixel*pixel;
-          if (distance <= cube_info->distance)
-            {
-              pixel=alpha*p->blue-beta*q->blue;
-              distance+=pixel*pixel;
-              if (distance <= cube_info->distance)
-                {
-                  if (cube_info->associate_alpha != MagickFalse)
-                    {
-                      pixel=p->alpha-q->alpha;
-                      distance+=pixel*pixel;
-                    }
-                  if (distance <= cube_info->distance)
-                    {
-                      cube_info->distance=distance;
-                      cube_info->color_number=node_info->color_number;
-                    }
-                }
-            }
-        }
+      alpha=(MagickRealType) (QuantumScale*p->alpha);
+      beta=(MagickRealType) (QuantumScale*q->alpha);
+    }
+  pixel=alpha*p->red-beta*q->red;
+  distance=pixel*pixel;
+  if (!(distance <= cube_info->distance))
+    return;
+  pixel=alpha*p->green-beta*q->green;
+  distance+=pixel*pixel;
+  if (!(distance <= cube_info->distance))
+    return;
+  pixel=alpha*p->blue-beta*q->blue;
+  distance+=pixel*pixel;
+  if (!(distance <= cube_info->distance))
+    return;
+  if (cube_info->associate_alpha != MagickFalse)
+    {
+      pixel=p->alpha-q->alpha;
+      distance+=pixel*pixel;
+    }
+  if (distance <= cube_info->distance)
+    {
+      cube_info->distance=distance;
+      cube_info->color_number=node_info->color_number;
     }
 }
 
