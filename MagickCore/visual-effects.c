@@ -3644,6 +3644,29 @@ static inline MagickBooleanType IsNonRGBPixelChannel(
     (pixel_channel != BluePixelChannel)) ? MagickTrue : MagickFalse);
 }
 
+static void CopyWaveletRow(const Image *image,const float *magick_restrict p,
+  float *magick_restrict q)
+{
+  ssize_t
+    c;
+
+  for (c=0; c < (ssize_t) image->columns; c++)
+    *q++=(*p++);
+}
+
+static void CopyWaveletColumn(const Image *image,
+  const float *magick_restrict p,float *magick_restrict q)
+{
+  ssize_t
+    r;
+
+  for (r=0; r < (ssize_t) image->rows; r++)
+  {
+    *q=(*p++);
+    q+=(ptrdiff_t) image->columns;
+  }
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -3805,15 +3828,11 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
           *magick_restrict p,
           *magick_restrict q;
 
-        ssize_t
-          c;
-
         p=kernel+id*(ssize_t) image->columns;
         q=pixels+y*(ssize_t) image->columns;
         HatTransform(q+high_pass,1,image->columns,((size_t) 1UL << level),p);
         q+=(ptrdiff_t) low_pass;
-        for (c=0; c < (ssize_t) image->columns; c++)
-          *q++=(*p++);
+        CopyWaveletRow(image,p,q);
       }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static,1) \
@@ -3828,17 +3847,10 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
           *magick_restrict p,
           *magick_restrict q;
 
-        ssize_t
-          r;
-
         p=kernel+id*(ssize_t) image->rows;
         q=pixels+x+low_pass;
         HatTransform(q,image->columns,image->rows,((size_t) 1UL << level),p);
-        for (r=0; r < (ssize_t) image->rows; r++)
-        {
-          *q=(*p++);
-          q+=(ptrdiff_t) image->columns;
-        }
+        CopyWaveletColumn(image,p,q);
       }
       /*
         To threshold, each coefficient is compared to a threshold value and
