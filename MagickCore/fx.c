@@ -1168,6 +1168,25 @@ static inline MagickBooleanType IsPixelReferenceElement(const ElementT *pel)
     MagickFalse);
 }
 
+static void CountJumpDestination (FxInfo * pfx, int i)
+{
+  ElementT * pel = &pfx->Elements[i];
+  if (IsJumpElement(pel) != MagickFalse) {
+    if (pel->element_index >= 0 && pel->element_index < pfx->numElements) {
+      ElementT * pelDest = &pfx->Elements[pel->element_index];
+      pelDest->number_dest++;
+    }
+  }
+}
+
+static void DumpChannelQualifier (ElementT * pel)
+{
+  if (pel->channel_qual != NO_CHAN_QUAL) {
+    if (pel->channel_qual == THIS_CHANNEL) fprintf (stderr, "  ch=this");
+    else fprintf (stderr, "  ch=%i", pel->channel_qual);
+  }
+}
+
 static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
 {
   int i;
@@ -1190,13 +1209,7 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
     pel->number_dest = 0;
   }
   for (i=0; i < pfx->usedElements; i++) {
-    ElementT * pel = &pfx->Elements[i];
-    if (IsJumpElement(pel) != MagickFalse) {
-      if (pel->element_index >= 0 && pel->element_index < pfx->numElements) {
-        ElementT * pelDest = &pfx->Elements[pel->element_index];
-        pelDest->number_dest++;
-      }
-    }
+    CountJumpDestination (pfx, i);
   }
   for (i=0; i < pfx->usedElements; i++) {
     char UserSym[MagickPathExtent];
@@ -1223,10 +1236,7 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
     if (pel->img_attr_qual != aNull)
       fprintf (fh, " ia=%s", OprStr((int) pel->img_attr_qual));
 
-    if (pel->channel_qual != NO_CHAN_QUAL) {
-      if (pel->channel_qual == THIS_CHANNEL) fprintf (stderr, "  ch=this");
-      else fprintf (stderr, "  ch=%i", pel->channel_qual);
-    }
+    DumpChannelQualifier (pel);
 
     if (pel->operator_index == rCopyTo) {
       fprintf (fh, "  CopyTo ==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
