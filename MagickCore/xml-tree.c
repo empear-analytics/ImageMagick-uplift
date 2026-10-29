@@ -2242,6 +2242,19 @@ MagickExport XMLTreeInfo *SetXMLTreeContent(XMLTreeInfo *xml_info,
 %
 */
 
+static MagickBooleanType ExtendXMLBuffer(char **source,const size_t *length,
+  size_t *extent,const char *text)
+{
+  if ((*length+strlen(text)+MagickPathExtent) > *extent)
+    {
+      *extent=(*length)+strlen(text)+MagickPathExtent;
+      *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
+      if (*source == (char *) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static char *EncodePredefinedEntities(const char *source,ssize_t offset,
   char **destination,size_t *length,size_t *extent,MagickBooleanType pedantic)
 {
@@ -2262,14 +2275,9 @@ static char *EncodePredefinedEntities(const char *source,ssize_t offset,
     }
   if (canonical_content == (char *) NULL)
     return(*destination);
-  if ((*length+strlen(canonical_content)+MagickPathExtent) > *extent)
-    {
-      *extent=(*length)+strlen(canonical_content)+MagickPathExtent;
-      *destination=(char *) ResizeQuantumMemory(*destination,*extent,
-        sizeof(**destination));
-      if (*destination == (char *) NULL)
-        return(*destination);
-    }
+  if (ExtendXMLBuffer(destination,length,extent,
+        canonical_content) == MagickFalse)
+    return(*destination);
   *length+=(size_t) FormatLocaleString(*destination+(*length),*extent,"%s",
     canonical_content);
   canonical_content=DestroyString(canonical_content);
