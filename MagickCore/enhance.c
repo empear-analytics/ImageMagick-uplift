@@ -1264,53 +1264,15 @@ static void ApplyCDLToPixels(const Image *image,
   }
 }
 
-MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
-  const char *color_correction_collection,ExceptionInfo *exception)
+static ColorCorrection ParseColorCorrection(XMLTreeInfo *cc)
 {
-#define ColorDecisionListCorrectImageTag  "ColorDecisionList/Image"
-
-  CacheView
-    *image_view;
-
   ColorCorrection
     color_correction;
 
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
-  PixelInfo
-    *cdl_map;
-
-  ssize_t
-    y;
-
   XMLTreeInfo
-    *cc,
-    *ccc,
     *sat,
     *sop;
 
-  /*
-    Allocate and initialize cdl maps.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (color_correction_collection == (const char *) NULL)
-    return(MagickFalse);
-  ccc=NewXMLTree((const char *) color_correction_collection,exception);
-  if (ccc == (XMLTreeInfo *) NULL)
-    return(MagickFalse);
-  cc=GetXMLTreeChild(ccc,"ColorCorrection");
-  if (cc == (XMLTreeInfo *) NULL)
-    {
-      ccc=DestroyXMLTree(ccc);
-      return(MagickFalse);
-    }
   color_correction.red.slope=1.0;
   color_correction.red.offset=0.0;
   color_correction.red.power=1.0;
@@ -1327,7 +1289,12 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   sat=GetXMLTreeChild(cc,"SATNode");
   if (sat != (XMLTreeInfo *) NULL)
     color_correction=ParseCDLSATNode(sat,color_correction);
-  ccc=DestroyXMLTree(ccc);
+  return(color_correction);
+}
+
+static void LogColorCorrection(const Image *image,
+  const ColorCorrection color_correction)
+{
   if (image->debug != MagickFalse)
     {
       (void) LogMagickEvent(TransformEvent,GetMagickModule(),
@@ -1353,6 +1320,56 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
       (void) LogMagickEvent(TransformEvent,GetMagickModule(),
         "  color_correction.saturation: %g",color_correction.saturation);
     }
+}
+
+MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
+  const char *color_correction_collection,ExceptionInfo *exception)
+{
+#define ColorDecisionListCorrectImageTag  "ColorDecisionList/Image"
+
+  CacheView
+    *image_view;
+
+  ColorCorrection
+    color_correction;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  PixelInfo
+    *cdl_map;
+
+  ssize_t
+    y;
+
+  XMLTreeInfo
+    *cc,
+    *ccc;
+
+  /*
+    Allocate and initialize cdl maps.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (color_correction_collection == (const char *) NULL)
+    return(MagickFalse);
+  ccc=NewXMLTree((const char *) color_correction_collection,exception);
+  if (ccc == (XMLTreeInfo *) NULL)
+    return(MagickFalse);
+  cc=GetXMLTreeChild(ccc,"ColorCorrection");
+  if (cc == (XMLTreeInfo *) NULL)
+    {
+      ccc=DestroyXMLTree(ccc);
+      return(MagickFalse);
+    }
+  color_correction=ParseColorCorrection(cc);
+  ccc=DestroyXMLTree(ccc);
+  LogColorCorrection(image,color_correction);
   cdl_map=(PixelInfo *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*cdl_map));
   if (cdl_map == (PixelInfo *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
