@@ -314,9 +314,17 @@ static inline const unsigned char *PushQuantumLongPixel(
 }
 
 static void ImportPixelChannel(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const unsigned char *magick_restrict p,
-  Quantum *magick_restrict q,PixelChannel channel)
+  const QuantumPixelSpan *span,PixelChannel channel)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  const unsigned char
+    *magick_restrict p = span->p;
+
+  Quantum
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
@@ -454,22 +462,13 @@ static void ImportPixelChannel(const Image *image,QuantumInfo *quantum_info,
 static void ImportAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
-  const MagickSizeType
-    number_pixels = span->number_pixels;
-
-  const unsigned char
-    *magick_restrict p = span->p;
-
-  Quantum
-    *magick_restrict q = span->q;
-
   if (image->alpha_trait == UndefinedPixelTrait)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
         "ImageDoesNotHaveAnAlphaChannel","`%s'",image->filename);
       return;
     }
-  ImportPixelChannel(image,quantum_info,number_pixels,p,q,AlphaPixelChannel);
+  ImportPixelChannel(image,quantum_info,span,AlphaPixelChannel);
 }
 
 static void ImportUnpacked12BitBGRQuantum(const Image *image,
@@ -1975,22 +1974,13 @@ static void ImportBGROQuantum(const Image *image,QuantumInfo *quantum_info,
 static void ImportBlackQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
-  const MagickSizeType
-    number_pixels = span->number_pixels;
-
-  const unsigned char
-    *magick_restrict p = span->p;
-
-  Quantum
-    *magick_restrict q = span->q;
-
   if (image->colorspace != CMYKColorspace)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
         "ColorSeparatedImageRequired","`%s'",image->filename);
       return;
     }
-  ImportPixelChannel(image,quantum_info,number_pixels,p,q,BlackPixelChannel);
+  ImportPixelChannel(image,quantum_info,span,BlackPixelChannel);
 }
 
 static void ImportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
@@ -5385,15 +5375,6 @@ static void ImportAnyDepthMultispectralQuantum(const Image *image,
 static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
-  const MagickSizeType
-    number_pixels = span->number_pixels;
-
-  const unsigned char
-    *magick_restrict p = span->p;
-
-  Quantum
-    *magick_restrict q = span->q;
-
   if (image->number_meta_channels == 0)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
@@ -5402,7 +5383,7 @@ static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
     }
   if (quantum_info->meta_channel != 0)
     {
-      ImportPixelChannel(image,quantum_info,number_pixels,p,q,
+      ImportPixelChannel(image,quantum_info,span,
         (PixelChannel) (MetaPixelChannels+quantum_info->meta_channel-1));
       return;
     }
@@ -7370,7 +7351,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     case BlueQuantum:
     case YellowQuantum:
     {
-      ImportPixelChannel(image,quantum_info,number_pixels,p,q,BluePixelChannel);
+      ImportPixelChannel(image,quantum_info,&span,BluePixelChannel);
       break;
     }
     case CMYKQuantum:
@@ -7411,7 +7392,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     case GreenQuantum:
     case MagentaQuantum:
     {
-      ImportPixelChannel(image,quantum_info,number_pixels,p,q,GreenPixelChannel);
+      ImportPixelChannel(image,quantum_info,&span,GreenPixelChannel);
       break;
     }
     case IndexQuantum:
@@ -7432,7 +7413,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     case RedQuantum:
     case CyanQuantum:
     {
-      ImportPixelChannel(image,quantum_info,number_pixels,p,q,RedPixelChannel);
+      ImportPixelChannel(image,quantum_info,&span,RedPixelChannel);
       break;
     }
     case RGBQuantum:
