@@ -763,6 +763,23 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static double GetColorMatrixSum(const Image *image,
+  const Quantum *magick_restrict p,const double *row)
+{
+  double
+    sum;
+
+  sum=row[0]*(double) GetPixelRed(image,p)+row[1]*
+    (double) GetPixelGreen(image,p)+row[2]*(double)
+    GetPixelBlue(image,p);
+  if (image->colorspace == CMYKColorspace)
+    sum+=row[3]*(double) GetPixelBlack(image,p);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    sum+=row[4]*(double) GetPixelAlpha(image,p);
+  sum+=(double) QuantumRange*row[5];
+  return(sum);
+}
+
 MagickExport Image *ColorMatrixImage(const Image *image,
   const KernelInfo *color_matrix,ExceptionInfo *exception)
 {
@@ -903,14 +920,7 @@ MagickExport Image *ColorMatrixImage(const Image *image,
         double
           sum;
 
-        sum=ColorMatrix[h][0]*(double) GetPixelRed(image,p)+ColorMatrix[h][1]*
-          (double) GetPixelGreen(image,p)+ColorMatrix[h][2]*(double)
-          GetPixelBlue(image,p);
-        if (image->colorspace == CMYKColorspace)
-          sum+=ColorMatrix[h][3]*(double) GetPixelBlack(image,p);
-        if (image->alpha_trait != UndefinedPixelTrait)
-          sum+=ColorMatrix[h][4]*(double) GetPixelAlpha(image,p);
-        sum+=(double) QuantumRange*ColorMatrix[h][5];
+        sum=GetColorMatrixSum(image,p,ColorMatrix[h]);
         switch (h)
         {
           case 0: pixel.red=sum; break;
