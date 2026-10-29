@@ -3758,6 +3758,66 @@ static fxFltType ExecuteFuncP (const RpnPixelInputs * in, fxFltType regA,
   return(regA);
 }
 
+typedef struct _RpnFirstImageInputs
+{
+  FxInfo
+    *pfx;
+
+  ElementT
+    *pel;
+
+  const Quantum
+    *p;
+
+  Image
+    *pimg;
+
+  PixelChannel
+    channel;
+
+  ssize_t
+    imgx,
+    imgy;
+} RpnFirstImageInputs;
+
+static fxFltType GetFirstImageValueU (const RpnFirstImageInputs * in,
+  const ssize_t ImgNum, fxFltType regA)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const Quantum
+    *const p = in->p;
+
+  Image
+    *const pimg = in->pimg;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    imgx = in->imgx,
+    imgy = in->imgy;
+
+  if (pfx->ImgNum==0) {
+    regA = QuantumScale * (double) p[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
+  } else {
+    const Quantum * pv = GetCacheViewVirtualPixels (
+                   pfx->Imgs[0].View, imgx, imgy, 1,1, pfx->exception);
+    if (!pv) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "fU can't get cache", "%lu", (unsigned long) ImgNum);
+      return(regA);
+    }
+    regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
+  }
+  return(regA);
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -4183,19 +4243,17 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
             if (pel->img_attr_qual == aNull) {
               if ((int) pel->channel_qual < 0) {
                 if (pel->channel_qual == NO_CHAN_QUAL || pel->channel_qual == THIS_CHANNEL) {
-                  if (pfx->ImgNum==0) {
-                    regA = QuantumScale * (double) p[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-                  } else {
-                    const Quantum * pv = GetCacheViewVirtualPixels (
-                                   pfx->Imgs[0].View, imgx, imgy, 1,1, pfx->exception);
-                    if (!pv) {
-                      (void) ThrowMagickException (
-                        pfx->exception, GetMagickModule(), OptionError,
-                        "fU can't get cache", "%lu", (unsigned long) ImgNum);
-                      break;
-                    }
-                    regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-                  }
+                  RpnFirstImageInputs
+                    first_in;
+
+                  first_in.pfx=pfx;
+                  first_in.pel=pel;
+                  first_in.p=p;
+                  first_in.pimg=pimg;
+                  first_in.channel=channel;
+                  first_in.imgx=imgx;
+                  first_in.imgy=imgy;
+                  regA = GetFirstImageValueU (&first_in, ImgNum, regA);
                 } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
                   regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
                   break;
