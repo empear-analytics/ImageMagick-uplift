@@ -2502,6 +2502,42 @@ static void GammaImageRow(const Image *image,const Quantum *gamma_map,
   }
 }
 
+static void BuildGammaMap(Quantum *gamma_map,const double gamma)
+{
+  ssize_t
+    i;
+
+  if (gamma != 0.0)
+    for (i=0; i <= (ssize_t) MaxMap; i++)
+      gamma_map[i]=ScaleMapToQuantum((double) (MaxMap*pow((double) i/
+        MaxMap,MagickSafeReciprocal(gamma))));
+}
+
+static void GammaColormap(Image *image,const Quantum *gamma_map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    /*
+      Gamma-correct colormap.
+    */
+    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].red=(double) gamma_map[ScaleQuantumToMap(
+        ClampToQuantum(image->colormap[i].red))];
+    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].green=(double) gamma_map[ScaleQuantumToMap(
+        ClampToQuantum(image->colormap[i].green))];
+    if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].blue=(double) gamma_map[ScaleQuantumToMap(
+        ClampToQuantum(image->colormap[i].blue))];
+    if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].alpha=(double) gamma_map[ScaleQuantumToMap(
+        ClampToQuantum(image->colormap[i].alpha))];
+  }
+}
+
 MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
   ExceptionInfo *exception)
 {
@@ -2520,9 +2556,6 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
     *gamma_map;
 
   ssize_t
-    i;
-
-  ssize_t
     y;
 
   /*
@@ -2539,29 +2572,9 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
   (void) memset(gamma_map,0,(MaxMap+1)*sizeof(*gamma_map));
-  if (gamma != 0.0)
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-      gamma_map[i]=ScaleMapToQuantum((double) (MaxMap*pow((double) i/
-        MaxMap,MagickSafeReciprocal(gamma))));
+  BuildGammaMap(gamma_map,gamma);
   if (image->storage_class == PseudoClass)
-    for (i=0; i < (ssize_t) image->colors; i++)
-    {
-      /*
-        Gamma-correct colormap.
-      */
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].red=(double) gamma_map[ScaleQuantumToMap(
-          ClampToQuantum(image->colormap[i].red))];
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].green=(double) gamma_map[ScaleQuantumToMap(
-          ClampToQuantum(image->colormap[i].green))];
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].blue=(double) gamma_map[ScaleQuantumToMap(
-          ClampToQuantum(image->colormap[i].blue))];
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].alpha=(double) gamma_map[ScaleQuantumToMap(
-          ClampToQuantum(image->colormap[i].alpha))];
-    }
+    GammaColormap(image,gamma_map);
   /*
     Gamma-correct image.
   */
