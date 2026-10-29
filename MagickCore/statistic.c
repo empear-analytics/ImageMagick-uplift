@@ -139,6 +139,18 @@ typedef struct _PixelChannels
     channel[MaxPixelChannels];
 } PixelChannels;
 
+typedef struct _EvaluateOperation
+{
+  const MagickEvaluateOperator
+    op;
+
+  const double
+    value;
+
+  const MagickBooleanType
+    clamp;
+} EvaluateOperation;
+
 static PixelChannels **DestroyPixelTLS(const Image *images,
   PixelChannels **pixels)
 {
@@ -937,9 +949,17 @@ MagickExport Image *EvaluateImages(const Image *images,
 }
 
 static void EvaluatePixel(const Image *image,RandomInfo *random_info,
-  const MagickEvaluateOperator op,const double value,
-  const MagickBooleanType clamp,Quantum *magick_restrict q)
+  const EvaluateOperation *operation,Quantum *magick_restrict q)
 {
+  const MagickEvaluateOperator
+    op = operation->op;
+
+  const double
+    value = operation->value;
+
+  const MagickBooleanType
+    clamp = operation->clamp;
+
   double
     result;
 
@@ -1012,6 +1032,9 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
     const int
       id = GetOpenMPThreadId();
 
+    const EvaluateOperation
+      operation = { op, value, clamp };
+
     Quantum
       *magick_restrict q;
 
@@ -1028,7 +1051,7 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      EvaluatePixel(image,random_info[id],op,value,clamp,q);
+      EvaluatePixel(image,random_info[id],&operation,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
