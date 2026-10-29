@@ -367,6 +367,50 @@ static inline MagickBooleanType IsBlendRowsMissing(const Quantum *p,
     (t == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _MaxMagnitudeInputs
+{
+  const Image
+    *alpha_image,
+    *beta_image,
+    *dx_image,
+    *dy_image;
+
+  const Quantum
+    *p,
+    *q;
+} MaxMagnitudeInputs;
+
+static void SelectMaxMagnitudePixel(const MaxMagnitudeInputs *selection,
+  const Quantum *magick_restrict r,const Quantum *magick_restrict s,
+  Quantum *magick_restrict t)
+{
+  const Image
+    *alpha_image = selection->alpha_image,
+    *beta_image = selection->beta_image,
+    *dx_image = selection->dx_image,
+    *dy_image = selection->dy_image;
+
+  const Quantum
+    *magick_restrict p = selection->p,
+    *magick_restrict q = selection->q;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
+    PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
+    PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
+    if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
+      continue;
+    if (p[i] > GetPixelChannel(beta_image,channel,q))
+      t[i]=GetPixelChannel(dx_image,channel,r);
+    else
+      t[i]=GetPixelChannel(dy_image,channel,s);
+  }
+}
+
 static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
   const Image *dx_image,const Image *dy_image,ExceptionInfo *exception)
 {
@@ -435,21 +479,16 @@ static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
       }
     for (x=0; x < (ssize_t) alpha_image->columns; x++)
     {
-      ssize_t
-        i;
+      MaxMagnitudeInputs
+        selection;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
-        PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
-        PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
-          continue;
-        if (p[i] > GetPixelChannel(beta_image,channel,q))
-          t[i]=GetPixelChannel(dx_image,channel,r);
-        else
-          t[i]=GetPixelChannel(dy_image,channel,s);
-      }
+      selection.alpha_image=alpha_image;
+      selection.beta_image=beta_image;
+      selection.dx_image=dx_image;
+      selection.dy_image=dy_image;
+      selection.p=p;
+      selection.q=q;
+      SelectMaxMagnitudePixel(&selection,r,s,t);
       p+=(ptrdiff_t) GetPixelChannels(alpha_image);
       q+=(ptrdiff_t) GetPixelChannels(beta_image);
       r+=(ptrdiff_t) GetPixelChannels(dx_image);
