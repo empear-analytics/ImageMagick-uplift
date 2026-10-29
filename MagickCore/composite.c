@@ -1823,6 +1823,60 @@ static MagickRealType GetPegtopLightBlend(const MagickRealType Sca,
   return(blend);
 }
 
+static ColorspaceType ParseComposeColorspace(const char *artifact)
+{
+  ColorspaceType
+    colorspace;
+
+  ssize_t
+    colorspace_type;
+
+  colorspace_type=ParseCommandOption(MagickColorspaceOptions,MagickFalse,
+    artifact);
+  if (colorspace_type < 0)
+    colorspace=UndefinedColorspace;
+  else
+    colorspace=(ColorspaceType) colorspace_type;
+  return(colorspace);
+}
+
+static inline double GetCompositeGamma(const CompositeOperator compose,
+  const MagickRealType alpha)
+{
+  double
+    gamma;
+
+  switch (compose)
+  {
+    case DarkenCompositeOp:
+    case LightenCompositeOp:
+    case ModulusSubtractCompositeOp:
+    {
+      gamma=MagickSafeReciprocal(1.0-alpha);
+      break;
+    }
+    default:
+    {
+      gamma=MagickSafeReciprocal(alpha);
+      break;
+    }
+  }
+  return(gamma);
+}
+
+static MagickRealType GetReflectBlend(const MagickRealType Sc,
+  const MagickRealType Dc)
+{
+  MagickRealType
+    blend;
+
+  if (Dc < 1.0)
+    blend=(Sc*Sc)/(1.0-Dc);
+  else
+    blend=1.0;
+  return(blend);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -1909,17 +1963,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     illuminant=ParseComposeIlluminant(artifact);
   artifact=GetImageArtifact(image,"compose:colorspace");
   if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        colorspace_type;
-
-      colorspace_type=ParseCommandOption(MagickColorspaceOptions,MagickFalse,
-        artifact);
-      if (colorspace_type < 0)
-        colorspace=UndefinedColorspace;
-      else
-        colorspace=(ColorspaceType) colorspace_type;
-    }
+    colorspace=ParseComposeColorspace(artifact);
   clamp=MagickTrue;
   artifact=GetImageArtifact(image,"compose:clamp");
   if (artifact != (const char *) NULL)
@@ -3055,21 +3099,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         */
         Sca=QuantumScale*Sa*Sc;
         Dca=QuantumScale*Da*Dc;
-        switch (compose)
-        {
-          case DarkenCompositeOp:
-          case LightenCompositeOp:
-          case ModulusSubtractCompositeOp:
-          {
-            gamma=MagickSafeReciprocal(1.0-alpha);
-            break;
-          }
-          default:
-          {
-            gamma=MagickSafeReciprocal(alpha);
-            break;
-          }
-        }
+        gamma=GetCompositeGamma(compose,alpha);
         pixel=Dc;
         switch (compose)
         {
@@ -3702,10 +3732,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           {
             if (compose_sync == MagickFalse)
               {
-                if (Dc < 1.0)
-                  blend=(Sc*Sc)/(1.0-Dc);
-                else
-                  blend=1.0;
+                blend=GetReflectBlend(Sc,Dc);
                 pixel=(double) QuantumRange*RoundToUnity(blend);
                 break;
               }
