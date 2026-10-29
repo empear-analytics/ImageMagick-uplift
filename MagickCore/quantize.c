@@ -1586,6 +1586,26 @@ static void FindClosestCubeColor(const Image *image,QCubeInfo *cube,
     *entry=(ssize_t) cube->color_number;
 }
 
+static size_t AssignClosestColormapEntry(Image *image,const QCubeInfo *cube,
+  const ssize_t *entry,Quantum *magick_restrict q)
+{
+  size_t
+    index;
+
+  index=(entry != (ssize_t *) NULL) ? (size_t) *entry : cube->color_number;
+  if (image->storage_class == PseudoClass)
+    SetPixelIndex(image,(Quantum) index,q);
+  if (cube->quantize_info->measure_error == MagickFalse)
+    {
+      SetPixelRed(image,ClampToQuantum(image->colormap[index].red),q);
+      SetPixelGreen(image,ClampToQuantum(image->colormap[index].green),q);
+      SetPixelBlue(image,ClampToQuantum(image->colormap[index].blue),q);
+      if (cube->associate_alpha != MagickFalse)
+        SetPixelAlpha(image,ClampToQuantum(image->colormap[index].alpha),q);
+    }
+  return(index);
+}
+
 static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -1703,22 +1723,8 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
       /*
         Assign pixel to closest colormap entry.
       */
-      index=(entry != (ssize_t *) NULL) ? (size_t) *entry : cube.color_number;
-      if (image->storage_class == PseudoClass)
-        SetPixelIndex(image,(Quantum) index,q+u*(ssize_t)
-          GetPixelChannels(image));
-      if (cube.quantize_info->measure_error == MagickFalse)
-        {
-          SetPixelRed(image,ClampToQuantum(image->colormap[index].red),
-            q+u*(ssize_t) GetPixelChannels(image));
-          SetPixelGreen(image,ClampToQuantum(image->colormap[index].green),
-            q+u*(ssize_t) GetPixelChannels(image));
-          SetPixelBlue(image,ClampToQuantum(image->colormap[index].blue),
-            q+u*(ssize_t) GetPixelChannels(image));
-          if (cube.associate_alpha != MagickFalse)
-            SetPixelAlpha(image,ClampToQuantum(image->colormap[index].alpha),
-              q+u*(ssize_t) GetPixelChannels(image));
-        }
+      index=AssignClosestColormapEntry(image,&cube,entry,q+u*(ssize_t)
+        GetPixelChannels(image));
       if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
         status=MagickFalse;
       /*
