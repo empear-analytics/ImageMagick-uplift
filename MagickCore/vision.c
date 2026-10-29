@@ -1530,6 +1530,16 @@ static void PrintObjects(const Image *image,const Image *component_image,
       PrintObject(image,object,i,n);
 }
 
+static void ResetAdjacentCensus(CCObjectInfo *object,const size_t *neighbors,
+  const size_t count)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) count; j++)
+    object[neighbors[j]].census=0.0;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2066,8 +2076,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       Merge with object of greatest adjacent area.
     */
     id=GetGreatestAdjacentObject(object,neighbors,count);
-    for (j=0; j < (ssize_t) count; j++)
-      object[neighbors[j]].census=0.0;
+    ResetAdjacentCensus(object,neighbors,count);
     object[i].area=0.0;
     for (y=0; y < (ssize_t) bounding_box.height; y++)
     {
