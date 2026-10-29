@@ -2280,6 +2280,17 @@ static void IntegrateRow(Image *integral_image,const Quantum *p,Quantum *q,
 }
 
 
+static Image *DestroyIntegralViews(CacheView *image_view,
+  CacheView *integral_view,Image *integral_image,const MagickBooleanType status)
+{
+  integral_view=DestroyCacheView(integral_view);
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    integral_image=DestroyImage(integral_image);
+  return(integral_image);
+}
+
+
 MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
 {
 #define IntegralImageTag  "Integral/Image"
@@ -2362,9 +2373,5 @@ MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
           status=MagickFalse;
       }
   }
-  integral_view=DestroyCacheView(integral_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    integral_image=DestroyImage(integral_image);
-  return(integral_image);
+  return(DestroyIntegralViews(image_view,integral_view,integral_image,status));
 }
