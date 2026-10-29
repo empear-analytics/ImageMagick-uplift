@@ -3569,6 +3569,51 @@ static double MinimizeTrailingRowDistance(const MorphologyDirectPixel *row,
   return(pixel);
 }
 
+typedef struct _MorphologyKernelRows
+{
+  Image
+    *image;
+
+  const KernelInfo
+    *kernel;
+
+  ssize_t
+    i;
+} MorphologyKernelRows;
+
+static double MinimizeTrailingRowsDistance(const MorphologyKernelRows *rows,
+  const OffsetInfo offset,const Quantum *magick_restrict pixels,double pixel)
+{
+  Image
+    *const image = rows->image;
+
+  const KernelInfo
+    *const kernel = rows->kernel;
+
+  const ssize_t
+    i = rows->i;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  ssize_t
+    u,
+    v;
+
+  k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
+  for (v=offset.y; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      pixel=MinimizeKernelDistance(k,pixels,i,pixel);
+      k--;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+  return(pixel);
+}
+
 static ssize_t MorphologyPrimitiveDirect(Image *image,
   const MorphologyMethod method,const KernelInfo *kernel,
   ExceptionInfo *exception)
@@ -3829,6 +3874,9 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         MorphologyDirectPixel
           row;
 
+        MorphologyKernelRows
+          rows;
+
         ssize_t
           u;
 
@@ -3847,17 +3895,10 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         {
           case DistanceMorphology:
           {
-            k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            for (v=offset.y; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            rows.image=image;
+            rows.kernel=kernel;
+            rows.i=i;
+            pixel=MinimizeTrailingRowsDistance(&rows,offset,pixels,pixel);
             k=(&kernel->values[(ssize_t) kernel->width*kernel->y+kernel->x-1]);
             row.image=image;
             row.kernel=kernel;
