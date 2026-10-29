@@ -2752,6 +2752,28 @@ static double UpdateKmeansCentroids(Image *image,KmeansInfo **kmeans_pixels)
   return(distortion);
 }
 
+static void SetKmeansDominantColor(Image *image,ExceptionInfo *exception)
+{
+  char
+    tuple[MagickPathExtent];
+
+  Image
+    *dominant_image;
+
+  dominant_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (dominant_image != (Image *) NULL)
+    {
+      /*
+        Note dominant color.
+      */
+      qsort((void *) dominant_image->colormap,dominant_image->colors,
+        sizeof(*dominant_image->colormap),DominantColorCompare);
+      GetColorTuple(dominant_image->colormap,MagickTrue,tuple);
+      dominant_image=DestroyImage(dominant_image);
+      (void) SetImageProperty(image,"dominant-color",tuple,exception);
+    }
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -2769,9 +2791,6 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
 
   double
     previous_tolerance;
-
-  Image
-    *dominant_image;
 
   KmeansInfo
     **kmeans_pixels;
@@ -2947,18 +2966,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
       (void) FormatLocaleFile(stderr,"%s %.17g\n",tuple,(double)
         image->colormap[n].count);
     }
-  dominant_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (dominant_image != (Image *) NULL)
-    {
-      /*
-        Note dominant color.
-      */
-      qsort((void *) dominant_image->colormap,dominant_image->colors,
-        sizeof(*dominant_image->colormap),DominantColorCompare);
-      GetColorTuple(dominant_image->colormap,MagickTrue,tuple);
-      dominant_image=DestroyImage(dominant_image);
-      (void) SetImageProperty(image,"dominant-color",tuple,exception);
-    }
+  SetKmeansDominantColor(image,exception);
   kmeans_pixels=DestroyKmeansTLS(kmeans_pixels);
   if (image->progress_monitor != (MagickProgressMonitor) NULL)
     (void) SetImageProgress(image,KmeansImageTag,(MagickOffsetType)
