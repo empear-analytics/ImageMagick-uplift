@@ -3591,6 +3591,31 @@ typedef struct _MorphologyKernelRows
     i;
 } MorphologyKernelRows;
 
+static void MinimizeKernelRowDistance(const MorphologyKernelRows *rows,
+  double *pixel,const MagickRealType *magick_restrict *k,
+  const Quantum *magick_restrict *pixels)
+{
+  Image
+    *const image = rows->image;
+
+  const KernelInfo
+    *const kernel = rows->kernel;
+
+  const ssize_t
+    i = rows->i;
+
+  ssize_t
+    u;
+
+  for (u=0; u < (ssize_t) kernel->width; u++)
+  {
+    *pixel=MinimizeKernelDistance(*k,*pixels,i,*pixel);
+    (*k)--;
+    *pixels+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  *pixels+=(image->columns-1)*GetPixelChannels(image);
+}
+
 static double MinimizeTrailingRowsDistance(const MorphologyKernelRows *rows,
   const OffsetInfo offset,const Quantum *magick_restrict pixels,double pixel)
 {
@@ -3737,6 +3762,9 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         MorphologyDirectPixel
           row;
 
+        MorphologyKernelRows
+          rows;
+
         ssize_t
           u;
 
@@ -3758,13 +3786,10 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
             k=(&kernel->values[kernel->width*kernel->height-1]);
             for (v=0; v <= offset.y; v++)
             {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
+              rows.image=image;
+              rows.kernel=kernel;
+              rows.i=i;
+              MinimizeKernelRowDistance(&rows,&pixel,&k,&pixels);
             }
             row.image=image;
             row.kernel=kernel;
