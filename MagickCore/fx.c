@@ -4766,6 +4766,16 @@ static FxInfo *AllocateFxRuntimes (FxInfo * pfx)
   return pfx;
 }
 
+static FxInfo *DestroyFxInfoOnFailure (FxInfo * pfx)
+{
+  (void) DestroyRPN (pfx);
+  pfx->expression = DestroyString (pfx->expression);
+  pfx->pex = NULL;
+  (void) DeInitFx (pfx);
+  pfx = (FxInfo*) RelinquishMagickMemory(pfx);
+  return NULL;
+}
+
 static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
   MagickBooleanType CalcAllStats, ExceptionInfo *exception)
 {
@@ -4794,12 +4804,7 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
 
   pfx->teDepth = 0;
   if (!TranslateStatementList (pfx, ";", &chLimit)) {
-    (void) DestroyRPN (pfx);
-    pfx->expression = DestroyString (pfx->expression);
-    pfx->pex = NULL;
-    (void) DeInitFx (pfx);
-    pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-    return NULL;
+    return (DestroyFxInfoOnFailure (pfx));
   }
 
   if (pfx->teDepth) {
@@ -4808,12 +4813,7 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
       "Translate expression depth", "(%i) not 0",
       pfx->teDepth);
 
-    (void) DestroyRPN (pfx);
-    pfx->expression = DestroyString (pfx->expression);
-    pfx->pex = NULL;
-    (void) DeInitFx (pfx);
-    pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-    return NULL;
+    return (DestroyFxInfoOnFailure (pfx));
   }
 
   if (chLimit != '\0' && chLimit != ';') {
@@ -4822,22 +4822,12 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
       "AcquireFxInfo: TranslateExpression did not exhaust input", "(chLimit=%i) at'%s'",
       (int)chLimit, pfx->pex);
 
-    (void) DestroyRPN (pfx);
-    pfx->expression = DestroyString (pfx->expression);
-    pfx->pex = NULL;
-    (void) DeInitFx (pfx);
-    pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-    return NULL;
+    return (DestroyFxInfoOnFailure (pfx));
   }
 
   if (IsStatisticsPending(pfx) != MagickFalse) {
     if (!CollectStatistics (pfx)) {
-      (void) DestroyRPN (pfx);
-      pfx->expression = DestroyString (pfx->expression);
-      pfx->pex = NULL;
-      (void) DeInitFx (pfx);
-      pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-      return NULL;
+      return (DestroyFxInfoOnFailure (pfx));
     }
   }
 
