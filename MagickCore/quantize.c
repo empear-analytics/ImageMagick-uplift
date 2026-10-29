@@ -524,6 +524,36 @@ static void SetColormapPixel(Image *image,const QCubeInfo *cube,
     }
 }
 
+static void SearchClosestCubeColor(const Image *image,QCubeInfo *cube,
+  const DoublePixelPacket pixel)
+{
+  QNodeInfo
+    *node_info;
+
+  size_t
+    index,
+    node_id;
+
+  /*
+    Identify the deepest node containing the pixel's color.
+  */
+  node_info=cube->root;
+  for (index=MaxTreeDepth-1; (ssize_t) index > 0; index--)
+  {
+    node_id=ColorToQNodeId(cube,&pixel,index);
+    if (node_info->child[node_id] == (QNodeInfo *) NULL)
+      break;
+    node_info=node_info->child[node_id];
+  }
+  /*
+    Find closest color among siblings and their children.
+  */
+  cube->target=pixel;
+  cube->distance=(double) (4.0*((double) QuantumRange+1.0)*((double)
+    QuantumRange+1.0)+1.0);
+  ClosestColor(image,cube,node_info->parent);
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -592,14 +622,10 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
           DoublePixelPacket
             pixel;
 
-          const QNodeInfo
-            *node_info;
-
           ssize_t
             i;
 
           size_t
-            id,
             index;
 
           /*
@@ -616,21 +642,7 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
               break;
           }
           AssociateAlphaPixel(image,&cube,q,&pixel);
-          node_info=cube.root;
-          for (index=MaxTreeDepth-1; (ssize_t) index > 0; index--)
-          {
-            id=ColorToQNodeId(&cube,&pixel,index);
-            if (node_info->child[id] == (QNodeInfo *) NULL)
-              break;
-            node_info=node_info->child[id];
-          }
-          /*
-            Find closest color among siblings and their children.
-          */
-          cube.target=pixel;
-          cube.distance=(double) (4.0*((double) QuantumRange+1.0)*
-            ((double) QuantumRange+1.0)+1.0);
-          ClosestColor(image,&cube,node_info->parent);
+          SearchClosestCubeColor(image,&cube,pixel);
           index=cube.color_number;
           for (i=0; i < (ssize_t) count; i++)
           {
@@ -1559,31 +1571,7 @@ static inline ssize_t *GetCacheEntry(QCubeInfo *cube_info,
 static void FindClosestCubeColor(const Image *image,QCubeInfo *cube,
   const DoublePixelPacket pixel,ssize_t *entry)
 {
-  QNodeInfo
-    *node_info;
-
-  size_t
-    index,
-    node_id;
-
-  /*
-    Identify the deepest node containing the pixel's color.
-  */
-  node_info=cube->root;
-  for (index=MaxTreeDepth-1; (ssize_t) index > 0; index--)
-  {
-    node_id=ColorToQNodeId(cube,&pixel,index);
-    if (node_info->child[node_id] == (QNodeInfo *) NULL)
-      break;
-    node_info=node_info->child[node_id];
-  }
-  /*
-    Find closest color among siblings and their children.
-  */
-  cube->target=pixel;
-  cube->distance=(double) (4.0*((double) QuantumRange+1.0)*((double)
-    QuantumRange+1.0)+1.0);
-  ClosestColor(image,cube,node_info->parent);
+  SearchClosestCubeColor(image,cube,pixel);
   if (entry != (ssize_t *) NULL)
     *entry=(ssize_t) cube->color_number;
 }
