@@ -979,14 +979,26 @@ static void EvaluatePixel(const Image *image,RandomInfo *random_info,
   }
 }
 
+static MagickBooleanType GetEvaluateClamp(const Image *image)
+{
+  const char
+    *artifact;
+
+  MagickBooleanType
+    clamp;
+
+  clamp=MagickFalse;
+  artifact=GetImageArtifact(image,"evaluate:clamp");
+  if (artifact != (const char *) NULL)
+    clamp=IsStringTrue(artifact);
+  return(clamp);
+}
+
 MagickExport MagickBooleanType EvaluateImage(Image *image,
   const MagickEvaluateOperator op,const double value,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
-
-  const char
-    *artifact;
 
   MagickBooleanType
     clamp,
@@ -1016,10 +1028,7 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
     return(MagickFalse);
   status=MagickTrue;
   progress=0;
-  clamp=MagickFalse;
-  artifact=GetImageArtifact(image,"evaluate:clamp");
-  if (artifact != (const char *) NULL)
-    clamp=IsStringTrue(artifact);
+  clamp=GetEvaluateClamp(image);
   random_info=AcquireRandomInfoTLS();
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
