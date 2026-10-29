@@ -241,6 +241,38 @@ static void ClipChopOffset(ssize_t *offset,size_t *extent)
     }
 }
 
+typedef struct _ChopRowImages
+{
+  const Image
+    *image;
+
+  Image
+    *chop_image;
+} ChopRowImages;
+
+static void ChopPixelRow(const ChopRowImages *images,
+  const RectangleInfo extent,const Quantum *p,Quantum *q)
+{
+  const Image
+    *const image = images->image;
+
+  Image
+    *const chop_image = images->chop_image;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if ((x < extent.x) || (x >= (extent.x+(ssize_t) extent.width)))
+      {
+        CopyPixelChannelsTo(image,chop_image,p,q);
+        q+=(ptrdiff_t) GetPixelChannels(chop_image);
+      }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
@@ -303,11 +335,11 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
 #endif
   for (y=0; y < (ssize_t) extent.y; y++)
   {
+    ChopRowImages
+      images;
+
     const Quantum
       *magick_restrict p;
-
-    ssize_t
-      x;
 
     Quantum
       *magick_restrict q;
@@ -322,15 +354,9 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if ((x < extent.x) || (x >= (extent.x+(ssize_t) extent.width)))
-        {
-          CopyPixelChannelsTo(image,chop_image,p,q);
-          q+=(ptrdiff_t) GetPixelChannels(chop_image);
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    images.image=image;
+    images.chop_image=chop_image;
+    ChopPixelRow(&images,extent,p,q);
     if (SyncCacheViewAuthenticPixels(chop_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
