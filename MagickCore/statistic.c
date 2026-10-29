@@ -1374,6 +1374,18 @@ static void SetPerceptualHashes(ChannelPerceptualHash *perceptual_hash,
         moments[channel].invariant[j])));
 }
 
+static char *AcquirePerceptualColorspaces(const char *artifact)
+{
+  char
+    *colorspaces;
+
+  if (artifact != (const char *) NULL)
+    colorspaces=AcquireString(artifact);
+  else
+    colorspaces=AcquireString("xyY,HSB");
+  return(colorspaces);
+}
+
 MagickExport ChannelPerceptualHash *GetImagePerceptualHash(const Image *image,
   ExceptionInfo *exception)
 {
@@ -1401,10 +1413,7 @@ MagickExport ChannelPerceptualHash *GetImagePerceptualHash(const Image *image,
   (void) memset(perceptual_hash,0,(MaxPixelChannels+1UL)*
     sizeof(*perceptual_hash));
   artifact=GetImageArtifact(image,"phash:colorspaces");
-  if (artifact != (const char *) NULL)
-    colorspaces=AcquireString(artifact);
-  else
-    colorspaces=AcquireString("xyY,HSB");
+  colorspaces=AcquirePerceptualColorspaces(artifact);
   perceptual_hash[0].number_colorspaces=0;
   perceptual_hash[0].number_channels=0;
   q=colorspaces;
