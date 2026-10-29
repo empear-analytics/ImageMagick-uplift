@@ -2710,6 +2710,26 @@ static Image *WriteAndReadQualityPreview(ImageInfo *preview_info,
   return(preview_image);
 }
 
+static Image *DespeckleThumbnail(Image *thumbnail,const ssize_t i,
+  ExceptionInfo *exception)
+{
+  Image
+    *preview_image;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (i-1); x++)
+  {
+    preview_image=DespeckleImage(thumbnail,exception);
+    if (preview_image == (Image *) NULL)
+      break;
+    thumbnail=DestroyImage(thumbnail);
+    thumbnail=preview_image;
+  }
+  return(thumbnail);
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -2910,14 +2930,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
       }
       case DespecklePreview:
       {
-        for (x=0; x < (i-1); x++)
-        {
-          preview_image=DespeckleImage(thumbnail,exception);
-          if (preview_image == (Image *) NULL)
-            break;
-          thumbnail=DestroyImage(thumbnail);
-          thumbnail=preview_image;
-        }
+        thumbnail=DespeckleThumbnail(thumbnail,i,exception);
         preview_image=DespeckleImage(thumbnail,exception);
         if (preview_image == (Image *) NULL)
           break;
