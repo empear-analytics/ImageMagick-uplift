@@ -1519,6 +1519,17 @@ static void AreaThreshold(const Image *component_image,CCObjectInfo *object,
       object[i].merge=MagickTrue;
 }
 
+static void PrintObjects(const Image *image,const Image *component_image,
+  const CCObjectInfo *object,const ssize_t n)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+    if (object[i].census > 0.0)
+      PrintObject(image,object,i,n);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2127,9 +2138,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       if (objects == (CCObjectInfo **) NULL)
         {
           PrintObjectsHeader(image,metrics,n);
-          for (i=0; i < (ssize_t) component_image->colors; i++)
-            if (object[i].census > 0.0)
-              PrintObject(image,object,i,n);
+          PrintObjects(image,component_image,object,n);
         }
     }
   if (objects == (CCObjectInfo **) NULL)
