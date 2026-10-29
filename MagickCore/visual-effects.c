@@ -3722,6 +3722,64 @@ static void ThresholdWaveletLevel(float *pixels,
   }
 }
 
+typedef struct _WaveletChannel
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    channel;
+
+  ExceptionInfo
+    *exception;
+} WaveletChannel;
+
+static MagickBooleanType CopyWaveletChannel(
+  const WaveletChannel *wavelet_channel,float *pixels,MagickBooleanType status)
+{
+  const Image
+    *const image = wavelet_channel->image;
+
+  CacheView
+    *const image_view = wavelet_channel->image_view;
+
+  const ssize_t
+    channel = wavelet_channel->channel;
+
+  ExceptionInfo
+    *const exception = wavelet_channel->exception;
+
+  ssize_t
+    i,
+    y;
+
+  i=0;
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x;
+
+    p=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        break;
+      }
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      pixels[i++]=(float) p[channel];
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  return(status);
+}
+
 static MagickBooleanType ReportWaveletProgress(const Image *image,
   const ssize_t channel,MagickBooleanType status)
 {
@@ -3839,6 +3897,9 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
     PixelTrait
       traits;
 
+    WaveletChannel
+      wavelet_channel;
+
     if (status == MagickFalse)
       continue;
     traits=GetPixelChannelTraits(image,(PixelChannel) channel);
@@ -3850,27 +3911,11 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
     /*
       Copy channel from image to wavelet pixel array.
     */
-    i=0;
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      const Quantum
-        *magick_restrict p;
-
-      ssize_t
-        x;
-
-      p=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        pixels[i++]=(float) p[channel];
-        p+=(ptrdiff_t) GetPixelChannels(image);
-      }
-    }
+    wavelet_channel.image=image;
+    wavelet_channel.image_view=image_view;
+    wavelet_channel.channel=channel;
+    wavelet_channel.exception=exception;
+    status=CopyWaveletChannel(&wavelet_channel,pixels,status);
     /*
       Low pass filter outputs are called approximation kernel & high pass
       filters are referred to as detail kernel. The detail kernel
