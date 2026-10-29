@@ -4068,6 +4068,143 @@ static size_t GetRotationalBlurStep(const double radius,
   return(step);
 }
 
+typedef struct _RotationalChannel
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  const Quantum
+    *p;
+
+  CacheView
+    *radial_view;
+
+  PointInfo
+    blur_center,
+    center;
+
+  double
+    *cos_theta,
+    *sin_theta;
+
+  size_t
+    n,
+    step;
+
+  ExceptionInfo
+    *exception;
+} RotationalChannel;
+
+static MagickBooleanType BlurRotationalChannel(
+  const RotationalChannel *rotational,const ssize_t i,
+  Quantum *magick_restrict q)
+{
+  double
+    gamma,
+    pixel;
+
+  MagickBooleanType
+    status;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    blur_traits,
+    traits;
+
+  RotationalBlendedSum
+    blended_sum;
+
+  RotationalSum
+    sum;
+
+  status=MagickTrue;
+  channel=GetPixelChannelChannel(rotational->image,i);
+  traits=GetPixelChannelTraits(rotational->image,channel);
+  blur_traits=GetPixelChannelTraits(rotational->blur_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (blur_traits == UndefinedPixelTrait))
+    return(status);
+  if ((blur_traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(rotational->blur_image,channel,rotational->p[i],q);
+      return(status);
+    }
+  gamma=0.0;
+  pixel=0.0;
+  if ((GetPixelChannelTraits(rotational->image,AlphaPixelChannel) ==
+       UndefinedPixelTrait) || (channel == AlphaPixelChannel))
+    {
+      sum.radial_view=rotational->radial_view;
+      sum.blur_center=rotational->blur_center;
+      sum.center=rotational->center;
+      sum.cos_theta=rotational->cos_theta;
+      sum.sin_theta=rotational->sin_theta;
+      sum.n=rotational->n;
+      sum.step=rotational->step;
+      sum.i=i;
+      sum.exception=rotational->exception;
+      if (SumRotationalPixels(&sum,&pixel,&gamma) == MagickFalse)
+        status=MagickFalse;
+      gamma=MagickSafeReciprocal(gamma);
+      SetPixelChannel(rotational->blur_image,channel,ClampToQuantum(gamma*
+        pixel),q);
+      return(status);
+    }
+  blended_sum.image=rotational->image;
+  blended_sum.radial_view=rotational->radial_view;
+  blended_sum.blur_center=rotational->blur_center;
+  blended_sum.center=rotational->center;
+  blended_sum.cos_theta=rotational->cos_theta;
+  blended_sum.sin_theta=rotational->sin_theta;
+  blended_sum.n=rotational->n;
+  blended_sum.step=rotational->step;
+  blended_sum.i=i;
+  blended_sum.exception=rotational->exception;
+  if (SumRotationalBlendedPixels(&blended_sum,&pixel,&gamma) == MagickFalse)
+    status=MagickFalse;
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(rotational->blur_image,channel,ClampToQuantum(gamma*pixel),
+    q);
+  return(status);
+}
+
+static MagickBooleanType BlurRotationalPixel(
+  const RotationalChannel *pixel_rotational,Quantum *magick_restrict q)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    i;
+
+  status=MagickTrue;
+  for (i=0; i < (ssize_t) GetPixelChannels(pixel_rotational->image); i++)
+  {
+    RotationalChannel
+      rotational;
+
+    rotational.image=pixel_rotational->image;
+    rotational.blur_image=pixel_rotational->blur_image;
+    rotational.p=pixel_rotational->p;
+    rotational.radial_view=pixel_rotational->radial_view;
+    rotational.blur_center=pixel_rotational->blur_center;
+    rotational.center=pixel_rotational->center;
+    rotational.cos_theta=pixel_rotational->cos_theta;
+    rotational.sin_theta=pixel_rotational->sin_theta;
+    rotational.n=pixel_rotational->n;
+    rotational.step=pixel_rotational->step;
+    rotational.exception=pixel_rotational->exception;
+    if (BlurRotationalChannel(&rotational,i,q) == MagickFalse)
+      status=MagickFalse;
+  }
+  return(status);
+}
+
 MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   ExceptionInfo *exception)
 {
@@ -4187,8 +4324,8 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
       PointInfo
         center;
 
-      ssize_t
-        i;
+      RotationalChannel
+        pixel_rotational;
 
       size_t
         step;
@@ -4197,71 +4334,19 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
       center.y=(double) y-blur_center.y;
       radius=hypot((double) center.x,center.y);
       step=GetRotationalBlurStep(radius,blur_radius,n);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          gamma,
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          blur_traits,
-          traits;
-
-        RotationalBlendedSum
-          blended_sum;
-
-        RotationalSum
-          sum;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        blur_traits=GetPixelChannelTraits(blur_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (blur_traits == UndefinedPixelTrait))
-          continue;
-        if ((blur_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(blur_image,channel,p[i],q);
-            continue;
-          }
-        gamma=0.0;
-        pixel=0.0;
-        if ((GetPixelChannelTraits(image,AlphaPixelChannel) == UndefinedPixelTrait) ||
-            (channel == AlphaPixelChannel))
-          {
-            sum.radial_view=radial_view;
-            sum.blur_center=blur_center;
-            sum.center=center;
-            sum.cos_theta=cos_theta;
-            sum.sin_theta=sin_theta;
-            sum.n=n;
-            sum.step=step;
-            sum.i=i;
-            sum.exception=exception;
-            if (SumRotationalPixels(&sum,&pixel,&gamma) == MagickFalse)
-              status=MagickFalse;
-            gamma=MagickSafeReciprocal(gamma);
-            SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
-            continue;
-          }
-        blended_sum.image=image;
-        blended_sum.radial_view=radial_view;
-        blended_sum.blur_center=blur_center;
-        blended_sum.center=center;
-        blended_sum.cos_theta=cos_theta;
-        blended_sum.sin_theta=sin_theta;
-        blended_sum.n=n;
-        blended_sum.step=step;
-        blended_sum.i=i;
-        blended_sum.exception=exception;
-        if (SumRotationalBlendedPixels(&blended_sum,&pixel,&gamma) == MagickFalse)
-          status=MagickFalse;
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
-      }
+      pixel_rotational.image=image;
+      pixel_rotational.blur_image=blur_image;
+      pixel_rotational.p=p;
+      pixel_rotational.radial_view=radial_view;
+      pixel_rotational.blur_center=blur_center;
+      pixel_rotational.center=center;
+      pixel_rotational.cos_theta=cos_theta;
+      pixel_rotational.sin_theta=sin_theta;
+      pixel_rotational.n=n;
+      pixel_rotational.step=step;
+      pixel_rotational.exception=exception;
+      if (BlurRotationalPixel(&pixel_rotational,q) == MagickFalse)
+        status=MagickFalse;
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(blur_image);
     }
