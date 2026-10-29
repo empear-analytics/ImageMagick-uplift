@@ -952,6 +952,55 @@ static MagickBooleanType ExportFloatRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportFloatQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,float *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=(float) (QuantumScale*((double) (GetPixelAlpha(image,p))));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelAlpha(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=(float) (QuantumScale*(double) GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelIntensity(image,p));
+      break;
+    }
+    default:
+      *q=0;
+  }
+}
+
 static MagickBooleanType ExportFloatPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1009,50 +1058,7 @@ static MagickBooleanType ExportFloatPixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelRed(image,p));
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=(float) (QuantumScale*((double) (GetPixelAlpha(image,p))));
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelAlpha(image,p));
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=(float) (QuantumScale*(double) GetPixelBlack(image,p));
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelIntensity(image,p));
-            break;
-          }
-          default:
-            *q=0;
-        }
+        ExportFloatQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
