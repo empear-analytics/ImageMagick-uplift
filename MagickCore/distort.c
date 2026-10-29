@@ -1672,6 +1672,34 @@ static Image *DistortResizeAlphaImage(const Image *image,Image *tmp_image,
   return(resize_image);
 }
 
+static Image *CropDistortResizeImage(Image *resize_image,
+  const size_t columns,const size_t rows,ExceptionInfo *exception)
+{
+  Image
+    *tmp_image;
+
+  RectangleInfo
+    crop_area;
+
+  /*
+    Clean up the results of the Distortion
+  */
+  crop_area.width=columns;
+  crop_area.height=rows;
+  crop_area.x=0;
+  crop_area.y=0;
+
+  tmp_image=resize_image;
+  resize_image=CropImage(tmp_image,&crop_area,exception);
+  tmp_image=DestroyImage(tmp_image);
+  if (resize_image != (Image *) NULL)
+    {
+      resize_image->page.width=0;
+      resize_image->page.height=0;
+    }
+  return(resize_image);
+}
+
 MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1680,9 +1708,6 @@ MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
   Image
     *resize_image,
     *tmp_image;
-
-  RectangleInfo
-    crop_area;
 
   double
     distort_args[12];
@@ -1741,24 +1766,7 @@ MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
         return((Image *) NULL);
     }
   (void) SetImageVirtualPixelMethod(resize_image,vp_save,exception);
-
-  /*
-    Clean up the results of the Distortion
-  */
-  crop_area.width=columns;
-  crop_area.height=rows;
-  crop_area.x=0;
-  crop_area.y=0;
-
-  tmp_image=resize_image;
-  resize_image=CropImage(tmp_image,&crop_area,exception);
-  tmp_image=DestroyImage(tmp_image);
-  if (resize_image != (Image *) NULL)
-    {
-      resize_image->page.width=0;
-      resize_image->page.height=0;
-    }
-  return(resize_image);
+  return(CropDistortResizeImage(resize_image,columns,rows,exception));
 }
 
 /*
