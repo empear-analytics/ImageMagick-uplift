@@ -1471,6 +1471,36 @@ static MagickBooleanType ResolveRowEquivalences(
   return(status);
 }
 
+static void RemoveObjectsByColor(const Image *component_image,
+  CCObjectInfo *object,const char *artifact,ExceptionInfo *exception)
+{
+  const char
+    *p;
+
+  for (p=artifact;  ; )
+  {
+    char
+      color[MagickPathExtent];
+
+    PixelInfo
+      pixel;
+
+    const char
+      *q;
+
+    for (q=p; *q != '\0'; q++)
+      if (*q == ';')
+        break;
+    (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
+      MagickPathExtent));
+    (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
+    SetObjectMergeByColor(object,component_image->colors,&pixel,MagickTrue);
+    if (*q == '\0')
+      break;
+    p=q+1;
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1792,34 +1822,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   artifact=GetImageArtifact(image,"connected-components:remove-colors");
   if (artifact != (const char *) NULL)
     {
-      const char
-        *p;
-
       /*
         Remove selected objects based on color, keep others.
       */
-      for (p=artifact;  ; )
-      {
-        char
-          color[MagickPathExtent];
-
-        PixelInfo
-          pixel;
-
-        const char
-          *q;
-
-        for (q=p; *q != '\0'; q++)
-          if (*q == ';')
-            break;
-        (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
-          MagickPathExtent));
-        (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-        SetObjectMergeByColor(object,component_image->colors,&pixel,MagickTrue);
-        if (*q == '\0')
-          break;
-        p=q+1;
-      }
+      RemoveObjectsByColor(component_image,object,artifact,exception);
     }
   artifact=GetImageArtifact(image,"connected-components:remove-ids");
   if (artifact == (const char *) NULL)
