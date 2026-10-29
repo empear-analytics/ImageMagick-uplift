@@ -1619,6 +1619,135 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
   }
 }
 
+typedef struct _DespeckleLoad
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Quantum
+    *pixels;
+
+  ssize_t
+    i;
+} DespeckleLoad;
+
+static MagickBooleanType LoadDespeckleChannel(const DespeckleLoad *load,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  const Image
+    *const image = load->image;
+
+  CacheView
+    *const image_view = load->image_view;
+
+  Quantum
+    *magick_restrict const pixels = load->pixels;
+
+  const ssize_t
+    i = load->i;
+
+  ssize_t
+    j,
+    x,
+    y;
+
+  j=(ssize_t) image->columns+2;
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    j++;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      pixels[j++]=p[i];
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    j++;
+  }
+  return(status);
+}
+
+typedef struct _DespeckleStore
+{
+  const Image
+    *image;
+
+  Image
+    *despeckle_image;
+
+  CacheView
+    *despeckle_view;
+
+  PixelChannel
+    channel;
+
+  Quantum
+    *pixels;
+} DespeckleStore;
+
+static MagickBooleanType StoreDespeckleChannel(const DespeckleStore *store,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  const Image
+    *const image = store->image;
+
+  Image
+    *const despeckle_image = store->despeckle_image;
+
+  CacheView
+    *const despeckle_view = store->despeckle_view;
+
+  const PixelChannel
+    channel = store->channel;
+
+  Quantum
+    *magick_restrict const pixels = store->pixels;
+
+  ssize_t
+    j,
+    x,
+    y;
+
+  j=(ssize_t) image->columns+2;
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    MagickBooleanType
+      sync;
+
+    Quantum
+      *magick_restrict q;
+
+    q=GetCacheViewAuthenticPixels(despeckle_view,0,y,despeckle_image->columns,
+      1,exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    j++;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      SetPixelChannel(despeckle_image,channel,pixels[j++],q);
+      q+=(ptrdiff_t) GetPixelChannels(despeckle_image);
+    }
+    sync=SyncCacheViewAuthenticPixels(despeckle_view,exception);
+    if (sync == MagickFalse)
+      status=MagickFalse;
+    j++;
+  }
+  return(status);
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
 #define DespeckleImageTag  "Despeckle/Image"
@@ -1706,6 +1835,12 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
   despeckle_view=AcquireAuthenticCacheView(despeckle_image,exception);
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
+    DespeckleLoad
+      load;
+
+    DespeckleStore
+      store;
+
     HullBuffers
       hull;
 
@@ -1717,12 +1852,7 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
       traits;
 
     ssize_t
-      k,
-      x;
-
-    ssize_t
-      j,
-      y;
+      k;
 
     if (status == MagickFalse)
       continue;
@@ -1735,26 +1865,11 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
     if ((despeckle_traits & CopyPixelTrait) != 0)
       continue;
     (void) memset(pixels,0,length*sizeof(*pixels));
-    j=(ssize_t) image->columns+2;
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      const Quantum
-        *magick_restrict p;
-
-      p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      j++;
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        pixels[j++]=p[i];
-        p+=(ptrdiff_t) GetPixelChannels(image);
-      }
-      j++;
-    }
+    load.image=image;
+    load.image_view=image_view;
+    load.pixels=pixels;
+    load.i=i;
+    status=LoadDespeckleChannel(&load,status,exception);
     (void) memset(buffer,0,length*sizeof(*buffer));
     for (k=0; k < 4; k++)
     {
@@ -1783,33 +1898,12 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
       hull.g=buffer;
       Hull(&hull,X[k],Y[k],-1);
     }
-    j=(ssize_t) image->columns+2;
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      MagickBooleanType
-        sync;
-
-      Quantum
-        *magick_restrict q;
-
-      q=GetCacheViewAuthenticPixels(despeckle_view,0,y,despeckle_image->columns,
-        1,exception);
-      if (q == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      j++;
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        SetPixelChannel(despeckle_image,channel,pixels[j++],q);
-        q+=(ptrdiff_t) GetPixelChannels(despeckle_image);
-      }
-      sync=SyncCacheViewAuthenticPixels(despeckle_view,exception);
-      if (sync == MagickFalse)
-        status=MagickFalse;
-      j++;
-    }
+    store.image=image;
+    store.despeckle_image=despeckle_image;
+    store.despeckle_view=despeckle_view;
+    store.channel=channel;
+    store.pixels=pixels;
+    status=StoreDespeckleChannel(&store,status,exception);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
