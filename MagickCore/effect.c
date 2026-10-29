@@ -2032,6 +2032,16 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void MirrorIntoPadding(const Image *image,float *out,const ssize_t x,
+  const ssize_t width)
+{
+  if ((x <= width) && (x != 0))
+    *(out-(x*2))=*out;
+  if ((x > (ssize_t) image->columns-width-2) &&
+      (x != (ssize_t) image->columns-1))
+    *(out+((image->columns-(size_t) x-1)*2))=*out;
+}
+
 static double GetTriangleWeightedSum(const float *pixels,const ssize_t offset,
   const ssize_t width)
 {
@@ -2198,11 +2208,7 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
         /* write to output */
         *out=(float) (sum/totalWeight);
         /* mirror into padding */
-        if ((x <= width) && (x != 0))
-          *(out-(x*2))=*out;
-        if ((x > (ssize_t) image->columns-width-2) &&
-            (x != (ssize_t) image->columns-1))
-          *(out+((image->columns-(size_t) x-1)*2))=*out;
+        MirrorIntoPadding(image,out,x,width);
         out+=image->columns+(size_t) (width*2);
       }
     }
