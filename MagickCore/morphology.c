@@ -3732,18 +3732,12 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
               }
               pixels+=(image->columns-1)*GetPixelChannels(image);
             }
-            k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            pixels=q-offset.x*(ssize_t) GetPixelChannels(image);
-            for (u=0; u < offset.x; u++)
-            {
-              if (!IsNaN(*k) && ((x+u-offset.x) >= 0))
-                {
-                  if (((double) pixels[i]+(*k)) < pixel)
-                    pixel=(double) pixels[i]+(*k);
-                }
-              k--;
-              pixels+=(ptrdiff_t) GetPixelChannels(image);
-            }
+            row.image=image;
+            row.kernel=kernel;
+            row.q=q;
+            row.x=x;
+            row.i=i;
+            pixel=MinimizeLeadingRowDistance(&row,offset,pixel);
             break;
           }
           default:
@@ -3887,17 +3881,12 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
               pixels+=(image->columns-1)*GetPixelChannels(image);
             }
             k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            pixels=q;
-            for (u=offset.x+1; u < (ssize_t) kernel->width; u++)
-            {
-              pixels+=(ptrdiff_t) GetPixelChannels(image);
-              if (!IsNaN(*k) && ((x+u-offset.x) < (ssize_t) image->columns))
-                {
-                  if (((double) pixels[i]+(*k)) < pixel)
-                    pixel=(double) pixels[i]+(*k);
-                }
-              k--;
-            }
+            row.image=image;
+            row.kernel=kernel;
+            row.q=q;
+            row.x=x;
+            row.i=i;
+            pixel=MinimizeTrailingRowDistance(&row,offset,k,pixel);
             break;
           }
           default:
