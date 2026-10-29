@@ -789,6 +789,19 @@ static ssize_t GetPixelRunLength(const Image *image,const Quantum *p,
   return(count);
 }
 
+static void TransformClassifyColorspace(const QCubeInfo *cube_info,
+  const Image *image,ExceptionInfo *exception)
+{
+  if ((cube_info->quantize_info->colorspace != UndefinedColorspace) &&
+      (cube_info->quantize_info->colorspace != CMYKColorspace))
+    (void) TransformImageColorspace((Image *) image,
+      cube_info->quantize_info->colorspace,exception);
+  else
+    if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+      (void) TransformImageColorspace((Image *) image,sRGBColorspace,
+        exception);
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -826,16 +839,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   */
   SetAssociatedAlpha(image,cube_info);
   if (cube_info->quantize_info->colorspace != image->colorspace)
-    {
-      if ((cube_info->quantize_info->colorspace != UndefinedColorspace) &&
-          (cube_info->quantize_info->colorspace != CMYKColorspace))
-        (void) TransformImageColorspace((Image *) image,
-          cube_info->quantize_info->colorspace,exception);
-      else
-        if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
-          (void) TransformImageColorspace((Image *) image,sRGBColorspace,
-            exception);
-    }
+    TransformClassifyColorspace(cube_info,image,exception);
   midpoint.red=(double) QuantumRange/2.0;
   midpoint.green=(double) QuantumRange/2.0;
   midpoint.blue=(double) QuantumRange/2.0;
