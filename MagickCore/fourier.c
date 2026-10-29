@@ -705,18 +705,44 @@ static double GetFourierPixel(const Image *image,const PixelChannel channel,
   return(pixel);
 }
 
-static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
-  const Image *image,double *magnitude_pixels,double *phase_pixels,
-  ExceptionInfo *exception)
+static void GetFourierChannelPixels(const FourierInfo *fourier_info,
+  const Image *image,double *source_pixels,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
-  const char
-    *value;
-
   const Quantum
     *p;
+
+  ssize_t
+    i,
+    x,
+    y;
+
+  i=0L;
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (y=0L; y < (ssize_t) fourier_info->height; y++)
+  {
+    p=GetCacheViewVirtualPixels(image_view,0L,y,fourier_info->width,1UL,
+      exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0L; x < (ssize_t) fourier_info->width; x++)
+    {
+      source_pixels[i]=GetFourierPixel(image,fourier_info->channel,p);
+      i++;
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+  image_view=DestroyCacheView(image_view);
+}
+
+static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
+  const Image *image,double *magnitude_pixels,double *phase_pixels,
+  ExceptionInfo *exception)
+{
+  const char
+    *value;
 
   double
     *source_pixels;
@@ -756,22 +782,7 @@ static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
   source_pixels=(double *) GetVirtualMemoryBlob(source_info);
   memset(source_pixels,0,fourier_info->width*fourier_info->height*
     sizeof(*source_pixels));
-  i=0L;
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0L; y < (ssize_t) fourier_info->height; y++)
-  {
-    p=GetCacheViewVirtualPixels(image_view,0L,y,fourier_info->width,1UL,
-      exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0L; x < (ssize_t) fourier_info->width; x++)
-    {
-      source_pixels[i]=GetFourierPixel(image,fourier_info->channel,p);
-      i++;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
-  image_view=DestroyCacheView(image_view);
+  GetFourierChannelPixels(fourier_info,image,source_pixels,exception);
   forward_info=AcquireVirtualMemory(fourier_info->width,(fourier_info->height/2+
     1)*sizeof(*forward_pixels));
   if (forward_info == (MemoryInfo *) NULL)
