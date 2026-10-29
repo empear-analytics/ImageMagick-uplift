@@ -109,6 +109,17 @@ typedef struct _HullBuffers
     *g;
 } HullBuffers;
 
+typedef struct _UnsharpPixels
+{
+  const Image
+    *image,
+    *unsharp_image;
+
+  double
+    quantum_threshold,
+    gain;
+} UnsharpPixels;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -4719,10 +4730,17 @@ MagickExport Image *SpreadImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static inline void UnsharpPixelChannels(const Image *image,
-  const Image *unsharp_image,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q,const double quantum_threshold,const double gain)
+static inline void UnsharpPixelChannels(const UnsharpPixels *unsharp,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
+  const Image
+    *const image = unsharp->image,
+    *const unsharp_image = unsharp->unsharp_image;
+
+  const double
+    quantum_threshold = unsharp->quantum_threshold,
+    gain = unsharp->gain;
+
   ssize_t
     i;
 
@@ -4817,6 +4835,9 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
     const Quantum
       *magick_restrict p;
 
+    const UnsharpPixels
+      unsharp = { image, unsharp_image, quantum_threshold, gain };
+
     Quantum
       *magick_restrict q;
 
@@ -4835,7 +4856,7 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      UnsharpPixelChannels(image,unsharp_image,p,q,quantum_threshold,gain);
+      UnsharpPixelChannels(&unsharp,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(unsharp_image);
     }
