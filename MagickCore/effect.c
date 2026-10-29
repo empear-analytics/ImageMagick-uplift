@@ -2900,6 +2900,71 @@ static MagickRealType *GetMotionBlurKernel(const size_t width,
   return(kernel);
 }
 
+typedef struct _MotionSum
+{
+  CacheView
+    *motion_view;
+
+  OffsetInfo
+    *offset;
+
+  size_t
+    width;
+
+  ssize_t
+    x,
+    y,
+    i;
+
+  ExceptionInfo
+    *exception;
+} MotionSum;
+
+static MagickBooleanType SumMotionPixels(const MotionSum *sum,double *pixel,
+  MagickRealType **k)
+{
+  CacheView
+    *const motion_view = sum->motion_view;
+
+  OffsetInfo
+    *const offset = sum->offset;
+
+  const size_t
+    width = sum->width;
+
+  const ssize_t
+    x = sum->x,
+    y = sum->y,
+    i = sum->i;
+
+  ExceptionInfo
+    *const exception = sum->exception;
+
+  const Quantum
+    *magick_restrict r;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    j;
+
+  status=MagickTrue;
+  for (j=0; j < (ssize_t) width; j++)
+  {
+    r=GetCacheViewVirtualPixels(motion_view,x+offset[j].x,y+
+      offset[j].y,1,1,exception);
+    if (r == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    *pixel+=(**k)*(double) r[i];
+    (*k)++;
+  }
+  return(status);
+}
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -3028,6 +3093,9 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
           gamma = 0.0,
           pixel;
 
+        MotionSum
+          sum;
+
         PixelChannel
           channel;
 
@@ -3059,18 +3127,15 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
         pixel=0.0;
         if ((blur_traits & BlendPixelTrait) == 0)
           {
-            for (j=0; j < (ssize_t) width; j++)
-            {
-              r=GetCacheViewVirtualPixels(motion_view,x+offset[j].x,y+
-                offset[j].y,1,1,exception);
-              if (r == (const Quantum *) NULL)
-                {
-                  status=MagickFalse;
-                  continue;
-                }
-              pixel+=(*k)*(double) r[i];
-              k++;
-            }
+            sum.motion_view=motion_view;
+            sum.offset=offset;
+            sum.width=width;
+            sum.x=x;
+            sum.y=y;
+            sum.i=i;
+            sum.exception=exception;
+            if (SumMotionPixels(&sum,&pixel,&k) == MagickFalse)
+              status=MagickFalse;
             SetPixelChannel(blur_image,channel,ClampToQuantum(pixel),q);
             continue;
           }
