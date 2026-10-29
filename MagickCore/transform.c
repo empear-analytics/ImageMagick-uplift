@@ -2185,6 +2185,20 @@ static RectangleInfo ClampTrimExtent(const Image *image,
   return(geometry);
 }
 
+static RectangleInfo ClampTrimOffset(const Image *image,
+  RectangleInfo geometry)
+{
+  if (geometry.x < 0)
+    geometry.x=0;
+  if ((geometry.x+(ssize_t) geometry.width) > (ssize_t) image->columns)
+    geometry.x=(ssize_t) image->columns-(ssize_t) geometry.width;
+  if (geometry.y < 0)
+    geometry.y=0;
+  if ((geometry.y+(ssize_t) geometry.height) > (ssize_t) image->rows)
+    geometry.y=(ssize_t) image->rows-(ssize_t) geometry.height;
+  return(geometry);
+}
+
 MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
 {
   const char
@@ -2289,14 +2303,7 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
               break;
           }
           geometry=ClampTrimExtent(image,minSize,geometry);
-          if (geometry.x < 0)
-            geometry.x=0;
-          if ((geometry.x+(ssize_t) geometry.width) > (ssize_t) image->columns)
-            geometry.x=(ssize_t) image->columns-(ssize_t) geometry.width;
-          if (geometry.y < 0)
-            geometry.y=0;
-          if ((geometry.y+(ssize_t) geometry.height) > (ssize_t) image->rows)
-            geometry.y=(ssize_t) image->rows-(ssize_t) geometry.height;
+          geometry=ClampTrimOffset(image,geometry);
         }
     }
   geometry.x+=image->page.x;
