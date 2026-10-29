@@ -3214,11 +3214,7 @@ MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
       return(status);
     }
   status=MagickFalse;
-  maximum_colors=quantize_info->number_colors;
-  if (maximum_colors == 0)
-    maximum_colors=MaxColormapSize;
-  if (maximum_colors > MaxColormapSize)
-    maximum_colors=MaxColormapSize;
+  maximum_colors=GetQuantizeMaximumColors(quantize_info);
   depth=quantize_info->tree_depth;
   if (depth == 0)
     {
