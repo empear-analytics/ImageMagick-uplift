@@ -2032,6 +2032,35 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static double GetTriangleWeightedSum(const float *pixels,const ssize_t offset,
+  const ssize_t width)
+{
+  const float
+    *pix;
+
+  double
+    sum,
+    weight;
+
+  ssize_t
+    i;
+
+  weight=1.0;
+  sum=0;
+  pix=pixels+offset;
+  for (i=0; i < width; i++)
+  {
+    sum+=weight*((double) *pix++);
+    weight+=1.0;
+  }
+  for (i=width+1; i < (2*width); i++)
+  {
+    sum+=weight*((double) *pix++);
+    weight-=1.0;
+  }
+  return(sum);
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -2142,9 +2171,6 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
       ssize_t
         y;
 
-      ssize_t
-        i;
-
       if (status == MagickFalse)
         continue;
       pixels=scanline;
@@ -2166,22 +2192,9 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
       for (y=0; y < (ssize_t) image->rows; y++)
       {
         double
-          sum,
-          weight;
+          sum;
 
-        weight=1.0;
-        sum=0;
-        pix=pixels+y;
-        for (i=0; i < width; i++)
-        {
-          sum+=weight*((double) *pix++);
-          weight+=1.0;
-        }
-        for (i=width+1; i < (2*width); i++)
-        {
-          sum+=weight*((double) *pix++);
-          weight-=1.0;
-        }
+        sum=GetTriangleWeightedSum(pixels,y,width);
         /* write to output */
         *out=(float) (sum/totalWeight);
         /* mirror into padding */
@@ -2214,14 +2227,12 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
         *magick_restrict p;
 
       float
-        *pix,
         *pixels;
 
       Quantum
         *magick_restrict q;
 
       ssize_t
-        i,
         x;
 
       if (status == MagickFalse)
@@ -2243,25 +2254,12 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
         double
           mult,
           srcVal,
-          sum,
-          weight;
+          sum;
 
         PixelTrait
           traits;
 
-        weight=1.0;
-        sum=0;
-        pix=pixels+x;
-        for (i=0; i < width; i++)
-        {
-          sum+=weight*((double) *pix++);
-          weight+=1.0;
-        }
-        for (i=width+1; i < (2*width); i++)
-        {
-          sum+=weight*((double) *pix++);
-          weight-=1.0;
-        }
+        sum=GetTriangleWeightedSum(pixels,x,width);
         /*
           Apply and write.
         */
