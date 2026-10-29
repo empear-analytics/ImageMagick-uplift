@@ -545,6 +545,27 @@ static void SetFourierPixel(const Image *image,const PixelChannel channel,
   }
 }
 
+static void ScaleForwardFourierPhase(const FourierInfo *fourier_info,
+  double *phase_pixels)
+{
+  ssize_t
+    i,
+    x,
+    y;
+
+  if (fourier_info->modulus != MagickFalse)
+    {
+      i=0L;
+      for (y=0L; y < (ssize_t) fourier_info->height; y++)
+        for (x=0L; x < (ssize_t) fourier_info->width; x++)
+        {
+          phase_pixels[i]/=(2.0*MagickPI);
+          phase_pixels[i]+=0.5;
+          i++;
+        }
+    }
+}
+
 static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   Image *image,double *magnitude,double *phase,ExceptionInfo *exception)
 {
@@ -613,17 +634,7 @@ static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
     status=ForwardQuadrantSwap(fourier_info->width,fourier_info->height,phase,
       phase_pixels);
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);
-  if (fourier_info->modulus != MagickFalse)
-    {
-      i=0L;
-      for (y=0L; y < (ssize_t) fourier_info->height; y++)
-        for (x=0L; x < (ssize_t) fourier_info->width; x++)
-        {
-          phase_pixels[i]/=(2.0*MagickPI);
-          phase_pixels[i]+=0.5;
-          i++;
-        }
-    }
+  ScaleForwardFourierPhase(fourier_info,phase_pixels);
   magnitude_view=AcquireAuthenticCacheView(magnitude_image,exception);
   i=0L;
   for (y=0L; y < (ssize_t) fourier_info->height; y++)
