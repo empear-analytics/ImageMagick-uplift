@@ -4262,19 +4262,17 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
                   break;
                 }
               } else {
-                if (pfx->ImgNum==0) {
-                  regA = QuantumScale * (double) p[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-                } else {
-                  const Quantum * pv = GetCacheViewVirtualPixels (
-                                 pfx->Imgs[0].View, imgx, imgy, 1,1, pfx->exception);
-                  if (!pv) {
-                    (void) ThrowMagickException (
-                      pfx->exception, GetMagickModule(), OptionError,
-                      "fU can't get cache", "%lu", (unsigned long) ImgNum);
-                    break;
-                  }
-                  regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-                }
+                RpnFirstImageInputs
+                  first_in;
+
+                first_in.pfx=pfx;
+                first_in.pel=pel;
+                first_in.p=p;
+                first_in.pimg=pimg;
+                first_in.channel=channel;
+                first_in.imgx=imgx;
+                first_in.imgy=imgy;
+                regA = GetFirstImageValueU (&first_in, ImgNum, regA);
               }
             } else {
               /* we have an image attribute */
