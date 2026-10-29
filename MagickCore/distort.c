@@ -486,6 +486,25 @@ static void SetArcOuterRadius(double *coeff,const size_t number_arguments,
   coeff[2] = arguments[2];
 }
 
+static double *SetShepardsPower(const Image *image,double *coeff,
+  ExceptionInfo *exception)
+{
+  { const char *artifact=GetImageArtifact(image,"shepards:power");
+    if ( artifact != (const char *) NULL ) {
+      coeff[0]=StringToDouble(artifact,(char **) NULL) / 2.0;
+      if ( coeff[0] < MagickEpsilon ) {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+            OptionError,"InvalidArgument","%s", "-define shepards:power" );
+        coeff=(double *) RelinquishMagickMemory(coeff);
+        return((double *) NULL);
+      }
+    }
+    else
+      coeff[0]=1.0;  /* Default power of 2 (Inverse Squared) */
+  }
+  return(coeff);
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -1576,20 +1595,7 @@ static double *GenerateCoefficients(const Image *image,
         return((double *) NULL);
       }
       /* User defined weighting power for Shepard's Method */
-      { const char *artifact=GetImageArtifact(image,"shepards:power");
-        if ( artifact != (const char *) NULL ) {
-          coeff[0]=StringToDouble(artifact,(char **) NULL) / 2.0;
-          if ( coeff[0] < MagickEpsilon ) {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-                OptionError,"InvalidArgument","%s", "-define shepards:power" );
-            coeff=(double *) RelinquishMagickMemory(coeff);
-            return((double *) NULL);
-          }
-        }
-        else
-          coeff[0]=1.0;  /* Default power of 2 (Inverse Squared) */
-      }
-      return(coeff);
+      return(SetShepardsPower(image,coeff,exception));
     }
     default:
       break;
