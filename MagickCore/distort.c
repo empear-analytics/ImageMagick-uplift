@@ -3605,19 +3605,13 @@ MagickExport Image *SparseColorImage(const Image *image,
                   ((double) i-arguments[ k ])*((double) i-arguments[ k ])
                 + ((double) j-arguments[k+1])*((double) j-arguments[k+1]);
               if ( distance < minimum ) {
-                ssize_t x = (ssize_t) k+2;
-                if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.red=arguments[x++];
-                if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.green=arguments[x++];
-                if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.blue=arguments[x++];
-                if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                    (image->colorspace == CMYKColorspace))
-                  pixel.black=arguments[x++];
-                if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                    (sparse_image->alpha_trait != UndefinedPixelTrait))
-                  pixel.alpha=arguments[x++];
+                SparseControlColor
+                  control;
+
+                control.image=image;
+                control.sparse_image=sparse_image;
+                control.arguments=arguments;
+                SetSparseControlColor(&control,k,&pixel);
                 minimum = distance;
               }
             }
