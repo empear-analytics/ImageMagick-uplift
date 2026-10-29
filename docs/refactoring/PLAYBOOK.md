@@ -1012,6 +1012,130 @@ during task M101.
 
 ---
 
+## Recipe N - Extract Function Taking an Input Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it meets Recipe E in every respect
+but one: it reads five or more of the caller's variables, so the new function would carry
+*Excess Number of Function Arguments* (and the pre-commit gate refuses a new function with
+a finding).
+
+**Not covered by:** Recipe E, whose new function would take every input as a parameter;
+Recipe B, which bundles the parameters of a function that already exists, so E then B is
+two commits of which the first adds a finding and lowers the score; Recipes O, K, T and J,
+which pass the block's *written* variables by pointer and leave its inputs as parameters.
+
+**How:**
+
+1. The block meets Recipe E steps 1 and 3 to 7, and the OpenMP rule above. It contains
+   no `#pragma omp` line.
+2. List the variables the block only reads. Choose a group of them that are scalars or
+   pointers, none written anywhere in the block, so the new function keeps at most four
+   parameters: the struct and what the block writes through (a pixel buffer, say).
+3. Declare `typedef struct _Name { ... } Name;` directly above the new function, one
+   member per variable in the group, with the variable's exact type and name: no `size_t`
+   for a `ssize_t`, no `const` added or dropped on what a pointer points to. Only a
+   top-level `const` of a parameter (`const double softness`) is left off the member,
+   which step 6 assigns.
+4. Cut the block into a new `static` function taking `const Name *name` in place of the
+   group. At the top of its body declare one `const` local per member, of the member's
+   type and name, initialised from the member; the block's text below is unchanged.
+5. In the caller, declare a `Name` local among the declarations at the top of the block
+   that holds the call (the loop body, for a call inside a loop), never after a
+   statement.
+6. Directly before the call, assign every member from the variable of the same name,
+   `name.member=member;`, in declaration order, with nothing between the assignments and
+   the call. Then call the function with `&name` where the block stood.
+7. Inside an OpenMP parallel loop, the `Name` local is declared inside the loop body, so
+   each thread fills its own.
+8. Check by reading that every member is assigned, from the variable of its name, and
+   that every other argument fills the parameter it names.
+
+**Before:**
+
+```c
+      magnitude=threshold*(double) noise_levels[level];
+      for (i=0; i < (ssize_t) number_pixels; ++i)
+      {
+        pixels[(ssize_t) high_pass+i]-=pixels[(ssize_t) low_pass+i];
+        if ((double) pixels[(ssize_t) high_pass+i] < -magnitude)
+          pixels[(ssize_t) high_pass+i]+=(float) (magnitude-softness*magnitude);
+        else
+          ...
+        if (high_pass != 0)
+          pixels[i]+=pixels[(ssize_t) high_pass+i];
+      }
+      high_pass=low_pass;
+```
+
+**After:**
+
+```c
+typedef struct _WaveletThreshold
+{
+  size_t
+    high_pass,
+    low_pass;
+
+  MagickSizeType
+    number_pixels;
+
+  double
+    magnitude,
+    softness;
+} WaveletThreshold;
+
+static void ThresholdWaveletLevel(float *pixels,
+  const WaveletThreshold *wavelet)
+{
+  const size_t
+    high_pass = wavelet->high_pass,
+    low_pass = wavelet->low_pass;
+  ...
+  for (i=0; i < (ssize_t) number_pixels; ++i)
+  {
+    pixels[(ssize_t) high_pass+i]-=pixels[(ssize_t) low_pass+i];
+    ...
+  }
+}
+...
+      magnitude=threshold*(double) noise_levels[level];
+      wavelet.high_pass=high_pass;
+      wavelet.low_pass=low_pass;
+      wavelet.number_pixels=number_pixels;
+      wavelet.magnitude=magnitude;
+      wavelet.softness=softness;
+      ThresholdWaveletLevel(pixels,&wavelet);
+      high_pass=low_pass;
+```
+
+**Careful:**
+
+- The members are read in the caller, directly before the call, from variables the block
+  does not write: each holds the value the block would have read at its first use, and
+  the `const` locals hold it for the whole block, as the block's own reads of an
+  unwritten variable did. A variable the block writes is never a member.
+- A member keeps the variable's exact type, so the assignment and the local's
+  initialisation convert nothing; under HDRI a `MagickRealType` member stays one.
+- Every member is assigned before the call: an unassigned member is read uninitialised,
+  and nothing checks it but reading (step 8). Count them against the typedef.
+- Recipe E's limit on what the block writes stands: one value returned, or writes
+  through a pointer the block already used for pixel data. A block writing more is
+  skipped, as in Recipe E.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 8 checked by reading.
+
+**Provenance:** 2026-10-29, from `visual-effects.c`'s `WaveletDenoiseImage`, whose last
+depth-4 site is the coefficient threshold loop (six inputs: the buffer, both offsets, the
+pixel count, the magnitude and the softness). The Mac campaign tried it with Recipe E
+(2.41 to 2.36 on the new function's *Excess Arguments*, M05) and refused `SteganoImage`'s
+bit switch for the same reason; `MotionBlurImage`'s kernel loops (9 to 11 inputs, M101)
+are the same shape. A probe of the struct form: the depth-4 finding leaves, 2.84 to 2.90.
+Added by Claude Code (Claude Opus 5.5) during task W07, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -1353,3 +1477,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-28 | AMEND | J | Step 5: an array accumulator goes as a pointer with its uses unchanged, as Recipe K already allows | `PerimeterThreshold`'s row loop counts into `pattern[4]`, the object's own array, and writes `status=MagickFalse` | mandate (2026-10-24) |
 | 2026-10-28 | AMEND | S | Scope: any MagickCore file whose family splits cleanly, not only the approved list; a split may lower MagickCore's per-file mean (the new file starts red) when it raises the original file; *Careful*'s new-file gate procedure confirmed | statistic.c's `StatisticImage` family (dry run 2.29 → 2.61); the per-file mean dip of the first three splits (4.97 → 4.96, line-weighted 3.149 → 3.200) | owner |
 | 2026-10-28 | AMEND | B | Step 5: the struct is declared among the declarations at the top of the block holding its calls, `const` with its initialiser where its operands are final there, otherwise filled member by member where it takes its values; `tools/ci_warnings.sh` joins the verification loop | `Main`'s macOS arm64 job (`-Wdeclaration-after-statement -Werror`) has failed on every merge since #31: 40 structs declared after statements in 20 files, as step 4's "directly before the call" placed them | mandate (2026-10-24) |
+| 2026-10-29 | NEW | N | Extract Function Taking an Input Struct: an E-legal block whose inputs would give the new function five or more parameters moves to a `static` function taking a `const` struct of the inputs it only reads, filled member by member directly before the call; `const` locals of the old names keep the block text unchanged | `WaveletDenoiseImage`'s threshold loop (six inputs; with Recipe E 2.41 to 2.36 in M05, with the struct 2.84 to 2.90); M05's `SteganoImage` bit switch and M101's `MotionBlurImage` kernel loops refused for the same reason | mandate (2026-10-24) |
