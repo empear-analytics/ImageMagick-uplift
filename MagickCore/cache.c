@@ -3840,6 +3840,13 @@ static inline MagickBooleanType IsCacheClonePending(const CacheInfo source_info,
     (cache_info->mode != PersistMode)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsCacheSourcePending(
+  const CacheInfo source_info,const MapMode mode)
+{
+  return(((source_info.storage_class != UndefinedClass) && (mode != ReadMode)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   ExceptionInfo *exception)
 {
@@ -4007,8 +4014,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
               if (cache_info->metacontent_extent != 0)
                 cache_info->metacontent=(void *) (cache_info->pixels+
                   cache_info->number_channels*number_pixels);
-              if ((source_info.storage_class != UndefinedClass) &&
-                  (mode != ReadMode))
+              if (IsCacheSourcePending(source_info,mode) != MagickFalse)
                 {
                   status=ClonePixelCacheRepository(cache_info,&source_info,
                     exception);
@@ -4032,8 +4038,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
               cache_info->storage_class=image->storage_class;
               if (status == 0)
                 {
-                  if ((source_info.storage_class != UndefinedClass) &&
-                      (mode != ReadMode))
+                  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
                     RelinquishPixelCachePixels(&source_info);
                   cache_info->type=UndefinedCache;
                   return(MagickFalse);
@@ -4076,8 +4081,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
                 (DistributeCacheInfo *) cache_info->server_info),
                 GetDistributeCachePort((DistributeCacheInfo *)
                 cache_info->server_info));
-              if ((source_info.storage_class != UndefinedClass) &&
-                  (mode != ReadMode))
+              if (IsCacheSourcePending(source_info,mode) != MagickFalse)
                 {
                   status=ClonePixelCacheRepository(cache_info,&source_info,
                     exception);
@@ -4101,8 +4105,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
                 }
               if (status == 0)
                 {
-                  if ((source_info.storage_class != UndefinedClass) &&
-                      (mode != ReadMode))
+                  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
                     RelinquishPixelCachePixels(&source_info);
                   cache_info->type=UndefinedCache;
                   return(MagickFalse);
@@ -4110,7 +4113,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
               return(MagickTrue);
             }
         }
-      if ((source_info.storage_class != UndefinedClass) && (mode != ReadMode))
+      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
         RelinquishPixelCachePixels(&source_info);
       cache_info->type=UndefinedCache;
       (void) memset(image->channel_map,0,MaxPixelChannels*
@@ -4124,7 +4127,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   */
   if (status == MagickFalse)
     {
-      if ((source_info.storage_class != UndefinedClass) && (mode != ReadMode))
+      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
         RelinquishPixelCachePixels(&source_info);
       cache_info->type=UndefinedCache;
       (void) memset(image->channel_map,0,MaxPixelChannels*
@@ -4140,7 +4143,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
     }
   if (OpenPixelCacheOnDisk(cache_info,mode) == MagickFalse)
     {
-      if ((source_info.storage_class != UndefinedClass) && (mode != ReadMode))
+      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
         RelinquishPixelCachePixels(&source_info);
       cache_info->type=UndefinedCache;
       ThrowFileException(exception,CacheError,"UnableToOpenPixelCache",
@@ -4151,7 +4154,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
     cache_info->length);
   if (status == MagickFalse)
     {
-      if ((source_info.storage_class != UndefinedClass) && (mode != ReadMode))
+      if (IsCacheSourcePending(source_info,mode) != MagickFalse)
         RelinquishPixelCachePixels(&source_info);
       cache_info->type=UndefinedCache;
       ThrowFileException(exception,CacheError,"UnableToExtendCache",
@@ -4186,8 +4189,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
               if (cache_info->metacontent_extent != 0)
                 cache_info->metacontent=(void *) (cache_info->pixels+
                   cache_info->number_channels*number_pixels);
-              if ((source_info.storage_class != UndefinedClass) &&
-                  (mode != ReadMode))
+              if (IsCacheSourcePending(source_info,mode) != MagickFalse)
                 {
                   status=ClonePixelCacheRepository(cache_info,&source_info,
                     exception);
@@ -4210,8 +4212,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
                 }
               if (status == 0)
                 {
-                  if ((source_info.storage_class != UndefinedClass) &&
-                      (mode != ReadMode))
+                  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
                     RelinquishPixelCachePixels(&source_info);
                   cache_info->type=UndefinedCache;
                   return(MagickFalse);
@@ -4221,7 +4222,7 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
         }
     }
   status=MagickTrue;
-  if ((source_info.storage_class != UndefinedClass) && (mode != ReadMode))
+  if (IsCacheSourcePending(source_info,mode) != MagickFalse)
     {
       status=ClonePixelCacheRepository(cache_info,&source_info,exception);
       RelinquishPixelCachePixels(&source_info);
