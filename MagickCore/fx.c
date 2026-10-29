@@ -1693,87 +1693,87 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
    If *seconds is not null, sets that from assumed date-time, or SECONDS_ERR if error.
 */
 {
+  int level = 0;
+  size_t len;
+  char sProperty [MagickPathExtent];
+  char * p;
+
   if (seconds != NULL) *seconds = SECONDS_ERR;
 
-  if (PeekStr (pfx, "%[")) {
-    int level = 0;
-    size_t len;
-    char sProperty [MagickPathExtent];
-    char * p = pfx->pex + 2;
+  if (!PeekStr (pfx, "%["))
+    return 0;
+  p = pfx->pex + 2;
 
-    while (*p) {
+  while (*p) {
 
-      if (*p == '[') level++;
-      else if (*p == ']') {
-        if (level == 0) break;
-        level--;
+    if (*p == '[') level++;
+    else if (*p == ']') {
+      if (level == 0) break;
+      level--;
+    }
+    p++;
+  }
+  if (!*p || level != 0) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "After '%[' expected ']' at", "'%s'",
+      SetShortExp(pfx));
+    return -1;
+  }
+
+  len = (size_t) (p - pfx->pex + 1);
+  if (len > MaxTokenLen) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Too much text between '%[' and ']' at", "'%s'",
+      SetShortExp(pfx));
+    return -1;
+  }
+
+  (void) CopyMagickString (sProperty, pfx->pex, len+1);
+  sProperty[len] = '\0';
+  {
+    char * tailptr;
+    char * text;
+    text = InterpretImageProperties (pfx->image->image_info, pfx->image,
+       sProperty, pfx->exception);
+    if (!text || !*text) {
+      text = DestroyString(text);
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Unknown property", "'%s' at '%s'",
+        sProperty, SetShortExp(pfx));
+      return -1;
+    }
+
+    if (seconds != NULL) {
+      struct tm tp;
+      if (ParseISO860(text,&tp) == MagickFalse) {
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Function 'epoch' expected date property, found ", "'%s' at '%s'",
+          text, SetShortExp(pfx));
+        text = DestroyString(text);
+        *seconds = SECONDS_ERR;
+        return -1;
       }
-      p++;
-    }
-    if (!*p || level != 0) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "After '%[' expected ']' at", "'%s'",
-        SetShortExp(pfx));
-      return -1;
-    }
-
-    len = (size_t) (p - pfx->pex + 1);
-    if (len > MaxTokenLen) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Too much text between '%[' and ']' at", "'%s'",
-        SetShortExp(pfx));
-      return -1;
-    }
-
-    (void) CopyMagickString (sProperty, pfx->pex, len+1);
-    sProperty[len] = '\0';
-    {
-      char * tailptr;
-      char * text;
-      text = InterpretImageProperties (pfx->image->image_info, pfx->image,
-         sProperty, pfx->exception);
-      if (!text || !*text) {
+      *seconds = (fxFltType)mktime (&tp);
+      *val = *seconds;
+    } else {
+      *val = strtold (text, &tailptr);
+      if (text == tailptr) {
         text = DestroyString(text);
         (void) ThrowMagickException (
           pfx->exception, GetMagickModule(), OptionError,
-          "Unknown property", "'%s' at '%s'",
-          sProperty, SetShortExp(pfx));
+          "Property", "'%s' text '%s' is not a number at '%s'",
+          sProperty, text, SetShortExp(pfx));
+        text = DestroyString(text);
         return -1;
       }
-
-      if (seconds != NULL) {
-        struct tm tp;
-        if (ParseISO860(text,&tp) == MagickFalse) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Function 'epoch' expected date property, found ", "'%s' at '%s'",
-            text, SetShortExp(pfx));
-          text = DestroyString(text);
-          *seconds = SECONDS_ERR;
-          return -1;
-        }
-        *seconds = (fxFltType)mktime (&tp);
-        *val = *seconds;
-      } else {
-        *val = strtold (text, &tailptr);
-        if (text == tailptr) {
-          text = DestroyString(text);
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Property", "'%s' text '%s' is not a number at '%s'",
-            sProperty, text, SetShortExp(pfx));
-          text = DestroyString(text);
-          return -1;
-        }
-      }
-      text = DestroyString(text);
     }
-    return ((ssize_t) len);
+    text = DestroyString(text);
   }
-
-  return 0;
+  return ((ssize_t) len);
 }
 
 static inline MagickBooleanType IsColourSpaceNamed(const ssize_t type,
