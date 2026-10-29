@@ -1128,7 +1128,6 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   fftw_complex *fourier_pixels,ExceptionInfo *exception)
 {
   CacheView
-    *magnitude_view,
     *phase_view;
 
   const Quantum
@@ -1178,22 +1177,8 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   magnitude_pixels=(double *) GetVirtualMemoryBlob(magnitude_info);
   phase_pixels=(double *) GetVirtualMemoryBlob(phase_info);
   inverse_pixels=(double *) GetVirtualMemoryBlob(inverse_info);
-  i=0L;
-  magnitude_view=AcquireVirtualCacheView(magnitude_image,exception);
-  for (y=0L; y < (ssize_t) fourier_info->height; y++)
-  {
-    p=GetCacheViewVirtualPixels(magnitude_view,0L,y,fourier_info->width,1UL,
-      exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0L; x < (ssize_t) fourier_info->width; x++)
-    {
-      magnitude_pixels[i]=GetFourierPixel(magnitude_image,fourier_info->channel,p);
-      i++;
-      p+=(ptrdiff_t) GetPixelChannels(magnitude_image);
-    }
-  }
-  magnitude_view=DestroyCacheView(magnitude_view);
+  GetFourierChannelPixels(fourier_info,magnitude_image,magnitude_pixels,
+    exception);
   status=InverseQuadrantSwap(fourier_info->width,fourier_info->height,
     magnitude_pixels,inverse_pixels);
   (void) memcpy(magnitude_pixels,inverse_pixels,fourier_info->height*
