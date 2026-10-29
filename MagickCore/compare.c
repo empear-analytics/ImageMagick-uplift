@@ -3646,6 +3646,22 @@ static Image *SIMPhaseCorrelationImage(const Image *target_image,
   return(cross_correlation);
 }
 
+static void SetPixelChannelsMean(const Image *image,
+  const ChannelStatistics *channel_statistics,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=(Quantum) channel_statistics[channel].mean;
+  }
+}
+
 static MagickBooleanType SIMSetImageMean(Image *image,
   const ChannelStatistics *channel_statistics,ExceptionInfo *exception)
 {
@@ -3684,17 +3700,7 @@ static MagickBooleanType SIMSetImageMean(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=(Quantum) channel_statistics[channel].mean;
-      }
+      SetPixelChannelsMean(image,channel_statistics,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
