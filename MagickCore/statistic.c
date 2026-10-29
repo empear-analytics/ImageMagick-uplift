@@ -1626,6 +1626,14 @@ static void SetMedianPivot(Quantum *pixels,const ssize_t low,
   SwapPixels(pixels[mid],pixels[low+1]);
 }
 
+static ssize_t SortMedianPair(Quantum *pixels,const ssize_t low,
+  const ssize_t high,const ssize_t median)
+{
+  if (pixels[low] > pixels[high])
+    SwapPixels(pixels[low],pixels[high]);
+  return(median);
+}
+
 static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
 {
   ssize_t
@@ -1643,11 +1651,7 @@ static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
     if (high <= low)
       return(median);
     if (high == (low+1))
-      {
-        if (pixels[low] > pixels[high])
-          SwapPixels(pixels[low],pixels[high]);
-        return(median);
-      }
+      return(SortMedianPair(pixels,low,high,median));
     SetMedianPivot(pixels,low,mid,high);
     for ( ; ; )
     {
