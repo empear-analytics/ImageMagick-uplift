@@ -1626,6 +1626,52 @@ static double *GenerateCoefficients(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *DistortResizeAlphaImage(const Image *image,Image *tmp_image,
+  const double *distort_args,ExceptionInfo *exception)
+{
+  /*
+    Basically we need to separate Virtual-Pixel alpha in the resized
+    image, so only the actual original images alpha channel is used.
+
+    distort alpha channel separately
+  */
+  Image
+    *resize_alpha,
+    *resize_image;
+
+  (void) SetImageAlphaChannel(tmp_image,ExtractAlphaChannel,exception);
+  (void) SetImageAlphaChannel(tmp_image,OpaqueAlphaChannel,exception);
+  resize_alpha=DistortImage(tmp_image,AffineDistortion,12,distort_args,
+    MagickTrue,exception),
+  tmp_image=DestroyImage(tmp_image);
+  if (resize_alpha == (Image *) NULL)
+    return((Image *) NULL);
+
+  /* distort the actual image containing alpha + VP alpha */
+  tmp_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (tmp_image == (Image *) NULL)
+    return((Image *) NULL);
+  (void) SetImageVirtualPixelMethod(tmp_image,
+    TransparentVirtualPixelMethod,exception);
+  resize_image=DistortImage(tmp_image,AffineDistortion,12,distort_args,
+    MagickTrue,exception),
+  tmp_image=DestroyImage(tmp_image);
+  if (resize_image == (Image *) NULL)
+    {
+      resize_alpha=DestroyImage(resize_alpha);
+      return((Image *) NULL);
+    }
+  /* replace resize images alpha with the separately distorted alpha */
+  (void) SetImageAlphaChannel(resize_image,OffAlphaChannel,exception);
+  (void) SetImageAlphaChannel(resize_alpha,OffAlphaChannel,exception);
+  (void) CompositeImage(resize_image,resize_alpha,CopyAlphaCompositeOp,
+    MagickTrue,0,0,exception);
+  resize_alpha=DestroyImage(resize_alpha);
+  resize_image->alpha_trait=image->alpha_trait;
+  resize_image->compose=image->compose;
+  return(resize_image);
+}
+
 MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1688,44 +1734,11 @@ MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
     {
       /*
         Image has transparency so handle colors and alpha separately.
-        Basically we need to separate Virtual-Pixel alpha in the resized
-        image, so only the actual original images alpha channel is used.
-
-        distort alpha channel separately
       */
-      Image
-        *resize_alpha;
-
-      (void) SetImageAlphaChannel(tmp_image,ExtractAlphaChannel,exception);
-      (void) SetImageAlphaChannel(tmp_image,OpaqueAlphaChannel,exception);
-      resize_alpha=DistortImage(tmp_image,AffineDistortion,12,distort_args,
-        MagickTrue,exception),
-      tmp_image=DestroyImage(tmp_image);
-      if (resize_alpha == (Image *) NULL)
-        return((Image *) NULL);
-
-      /* distort the actual image containing alpha + VP alpha */
-      tmp_image=CloneImage(image,0,0,MagickTrue,exception);
-      if (tmp_image == (Image *) NULL)
-        return((Image *) NULL);
-      (void) SetImageVirtualPixelMethod(tmp_image,
-        TransparentVirtualPixelMethod,exception);
-      resize_image=DistortImage(tmp_image,AffineDistortion,12,distort_args,
-        MagickTrue,exception),
-      tmp_image=DestroyImage(tmp_image);
+      resize_image=DistortResizeAlphaImage(image,tmp_image,distort_args,
+        exception);
       if (resize_image == (Image *) NULL)
-        {
-          resize_alpha=DestroyImage(resize_alpha);
-          return((Image *) NULL);
-        }
-      /* replace resize images alpha with the separately distorted alpha */
-      (void) SetImageAlphaChannel(resize_image,OffAlphaChannel,exception);
-      (void) SetImageAlphaChannel(resize_alpha,OffAlphaChannel,exception);
-      (void) CompositeImage(resize_image,resize_alpha,CopyAlphaCompositeOp,
-        MagickTrue,0,0,exception);
-      resize_alpha=DestroyImage(resize_alpha);
-      resize_image->alpha_trait=image->alpha_trait;
-      resize_image->compose=image->compose;
+        return((Image *) NULL);
     }
   (void) SetImageVirtualPixelMethod(resize_image,vp_save,exception);
 
