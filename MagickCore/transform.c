@@ -232,6 +232,15 @@ static inline MagickBooleanType IsChopOutsideImage(const Image *image,
     (chop_info->y > (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
 }
 
+static void ClipChopOffset(ssize_t *offset,size_t *extent)
+{
+  if (*offset < 0)
+    {
+      *extent-=(size_t) (-*offset);
+      *offset=0;
+    }
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
@@ -273,11 +282,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
     extent.width=(size_t) ((ssize_t) image->columns-extent.x);
   if ((extent.y+(ssize_t) extent.height) > (ssize_t) image->rows)
     extent.height=(size_t) ((ssize_t) image->rows-extent.y);
-  if (extent.x < 0)
-    {
-      extent.width-=(size_t) (-extent.x);
-      extent.x=0;
-    }
+  ClipChopOffset(&extent.x,&extent.width);
   if (extent.y < 0)
     {
       extent.height-=(size_t) (-extent.y);
