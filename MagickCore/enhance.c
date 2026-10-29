@@ -4244,17 +4244,7 @@ static void NegateImageRow(const Image *image,Quantum *q)
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    ssize_t
-      j;
-
-    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-    {
-      PixelChannel channel = GetPixelChannelChannel(image,j);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      if ((traits & UpdatePixelTrait) == 0)
-        continue;
-      q[j]=QuantumRange-q[j];
-    }
+    NegatePixelChannels(image,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
