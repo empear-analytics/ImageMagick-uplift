@@ -1182,6 +1182,41 @@ static MagickBooleanType ResolveEquivalence(MatrixInfo *equivalences,
   return(status);
 }
 
+typedef struct _CCObjectRelabel
+{
+  Image
+    *component_image;
+
+  ssize_t
+    i;
+
+  size_t
+    id;
+} CCObjectRelabel;
+
+static void RelabelObjectRow(const CCObjectRelabel *object_relabel,
+  const RectangleInfo bounding_box,Quantum *q)
+{
+  Image
+    *const component_image = object_relabel->component_image;
+
+  const ssize_t
+    i = object_relabel->i;
+
+  const size_t
+    id = object_relabel->id;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) bounding_box.width; x++)
+  {
+    if ((ssize_t) GetPixelIndex(component_image,q) == i)
+      SetPixelIndex(component_image,(Quantum) id,q);
+    q+=(ptrdiff_t) GetPixelChannels(component_image);
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1818,11 +1853,11 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     object[i].area=0.0;
     for (y=0; y < (ssize_t) bounding_box.height; y++)
     {
+      CCObjectRelabel
+        object_relabel;
+
       Quantum
         *magick_restrict q;
-
-      ssize_t
-        x;
 
       if (status == MagickFalse)
         continue;
@@ -1833,12 +1868,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           status=MagickFalse;
           continue;
         }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        if ((ssize_t) GetPixelIndex(component_image,q) == i)
-          SetPixelIndex(component_image,(Quantum) id,q);
-        q+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
+      object_relabel.component_image=component_image;
+      object_relabel.i=i;
+      object_relabel.id=id;
+      RelabelObjectRow(&object_relabel,bounding_box,q);
       if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
         status=MagickFalse;
     }
