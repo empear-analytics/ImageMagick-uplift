@@ -2965,6 +2965,62 @@ static MagickBooleanType SumMotionPixels(const MotionSum *sum,double *pixel,
   return(status);
 }
 
+typedef struct _MotionBlendedSum
+{
+  const Image
+    *image;
+
+  CacheView
+    *motion_view;
+
+  OffsetInfo
+    *offset;
+
+  size_t
+    width;
+
+  ssize_t
+    x,
+    y,
+    i;
+
+  ExceptionInfo
+    *exception;
+} MotionBlendedSum;
+
+static MagickBooleanType SumMotionBlendedPixels(const MotionBlendedSum *sum,
+  double *pixel,double *gamma,MagickRealType **k)
+{
+  const Quantum
+    *magick_restrict r;
+
+  double
+    alpha = 0.0;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    j;
+
+  status=MagickTrue;
+  for (j=0; j < (ssize_t) sum->width; j++)
+  {
+    r=GetCacheViewVirtualPixels(sum->motion_view,sum->x+sum->offset[j].x,
+      sum->y+sum->offset[j].y,1,1,sum->exception);
+    if (r == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    alpha=QuantumScale*(double) GetPixelAlpha(sum->image,r);
+    *pixel+=(**k)*alpha*(double) r[sum->i];
+    *gamma+=(**k)*alpha;
+    (*k)++;
+  }
+  return(status);
+}
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -3089,9 +3145,11 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
         double
-          alpha = 0.0,
           gamma = 0.0,
           pixel;
+
+        MotionBlendedSum
+          blended_sum;
 
         MotionSum
           sum;
@@ -3103,14 +3161,8 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
           blur_traits,
           traits;
 
-        const Quantum
-          *magick_restrict r;
-
         MagickRealType
           *magick_restrict k;
-
-        ssize_t
-          j;
 
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
@@ -3139,20 +3191,16 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
             SetPixelChannel(blur_image,channel,ClampToQuantum(pixel),q);
             continue;
           }
-        for (j=0; j < (ssize_t) width; j++)
-        {
-          r=GetCacheViewVirtualPixels(motion_view,x+offset[j].x,y+offset[j].y,1,
-            1,exception);
-          if (r == (const Quantum *) NULL)
-            {
-              status=MagickFalse;
-              continue;
-            }
-          alpha=QuantumScale*(double) GetPixelAlpha(image,r);
-          pixel+=(*k)*alpha*(double) r[i];
-          gamma+=(*k)*alpha;
-          k++;
-        }
+        blended_sum.image=image;
+        blended_sum.motion_view=motion_view;
+        blended_sum.offset=offset;
+        blended_sum.width=width;
+        blended_sum.x=x;
+        blended_sum.y=y;
+        blended_sum.i=i;
+        blended_sum.exception=exception;
+        if (SumMotionBlendedPixels(&blended_sum,&pixel,&gamma,&k) == MagickFalse)
+          status=MagickFalse;
         gamma=MagickSafeReciprocal(gamma);
         SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
       }
