@@ -1787,6 +1787,49 @@ static void ComputeCompositeStatistics(const Image *image,
   cs_comp->entropy/=channels;
 }
 
+static void ComputeChannelEntropy(const Image *image,const double *histogram,
+  ChannelStatistics *channel_statistics,const ssize_t i)
+{
+  ChannelStatistics
+    *cs;
+
+  double
+    number_bins;
+
+  long double
+    area;
+
+  ssize_t
+    j;
+
+  PixelChannel channel = GetPixelChannelChannel(image,i);
+  PixelTrait traits = GetPixelChannelTraits(image,channel);
+  if ((traits & UpdatePixelTrait) == 0)
+    return;
+  cs=channel_statistics+(ssize_t) channel;
+  NormalizeChannelSums(cs);
+  /*
+    Compute pixel entropy.
+  */
+  number_bins=CountHistogramBins(image,histogram,i);
+  area=MagickSafeReciprocalLD(channel_statistics[channel].area);
+  number_bins=(double) MagickSafeReciprocalLD((long double) log2(number_bins));
+  for (j=0; j <= (ssize_t) MaxMap; j++)
+  {
+    double
+      entropy,
+      count;
+
+    count=(double) (area*histogram[(ssize_t) GetPixelChannels(image)*j+i]);
+    entropy=-count*log2(count)*number_bins;
+    if (IsNaN(entropy) != 0)
+      continue;
+    channel_statistics[channel].entropy+=(double) entropy;
+    channel_statistics[CompositePixelChannel].entropy+=((double) entropy/
+      GetPixelChannels(image));
+  }
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -1795,9 +1838,6 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
 
   double
     *histogram;
-
-  long double
-    area;
 
   MagickStatusType
     status;
@@ -1924,43 +1964,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     ComputeChannelMoments(cs);
   }
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    ChannelStatistics
-      *cs;
-
-    double
-      number_bins;
-
-    ssize_t
-      j;
-
-    PixelChannel channel = GetPixelChannelChannel(image,i);
-    PixelTrait traits = GetPixelChannelTraits(image,channel);
-    if ((traits & UpdatePixelTrait) == 0)
-      continue;
-    cs=channel_statistics+(ssize_t) channel;
-    NormalizeChannelSums(cs);
-    /*
-      Compute pixel entropy.
-    */
-    number_bins=CountHistogramBins(image,histogram,i);
-    area=MagickSafeReciprocalLD(channel_statistics[channel].area);
-    number_bins=(double) MagickSafeReciprocalLD((long double) log2(number_bins));
-    for (j=0; j <= (ssize_t) MaxMap; j++)
-    {
-      double
-        entropy,
-        count;
-
-      count=(double) (area*histogram[(ssize_t) GetPixelChannels(image)*j+i]);
-      entropy=-count*log2(count)*number_bins;
-      if (IsNaN(entropy) != 0)
-        continue;
-      channel_statistics[channel].entropy+=(double) entropy;
-      channel_statistics[CompositePixelChannel].entropy+=((double) entropy/
-        GetPixelChannels(image));
-    }
-  }
+    ComputeChannelEntropy(image,histogram,channel_statistics,i);
   histogram=(double *) RelinquishMagickMemory(histogram);
   median_info=AcquireVirtualMemory(image->columns,image->rows*sizeof(*median));
   if (median_info == (MemoryInfo *) NULL)
