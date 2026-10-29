@@ -899,13 +899,13 @@ static double **AcquireBilateralTLS(const size_t number_threads,
   return(weights);
 }
 
+#define MaxIntensity  (255)
+#define BilateralBlurImageTag  "Blur/Image"
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
 {
-#define MaxIntensity  (255)
-#define BilateralBlurImageTag  "Blur/Image"
-
   CacheView
     *blur_view,
     *image_view;
