@@ -2181,6 +2181,55 @@ static MagickBooleanType ExportShortRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportShortQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned short *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToShort(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToShort(ClampToQuantum(GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ExportShortPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -2238,50 +2287,7 @@ static MagickBooleanType ExportShortPixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelRed(image,p));
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelGreen(image,p));
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelBlue(image,p));
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=ScaleQuantumToShort(GetPixelBlack(image,p));
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=ScaleQuantumToShort(ClampToQuantum(GetPixelIntensity(image,p)));
-            break;
-          }
-          default:
-            break;
-        }
+        ExportShortQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
