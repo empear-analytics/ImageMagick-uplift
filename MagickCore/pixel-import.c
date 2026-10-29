@@ -1104,6 +1104,61 @@ static MagickBooleanType ImportFloatRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ImportFloatQuantum(const Image *image,const QuantumType quantum,
+  const float *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    case AlphaQuantum:
+    {
+      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    case BlackQuantum:
+    {
+      SetPixelBlack(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    case IndexQuantum:
+    {
+      SetPixelGray(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ImportFloatPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1160,56 +1215,7 @@ static MagickBooleanType ImportFloatPixel(Image *image,
 
       for (i=0; i < (ssize_t) length; i++)
       {
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-            (*p)),q);
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-            (*p)),q);
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-            (*p)),q);
-            break;
-          }
-          case AlphaQuantum:
-          {
-            SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
-            (*p)),q);
-            break;
-          }
-          case OpacityQuantum:
-          {
-            SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
-            (*p)),q);
-            break;
-          }
-          case BlackQuantum:
-          {
-            SetPixelBlack(image,ClampToQuantum((double) QuantumRange*(double)
-            (*p)),q);
-            break;
-          }
-          case IndexQuantum:
-          {
-            SetPixelGray(image,ClampToQuantum((double) QuantumRange*(double)
-            (*p)),q);
-            break;
-          }
-          default:
-            break;
-        }
+        ImportFloatQuantum(image,quantum_map[i],p,q);
         p++;
       }
       q+=(ptrdiff_t) GetPixelChannels(image);
