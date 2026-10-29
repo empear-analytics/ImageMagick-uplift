@@ -3717,6 +3717,64 @@ static MagickBooleanType SIMSetImageMean(Image *image,
   return(status);
 }
 
+typedef struct _SubtractMeanRowInfo
+{
+  Image
+    *subtract_image;
+
+  const Image
+    *beta_image;
+
+  const ChannelStatistics
+    *channel_statistics;
+
+  ssize_t
+    y;
+} SubtractMeanRowInfo;
+
+static void SubtractMeanRow(const SubtractMeanRowInfo *subtract_row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  Image
+    *const subtract_image = subtract_row->subtract_image;
+
+  const Image
+    *const beta_image = subtract_row->beta_image;
+
+  const ChannelStatistics
+    *const channel_statistics = subtract_row->channel_statistics;
+
+  const ssize_t
+    y = subtract_row->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) subtract_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(subtract_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(subtract_image,i);
+      PixelTrait traits = GetPixelChannelTraits(subtract_image,channel);
+      PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
+      if (((traits & UpdatePixelTrait) == 0) ||
+          ((beta_traits & UpdatePixelTrait) == 0))
+        continue;
+      if ((x >= (ssize_t) beta_image->columns) ||
+          (y >= (ssize_t) beta_image->rows))
+        q[i]=(Quantum) 0;
+      else
+        q[i]=(Quantum) ((double) GetPixelChannel(beta_image,channel,p)-
+          channel_statistics[channel].mean);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(beta_image);
+    q+=(ptrdiff_t) GetPixelChannels(subtract_image);
+  }
+}
+
 static Image *SIMSubtractImageMean(const Image *alpha_image,
   const Image *beta_image,const ChannelStatistics *channel_statistics,
   ExceptionInfo *exception)
@@ -3755,8 +3813,8 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    SubtractMeanRowInfo
+      subtract_row;
 
     if (status == MagickFalse)
       continue;
@@ -3768,29 +3826,11 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) subtract_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(subtract_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(subtract_image,i);
-        PixelTrait traits = GetPixelChannelTraits(subtract_image,channel);
-        PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
-          continue;
-        if ((x >= (ssize_t) beta_image->columns) ||
-            (y >= (ssize_t) beta_image->rows))
-          q[i]=(Quantum) 0;
-        else
-          q[i]=(Quantum) ((double) GetPixelChannel(beta_image,channel,p)-
-            channel_statistics[channel].mean);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(beta_image);
-      q+=(ptrdiff_t) GetPixelChannels(subtract_image);
-    }
+    subtract_row.subtract_image=subtract_image;
+    subtract_row.beta_image=beta_image;
+    subtract_row.channel_statistics=channel_statistics;
+    subtract_row.y=y;
+    SubtractMeanRow(&subtract_row,p,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
