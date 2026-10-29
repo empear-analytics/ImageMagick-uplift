@@ -3667,6 +3667,53 @@ static void CopyWaveletColumn(const Image *image,
   }
 }
 
+typedef struct _WaveletThreshold
+{
+  size_t
+    high_pass,
+    low_pass;
+
+  MagickSizeType
+    number_pixels;
+
+  double
+    magnitude,
+    softness;
+} WaveletThreshold;
+
+static void ThresholdWaveletLevel(float *pixels,
+  const WaveletThreshold *wavelet)
+{
+  const size_t
+    high_pass = wavelet->high_pass,
+    low_pass = wavelet->low_pass;
+
+  const MagickSizeType
+    number_pixels = wavelet->number_pixels;
+
+  const double
+    magnitude = wavelet->magnitude,
+    softness = wavelet->softness;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_pixels; ++i)
+  {
+    pixels[(ssize_t) high_pass+i]-=pixels[(ssize_t) low_pass+i];
+    if ((double) pixels[(ssize_t) high_pass+i] < -magnitude)
+      pixels[(ssize_t) high_pass+i]+=(float) (magnitude-softness*magnitude);
+    else
+      if ((double) pixels[(ssize_t) high_pass+i] > magnitude)
+        pixels[(ssize_t) high_pass+i]-=(float) (magnitude-softness*
+          magnitude);
+      else
+        pixels[(ssize_t) high_pass+i]*=(float) softness;
+    if (high_pass != 0)
+      pixels[i]+=pixels[(ssize_t) high_pass+i];
+  }
+}
+
 MagickExport Image *WaveletDenoiseImage(const Image *image,
   const double threshold,const double softness,ExceptionInfo *exception)
 {
@@ -3814,6 +3861,9 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
       ssize_t
         x;
 
+      WaveletThreshold
+        wavelet;
+
       low_pass=(size_t) (number_pixels*((level & 0x01)+1));
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static,1) \
@@ -3857,20 +3907,12 @@ MagickExport Image *WaveletDenoiseImage(const Image *image,
         attenuated / shrunk by some factor.
       */
       magnitude=threshold*(double) noise_levels[level];
-      for (i=0; i < (ssize_t) number_pixels; ++i)
-      {
-        pixels[(ssize_t) high_pass+i]-=pixels[(ssize_t) low_pass+i];
-        if ((double) pixels[(ssize_t) high_pass+i] < -magnitude)
-          pixels[(ssize_t) high_pass+i]+=(float) (magnitude-softness*magnitude);
-        else
-          if ((double) pixels[(ssize_t) high_pass+i] > magnitude)
-            pixels[(ssize_t) high_pass+i]-=(float) (magnitude-softness*
-              magnitude);
-          else
-            pixels[(ssize_t) high_pass+i]*=(float) softness;
-        if (high_pass != 0)
-          pixels[i]+=pixels[(ssize_t) high_pass+i];
-      }
+      wavelet.high_pass=high_pass;
+      wavelet.low_pass=low_pass;
+      wavelet.number_pixels=number_pixels;
+      wavelet.magnitude=magnitude;
+      wavelet.softness=softness;
+      ThresholdWaveletLevel(pixels,&wavelet);
       high_pass=low_pass;
     }
     /*
