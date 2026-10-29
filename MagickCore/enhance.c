@@ -2299,6 +2299,41 @@ static void IntegrateEqualizeHistogram(const Image *image,
   }
 }
 
+static MagickBooleanType FormEqualizeHistogram(const Image *image,
+  double *histogram,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
+    sizeof(*histogram));
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    AccumulateEqualizeHistogram(image,p,histogram);
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2356,26 +2391,7 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   /*
     Form histogram.
   */
-  status=MagickTrue;
-  (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
-    sizeof(*histogram));
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    AccumulateEqualizeHistogram(image,p,histogram);
-  }
-  image_view=DestroyCacheView(image_view);
+  status=FormEqualizeHistogram(image,histogram,exception);
   /*
     Integrate the histogram to get the equalization map.
   */
