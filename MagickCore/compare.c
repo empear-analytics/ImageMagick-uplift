@@ -3430,6 +3430,57 @@ typedef struct
     y;
 } MinimaInfo;
 
+typedef struct _MinimaPixelInfo
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x,
+    y;
+} MinimaPixelInfo;
+
+static MinimaInfo FindPixelMinima(const MinimaPixelInfo *minima_pixel,
+  MinimaInfo channel_minima)
+{
+  const Image
+    *const image = minima_pixel->image;
+
+  const Quantum
+    *const p = minima_pixel->p;
+
+  const ssize_t
+    x = minima_pixel->x,
+    y = minima_pixel->y;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      pixel;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    pixel=(double) p[i];
+    if (IsNaN(pixel) != 0)
+      pixel=0.0;
+    if (pixel < channel_minima.minima)
+      {
+        channel_minima.minima=pixel;
+        channel_minima.x=x;
+        channel_minima.y=y;
+      }
+  }
+  return(channel_minima);
+}
+
 static MagickBooleanType SIMMinimaImage(const Image *image,double *minima,
   RectangleInfo *offset,ExceptionInfo *exception)
 {
@@ -3482,28 +3533,14 @@ static MagickBooleanType SIMMinimaImage(const Image *image,double *minima,
     channel_minima=minima_info;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
+      MinimaPixelInfo
+        minima_pixel;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          pixel;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        pixel=(double) p[i];
-        if (IsNaN(pixel) != 0)
-          pixel=0.0;
-        if (pixel < channel_minima.minima)
-          {
-            channel_minima.minima=pixel;
-            channel_minima.x=x;
-            channel_minima.y=y;
-          }
-      }
+      minima_pixel.image=image;
+      minima_pixel.p=p;
+      minima_pixel.x=x;
+      minima_pixel.y=y;
+      channel_minima=FindPixelMinima(&minima_pixel,channel_minima);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
