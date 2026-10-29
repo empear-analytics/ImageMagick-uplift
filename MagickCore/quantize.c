@@ -1776,6 +1776,17 @@ static DoublePixelPacket AddRiemersmaQueueError(const QCubeInfo *cube_info,
   return(pixel);
 }
 
+static void MoveRiemersmaPosition(QCubeInfo *p,const unsigned int direction)
+{
+  switch (direction)
+  {
+    case WestGravity: p->x--; break;
+    case EastGravity: p->x++; break;
+    case NorthGravity: p->y--; break;
+    case SouthGravity: p->y++; break;
+  }
+}
+
 static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
   const unsigned int direction,ExceptionInfo *exception)
 {
@@ -1846,13 +1857,7 @@ static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
         return(MagickFalse);
       p->offset++;
     }
-  switch (direction)
-  {
-    case WestGravity: p->x--; break;
-    case EastGravity: p->x++; break;
-    case NorthGravity: p->y--; break;
-    case SouthGravity: p->y++; break;
-  }
+  MoveRiemersmaPosition(p,direction);
   return(MagickTrue);
 }
 
