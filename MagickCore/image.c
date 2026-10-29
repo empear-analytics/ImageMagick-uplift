@@ -2835,6 +2835,44 @@ static void TestMultipleImageSupport(ImageInfo *image_info,char *component,
     image_info->adjoin=MagickFalse;
 }
 
+static MagickBooleanType CopyImageToSeekableFile(ImageInfo *image_info,
+  Image *image,char *component,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  if ((IsBlobSeekable(image) == MagickFalse) ||
+      (IsBlobExempt(image) != MagickFalse))
+    {
+      /*
+        Copy image to seekable temporary file.
+      */
+      *component='\0';
+      status=ImageToFile(image,component,exception);
+      if (CloseBlob(image) == MagickFalse)
+        status=MagickFalse;
+      if (status == MagickFalse)
+        {
+          (void) RelinquishUniqueFileResource(component);
+          image=DestroyImage(image);
+          return(MagickFalse);
+        }
+      SetImageInfoFile(image_info,(FILE *) NULL);
+      (void) CopyMagickString(image->filename,component,MagickPathExtent);
+      status=OpenBlob(image_info,image,ReadBinaryBlobMode,exception);
+      if (status == MagickFalse)
+        {
+          (void) RelinquishUniqueFileResource(component);
+          image=DestroyImage(image);
+          return(MagickFalse);
+        }
+      (void) CopyMagickString(image_info->filename,component,
+        MagickPathExtent);
+      image_info->temporary=MagickTrue;
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
@@ -2950,35 +2988,9 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
           image=DestroyImage(image);
           return(MagickFalse);
         }
-      if ((IsBlobSeekable(image) == MagickFalse) ||
-          (IsBlobExempt(image) != MagickFalse))
-        {
-          /*
-            Copy image to seekable temporary file.
-          */
-          *component='\0';
-          status=ImageToFile(image,component,exception);
-          if (CloseBlob(image) == MagickFalse)
-            status=MagickFalse;
-          if (status == MagickFalse)
-            {
-              (void) RelinquishUniqueFileResource(component);
-              image=DestroyImage(image);
-              return(MagickFalse);
-            }
-          SetImageInfoFile(image_info,(FILE *) NULL);
-          (void) CopyMagickString(image->filename,component,MagickPathExtent);
-          status=OpenBlob(image_info,image,ReadBinaryBlobMode,exception);
-          if (status == MagickFalse)
-            {
-              (void) RelinquishUniqueFileResource(component);
-              image=DestroyImage(image);
-              return(MagickFalse);
-            }
-          (void) CopyMagickString(image_info->filename,component,
-            MagickPathExtent);
-          image_info->temporary=MagickTrue;
-        }
+      if (CopyImageToSeekableFile(image_info,image,component,exception) ==
+          MagickFalse)
+        return(MagickFalse);
       magick=(unsigned char *) AcquireQuantumMemory(1,magick_size);
       if (magick == (unsigned char *) NULL)
         {
