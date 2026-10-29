@@ -565,6 +565,23 @@ static inline MagickBooleanType IsCropOutsideImage(const Image *image,
     MagickTrue : MagickFalse);
 }
 
+static void ClipCropOffset(ssize_t *offset,size_t *extent,
+  const ssize_t origin)
+{
+  if ((*offset < 0) && (origin >= 0))
+    {
+      *extent=CastDoubleToSizeT((double) *extent+*offset-origin);
+      *offset=0;
+    }
+  else
+    {
+      *extent=CastDoubleToSizeT((double) *extent-(origin-*offset));
+      *offset-=origin;
+      if (*offset < 0)
+        *offset=0;
+    }
+}
+
 static void CopyPixelRow(const Image *image,const Image *destination,
   const Quantum *p,Quantum *q)
 {
@@ -650,18 +667,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
         crop_image->dispose=NoneDispose;
       return(crop_image);
     }
-  if ((page.x < 0) && (bounding_box.x >= 0))
-    {
-      page.width=CastDoubleToSizeT((double) page.width+page.x-bounding_box.x);
-      page.x=0;
-    }
-  else
-    {
-      page.width=CastDoubleToSizeT((double) page.width-(bounding_box.x-page.x));
-      page.x-=bounding_box.x;
-      if (page.x < 0)
-        page.x=0;
-    }
+  ClipCropOffset(&page.x,&page.width,bounding_box.x);
   if ((page.y < 0) && (bounding_box.y >= 0))
     {
       page.height=CastDoubleToSizeT((double) page.height+page.y-bounding_box.y);
