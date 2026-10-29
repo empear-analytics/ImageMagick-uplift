@@ -128,6 +128,7 @@ $call Make statistic-moments.c
 $call Make statistic-image.c
 $call Make stream.c
 $call Make string.c
+$call Make string-si.c
 $call Make thread.c
 $call Make timer.c
 $call Make token.c
