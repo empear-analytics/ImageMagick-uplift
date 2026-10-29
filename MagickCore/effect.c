@@ -120,6 +120,16 @@ typedef struct _UnsharpPixels
     gain;
 } UnsharpPixels;
 
+typedef struct _ShadeImages
+{
+  const Image
+    *linear_image,
+    *shade_image;
+
+  MagickBooleanType
+    gray;
+} ShadeImages;
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -4234,10 +4244,17 @@ static inline double GetSurfaceShade(const PrimaryInfo *normal,
   return(shade);
 }
 
-static inline void ShadePixelChannels(const Image *linear_image,
-  const Image *shade_image,const Quantum *magick_restrict center,
-  Quantum *magick_restrict q,const MagickBooleanType gray,const double shade)
+static inline void ShadePixelChannels(const ShadeImages *shading,
+  const Quantum *magick_restrict center,Quantum *magick_restrict q,
+  const double shade)
 {
+  const Image
+    *const linear_image = shading->linear_image,
+    *const shade_image = shading->shade_image;
+
+  const MagickBooleanType
+    gray = shading->gray;
+
   ssize_t
     i;
 
@@ -4355,6 +4372,9 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
     PrimaryInfo
       normal;
 
+    const ShadeImages
+      shading = { linear_image, shade_image, gray };
+
     const Quantum
       *magick_restrict center,
       *magick_restrict p,
@@ -4405,7 +4425,7 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
         GetShadeIntensity(linear_image,pre)-
         GetShadeIntensity(linear_image,pre+GetPixelChannels(linear_image)));
       shade=GetSurfaceShade(&normal,&light);
-      ShadePixelChannels(linear_image,shade_image,center,q,gray,shade);
+      ShadePixelChannels(&shading,center,q,shade);
       p+=(ptrdiff_t) GetPixelChannels(linear_image);
       q+=(ptrdiff_t) GetPixelChannels(shade_image);
     }
