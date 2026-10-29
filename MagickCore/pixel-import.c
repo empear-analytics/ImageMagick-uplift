@@ -1751,6 +1751,54 @@ static MagickBooleanType ImportLongLongRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ImportLongLongQuantum(const Image *image,const QuantumType quantum,
+  const MagickSizeType *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    case AlphaQuantum:
+    {
+      SetPixelAlpha(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      SetPixelAlpha(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    case BlackQuantum:
+    {
+      SetPixelBlack(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    case IndexQuantum:
+    {
+      SetPixelGray(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ImportLongLongPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1807,49 +1855,7 @@ static MagickBooleanType ImportLongLongPixel(Image *image,
 
       for (i=0; i < (ssize_t) length; i++)
       {
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            SetPixelRed(image,ScaleLongLongToQuantum(*p),q);
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            SetPixelGreen(image,ScaleLongLongToQuantum(*p),q);
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            SetPixelBlue(image,ScaleLongLongToQuantum(*p),q);
-            break;
-          }
-          case AlphaQuantum:
-          {
-            SetPixelAlpha(image,ScaleLongLongToQuantum(*p),q);
-            break;
-          }
-          case OpacityQuantum:
-          {
-            SetPixelAlpha(image,ScaleLongLongToQuantum(*p),q);
-            break;
-          }
-          case BlackQuantum:
-          {
-            SetPixelBlack(image,ScaleLongLongToQuantum(*p),q);
-            break;
-          }
-          case IndexQuantum:
-          {
-            SetPixelGray(image,ScaleLongLongToQuantum(*p),q);
-            break;
-          }
-          default:
-            break;
-        }
+        ImportLongLongQuantum(image,quantum_map[i],p,q);
         p++;
       }
       q+=(ptrdiff_t) GetPixelChannels(image);
