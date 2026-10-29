@@ -493,6 +493,20 @@ static void ClearPolynomialPixels(const Image *image,
       polynomial_pixel[j].channel[i]=0.0;
 }
 
+static void ScaleEvaluateProduct(const Image *image,
+  const size_t number_images,PixelChannels *evaluate_pixel,const ssize_t x)
+{
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    for (j=0; j < ((ssize_t) number_images-1); j++)
+      evaluate_pixel[x].channel[i]*=QuantumScale;
+  }
+}
+
 static void SetEvaluateMedianPixel(const Image *image,
   const PixelChannels *evaluate_pixel,const size_t number_images,
   Quantum *magick_restrict q)
@@ -812,11 +826,7 @@ MagickExport Image *EvaluateImages(const Image *images,
             }
             case MultiplyEvaluateOperator:
             {
-              for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-              {
-                for (j=0; j < ((ssize_t) number_images-1); j++)
-                  evaluate_pixel[x].channel[i]*=QuantumScale;
-              }
+              ScaleEvaluateProduct(image,number_images,evaluate_pixel,x);
               break;
             }
             case RootMeanSquareEvaluateOperator:
