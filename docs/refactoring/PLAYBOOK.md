@@ -1156,10 +1156,10 @@ Added by Claude Code (Claude Opus 5.5) during task W07, under the mandate of 202
 
 **Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
 Method*, *Complex Method* or *Large Method*, and the block that would fix it is a
-per-pixel accumulation inside a parallel loop body that meets Recipe K in every respect
-but one: with its inputs as parameters, the new function would take five or more
-arguments (*Excess Number of Function Arguments*, which the pre-commit gate refuses on a
-new function). The typical case is a filter's per-channel weighted sum (`pixel`, `gamma`
+per-pixel accumulation inside a parallel loop body (or in a sequential function, step 1)
+that meets Recipe K in every respect but one: with its inputs as parameters, the new
+function would take five or more arguments (*Excess Number of Function Arguments*, which
+the pre-commit gate refuses on a new function). The typical case is a filter's per-channel weighted sum (`pixel`, `gamma`
 and a cursor), reading the window pointer, the window size, the weights and the channel.
 
 **Not covered by:** Recipe K, which passes every input as a parameter; Recipe N, whose
@@ -1171,7 +1171,10 @@ as parameters. K then B is two commits, of which the first adds a finding.
 
 1. The block meets Recipe K steps 1 to 3: no `#pragma omp` line, no `return`, `goto`, or
    `continue`/`break` that leaves it; it writes at most four of the parallel loop body's
-   own variables, and nothing declared outside that body.
+   own variables, and nothing declared outside that body. A block in a function with no
+   OpenMP region at all (a sequential pass) qualifies too: it then writes at most four
+   plain locals of the caller, none a parameter, a global or a `static`, and none whose
+   address is taken elsewhere (Recipe O step 2).
 2. Split what the block touches in two: the variables it writes (the accumulators and
    any cursor it advances, such as `n`), and the variables it only reads. Variables it
    declares and uses alone move with it, as in Recipe K step 3.
@@ -1264,6 +1267,11 @@ static void SumBilateralPixels(const BilateralSum *sum,double *pixel,
   the struct may freeze.
 - More than four written variables, or a write to `status`, is not this recipe: skip the
   block (Recipe J covers `status` when the inputs fit in parameters).
+- In a sequential function there is no thread to share with: each written local becomes
+  `*v` in the callee, the same object in the same order, which is Recipe O's argument.
+  A cursor the block advances and the caller reads again (a kernel pointer `k`, a window
+  pointer `pixels`, advanced row by row by repeated calls) is such a written local, passed
+  by pointer.
 - Two blocks that differ only by a line or two (a plain and an alpha-blended sum) become
   two helpers that CodeScene may report as *Code Duplication*; measure, and keep the step
   only when no duplication appears.
@@ -1740,3 +1748,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | NEW | Q | Extract Accumulating Block Taking an Input Struct: a Recipe K accumulation whose inputs would give the new function five or more parameters moves to a `static void` function taking a `const` struct of the inputs it only reads (Recipe N) and a pointer per written scalar (Recipe K), at most four parameters | `BilateralBlurImage`'s plain and alpha-blended per-channel sums (`pixel`, `gamma`, `n`; eight inputs): K gives eleven parameters, N refuses accumulators; a probe of the sums and then the per-channel body (Recipe N), 1.72 to 1.89 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | E | Step 7: inside a `switch` case, a block after which the case runs only its closing `break;` may contain `break;` statements of that `switch` when its single output is one variable: the new function takes it by value and returns it, each such `break;` becomes `return(v);`, and the block becomes `v=Helper(...);`, so both reach the case's end with the same value | `fx.c`'s `ExecuteRPN`: its pixel-lookup cases (`fU`, `fU0`, `fUP`, `fS`/`fV`, `fP`/`fSP`/`fVP`) hold its nesting of 8 and each sets `regA` and leaves the `switch` by `break` from inside nested `if`s. A probe removing them: depth 8 to 4, fx.c 2.62 to 2.92 | mandate (2026-10-24) |
 | 2026-10-29 | NEW | U | Extract Function Returning the Loop Status Taking an Input Struct: a Recipe T block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and the written row pointers by value; the caller writes `status=MagickFalse` from its result (Recipe T) | `FxImage`'s per-channel loop inside its parallel row loop (seven inputs and `status`): T gives seven parameters, N refuses the `status` write, the whole column loop is a Complex Method (cc 9). A probe: FxImage leaves Deep, Nested Complexity, fx.c 2.74 to 2.80 | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | Q | Step 1: a block in a function with no OpenMP region (a sequential pass) qualifies, its written variables being plain locals of the caller (Recipe O step 2); *Careful* notes the cursors (`k`, `pixels`) such a block advances for the next call | `morphology.c`'s `MorphologyPrimitiveDirect`: its forward pass repeats one kernel-row body (`pixel`, `k`, `pixels` written; `image`, `kernel`, `i` read) in the Distance and Voronoi double loops; the function is sequential (two views of one image), so Recipe K's parallel-body wording refuses it, Recipe E step 4 refuses three outputs and Recipe O wants a selection. A probe of the row helper at both sites: nesting 6 to 5, 2.41 to 2.46 | mandate (2026-10-24) |
