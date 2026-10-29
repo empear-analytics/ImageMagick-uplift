@@ -1705,6 +1705,23 @@ static inline void CopySourceChannels(const Image *source_image,
   }
 }
 
+static IlluminantType ParseComposeIlluminant(const char *artifact)
+{
+  IlluminantType
+    illuminant;
+
+  ssize_t
+    illuminant_type;
+
+  illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
+    artifact);
+  if (illuminant_type < 0)
+    illuminant=UndefinedIlluminant;
+  else
+    illuminant=(IlluminantType) illuminant_type;
+  return(illuminant);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -1788,17 +1805,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     white_luminance=StringToDouble(artifact,(char **) NULL);
   artifact=GetImageArtifact(image,"compose:illuminant");
   if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        illuminant_type;
-
-      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
-        artifact);
-      if (illuminant_type < 0)
-        illuminant=UndefinedIlluminant;
-      else
-        illuminant=(IlluminantType) illuminant_type;
-    }
+    illuminant=ParseComposeIlluminant(artifact);
   artifact=GetImageArtifact(image,"compose:colorspace");
   if (artifact != (const char *) NULL)
     {
