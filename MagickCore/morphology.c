@@ -2782,6 +2782,22 @@ static void CalcKernelMetaData(KernelInfo *kernel)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static double MinimizeChannelValue(const Quantum *magick_restrict pixels,
+  const ssize_t i,double minimum)
+{
+  if ((double) pixels[i] < minimum)
+    minimum=(double) pixels[i];
+  return(minimum);
+}
+
+static double MaximizeChannelValue(const Quantum *magick_restrict pixels,
+  const ssize_t i,double maximum)
+{
+  if ((double) pixels[i] > maximum)
+    maximum=(double) pixels[i];
+  return(maximum);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3285,16 +3301,10 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 if (!IsNaN(*k))
                   {
                     if (*k > 0.7)
-                      {
-                        if ((double) pixels[i] < minimum)
-                          minimum=(double) pixels[i];
-                      }
+                      minimum=MinimizeChannelValue(pixels,i,minimum);
                     else
                       if (*k < 0.3)
-                        {
-                          if ((double) pixels[i] > maximum)
-                            maximum=(double) pixels[i];
-                        }
+                        maximum=MaximizeChannelValue(pixels,i,maximum);
                   }
                 k++;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
