@@ -763,6 +763,24 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void LoadColorMatrix(const KernelInfo *color_matrix,
+  double ColorMatrix[][6])
+{
+  ssize_t
+    i,
+    u,
+    v;
+
+  i=0;
+  for (v=0; v < (ssize_t) color_matrix->height; v++)
+    for (u=0; u < (ssize_t) color_matrix->width; u++)
+    {
+      if ((v < 6) && (u < 6))
+        ColorMatrix[v][u]=color_matrix->values[i];
+      i++;
+    }
+}
+
 static double GetColorMatrixSum(const Image *image,
   const Quantum *magick_restrict p,const double *row)
 {
@@ -825,9 +843,6 @@ MagickExport Image *ColorMatrixImage(const Image *image,
     progress;
 
   ssize_t
-    i;
-
-  ssize_t
     u,
     v,
     y;
@@ -841,14 +856,7 @@ MagickExport Image *ColorMatrixImage(const Image *image,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  i=0;
-  for (v=0; v < (ssize_t) color_matrix->height; v++)
-    for (u=0; u < (ssize_t) color_matrix->width; u++)
-    {
-      if ((v < 6) && (u < 6))
-        ColorMatrix[v][u]=color_matrix->values[i];
-      i++;
-    }
+  LoadColorMatrix(color_matrix,ColorMatrix);
   /*
     Initialize color image.
   */
