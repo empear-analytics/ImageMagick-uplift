@@ -1007,6 +1007,18 @@ MagickExport Image *ExtentImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AppendTransformProperty(const Image *image,
+  Image *transform_image,const char *format,ExceptionInfo *exception)
+{
+  char
+    transform[MagickPathExtent];
+
+  (void) FormatLocaleString(transform,MagickPathExtent,format,
+    (double) image->columns,(double) image->rows);
+  AppendImageProfileProperty(transform_image,"hdrgm","hdrgm:Transform",
+    transform,exception);
+}
+
 MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
 {
 #define FlipImageTag  "Flip/Image"
@@ -1093,15 +1105,8 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
     page.y=((ssize_t) page.height-(ssize_t) flip_image->rows-page.y);
   flip_image->page=page;
   if (status != MagickFalse)
-    {
-      char
-        transform[MagickPathExtent];
-
-      (void) FormatLocaleString(transform,MagickPathExtent,
-        "flip %.17gx%.17g",(double) image->columns,(double) image->rows);
-      AppendImageProfileProperty(flip_image,"hdrgm","hdrgm:Transform",
-        transform,exception);
-    }
+    AppendTransformProperty(image,flip_image,"flip %.17gx%.17g",
+      exception);
   if (status == MagickFalse)
     flip_image=DestroyImage(flip_image);
   return(flip_image);
@@ -1227,15 +1232,8 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
     page.x=((ssize_t) page.width-(ssize_t) flop_image->columns-page.x);
   flop_image->page=page;
   if (status != MagickFalse)
-    {
-      char
-        transform[MagickPathExtent];
-
-      (void) FormatLocaleString(transform,MagickPathExtent,
-        "flop %.17gx%.17g",(double) image->columns,(double) image->rows);
-      AppendImageProfileProperty(flop_image,"hdrgm","hdrgm:Transform",
-        transform,exception);
-    }
+    AppendTransformProperty(image,flop_image,"flop %.17gx%.17g",
+      exception);
   if (status == MagickFalse)
     flop_image=DestroyImage(flop_image);
   return(flop_image);
