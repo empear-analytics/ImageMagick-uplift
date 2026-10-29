@@ -1722,6 +1722,101 @@ static IlluminantType ParseComposeIlluminant(const char *artifact)
   return(illuminant);
 }
 
+static MagickRealType GetColorDodgeBlend(const MagickRealType S,
+  const MagickRealType D)
+{
+  MagickRealType
+    blend;
+
+  if (S >= 1.0)
+    blend=1.0;
+  else
+    if (D <= 0.0)
+      blend=0.0;
+    else
+      {
+        if ((1.0-S) <= 0.0)
+          blend=1.0;
+        else
+          blend=MagickMin(1.0,D/(1.0-S));
+      }
+  return(blend);
+}
+
+static MagickRealType GetSoftBurnBlend(const MagickRealType Sca,
+  const MagickRealType Dca)
+{
+  MagickRealType
+    blend;
+
+  if (RoundToUnity(Dca) <= 0.0)
+    blend = 0.0;
+  else
+    if (RoundToUnity(Sca) >= 1.0)
+      blend = 1.0;
+    else
+      blend=1.0-MagickMin(1.0,(1.0-RoundToUnity(Dca))/
+        RoundToUnity(Sca));
+  return(blend);
+}
+
+static MagickRealType GetSoftDodgeBlend(const MagickRealType Sca,
+  const MagickRealType Dca)
+{
+  MagickRealType
+    blend;
+
+  if (RoundToUnity(Sca) <= 0.0)
+    blend=RoundToUnity(Dca);
+  else
+    if (RoundToUnity(Dca) >= 1.0)
+      blend=1.0;
+    else
+      blend=MagickMin(1.0,RoundToUnity(Dca)/(1.0-RoundToUnity(Sca)));
+  return(blend);
+}
+
+static MagickRealType GetVividLightBlend(const MagickRealType Sa,
+  const MagickRealType Sca,const MagickRealType Da,const MagickRealType Dca)
+{
+  MagickRealType
+    blend;
+
+  if (RoundToUnity(Sca/Sa) <= 0.0)
+    blend=0.0;
+  else
+    if (RoundToUnity(Sca/Sa) < 0.5)
+      blend=1.0-(1.0-RoundToUnity(Dca/Da))/(2.0*RoundToUnity(Sca/Sa));
+  else
+    if (RoundToUnity(Sca/Sa) < 1.0)
+      blend=RoundToUnity(Dca/Da)/(2.0*(1.0-RoundToUnity(Sca/Sa)));
+    else
+      blend=1.0;
+  return(blend);
+}
+
+static MagickRealType GetPegtopLightBlend(const MagickRealType Sca,
+  const MagickRealType Da,const MagickRealType Dca)
+{
+  MagickRealType
+    blend;
+
+  if (RoundToUnity(Sca) <= 0.5)
+    blend=RoundToUnity(Dca/Da)-(1.0-2.0*RoundToUnity(Sca))*
+      RoundToUnity(Dca/Da)*(1.0-RoundToUnity(Dca/Da));
+  else
+    {
+      if (RoundToUnity(Dca/Da) <= 0.25)
+        blend=((16.0*RoundToUnity(Dca/Da)-12.0)*RoundToUnity(Dca/Da)+
+          4.0)*RoundToUnity(Dca/Da);
+      else
+        blend=sqrt(RoundToUnity(Dca/Da));
+      blend=RoundToUnity(Dca/Da)+(2.0*RoundToUnity(Sca)-1.0)*
+        (blend-RoundToUnity(Dca/Da));
+    }
+  return(blend);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3044,18 +3139,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               D=RoundToUnity(Dca/Da);
             else
               D=0.0;
-            if (S >= 1.0)
-              blend=1.0;
-            else
-              if (D <= 0.0)
-                blend=0.0;
-              else
-                {
-                  if ((1.0-S) <= 0.0)
-                    blend=1.0;
-                  else
-                    blend=MagickMin(1.0,D/(1.0-S));
-                }
+            blend=GetColorDodgeBlend(S,D);
             pixel=(double) QuantumRange*gamma*(Sa*Da*blend+Sca*(1.0-Da)+Dca*
               (1.0-Sa));
             break;
@@ -3573,19 +3657,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
                 pixel=(double) QuantumRange*gamma*Sca;
                 break;
               }
-            if (RoundToUnity(Sca) <= 0.5)
-              blend=RoundToUnity(Dca/Da)-(1.0-2.0*RoundToUnity(Sca))*
-                RoundToUnity(Dca/Da)*(1.0-RoundToUnity(Dca/Da));
-            else
-              {
-                if (RoundToUnity(Dca/Da) <= 0.25)
-                  blend=((16.0*RoundToUnity(Dca/Da)-12.0)*RoundToUnity(Dca/Da)+
-                    4.0)*RoundToUnity(Dca/Da);
-                else
-                  blend=sqrt(RoundToUnity(Dca/Da));
-                blend=RoundToUnity(Dca/Da)+(2.0*RoundToUnity(Sca)-1.0)*
-                  (blend-RoundToUnity(Dca/Da));
-              }
+            blend=GetPegtopLightBlend(Sca,Da,Dca);
             pixel=(double) QuantumRange*gamma*(RoundToUnity(blend)*Da*Sa+Dca*
               (1.0-Sa));
             break;
@@ -3722,26 +3794,13 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           }
           case SoftBurnCompositeOp:
           {
-            if (RoundToUnity(Dca) <= 0.0)
-              blend = 0.0;
-            else
-              if (RoundToUnity(Sca) >= 1.0)
-                blend = 1.0;
-              else
-                blend=1.0-MagickMin(1.0,(1.0-RoundToUnity(Dca))/
-                  RoundToUnity(Sca));
+            blend=GetSoftBurnBlend(Sca,Dca);
             pixel=(double) QuantumRange*gamma*RoundToUnity(blend);
             break;
           }
           case SoftDodgeCompositeOp:
           {
-            if (RoundToUnity(Sca) <= 0.0)
-              blend=RoundToUnity(Dca);
-            else
-              if (RoundToUnity(Dca) >= 1.0)
-                blend=1.0;
-              else
-                blend=MagickMin(1.0,RoundToUnity(Dca)/(1.0-RoundToUnity(Sca)));
+            blend=GetSoftDodgeBlend(Sca,Dca);
             pixel=(double) QuantumRange*gamma*RoundToUnity(blend);
             break;
           }
@@ -3798,16 +3857,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
                   (1.0-Sa));
                 break;
               }
-            if (RoundToUnity(Sca/Sa) <= 0.0)
-              blend=0.0;
-            else
-              if (RoundToUnity(Sca/Sa) < 0.5)
-                blend=1.0-(1.0-RoundToUnity(Dca/Da))/(2.0*RoundToUnity(Sca/Sa));
-            else
-              if (RoundToUnity(Sca/Sa) < 1.0)
-                blend=RoundToUnity(Dca/Da)/(2.0*(1.0-RoundToUnity(Sca/Sa)));
-              else
-                blend=1.0;
+            blend=GetVividLightBlend(Sa,Sca,Da,Dca);
             pixel=(double) QuantumRange*gamma*(Sa*Da*RoundToUnity(blend)+Sca*
               (1.0-Da)+Dca*(1.0-Sa));
             break;
