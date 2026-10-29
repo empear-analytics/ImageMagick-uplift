@@ -2306,13 +2306,8 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   offset=0;
   *source=EncodePredefinedEntities(content+start,(ssize_t) (xml_info->offset-
     start),source,length,extent,MagickFalse);
-  if ((*length+strlen(xml_info->tag)+MagickPathExtent) > *extent)
-    {
-      *extent=(*length)+strlen(xml_info->tag)+MagickPathExtent;
-      *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
-      if (*source == (char *) NULL)
-        return(*source);
-    }
+  if (ExtendXMLBuffer(source,length,extent,xml_info->tag) == MagickFalse)
+    return(*source);
   *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
     "<%s",xml_info->tag);
   for (i=0; xml_info->attributes[i]; i+=2)
@@ -2320,13 +2315,9 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
     attribute=GetXMLTreeAttribute(xml_info,xml_info->attributes[i]);
     if (attribute != xml_info->attributes[i+1])
       continue;
-    if ((*length+strlen(xml_info->attributes[i])+MagickPathExtent) > *extent)
-      {
-        *extent=(*length)+strlen(xml_info->attributes[i])+MagickPathExtent;
-        *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
-        if (*source == (char *) NULL)
-          return((char *) NULL);
-      }
+    if (ExtendXMLBuffer(source,length,extent,
+          xml_info->attributes[i]) == MagickFalse)
+      return((char *) NULL);
     *length+=(size_t) FormatLocaleString(*source+(*length),*extent," %s=\"",
       xml_info->attributes[i]);
     (void) EncodePredefinedEntities(xml_info->attributes[i+1],-1,source,length,
@@ -2347,13 +2338,8 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
         j+=3;
         continue;
       }
-    if ((*length+strlen(attributes[i][j])+MagickPathExtent) > *extent)
-      {
-        *extent=(*length)+strlen(attributes[i][j])+MagickPathExtent;
-        *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
-        if (*source == (char *) NULL)
-          return((char *) NULL);
-      }
+    if (ExtendXMLBuffer(source,length,extent,attributes[i][j]) == MagickFalse)
+      return((char *) NULL);
     *length+=(size_t) FormatLocaleString(*source+(*length),*extent," %s=\"",
       attributes[i][j]);
     (void) EncodePredefinedEntities(attributes[i][j+1],-1,source,length,extent,
@@ -2368,13 +2354,8 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   else
     *source=EncodePredefinedEntities(xml_info->content,-1,source,length,extent,
       MagickFalse);
-  if ((*length+strlen(xml_info->tag)+MagickPathExtent) > *extent)
-    {
-      *extent=(*length)+strlen(xml_info->tag)+MagickPathExtent;
-      *source=(char *) ResizeQuantumMemory(*source,*extent,sizeof(**source));
-      if (*source == (char *) NULL)
-        return((char *) NULL);
-    }
+  if (ExtendXMLBuffer(source,length,extent,xml_info->tag) == MagickFalse)
+    return((char *) NULL);
   if (*xml_info->content != '\0')
     *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"</%s>",
       xml_info->tag);
