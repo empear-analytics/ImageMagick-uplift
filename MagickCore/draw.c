@@ -1816,6 +1816,15 @@ static inline MagickBooleanType IsDashSegmentPending(
     ((n & 0x01) == 0) && (j > 1)) ? MagickTrue : MagickFalse);
 }
 
+static ssize_t GetNextDashIndex(const DrawInfo *draw_info,ssize_t n)
+{
+  if (fabs(draw_info->dash_pattern[n]) >= MagickEpsilon)
+    n++;
+  if (fabs(draw_info->dash_pattern[n]) < MagickEpsilon)
+    n=0;
+  return(n);
+}
+
 static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,Image *image,ExceptionInfo *exception)
 {
@@ -1904,10 +1913,7 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
       continue;
     if (fabs(length) < MagickEpsilon)
       {
-        if (fabs(draw_info->dash_pattern[n]) >= MagickEpsilon)
-          n++;
-        if (fabs(draw_info->dash_pattern[n]) < MagickEpsilon)
-          n=0;
+        n=GetNextDashIndex(draw_info,n);
         length=scale*draw_info->dash_pattern[n];
       }
     for (total_length=0.0; (length >= 0.0) && (maximum_length >= (total_length+length)); )
@@ -1942,10 +1948,7 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
           if (status == MagickFalse)
             break;
         }
-      if (fabs(draw_info->dash_pattern[n]) >= MagickEpsilon)
-        n++;
-      if (fabs(draw_info->dash_pattern[n]) < MagickEpsilon)
-        n=0;
+      n=GetNextDashIndex(draw_info,n);
       length=scale*draw_info->dash_pattern[n];
     }
     length-=(maximum_length-total_length);
