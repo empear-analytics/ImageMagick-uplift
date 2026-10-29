@@ -93,6 +93,23 @@
 #include "MagickCore/utility-private.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _HullBuffers
+{
+  const Image
+    *image;
+
+  size_t
+    columns,
+    rows;
+
+  Quantum
+    *f,
+    *g;
+} HullBuffers;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -1474,10 +1491,20 @@ MagickExport Image *ConvolveImage(const Image *image,
 %
 */
 
-static void Hull(const Image *image,const ssize_t x_offset,
-  const ssize_t y_offset,const size_t columns,const size_t rows,
-  const int polarity,Quantum *magick_restrict f,Quantum *magick_restrict g)
+static void Hull(const HullBuffers *hull,const ssize_t x_offset,
+  const ssize_t y_offset,const int polarity)
 {
+  const Image
+    *const image = hull->image;
+
+  const size_t
+    columns = hull->columns,
+    rows = hull->rows;
+
+  Quantum
+    *magick_restrict const f = hull->f,
+    *magick_restrict const g = hull->g;
+
   Quantum
     *p,
     *q,
@@ -1658,6 +1685,9 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
   despeckle_view=AcquireAuthenticCacheView(despeckle_image,exception);
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
+    HullBuffers
+      hull;
+
     PixelChannel
        channel;
 
@@ -1707,10 +1737,30 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
     (void) memset(buffer,0,length*sizeof(*buffer));
     for (k=0; k < 4; k++)
     {
-      Hull(image,X[k],Y[k],image->columns,image->rows,1,pixels,buffer);
-      Hull(image,-X[k],-Y[k],image->columns,image->rows,1,pixels,buffer);
-      Hull(image,-X[k],-Y[k],image->columns,image->rows,-1,pixels,buffer);
-      Hull(image,X[k],Y[k],image->columns,image->rows,-1,pixels,buffer);
+      hull.image=image;
+      hull.columns=image->columns;
+      hull.rows=image->rows;
+      hull.f=pixels;
+      hull.g=buffer;
+      Hull(&hull,X[k],Y[k],1);
+      hull.image=image;
+      hull.columns=image->columns;
+      hull.rows=image->rows;
+      hull.f=pixels;
+      hull.g=buffer;
+      Hull(&hull,-X[k],-Y[k],1);
+      hull.image=image;
+      hull.columns=image->columns;
+      hull.rows=image->rows;
+      hull.f=pixels;
+      hull.g=buffer;
+      Hull(&hull,-X[k],-Y[k],-1);
+      hull.image=image;
+      hull.columns=image->columns;
+      hull.rows=image->rows;
+      hull.f=pixels;
+      hull.g=buffer;
+      Hull(&hull,X[k],Y[k],-1);
     }
     j=(ssize_t) image->columns+2;
     for (y=0; y < (ssize_t) image->rows; y++)
