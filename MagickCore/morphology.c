@@ -4120,6 +4120,52 @@ static void ReportSaveForCompose(const MagickBooleanType verbose)
     (void) FormatLocaleFile(stderr, " (save for compose)");
 }
 
+typedef struct _MorphologyKernelCompose
+{
+  MagickBooleanType
+    verbose;
+
+  CompositeOperator
+    rslt_compose;
+
+  Image
+    *rslt_image;
+
+  const Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} MorphologyKernelCompose;
+
+static Image *ComposeKernelResult(const MorphologyKernelCompose *kernel_compose,
+  Image *curr_image)
+{
+  const MagickBooleanType
+    verbose = kernel_compose->verbose;
+
+  const CompositeOperator
+    rslt_compose = kernel_compose->rslt_compose;
+
+  Image
+    *const rslt_image = kernel_compose->rslt_image;
+
+  const Image
+    *const image = kernel_compose->image;
+
+  ExceptionInfo
+    *const exception = kernel_compose->exception;
+
+  if (verbose != MagickFalse)
+    (void) FormatLocaleFile(stderr, " (compose \"%s\")",
+      CommandOptionToMnemonic(MagickComposeOptions, rslt_compose) );
+  (void) CompositeImage(rslt_image,curr_image,rslt_compose,MagickTrue,
+    0,0,exception);
+  curr_image = DestroyImage(curr_image);
+  curr_image = (Image *) image;  /* continue with original image */
+  return(curr_image);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4292,6 +4338,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
     kernel_number = 0;
     while ( norm_kernel != NULL ) {
+      MorphologyKernelCompose
+        kernel_compose;
+
 
       /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
       stage_loop = 0;          /* the compound morphology stage number */
@@ -4504,13 +4553,12 @@ MagickPrivate Image *MorphologyApply(const Image *image,
           ** purely mathematical way, and only to the selected channels.
           ** IE: Turn off SVG composition 'alpha blending'.
           */
-          if (verbose != MagickFalse)
-            (void) FormatLocaleFile(stderr, " (compose \"%s\")",
-              CommandOptionToMnemonic(MagickComposeOptions, rslt_compose) );
-          (void) CompositeImage(rslt_image,curr_image,rslt_compose,MagickTrue,
-            0,0,exception);
-          curr_image = DestroyImage(curr_image);
-          curr_image = (Image *) image;  /* continue with original image */
+          kernel_compose.verbose=verbose;
+          kernel_compose.rslt_compose=rslt_compose;
+          kernel_compose.rslt_image=rslt_image;
+          kernel_compose.image=image;
+          kernel_compose.exception=exception;
+          curr_image=ComposeKernelResult(&kernel_compose,curr_image);
         }
       if (verbose != MagickFalse)
         (void) FormatLocaleFile(stderr, "\n");
