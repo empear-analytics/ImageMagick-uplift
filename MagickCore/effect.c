@@ -4142,6 +4142,45 @@ static inline MagickBooleanType IsSelectiveRowMissing(const Quantum *p,
     (q == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _SelectiveTap
+{
+  double
+    contrast,
+    threshold;
+
+  const MagickRealType
+    *k;
+
+  const Quantum
+    *pixels;
+
+  ssize_t
+    i;
+} SelectiveTap;
+
+static void AddSelectiveTap(const SelectiveTap *tap,double *pixel,
+  double *gamma)
+{
+  const double
+    contrast = tap->contrast,
+    threshold = tap->threshold;
+
+  const MagickRealType
+    *magick_restrict const k = tap->k;
+
+  const Quantum
+    *magick_restrict const pixels = tap->pixels;
+
+  const ssize_t
+    i = tap->i;
+
+  if (fabs(contrast) < threshold)
+    {
+      *pixel+=(*k)*(double) pixels[i];
+      *gamma+=(*k);
+    }
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -4364,13 +4403,17 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
             {
               for (u=0; u < (ssize_t) width; u++)
               {
+                SelectiveTap
+                  tap;
+
                 contrast=GetPixelIntensity(luminance_image,luminance_pixels)-
                   intensity;
-                if (fabs(contrast) < threshold)
-                  {
-                    pixel+=(*k)*(double) pixels[i];
-                    gamma+=(*k);
-                  }
+                tap.contrast=contrast;
+                tap.threshold=threshold;
+                tap.k=k;
+                tap.pixels=pixels;
+                tap.i=i;
+                AddSelectiveTap(&tap,&pixel,&gamma);
                 k++;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
                 luminance_pixels+=(ptrdiff_t) GetPixelChannels(luminance_image);
