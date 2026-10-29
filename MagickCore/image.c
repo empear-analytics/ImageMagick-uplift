@@ -2794,6 +2794,47 @@ static const MagickInfo *SetUserSpecifiedFormat(ImageInfo *image_info,
   return(magick_info);
 }
 
+static void ParseSubimageComponent(ImageInfo *image_info)
+{
+  char
+    component[MagickPathExtent];
+
+  *component='\0';
+  GetPathComponent(image_info->filename,SubimagePath,component);
+  if (*component == '\0')
+    {   
+      const char *image_frames = GetImageOption(image_info,"image:frames");
+      if (image_frames != (const char *) NULL)
+        (void) CopyMagickString(component,image_frames,MagickPathExtent);
+    }     
+  if (*component != '\0')
+    {
+      /*
+        Look for scene specification (e.g. img0001.pcd[4]).
+      */
+      if (IsSceneGeometry(component,MagickFalse) == MagickFalse)
+        {
+          if (IsGeometry(component) != MagickFalse)
+            (void) CloneString(&image_info->extract,component);
+        }
+      else
+        ParseSceneRange(image_info,component);
+    }
+}
+
+static void TestMultipleImageSupport(ImageInfo *image_info,char *component,
+  ExceptionInfo *exception)
+{
+  /*
+    Test for multiple image support (e.g. image%02d.png).
+  */
+  (void) InterpretImageFilename(image_info,(Image *) NULL,
+    image_info->filename,(int) image_info->scene,component,exception);
+  if ((LocaleCompare(component,image_info->filename) != 0) &&
+      (strchr(component,'%') == (char *) NULL))
+    image_info->adjoin=MagickFalse;
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
@@ -2828,27 +2869,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       image_info->filename);
-  *component='\0';
-  GetPathComponent(image_info->filename,SubimagePath,component);
-  if (*component == '\0')
-    {   
-      const char *image_frames = GetImageOption(image_info,"image:frames");
-      if (image_frames != (const char *) NULL)
-        (void) CopyMagickString(component,image_frames,MagickPathExtent);
-    }     
-  if (*component != '\0')
-    {
-      /*
-        Look for scene specification (e.g. img0001.pcd[4]).
-      */
-      if (IsSceneGeometry(component,MagickFalse) == MagickFalse)
-        {
-          if (IsGeometry(component) != MagickFalse)
-            (void) CloneString(&image_info->extract,component);
-        }
-      else
-        ParseSceneRange(image_info,component);
-    }
+  ParseSubimageComponent(image_info);
   *component='\0';
   if (*image_info->magick == '\0')
     GetPathComponent(image_info->filename,ExtensionPath,component);
@@ -2891,16 +2912,7 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
       (GetMagickEndianSupport(magick_info) == MagickFalse))
     image_info->endian=UndefinedEndian;
   if ((image_info->adjoin != MagickFalse) && (frames > 1))
-    {
-      /*
-        Test for multiple image support (e.g. image%02d.png).
-      */
-      (void) InterpretImageFilename(image_info,(Image *) NULL,
-        image_info->filename,(int) image_info->scene,component,exception);
-      if ((LocaleCompare(component,image_info->filename) != 0) &&
-          (strchr(component,'%') == (char *) NULL))
-        image_info->adjoin=MagickFalse;
-    }
+    TestMultipleImageSupport(image_info,component,exception);
   if ((image_info->adjoin != MagickFalse) && (frames > 0))
     {
       /*
