@@ -3334,6 +3334,21 @@ static void SetSparseControlColor(const SparseControlColor *control,
     pixel->alpha=arguments[x++];
 }
 
+static double ManhattanDistance(const ssize_t i,const ssize_t j,
+  const double *arguments,const size_t k)
+{
+  return(fabs((double)i-arguments[ k ])+
+    fabs((double)j-arguments[k+1]));
+}
+
+static double VoronoiDistance(const ssize_t i,const ssize_t j,
+  const double *arguments,const size_t k)
+{
+  return(
+      ((double) i-arguments[ k ])*((double) i-arguments[ k ])
+    + ((double) j-arguments[k+1])*((double) j-arguments[k+1]));
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3573,8 +3588,7 @@ MagickExport Image *SparseColorImage(const Image *image,
             */
             for (k=0; k<number_arguments; k+=2+number_colors)
             {
-              double distance = fabs((double)i-arguments[ k ])+
-                fabs((double)j-arguments[k+1]);
+              double distance = ManhattanDistance(i,j,arguments,k);
               if ( distance < minimum ) {
                 SparseControlColor
                   control;
@@ -3601,9 +3615,7 @@ MagickExport Image *SparseColorImage(const Image *image,
               Just use the closest control point you can find!
             */
             for (k=0; k<number_arguments; k+=2+number_colors) {
-              double distance =
-                  ((double) i-arguments[ k ])*((double) i-arguments[ k ])
-                + ((double) j-arguments[k+1])*((double) j-arguments[k+1]);
+              double distance = VoronoiDistance(i,j,arguments,k);
               if ( distance < minimum ) {
                 SparseControlColor
                   control;
