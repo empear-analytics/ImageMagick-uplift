@@ -3307,19 +3307,19 @@ static Image *SIMMagnitudeImage(Image *alpha_image,Image *beta_image,
   return(magnitude_image);
 }
 
+typedef struct
+{
+  double
+    maxima;
+
+  ssize_t
+    x,
+    y;
+} MaximaInfo;
+
 static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
   RectangleInfo *offset,ExceptionInfo *exception)
 {
-  typedef struct
-  {
-    double
-      maxima;
-
-    ssize_t
-      x,
-      y;
-  } MaximaInfo;
-
   CacheView
     *image_view;
 
