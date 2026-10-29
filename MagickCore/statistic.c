@@ -1830,6 +1830,50 @@ static void ComputeChannelEntropy(const Image *image,const double *histogram,
   }
 }
 
+typedef struct _ChannelSample
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    i;
+} ChannelSample;
+
+static void AccumulateChannelSample(const ChannelSample *sample,
+  ChannelStatistics *cs,double *histogram)
+{
+  const Image
+    *const image = sample->image;
+
+  const Quantum
+    *const p = sample->p;
+
+  const ssize_t
+    i = sample->i;
+
+  cs->area++;
+  if ((double) p[i] < cs->minima)
+    cs->minima=(double) p[i];
+  if ((double) p[i] > cs->maxima)
+    cs->maxima=(double) p[i];
+  histogram[(ssize_t) GetPixelChannels(image)*ScaleQuantumToMap(
+    ClampToQuantum((double) p[i]))+i]++;
+  cs->sumLD+=(long double) p[i];
+  /*
+    sum_squared, sum_cubed and sum_fourth_power are not used in
+    MagickCore or MagickWand, but are made available in
+    Magick++/lib/Statistic.cpp, so we need to calculate these.
+  */
+  cs->sum_squared+=(double) p[i]*(double) p[i];
+  cs->sum_cubed+=(double) p[i]*(double) p[i]*(double) p[i];
+  cs->sum_fourth_power+=(double) p[i]*(double) p[i]*(double) p[i]*
+    (double) p[i];
+  UpdateWelfordMoments(cs,p,i);
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -1909,6 +1953,9 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
         ChannelStatistics
           *cs;
 
+        ChannelSample
+          sample;
+
         PixelChannel channel = GetPixelChannelChannel(image,i);
         PixelTrait traits = GetPixelChannelTraits(image,channel);
         if ((traits & UpdatePixelTrait) == 0)
@@ -1929,24 +1976,10 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
                 continue;
               }
           }
-        cs->area++;
-        if ((double) p[i] < cs->minima)
-          cs->minima=(double) p[i];
-        if ((double) p[i] > cs->maxima)
-          cs->maxima=(double) p[i];
-        histogram[(ssize_t) GetPixelChannels(image)*ScaleQuantumToMap(
-          ClampToQuantum((double) p[i]))+i]++;
-        cs->sumLD+=(long double) p[i];
-        /*
-          sum_squared, sum_cubed and sum_fourth_power are not used in
-          MagickCore or MagickWand, but are made available in
-          Magick++/lib/Statistic.cpp, so we need to calculate these.
-        */
-        cs->sum_squared+=(double) p[i]*(double) p[i];
-        cs->sum_cubed+=(double) p[i]*(double) p[i]*(double) p[i];
-        cs->sum_fourth_power+=(double) p[i]*(double) p[i]*(double) p[i]*
-          (double) p[i];
-        UpdateWelfordMoments(cs,p,i);
+        sample.image=image;
+        sample.p=p;
+        sample.i=i;
+        AccumulateChannelSample(&sample,cs,histogram);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
