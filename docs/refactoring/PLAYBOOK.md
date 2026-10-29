@@ -1321,12 +1321,20 @@ no `status`. T then B is two commits, of which the first adds a finding.
    parameters. At the top of its body declare one `const` local per member, as Recipe N
    step 4 does; then a local `status` set to `MagickTrue` first, as Recipe T step 5
    does. The block's text is unchanged, and the function ends with `return(status);`.
+   Or, instead of the `const` locals, write `name->member` for every use of a member in
+   the block, as Recipe B step 3 allows (Recipe W step 3).
 4. In the caller, declare the `Name` local among the declarations at the top of the
    block holding the call, inside the parallel loop body, so each thread fills its own.
 5. Directly before the call, assign every member from the variable of its name, in
    declaration order, with nothing between the assignments and the call.
 6. Where the block stood, write `if (Helper(&name,...) == MagickFalse)
    status=MagickFalse;`, and check every member and argument by reading.
+7. A block that is the whole body of a loop inside the parallel loop body (a channel
+   loop), declarations included, may contain `continue;` statements of that loop: each
+   becomes `return(status);`, and the body becomes the declaration of the `Name` local,
+   its assignments and the call, as Recipe E step 7 does for a `void` function. The
+   loop's counter goes by value. The block contains no `break` or `return` of its own,
+   and no `continue` of a loop nested inside it changes.
 
 **Before:**
 
@@ -1434,7 +1442,9 @@ which refuses both. J then B is two commits, of which the first adds a finding.
    first, then one pointer per written accumulator or cursor, in the order the block
    first writes them, at most four parameters in all. At the top of its body declare one
    `const` local per member, as Recipe N step 4 does, then a local `status` set to
-   `MagickTrue` first, as Recipe J step 4 does.
+   `MagickTrue` first, as Recipe J step 4 does. Or, instead of the `const` locals, write
+   `name->member` for every use of a member in the block, as Recipe B step 3 allows:
+   the form for a block whose sibling helper unpacks the same members.
 4. In the block's text write each written variable `v` as `*v` at every use, reads
    included (`(*v)++` for `v++`, `(**k)` for `(*k)` where `k` is a pointer cursor), as
    Recipe K step 4 does; every `status=MagickFalse;` stays; the function ends with
@@ -1524,8 +1534,9 @@ static MagickBooleanType SumMotionPixels(const MotionSum *sum,double *pixel,
 - Two blocks that differ only by a line or two (a plain and an alpha-blended sum, which
   share the fetch and the member locals) become helpers CodeScene reports as *Code
   Duplication*: extracting both measured 2.06 to 2.01 on `MotionBlurImage` and 2.02 to
-  1.95 on `RotationalBlurImage`. Extract one of the pair, and keep the step only when no
-  duplication appears.
+  1.95 on `RotationalBlurImage`. The shared lines are mostly the `const` locals: write
+  the second helper in the member form of step 3 (on `MotionBlurImage`, no duplication,
+  2.18 to 2.20), and keep the step only when no duplication appears.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 2 and 7 checked by reading: the oracle runs
@@ -1987,3 +1998,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | AMEND | Q | Step 1: a block in a function with no OpenMP region (a sequential pass) qualifies, its written variables being plain locals of the caller (Recipe O step 2); *Careful* notes the cursors (`k`, `pixels`) such a block advances for the next call | `morphology.c`'s `MorphologyPrimitiveDirect`: its forward pass repeats one kernel-row body (`pixel`, `k`, `pixels` written; `image`, `kernel`, `i` read) in the Distance and Voronoi double loops; the function is sequential (two views of one image), so Recipe K's parallel-body wording refuses it, Recipe E step 4 refuses three outputs and Recipe O wants a selection. A probe of the row helper at both sites: nesting 6 to 5, 2.41 to 2.46 | mandate (2026-10-24) |
 | 2026-10-29 | NEW | V | Extract Block Returning Success for a Cleanup Jump: a block outside OpenMP that leaves through `goto L;` and writes at most one caller local moves to a `static MagickBooleanType` function, each `goto L;` becoming `return(MagickFalse);`, the local passed by pointer; the caller writes `if (Helper(...) == MagickFalse) goto L;` | `MorphologyApply`'s work-image clone inside four nested loops (nesting 6), refused by every extraction recipe for its `goto error_cleanup`; the plateau of the earlier W07 pass on `morphology.c`. A probe: nesting 6 to 5, 2.46 to 2.51 | mandate (2026-10-24) |
 | 2026-10-29 | NEW | W | Extract Accumulating Block Returning the Loop Status Taking an Input Struct: a Recipe J block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and a pointer per written accumulator or cursor (Recipe K); the caller writes `status=MagickFalse` from its result (Recipe T) | `MotionBlurImage`'s plain kernel sum (nesting 6; `pixel`, `k` and `status` written, seven inputs): J gives ten parameters (M101), Q and U refuse the status or the accumulator. A probe: nesting 6 to 5, 2.06 to 2.10 | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | W | Step 3: instead of the `const` locals, the body may write `name->member` at every use of a member (Recipe B step 3's form); *Careful* names it as the way to extract the second of a plain and a blended sum without the two helpers repeating each other's locals | `MotionBlurImage`'s blended kernel sum beside `SumMotionPixels`: with `const` locals the pair is reported as Code Duplication (2.06 to 2.01); in the member form no duplication, 2.18 to 2.20 | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | U | Step 3: the member form of Recipe W step 3. Step 7: a block that is the whole body of a channel loop inside the parallel loop body may contain `continue;` of that loop, each becoming `return(status);`, as Recipe E step 7 does for a `void` function | `MotionBlurImage`'s per-channel body after both kernel sums moved: the channel loop as one helper is a Complex Method (cc 11, its `continue`s counted); the body as a helper (cc 6) called from a channel-loop helper (cc 3) takes the function out of Brain Method and Deep, Nested Complexity, 2.20 to 2.43 in a probe | mandate (2026-10-24) |
