@@ -3662,6 +3662,29 @@ static inline fxFltType GetIntensity (FxInfo * pfx, ssize_t ImgNum, const fxFltT
   return QuantumScale * GetPixelIntensity (img, quantum_pixel);
 }
 
+static fxFltType GetElementValue (ElementT * pel, const PixelChannel channel)
+{
+  fxFltType
+    regA;
+
+  if (pel->type == etColourConstant) {
+    switch (channel) { default:
+      case (PixelChannel) 0:
+        regA = pel->val;
+        break;
+      case (PixelChannel) 1:
+        regA = pel->val1;
+        break;
+      case (PixelChannel) 2:
+        regA = pel->val2;
+        break;
+    }
+  } else {
+    regA = pel->val;
+  }
+  return(regA);
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -3872,21 +3895,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           pel->val = regA;
           break;
         case oNull: {
-          if (pel->type == etColourConstant) {
-            switch (channel) { default:
-              case (PixelChannel) 0:
-                regA = pel->val;
-                break;
-              case (PixelChannel) 1:
-                regA = pel->val1;
-                break;
-              case (PixelChannel) 2:
-                regA = pel->val2;
-                break;
-            }
-          } else {
-            regA = pel->val;
-          }
+          regA = GetElementValue (pel, channel);
           break;
         }
         case fAbs:
