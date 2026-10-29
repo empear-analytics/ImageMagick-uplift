@@ -3349,6 +3349,75 @@ static double VoronoiDistance(const ssize_t i,const ssize_t j,
     + ((double) j-arguments[k+1])*((double) j-arguments[k+1]));
 }
 
+typedef struct _SparseColorPoint
+{
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  ssize_t
+    i,
+    j;
+} SparseColorPoint;
+
+static void ManhattanSparseColor(const SparseColorPoint *point,
+  PixelInfo *pixel)
+{
+  const Image
+    *const image = point->image;
+
+  Image
+    *const sparse_image = point->sparse_image;
+
+  const size_t
+    number_arguments = point->number_arguments;
+
+  const double
+    *const arguments = point->arguments;
+
+  const size_t
+    number_colors = point->number_colors;
+
+  const ssize_t
+    i = point->i,
+    j = point->j;
+
+  double
+    minimum = MagickMaximumValue;
+
+  size_t
+    k;
+
+  /*
+    Just use the closest control point you can find!
+  */
+  for (k=0; k<number_arguments; k+=2+number_colors)
+  {
+    double distance = ManhattanDistance(i,j,arguments,k);
+    if ( distance < minimum ) {
+      SparseControlColor
+        control;
+
+      control.image=image;
+      control.sparse_image=sparse_image;
+      control.arguments=arguments;
+      SetSparseControlColor(&control,k,pixel);
+      minimum = distance;
+    }
+  }
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3577,29 +3646,17 @@ MagickExport Image *SparseColorImage(const Image *image,
           }
           case ManhattanColorInterpolate:
           {
-            double
-              minimum = MagickMaximumValue;
+            SparseColorPoint
+              point;
 
-            size_t
-              k;
-
-            /*
-              Just use the closest control point you can find!
-            */
-            for (k=0; k<number_arguments; k+=2+number_colors)
-            {
-              double distance = ManhattanDistance(i,j,arguments,k);
-              if ( distance < minimum ) {
-                SparseControlColor
-                  control;
-
-                control.image=image;
-                control.sparse_image=sparse_image;
-                control.arguments=arguments;
-                SetSparseControlColor(&control,k,&pixel);
-                minimum = distance;
-              }
-            }
+            point.image=image;
+            point.sparse_image=sparse_image;
+            point.number_arguments=number_arguments;
+            point.arguments=arguments;
+            point.number_colors=number_colors;
+            point.i=i;
+            point.j=j;
+            ManhattanSparseColor(&point,&pixel);
             break;
           }
           case VoronoiColorInterpolate:
