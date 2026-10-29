@@ -4069,6 +4069,20 @@ static void ReportMorphologyPass(const char *v_info,
     (double) count,(double) changed);
 }
 
+static MagickBooleanType AcquireWorkImage(const Image *image,
+  Image **work_image,ExceptionInfo *exception)
+{
+  if ( *work_image == (Image *) NULL )
+    {
+      *work_image=CloneImage(image,0,0,MagickTrue,exception);
+      if (*work_image == (Image *) NULL)
+        return(MagickFalse);
+      if (SetImageStorageClass(*work_image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4362,14 +4376,8 @@ MagickPrivate Image *MorphologyApply(const Image *image,
           kernel_loop++;     /* the iteration of this kernel */
 
           /* Create a clone as the destination image, if not yet defined */
-          if ( work_image == (Image *) NULL )
-            {
-              work_image=CloneImage(image,0,0,MagickTrue,exception);
-              if (work_image == (Image *) NULL)
-                goto error_cleanup;
-              if (SetImageStorageClass(work_image,DirectClass,exception) == MagickFalse)
-                goto error_cleanup;
-            }
+          if (AcquireWorkImage(image,&work_image,exception) == MagickFalse)
+            goto error_cleanup;
 
           /* APPLY THE MORPHOLOGICAL PRIMITIVE (curr -> work) */
           count++;
