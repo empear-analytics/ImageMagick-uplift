@@ -668,19 +668,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
       return(crop_image);
     }
   ClipCropOffset(&page.x,&page.width,bounding_box.x);
-  if ((page.y < 0) && (bounding_box.y >= 0))
-    {
-      page.height=CastDoubleToSizeT((double) page.height+page.y-bounding_box.y);
-      page.y=0;
-    }
-  else
-    {
-      page.height=CastDoubleToSizeT((double) page.height-(bounding_box.y-
-        page.y));
-      page.y-=bounding_box.y;
-      if (page.y < 0)
-        page.y=0;
-    }
+  ClipCropOffset(&page.y,&page.height,bounding_box.y);
   if ((page.x+(ssize_t) page.width) > (ssize_t) image->columns)
     page.width=(size_t) ((ssize_t) image->columns-page.x);
   if ((geometry->width != 0) && (page.width > geometry->width))
