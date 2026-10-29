@@ -1325,6 +1325,63 @@ static void NormalizeLabeledObject(const Image *image,CCObjectInfo *object,
   object[i].centroid.y/=object[i].area;
 }
 
+typedef struct _CCObjectStatistics
+{
+  Image
+    *component_image;
+
+  CacheView
+    *component_view;
+
+  ExceptionInfo
+    *exception;
+} CCObjectStatistics;
+
+static MagickBooleanType AccumulateObjectStatistics(CCObjectInfo *object,
+  const CCObjectStatistics *object_statistics,MagickBooleanType status)
+{
+  Image
+    *const component_image = object_statistics->component_image;
+
+  CacheView
+    *const component_view = object_statistics->component_view;
+
+  ExceptionInfo
+    *const exception = object_statistics->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) component_image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(component_view,0,y,component_image->columns,
+      1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    for (x=0; x < (ssize_t) component_image->columns; x++)
+    {
+      size_t
+        id;
+
+      id=(size_t) GetPixelIndex(component_image,p);
+      AddObjectPixel(object,id,x,y);
+      p+=(ptrdiff_t) GetPixelChannels(component_image);
+    }
+  }
+  return(status);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1972,6 +2029,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   if ((IsStringTrue(artifact) != MagickFalse) ||
       (objects != (CCObjectInfo **) NULL))
     {
+      CCObjectStatistics
+        object_statistics;
+
       ssize_t
         key,
         order;
@@ -1981,33 +2041,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       */
       ResetObjectStatistics(component_image,object);
       component_view=AcquireVirtualCacheView(component_image,exception);
-      for (y=0; y < (ssize_t) component_image->rows; y++)
-      {
-        const Quantum
-          *magick_restrict p;
-
-        ssize_t
-          x;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(component_view,0,y,component_image->columns,
-          1,exception);
-        if (p == (const Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) component_image->columns; x++)
-        {
-          size_t
-            id;
-
-          id=(size_t) GetPixelIndex(component_image,p);
-          AddObjectPixel(object,id,x,y);
-          p+=(ptrdiff_t) GetPixelChannels(component_image);
-        }
-      }
+      object_statistics.component_image=component_image;
+      object_statistics.component_view=component_view;
+      object_statistics.exception=exception;
+      status=AccumulateObjectStatistics(object,&object_statistics,status);
       NormalizeObjectStatistics(component_image,object);
       component_view=DestroyCacheView(component_view);
       order=GetObjectSortOrder(image);
