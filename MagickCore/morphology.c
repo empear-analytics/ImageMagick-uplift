@@ -3858,6 +3858,41 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   Basically this provides the complex glue between the requested morphology
   method and raw low-level implementation (above).
 */
+typedef struct _MorphologyStage
+{
+  MorphologyMethod
+    method,
+    primitive;
+
+  size_t
+    method_loop,
+    stage_loop,
+    stage_limit;
+} MorphologyStage;
+
+static void FormatMorphologyStage(char *v_info,const MorphologyStage *stage)
+{
+  const MorphologyMethod
+    method = stage->method,
+    primitive = stage->primitive;
+
+  const size_t
+    method_loop = stage->method_loop,
+    stage_loop = stage->stage_loop,
+    stage_limit = stage->stage_limit;
+
+  if ( stage_limit > 1 )
+    (void) FormatLocaleString(v_info,MagickPathExtent,"%s:%.17g.%.17g -> ",
+     CommandOptionToMnemonic(MagickMorphologyOptions,method),(double)
+     method_loop,(double) stage_loop);
+  else if ( primitive != method )
+    (void) FormatLocaleString(v_info, MagickPathExtent, "%s:%.17g -> ",
+      CommandOptionToMnemonic(MagickMorphologyOptions, method),(double)
+      method_loop);
+  else
+    v_info[0] = '\0';
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4130,16 +4165,15 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
         /* Extra information for debugging compound operations */
         if (verbose != MagickFalse) {
-          if ( stage_limit > 1 )
-            (void) FormatLocaleString(v_info,MagickPathExtent,"%s:%.17g.%.17g -> ",
-             CommandOptionToMnemonic(MagickMorphologyOptions,method),(double)
-             method_loop,(double) stage_loop);
-          else if ( primitive != method )
-            (void) FormatLocaleString(v_info, MagickPathExtent, "%s:%.17g -> ",
-              CommandOptionToMnemonic(MagickMorphologyOptions, method),(double)
-              method_loop);
-          else
-            v_info[0] = '\0';
+          MorphologyStage
+            stage;
+
+          stage.method=method;
+          stage.primitive=primitive;
+          stage.method_loop=method_loop;
+          stage.stage_loop=stage_loop;
+          stage.stage_limit=stage_limit;
+          FormatMorphologyStage(v_info,&stage);
         }
 
         /* Loop 4: Iterate the kernel with primitive */
