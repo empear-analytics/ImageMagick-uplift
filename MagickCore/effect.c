@@ -2071,6 +2071,64 @@ static double GetTriangleWeightedSum(const float *pixels,const ssize_t offset,
   return(sum);
 }
 
+typedef struct _LocalContrastPixel
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  double
+    sum,
+    totalWeight,
+    strength;
+
+  Image
+    *contrast_image;
+} LocalContrastPixel;
+
+static void ApplyLocalContrastPixel(const LocalContrastPixel *contrast,
+  Quantum *magick_restrict q)
+{
+  const Image
+    *const image = contrast->image;
+
+  const Quantum
+    *const p = contrast->p;
+
+  const double
+    sum = contrast->sum,
+    totalWeight = contrast->totalWeight,
+    strength = contrast->strength;
+
+  Image
+    *const contrast_image = contrast->contrast_image;
+
+  double
+    mult,
+    srcVal;
+
+  PixelTrait
+    traits;
+
+  srcVal=(float) GetPixelLuma(image,p);
+  mult=(srcVal-(sum/totalWeight))*(strength/100.0);
+  mult=(srcVal+mult)/srcVal;
+  traits=GetPixelChannelTraits(image,RedPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelRed(contrast_image,ClampToQuantum((MagickRealType)
+      GetPixelRed(image,p)*mult),q);
+  traits=GetPixelChannelTraits(image,GreenPixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelGreen(contrast_image,ClampToQuantum((MagickRealType)
+      GetPixelGreen(image,p)*mult),q);
+  traits=GetPixelChannelTraits(image,BluePixelChannel);
+  if ((traits & UpdatePixelTrait) != 0)
+    SetPixelBlue(contrast_image,ClampToQuantum((MagickRealType)
+      GetPixelBlue(image,p)*mult),q);
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -2235,6 +2293,9 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
       float
         *pixels;
 
+      LocalContrastPixel
+        contrast;
+
       Quantum
         *magick_restrict q;
 
@@ -2258,32 +2319,19 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
       for (x=0; x < (ssize_t) image->columns; x++)
       {
         double
-          mult,
-          srcVal,
           sum;
-
-        PixelTrait
-          traits;
 
         sum=GetTriangleWeightedSum(pixels,x,width);
         /*
           Apply and write.
         */
-        srcVal=(float) GetPixelLuma(image,p);
-        mult=(srcVal-(sum/totalWeight))*(strength/100.0);
-        mult=(srcVal+mult)/srcVal;
-        traits=GetPixelChannelTraits(image,RedPixelChannel);
-        if ((traits & UpdatePixelTrait) != 0)
-          SetPixelRed(contrast_image,ClampToQuantum((MagickRealType)
-            GetPixelRed(image,p)*mult),q);
-        traits=GetPixelChannelTraits(image,GreenPixelChannel);
-        if ((traits & UpdatePixelTrait) != 0)
-          SetPixelGreen(contrast_image,ClampToQuantum((MagickRealType)
-            GetPixelGreen(image,p)*mult),q);
-        traits=GetPixelChannelTraits(image,BluePixelChannel);
-        if ((traits & UpdatePixelTrait) != 0)
-          SetPixelBlue(contrast_image,ClampToQuantum((MagickRealType)
-            GetPixelBlue(image,p)*mult),q);
+        contrast.image=image;
+        contrast.p=p;
+        contrast.sum=sum;
+        contrast.totalWeight=totalWeight;
+        contrast.strength=strength;
+        contrast.contrast_image=contrast_image;
+        ApplyLocalContrastPixel(&contrast,q);
         p+=(ptrdiff_t) image->number_channels;
         q+=(ptrdiff_t) contrast_image->number_channels;
       }
