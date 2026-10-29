@@ -2284,6 +2284,17 @@ static Image *TrimEmptyImage(const Image *image,ExceptionInfo *exception)
   return(trim_image);
 }
 
+static void SetTrimPage(const Image *image,const RectangleInfo geometry,
+  Image *trim_image)
+{
+  trim_image->page.width=image->columns;
+  trim_image->page.height=image->rows;
+  if (trim_image->page.x == 0)
+    trim_image->page.x=geometry.x;
+  if (trim_image->page.y == 0)
+    trim_image->page.y=geometry.y;
+}
+
 MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
 {
   const char
@@ -2379,13 +2390,6 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
   geometry.y+=image->page.y;
   trim_image=CropImage(image,&geometry,exception);
   if (trim_image != (Image *) NULL)
-    {
-      trim_image->page.width=image->columns;
-      trim_image->page.height=image->rows;
-      if (trim_image->page.x == 0)
-        trim_image->page.x=geometry.x;
-      if (trim_image->page.y == 0)
-        trim_image->page.y=geometry.y;
-    }
+    SetTrimPage(image,geometry,trim_image);
   return(trim_image);
 }
