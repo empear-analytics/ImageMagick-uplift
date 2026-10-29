@@ -3420,19 +3420,19 @@ static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
   return(status);
 }
 
+typedef struct
+{
+  double
+    minima;
+
+  ssize_t
+    x,
+    y;
+} MinimaInfo;
+
 static MagickBooleanType SIMMinimaImage(const Image *image,double *minima,
   RectangleInfo *offset,ExceptionInfo *exception)
 {
-  typedef struct
-  {
-    double
-      minima;
-
-    ssize_t
-      x,
-      y;
-  } MinimaInfo;
-
   CacheView
     *image_view;
 
