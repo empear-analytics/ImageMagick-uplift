@@ -3922,6 +3922,64 @@ MagickExport Image *PingBlob(const ImageInfo *image_info,const void *blob,
 %      file.
 %
 */
+static ssize_t ReadBlobFile(BlobInfo *magick_restrict blob_info,
+  const size_t length,unsigned char *q,ssize_t count)
+{
+  int
+    c;
+
+  switch (length)
+  {
+    default:
+    {
+      count=(ssize_t) fread(q,1,length,blob_info->file_info.file);
+      break;
+    }
+    case 4:
+    {
+      c=getc(blob_info->file_info.file);
+      if (c == EOF)
+        break;
+      *q++=(unsigned char) c;
+      count++;
+      magick_fallthrough;
+    }
+    case 3:
+    {
+      c=getc(blob_info->file_info.file);
+      if (c == EOF)
+        break;
+      *q++=(unsigned char) c;
+      count++;
+      magick_fallthrough;
+    }
+    case 2:
+    {
+      c=getc(blob_info->file_info.file);
+      if (c == EOF)
+        break;
+      *q++=(unsigned char) c;
+      count++;
+      magick_fallthrough;
+    }
+    case 1:
+    {
+      c=getc(blob_info->file_info.file);
+      if (c == EOF)
+        break;
+      *q++=(unsigned char) c;
+      count++;
+      magick_fallthrough;
+    }
+    case 0:
+      break;
+  }
+  if ((count != (ssize_t) length) &&
+      (ferror(blob_info->file_info.file) != 0))
+    ThrowBlobException(blob_info);
+  return(count);
+}
+
 MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
 {
   BlobInfo
@@ -3954,55 +4012,7 @@ MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
     case FileStream:
     case PipeStream:
     {
-      switch (length)
-      {
-        default:
-        {
-          count=(ssize_t) fread(q,1,length,blob_info->file_info.file);
-          break;
-        }
-        case 4:
-        {
-          c=getc(blob_info->file_info.file);
-          if (c == EOF)
-            break;
-          *q++=(unsigned char) c;
-          count++;
-          magick_fallthrough;
-        }
-        case 3:
-        {
-          c=getc(blob_info->file_info.file);
-          if (c == EOF)
-            break;
-          *q++=(unsigned char) c;
-          count++;
-          magick_fallthrough;
-        }
-        case 2:
-        {
-          c=getc(blob_info->file_info.file);
-          if (c == EOF)
-            break;
-          *q++=(unsigned char) c;
-          count++;
-          magick_fallthrough;
-        }
-        case 1:
-        {
-          c=getc(blob_info->file_info.file);
-          if (c == EOF)
-            break;
-          *q++=(unsigned char) c;
-          count++;
-          magick_fallthrough;
-        }
-        case 0:
-          break;
-      }
-      if ((count != (ssize_t) length) &&
-          (ferror(blob_info->file_info.file) != 0))
-        ThrowBlobException(blob_info);
+      count=ReadBlobFile(blob_info,length,q,count);
       break;
     }
     case ZipStream:
