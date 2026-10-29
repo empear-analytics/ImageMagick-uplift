@@ -1630,6 +1630,35 @@ static void NormalizeKernelValues(KernelInfo *kernel_info)
     kernel_info->values[i]*=gamma;
 }
 
+static void SetEmbossKernelValues(KernelInfo *kernel_info,const double sigma)
+{
+  ssize_t
+    i;
+
+  ssize_t
+    j,
+    k,
+    u,
+    v;
+
+  j=(ssize_t) (kernel_info->width-1)/2;
+  k=j;
+  i=0;
+  for (v=(-j); v <= j; v++)
+  {
+    for (u=(-j); u <= j; u++)
+    {
+      kernel_info->values[i]=(MagickRealType) (((u < 0) || (v < 0) ? -8.0 :
+        8.0)*exp(-((double) u*u+v*v)/(2.0*MagickSigma*MagickSigma))/
+        (2.0*MagickPI*MagickSigma*MagickSigma));
+      if (u != k)
+        kernel_info->values[i]=0.0;
+      i++;
+    }
+    k--;
+  }
+}
+
 MagickExport Image *EmbossImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1639,17 +1668,8 @@ MagickExport Image *EmbossImage(const Image *image,const double radius,
   KernelInfo
     *kernel_info;
 
-  ssize_t
-    i;
-
   size_t
     width;
-
-  ssize_t
-    j,
-    k,
-    u,
-    v;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1673,22 +1693,7 @@ MagickExport Image *EmbossImage(const Image *image,const double radius,
       kernel_info=DestroyKernelInfo(kernel_info);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  j=(ssize_t) (kernel_info->width-1)/2;
-  k=j;
-  i=0;
-  for (v=(-j); v <= j; v++)
-  {
-    for (u=(-j); u <= j; u++)
-    {
-      kernel_info->values[i]=(MagickRealType) (((u < 0) || (v < 0) ? -8.0 :
-        8.0)*exp(-((double) u*u+v*v)/(2.0*MagickSigma*MagickSigma))/
-        (2.0*MagickPI*MagickSigma*MagickSigma));
-      if (u != k)
-        kernel_info->values[i]=0.0;
-      i++;
-    }
-    k--;
-  }
+  SetEmbossKernelValues(kernel_info,sigma);
   NormalizeKernelValues(kernel_info);
   emboss_image=ConvolveImage(image,kernel_info,exception);
   kernel_info=DestroyKernelInfo(kernel_info);
