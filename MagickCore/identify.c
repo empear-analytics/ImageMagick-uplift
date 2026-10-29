@@ -1148,6 +1148,58 @@ static void PrintAlphaColor(FILE *file,const Image *image,
   (void) FormatLocaleFile(file,"  %s\n",tuple);
 }
 
+static void PrintColorspaceLocations(const Image *image,
+  const ColorspaceType colorspace,ChannelLocationsReport report)
+{
+  ssize_t
+    i;
+
+  switch (colorspace)
+  {
+    case RGBColorspace:
+    case sRGBColorspace:
+    {
+      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,RedPixelChannel,"Red");
+      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,GreenPixelChannel,"Green");
+      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,BluePixelChannel,"Blue");
+      break;
+    }
+    case CMYKColorspace:
+    {
+      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,CyanPixelChannel,"Cyan");
+      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,MagentaPixelChannel,"Magenta");
+      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,YellowPixelChannel,"Yellow");
+      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,BlackPixelChannel,"Black");
+      break;
+    }
+    case LinearGRAYColorspace:
+    case GRAYColorspace:
+    {
+      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,GrayPixelChannel,"Gray");
+      break;
+    }
+    default:
+    {
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,i);
+        PixelTrait traits = GetPixelChannelTraits(image,channel);
+        if ((traits & UpdatePixelTrait) != 0)
+          (void) PrintChannelLocations(&report,channel,"Channel");
+      }
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1249,50 +1301,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       report.channel_statistics=channel_statistics;
 
       (void) FormatLocaleFile(file,"Channel %s locations:\n",locate);
-      switch (colorspace)
-      {
-        case RGBColorspace:
-        case sRGBColorspace:
-        {
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,RedPixelChannel,"Red");
-          if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,GreenPixelChannel,"Green");
-          if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,BluePixelChannel,"Blue");
-          break;
-        }
-        case CMYKColorspace:
-        {
-          if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,CyanPixelChannel,"Cyan");
-          if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,MagentaPixelChannel,"Magenta");
-          if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,YellowPixelChannel,"Yellow");
-          if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,BlackPixelChannel,"Black");
-          break;
-        }
-        case LinearGRAYColorspace:
-        case GRAYColorspace:
-        {
-          if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,GrayPixelChannel,"Gray");
-          break;
-        }
-        default:
-        {
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) != 0)
-              (void) PrintChannelLocations(&report,channel,"Channel");
-          }
-          break;
-        }
-      }
+      PrintColorspaceLocations(image,colorspace,report);
       if (image->alpha_trait != UndefinedPixelTrait)
         (void) PrintChannelLocations(&report,AlphaPixelChannel,"Alpha");
       channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
