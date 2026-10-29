@@ -3364,6 +3364,18 @@ static size_t QuantizeErrorFlatten(const QCubeInfo *cube_info,
 %    o node_info: pointer to node in color cube tree that is to be pruned.
 %
 */
+static void UpdateNextPruningThreshold(QCubeInfo *cube_info,
+  const QNodeInfo *node_info)
+{
+  /*
+    Find minimum pruning threshold.
+  */
+  if (node_info->number_unique > 0)
+    cube_info->colors++;
+  if (node_info->quantize_error < cube_info->next_threshold)
+    cube_info->next_threshold=node_info->quantize_error;
+}
+
 static void Reduce(QCubeInfo *cube_info,const QNodeInfo *node_info)
 {
   size_t
@@ -3382,15 +3394,7 @@ static void Reduce(QCubeInfo *cube_info,const QNodeInfo *node_info)
   if (node_info->quantize_error <= cube_info->pruning_threshold)
     PruneChild(cube_info,node_info);
   else
-    {
-      /*
-        Find minimum pruning threshold.
-      */
-      if (node_info->number_unique > 0)
-        cube_info->colors++;
-      if (node_info->quantize_error < cube_info->next_threshold)
-        cube_info->next_threshold=node_info->quantize_error;
-    }
+    UpdateNextPruningThreshold(cube_info,node_info);
 }
 
 /*
