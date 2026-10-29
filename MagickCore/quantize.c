@@ -1755,6 +1755,27 @@ static inline MagickBooleanType IsDitherPositionInImage(const Image *image,
     (p->y >= 0) && (p->y < (ssize_t) image->rows)) ? MagickTrue : MagickFalse);
 }
 
+static DoublePixelPacket AddRiemersmaQueueError(const QCubeInfo *cube_info,
+  const QCubeInfo *p,DoublePixelPacket pixel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < ErrorQueueLength; i++)
+  {
+    pixel.red+=ErrorRelativeWeight*cube_info->diffusion*p->weights[i]*
+      p->error[i].red;
+    pixel.green+=ErrorRelativeWeight*cube_info->diffusion*p->weights[i]*
+      p->error[i].green;
+    pixel.blue+=ErrorRelativeWeight*cube_info->diffusion*p->weights[i]*
+      p->error[i].blue;
+    if (cube_info->associate_alpha != MagickFalse)
+      pixel.alpha+=ErrorRelativeWeight*cube_info->diffusion*p->weights[i]*
+        p->error[i].alpha;
+  }
+  return(pixel);
+}
+
 static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
   const unsigned int direction,ExceptionInfo *exception)
 {
@@ -1789,8 +1810,7 @@ static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
         *magick_restrict q;
 
       ssize_t
-        *entry,
-        i;
+        *entry;
 
       /*
         Distribute error.
@@ -1799,18 +1819,7 @@ static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
       if (q == (Quantum *) NULL)
         return(MagickFalse);
       AssociateAlphaPixel(image,cube_info,q,&pixel);
-      for (i=0; i < ErrorQueueLength; i++)
-      {
-        pixel.red+=ErrorRelativeWeight*cube_info->diffusion*p->weights[i]*
-          p->error[i].red;
-        pixel.green+=ErrorRelativeWeight*cube_info->diffusion*p->weights[i]*
-          p->error[i].green;
-        pixel.blue+=ErrorRelativeWeight*cube_info->diffusion*p->weights[i]*
-          p->error[i].blue;
-        if (cube_info->associate_alpha != MagickFalse)
-          pixel.alpha+=ErrorRelativeWeight*cube_info->diffusion*p->weights[i]*
-            p->error[i].alpha;
-      }
+      pixel=AddRiemersmaQueueError(cube_info,p,pixel);
       pixel=ClampDitherPixel(cube_info,pixel);
       entry=GetCacheEntry(p,&pixel);
       if ((entry == (ssize_t *) NULL) || (*entry < 0))
