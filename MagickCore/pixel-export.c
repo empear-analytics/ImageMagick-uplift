@@ -340,6 +340,55 @@ static MagickBooleanType ExportCharRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportCharQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned char *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToChar(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ExportCharPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -397,50 +446,7 @@ static MagickBooleanType ExportCharPixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelRed(image,p));
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelGreen(image,p));
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelBlue(image,p));
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=ScaleQuantumToChar(GetPixelBlack(image,p));
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
-            break;
-          }
-          default:
-            break;
-        }
+        ExportCharQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
