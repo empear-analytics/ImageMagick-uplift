@@ -4706,6 +4706,14 @@ static Image *RMSESimilarityImage(const Image *image,const Image *reconstruct,
   *similarity_metric=sqrt(*similarity_metric);
   return(rmse_image);
 }
+
+static inline MagickBooleanType IsFrequencyDomainSimilarity(
+  const Image *image,const char *artifact)
+{
+  return((((artifact == (const char *) NULL) ||
+    (IsStringTrue(artifact) != MagickFalse)) &&
+    ((image->channels & ReadMaskChannel) == 0)) ? MagickTrue : MagickFalse);
+}
 #endif
 
 static double GetSimilarityMetric(const Image *image,
@@ -4810,9 +4818,7 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const char *artifact = GetImageArtifact(image,"compare:frequency-domain");
   if (artifact == (const char *) NULL)
     artifact=GetImageArtifact(image,"compare:accelerate-ncc");
-  if (((artifact == (const char *) NULL) ||
-       (IsStringTrue(artifact) != MagickFalse)) &&
-      ((image->channels & ReadMaskChannel) == 0))
+  if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
     switch (metric)
     {
       case DotProductCorrelationErrorMetric:
