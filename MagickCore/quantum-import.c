@@ -4418,6 +4418,19 @@ static void ImportGrayAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static inline unsigned char GetColormapBit(const QuantumInfo *quantum_info,
+  const unsigned char *magick_restrict p,const ssize_t bit)
+{
+  unsigned char
+    pixel;
+
+  if (quantum_info->min_is_white == MagickFalse)
+    pixel=(unsigned char) (((*p) & (1 << (7-bit))) == 0 ? 0x00 : 0x01);
+  else
+    pixel=(unsigned char) (((*p) & (1 << (7-bit))) != 0 ? 0x00 : 0x01);
+  return(pixel);
+}
+
 static MagickBooleanType Import1BitIndexQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span)
 {
@@ -4446,12 +4459,7 @@ static MagickBooleanType Import1BitIndexQuantum(const Image *image,
   {
     for (bit=0; bit < 8; bit++)
     {
-      if (quantum_info->min_is_white == MagickFalse)
-        pixel=(unsigned char) (((*p) & (1 << (7-bit))) == 0 ?
-          0x00 : 0x01);
-      else
-        pixel=(unsigned char) (((*p) & (1 << (7-bit))) != 0 ?
-          0x00 : 0x01);
+      pixel=GetColormapBit(quantum_info,p,bit);
       SetPixelIndex(image,PushColormapIndex(image,pixel,&range_exception),
         q);
       SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
@@ -4462,10 +4470,7 @@ static MagickBooleanType Import1BitIndexQuantum(const Image *image,
   }
   for (bit=0; bit < (ssize_t) (number_pixels % 8); bit++)
   {
-    if (quantum_info->min_is_white == MagickFalse)
-      pixel=(unsigned char) (((*p) & (1 << (7-bit))) == 0 ? 0x00 : 0x01);
-    else
-      pixel=(unsigned char) (((*p) & (1 << (7-bit))) != 0 ? 0x00 : 0x01);
+    pixel=GetColormapBit(quantum_info,p,bit);
     SetPixelIndex(image,PushColormapIndex(image,pixel,&range_exception),q);
     SetPixelViaPixelInfo(image,image->colormap+(ssize_t)
       GetPixelIndex(image,q),q);
