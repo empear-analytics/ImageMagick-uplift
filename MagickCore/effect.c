@@ -2063,6 +2063,56 @@ static inline MagickRealType GetMeanLuma(const Image *magick_restrict image,
     0.072186*pixel[image->channel_map[BluePixelChannel].offset]);  /* Rec709 */
 }
 
+static void GetKuwaharaMean(const Image *gaussian_image,
+  const Quantum *magick_restrict p,const size_t width,double *mean)
+{
+  const Quantum
+    *magick_restrict k;
+
+  ssize_t
+    j,
+    n;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(gaussian_image); j++)
+    mean[j]=0.0;
+  k=p;
+  for (n=0; n < (ssize_t) (width*width); n++)
+  {
+    for (j=0; j < (ssize_t) GetPixelChannels(gaussian_image); j++)
+      mean[j]+=(double) k[j];
+    k+=(ptrdiff_t) GetPixelChannels(gaussian_image);
+  }
+  for (j=0; j < (ssize_t) GetPixelChannels(gaussian_image); j++)
+    mean[j]/=(double) (width*width);
+}
+
+static double GetKuwaharaVariance(const Image *gaussian_image,
+  const Quantum *magick_restrict p,const size_t width,const double *mean)
+{
+  const Quantum
+    *magick_restrict k;
+
+  double
+    variance;
+
+  ssize_t
+    n;
+
+  k=p;
+  variance=0.0;
+  for (n=0; n < (ssize_t) (width*width); n++)
+  {
+    double
+      luma;
+
+    luma=GetPixelLuma(gaussian_image,k);
+    variance+=(luma-GetMeanLuma(gaussian_image,mean))*
+      (luma-GetMeanLuma(gaussian_image,mean));
+    k+=(ptrdiff_t) GetPixelChannels(gaussian_image);
+  }
+  return(variance);
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -2162,18 +2212,9 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
       quadrant.height=width;
       for (i=0; i < 4; i++)
       {
-        const Quantum
-          *magick_restrict k;
-
         double
           mean[MaxPixelChannels],
           variance;
-
-        ssize_t
-          n;
-
-        ssize_t
-          j;
 
         quadrant.x=x;
         quadrant.y=y;
@@ -2203,29 +2244,8 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
           quadrant.width,quadrant.height,exception);
         if (p == (const Quantum *) NULL)
           break;
-        for (j=0; j < (ssize_t) GetPixelChannels(gaussian_image); j++)
-          mean[j]=0.0;
-        k=p;
-        for (n=0; n < (ssize_t) (width*width); n++)
-        {
-          for (j=0; j < (ssize_t) GetPixelChannels(gaussian_image); j++)
-            mean[j]+=(double) k[j];
-          k+=(ptrdiff_t) GetPixelChannels(gaussian_image);
-        }
-        for (j=0; j < (ssize_t) GetPixelChannels(gaussian_image); j++)
-          mean[j]/=(double) (width*width);
-        k=p;
-        variance=0.0;
-        for (n=0; n < (ssize_t) (width*width); n++)
-        {
-          double
-            luma;
-
-          luma=GetPixelLuma(gaussian_image,k);
-          variance+=(luma-GetMeanLuma(gaussian_image,mean))*
-            (luma-GetMeanLuma(gaussian_image,mean));
-          k+=(ptrdiff_t) GetPixelChannels(gaussian_image);
-        }
+        GetKuwaharaMean(gaussian_image,p,width,mean);
+        variance=GetKuwaharaVariance(gaussian_image,p,width,mean);
         if (variance < min_variance)
           {
             min_variance=variance;
