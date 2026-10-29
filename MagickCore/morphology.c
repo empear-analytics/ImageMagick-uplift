@@ -3766,9 +3766,6 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
           rows;
 
         ssize_t
-          u;
-
-        ssize_t
           v;
 
         channel=GetPixelChannelChannel(image,i);
@@ -3804,13 +3801,10 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
             k=(&kernel->values[kernel->width*kernel->height-1]);
             for (v=0; v < offset.y; v++)
             {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
+              rows.image=image;
+              rows.kernel=kernel;
+              rows.i=i;
+              MinimizeKernelRowDistance(&rows,&pixel,&k,&pixels);
             }
             row.image=image;
             row.kernel=kernel;
