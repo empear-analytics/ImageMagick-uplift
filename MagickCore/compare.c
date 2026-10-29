@@ -3188,6 +3188,22 @@ static MagickBooleanType SIMFilterImageNaNs(Image *image,
   return(status);
 }
 
+static void SquarePixelChannels(const Image *square_image,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(square_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(square_image,i);
+    PixelTrait traits = GetPixelChannelTraits(square_image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=(Quantum) (QuantumScale*(double) q[i]*(double) q[i]);
+  }
+}
+
 static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -3232,17 +3248,7 @@ static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
       }
     for (x=0; x < (ssize_t) square_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(square_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(square_image,i);
-        PixelTrait traits = GetPixelChannelTraits(square_image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=(Quantum) (QuantumScale*(double) q[i]*(double) q[i]);
-      }
+      SquarePixelChannels(square_image,q);
       q+=(ptrdiff_t) GetPixelChannels(square_image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
