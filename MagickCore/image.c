@@ -3976,6 +3976,37 @@ static void ParseChromaticityPrimary(const char *option,PrimaryInfo *primary)
     primary->y=geometry_info.sigma;
 }
 
+static void SetImageResolutionFromDensity(Image *image,const char *density)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  flags=ParseGeometry(density,&geometry_info);
+  if ((flags & RhoValue) != 0)
+    image->resolution.x=geometry_info.rho;
+  image->resolution.y=image->resolution.x;
+  if ((flags & SigmaValue) != 0)
+    image->resolution.y=geometry_info.sigma;
+}
+
+static MagickStatusType ParsePageGeometryOption(const char *option,
+  RectangleInfo *region)
+{
+  char
+    *geometry;
+
+  MagickStatusType
+    flags;
+
+  geometry=GetPageGeometry(option);
+  flags=ParseAbsoluteGeometry(geometry,region);
+  geometry=DestroyString(geometry);
+  return(flags);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -4068,12 +4099,6 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
   const char
     *option;
 
-  GeometryInfo
-    geometry_info;
-
-  MagickStatusType
-    flags;
-
   ResolutionType
     units;
 
@@ -4117,14 +4142,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickFalse,option);
   option=GetImageOption(image_info,"density");
   if (option != (const char *) NULL)
-    {
-      flags=ParseGeometry(option,&geometry_info);
-      if ((flags & RhoValue) != 0)
-        image->resolution.x=geometry_info.rho;
-      image->resolution.y=image->resolution.x;
-      if ((flags & SigmaValue) != 0)
-        image->resolution.y=geometry_info.sigma;
-    }
+    SetImageResolutionFromDensity(image,option);
   option=GetImageOption(image_info,"depth");
   if (option != (const char *) NULL)
     image->depth=StringToUnsignedLong(option);
@@ -4175,14 +4193,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickOrientationOptions,MagickFalse,option);
   option=GetImageOption(image_info,"page");
   if (option != (const char *) NULL)
-    {
-      char
-        *geometry;
-
-      geometry=GetPageGeometry(option);
-      flags=ParseAbsoluteGeometry(geometry,&image->page);
-      geometry=DestroyString(geometry);
-    }
+    (void) ParsePageGeometryOption(option,&image->page);
   option=GetImageOption(image_info,"quality");
   if (option != (const char *) NULL)
     image->quality=StringToUnsignedLong(option);
@@ -4200,14 +4211,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       MagickFalse,option);
   option=GetImageOption(image_info,"tile-offset");
   if (option != (const char *) NULL)
-    {
-      char
-        *geometry;
-
-      geometry=GetPageGeometry(option);
-      flags=ParseAbsoluteGeometry(geometry,&image->tile_offset);
-      geometry=DestroyString(geometry);
-    }
+    (void) ParsePageGeometryOption(option,&image->tile_offset);
   option=GetImageOption(image_info,"transparent-color");
   if (option != (const char *) NULL)
     (void) QueryColorCompliance(option,AllCompliance,&image->transparent_color,
@@ -4227,14 +4231,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
       image->units=units;
       option=GetImageOption(image_info,"density");
       if (option != (const char *) NULL)
-        {
-          flags=ParseGeometry(option,&geometry_info);
-          if ((flags & RhoValue) != 0)
-            image->resolution.x=geometry_info.rho;
-          image->resolution.y=image->resolution.x;
-          if ((flags & SigmaValue) != 0)
-            image->resolution.y=geometry_info.sigma;
-        }
+        SetImageResolutionFromDensity(image,option);
     }
   option=GetImageOption(image_info,"virtual-pixel");
   if (option != (const char *) NULL)

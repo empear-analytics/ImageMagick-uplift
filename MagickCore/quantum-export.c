@@ -252,105 +252,218 @@ static inline unsigned char *PopQuantumLongPixel(QuantumInfo *quantum_info,
   return(pixels);
 }
 
-static void ExportPixelChannel(const Image *image,QuantumInfo *quantum_info,
-  const MagickSizeType number_pixels,const Quantum *magick_restrict p,
-  unsigned char *magick_restrict q,PixelChannel channel)
+static void Export8BitPixelChannel(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,const Quantum *magick_restrict p)
 {
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned char
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToChar(*p);
+    q=PopCharPixel(pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportFloat16BitPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  const Quantum *magick_restrict p)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=SinglePrecisionToHalf(QuantumScale*(*p));
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export16BitPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  const Quantum *magick_restrict p)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned short
+    pixel;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      ExportFloat16BitPixelChannel(image,quantum_info,span,p);
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToShort(*p);
+    q=PopShortPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportFloat32BitPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  const Quantum *magick_restrict p)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    q=PopQuantumFloatPixel(quantum_info,(float) *p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export32BitPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  const Quantum *magick_restrict p)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  unsigned int
+    pixel;
+
+  if (quantum_info->format == FloatingPointQuantumFormat)
+    {
+      ExportFloat32BitPixelChannel(image,quantum_info,span,p);
+      return;
+    }
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    pixel=ScaleQuantumToLong(*p);
+    q=PopLongPixel(quantum_info->endian,pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void Export64BitFloatPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  const Quantum *magick_restrict p)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    q=PopQuantumDoublePixel(quantum_info,(double) *p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportAnyDepthPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  const Quantum *magick_restrict p)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
   QuantumAny
     range;
 
   ssize_t
     x;
 
+  range=GetQuantumRange(quantum_info->depth);
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(*p,range),q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
+static void ExportPixelChannel(const Image *image,QuantumInfo *quantum_info,
+  const QuantumPixelSpan *span,PixelChannel channel)
+{
+  const Quantum
+    *magick_restrict p = span->p;
+
   p+=(ptrdiff_t) image->channel_map[channel].offset;
   switch (quantum_info->depth)
   {
     case 8:
     {
-      unsigned char
-        pixel;
-
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToChar(*p);
-        q=PopCharPixel(pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export8BitPixelChannel(image,quantum_info,span,p);
       break;
     }
     case 16:
     {
-      unsigned short
-        pixel;
-
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            pixel=SinglePrecisionToHalf(QuantumScale*(*p));
-            q=PopShortPixel(quantum_info->endian,pixel,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToShort(*p);
-        q=PopShortPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export16BitPixelChannel(image,quantum_info,span,p);
       break;
     }
     case 32:
     {
-      unsigned int
-        pixel;
-
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            q=PopQuantumFloatPixel(quantum_info,(float) *p,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
-          break;
-        }
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        pixel=ScaleQuantumToLong(*p);
-        q=PopLongPixel(quantum_info->endian,pixel,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      Export32BitPixelChannel(image,quantum_info,span,p);
       break;
     }
     case 64:
     {
       if (quantum_info->format == FloatingPointQuantumFormat)
         {
-          for (x=0; x < (ssize_t) number_pixels; x++)
-          {
-            q=PopQuantumDoublePixel(quantum_info,(double) *p,q);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) quantum_info->pad;
-          }
+          Export64BitFloatPixelChannel(image,quantum_info,span,p);
           break;
         }
       magick_fallthrough;
     }
     default:
     {
-      range=GetQuantumRange(quantum_info->depth);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        q=PopQuantumPixel(quantum_info,ScaleQuantumToAny(*p,range),q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportAnyDepthPixelChannel(image,quantum_info,span,p);
       break;
     }
   }
@@ -359,22 +472,13 @@ static void ExportPixelChannel(const Image *image,QuantumInfo *quantum_info,
 static void ExportAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
-  const MagickSizeType
-    number_pixels = span->number_pixels;
-
-  const Quantum
-    *magick_restrict p = span->p;
-
-  unsigned char
-    *magick_restrict q = span->q;
-
   if (image->alpha_trait == UndefinedPixelTrait)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
         "ImageDoesNotHaveAnAlphaChannel","`%s'",image->filename);
       return;
     }
-  ExportPixelChannel(image,quantum_info,number_pixels,p,q,AlphaPixelChannel);
+  ExportPixelChannel(image,quantum_info,span,AlphaPixelChannel);
 }
 
 static void Export8BitBGRQuantum(const Image *image,QuantumInfo *quantum_info,
@@ -1802,22 +1906,13 @@ static void ExportBGROQuantum(const Image *image,QuantumInfo *quantum_info,
 static void ExportBlackQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
-  const MagickSizeType
-    number_pixels = span->number_pixels;
-
-  const Quantum
-    *magick_restrict p = span->p;
-
-  unsigned char
-    *magick_restrict q = span->q;
-
   if (image->colorspace != CMYKColorspace)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
         "ColorSeparatedImageRequired","`%s'",image->filename);
       return;
     }
-  ExportPixelChannel(image,quantum_info,number_pixels,p,q,BlackPixelChannel);
+  ExportPixelChannel(image,quantum_info,span,BlackPixelChannel);
 }
 
 static void ExportCbYCrYQuantum(const Image *image,QuantumInfo *quantum_info,
@@ -4593,15 +4688,6 @@ static void ExportAnyDepthMultispectralQuantum(const Image *image,
 static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
-  const MagickSizeType
-    number_pixels = span->number_pixels;
-
-  const Quantum
-    *magick_restrict p = span->p;
-
-  unsigned char
-    *magick_restrict q = span->q;
-
   if (image->number_meta_channels == 0)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
@@ -4610,7 +4696,7 @@ static void ExportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
     }
   if (quantum_info->meta_channel != 0)
     {
-      ExportPixelChannel(image,quantum_info,number_pixels,p,q,
+      ExportPixelChannel(image,quantum_info,span,
         (PixelChannel) (MetaPixelChannels+quantum_info->meta_channel-1));
       return;
     }
@@ -6458,7 +6544,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     case BlueQuantum:
     case YellowQuantum:
     {
-      ExportPixelChannel(image,quantum_info,number_pixels,p,q,BluePixelChannel);
+      ExportPixelChannel(image,quantum_info,&span,BluePixelChannel);
       break;
     }
     case CMYKQuantum:
@@ -6499,7 +6585,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     case GreenQuantum:
     case MagentaQuantum:
     {
-      ExportPixelChannel(image,quantum_info,number_pixels,p,q,
+      ExportPixelChannel(image,quantum_info,&span,
         GreenPixelChannel);
       break;
     }
@@ -6516,7 +6602,7 @@ MagickExport size_t ExportQuantumPixels(const Image *image,
     case RedQuantum:
     case CyanQuantum:
     {
-      ExportPixelChannel(image,quantum_info,number_pixels,p,q,RedPixelChannel);
+      ExportPixelChannel(image,quantum_info,&span,RedPixelChannel);
       break;
     }
     case OpacityQuantum:
