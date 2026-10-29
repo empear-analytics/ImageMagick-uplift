@@ -1823,11 +1823,7 @@ static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
           pixel.alpha+=ErrorRelativeWeight*cube_info->diffusion*p->weights[i]*
             p->error[i].alpha;
       }
-      pixel.red=(double) ClampPixel(pixel.red);
-      pixel.green=(double) ClampPixel(pixel.green);
-      pixel.blue=(double) ClampPixel(pixel.blue);
-      if (cube_info->associate_alpha != MagickFalse)
-        pixel.alpha=(double) ClampPixel(pixel.alpha);
+      pixel=ClampDitherPixel(cube_info,pixel);
       entry=GetCacheEntry(p,&pixel);
       if ((entry == (ssize_t *) NULL) || (*entry < 0))
         FindClosestCubeColor(image,p,pixel,entry);
