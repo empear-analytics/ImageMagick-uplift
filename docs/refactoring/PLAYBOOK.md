@@ -1282,6 +1282,117 @@ Code (Claude Opus 5.5) during task W07, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe U - Extract Function Returning the Loop Status Taking an Input Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it meets Recipe T in every
+respect but one: with the variables it reads as parameters, the new function would take
+five or more arguments (*Excess Number of Function Arguments*, which the pre-commit gate
+refuses on a new function). The typical case is a per-pixel channel loop inside a
+parallel row loop, reading both images, the context, the thread id and the coordinates.
+
+**Not covered by:** Recipe T, which passes every input as a parameter; Recipe N, whose
+block must meet Recipe E's OpenMP rule and so may not write `status`; Recipe J, which
+takes accumulators by pointer and its inputs as parameters; Recipe Q, whose block writes
+no `status`. T then B is two commits, of which the first adds a finding.
+
+**How:**
+
+1. The block meets Recipe T steps 1 to 4: it lies in one iteration of the parallel loop
+   body with no `#pragma omp` line; its only write to a variable declared outside the
+   loop body is `status=MagickFalse;`, and it does not read `status`; every loop-body
+   variable it writes is declared in the block or not read after it before being
+   written again (those are declared in the new function instead, with any initialiser);
+   no `return`, `goto`, or `continue`/`break` of the parallel loop.
+2. Put the variables it only reads, scalars and pointers none of which the block writes,
+   in a struct as Recipe N steps 2 and 3 do: one member per variable, the variable's
+   exact type and name, a top-level `const` or `magick_restrict` left off. A variable
+   the block writes (a row pointer it advances) is never a member: it goes by value.
+3. Cut the block into a new `static MagickBooleanType` function taking `const Name *name`
+   first and then the written-but-not-read-after variables by value, at most four
+   parameters. At the top of its body declare one `const` local per member, as Recipe N
+   step 4 does; then a local `status` set to `MagickTrue` first, as Recipe T step 5
+   does. The block's text is unchanged, and the function ends with `return(status);`.
+4. In the caller, declare the `Name` local among the declarations at the top of the
+   block holding the call, inside the parallel loop body, so each thread fills its own.
+5. Directly before the call, assign every member from the variable of its name, in
+   declaration order, with nothing between the assignments and the call.
+6. Where the block stood, write `if (Helper(&name,...) == MagickFalse)
+   status=MagickFalse;`, and check every member and argument by reading.
+
+**Before:**
+
+```c
+    for (x=0; x < (ssize_t) fx_image->columns; x++) {
+      ssize_t i;
+
+      pfx->fxrts[id].thisPixel = (Quantum *)p;
+
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        ...
+        if (!ExecuteRPN (pfx, &pfx->fxrts[id], &result, &pos)) {
+          status=MagickFalse;
+          break;
+        }
+
+        q[i] = ClampToQuantum ((MagickRealType) (QuantumRange*result));
+      }
+      p+=(ptrdiff_t) GetPixelChannels (image);
+```
+
+**After:**
+
+```c
+static MagickBooleanType ApplyFxToPixel (const FxPixelInputs * in,
+  const Quantum *magick_restrict p, Quantum *magick_restrict q)
+{
+  const Image
+    *const image = in->image;
+  ...
+  status=MagickTrue;
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    ...
+  }
+  return(status);
+}
+...
+      pixel_in.image=image;
+      ...
+      pixel_in.y=y;
+      if (ApplyFxToPixel (&pixel_in, p, q) == MagickFalse)
+        status=MagickFalse;
+      p+=(ptrdiff_t) GetPixelChannels (image);
+```
+
+**Careful:**
+
+- The two halves keep the arguments of the recipes they come from. The write to the
+  shared `status` moves to the end of the block, as in Recipe T: the block does not read
+  `status`, and OpenMP orders this unsynchronised write against no other thread. The
+  members are copied directly before the call from variables the block does not write,
+  as in Recipe N, into a local each thread owns.
+- A temporary the caller declared with an initialiser (`result = 0.0`) and the block
+  writes before every read moves into the new function with its initialiser; it is
+  then initialised once per call instead of once per outer iteration, which no read
+  can see. A temporary read before it is written in the block is not one: skip the block.
+- Writes through pointers the block already used (the pixels of `q`, the per-thread slot
+  `pfx->fxrts[id]`) stay as they are: the same thread writes the same objects.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 6 checked by reading: the oracle runs
+single-threaded.
+
+**Provenance:** 2026-10-29, from `fx.c`'s `FxImage`, whose last depth-4 site is the
+per-channel loop of its parallel row loop (seven inputs: both images, `pfx`, `id`, `x`,
+`y`, `p` and `q`, plus `status`). Recipe T gives the helper seven parameters, and moving
+the whole column loop leaves it a Complex Method (cc 9). A probe of the struct form:
+the function leaves Deep, Nested Complexity, fx.c 2.74 to 2.80. Added by Claude Code
+(Claude Opus 5.5) during task W07, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -1628,3 +1739,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | AMEND | E | Step 7: a loop's whole body may move even when it `continue`s that loop; each such `continue;` becomes `return;` of the new `void` function, whose call is the whole body, so both end the iteration at the same point | `statistic.c`'s GetImageStatistics entropy pass (W06: moving the outer loop gives the helper a Bumpy Road; moving the inner loop needs six parameters), and the per-channel bodies of `effect.c`'s blur family (W07), both refused for want of this | mandate (2026-10-24) |
 | 2026-10-29 | NEW | Q | Extract Accumulating Block Taking an Input Struct: a Recipe K accumulation whose inputs would give the new function five or more parameters moves to a `static void` function taking a `const` struct of the inputs it only reads (Recipe N) and a pointer per written scalar (Recipe K), at most four parameters | `BilateralBlurImage`'s plain and alpha-blended per-channel sums (`pixel`, `gamma`, `n`; eight inputs): K gives eleven parameters, N refuses accumulators; a probe of the sums and then the per-channel body (Recipe N), 1.72 to 1.89 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | E | Step 7: inside a `switch` case, a block after which the case runs only its closing `break;` may contain `break;` statements of that `switch` when its single output is one variable: the new function takes it by value and returns it, each such `break;` becomes `return(v);`, and the block becomes `v=Helper(...);`, so both reach the case's end with the same value | `fx.c`'s `ExecuteRPN`: its pixel-lookup cases (`fU`, `fU0`, `fUP`, `fS`/`fV`, `fP`/`fSP`/`fVP`) hold its nesting of 8 and each sets `regA` and leaves the `switch` by `break` from inside nested `if`s. A probe removing them: depth 8 to 4, fx.c 2.62 to 2.92 | mandate (2026-10-24) |
+| 2026-10-29 | NEW | U | Extract Function Returning the Loop Status Taking an Input Struct: a Recipe T block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and the written row pointers by value; the caller writes `status=MagickFalse` from its result (Recipe T) | `FxImage`'s per-channel loop inside its parallel row loop (seven inputs and `status`): T gives seven parameters, N refuses the `status` write, the whole column loop is a Complex Method (cc 9). A probe: FxImage leaves Deep, Nested Complexity, fx.c 2.74 to 2.80 | mandate (2026-10-24) |
