@@ -1261,6 +1261,21 @@ MagickExport MagickBooleanType GetImageMedian(const Image *image,double *median,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetPerceptualHashes(ChannelPerceptualHash *perceptual_hash,
+  const ChannelMoments *moments,const ssize_t i)
+{
+  size_t
+    j;
+
+  ssize_t
+    channel;
+
+  for (channel=0; channel <= MaxPixelChannels; channel++)
+    for (j=0; j < MaximumNumberOfPerceptualHashes; j++)
+      perceptual_hash[channel].phash[i][j]=(-MagickSafeLog10(fabs(
+        moments[channel].invariant[j])));
+}
+
 MagickExport ChannelPerceptualHash *GetImagePerceptualHash(const Image *image,
   ExceptionInfo *exception)
 {
@@ -1303,11 +1318,7 @@ MagickExport ChannelPerceptualHash *GetImagePerceptualHash(const Image *image,
     Image
       *hash_image;
 
-    size_t
-      j;
-
     ssize_t
-      channel,
       colorspace;
 
     if (i >= MaximumNumberOfPerceptualColorspaces)
@@ -1334,10 +1345,7 @@ MagickExport ChannelPerceptualHash *GetImagePerceptualHash(const Image *image,
       }
     perceptual_hash[0].number_colorspaces++;
     perceptual_hash[0].number_channels+=GetImageChannels(hash_image);
-    for (channel=0; channel <= MaxPixelChannels; channel++)
-      for (j=0; j < MaximumNumberOfPerceptualHashes; j++)
-        perceptual_hash[channel].phash[i][j]=(-MagickSafeLog10(fabs(
-          moments[channel].invariant[j])));
+    SetPerceptualHashes(perceptual_hash,moments,i);
     hash_image=DestroyImage(hash_image);
     moments=(ChannelMoments *) RelinquishMagickMemory(moments);
   }
