@@ -2075,6 +2075,36 @@ static int StopInfoCompare(const void *x,const void *y)
   return(-1);
 }
 
+static PixelInfo GetPadGradientColor(const GradientInfo *gradient,
+  const double offset,PixelInfo composite)
+{
+  double
+    alpha;
+
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i < (ssize_t) gradient->number_stops; i++)
+    if (offset < gradient->stops[i].offset)
+      break;
+  if ((offset < 0.0) || (i == 0))
+    composite=gradient->stops[0].color;
+  else
+    if ((offset > 1.0) || (i == (ssize_t) gradient->number_stops))
+      composite=gradient->stops[gradient->number_stops-1].color;
+    else
+      {
+        j=i;
+        i--;
+        alpha=(offset-gradient->stops[i].offset)/
+          (gradient->stops[j].offset-gradient->stops[i].offset);
+        CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
+          &gradient->stops[j].color,alpha,&composite);
+      }
+  return(composite);
+}
+
 MagickExport MagickBooleanType DrawGradientImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -2183,23 +2213,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
               if (gradient->type != RadialGradient)
                 offset*=MagickSafeReciprocal(length);
             }
-          for (i=0; i < (ssize_t) gradient->number_stops; i++)
-            if (offset < gradient->stops[i].offset)
-              break;
-          if ((offset < 0.0) || (i == 0))
-            composite=gradient->stops[0].color;
-          else
-            if ((offset > 1.0) || (i == (ssize_t) gradient->number_stops))
-              composite=gradient->stops[gradient->number_stops-1].color;
-            else
-              {
-                j=i;
-                i--;
-                alpha=(offset-gradient->stops[i].offset)/
-                  (gradient->stops[j].offset-gradient->stops[i].offset);
-                CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
-                  &gradient->stops[j].color,alpha,&composite);
-              }
+          composite=GetPadGradientColor(gradient,offset,composite);
           break;
         }
         case ReflectSpread:
