@@ -3967,6 +3967,46 @@ static fxFltType GetImageZeroCacheValueU0 (const RpnPixelInputs * in,
   return(regA);
 }
 
+static fxFltType GetPixelValueSV (const RpnPixelInputs * in,
+  const fxImgXYT xy, const ssize_t ImgNum, fxFltType regA)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    imgx = in->imgx,
+    imgy = in->imgy;
+
+  const Quantum * pv = GetCacheViewVirtualPixels (
+                         pfx->Imgs[ImgNum].View, imgx, imgy, 1,1, pfx->exception);
+  if (!pv) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "fV can't get cache", "%lu", (unsigned long) ImgNum);
+    return(regA);
+  }
+
+  if ((int) pel->channel_qual < 0) {
+    if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
+      regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
+      return(regA);
+    } else if (pel->channel_qual == INTENSITY_CHANNEL) {
+      regA = GetIntensity (pfx, ImgNum, (double) imgx, (double) imgy);
+      return(regA);
+    }
+  }
+
+  regA = QuantumScale * (double)
+    pv[pfx->Images[ImgNum]->channel_map[WHICH_NON_ATTR_CHAN].offset];
+  return(regA);
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -4499,27 +4539,12 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           if (pel->operator_index == fS) ImgNum = pfx->ImgNum;
 
           if (pel->img_attr_qual == aNull) {
-            const Quantum * pv = GetCacheViewVirtualPixels (
-                                   pfx->Imgs[ImgNum].View, imgx, imgy, 1,1, pfx->exception);
-            if (!pv) {
-              (void) ThrowMagickException (
-                pfx->exception, GetMagickModule(), OptionError,
-                "fV can't get cache", "%lu", (unsigned long) ImgNum);
-              break;
-            }
-
-            if ((int) pel->channel_qual < 0) {
-              if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-                regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
-                break;
-              } else if (pel->channel_qual == INTENSITY_CHANNEL) {
-                regA = GetIntensity (pfx, ImgNum, (double) imgx, (double) imgy);
-                break;
-              }
-            }
-
-            regA = QuantumScale * (double)
-              pv[pfx->Images[ImgNum]->channel_map[WHICH_NON_ATTR_CHAN].offset];
+            rpn_in.pfx=pfx;
+            rpn_in.pel=pel;
+            rpn_in.channel=channel;
+            rpn_in.imgx=imgx;
+            rpn_in.imgy=imgy;
+            regA = GetPixelValueSV (&rpn_in, xy, ImgNum, regA);
           } else {
             regA = ImageStat (pfx, ImgNum, WHICH_ATTR_CHAN, pel->img_attr_qual);
           }
