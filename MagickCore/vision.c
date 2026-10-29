@@ -1112,6 +1112,76 @@ static void AddLabeledObjectPixel(CCObjectInfo *object,
   object[id].area++;
 }
 
+typedef struct _CCEquivalencePixel
+{
+  const Image
+    *image;
+
+  ssize_t
+    x,
+    y,
+    dx,
+    dy;
+} CCEquivalencePixel;
+
+static MagickBooleanType ResolveEquivalence(MatrixInfo *equivalences,
+  const CCEquivalencePixel *equivalence_pixel)
+{
+  const Image
+    *const image = equivalence_pixel->image;
+
+  const ssize_t
+    x = equivalence_pixel->x,
+    y = equivalence_pixel->y,
+    dx = equivalence_pixel->dx,
+    dy = equivalence_pixel->dy;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    neighbor_offset,
+    obj,
+    offset,
+    ox,
+    oy,
+    root;
+
+  offset=y*(ssize_t) image->columns+x;
+  neighbor_offset=dy*(ssize_t) image->columns+dx;
+  ox=offset;
+  status=GetMatrixElement(equivalences,ox,0,&obj);
+  while (obj != ox)
+  {
+    ox=obj;
+    status=GetMatrixElement(equivalences,ox,0,&obj);
+  }
+  oy=offset+neighbor_offset;
+  status=GetMatrixElement(equivalences,oy,0,&obj);
+  while (obj != oy)
+  {
+    oy=obj;
+    status=GetMatrixElement(equivalences,oy,0,&obj);
+  }
+  if (ox < oy)
+    {
+      status=SetMatrixElement(equivalences,oy,0,&ox);
+      root=ox;
+    }
+  else
+    {
+      status=SetMatrixElement(equivalences,ox,0,&oy);
+      root=oy;
+    }
+  ox=offset;
+  status=SetEquivalencePathRoot(equivalences,ox,root);
+  oy=offset+neighbor_offset;
+  status=SetEquivalencePathRoot(equivalences,oy,root);
+  status=SetMatrixElement(equivalences,y*(ssize_t) image->columns+x,0,
+    &root);
+  return(status);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1247,17 +1317,15 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       p+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
       for (x=0; x < (ssize_t) image->columns; x++)
       {
+        CCEquivalencePixel
+          equivalence_pixel;
+
         PixelInfo
           pixel,
           target;
 
         ssize_t
-          neighbor_offset,
-          obj,
-          offset,
-          ox,
-          oy,
-          root;
+          neighbor_offset;
 
         /*
           Is neighbor an authentic pixel and a different color than the pixel?
@@ -1279,38 +1347,12 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         /*
           Resolve this equivalence.
         */
-        offset=y*(ssize_t) image->columns+x;
-        neighbor_offset=dy*(ssize_t) image->columns+dx;
-        ox=offset;
-        status=GetMatrixElement(equivalences,ox,0,&obj);
-        while (obj != ox)
-        {
-          ox=obj;
-          status=GetMatrixElement(equivalences,ox,0,&obj);
-        }
-        oy=offset+neighbor_offset;
-        status=GetMatrixElement(equivalences,oy,0,&obj);
-        while (obj != oy)
-        {
-          oy=obj;
-          status=GetMatrixElement(equivalences,oy,0,&obj);
-        }
-        if (ox < oy)
-          {
-            status=SetMatrixElement(equivalences,oy,0,&ox);
-            root=ox;
-          }
-        else
-          {
-            status=SetMatrixElement(equivalences,ox,0,&oy);
-            root=oy;
-          }
-        ox=offset;
-        status=SetEquivalencePathRoot(equivalences,ox,root);
-        oy=offset+neighbor_offset;
-        status=SetEquivalencePathRoot(equivalences,oy,root);
-        status=SetMatrixElement(equivalences,y*(ssize_t) image->columns+x,0,
-          &root);
+        equivalence_pixel.image=image;
+        equivalence_pixel.x=x;
+        equivalence_pixel.y=y;
+        equivalence_pixel.dx=dx;
+        equivalence_pixel.dy=dy;
+        status=ResolveEquivalence(equivalences,&equivalence_pixel);
         p+=(ptrdiff_t) GetPixelChannels(image);
       }
     }
