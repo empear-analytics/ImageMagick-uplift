@@ -2171,6 +2171,20 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static RectangleInfo ClampTrimExtent(const Image *image,
+  const RectangleInfo minSize,RectangleInfo geometry)
+{
+  if (geometry.width < minSize.width)
+    geometry.width=minSize.width;
+  if (geometry.height < minSize.height)
+    geometry.height=minSize.height;
+  if (geometry.width > image->columns)
+    geometry.width=image->columns;
+  if (geometry.height > image->rows)
+    geometry.height=image->rows;
+  return(geometry);
+}
+
 MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
 {
   const char
@@ -2274,14 +2288,7 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
             default:
               break;
           }
-          if (geometry.width < minSize.width)
-            geometry.width=minSize.width;
-          if (geometry.height < minSize.height)
-            geometry.height=minSize.height;
-          if (geometry.width > image->columns)
-            geometry.width=image->columns;
-          if (geometry.height > image->rows)
-            geometry.height=image->rows;
+          geometry=ClampTrimExtent(image,minSize,geometry);
           if (geometry.x < 0)
             geometry.x=0;
           if ((geometry.x+(ssize_t) geometry.width) > (ssize_t) image->columns)
