@@ -1653,6 +1653,75 @@ static void NormalizeChannelSums(ChannelStatistics *cs)
     }
 }
 
+static void ComputeCompositeStatistics(const Image *image,
+  ChannelStatistics *channel_statistics)
+{
+  ChannelStatistics
+    *cs_comp;
+
+  double
+    channels;
+
+  ssize_t
+    i;
+
+  cs_comp=channel_statistics+CompositePixelChannel;
+  cs_comp->sum=0.0;
+  cs_comp->sum_squared=0.0;
+  cs_comp->sum_cubed=0.0;
+  cs_comp->sum_fourth_power=0.0;
+  cs_comp->maxima=(-MagickMaximumValue);
+  cs_comp->minima=MagickMaximumValue;
+  cs_comp->area=0.0;
+  cs_comp->mean=0.0;
+  cs_comp->median=0.0;
+  cs_comp->variance=0.0;
+  cs_comp->standard_deviation=0.0;
+  cs_comp->entropy=0.0;
+  cs_comp->skewness=0.0;
+  cs_comp->kurtosis=0.0;
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    ChannelStatistics
+      *cs;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    cs=channel_statistics+channel;
+    if (cs_comp->maxima < cs->maxima)
+      cs_comp->maxima=cs->maxima;
+    if (cs_comp->minima > cs->minima)
+      cs_comp->minima=cs->minima;
+    cs_comp->sum+=cs->sum;
+    cs_comp->sum_squared+=cs->sum_squared;
+    cs_comp->sum_cubed+=cs->sum_cubed;
+    cs_comp->sum_fourth_power+=cs->sum_fourth_power;
+    cs_comp->median+=cs->median;
+    cs_comp->area+=cs->area;
+    cs_comp->mean+=cs->mean;
+    cs_comp->variance+=cs->variance;
+    cs_comp->standard_deviation+=cs->standard_deviation;
+    cs_comp->skewness+=cs->skewness;
+    cs_comp->kurtosis+=cs->kurtosis;
+    cs_comp->entropy+=cs->entropy;
+  }
+  channels=(double) GetImageChannels(image);
+  cs_comp->sum/=channels;
+  cs_comp->sum_squared/=channels;
+  cs_comp->sum_cubed/=channels;
+  cs_comp->sum_fourth_power/=channels;
+  cs_comp->median/=channels;
+  cs_comp->area/=channels;
+  cs_comp->mean/=channels;
+  cs_comp->variance/=channels;
+  cs_comp->standard_deviation/=channels;
+  cs_comp->skewness/=channels;
+  cs_comp->kurtosis/=channels;
+  cs_comp->entropy/=channels;
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -1660,7 +1729,6 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     *channel_statistics;
 
   double
-    channels,
     *histogram;
 
   long double
@@ -1875,63 +1943,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
       }
       median_info=RelinquishVirtualMemory(median_info);
     }
-  {
-    ChannelStatistics *cs_comp = channel_statistics+CompositePixelChannel;
-    cs_comp->sum=0.0;
-    cs_comp->sum_squared=0.0;
-    cs_comp->sum_cubed=0.0;
-    cs_comp->sum_fourth_power=0.0;
-    cs_comp->maxima=(-MagickMaximumValue);
-    cs_comp->minima=MagickMaximumValue;
-    cs_comp->area=0.0;
-    cs_comp->mean=0.0;
-    cs_comp->median=0.0;
-    cs_comp->variance=0.0;
-    cs_comp->standard_deviation=0.0;
-    cs_comp->entropy=0.0;
-    cs_comp->skewness=0.0;
-    cs_comp->kurtosis=0.0;
-    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    {
-      ChannelStatistics
-        *cs;
-
-      PixelChannel channel = GetPixelChannelChannel(image,i);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      if ((traits & UpdatePixelTrait) == 0)
-        continue;
-      cs=channel_statistics+channel;
-      if (cs_comp->maxima < cs->maxima)
-        cs_comp->maxima=cs->maxima;
-      if (cs_comp->minima > cs->minima)
-        cs_comp->minima=cs->minima;
-      cs_comp->sum+=cs->sum;
-      cs_comp->sum_squared+=cs->sum_squared;
-      cs_comp->sum_cubed+=cs->sum_cubed;
-      cs_comp->sum_fourth_power+=cs->sum_fourth_power;
-      cs_comp->median+=cs->median;
-      cs_comp->area+=cs->area;
-      cs_comp->mean+=cs->mean;
-      cs_comp->variance+=cs->variance;
-      cs_comp->standard_deviation+=cs->standard_deviation;
-      cs_comp->skewness+=cs->skewness;
-      cs_comp->kurtosis+=cs->kurtosis;
-      cs_comp->entropy+=cs->entropy;
-    }
-    channels=(double) GetImageChannels(image);
-    cs_comp->sum/=channels;
-    cs_comp->sum_squared/=channels;
-    cs_comp->sum_cubed/=channels;
-    cs_comp->sum_fourth_power/=channels;
-    cs_comp->median/=channels;
-    cs_comp->area/=channels;
-    cs_comp->mean/=channels;
-    cs_comp->variance/=channels;
-    cs_comp->standard_deviation/=channels;
-    cs_comp->skewness/=channels;
-    cs_comp->kurtosis/=channels;
-    cs_comp->entropy/=channels;
-  }
+  ComputeCompositeStatistics(image,channel_statistics);
   if (y < (ssize_t) image->rows)
     channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
       channel_statistics);
