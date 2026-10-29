@@ -1164,40 +1164,7 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
       break;
     for (x=0L; x < (ssize_t) fourier_info->width; x++)
     {
-      switch (fourier_info->channel)
-      {
-        case RedPixelChannel:
-        default:
-        {
-          magnitude_pixels[i]=QuantumScale*(double)
-            GetPixelRed(magnitude_image,p);
-          break;
-        }
-        case GreenPixelChannel:
-        {
-          magnitude_pixels[i]=QuantumScale*(double)
-            GetPixelGreen(magnitude_image,p);
-          break;
-        }
-        case BluePixelChannel:
-        {
-          magnitude_pixels[i]=QuantumScale*(double)
-            GetPixelBlue(magnitude_image,p);
-          break;
-        }
-        case BlackPixelChannel:
-        {
-          magnitude_pixels[i]=QuantumScale*(double)
-            GetPixelBlack(magnitude_image,p);
-          break;
-        }
-        case AlphaPixelChannel:
-        {
-          magnitude_pixels[i]=QuantumScale*(double)
-            GetPixelAlpha(magnitude_image,p);
-          break;
-        }
-      }
+      magnitude_pixels[i]=GetFourierPixel(magnitude_image,fourier_info->channel,p);
       i++;
       p+=(ptrdiff_t) GetPixelChannels(magnitude_image);
     }
@@ -1217,35 +1184,7 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
       break;
     for (x=0L; x < (ssize_t) fourier_info->width; x++)
     {
-      switch (fourier_info->channel)
-      {
-        case RedPixelChannel:
-        default:
-        {
-          phase_pixels[i]=QuantumScale*(double) GetPixelRed(phase_image,p);
-          break;
-        }
-        case GreenPixelChannel:
-        {
-          phase_pixels[i]=QuantumScale*(double) GetPixelGreen(phase_image,p);
-          break;
-        }
-        case BluePixelChannel:
-        {
-          phase_pixels[i]=QuantumScale*(double) GetPixelBlue(phase_image,p);
-          break;
-        }
-        case BlackPixelChannel:
-        {
-          phase_pixels[i]=QuantumScale*(double) GetPixelBlack(phase_image,p);
-          break;
-        }
-        case AlphaPixelChannel:
-        {
-          phase_pixels[i]=QuantumScale*(double) GetPixelAlpha(phase_image,p);
-          break;
-        }
-      }
+      phase_pixels[i]=GetFourierPixel(phase_image,fourier_info->channel,p);
       i++;
       p+=(ptrdiff_t) GetPixelChannels(phase_image);
     }
