@@ -170,6 +170,9 @@ blocks of nested logic). Each bump is a missing function.
 1. Find one nested block. It usually already has a comment or a blank line around it.
 2. Cut it into a new `static` function directly above the current one.
 3. Pass in every variable it reads as a parameter. Return the single value it produces.
+   When that value is an array of the caller's that the block updates element by
+   element (an accumulator, `mean[i]+=...`), pass the array as a pointer parameter
+   whose uses do not change, as Recipe K does; the OpenMP rule below still applies.
 4. If the block writes to more than one outer variable, **skip it** and move to the next
    bump. Do not invent an out-parameter struct. A variable that nothing after the block
    reads does not count (a block that runs to the end of the function, step 7, advancing
@@ -186,6 +189,19 @@ blocks of nested logic). Each bump is a missing function.
    used only by the block (`#define` ... `#undef`) move with it. Likewise, a block of a
    value-returning function whose every path ends in `return(<expr>);` moves to a
    function of the caller's return type, and the block becomes `return(<call>);`.
+   Likewise, a block that is a loop's whole body, declarations included, may contain
+   `continue;` statements of that loop: they become `return;` of a new `void`
+   function, and the body becomes the call alone, so both end the iteration at the
+   same point. The block contains no `break` or `return` of its own, and no `continue`
+   of a loop nested inside it changes; the loop's counter goes by value.
+   Likewise, inside a `switch` case, a block after which the case runs nothing but its
+   closing `break;` on every path (the case's whole body, or the last statement of a
+   branch that ends the case) may contain `break;` statements of that `switch`, when
+   its single output is one variable `v`: the new function takes `v` by value and
+   returns it, each such `break;` becomes `return(v);`, the function ends with
+   `return(v);`, and the block becomes `v=Helper(...);`. A path that left `v` alone
+   returns the caller's value. The block contains no `continue`, `return` or `goto`,
+   and a `break` of a loop or `switch` nested inside it does not change.
 
 **Before:**
 
@@ -1015,6 +1031,475 @@ during task M101.
 
 ---
 
+## Recipe N - Extract Function Taking an Input Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it meets Recipe E in every respect
+but one: it reads five or more of the caller's variables, so the new function would carry
+*Excess Number of Function Arguments* (and the pre-commit gate refuses a new function with
+a finding).
+
+**Not covered by:** Recipe E, whose new function would take every input as a parameter;
+Recipe B, which bundles the parameters of a function that already exists, so E then B is
+two commits of which the first adds a finding and lowers the score; Recipes O, K, T and J,
+which pass the block's *written* variables by pointer and leave its inputs as parameters.
+
+**How:**
+
+1. The block meets Recipe E steps 1 and 3 to 7, and the OpenMP rule above. It contains
+   no `#pragma omp` line.
+2. List the variables the block only reads. Choose a group of them that are scalars or
+   pointers, none written anywhere in the block, so the new function keeps at most four
+   parameters: the struct and what the block writes through (a pixel buffer, say).
+3. Declare `typedef struct _Name { ... } Name;` directly above the new function, one
+   member per variable in the group, with the variable's exact type and name: no `size_t`
+   for a `ssize_t`, no `const` added or dropped on what a pointer points to. Only a
+   top-level `const` of a parameter (`const double softness`) is left off the member,
+   which step 6 assigns.
+4. Cut the block into a new `static` function taking `const Name *name` in place of the
+   group. At the top of its body declare one `const` local per member, of the member's
+   type and name, initialised from the member; the block's text below is unchanged.
+5. In the caller, declare a `Name` local among the declarations at the top of the block
+   that holds the call (the loop body, for a call inside a loop), never after a
+   statement.
+6. Directly before the call, assign every member from the variable of the same name,
+   `name.member=member;`, in declaration order, with nothing between the assignments and
+   the call. Then call the function with `&name` where the block stood.
+7. Inside an OpenMP parallel loop, the `Name` local is declared inside the loop body, so
+   each thread fills its own.
+8. Check by reading that every member is assigned, from the variable of its name, and
+   that every other argument fills the parameter it names.
+
+**Before:**
+
+```c
+      magnitude=threshold*(double) noise_levels[level];
+      for (i=0; i < (ssize_t) number_pixels; ++i)
+      {
+        pixels[(ssize_t) high_pass+i]-=pixels[(ssize_t) low_pass+i];
+        if ((double) pixels[(ssize_t) high_pass+i] < -magnitude)
+          pixels[(ssize_t) high_pass+i]+=(float) (magnitude-softness*magnitude);
+        else
+          ...
+        if (high_pass != 0)
+          pixels[i]+=pixels[(ssize_t) high_pass+i];
+      }
+      high_pass=low_pass;
+```
+
+**After:**
+
+```c
+typedef struct _WaveletThreshold
+{
+  size_t
+    high_pass,
+    low_pass;
+
+  MagickSizeType
+    number_pixels;
+
+  double
+    magnitude,
+    softness;
+} WaveletThreshold;
+
+static void ThresholdWaveletLevel(float *pixels,
+  const WaveletThreshold *wavelet)
+{
+  const size_t
+    high_pass = wavelet->high_pass,
+    low_pass = wavelet->low_pass;
+  ...
+  for (i=0; i < (ssize_t) number_pixels; ++i)
+  {
+    pixels[(ssize_t) high_pass+i]-=pixels[(ssize_t) low_pass+i];
+    ...
+  }
+}
+...
+      magnitude=threshold*(double) noise_levels[level];
+      wavelet.high_pass=high_pass;
+      wavelet.low_pass=low_pass;
+      wavelet.number_pixels=number_pixels;
+      wavelet.magnitude=magnitude;
+      wavelet.softness=softness;
+      ThresholdWaveletLevel(pixels,&wavelet);
+      high_pass=low_pass;
+```
+
+**Careful:**
+
+- The members are read in the caller, directly before the call, from variables the block
+  does not write: each holds the value the block would have read at its first use, and
+  the `const` locals hold it for the whole block, as the block's own reads of an
+  unwritten variable did. A variable the block writes is never a member.
+- A member keeps the variable's exact type, so the assignment and the local's
+  initialisation convert nothing; under HDRI a `MagickRealType` member stays one.
+- Every member is assigned before the call: an unassigned member is read uninitialised,
+  and nothing checks it but reading (step 8). Count them against the typedef.
+- Recipe E's limit on what the block writes stands: one value returned, or writes
+  through a pointer the block already used for pixel data. A block writing more is
+  skipped, as in Recipe E.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 8 checked by reading.
+
+**Provenance:** 2026-10-29, from `visual-effects.c`'s `WaveletDenoiseImage`, whose last
+depth-4 site is the coefficient threshold loop (six inputs: the buffer, both offsets, the
+pixel count, the magnitude and the softness). The Mac campaign tried it with Recipe E
+(2.41 to 2.36 on the new function's *Excess Arguments*, M05) and refused `SteganoImage`'s
+bit switch for the same reason; `MotionBlurImage`'s kernel loops (9 to 11 inputs, M101)
+are the same shape. A probe of the struct form: the depth-4 finding leaves, 2.84 to 2.90.
+Added by Claude Code (Claude Opus 5.5) during task W07, under the mandate of 2026-10-24.
+
+---
+
+## Recipe Q - Extract Accumulating Block Taking an Input Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
+Method*, *Complex Method* or *Large Method*, and the block that would fix it is a
+per-pixel accumulation inside a parallel loop body (or in a sequential function, step 1)
+that meets Recipe K in every respect but one: with its inputs as parameters, the new
+function would take five or more arguments (*Excess Number of Function Arguments*, which
+the pre-commit gate refuses on a new function). The typical case is a filter's per-channel weighted sum (`pixel`, `gamma`
+and a cursor), reading the window pointer, the window size, the weights and the channel.
+
+**Not covered by:** Recipe K, which passes every input as a parameter; Recipe N, whose
+block may write only one value or through a pixel pointer, and which keeps written
+variables out of its struct; Recipe J, which also writes `status` and passes its inputs
+as parameters. K then B is two commits, of which the first adds a finding.
+
+**How:**
+
+1. The block meets Recipe K steps 1 to 3: no `#pragma omp` line, no `return`, `goto`, or
+   `continue`/`break` that leaves it; it writes at most four of the parallel loop body's
+   own variables, and nothing declared outside that body. A block in a function with no
+   OpenMP region at all (a sequential pass) qualifies too: it then writes at most four
+   plain locals of the caller, none a parameter, a global or a `static`, and none whose
+   address is taken elsewhere (Recipe O step 2).
+2. Split what the block touches in two: the variables it writes (the accumulators and
+   any cursor it advances, such as `n`), and the variables it only reads. Variables it
+   declares and uses alone move with it, as in Recipe K step 3.
+3. Put the read-only variables, scalars and pointers, in a struct as Recipe N steps 2
+   and 3 do: one member per variable, the variable's exact type and name, a top-level
+   `const` or `magick_restrict` left off. A written variable is never a member.
+4. Cut the block into a new `static void` function taking `const Name *name` first, then
+   one pointer per written scalar, in the order the block first writes them. At the
+   top of its body declare one `const` local per member, as Recipe N step 4 does.
+5. In the block's text, write each written scalar `v` as `*v` (`(*v)++` for `v++`) at
+   every use, reads included, as Recipe K step 4 does; nothing else in the text changes.
+6. In the caller, declare the `Name` local at the top of the block holding the call (in
+   the parallel loop body, so each thread fills its own), and directly before the call
+   assign every member from the variable of its name, in declaration order, with nothing
+   between the assignments and the call.
+7. Call it with `&name` and `&v` for each written scalar, at most four parameters in
+   all; check every member and every argument by reading.
+
+**Before:**
+
+```c
+        pixel=0.0;
+        gamma=0.0;
+        n=0;
+        if ((blur_traits & BlendPixelTrait) == 0)
+          {
+            for (v=0; v < (ssize_t) MagickMax(height,1); v++)
+            {
+              for (u=0; u < (ssize_t) MagickMax(width,1); u++)
+              {
+                 r=p-(ssize_t) (GetPixelChannels(image)*MagickMax(width,1)*
+                  (size_t) (mid.y-v)+GetPixelChannels(image)*(size_t)
+                  (mid.x-u));
+                pixel+=weights[id][n]*(double) r[i];
+                gamma+=weights[id][n];
+                n++;
+              }
+            }
+            SetPixelChannel(blur_image,channel,ClampToQuantum(
+              MagickSafeReciprocal(gamma)*pixel),q);
+            continue;
+          }
+```
+
+**After:**
+
+```c
+static void SumBilateralPixels(const BilateralSum *sum,double *pixel,
+  double *gamma,ssize_t *n)
+{
+  const Image
+    *const image = sum->image;
+  ...
+  for (v=0; v < (ssize_t) MagickMax(height,1); v++)
+  {
+    for (u=0; u < (ssize_t) MagickMax(width,1); u++)
+    {
+       r=p-(ssize_t) (GetPixelChannels(image)*MagickMax(width,1)*
+        (size_t) (mid.y-v)+GetPixelChannels(image)*(size_t)
+        (mid.x-u));
+      *pixel+=weights[id][*n]*(double) r[i];
+      *gamma+=weights[id][*n];
+      (*n)++;
+    }
+  }
+}
+...
+        if ((blur_traits & BlendPixelTrait) == 0)
+          {
+            sum.image=image;
+            sum.p=p;
+            ...
+            sum.i=i;
+            SumBilateralPixels(&sum,&pixel,&gamma,&n);
+            SetPixelChannel(blur_image,channel,ClampToQuantum(
+              MagickSafeReciprocal(gamma)*pixel),q);
+            continue;
+          }
+```
+
+**Careful:**
+
+- The two halves keep the arguments of the recipes they come from. The written
+  variables are each thread's own and change through `*v`, the same operations on the
+  same objects in the same order (Recipe K); the read-only ones are copied directly
+  before the call from variables the block does not write, so each holds the value the
+  block would have read (Recipe N).
+- A cursor the block reads before writing (`n`, initialised before the block) is a
+  written variable, passed by pointer, never a member: its value at the call is not one
+  the struct may freeze.
+- More than four written variables, or a write to `status`, is not this recipe: skip the
+  block (Recipe J covers `status` when the inputs fit in parameters).
+- In a sequential function there is no thread to share with: each written local becomes
+  `*v` in the callee, the same object in the same order, which is Recipe O's argument.
+  A cursor the block advances and the caller reads again (a kernel pointer `k`, a window
+  pointer `pixels`, advanced row by row by repeated calls) is such a written local, passed
+  by pointer.
+- Two blocks that differ only by a line or two (a plain and an alpha-blended sum) become
+  two helpers that CodeScene may report as *Code Duplication*; measure, and keep the step
+  only when no duplication appears.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new
+function, nothing else moved), and steps 1, 3 and 7 checked by reading: the oracle runs
+single-threaded.
+
+**Provenance:** 2026-10-29, from `effect.c`'s `BilateralBlurImage`, whose per-channel
+body holds a plain and an alpha-blended weighted sum (`pixel`, `gamma` and the cursor `n`,
+reading eight variables): Recipe K gives each helper eleven parameters, Recipe N refuses
+the accumulators, and the per-channel body cannot move (Recipe E step 7) while the two
+sums keep it a Bumpy Road. A probe of the three steps (sums, then the body): the
+function leaves Brain Method and Deep, Nested Complexity, 1.72 to 1.89. Added by Claude
+Code (Claude Opus 5.5) during task W07, under the mandate of 2026-10-24.
+
+---
+
+## Recipe U - Extract Function Returning the Loop Status Taking an Input Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it meets Recipe T in every
+respect but one: with the variables it reads as parameters, the new function would take
+five or more arguments (*Excess Number of Function Arguments*, which the pre-commit gate
+refuses on a new function). The typical case is a per-pixel channel loop inside a
+parallel row loop, reading both images, the context, the thread id and the coordinates.
+
+**Not covered by:** Recipe T, which passes every input as a parameter; Recipe N, whose
+block must meet Recipe E's OpenMP rule and so may not write `status`; Recipe J, which
+takes accumulators by pointer and its inputs as parameters; Recipe Q, whose block writes
+no `status`. T then B is two commits, of which the first adds a finding.
+
+**How:**
+
+1. The block meets Recipe T steps 1 to 4: it lies in one iteration of the parallel loop
+   body with no `#pragma omp` line; its only write to a variable declared outside the
+   loop body is `status=MagickFalse;`, and it does not read `status`; every loop-body
+   variable it writes is declared in the block or not read after it before being
+   written again (those are declared in the new function instead, with any initialiser);
+   no `return`, `goto`, or `continue`/`break` of the parallel loop.
+2. Put the variables it only reads, scalars and pointers none of which the block writes,
+   in a struct as Recipe N steps 2 and 3 do: one member per variable, the variable's
+   exact type and name, a top-level `const` or `magick_restrict` left off. A variable
+   the block writes (a row pointer it advances) is never a member: it goes by value.
+3. Cut the block into a new `static MagickBooleanType` function taking `const Name *name`
+   first and then the written-but-not-read-after variables by value, at most four
+   parameters. At the top of its body declare one `const` local per member, as Recipe N
+   step 4 does; then a local `status` set to `MagickTrue` first, as Recipe T step 5
+   does. The block's text is unchanged, and the function ends with `return(status);`.
+4. In the caller, declare the `Name` local among the declarations at the top of the
+   block holding the call, inside the parallel loop body, so each thread fills its own.
+5. Directly before the call, assign every member from the variable of its name, in
+   declaration order, with nothing between the assignments and the call.
+6. Where the block stood, write `if (Helper(&name,...) == MagickFalse)
+   status=MagickFalse;`, and check every member and argument by reading.
+
+**Before:**
+
+```c
+    for (x=0; x < (ssize_t) fx_image->columns; x++) {
+      ssize_t i;
+
+      pfx->fxrts[id].thisPixel = (Quantum *)p;
+
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        ...
+        if (!ExecuteRPN (pfx, &pfx->fxrts[id], &result, &pos)) {
+          status=MagickFalse;
+          break;
+        }
+
+        q[i] = ClampToQuantum ((MagickRealType) (QuantumRange*result));
+      }
+      p+=(ptrdiff_t) GetPixelChannels (image);
+```
+
+**After:**
+
+```c
+static MagickBooleanType ApplyFxToPixel (const FxPixelInputs * in,
+  const Quantum *magick_restrict p, Quantum *magick_restrict q)
+{
+  const Image
+    *const image = in->image;
+  ...
+  status=MagickTrue;
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    ...
+  }
+  return(status);
+}
+...
+      pixel_in.image=image;
+      ...
+      pixel_in.y=y;
+      if (ApplyFxToPixel (&pixel_in, p, q) == MagickFalse)
+        status=MagickFalse;
+      p+=(ptrdiff_t) GetPixelChannels (image);
+```
+
+**Careful:**
+
+- The two halves keep the arguments of the recipes they come from. The write to the
+  shared `status` moves to the end of the block, as in Recipe T: the block does not read
+  `status`, and OpenMP orders this unsynchronised write against no other thread. The
+  members are copied directly before the call from variables the block does not write,
+  as in Recipe N, into a local each thread owns.
+- A temporary the caller declared with an initialiser (`result = 0.0`) and the block
+  writes before every read moves into the new function with its initialiser; it is
+  then initialised once per call instead of once per outer iteration, which no read
+  can see. A temporary read before it is written in the block is not one: skip the block.
+- Writes through pointers the block already used (the pixels of `q`, the per-thread slot
+  `pfx->fxrts[id]`) stay as they are: the same thread writes the same objects.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 6 checked by reading: the oracle runs
+single-threaded.
+
+**Provenance:** 2026-10-29, from `fx.c`'s `FxImage`, whose last depth-4 site is the
+per-channel loop of its parallel row loop (seven inputs: both images, `pfx`, `id`, `x`,
+`y`, `p` and `q`, plus `status`). Recipe T gives the helper seven parameters, and moving
+the whole column loop leaves it a Complex Method (cc 9). A probe of the struct form:
+the function leaves Deep, Nested Complexity, fx.c 2.74 to 2.80. Added by Claude Code
+(Claude Opus 5.5) during task W07, under the mandate of 2026-10-24.
+
+---
+
+## Recipe V - Extract Block Returning Success for a Cleanup Jump
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
+Method*, *Complex Method* or *Large Method*, and the block that would fix it leaves the
+function on failure through `goto <label>;`, to a cleanup label further down, as
+`MorphologyApply`'s image clone does (`goto error_cleanup;` when the clone fails).
+
+**Not covered by:** Recipe E, whose step 6 covers the `return` hidden in the throw
+macros and whose step 7 the `return` of a block that ends the function: a jump to the
+caller's label is neither, and a new function cannot jump to it; Recipes O, T, K, J, N,
+Q and U, whose first step refuses a block containing `goto`.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. Every
+   `goto` in it jumps to one label `L` outside the block; it contains no `return`, and no
+   `continue` or `break` that leaves it.
+2. The block writes at most one variable of the caller, `v`, a plain local (not a
+   parameter, a global or a `static`) whose address is not taken elsewhere. Writes
+   through pointers the block already uses stay as they are; variables it declares move
+   with it.
+3. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. Each `goto L;` becomes `return(MagickFalse);`, one for one, and the function
+   ends with `return(MagickTrue);`. Nothing else in the text changes.
+4. Pass every variable the block only reads by value, and `v` as a pointer, written `*v`
+   at every use, reads included (Recipe O step 5), at most four parameters in all;
+   otherwise skip the block.
+5. Where the block stood, write `if (Helper(...) == MagickFalse) goto L;`, and check
+   every argument against its parameter by reading.
+
+**Before:**
+
+```c
+          kernel_loop++;     /* the iteration of this kernel */
+
+          /* Create a clone as the destination image, if not yet defined */
+          if ( work_image == (Image *) NULL )
+            {
+              work_image=CloneImage(image,0,0,MagickTrue,exception);
+              if (work_image == (Image *) NULL)
+                goto error_cleanup;
+              if (SetImageStorageClass(work_image,DirectClass,exception) == MagickFalse)
+                goto error_cleanup;
+            }
+
+          /* APPLY THE MORPHOLOGICAL PRIMITIVE (curr -> work) */
+```
+
+**After:**
+
+```c
+static MagickBooleanType AcquireWorkImage(const Image *image,
+  Image **work_image,ExceptionInfo *exception)
+{
+  if ( *work_image == (Image *) NULL )
+    {
+      *work_image=CloneImage(image,0,0,MagickTrue,exception);
+      if (*work_image == (Image *) NULL)
+        return(MagickFalse);
+      if (SetImageStorageClass(*work_image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+...
+          /* Create a clone as the destination image, if not yet defined */
+          if (AcquireWorkImage(image,&work_image,exception) == MagickFalse)
+            goto error_cleanup;
+```
+
+**Careful:**
+
+- On a failure path the caller jumps from the same point as before: the block's
+  statements after the jump run in neither version, and every write before it has
+  landed in `v` through the pointer, so the cleanup code at `L` reads the same values
+  (here a `work_image` that is NULL, or a clone it destroys).
+- On the success path the function returns at the block's end and the caller goes on
+  with the next statement, where the block fell through.
+- The failure paths are mostly allocation failures that no case reaches: the oracle
+  checks the success path; the failure path is checked by reading, each `goto L;`
+  against its `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2`.
+- A block that jumps to two labels, or writes two of the caller's variables, is not this
+  recipe: skip it.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 5 checked by reading.
+
+**Provenance:** 2026-10-29, from `morphology.c`'s `MorphologyApply`, whose deepest sites
+inside its four nested loops (kernel, stage, compound method, kernel iteration) leave
+through `goto error_cleanup`, the plateau the earlier W07 pass on the file recorded. A
+probe of the work-image clone: nesting 6 to 5, 2.46 to 2.51. Cleanup labels reached by
+`goto` also occur in `property.c` and `annotate.c`. Added by Claude Code (Claude Opus
+5.5) during task W07, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -1356,4 +1841,12 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-28 | AMEND | J | Step 5: an array accumulator goes as a pointer with its uses unchanged, as Recipe K already allows | `PerimeterThreshold`'s row loop counts into `pattern[4]`, the object's own array, and writes `status=MagickFalse` | mandate (2026-10-24) |
 | 2026-10-28 | AMEND | S | Scope: any MagickCore file whose family splits cleanly, not only the approved list; a split may lower MagickCore's per-file mean (the new file starts red) when it raises the original file; *Careful*'s new-file gate procedure confirmed | statistic.c's `StatisticImage` family (dry run 2.29 → 2.61); the per-file mean dip of the first three splits (4.97 → 4.96, line-weighted 3.149 → 3.200) | owner |
 | 2026-10-28 | AMEND | B | Step 5: the struct is declared among the declarations at the top of the block holding its calls, `const` with its initialiser where its operands are final there, otherwise filled member by member where it takes its values; `tools/ci_warnings.sh` joins the verification loop | `Main`'s macOS arm64 job (`-Wdeclaration-after-statement -Werror`) has failed on every merge since #31: 40 structs declared after statements in 20 files, as step 4's "directly before the call" placed them | mandate (2026-10-24) |
+| 2026-10-29 | NEW | N | Extract Function Taking an Input Struct: an E-legal block whose inputs would give the new function five or more parameters moves to a `static` function taking a `const` struct of the inputs it only reads, filled member by member directly before the call; `const` locals of the old names keep the block text unchanged | `WaveletDenoiseImage`'s threshold loop (six inputs; with Recipe E 2.41 to 2.36 in M05, with the struct 2.84 to 2.90); M05's `SteganoImage` bit switch and M101's `MotionBlurImage` kernel loops refused for the same reason | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | E | Step 3: a block whose single output is an array of the caller's, updated element by element, takes the array as a pointer with its uses unchanged, as Recipe K does for arrays | `BlendMeanImage`'s serial first pass sums each channel into `mean[MaxPixelChannels]`; outside OpenMP, so Recipe K (parallel loop bodies) does not name it, and E's "return the single value" cannot return an array. A probe: the function's last depth-4 site goes, 2.43 to 2.49 | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | E | Step 7: a loop's whole body may move even when it `continue`s that loop; each such `continue;` becomes `return;` of the new `void` function, whose call is the whole body, so both end the iteration at the same point | `statistic.c`'s GetImageStatistics entropy pass (W06: moving the outer loop gives the helper a Bumpy Road; moving the inner loop needs six parameters), and the per-channel bodies of `effect.c`'s blur family (W07), both refused for want of this | mandate (2026-10-24) |
+| 2026-10-29 | NEW | Q | Extract Accumulating Block Taking an Input Struct: a Recipe K accumulation whose inputs would give the new function five or more parameters moves to a `static void` function taking a `const` struct of the inputs it only reads (Recipe N) and a pointer per written scalar (Recipe K), at most four parameters | `BilateralBlurImage`'s plain and alpha-blended per-channel sums (`pixel`, `gamma`, `n`; eight inputs): K gives eleven parameters, N refuses accumulators; a probe of the sums and then the per-channel body (Recipe N), 1.72 to 1.89 | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | E | Step 7: inside a `switch` case, a block after which the case runs only its closing `break;` may contain `break;` statements of that `switch` when its single output is one variable: the new function takes it by value and returns it, each such `break;` becomes `return(v);`, and the block becomes `v=Helper(...);`, so both reach the case's end with the same value | `fx.c`'s `ExecuteRPN`: its pixel-lookup cases (`fU`, `fU0`, `fUP`, `fS`/`fV`, `fP`/`fSP`/`fVP`) hold its nesting of 8 and each sets `regA` and leaves the `switch` by `break` from inside nested `if`s. A probe removing them: depth 8 to 4, fx.c 2.62 to 2.92 | mandate (2026-10-24) |
+| 2026-10-29 | NEW | U | Extract Function Returning the Loop Status Taking an Input Struct: a Recipe T block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and the written row pointers by value; the caller writes `status=MagickFalse` from its result (Recipe T) | `FxImage`'s per-channel loop inside its parallel row loop (seven inputs and `status`): T gives seven parameters, N refuses the `status` write, the whole column loop is a Complex Method (cc 9). A probe: FxImage leaves Deep, Nested Complexity, fx.c 2.74 to 2.80 | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | Q | Step 1: a block in a function with no OpenMP region (a sequential pass) qualifies, its written variables being plain locals of the caller (Recipe O step 2); *Careful* notes the cursors (`k`, `pixels`) such a block advances for the next call | `morphology.c`'s `MorphologyPrimitiveDirect`: its forward pass repeats one kernel-row body (`pixel`, `k`, `pixels` written; `image`, `kernel`, `i` read) in the Distance and Voronoi double loops; the function is sequential (two views of one image), so Recipe K's parallel-body wording refuses it, Recipe E step 4 refuses three outputs and Recipe O wants a selection. A probe of the row helper at both sites: nesting 6 to 5, 2.41 to 2.46 | mandate (2026-10-24) |
+| 2026-10-29 | NEW | V | Extract Block Returning Success for a Cleanup Jump: a block outside OpenMP that leaves through `goto L;` and writes at most one caller local moves to a `static MagickBooleanType` function, each `goto L;` becoming `return(MagickFalse);`, the local passed by pointer; the caller writes `if (Helper(...) == MagickFalse) goto L;` | `MorphologyApply`'s work-image clone inside four nested loops (nesting 6), refused by every extraction recipe for its `goto error_cleanup`; the plateau of the earlier W07 pass on `morphology.c`. A probe: nesting 6 to 5, 2.46 to 2.51 | mandate (2026-10-24) |
 | 2026-10-28 | AMEND | E | Step 4: a variable the block writes but nothing after it reads is not counted; the new function declares it with its initialiser, when nothing between that declaration and the block writes it (Recipes T and J already say "or is not read after it"); `tools/extract_case.py` applies it to one case of a function's closing `switch` | quantum-import.c's `Import*Quantum`: each depth case advances the span's `p` and `q` to the end of the function; extracting the cases raised the file 1.88 → 2.34, the fallthrough chains (24, 64, default) 2.34 → 2.59 in a probe | mandate (2026-10-24) |

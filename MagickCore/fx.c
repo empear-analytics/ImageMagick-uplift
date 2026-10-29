@@ -728,6 +728,16 @@ typedef struct {
   ssize_t imgy;
 } fxPixelPosT;
 
+typedef struct {
+  ssize_t imgx;
+  ssize_t imgy;
+} fxImgXYT;
+
+typedef struct {
+  fxFltType fx;
+  fxFltType fy;
+} fxFltXYT;
+
 struct _FxInfo {
   Image * image;
   size_t ImgListLen;
@@ -849,6 +859,17 @@ static MagickBooleanType InitFx (FxInfo * pfx, const Image * img,
   return MagickTrue;
 }
 
+static void DestroyImgViews (FxInfo * pfx)
+{
+  ssize_t i;
+
+  for (i = (ssize_t)GetImageListLength(pfx->image); i > 0; i--) {
+    ImgT * pimg = &pfx->Imgs[i-1];
+    pimg->View = DestroyCacheView (pimg->View);
+  }
+  pfx->Imgs=(ImgT *) RelinquishMagickMemory (pfx->Imgs);
+}
+
 static MagickBooleanType DeInitFx (FxInfo * pfx)
 {
   ssize_t i;
@@ -856,11 +877,7 @@ static MagickBooleanType DeInitFx (FxInfo * pfx)
   if (pfx->Images) pfx->Images = (Image**) RelinquishMagickMemory (pfx->Images);
 
   if (pfx->Imgs) {
-    for (i = (ssize_t)GetImageListLength(pfx->image); i > 0; i--) {
-      ImgT * pimg = &pfx->Imgs[i-1];
-      pimg->View = DestroyCacheView (pimg->View);
-    }
-    pfx->Imgs=(ImgT *) RelinquishMagickMemory (pfx->Imgs);
+    DestroyImgViews (pfx);
   }
   pfx->random_infos = DestroyRandomInfoTLS (pfx->random_infos);
 
@@ -1151,6 +1168,25 @@ static inline MagickBooleanType IsPixelReferenceElement(const ElementT *pel)
     MagickFalse);
 }
 
+static void CountJumpDestination (FxInfo * pfx, int i)
+{
+  ElementT * pel = &pfx->Elements[i];
+  if (IsJumpElement(pel) != MagickFalse) {
+    if (pel->element_index >= 0 && pel->element_index < pfx->numElements) {
+      ElementT * pelDest = &pfx->Elements[pel->element_index];
+      pelDest->number_dest++;
+    }
+  }
+}
+
+static void DumpChannelQualifier (ElementT * pel)
+{
+  if (pel->channel_qual != NO_CHAN_QUAL) {
+    if (pel->channel_qual == THIS_CHANNEL) fprintf (stderr, "  ch=this");
+    else fprintf (stderr, "  ch=%i", pel->channel_qual);
+  }
+}
+
 static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
 {
   int i;
@@ -1173,13 +1209,7 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
     pel->number_dest = 0;
   }
   for (i=0; i < pfx->usedElements; i++) {
-    ElementT * pel = &pfx->Elements[i];
-    if (IsJumpElement(pel) != MagickFalse) {
-      if (pel->element_index >= 0 && pel->element_index < pfx->numElements) {
-        ElementT * pelDest = &pfx->Elements[pel->element_index];
-        pelDest->number_dest++;
-      }
-    }
+    CountJumpDestination (pfx, i);
   }
   for (i=0; i < pfx->usedElements; i++) {
     char UserSym[MagickPathExtent];
@@ -1206,10 +1236,7 @@ static MagickBooleanType DumpRPN (FxInfo * pfx, FILE * fh)
     if (pel->img_attr_qual != aNull)
       fprintf (fh, " ia=%s", OprStr((int) pel->img_attr_qual));
 
-    if (pel->channel_qual != NO_CHAN_QUAL) {
-      if (pel->channel_qual == THIS_CHANNEL) fprintf (stderr, "  ch=this");
-      else fprintf (stderr, "  ch=%i", pel->channel_qual);
-    }
+    DumpChannelQualifier (pel);
 
     if (pel->operator_index == rCopyTo) {
       fprintf (fh, "  CopyTo ==> %s", NameOfUserSym (pfx, pel->element_index, UserSym));
@@ -1424,6 +1451,15 @@ static inline MagickBooleanType IsUnqualifiableAttr(const ImgAttrE *pop)
     MagickFalse);
 }
 
+static int MatchXYWHToken (FxInfo * pfx, int ret)
+{
+  if (LocaleCompare ("x", pfx->token)==0) ret=1;
+  else if (LocaleCompare ("y", pfx->token)==0) ret=2;
+  else if (LocaleCompare ("width", pfx->token)==0) ret=3;
+  else if (LocaleCompare ("height", pfx->token)==0) ret=4;
+  return ret;
+}
+
 static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
 /* If ".x" or ".y" or ".width" or ".height" increments *pop and returns 1 to 4 .
    Otherwise returns 0.
@@ -1438,10 +1474,7 @@ static int MaybeXYWH (FxInfo * pfx, ImgAttrE * pop)
   if (!ExpectChar (pfx, '.')) return 0;
 
   (void) GetToken (pfx);
-  if (LocaleCompare ("x", pfx->token)==0) ret=1;
-  else if (LocaleCompare ("y", pfx->token)==0) ret=2;
-  else if (LocaleCompare ("width", pfx->token)==0) ret=3;
-  else if (LocaleCompare ("height", pfx->token)==0) ret=4;
+  ret = MatchXYWHToken (pfx, ret);
 
   if (!ret)
     (void) ThrowMagickException (
@@ -1569,28 +1602,28 @@ static inline MagickBooleanType IsAttributeWithVirtualChannel(const int op,
 
 static PixelChannel GetChannelQualifier (FxInfo * pfx, int op)
 {
-  if (IsChannelQualifiableOperator(op) != MagickFalse)
-  {
-    const ChannelT * pch = &Channels[0];
-    (void) GetToken (pfx);
+  const ChannelT * pch;
+  if (IsChannelQualifiableOperator(op) == MagickFalse)
+    return NO_CHAN_QUAL;
+  pch = &Channels[0];
+  (void) GetToken (pfx);
 
-    while (*pch->str) {
-      if (LocaleCompare (pch->str, pfx->token)==0) {
+  while (*pch->str) {
+    if (LocaleCompare (pch->str, pfx->token)==0) {
 
-        if (IsAttributeWithVirtualChannel(op,pch) != MagickFalse)
-        {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Can't have image attribute with channel qualifier at", "'%s' at '%s'",
-            pfx->token, SetShortExp(pfx));
-          return NO_CHAN_QUAL;
-        }
-
-        pfx->pex += pfx->lenToken;
-        return pch->pixel_channel;
+      if (IsAttributeWithVirtualChannel(op,pch) != MagickFalse)
+      {
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Can't have image attribute with channel qualifier at", "'%s' at '%s'",
+          pfx->token, SetShortExp(pfx));
+        return NO_CHAN_QUAL;
       }
-      pch++;
+
+      pfx->pex += pfx->lenToken;
+      return pch->pixel_channel;
     }
+    pch++;
   }
   return NO_CHAN_QUAL;
 }
@@ -1683,93 +1716,104 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
    If *seconds is not null, sets that from assumed date-time, or SECONDS_ERR if error.
 */
 {
+  int level = 0;
+  size_t len;
+  char sProperty [MagickPathExtent];
+  char * p;
+
   if (seconds != NULL) *seconds = SECONDS_ERR;
 
-  if (PeekStr (pfx, "%[")) {
-    int level = 0;
-    size_t len;
-    char sProperty [MagickPathExtent];
-    char * p = pfx->pex + 2;
+  if (!PeekStr (pfx, "%["))
+    return 0;
+  p = pfx->pex + 2;
 
-    while (*p) {
+  while (*p) {
 
-      if (*p == '[') level++;
-      else if (*p == ']') {
-        if (level == 0) break;
-        level--;
+    if (*p == '[') level++;
+    else if (*p == ']') {
+      if (level == 0) break;
+      level--;
+    }
+    p++;
+  }
+  if (!*p || level != 0) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "After '%[' expected ']' at", "'%s'",
+      SetShortExp(pfx));
+    return -1;
+  }
+
+  len = (size_t) (p - pfx->pex + 1);
+  if (len > MaxTokenLen) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Too much text between '%[' and ']' at", "'%s'",
+      SetShortExp(pfx));
+    return -1;
+  }
+
+  (void) CopyMagickString (sProperty, pfx->pex, len+1);
+  sProperty[len] = '\0';
+  {
+    char * tailptr;
+    char * text;
+    text = InterpretImageProperties (pfx->image->image_info, pfx->image,
+       sProperty, pfx->exception);
+    if (!text || !*text) {
+      text = DestroyString(text);
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Unknown property", "'%s' at '%s'",
+        sProperty, SetShortExp(pfx));
+      return -1;
+    }
+
+    if (seconds != NULL) {
+      struct tm tp;
+      if (ParseISO860(text,&tp) == MagickFalse) {
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Function 'epoch' expected date property, found ", "'%s' at '%s'",
+          text, SetShortExp(pfx));
+        text = DestroyString(text);
+        *seconds = SECONDS_ERR;
+        return -1;
       }
-      p++;
-    }
-    if (!*p || level != 0) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "After '%[' expected ']' at", "'%s'",
-        SetShortExp(pfx));
-      return -1;
-    }
-
-    len = (size_t) (p - pfx->pex + 1);
-    if (len > MaxTokenLen) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Too much text between '%[' and ']' at", "'%s'",
-        SetShortExp(pfx));
-      return -1;
-    }
-
-    (void) CopyMagickString (sProperty, pfx->pex, len+1);
-    sProperty[len] = '\0';
-    {
-      char * tailptr;
-      char * text;
-      text = InterpretImageProperties (pfx->image->image_info, pfx->image,
-         sProperty, pfx->exception);
-      if (!text || !*text) {
+      *seconds = (fxFltType)mktime (&tp);
+      *val = *seconds;
+    } else {
+      *val = strtold (text, &tailptr);
+      if (text == tailptr) {
         text = DestroyString(text);
         (void) ThrowMagickException (
           pfx->exception, GetMagickModule(), OptionError,
-          "Unknown property", "'%s' at '%s'",
-          sProperty, SetShortExp(pfx));
+          "Property", "'%s' text '%s' is not a number at '%s'",
+          sProperty, text, SetShortExp(pfx));
+        text = DestroyString(text);
         return -1;
       }
-
-      if (seconds != NULL) {
-        struct tm tp;
-        if (ParseISO860(text,&tp) == MagickFalse) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Function 'epoch' expected date property, found ", "'%s' at '%s'",
-            text, SetShortExp(pfx));
-          text = DestroyString(text);
-          *seconds = SECONDS_ERR;
-          return -1;
-        }
-        *seconds = (fxFltType)mktime (&tp);
-        *val = *seconds;
-      } else {
-        *val = strtold (text, &tailptr);
-        if (text == tailptr) {
-          text = DestroyString(text);
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Property", "'%s' text '%s' is not a number at '%s'",
-            sProperty, text, SetShortExp(pfx));
-          text = DestroyString(text);
-          return -1;
-        }
-      }
-      text = DestroyString(text);
     }
-    return ((ssize_t) len);
+    text = DestroyString(text);
   }
-
-  return 0;
+  return ((ssize_t) len);
 }
 
 static inline MagickBooleanType IsColourSpaceNamed(const ssize_t type,
   const MagickBooleanType IsIcc,const MagickBooleanType IsDev)
 {
   return((type >= 0 || IsIcc || IsDev) ? MagickTrue : MagickFalse);
+}
+
+static ssize_t ReportColourSpaceWithoutArgs (FxInfo * pfx,
+  ExceptionInfo * dummy_exception)
+{
+  (void) ThrowMagickException (
+    pfx->exception, GetMagickModule(), OptionError,
+    "colorspace but not a valid color with '(...)' at", "'%s'",
+    SetShortExp(pfx));
+  dummy_exception = DestroyExceptionInfo (dummy_exception);
+  return -1;
 }
 
 static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType *v1, fxFltType *v2)
@@ -1843,12 +1887,7 @@ static inline ssize_t GetConstantColour (FxInfo * pfx, fxFltType *v0, fxFltType 
           return (ssize_t)lenfun;
         }
       } else {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "colorspace but not a valid color with '(...)' at", "'%s'",
-          SetShortExp(pfx));
-        dummy_exception = DestroyExceptionInfo (dummy_exception);
-        return -1;
+        return (ReportColourSpaceWithoutArgs (pfx, dummy_exception));
       }
     }
     if (!IsGray) {
@@ -2003,6 +2042,93 @@ static inline MagickBooleanType IsCoordFunction(const FunctionE fe)
   return((fe == fU || fe == fV || fe == fS) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType AddEpochSeconds (FxInfo * pfx, fxFltType seconds,
+  ssize_t lenOptArt, OperatorE pushOp)
+{
+  (void) AddElement (pfx, seconds, oNull);
+  pfx->pex += lenOptArt;
+  if (!ExpectChar (pfx, ')')) return MagickFalse;
+  if (!PopOprOpenParen (pfx, pushOp)) return MagickFalse;
+  return MagickTrue;
+}
+
+static void AddFirstArgAddressing (FxInfo * pfx, FunctionE fe)
+{
+  if (fe==fWhile || fe==fIf) {
+    (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx2+1 */
+  } else if (fe==fDo) {
+    (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx2+1 */
+  } else if (fe==fFor) {
+    pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
+  }
+}
+
+static void AddSecondArgAddressing (FxInfo * pfx, FunctionE fe, int ndx0)
+{
+  if (fe==fWhile) {
+    pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
+    (void) AddAddressingElement (pfx, rGotoChk, ndx0);
+  } else if (fe==fDo) {
+    pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
+    (void) AddAddressingElement (pfx, rGotoChk, ndx0 + 1);
+  } else if (fe==fFor) {
+    (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx3 */
+    pfx->Elements[pfx->usedElements-1].do_push = MagickTrue; /* we may need return from for() */
+    (void) AddAddressingElement (pfx, rZerStk, NULL_ADDRESS);
+  } else if (fe==fIf) {
+    (void) AddAddressingElement (pfx, rGoto, NULL_ADDRESS); /* address will be ndx3 */
+  }
+}
+
+static int AddDefaultArgs (FxInfo * pfx, FunctionE fe, int FndArgs)
+{
+  while (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
+    (void) AddElement (pfx, (fxFltType) 0, oNull);
+    FndArgs++;
+  }
+  return FndArgs;
+}
+
+static MagickBooleanType ReportTooManyArgs (FxInfo * pfx, FunctionE fe,
+  const char * funStr, int FndArgs)
+{
+  if (fe==fChannel) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s' expected up to %i arguments, found '%i' at '%s'",
+      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
+  } else {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "For function", "'%s' expected %i arguments, found '%i' at '%s'",
+      funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
+  }
+  return MagickFalse;
+}
+
+static MagickBooleanType CheckAttrChannelQualifier (FxInfo * pfx,
+  ImgAttrE iaQual, PixelChannel chQual)
+{
+  if (ImgAttrs[iaQual-(int) FirstImgAttr].need_stats == MagickFalse) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Can't have image attribute ", "'%s' with channel qualifier '%s' at '%s'",
+      ImgAttrs[iaQual-(int) FirstImgAttr].str,
+      pfx->token, SetShortExp(pfx));
+    return MagickFalse;
+  } else {
+    if (ChanIsVirtual (chQual)) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Can't have statistical image attribute ", "'%s' with virtual channel qualifier '%s' at '%s'",
+        ImgAttrs[iaQual-(int) FirstImgAttr].str,
+        pfx->token, SetShortExp(pfx));
+      return MagickFalse;
+    }
+  }
+  return MagickTrue;
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2090,11 +2216,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
     }
     if (lenOptArt < 0) return MagickFalse;
     if (lenOptArt > 0) {
-      (void) AddElement (pfx, seconds, oNull);
-      pfx->pex += lenOptArt;
-      if (!ExpectChar (pfx, ')')) return MagickFalse;
-      if (!PopOprOpenParen (pfx, pushOp)) return MagickFalse;
-      return MagickTrue;
+      return (AddEpochSeconds (pfx, seconds, lenOptArt, pushOp));
     }
   }
 
@@ -2139,13 +2261,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
           return MagickFalse;
         }
         ndx1 = pfx->usedElements;
-        if (fe==fWhile || fe==fIf) {
-          (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx2+1 */
-        } else if (fe==fDo) {
-          (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx2+1 */
-        } else if (fe==fFor) {
-          pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
-        }
+        AddFirstArgAddressing (pfx, fe);
         break;
       case 2:
         if (ndx2 != NULL_ADDRESS) {
@@ -2156,19 +2272,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
           return MagickFalse;
         }
         ndx2 = pfx->usedElements;
-        if (fe==fWhile) {
-          pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
-          (void) AddAddressingElement (pfx, rGotoChk, ndx0);
-        } else if (fe==fDo) {
-          pfx->Elements[pfx->usedElements-1].do_push = MagickFalse;
-          (void) AddAddressingElement (pfx, rGotoChk, ndx0 + 1);
-        } else if (fe==fFor) {
-          (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS); /* address will be ndx3 */
-          pfx->Elements[pfx->usedElements-1].do_push = MagickTrue; /* we may need return from for() */
-          (void) AddAddressingElement (pfx, rZerStk, NULL_ADDRESS);
-        } else if (fe==fIf) {
-          (void) AddAddressingElement (pfx, rGoto, NULL_ADDRESS); /* address will be ndx3 */
-        }
+        AddSecondArgAddressing (pfx, fe, ndx0);
         break;
       case 3:
         if (ndx3 != NULL_ADDRESS) {
@@ -2201,26 +2305,12 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   }
 
   if (IsDefaultArgsFunction(fe) != MagickFalse) {
-    while (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
-      (void) AddElement (pfx, (fxFltType) 0, oNull);
-      FndArgs++;
-    }
+    FndArgs = AddDefaultArgs (pfx, fe, FndArgs);
   }
 
   if (FndArgs > Functions[fe-(int) FirstFunc].number_args)
   {
-    if (fe==fChannel) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s' expected up to %i arguments, found '%i' at '%s'",
-        funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
-    } else {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "For function", "'%s' expected %i arguments, found '%i' at '%s'",
-        funStr, Functions[fe-(int) FirstFunc].number_args, FndArgs, SetShortExp(pfx));
-    }
-    return MagickFalse;
+    return (ReportTooManyArgs (pfx, fe, funStr, FndArgs));
   }
   if (FndArgs < Functions[fe-(int) FirstFunc].number_args) {
     (void) ThrowMagickException (
@@ -2325,23 +2415,7 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
   }
 
   if (iaQual != aNull && chQual != NO_CHAN_QUAL) {
-    if (ImgAttrs[iaQual-(int) FirstImgAttr].need_stats == MagickFalse) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Can't have image attribute ", "'%s' with channel qualifier '%s' at '%s'",
-        ImgAttrs[iaQual-(int) FirstImgAttr].str,
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    } else {
-      if (ChanIsVirtual (chQual)) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Can't have statistical image attribute ", "'%s' with virtual channel qualifier '%s' at '%s'",
-          ImgAttrs[iaQual-(int) FirstImgAttr].str,
-          pfx->token, SetShortExp(pfx));
-        return MagickFalse;
-      }
-    }
+    if (!CheckAttrChannelQualifier (pfx, iaQual, chQual)) return MagickFalse;
   }
 
   if (fe==fWhile) {
@@ -2406,6 +2480,118 @@ static inline MagickBooleanType IsHslSymbol(const SymbolE se)
     MagickFalse);
 }
 
+static fxFltType ApplyNumberPrefix (FxInfo * pfx, char * tailptr, fxFltType val)
+{
+  /* Could have "prefix" K, Ki, M etc.
+     See https://en.wikipedia.org/wiki/Metric_prefix
+     and https://en.wikipedia.org/wiki/Binary_prefix
+  */
+  double Pow = 0.0;
+  const char Prefixes[] = "yzafpnum.kMGTPEZY";
+  const char * pSi = strchr (Prefixes, *tailptr);
+  if (pSi && *pSi != '.') Pow = (double) ((pSi - Prefixes) * 3 - 24);
+  else if (*tailptr == 'c') Pow = -2;
+  else if (*tailptr == 'h') Pow =  2;
+  else if (*tailptr == 'k') Pow =  3;
+  if (Pow != 0.0) {
+    if (*(++pfx->pex) == 'i') {
+      val *= pow (2.0, Pow/0.3);
+      pfx->pex++;
+    } else {
+      val *= pow (10.0, Pow);
+    }
+  }
+  return val;
+}
+
+static MagickBooleanType GetParenthesisedOperand (
+  FxInfo * pfx, OperatorE op, MagickBooleanType * needPopAll)
+{
+  char chLimit = '\0';
+  if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
+  pfx->pex++;
+  if (!TranslateExpression (pfx, ")", &chLimit, needPopAll)) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Empty expression in parentheses at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  if (chLimit != ')') {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "'(' but no ')' at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  /* Top of opr stack should be '('. */
+  if (!PopOprOpenParen (pfx, oOpenParen)) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Bug: tos not '(' at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  return MagickTrue;
+}
+
+static MagickBooleanType GetHexColourOperand (FxInfo * pfx)
+{
+  fxFltType v0=0, v1=0, v2=0;
+  ssize_t lenToken = GetHexColour (pfx, &v0, &v1, &v2);
+  if (lenToken < 0) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Bad hex number at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  } else if (lenToken > 0) {
+    (void) AddColourElement (pfx, v0, v1, v2);
+    pfx->pex+=lenToken;
+  }
+  return MagickTrue;
+}
+
+static MagickBooleanType AddImgAttrOperand (FxInfo * pfx, ImgAttrE ia)
+{
+  fxFltType val = 0;
+  (void) AddElement (pfx, val, (int) ia);
+
+  if (ImgAttrs[ia-(int) FirstImgAttr].need_stats != MagickFalse) {
+    if (IsQualifier (pfx)) {
+      PixelChannel chQual = GetChannelQualifier (pfx, (int) ia);
+      ElementT * pel;
+      if (chQual == NO_CHAN_QUAL) {
+        (void) ThrowMagickException (
+          pfx->exception, GetMagickModule(), OptionError,
+          "Bad channel qualifier at", "'%s'",
+          SetShortExp(pfx));
+        return MagickFalse;
+      }
+      /* Adjust the element */
+      pel = &pfx->Elements[pfx->usedElements-1];
+      pel->channel_qual = chQual;
+    }
+  }
+  return MagickTrue;
+}
+
+static MagickBooleanType AddArtifactOperand (FxInfo * pfx, const char * artifact)
+{
+  char * tailptr;
+  fxFltType val = strtold (artifact, &tailptr);
+  if (pfx->token == tailptr) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Artifact", "'%s' has value '%s', not a number, at '%s'",
+      pfx->token, artifact, SetShortExp(pfx));
+    return MagickFalse;
+  }
+  (void) AddElement (pfx, val, oNull);
+  pfx->pex+=pfx->lenToken;
+  return MagickTrue;
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
   MagickBooleanType * needPopAll)
@@ -2424,32 +2610,7 @@ static MagickBooleanType GetOperand (
     */
     OperatorE op = GetLeadingOp (pfx);
     if (op==oOpenParen) {
-      char chLimit = '\0';
-      if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
-      pfx->pex++;
-      if (!TranslateExpression (pfx, ")", &chLimit, needPopAll)) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Empty expression in parentheses at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      if (chLimit != ')') {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "'(' but no ')' at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      /* Top of opr stack should be '('. */
-      if (!PopOprOpenParen (pfx, oOpenParen)) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Bug: tos not '(' at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      return MagickTrue;
+      return (GetParenthesisedOperand (pfx, op, needPopAll));
     } else if (OprIsUnaryPrefix (op)) {
       MagickBooleanType operand_ok;
       if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
@@ -2493,19 +2654,7 @@ static MagickBooleanType GetOperand (
       (void) GetToken (pfx);
       return MagickTrue;
     } else if (*pfx->pex == '#') {
-      fxFltType v0=0, v1=0, v2=0;
-      ssize_t lenToken = GetHexColour (pfx, &v0, &v1, &v2);
-      if (lenToken < 0) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Bad hex number at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      } else if (lenToken > 0) {
-        (void) AddColourElement (pfx, v0, v1, v2);
-        pfx->pex+=lenToken;
-      }
-      return MagickTrue;
+      return (GetHexColourOperand (pfx));
     }
 
     /* Try a constant number.
@@ -2517,25 +2666,7 @@ static MagickBooleanType GetOperand (
       if (pfx->pex != tailptr) {
         pfx->pex = tailptr;
         if (*tailptr) {
-          /* Could have "prefix" K, Ki, M etc.
-             See https://en.wikipedia.org/wiki/Metric_prefix
-             and https://en.wikipedia.org/wiki/Binary_prefix
-          */
-          double Pow = 0.0;
-          const char Prefixes[] = "yzafpnum.kMGTPEZY";
-          const char * pSi = strchr (Prefixes, *tailptr);
-          if (pSi && *pSi != '.') Pow = (double) ((pSi - Prefixes) * 3 - 24);
-          else if (*tailptr == 'c') Pow = -2;
-          else if (*tailptr == 'h') Pow =  2;
-          else if (*tailptr == 'k') Pow =  3;
-          if (Pow != 0.0) {
-            if (*(++pfx->pex) == 'i') {
-              val *= pow (2.0, Pow/0.3);
-              pfx->pex++;
-            } else {
-              val *= pow (10.0, Pow);
-            }
-          }
+          val = ApplyNumberPrefix (pfx, tailptr, val);
         }
         (void) AddElement (pfx, val, oNull);
         return MagickTrue;
@@ -2610,26 +2741,7 @@ static MagickBooleanType GetOperand (
     {
       ImgAttrE ia = GetImgAttrToken (pfx);
       if (ia != aNull) {
-        fxFltType val = 0;
-        (void) AddElement (pfx, val, (int) ia);
-
-        if (ImgAttrs[ia-(int) FirstImgAttr].need_stats != MagickFalse) {
-          if (IsQualifier (pfx)) {
-            PixelChannel chQual = GetChannelQualifier (pfx, (int) ia);
-            ElementT * pel;
-            if (chQual == NO_CHAN_QUAL) {
-              (void) ThrowMagickException (
-                pfx->exception, GetMagickModule(), OptionError,
-                "Bad channel qualifier at", "'%s'",
-                SetShortExp(pfx));
-              return MagickFalse;
-            }
-            /* Adjust the element */
-            pel = &pfx->Elements[pfx->usedElements-1];
-            pel->channel_qual = chQual;
-          }
-        }
-        return MagickTrue;
+        return (AddImgAttrOperand (pfx, ia));
       }
     }
 
@@ -2672,18 +2784,7 @@ static MagickBooleanType GetOperand (
       const char *artifact;
       artifact = GetImageArtifact (pfx->image, pfx->token);
       if (artifact != (const char *) NULL) {
-        char * tailptr;
-        fxFltType val = strtold (artifact, &tailptr);
-        if (pfx->token == tailptr) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Artifact", "'%s' has value '%s', not a number, at '%s'",
-            pfx->token, artifact, SetShortExp(pfx));
-          return MagickFalse;
-        }
-        (void) AddElement (pfx, val, oNull);
-        pfx->pex+=pfx->lenToken;
-        return MagickTrue;
+        return (AddArtifactOperand (pfx, artifact));
       }
     }
 
@@ -2936,6 +3037,63 @@ static inline MagickBooleanType IsUnassignedUserSymbolRead(
     MagickTrue : MagickFalse);
 }
 
+static void FlushUnaryPrefixOperators (FxInfo * pfx)
+{
+  while (TopOprIsUnaryPrefix (pfx)) {
+    OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
+    (void) AddElement (pfx, (fxFltType) 0, (int) op);
+    pfx->usedOprStack--;
+  }
+}
+
+static MagickBooleanType AddFinalCopyFrom (FxInfo * pfx,
+  MagickBooleanType NewUserSymbol, int UserSymNdx0)
+{
+  ElementT * pel;
+  if (NewUserSymbol) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "NewUserSymbol", "'%s' needs assignment operator at '%s'",
+      pfx->token, SetShortExp(pfx));
+    return MagickFalse;
+  }
+  (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx0);
+  pel = &pfx->Elements[pfx->usedElements-1];
+  pel->do_push = MagickTrue;
+  return MagickTrue;
+}
+
+static MagickBooleanType AddAssignmentCopyTo (FxInfo * pfx, int UserSymNdx0)
+{
+  if (UserSymNdx0 < 0) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Assignment to unknown user symbol at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  /* Adjust last element, by deletion and add.
+  */
+  pfx->usedElements--;
+  (void) AddAddressingElement (pfx, rCopyTo, UserSymNdx0);
+  return MagickTrue;
+}
+
+static MagickBooleanType SetInPlaceTarget (FxInfo * pfx, int UserSymNdx0)
+{
+  if (UserSymNdx0 < 0) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Operator-in-place to unknown user symbol at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+  /* Modify latest element.
+  */
+  pfx->Elements[pfx->usedElements-1].element_index = UserSymNdx0;
+  return MagickTrue;
+}
+
 static MagickBooleanType TranslateExpression (
   FxInfo * pfx, const char * strLimit, char * chLimit, MagickBooleanType * needPopAll)
 {
@@ -3030,11 +3188,7 @@ static MagickBooleanType TranslateExpression (
     }
 
     if (UserSymbol) {
-      while (TopOprIsUnaryPrefix (pfx)) {
-        OperatorE op = pfx->OperatorStack[pfx->usedOprStack-1];
-        (void) AddElement (pfx, (fxFltType) 0, (int) op);
-        pfx->usedOprStack--;
-      }
+      FlushUnaryPrefixOperators (pfx);
     }
 
     if (!ProcessTernaryOpr (pfx, &ternary)) return MagickFalse;
@@ -3089,17 +3243,7 @@ static MagickBooleanType TranslateExpression (
 
   if (IsUnassignedUserSymbolRead(UserSymbol,Assign,Update,UserSymNdx0) !=
       MagickFalse) {
-    ElementT * pel;
-    if (NewUserSymbol) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "NewUserSymbol", "'%s' needs assignment operator at '%s'",
-        pfx->token, SetShortExp(pfx));
-      return MagickFalse;
-    }
-    (void) AddAddressingElement (pfx, rCopyFrom, UserSymNdx0);
-    pel = &pfx->Elements[pfx->usedElements-1];
-    pel->do_push = MagickTrue;
+    if (!AddFinalCopyFrom (pfx, NewUserSymbol, UserSymNdx0)) return MagickFalse;
   }
 
   if (IsPendingLimitChar(pfx,chLimit,strLimit) != MagickFalse) {
@@ -3117,29 +3261,10 @@ static MagickBooleanType TranslateExpression (
     pfx->usedOprStack--;
     (void) AddElement (pfx, (fxFltType) 0, (int) op);
     if (op == oAssign) {
-      if (UserSymNdx0 < 0) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Assignment to unknown user symbol at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      /* Adjust last element, by deletion and add.
-      */
-      pfx->usedElements--;
-      (void) AddAddressingElement (pfx, rCopyTo, UserSymNdx0);
+      if (!AddAssignmentCopyTo (pfx, UserSymNdx0)) return MagickFalse;
       break;
     } else if (OprInPlace ((int) op)) {
-      if (UserSymNdx0 < 0) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Operator-in-place to unknown user symbol at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-      /* Modify latest element.
-      */
-      pfx->Elements[pfx->usedElements-1].element_index = UserSymNdx0;
+      if (!SetInPlaceTarget (pfx, UserSymNdx0)) return MagickFalse;
       break;
     }
   }
@@ -3291,6 +3416,17 @@ static inline fxFltType PopVal (FxInfo * pfx, fxRtT * pfxrt, int addr)
   return pfxrt->ValStack[--pfxrt->usedValStack];
 }
 
+static PixelChannel CheckStatisticsChannel (FxInfo * pfx, PixelChannel channel)
+{
+  if ((channel < 0) || (channel > MaxPixelChannels))
+    {
+      (void) ThrowMagickException(pfx->exception,GetMagickModule(),
+        OptionError,"NoSuchImageChannel","%i",channel);
+      channel=(PixelChannel) 0;
+    }
+  return(channel);
+}
+
 static inline fxFltType ImageStat (
   FxInfo * pfx, ssize_t ImgNum, PixelChannel channel, ImgAttrE ia)
 {
@@ -3306,21 +3442,11 @@ static inline fxFltType ImageStat (
     }
 
   if (pfx->GotStats) {
-    if ((channel < 0) || (channel > MaxPixelChannels))
-      {
-        (void) ThrowMagickException(pfx->exception,GetMagickModule(),
-          OptionError,"NoSuchImageChannel","%i",channel);
-        channel=(PixelChannel) 0;
-      }
+    channel=CheckStatisticsChannel (pfx, channel);
     cs = pfx->statistics[ImgNum];
   } else if (pfx->NeedStats) {
     /* If we need more than one statistic per pixel, this is inefficient. */
-    if ((channel < 0) || (channel > MaxPixelChannels))
-      {
-        (void) ThrowMagickException(pfx->exception,GetMagickModule(),
-          OptionError,"NoSuchImageChannel","%i",channel);
-        channel=(PixelChannel) 0;
-      }
+    channel=CheckStatisticsChannel (pfx, channel);
     cs = CollectOneImgStats (pfx, pfx->Images[ImgNum]);
     NeedRelinq = MagickTrue;
   }
@@ -3459,9 +3585,11 @@ static inline ssize_t ChkImgNum (FxInfo * pfx, fxFltType f)
   ) ? (channel == CompositePixelChannel ? RedPixelChannel: channel) \
     : pel->channel_qual
 
-static fxFltType GetHslFlt (FxInfo * pfx, ssize_t ImgNum, const fxFltType fx, const fxFltType fy,
+static fxFltType GetHslFlt (FxInfo * pfx, ssize_t ImgNum, const fxFltXYT * fxy,
   PixelChannel channel)
 {
+  const fxFltType fx = fxy->fx;
+  const fxFltType fy = fxy->fy;
   Image * img = pfx->Images[ImgNum];
 
   double red, green, blue;
@@ -3492,8 +3620,10 @@ static fxFltType GetHslFlt (FxInfo * pfx, ssize_t ImgNum, const fxFltType fx, co
   return 0.0;
 }
 
-static fxFltType GetHslInt (FxInfo * pfx, ssize_t ImgNum, const ssize_t imgx, const ssize_t imgy, PixelChannel channel)
+static fxFltType GetHslInt (FxInfo * pfx, ssize_t ImgNum, const fxImgXYT * xy, PixelChannel channel)
 {
+  const ssize_t imgx = xy->imgx;
+  const ssize_t imgy = xy->imgy;
   Image * img = pfx->Images[ImgNum];
 
   double hue=0, saturation=0, lightness=0;
@@ -3543,12 +3673,216 @@ static inline fxFltType GetIntensity (FxInfo * pfx, ssize_t ImgNum, const fxFltT
   return QuantumScale * GetPixelIntensity (img, quantum_pixel);
 }
 
+static fxFltType GetElementValue (ElementT * pel, const PixelChannel channel)
+{
+  fxFltType
+    regA;
+
+  if (pel->type == etColourConstant) {
+    switch (channel) { default:
+      case (PixelChannel) 0:
+        regA = pel->val;
+        break;
+      case (PixelChannel) 1:
+        regA = pel->val1;
+        break;
+      case (PixelChannel) 2:
+        regA = pel->val2;
+        break;
+    }
+  } else {
+    regA = pel->val;
+  }
+  return(regA);
+}
+
+typedef struct _RpnPixelInputs
+{
+  FxInfo
+    *pfx;
+
+  ElementT
+    *pel;
+
+  PixelChannel
+    channel;
+
+  ssize_t
+    imgx,
+    imgy;
+} RpnPixelInputs;
+
+static fxFltType ExecuteFuncP (const RpnPixelInputs * in, fxFltType regA,
+  const fxFltType regB)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    imgx = in->imgx,
+    imgy = in->imgy;
+
+  /* 2 args are: x, y */
+  fxFltType fx, fy;
+  ssize_t ImgNum = pfx->ImgNum;
+  if (pel->operator_index == fVP) ImgNum = 1;
+  if (pel->is_relative) {
+    fx = imgx + regA;
+    fy = imgy + regB;
+  } else {
+    fx = regA;
+    fy = regB;
+  }
+  if ((int) pel->channel_qual < 0) {
+    if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
+      const fxFltXYT fxy = { fx, fy };
+      regA = GetHslFlt (pfx, ImgNum, &fxy, pel->channel_qual);
+      return(regA);
+    } else if (pel->channel_qual == INTENSITY_CHANNEL) {
+      regA = GetIntensity (pfx, ImgNum, fx, fy);
+      return(regA);
+    }
+  }
+
+  {
+    double v;
+
+    if (! InterpolatePixelChannel (pfx->Images[ImgNum], pfx->Imgs[ImgNum].View,
+                                   WHICH_NON_ATTR_CHAN, pfx->Images[ImgNum]->interpolate,
+                                   (double) fx, (double) fy, &v, pfx->exception)
+                                  )
+    {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "fSP or fVP can't get interp", "%lu", (unsigned long) ImgNum);
+      return(regA);
+    }
+    regA = v * (fxFltType)QuantumScale;
+  }
+
+  return(regA);
+}
+
+static fxFltType GetOtherImageValueU (const RpnPixelInputs * in,
+  const fxImgXYT xy, const ssize_t ImgNum, fxFltType regA)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    imgx = in->imgx,
+    imgy = in->imgy;
+
+  /* We have non-zero ImgNum. */
+  if (pel->img_attr_qual == aNull) {
+    const Quantum * pv;
+    if ((int) pel->channel_qual < 0) {
+      if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse)
+      {
+        regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
+        return(regA);
+      } else if (pel->channel_qual == INTENSITY_CHANNEL)
+      {
+        regA = GetIntensity (pfx, ImgNum, (fxFltType) imgx, (fxFltType) imgy);
+        return(regA);
+      }
+    }
+
+    pv = GetCacheViewVirtualPixels (
+           pfx->Imgs[ImgNum].View, imgx, imgy, 1,1, pfx->exception);
+    if (!pv) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "fU can't get cache", "%lu", (unsigned long) ImgNum);
+      return(regA);
+    }
+    regA = QuantumScale * (double)
+      pv[pfx->Images[ImgNum]->channel_map[WHICH_NON_ATTR_CHAN].offset];
+  } else {
+    regA = ImageStat (pfx, ImgNum, WHICH_ATTR_CHAN, pel->img_attr_qual);
+  }
+  return(regA);
+}
+
+typedef struct _RpnFirstImageInputs
+{
+  FxInfo
+    *pfx;
+
+  ElementT
+    *pel;
+
+  const Quantum
+    *p;
+
+  Image
+    *pimg;
+
+  PixelChannel
+    channel;
+
+  ssize_t
+    imgx,
+    imgy;
+} RpnFirstImageInputs;
+
+static fxFltType GetFirstImageValueU (const RpnFirstImageInputs * in,
+  const ssize_t ImgNum, fxFltType regA)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const Quantum
+    *const p = in->p;
+
+  Image
+    *const pimg = in->pimg;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    imgx = in->imgx,
+    imgy = in->imgy;
+
+  if (pfx->ImgNum==0) {
+    regA = QuantumScale * (double) p[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
+  } else {
+    const Quantum * pv = GetCacheViewVirtualPixels (
+                   pfx->Imgs[0].View, imgx, imgy, 1,1, pfx->exception);
+    if (!pv) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "fU can't get cache", "%lu", (unsigned long) ImgNum);
+      return(regA);
+    }
+    regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
+  }
+  return(regA);
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
   const PixelChannel channel = pos->channel;
   const ssize_t imgx = pos->imgx;
   const ssize_t imgy = pos->imgy;
+  const fxImgXYT xy = { imgx, imgy };
   const Quantum * p = pfxrt->thisPixel;
   fxFltType regA=0, regB=0, regC=0, regD=0, regE=0;
   Image * img = pfx->image;
@@ -3590,6 +3924,9 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
   for (i=0; i < pfx->usedElements; i++) {
     ElementT
       *pel;
+
+    RpnPixelInputs
+      rpn_in;
 
     if (i < 0) {
       (void) ThrowMagickException (
@@ -3752,21 +4089,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           pel->val = regA;
           break;
         case oNull: {
-          if (pel->type == etColourConstant) {
-            switch (channel) { default:
-              case (PixelChannel) 0:
-                regA = pel->val;
-                break;
-              case (PixelChannel) 1:
-                regA = pel->val1;
-                break;
-              case (PixelChannel) 2:
-                regA = pel->val2;
-                break;
-            }
-          } else {
-            regA = pel->val;
-          }
+          regA = GetElementValue (pel, channel);
           break;
         }
         case fAbs:
@@ -3978,74 +4301,48 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
             if (pel->img_attr_qual == aNull) {
               if ((int) pel->channel_qual < 0) {
                 if (pel->channel_qual == NO_CHAN_QUAL || pel->channel_qual == THIS_CHANNEL) {
-                  if (pfx->ImgNum==0) {
-                    regA = QuantumScale * (double) p[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-                  } else {
-                    const Quantum * pv = GetCacheViewVirtualPixels (
-                                   pfx->Imgs[0].View, imgx, imgy, 1,1, pfx->exception);
-                    if (!pv) {
-                      (void) ThrowMagickException (
-                        pfx->exception, GetMagickModule(), OptionError,
-                        "fU can't get cache", "%lu", (unsigned long) ImgNum);
-                      break;
-                    }
-                    regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-                  }
+                  RpnFirstImageInputs
+                    first_in;
+
+                  first_in.pfx=pfx;
+                  first_in.pel=pel;
+                  first_in.p=p;
+                  first_in.pimg=pimg;
+                  first_in.channel=channel;
+                  first_in.imgx=imgx;
+                  first_in.imgy=imgy;
+                  regA = GetFirstImageValueU (&first_in, ImgNum, regA);
                 } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-                  regA = GetHslInt (pfx, ImgNum, imgx, imgy, pel->channel_qual);
+                  regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
                   break;
                 } else if (pel->channel_qual == INTENSITY_CHANNEL) {
                   regA = GetIntensity (pfx, 0, (double) imgx, (double) imgy);
                   break;
                 }
               } else {
-                if (pfx->ImgNum==0) {
-                  regA = QuantumScale * (double) p[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-                } else {
-                  const Quantum * pv = GetCacheViewVirtualPixels (
-                                 pfx->Imgs[0].View, imgx, imgy, 1,1, pfx->exception);
-                  if (!pv) {
-                    (void) ThrowMagickException (
-                      pfx->exception, GetMagickModule(), OptionError,
-                      "fU can't get cache", "%lu", (unsigned long) ImgNum);
-                    break;
-                  }
-                  regA = QuantumScale * (double) pv[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-                }
+                RpnFirstImageInputs
+                  first_in;
+
+                first_in.pfx=pfx;
+                first_in.pel=pel;
+                first_in.p=p;
+                first_in.pimg=pimg;
+                first_in.channel=channel;
+                first_in.imgx=imgx;
+                first_in.imgy=imgy;
+                regA = GetFirstImageValueU (&first_in, ImgNum, regA);
               }
             } else {
               /* we have an image attribute */
               regA = ImageStat (pfx, 0, WHICH_ATTR_CHAN, pel->img_attr_qual);
             }
           } else {
-            /* We have non-zero ImgNum. */
-            if (pel->img_attr_qual == aNull) {
-              const Quantum * pv;
-              if ((int) pel->channel_qual < 0) {
-                if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse)
-                {
-                  regA = GetHslInt (pfx, ImgNum, imgx, imgy, pel->channel_qual);
-                  break;
-                } else if (pel->channel_qual == INTENSITY_CHANNEL)
-                {
-                  regA = GetIntensity (pfx, ImgNum, (fxFltType) imgx, (fxFltType) imgy);
-                  break;
-                }
-              }
-
-              pv = GetCacheViewVirtualPixels (
-                     pfx->Imgs[ImgNum].View, imgx, imgy, 1,1, pfx->exception);
-              if (!pv) {
-                (void) ThrowMagickException (
-                  pfx->exception, GetMagickModule(), OptionError,
-                  "fU can't get cache", "%lu", (unsigned long) ImgNum);
-                break;
-              }
-              regA = QuantumScale * (double)
-                pv[pfx->Images[ImgNum]->channel_map[WHICH_NON_ATTR_CHAN].offset];
-            } else {
-              regA = ImageStat (pfx, ImgNum, WHICH_ATTR_CHAN, pel->img_attr_qual);
-            }
+            rpn_in.pfx=pfx;
+            rpn_in.pel=pel;
+            rpn_in.channel=channel;
+            rpn_in.imgx=imgx;
+            rpn_in.imgy=imgy;
+            regA = GetOtherImageValueU (&rpn_in, xy, ImgNum, regA);
           }
           break;
         }
@@ -4072,7 +4369,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
               }
 
             } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-              regA = GetHslInt (pfx, 0, imgx, imgy, pel->channel_qual);
+              regA = GetHslInt (pfx, 0, &xy, pel->channel_qual);
               break;
             } else if (pel->channel_qual == INTENSITY_CHANNEL) {
               regA = GetIntensity (pfx, 0, (fxFltType) imgx, (fxFltType) imgy);
@@ -4111,7 +4408,8 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
 
           if ((int) pel->channel_qual < 0) {
             if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-              regA = GetHslFlt (pfx, ImgNum, fx, fy, pel->channel_qual);
+              const fxFltXYT fxy = { fx, fy };
+              regA = GetHslFlt (pfx, ImgNum, &fxy, pel->channel_qual);
               break;
             } else if (pel->channel_qual == INTENSITY_CHANNEL) {
               regA = GetIntensity (pfx, ImgNum, fx, fy);
@@ -4153,7 +4451,7 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
 
             if ((int) pel->channel_qual < 0) {
               if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-                regA = GetHslInt (pfx, ImgNum, imgx, imgy, pel->channel_qual);
+                regA = GetHslInt (pfx, ImgNum, &xy, pel->channel_qual);
                 break;
               } else if (pel->channel_qual == INTENSITY_CHANNEL) {
                 regA = GetIntensity (pfx, ImgNum, (double) imgx, (double) imgy);
@@ -4172,43 +4470,12 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
         case fP:
         case fSP:
         case fVP: {
-          /* 2 args are: x, y */
-          fxFltType fx, fy;
-          ssize_t ImgNum = pfx->ImgNum;
-          if (pel->operator_index == fVP) ImgNum = 1;
-          if (pel->is_relative) {
-            fx = imgx + regA;
-            fy = imgy + regB;
-          } else {
-            fx = regA;
-            fy = regB;
-          }
-          if ((int) pel->channel_qual < 0) {
-            if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-              regA = GetHslFlt (pfx, ImgNum, fx, fy, pel->channel_qual);
-              break;
-            } else if (pel->channel_qual == INTENSITY_CHANNEL) {
-              regA = GetIntensity (pfx, ImgNum, fx, fy);
-              break;
-            }
-          }
-
-          {
-            double v;
-
-            if (! InterpolatePixelChannel (pfx->Images[ImgNum], pfx->Imgs[ImgNum].View,
-                                           WHICH_NON_ATTR_CHAN, pfx->Images[ImgNum]->interpolate,
-                                           (double) fx, (double) fy, &v, pfx->exception)
-                                          )
-            {
-              (void) ThrowMagickException (
-                pfx->exception, GetMagickModule(), OptionError,
-                "fSP or fVP can't get interp", "%lu", (unsigned long) ImgNum);
-              break;
-            }
-            regA = v * (fxFltType)QuantumScale;
-          }
-
+          rpn_in.pfx=pfx;
+          rpn_in.pel=pel;
+          rpn_in.channel=channel;
+          rpn_in.imgx=imgx;
+          rpn_in.imgy=imgy;
+          regA = ExecuteFuncP (&rpn_in, regA, regB);
           break;
         }
         case fNull:
@@ -4457,6 +4724,58 @@ static inline MagickBooleanType IsStatisticsPending(const FxInfo *pfx)
     !pfx->statistics) ? MagickTrue : MagickFalse);
 }
 
+static FxInfo *AllocateFxRuntimes (FxInfo * pfx)
+{
+  size_t number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
+  ssize_t t;
+
+  pfx->fxrts = (fxRtT *)AcquireQuantumMemory (number_threads, sizeof(fxRtT));
+  if (!pfx->fxrts) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), ResourceLimitFatalError,
+      "fxrts", "%lu",
+      (unsigned long) number_threads);
+    (void) DestroyRPN (pfx);
+    pfx->expression = DestroyString (pfx->expression);
+    pfx->pex = NULL;
+    (void) DeInitFx (pfx);
+    pfx = (FxInfo*) RelinquishMagickMemory(pfx);
+    return NULL;
+  }
+  for (t=0; t < (ssize_t) number_threads; t++) {
+    if (!AllocFxRt (pfx, &pfx->fxrts[t])) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), ResourceLimitFatalError,
+        "AllocFxRt t=", "%g",
+        (double) t);
+      {
+        ssize_t t2;
+        for (t2 = t-1; t2 >= 0; t2--) {
+          DestroyFxRt (&pfx->fxrts[t2]);
+        }
+      }
+      pfx->fxrts = (fxRtT *) RelinquishMagickMemory (pfx->fxrts);
+      (void) DestroyRPN (pfx);
+      pfx->expression = DestroyString (pfx->expression);
+      pfx->pex = NULL;
+      (void) DeInitFx (pfx);
+      pfx = (FxInfo*) RelinquishMagickMemory(pfx);
+      return NULL;
+    }
+  }
+  return pfx;
+}
+
+static FxInfo *DestroyFxInfoOnFailure (FxInfo * pfx)
+{
+  (void) DestroyRPN (pfx);
+  pfx->expression = DestroyString (pfx->expression);
+  pfx->pex = NULL;
+  (void) DeInitFx (pfx);
+  pfx = (FxInfo*) RelinquishMagickMemory(pfx);
+  return NULL;
+}
+
 static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expression,
   MagickBooleanType CalcAllStats, ExceptionInfo *exception)
 {
@@ -4485,12 +4804,7 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
 
   pfx->teDepth = 0;
   if (!TranslateStatementList (pfx, ";", &chLimit)) {
-    (void) DestroyRPN (pfx);
-    pfx->expression = DestroyString (pfx->expression);
-    pfx->pex = NULL;
-    (void) DeInitFx (pfx);
-    pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-    return NULL;
+    return (DestroyFxInfoOnFailure (pfx));
   }
 
   if (pfx->teDepth) {
@@ -4499,12 +4813,7 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
       "Translate expression depth", "(%i) not 0",
       pfx->teDepth);
 
-    (void) DestroyRPN (pfx);
-    pfx->expression = DestroyString (pfx->expression);
-    pfx->pex = NULL;
-    (void) DeInitFx (pfx);
-    pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-    return NULL;
+    return (DestroyFxInfoOnFailure (pfx));
   }
 
   if (chLimit != '\0' && chLimit != ';') {
@@ -4513,22 +4822,12 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
       "AcquireFxInfo: TranslateExpression did not exhaust input", "(chLimit=%i) at'%s'",
       (int)chLimit, pfx->pex);
 
-    (void) DestroyRPN (pfx);
-    pfx->expression = DestroyString (pfx->expression);
-    pfx->pex = NULL;
-    (void) DeInitFx (pfx);
-    pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-    return NULL;
+    return (DestroyFxInfoOnFailure (pfx));
   }
 
   if (IsStatisticsPending(pfx) != MagickFalse) {
     if (!CollectStatistics (pfx)) {
-      (void) DestroyRPN (pfx);
-      pfx->expression = DestroyString (pfx->expression);
-      pfx->pex = NULL;
-      (void) DeInitFx (pfx);
-      pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-      return NULL;
+      return (DestroyFxInfoOnFailure (pfx));
     }
   }
 
@@ -4538,46 +4837,7 @@ static FxInfo *AcquireFxInfoPrivate (const Image * images, const char * expressi
     (void) DumpRPN (pfx, stderr);
   }
 
-  {
-    size_t number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
-    ssize_t t;
-
-    pfx->fxrts = (fxRtT *)AcquireQuantumMemory (number_threads, sizeof(fxRtT));
-    if (!pfx->fxrts) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), ResourceLimitFatalError,
-        "fxrts", "%lu",
-        (unsigned long) number_threads);
-      (void) DestroyRPN (pfx);
-      pfx->expression = DestroyString (pfx->expression);
-      pfx->pex = NULL;
-      (void) DeInitFx (pfx);
-      pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-      return NULL;
-    }
-    for (t=0; t < (ssize_t) number_threads; t++) {
-      if (!AllocFxRt (pfx, &pfx->fxrts[t])) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), ResourceLimitFatalError,
-          "AllocFxRt t=", "%g",
-          (double) t);
-        {
-          ssize_t t2;
-          for (t2 = t-1; t2 >= 0; t2--) {
-            DestroyFxRt (&pfx->fxrts[t2]);
-          }
-        }
-        pfx->fxrts = (fxRtT *) RelinquishMagickMemory (pfx->fxrts);
-        (void) DestroyRPN (pfx);
-        pfx->expression = DestroyString (pfx->expression);
-        pfx->pex = NULL;
-        (void) DeInitFx (pfx);
-        pfx = (FxInfo*) RelinquishMagickMemory(pfx);
-        return NULL;
-      }
-    }
-  }
-  return pfx;
+  return (AllocateFxRuntimes (pfx));
 }
 
 FxInfo *AcquireFxInfo (const Image * images, const char * expression, ExceptionInfo *exception)
@@ -4610,6 +4870,78 @@ FxInfo *DestroyFxInfo (FxInfo * pfx)
   pfx = (FxInfo*) RelinquishMagickMemory(pfx);
 
   return NULL;
+}
+
+typedef struct _FxPixelInputs
+{
+  const Image
+    *image;
+
+  Image
+    *fx_image;
+
+  FxInfo
+    *pfx;
+
+  int
+    id;
+
+  ssize_t
+    x,
+    y;
+} FxPixelInputs;
+
+static MagickBooleanType ApplyFxToPixel (const FxPixelInputs * in,
+  const Quantum *magick_restrict p, Quantum *magick_restrict q)
+{
+  const Image
+    *const image = in->image;
+
+  Image
+    *const fx_image = in->fx_image;
+
+  FxInfo
+    *const pfx = in->pfx;
+
+  const int
+    id = in->id;
+
+  const ssize_t
+    x = in->x,
+    y = in->y;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    i;
+
+  fxFltType
+    result = 0.0;
+
+  status=MagickTrue;
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel (image, i);
+    PixelTrait traits = GetPixelChannelTraits (image, channel);
+    PixelTrait fx_traits = GetPixelChannelTraits (fx_image, channel);
+    const fxPixelPosT pos = { channel, x, y };
+    if ((traits == UndefinedPixelTrait) ||
+        (fx_traits == UndefinedPixelTrait))
+      continue;
+    if ((fx_traits & CopyPixelTrait) != 0) {
+        SetPixelChannel (fx_image, channel, p[i], q);
+        continue;
+    }
+
+    if (!ExecuteRPN (pfx, &pfx->fxrts[id], &result, &pos)) {
+      status=MagickFalse;
+      break;
+    }
+
+    q[i] = ClampToQuantum ((MagickRealType) (QuantumRange*result));
+  }
+  return(status);
 }
 
 /* Following is substitute for FxImage().
@@ -4686,9 +5018,6 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
     ssize_t
       x;
 
-    fxFltType
-      result = 0.0;
-
     if (status == MagickFalse)
       continue;
     p = GetCacheViewVirtualPixels (image_view, 0, y, image->columns, 1, pfx->exception);
@@ -4698,31 +5027,19 @@ MagickExport Image *FxImage(const Image *image,const char *expression,
         continue;
     }
     for (x=0; x < (ssize_t) fx_image->columns; x++) {
-      ssize_t i;
+      FxPixelInputs
+        pixel_in;
 
       pfx->fxrts[id].thisPixel = (Quantum *)p;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel (image, i);
-        PixelTrait traits = GetPixelChannelTraits (image, channel);
-        PixelTrait fx_traits = GetPixelChannelTraits (fx_image, channel);
-        const fxPixelPosT pos = { channel, x, y };
-        if ((traits == UndefinedPixelTrait) ||
-            (fx_traits == UndefinedPixelTrait))
-          continue;
-        if ((fx_traits & CopyPixelTrait) != 0) {
-            SetPixelChannel (fx_image, channel, p[i], q);
-            continue;
-        }
-
-        if (!ExecuteRPN (pfx, &pfx->fxrts[id], &result, &pos)) {
-          status=MagickFalse;
-          break;
-        }
-
-        q[i] = ClampToQuantum ((MagickRealType) (QuantumRange*result));
-      }
+      pixel_in.image=image;
+      pixel_in.fx_image=fx_image;
+      pixel_in.pfx=pfx;
+      pixel_in.id=id;
+      pixel_in.x=x;
+      pixel_in.y=y;
+      if (ApplyFxToPixel (&pixel_in, p, q) == MagickFalse)
+        status=MagickFalse;
       p+=(ptrdiff_t) GetPixelChannels (image);
       q+=(ptrdiff_t) GetPixelChannels (fx_image);
     }

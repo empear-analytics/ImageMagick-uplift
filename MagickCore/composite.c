@@ -253,6 +253,36 @@ static inline MagickBooleanType IsBlendChannelSkipped(const PixelTrait traits,
     ((other_traits & UpdatePixelTrait) == 0)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _BlendGradients
+{
+  const Image
+    *dx_image,
+    *dy_image;
+} BlendGradients;
+
+static void SetMagnitudePixel(const BlendGradients *gradients,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q,
+  Quantum *magick_restrict r)
+{
+  const Image
+    *dx_image = gradients->dx_image,
+    *dy_image = gradients->dy_image;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(dx_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(dx_image,i);
+    PixelTrait traits = GetPixelChannelTraits(dx_image,channel);
+    PixelTrait dy_traits = GetPixelChannelTraits(dy_image,channel);
+    if (IsBlendChannelSkipped(traits,dy_traits) != MagickFalse)
+      continue;
+    r[i]=ClampToQuantum(hypot((double) p[i],(double)
+      GetPixelChannel(dy_image,channel,q)));
+  }
+}
+
 static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
   ExceptionInfo *exception)
 {
@@ -308,19 +338,12 @@ static Image *BlendMagnitudeImage(const Image *dx_image,const Image *dy_image,
       }
     for (x=0; x < (ssize_t) dx_image->columns; x++)
     {
-      ssize_t
-        i;
+      BlendGradients
+        gradients;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(dx_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(dx_image,i);
-        PixelTrait traits = GetPixelChannelTraits(dx_image,channel);
-        PixelTrait dy_traits = GetPixelChannelTraits(dy_image,channel);
-        if (IsBlendChannelSkipped(traits,dy_traits) != MagickFalse)
-          continue;
-        r[i]=ClampToQuantum(hypot((double) p[i],(double)
-          GetPixelChannel(dy_image,channel,q)));
-      }
+      gradients.dx_image=dx_image;
+      gradients.dy_image=dy_image;
+      SetMagnitudePixel(&gradients,p,q,r);
       p+=(ptrdiff_t) GetPixelChannels(dx_image);
       q+=(ptrdiff_t) GetPixelChannels(dy_image);
       r+=(ptrdiff_t) GetPixelChannels(magnitude_image);
@@ -342,6 +365,50 @@ static inline MagickBooleanType IsBlendRowsMissing(const Quantum *p,
   return(((p == (const Quantum *) NULL) || (q == (const Quantum *) NULL) ||
     (r == (const Quantum *) NULL) || (s == (const Quantum *) NULL) ||
     (t == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
+}
+
+typedef struct _MaxMagnitudeInputs
+{
+  const Image
+    *alpha_image,
+    *beta_image,
+    *dx_image,
+    *dy_image;
+
+  const Quantum
+    *p,
+    *q;
+} MaxMagnitudeInputs;
+
+static void SelectMaxMagnitudePixel(const MaxMagnitudeInputs *selection,
+  const Quantum *magick_restrict r,const Quantum *magick_restrict s,
+  Quantum *magick_restrict t)
+{
+  const Image
+    *alpha_image = selection->alpha_image,
+    *beta_image = selection->beta_image,
+    *dx_image = selection->dx_image,
+    *dy_image = selection->dy_image;
+
+  const Quantum
+    *magick_restrict p = selection->p,
+    *magick_restrict q = selection->q;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
+    PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
+    PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
+    if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
+      continue;
+    if (p[i] > GetPixelChannel(beta_image,channel,q))
+      t[i]=GetPixelChannel(dx_image,channel,r);
+    else
+      t[i]=GetPixelChannel(dy_image,channel,s);
+  }
 }
 
 static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
@@ -412,21 +479,16 @@ static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
       }
     for (x=0; x < (ssize_t) alpha_image->columns; x++)
     {
-      ssize_t
-        i;
+      MaxMagnitudeInputs
+        selection;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
-        PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
-        PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
-          continue;
-        if (p[i] > GetPixelChannel(beta_image,channel,q))
-          t[i]=GetPixelChannel(dx_image,channel,r);
-        else
-          t[i]=GetPixelChannel(dy_image,channel,s);
-      }
+      selection.alpha_image=alpha_image;
+      selection.beta_image=beta_image;
+      selection.dx_image=dx_image;
+      selection.dy_image=dy_image;
+      selection.p=p;
+      selection.q=q;
+      SelectMaxMagnitudePixel(&selection,r,s,t);
       p+=(ptrdiff_t) GetPixelChannels(alpha_image);
       q+=(ptrdiff_t) GetPixelChannels(beta_image);
       r+=(ptrdiff_t) GetPixelChannels(dx_image);
@@ -444,6 +506,59 @@ static Image *BlendMaxMagnitudeImage(const BlendMagnitudePair *magnitudes,
   if (status == MagickFalse)
     magnitude_image=DestroyImage(magnitude_image);
   return(magnitude_image);
+}
+
+typedef struct _SumBlendInputs
+{
+  const Image
+    *alpha_image,
+    *beta_image;
+
+  Image
+    *sum_image;
+
+  double
+    attenuate,
+    sign;
+} SumBlendInputs;
+
+static void SumBlendRow(const SumBlendInputs *row,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q,
+  Quantum *magick_restrict r)
+{
+  const Image
+    *alpha_image = row->alpha_image,
+    *beta_image = row->beta_image;
+
+  Image
+    *sum_image = row->sum_image;
+
+  const double
+    attenuate = row->attenuate,
+    sign = row->sign;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) alpha_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
+      PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
+      PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
+      if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
+        continue;
+      r[i]=ClampToQuantum(attenuate*((double) p[i]+sign*
+        (double) GetPixelChannel(beta_image,channel,q)));
+    }
+    p+=(ptrdiff_t) GetPixelChannels(alpha_image);
+    q+=(ptrdiff_t) GetPixelChannels(beta_image);
+    r+=(ptrdiff_t) GetPixelChannels(sum_image);
+  }
 }
 
 static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
@@ -489,8 +604,8 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
     Quantum
       *magick_restrict r;
 
-    ssize_t
-      x;
+    SumBlendInputs
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -504,25 +619,12 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) alpha_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(alpha_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
-        PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
-        PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
-          continue;
-        r[i]=ClampToQuantum(attenuate*((double) p[i]+sign*
-          (double) GetPixelChannel(beta_image,channel,q)));
-      }
-      p+=(ptrdiff_t) GetPixelChannels(alpha_image);
-      q+=(ptrdiff_t) GetPixelChannels(beta_image);
-      r+=(ptrdiff_t) GetPixelChannels(sum_image);
-    }
+    row.alpha_image=alpha_image;
+    row.beta_image=beta_image;
+    row.sum_image=sum_image;
+    row.attenuate=attenuate;
+    row.sign=sign;
+    SumBlendRow(&row,p,q,r);
     if (SyncCacheViewAuthenticPixels(sum_view,exception) == MagickFalse)
       status=MagickFalse;
   }
@@ -736,6 +838,76 @@ static MagickBooleanType BlendMaskAlphaChannel(Image *image,
   return(status);
 }
 
+typedef struct _MeanFillInputs
+{
+  const Image
+    *mask_image;
+
+  Image
+    *mean_image;
+} MeanFillInputs;
+
+static void FillMeanRow(const MeanFillInputs *row,const double *mean,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *mask_image = row->mask_image;
+
+  Image
+    *mean_image = row->mean_image;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) mean_image->columns; x++)
+  {
+    Quantum
+      alpha = GetPixelAlpha(mask_image,p),
+      mask = GetPixelReadMask(mask_image,p);
+
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(mean_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(mean_image,i);
+      PixelTrait traits = GetPixelChannelTraits(mean_image,channel);
+      if (traits == UndefinedPixelTrait)
+        continue;
+      if (mask <= (QuantumRange/2))
+        q[i]=(Quantum) 0;
+      else
+        if (fabs((double) alpha) >= MagickEpsilon)
+          q[i]=ClampToQuantum(mean[i]);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(mask_image);
+    q+=(ptrdiff_t) GetPixelChannels(mean_image);
+  }
+}
+
+static void AccumulateMeanRow(const Image *image,
+  const Quantum *magick_restrict p,double *mean)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if (traits == UndefinedPixelTrait)
+        continue;
+      mean[i]+=QuantumScale*(double) p[i];
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static Image *BlendMeanImage(Image *image,const Image *mask_image,
   ExceptionInfo *exception)
 {
@@ -767,28 +939,11 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     p=GetCacheViewVirtualPixels(alpha_view,0,y,image->columns,1,
       exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        mean[i]+=QuantumScale*(double) p[i];
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateMeanRow(image,p,mean);
   }
   alpha_view=DestroyCacheView(alpha_view);
   if (y < (ssize_t) image->rows)
@@ -816,8 +971,8 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    MeanFillInputs
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -829,30 +984,9 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) mean_image->columns; x++)
-    {
-      Quantum
-        alpha = GetPixelAlpha(mask_image,p),
-        mask = GetPixelReadMask(mask_image,p);
-
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(mean_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(mean_image,i);
-        PixelTrait traits = GetPixelChannelTraits(mean_image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        if (mask <= (QuantumRange/2))
-          q[i]=(Quantum) 0;
-        else
-          if (fabs((double) alpha) >= MagickEpsilon)
-            q[i]=ClampToQuantum(mean[i]);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(mask_image);
-      q+=(ptrdiff_t) GetPixelChannels(mean_image);
-    }
+    row.mask_image=mask_image;
+    row.mean_image=mean_image;
+    FillMeanRow(&row,mean,p,q);
     if (SyncCacheViewAuthenticPixels(mean_view,exception) == MagickFalse)
       status=MagickFalse;
   }
@@ -1216,6 +1350,14 @@ static MagickBooleanType CompositeOverImage(Image *image,
   return(status);
 }
 
+static void ReportBlendResidual(const MagickBooleanType verbose,
+  const ssize_t i,const double residual)
+{
+  if (verbose != MagickFalse)
+    (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double)
+      residual);
+}
+
 static MagickBooleanType SaliencyBlendImage(Image *image,
   const Image *source_image,const ssize_t x_offset,const ssize_t y_offset,
   const double iterations,const double residual_threshold,const size_t tick,
@@ -1328,9 +1470,7 @@ static MagickBooleanType SaliencyBlendImage(Image *image,
       (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
     if (residual < residual_threshold)
       {
-        if (verbose != MagickFalse)
-          (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double)
-            residual);
+        ReportBlendResidual(verbose,i,residual);
         break;
       }
     residual_image=DestroyImage(residual_image);
@@ -1460,9 +1600,7 @@ static MagickBooleanType SeamlessBlendImage(Image *image,
       (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double) residual);
     if (residual < residual_threshold)
       {
-        if (verbose != MagickFalse)
-          (void) FormatLocaleFile(stderr,"  %g: %g\n",(double) i,(double)
-            residual);
+        ReportBlendResidual(verbose,i,residual);
         break;
       }
     if (residual_image != (Image *) NULL)
@@ -1577,6 +1715,172 @@ static inline void CopySourceChannels(const Image *source_image,
   }
 }
 
+static IlluminantType ParseComposeIlluminant(const char *artifact)
+{
+  IlluminantType
+    illuminant;
+
+  ssize_t
+    illuminant_type;
+
+  illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
+    artifact);
+  if (illuminant_type < 0)
+    illuminant=UndefinedIlluminant;
+  else
+    illuminant=(IlluminantType) illuminant_type;
+  return(illuminant);
+}
+
+static MagickRealType GetColorDodgeBlend(const MagickRealType S,
+  const MagickRealType D)
+{
+  MagickRealType
+    blend;
+
+  if (S >= 1.0)
+    blend=1.0;
+  else
+    if (D <= 0.0)
+      blend=0.0;
+    else
+      {
+        if ((1.0-S) <= 0.0)
+          blend=1.0;
+        else
+          blend=MagickMin(1.0,D/(1.0-S));
+      }
+  return(blend);
+}
+
+static MagickRealType GetSoftBurnBlend(const MagickRealType Sca,
+  const MagickRealType Dca)
+{
+  MagickRealType
+    blend;
+
+  if (RoundToUnity(Dca) <= 0.0)
+    blend = 0.0;
+  else
+    if (RoundToUnity(Sca) >= 1.0)
+      blend = 1.0;
+    else
+      blend=1.0-MagickMin(1.0,(1.0-RoundToUnity(Dca))/
+        RoundToUnity(Sca));
+  return(blend);
+}
+
+static MagickRealType GetSoftDodgeBlend(const MagickRealType Sca,
+  const MagickRealType Dca)
+{
+  MagickRealType
+    blend;
+
+  if (RoundToUnity(Sca) <= 0.0)
+    blend=RoundToUnity(Dca);
+  else
+    if (RoundToUnity(Dca) >= 1.0)
+      blend=1.0;
+    else
+      blend=MagickMin(1.0,RoundToUnity(Dca)/(1.0-RoundToUnity(Sca)));
+  return(blend);
+}
+
+static MagickRealType GetVividLightBlend(const MagickRealType Sa,
+  const MagickRealType Sca,const MagickRealType Da,const MagickRealType Dca)
+{
+  MagickRealType
+    blend;
+
+  if (RoundToUnity(Sca/Sa) <= 0.0)
+    blend=0.0;
+  else
+    if (RoundToUnity(Sca/Sa) < 0.5)
+      blend=1.0-(1.0-RoundToUnity(Dca/Da))/(2.0*RoundToUnity(Sca/Sa));
+  else
+    if (RoundToUnity(Sca/Sa) < 1.0)
+      blend=RoundToUnity(Dca/Da)/(2.0*(1.0-RoundToUnity(Sca/Sa)));
+    else
+      blend=1.0;
+  return(blend);
+}
+
+static MagickRealType GetPegtopLightBlend(const MagickRealType Sca,
+  const MagickRealType Da,const MagickRealType Dca)
+{
+  MagickRealType
+    blend;
+
+  if (RoundToUnity(Sca) <= 0.5)
+    blend=RoundToUnity(Dca/Da)-(1.0-2.0*RoundToUnity(Sca))*
+      RoundToUnity(Dca/Da)*(1.0-RoundToUnity(Dca/Da));
+  else
+    {
+      if (RoundToUnity(Dca/Da) <= 0.25)
+        blend=((16.0*RoundToUnity(Dca/Da)-12.0)*RoundToUnity(Dca/Da)+
+          4.0)*RoundToUnity(Dca/Da);
+      else
+        blend=sqrt(RoundToUnity(Dca/Da));
+      blend=RoundToUnity(Dca/Da)+(2.0*RoundToUnity(Sca)-1.0)*
+        (blend-RoundToUnity(Dca/Da));
+    }
+  return(blend);
+}
+
+static ColorspaceType ParseComposeColorspace(const char *artifact)
+{
+  ColorspaceType
+    colorspace;
+
+  ssize_t
+    colorspace_type;
+
+  colorspace_type=ParseCommandOption(MagickColorspaceOptions,MagickFalse,
+    artifact);
+  if (colorspace_type < 0)
+    colorspace=UndefinedColorspace;
+  else
+    colorspace=(ColorspaceType) colorspace_type;
+  return(colorspace);
+}
+
+static inline double GetCompositeGamma(const CompositeOperator compose,
+  const MagickRealType alpha)
+{
+  double
+    gamma;
+
+  switch (compose)
+  {
+    case DarkenCompositeOp:
+    case LightenCompositeOp:
+    case ModulusSubtractCompositeOp:
+    {
+      gamma=MagickSafeReciprocal(1.0-alpha);
+      break;
+    }
+    default:
+    {
+      gamma=MagickSafeReciprocal(alpha);
+      break;
+    }
+  }
+  return(gamma);
+}
+
+static MagickRealType GetReflectBlend(const MagickRealType Sc,
+  const MagickRealType Dc)
+{
+  MagickRealType
+    blend;
+
+  if (Dc < 1.0)
+    blend=(Sc*Sc)/(1.0-Dc);
+  else
+    blend=1.0;
+  return(blend);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -1660,30 +1964,10 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     white_luminance=StringToDouble(artifact,(char **) NULL);
   artifact=GetImageArtifact(image,"compose:illuminant");
   if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        illuminant_type;
-
-      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
-        artifact);
-      if (illuminant_type < 0)
-        illuminant=UndefinedIlluminant;
-      else
-        illuminant=(IlluminantType) illuminant_type;
-    }
+    illuminant=ParseComposeIlluminant(artifact);
   artifact=GetImageArtifact(image,"compose:colorspace");
   if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        colorspace_type;
-
-      colorspace_type=ParseCommandOption(MagickColorspaceOptions,MagickFalse,
-        artifact);
-      if (colorspace_type < 0)
-        colorspace=UndefinedColorspace;
-      else
-        colorspace=(ColorspaceType) colorspace_type;
-    }
+    colorspace=ParseComposeColorspace(artifact);
   clamp=MagickTrue;
   artifact=GetImageArtifact(image,"compose:clamp");
   if (artifact != (const char *) NULL)
@@ -2819,21 +3103,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
         */
         Sca=QuantumScale*Sa*Sc;
         Dca=QuantumScale*Da*Dc;
-        switch (compose)
-        {
-          case DarkenCompositeOp:
-          case LightenCompositeOp:
-          case ModulusSubtractCompositeOp:
-          {
-            gamma=MagickSafeReciprocal(1.0-alpha);
-            break;
-          }
-          default:
-          {
-            gamma=MagickSafeReciprocal(alpha);
-            break;
-          }
-        }
+        gamma=GetCompositeGamma(compose,alpha);
         pixel=Dc;
         switch (compose)
         {
@@ -2909,18 +3179,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               D=RoundToUnity(Dca/Da);
             else
               D=0.0;
-            if (S >= 1.0)
-              blend=1.0;
-            else
-              if (D <= 0.0)
-                blend=0.0;
-              else
-                {
-                  if ((1.0-S) <= 0.0)
-                    blend=1.0;
-                  else
-                    blend=MagickMin(1.0,D/(1.0-S));
-                }
+            blend=GetColorDodgeBlend(S,D);
             pixel=(double) QuantumRange*gamma*(Sa*Da*blend+Sca*(1.0-Da)+Dca*
               (1.0-Sa));
             break;
@@ -3438,19 +3697,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
                 pixel=(double) QuantumRange*gamma*Sca;
                 break;
               }
-            if (RoundToUnity(Sca) <= 0.5)
-              blend=RoundToUnity(Dca/Da)-(1.0-2.0*RoundToUnity(Sca))*
-                RoundToUnity(Dca/Da)*(1.0-RoundToUnity(Dca/Da));
-            else
-              {
-                if (RoundToUnity(Dca/Da) <= 0.25)
-                  blend=((16.0*RoundToUnity(Dca/Da)-12.0)*RoundToUnity(Dca/Da)+
-                    4.0)*RoundToUnity(Dca/Da);
-                else
-                  blend=sqrt(RoundToUnity(Dca/Da));
-                blend=RoundToUnity(Dca/Da)+(2.0*RoundToUnity(Sca)-1.0)*
-                  (blend-RoundToUnity(Dca/Da));
-              }
+            blend=GetPegtopLightBlend(Sca,Da,Dca);
             pixel=(double) QuantumRange*gamma*(RoundToUnity(blend)*Da*Sa+Dca*
               (1.0-Sa));
             break;
@@ -3489,10 +3736,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           {
             if (compose_sync == MagickFalse)
               {
-                if (Dc < 1.0)
-                  blend=(Sc*Sc)/(1.0-Dc);
-                else
-                  blend=1.0;
+                blend=GetReflectBlend(Sc,Dc);
                 pixel=(double) QuantumRange*RoundToUnity(blend);
                 break;
               }
@@ -3587,26 +3831,13 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           }
           case SoftBurnCompositeOp:
           {
-            if (RoundToUnity(Dca) <= 0.0)
-              blend = 0.0;
-            else
-              if (RoundToUnity(Sca) >= 1.0)
-                blend = 1.0;
-              else
-                blend=1.0-MagickMin(1.0,(1.0-RoundToUnity(Dca))/
-                  RoundToUnity(Sca));
+            blend=GetSoftBurnBlend(Sca,Dca);
             pixel=(double) QuantumRange*gamma*RoundToUnity(blend);
             break;
           }
           case SoftDodgeCompositeOp:
           {
-            if (RoundToUnity(Sca) <= 0.0)
-              blend=RoundToUnity(Dca);
-            else
-              if (RoundToUnity(Dca) >= 1.0)
-                blend=1.0;
-              else
-                blend=MagickMin(1.0,RoundToUnity(Dca)/(1.0-RoundToUnity(Sca)));
+            blend=GetSoftDodgeBlend(Sca,Dca);
             pixel=(double) QuantumRange*gamma*RoundToUnity(blend);
             break;
           }
@@ -3663,16 +3894,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
                   (1.0-Sa));
                 break;
               }
-            if (RoundToUnity(Sca/Sa) <= 0.0)
-              blend=0.0;
-            else
-              if (RoundToUnity(Sca/Sa) < 0.5)
-                blend=1.0-(1.0-RoundToUnity(Dca/Da))/(2.0*RoundToUnity(Sca/Sa));
-            else
-              if (RoundToUnity(Sca/Sa) < 1.0)
-                blend=RoundToUnity(Dca/Da)/(2.0*(1.0-RoundToUnity(Sca/Sa)));
-              else
-                blend=1.0;
+            blend=GetVividLightBlend(Sa,Sca,Da,Dca);
             pixel=(double) QuantumRange*gamma*(Sa*Da*RoundToUnity(blend)+Sca*
               (1.0-Da)+Dca*(1.0-Sa));
             break;
@@ -3755,6 +3977,51 @@ static inline MagickBooleanType IsTextureComposited(const Image *image,
     (image->alpha_trait != UndefinedPixelTrait) ||
     (texture_image->alpha_trait != UndefinedPixelTrait))) ? MagickTrue :
     MagickFalse);
+}
+
+typedef struct _TextureSpan
+{
+  Image
+    *image,
+    *texture_image;
+
+  size_t
+    width;
+} TextureSpan;
+
+static Quantum *CopyTextureSpan(const TextureSpan *span,const Quantum *p,
+  Quantum *q)
+{
+  Image
+    *image = span->image,
+    *texture_image = span->texture_image;
+
+  const size_t
+    width = span->width;
+
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) width; j++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(texture_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(texture_image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      PixelTrait texture_traits=GetPixelChannelTraits(texture_image,
+        channel);
+      if ((traits == UndefinedPixelTrait) ||
+          (texture_traits == UndefinedPixelTrait))
+        continue;
+      SetPixelChannel(image,channel,p[i],q);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(texture_image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
 }
 
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
@@ -3873,32 +4140,17 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
       }
     for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) texture_image->columns)
     {
-      ssize_t
-        j;
+      TextureSpan
+        span;
 
       p=pixels;
       width=texture_image->columns;
       if ((x+(ssize_t) width) > (ssize_t) image->columns)
         width=image->columns-(size_t) x;
-      for (j=0; j < (ssize_t) width; j++)
-      {
-        ssize_t
-          i;
-
-        for (i=0; i < (ssize_t) GetPixelChannels(texture_image); i++)
-        {
-          PixelChannel channel = GetPixelChannelChannel(texture_image,i);
-          PixelTrait traits = GetPixelChannelTraits(image,channel);
-          PixelTrait texture_traits=GetPixelChannelTraits(texture_image,
-            channel);
-          if ((traits == UndefinedPixelTrait) ||
-              (texture_traits == UndefinedPixelTrait))
-            continue;
-          SetPixelChannel(image,channel,p[i],q);
-        }
-        p+=(ptrdiff_t) GetPixelChannels(texture_image);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      span.image=image;
+      span.texture_image=texture_image;
+      span.width=width;
+      q=CopyTextureSpan(&span,p,q);
     }
     sync=SyncCacheViewAuthenticPixels(image_view,exception);
     if (sync == MagickFalse)

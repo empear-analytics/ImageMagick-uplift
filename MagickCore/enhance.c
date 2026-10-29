@@ -656,6 +656,31 @@ static MagickBooleanType CLAHE(const RectangleInfo *clahe_info,
   return(MagickTrue);
 }
 
+static RectangleInfo GetCLAHETileInfo(const Image *image,const size_t width,
+  const size_t height)
+{
+  RectangleInfo
+    tile_info;
+
+  tile_info.width=width;
+  if (tile_info.width == 0)
+    tile_info.width=image->columns >> 3;
+  if (tile_info.width < 2)
+    tile_info.width=2;
+  tile_info.height=height;
+  if (tile_info.height == 0)
+    tile_info.height=image->rows >> 3;
+  if (tile_info.height < 2)
+    tile_info.height=2;
+  tile_info.x=0;
+  if ((image->columns % tile_info.width) != 0)
+    tile_info.x=(ssize_t) (tile_info.width-(image->columns % tile_info.width));
+  tile_info.y=0;
+  if ((image->rows % tile_info.height) != 0)
+    tile_info.y=(ssize_t) (tile_info.height-(image->rows % tile_info.height));
+  return(tile_info);
+}
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
@@ -702,22 +727,7 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   range_info.min=0;
   range_info.max=NumberCLAHEGrays-1;
-  tile_info.width=width;
-  if (tile_info.width == 0)
-    tile_info.width=image->columns >> 3;
-  if (tile_info.width < 2)
-    tile_info.width=2;
-  tile_info.height=height;
-  if (tile_info.height == 0)
-    tile_info.height=image->rows >> 3;
-  if (tile_info.height < 2)
-    tile_info.height=2;
-  tile_info.x=0;
-  if ((image->columns % tile_info.width) != 0)
-    tile_info.x=(ssize_t) (tile_info.width-(image->columns % tile_info.width));
-  tile_info.y=0;
-  if ((image->rows % tile_info.height) != 0)
-    tile_info.y=(ssize_t) (tile_info.height-(image->rows % tile_info.height));
+  tile_info=GetCLAHETileInfo(image,width,height);
   clahe_info.width=(size_t) ((ssize_t) image->columns+tile_info.x);
   clahe_info.height=(size_t) ((ssize_t) image->rows+tile_info.y);
   clahe_info.x=(ssize_t) (clahe_info.width/tile_info.width);
@@ -1254,53 +1264,15 @@ static void ApplyCDLToPixels(const Image *image,
   }
 }
 
-MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
-  const char *color_correction_collection,ExceptionInfo *exception)
+static ColorCorrection ParseColorCorrection(XMLTreeInfo *cc)
 {
-#define ColorDecisionListCorrectImageTag  "ColorDecisionList/Image"
-
-  CacheView
-    *image_view;
-
   ColorCorrection
     color_correction;
 
-  MagickBooleanType
-    status;
-
-  MagickOffsetType
-    progress;
-
-  PixelInfo
-    *cdl_map;
-
-  ssize_t
-    y;
-
   XMLTreeInfo
-    *cc,
-    *ccc,
     *sat,
     *sop;
 
-  /*
-    Allocate and initialize cdl maps.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (color_correction_collection == (const char *) NULL)
-    return(MagickFalse);
-  ccc=NewXMLTree((const char *) color_correction_collection,exception);
-  if (ccc == (XMLTreeInfo *) NULL)
-    return(MagickFalse);
-  cc=GetXMLTreeChild(ccc,"ColorCorrection");
-  if (cc == (XMLTreeInfo *) NULL)
-    {
-      ccc=DestroyXMLTree(ccc);
-      return(MagickFalse);
-    }
   color_correction.red.slope=1.0;
   color_correction.red.offset=0.0;
   color_correction.red.power=1.0;
@@ -1317,7 +1289,12 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   sat=GetXMLTreeChild(cc,"SATNode");
   if (sat != (XMLTreeInfo *) NULL)
     color_correction=ParseCDLSATNode(sat,color_correction);
-  ccc=DestroyXMLTree(ccc);
+  return(color_correction);
+}
+
+static void LogColorCorrection(const Image *image,
+  const ColorCorrection color_correction)
+{
   if (image->debug != MagickFalse)
     {
       (void) LogMagickEvent(TransformEvent,GetMagickModule(),
@@ -1343,6 +1320,56 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
       (void) LogMagickEvent(TransformEvent,GetMagickModule(),
         "  color_correction.saturation: %g",color_correction.saturation);
     }
+}
+
+MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
+  const char *color_correction_collection,ExceptionInfo *exception)
+{
+#define ColorDecisionListCorrectImageTag  "ColorDecisionList/Image"
+
+  CacheView
+    *image_view;
+
+  ColorCorrection
+    color_correction;
+
+  MagickBooleanType
+    status;
+
+  MagickOffsetType
+    progress;
+
+  PixelInfo
+    *cdl_map;
+
+  ssize_t
+    y;
+
+  XMLTreeInfo
+    *cc,
+    *ccc;
+
+  /*
+    Allocate and initialize cdl maps.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (color_correction_collection == (const char *) NULL)
+    return(MagickFalse);
+  ccc=NewXMLTree((const char *) color_correction_collection,exception);
+  if (ccc == (XMLTreeInfo *) NULL)
+    return(MagickFalse);
+  cc=GetXMLTreeChild(ccc,"ColorCorrection");
+  if (cc == (XMLTreeInfo *) NULL)
+    {
+      ccc=DestroyXMLTree(ccc);
+      return(MagickFalse);
+    }
+  color_correction=ParseColorCorrection(cc);
+  ccc=DestroyXMLTree(ccc);
+  LogColorCorrection(image,color_correction);
   cdl_map=(PixelInfo *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*cdl_map));
   if (cdl_map == (PixelInfo *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
@@ -1778,6 +1805,19 @@ static ssize_t FindStretchWhiteLevel(const Image *image,
   return(j);
 }
 
+static void RelinquishStretchMemory(double *histogram,Quantum *stretch_map,
+  Quantum *white,Quantum *black)
+{
+  if (histogram != (double *) NULL)
+    histogram=(double *) RelinquishMagickMemory(histogram);
+  if (stretch_map != (Quantum *) NULL)
+    stretch_map=(Quantum *) RelinquishMagickMemory(stretch_map);
+  if (white != (Quantum *) NULL)
+    white=(Quantum *) RelinquishMagickMemory(white);
+  if (black != (Quantum *) NULL)
+    black=(Quantum *) RelinquishMagickMemory(black);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -1830,14 +1870,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     sizeof(*histogram));
   if (IsStretchMemoryMissing(black,white,stretch_map,histogram) != MagickFalse)
     {
-      if (histogram != (double *) NULL)
-        histogram=(double *) RelinquishMagickMemory(histogram);
-      if (stretch_map != (Quantum *) NULL)
-        stretch_map=(Quantum *) RelinquishMagickMemory(stretch_map);
-      if (white != (Quantum *) NULL)
-        white=(Quantum *) RelinquishMagickMemory(white);
-      if (black != (Quantum *) NULL)
-        black=(Quantum *) RelinquishMagickMemory(black);
+      RelinquishStretchMemory(histogram,stretch_map,white,black);
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
@@ -2289,6 +2322,86 @@ static void IntegrateEqualizeHistogram(const Image *image,
   }
 }
 
+static MagickBooleanType FormEqualizeHistogram(const Image *image,
+  double *histogram,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
+    sizeof(*histogram));
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    AccumulateEqualizeHistogram(image,p,histogram);
+  }
+  image_view=DestroyCacheView(image_view);
+  return(status);
+}
+
+typedef struct _EqualizeChannel
+{
+  Image
+    *image;
+
+  double
+    *map;
+
+  ssize_t
+    i;
+} EqualizeChannel;
+
+static void BuildEqualizeChannelMap(const EqualizeChannel *equalize,
+  const double *black,const double *white,double *equalize_map)
+{
+  Image
+    *const image = equalize->image;
+
+  double
+    *const map = equalize->map;
+
+  const ssize_t
+    i = equalize->i;
+
+  ssize_t
+    j;
+
+  if (black[i] != white[i])
+    for (j=0; j <= (ssize_t) MaxMap; j++)
+      equalize_map[GetPixelChannels(image)*(size_t) j+(size_t) i]=(double)
+        ScaleMapToQuantum((double) ((MaxMap*(map[GetPixelChannels(image)*
+        (size_t) j+(size_t) i]-black[i]))/(white[i]-black[i])));
+}
+
+static void RelinquishEqualizeMemory(double *map,double *histogram,
+  double *equalize_map)
+{
+  if (map != (double *) NULL)
+    map=(double *) RelinquishMagickMemory(map);
+  if (histogram != (double *) NULL)
+    histogram=(double *) RelinquishMagickMemory(histogram);
+  if (equalize_map != (double *) NULL)
+    equalize_map=(double *) RelinquishMagickMemory(equalize_map);
+}
+
 MagickExport MagickBooleanType EqualizeImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2334,38 +2447,14 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   map=(double *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*sizeof(*map));
   if (IsEqualizeMemoryMissing(equalize_map,histogram,map) != MagickFalse)
     {
-      if (map != (double *) NULL)
-        map=(double *) RelinquishMagickMemory(map);
-      if (histogram != (double *) NULL)
-        histogram=(double *) RelinquishMagickMemory(histogram);
-      if (equalize_map != (double *) NULL)
-        equalize_map=(double *) RelinquishMagickMemory(equalize_map);
+      RelinquishEqualizeMemory(map,histogram,equalize_map);
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
   /*
     Form histogram.
   */
-  status=MagickTrue;
-  (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
-    sizeof(*histogram));
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    AccumulateEqualizeHistogram(image,p,histogram);
-  }
-  image_view=DestroyCacheView(image_view);
+  status=FormEqualizeHistogram(image,histogram,exception);
   /*
     Integrate the histogram to get the equalization map.
   */
@@ -2376,16 +2465,15 @@ MagickExport MagickBooleanType EqualizeImage(Image *image,
   (void) memset(white,0,sizeof(*white));
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    ssize_t
-      j;
+    EqualizeChannel
+      equalize;
 
     black[i]=map[i];
     white[i]=map[GetPixelChannels(image)*MaxMap+(size_t) i];
-    if (black[i] != white[i])
-      for (j=0; j <= (ssize_t) MaxMap; j++)
-        equalize_map[GetPixelChannels(image)*(size_t) j+(size_t) i]=(double)
-          ScaleMapToQuantum((double) ((MaxMap*(map[GetPixelChannels(image)*
-          (size_t) j+(size_t) i]-black[i]))/(white[i]-black[i])));
+    equalize.image=image;
+    equalize.map=map;
+    equalize.i=i;
+    BuildEqualizeChannelMap(&equalize,black,white,equalize_map);
   }
   histogram=(double *) RelinquishMagickMemory(histogram);
   map=(double *) RelinquishMagickMemory(map);
@@ -2502,6 +2590,42 @@ static void GammaImageRow(const Image *image,const Quantum *gamma_map,
   }
 }
 
+static void BuildGammaMap(Quantum *gamma_map,const double gamma)
+{
+  ssize_t
+    i;
+
+  if (gamma != 0.0)
+    for (i=0; i <= (ssize_t) MaxMap; i++)
+      gamma_map[i]=ScaleMapToQuantum((double) (MaxMap*pow((double) i/
+        MaxMap,MagickSafeReciprocal(gamma))));
+}
+
+static void GammaColormap(Image *image,const Quantum *gamma_map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    /*
+      Gamma-correct colormap.
+    */
+    if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].red=(double) gamma_map[ScaleQuantumToMap(
+        ClampToQuantum(image->colormap[i].red))];
+    if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].green=(double) gamma_map[ScaleQuantumToMap(
+        ClampToQuantum(image->colormap[i].green))];
+    if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].blue=(double) gamma_map[ScaleQuantumToMap(
+        ClampToQuantum(image->colormap[i].blue))];
+    if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+      image->colormap[i].alpha=(double) gamma_map[ScaleQuantumToMap(
+        ClampToQuantum(image->colormap[i].alpha))];
+  }
+}
+
 MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
   ExceptionInfo *exception)
 {
@@ -2520,9 +2644,6 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
     *gamma_map;
 
   ssize_t
-    i;
-
-  ssize_t
     y;
 
   /*
@@ -2539,29 +2660,9 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
   (void) memset(gamma_map,0,(MaxMap+1)*sizeof(*gamma_map));
-  if (gamma != 0.0)
-    for (i=0; i <= (ssize_t) MaxMap; i++)
-      gamma_map[i]=ScaleMapToQuantum((double) (MaxMap*pow((double) i/
-        MaxMap,MagickSafeReciprocal(gamma))));
+  BuildGammaMap(gamma_map,gamma);
   if (image->storage_class == PseudoClass)
-    for (i=0; i < (ssize_t) image->colors; i++)
-    {
-      /*
-        Gamma-correct colormap.
-      */
-      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].red=(double) gamma_map[ScaleQuantumToMap(
-          ClampToQuantum(image->colormap[i].red))];
-      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].green=(double) gamma_map[ScaleQuantumToMap(
-          ClampToQuantum(image->colormap[i].green))];
-      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].blue=(double) gamma_map[ScaleQuantumToMap(
-          ClampToQuantum(image->colormap[i].blue))];
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        image->colormap[i].alpha=(double) gamma_map[ScaleQuantumToMap(
-          ClampToQuantum(image->colormap[i].alpha))];
-    }
+    GammaColormap(image,gamma_map);
   /*
     Gamma-correct image.
   */
@@ -2728,6 +2829,47 @@ static MagickRealType GetGrayscaleIntensity(const Image *image,
   return(intensity);
 }
 
+static void GrayscaleImageRow(const Image *image,
+  const PixelIntensityMethod method,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MagickRealType
+      intensity;
+
+    intensity=GetGrayscaleIntensity(image,method,q);
+    SetPixelGray(image,ClampToQuantum(intensity),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static MagickBooleanType SyncGrayscaleImageClass(Image *image,
+  ExceptionInfo *exception)
+{
+  if (image->storage_class == PseudoClass)
+    {
+      if (SyncImage(image,exception) == MagickFalse)
+        return(MagickFalse);
+      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetGrayscaleImageColorspace(Image *image,
+  const PixelIntensityMethod method,ExceptionInfo *exception)
+{
+  image->intensity=method;
+  image->type=GrayscaleType;
+  if ((method == Rec601LuminancePixelIntensityMethod) ||
+      (method == Rec709LuminancePixelIntensityMethod))
+    return(SetImageColorspace(image,LinearGRAYColorspace,exception));
+  return(SetImageColorspace(image,GRAYColorspace,exception));
+}
+
 MagickExport MagickBooleanType GrayscaleImage(Image *image,
   const PixelIntensityMethod method,ExceptionInfo *exception)
 {
@@ -2749,13 +2891,8 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (image->storage_class == PseudoClass)
-    {
-      if (SyncImage(image,exception) == MagickFalse)
-        return(MagickFalse);
-      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-        return(MagickFalse);
-    }
+  if (SyncGrayscaleImageClass(image,exception) == MagickFalse)
+    return(MagickFalse);
 #if defined(MAGICKCORE_OPENCL_SUPPORT)
   if (AccelerateGrayscaleImage(image,method,exception) != MagickFalse)
     {
@@ -2782,9 +2919,6 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2793,15 +2927,7 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MagickRealType
-        intensity;
-
-      intensity=GetGrayscaleIntensity(image,method,q);
-      SetPixelGray(image,ClampToQuantum(intensity),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    GrayscaleImageRow(image,method,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -2819,12 +2945,7 @@ MagickExport MagickBooleanType GrayscaleImage(Image *image,
       }
   }
   image_view=DestroyCacheView(image_view);
-  image->intensity=method;
-  image->type=GrayscaleType;
-  if ((method == Rec601LuminancePixelIntensityMethod) ||
-      (method == Rec709LuminancePixelIntensityMethod))
-    return(SetImageColorspace(image,LinearGRAYColorspace,exception));
-  return(SetImageColorspace(image,GRAYColorspace,exception));
+  return(SetGrayscaleImageColorspace(image,method,exception));
 }
 
 /*
@@ -3974,6 +4095,52 @@ static void ModulateColor(const ModulateInfo *modulate_info,double *red,
   }
 }
 
+static void ParseModulatePercents(const char *modulate,
+  double *percent_brightness,double *percent_saturation,double *percent_hue)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  flags=ParseGeometry(modulate,&geometry_info);
+  if ((flags & RhoValue) != 0)
+    *percent_brightness=geometry_info.rho;
+  if ((flags & SigmaValue) != 0)
+    *percent_saturation=geometry_info.sigma;
+  if ((flags & XiValue) != 0)
+    *percent_hue=geometry_info.xi;
+}
+
+static void GetModulateColorspace(const Image *image,
+  ColorspaceType *colorspace,IlluminantType *illuminant)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"modulate:colorspace");
+  if (artifact != (const char *) NULL)
+    *colorspace=(ColorspaceType) ParseCommandOption(MagickColorspaceOptions,
+      MagickFalse,artifact);
+  artifact=GetImageArtifact(image,"color:illuminant");
+  if (artifact != (const char *) NULL)
+    {
+      ssize_t
+        illuminant_type;
+
+      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
+        artifact);
+      if (illuminant_type < 0)
+        {
+          *illuminant=UndefinedIlluminant;
+          *colorspace=UndefinedColorspace;
+        }
+      else
+        *illuminant=(IlluminantType) illuminant_type;
+    }
+}
+
 MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ExceptionInfo *exception)
 {
@@ -3985,16 +4152,10 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ColorspaceType
     colorspace = UndefinedColorspace;
 
-  const char
-    *artifact;
-
   double
     percent_brightness = 100.0,
     percent_hue = 100.0,
     percent_saturation = 100.0;
-
-  GeometryInfo
-    geometry_info;
 
   IlluminantType
     illuminant = D65Illuminant;
@@ -4004,9 +4165,6 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
 
   MagickOffsetType
     progress;
-
-  MagickStatusType
-    flags;
 
   ssize_t
     i;
@@ -4025,33 +4183,9 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
     return(MagickFalse);
   if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
     (void) SetImageColorspace(image,sRGBColorspace,exception);
-  flags=ParseGeometry(modulate,&geometry_info);
-  if ((flags & RhoValue) != 0)
-    percent_brightness=geometry_info.rho;
-  if ((flags & SigmaValue) != 0)
-    percent_saturation=geometry_info.sigma;
-  if ((flags & XiValue) != 0)
-    percent_hue=geometry_info.xi;
-  artifact=GetImageArtifact(image,"modulate:colorspace");
-  if (artifact != (const char *) NULL)
-    colorspace=(ColorspaceType) ParseCommandOption(MagickColorspaceOptions,
-      MagickFalse,artifact);
-  artifact=GetImageArtifact(image,"color:illuminant");
-  if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        illuminant_type;
-
-      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
-        artifact);
-      if (illuminant_type < 0)
-        {
-          illuminant=UndefinedIlluminant;
-          colorspace=UndefinedColorspace;
-        }
-      else
-        illuminant=(IlluminantType) illuminant_type;
-    }
+  ParseModulatePercents(modulate,&percent_brightness,&percent_saturation,
+    &percent_hue);
+  GetModulateColorspace(image,&colorspace,&illuminant);
   if (image->storage_class == PseudoClass)
     for (i=0; i < (ssize_t) image->colors; i++)
     {
@@ -4172,6 +4306,21 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void NegatePixelChannels(const Image *image,Quantum *q)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[j]=QuantumRange-q[j];
+  }
+}
+
 static void NegateGrayImageRow(const Image *image,Quantum *q)
 {
   ssize_t
@@ -4179,22 +4328,12 @@ static void NegateGrayImageRow(const Image *image,Quantum *q)
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    ssize_t
-      j;
-
     if (IsPixelGray(image,q) == MagickFalse)
       {
         q+=(ptrdiff_t) GetPixelChannels(image);
         continue;
       }
-    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-    {
-      PixelChannel channel = GetPixelChannelChannel(image,j);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      if ((traits & UpdatePixelTrait) == 0)
-        continue;
-      q[j]=QuantumRange-q[j];
-    }
+    NegatePixelChannels(image,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
@@ -4206,17 +4345,7 @@ static void NegateImageRow(const Image *image,Quantum *q)
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    ssize_t
-      j;
-
-    for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-    {
-      PixelChannel channel = GetPixelChannelChannel(image,j);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      if ((traits & UpdatePixelTrait) == 0)
-        continue;
-      q[j]=QuantumRange-q[j];
-    }
+    NegatePixelChannels(image,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }

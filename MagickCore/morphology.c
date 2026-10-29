@@ -2782,6 +2782,22 @@ static void CalcKernelMetaData(KernelInfo *kernel)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static double MinimizeChannelValue(const Quantum *magick_restrict pixels,
+  const ssize_t i,double minimum)
+{
+  if ((double) pixels[i] < minimum)
+    minimum=(double) pixels[i];
+  return(minimum);
+}
+
+static double MaximizeChannelValue(const Quantum *magick_restrict pixels,
+  const ssize_t i,double maximum)
+{
+  if ((double) pixels[i] > maximum)
+    maximum=(double) pixels[i];
+  return(maximum);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3285,16 +3301,10 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 if (!IsNaN(*k))
                   {
                     if (*k > 0.7)
-                      {
-                        if ((double) pixels[i] < minimum)
-                          minimum=(double) pixels[i];
-                      }
+                      minimum=MinimizeChannelValue(pixels,i,minimum);
                     else
                       if (*k < 0.3)
-                        {
-                          if ((double) pixels[i] > maximum)
-                            maximum=(double) pixels[i];
-                        }
+                        maximum=MaximizeChannelValue(pixels,i,maximum);
                   }
                 k++;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
@@ -3466,6 +3476,179 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   Because of this 're-use of results' this function can not make use of multi-
   threaded, parallel processing.
 */
+static double MinimizeKernelDistance(const MagickRealType *magick_restrict k,
+  const Quantum *magick_restrict pixels,const ssize_t i,double pixel)
+{
+  if (!IsNaN(*k))
+    {
+      if (((double) pixels[i]+(*k)) < pixel)
+        pixel=(double) pixels[i]+(*k);
+    }
+  return(pixel);
+}
+
+typedef struct _MorphologyDirectPixel
+{
+  Image
+    *image;
+
+  const KernelInfo
+    *kernel;
+
+  Quantum
+    *q;
+
+  ssize_t
+    x,
+    i;
+} MorphologyDirectPixel;
+
+static double MinimizeLeadingRowDistance(const MorphologyDirectPixel *row,
+  const OffsetInfo offset,double pixel)
+{
+  Image
+    *const image = row->image;
+
+  const KernelInfo
+    *const kernel = row->kernel;
+
+  Quantum
+    *const q = row->q;
+
+  const ssize_t
+    x = row->x,
+    i = row->i;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  ssize_t
+    u;
+
+  k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
+  pixels=q-offset.x*(ssize_t) GetPixelChannels(image);
+  for (u=0; u < offset.x; u++)
+  {
+    if (!IsNaN(*k) && ((x+u-offset.x) >= 0))
+      {
+        if (((double) pixels[i]+(*k)) < pixel)
+          pixel=(double) pixels[i]+(*k);
+      }
+    k--;
+    pixels+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(pixel);
+}
+
+static double MinimizeTrailingRowDistance(const MorphologyDirectPixel *row,
+  const OffsetInfo offset,const MagickRealType *magick_restrict k,double pixel)
+{
+  Image
+    *const image = row->image;
+
+  const KernelInfo
+    *const kernel = row->kernel;
+
+  Quantum
+    *const q = row->q;
+
+  const ssize_t
+    x = row->x,
+    i = row->i;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  ssize_t
+    u;
+
+  pixels=q;
+  for (u=offset.x+1; u < (ssize_t) kernel->width; u++)
+  {
+    pixels+=(ptrdiff_t) GetPixelChannels(image);
+    if (!IsNaN(*k) && ((x+u-offset.x) < (ssize_t) image->columns))
+      {
+        if (((double) pixels[i]+(*k)) < pixel)
+          pixel=(double) pixels[i]+(*k);
+      }
+    k--;
+  }
+  return(pixel);
+}
+
+typedef struct _MorphologyKernelRows
+{
+  Image
+    *image;
+
+  const KernelInfo
+    *kernel;
+
+  ssize_t
+    i;
+} MorphologyKernelRows;
+
+static void MinimizeKernelRowDistance(const MorphologyKernelRows *rows,
+  double *pixel,const MagickRealType *magick_restrict *k,
+  const Quantum *magick_restrict *pixels)
+{
+  Image
+    *const image = rows->image;
+
+  const KernelInfo
+    *const kernel = rows->kernel;
+
+  const ssize_t
+    i = rows->i;
+
+  ssize_t
+    u;
+
+  for (u=0; u < (ssize_t) kernel->width; u++)
+  {
+    *pixel=MinimizeKernelDistance(*k,*pixels,i,*pixel);
+    (*k)--;
+    *pixels+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  *pixels+=(image->columns-1)*GetPixelChannels(image);
+}
+
+static double MinimizeTrailingRowsDistance(const MorphologyKernelRows *rows,
+  const OffsetInfo offset,const Quantum *magick_restrict pixels,double pixel)
+{
+  Image
+    *const image = rows->image;
+
+  const KernelInfo
+    *const kernel = rows->kernel;
+
+  const ssize_t
+    i = rows->i;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  ssize_t
+    u,
+    v;
+
+  k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
+  for (v=offset.y; v < (ssize_t) kernel->height; v++)
+  {
+    for (u=0; u < (ssize_t) kernel->width; u++)
+    {
+      pixel=MinimizeKernelDistance(k,pixels,i,pixel);
+      k--;
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(image->columns-1)*GetPixelChannels(image);
+  }
+  return(pixel);
+}
+
 static ssize_t MorphologyPrimitiveDirect(Image *image,
   const MorphologyMethod method,const KernelInfo *kernel,
   ExceptionInfo *exception)
@@ -3576,8 +3759,11 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         const Quantum
           *magick_restrict pixels;
 
-        ssize_t
-          u;
+        MorphologyDirectPixel
+          row;
+
+        MorphologyKernelRows
+          rows;
 
         ssize_t
           v;
@@ -3597,30 +3783,17 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
             k=(&kernel->values[kernel->width*kernel->height-1]);
             for (v=0; v <= offset.y; v++)
             {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    if (((double) pixels[i]+(*k)) < pixel)
-                      pixel=(double) pixels[i]+(*k);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
+              rows.image=image;
+              rows.kernel=kernel;
+              rows.i=i;
+              MinimizeKernelRowDistance(&rows,&pixel,&k,&pixels);
             }
-            k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            pixels=q-offset.x*(ssize_t) GetPixelChannels(image);
-            for (u=0; u < offset.x; u++)
-            {
-              if (!IsNaN(*k) && ((x+u-offset.x) >= 0))
-                {
-                  if (((double) pixels[i]+(*k)) < pixel)
-                    pixel=(double) pixels[i]+(*k);
-                }
-              k--;
-              pixels+=(ptrdiff_t) GetPixelChannels(image);
-            }
+            row.image=image;
+            row.kernel=kernel;
+            row.q=q;
+            row.x=x;
+            row.i=i;
+            pixel=MinimizeLeadingRowDistance(&row,offset,pixel);
             break;
           }
           case VoronoiMorphology:
@@ -3628,30 +3801,17 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
             k=(&kernel->values[kernel->width*kernel->height-1]);
             for (v=0; v < offset.y; v++)
             {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    if (((double) pixels[i]+(*k)) < pixel)
-                      pixel=(double) pixels[i]+(*k);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
+              rows.image=image;
+              rows.kernel=kernel;
+              rows.i=i;
+              MinimizeKernelRowDistance(&rows,&pixel,&k,&pixels);
             }
-            k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            pixels=q-offset.x*(ssize_t) GetPixelChannels(image);
-            for (u=0; u < offset.x; u++)
-            {
-              if (!IsNaN(*k) && ((x+u-offset.x) >= 0))
-                {
-                  if (((double) pixels[i]+(*k)) < pixel)
-                    pixel=(double) pixels[i]+(*k);
-                }
-              k--;
-              pixels+=(ptrdiff_t) GetPixelChannels(image);
-            }
+            row.image=image;
+            row.kernel=kernel;
+            row.q=q;
+            row.x=x;
+            row.i=i;
+            pixel=MinimizeLeadingRowDistance(&row,offset,pixel);
             break;
           }
           default:
@@ -3740,11 +3900,11 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         const Quantum
           *magick_restrict pixels;
 
-        ssize_t
-          u;
+        MorphologyDirectPixel
+          row;
 
-        ssize_t
-          v;
+        MorphologyKernelRows
+          rows;
 
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
@@ -3758,64 +3918,32 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
         {
           case DistanceMorphology:
           {
-            k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            for (v=offset.y; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    if (((double) pixels[i]+(*k)) < pixel)
-                      pixel=(double) pixels[i]+(*k);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
+            rows.image=image;
+            rows.kernel=kernel;
+            rows.i=i;
+            pixel=MinimizeTrailingRowsDistance(&rows,offset,pixels,pixel);
             k=(&kernel->values[(ssize_t) kernel->width*kernel->y+kernel->x-1]);
-            pixels=q;
-            for (u=offset.x+1; u < (ssize_t) kernel->width; u++)
-            {
-              pixels+=(ptrdiff_t) GetPixelChannels(image);
-              if (!IsNaN(*k) && ((x+u-offset.x) < (ssize_t) image->columns))
-                {
-                  if (((double) pixels[i]+(*k)) < pixel)
-                    pixel=(double) pixels[i]+(*k);
-                }
-              k--;
-            }
+            row.image=image;
+            row.kernel=kernel;
+            row.q=q;
+            row.x=x;
+            row.i=i;
+            pixel=MinimizeTrailingRowDistance(&row,offset,k,pixel);
             break;
           }
           case VoronoiMorphology:
           {
+            rows.image=image;
+            rows.kernel=kernel;
+            rows.i=i;
+            pixel=MinimizeTrailingRowsDistance(&rows,offset,pixels,pixel);
             k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            for (v=offset.y; v < (ssize_t) kernel->height; v++)
-            {
-              for (u=0; u < (ssize_t) kernel->width; u++)
-              {
-                if (!IsNaN(*k))
-                  {
-                    if (((double) pixels[i]+(*k)) < pixel)
-                      pixel=(double) pixels[i]+(*k);
-                  }
-                k--;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-              pixels+=(image->columns-1)*GetPixelChannels(image);
-            }
-            k=(&kernel->values[(ssize_t) kernel->width*(kernel->y+1)-1]);
-            pixels=q;
-            for (u=offset.x+1; u < (ssize_t) kernel->width; u++)
-            {
-              pixels+=(ptrdiff_t) GetPixelChannels(image);
-              if (!IsNaN(*k) && ((x+u-offset.x) < (ssize_t) image->columns))
-                {
-                  if (((double) pixels[i]+(*k)) < pixel)
-                    pixel=(double) pixels[i]+(*k);
-                }
-              k--;
-            }
+            row.image=image;
+            row.kernel=kernel;
+            row.q=q;
+            row.x=x;
+            row.i=i;
+            pixel=MinimizeTrailingRowDistance(&row,offset,k,pixel);
             break;
           }
           default:
@@ -3858,6 +3986,186 @@ static ssize_t MorphologyPrimitiveDirect(Image *image,
   Basically this provides the complex glue between the requested morphology
   method and raw low-level implementation (above).
 */
+typedef struct _MorphologyStage
+{
+  MorphologyMethod
+    method,
+    primitive;
+
+  size_t
+    method_loop,
+    stage_loop,
+    stage_limit;
+} MorphologyStage;
+
+static void FormatMorphologyStage(char *v_info,const MorphologyStage *stage)
+{
+  const MorphologyMethod
+    method = stage->method,
+    primitive = stage->primitive;
+
+  const size_t
+    method_loop = stage->method_loop,
+    stage_loop = stage->stage_loop,
+    stage_limit = stage->stage_limit;
+
+  if ( stage_limit > 1 )
+    (void) FormatLocaleString(v_info,MagickPathExtent,"%s:%.17g.%.17g -> ",
+     CommandOptionToMnemonic(MagickMorphologyOptions,method),(double)
+     method_loop,(double) stage_loop);
+  else if ( primitive != method )
+    (void) FormatLocaleString(v_info, MagickPathExtent, "%s:%.17g -> ",
+      CommandOptionToMnemonic(MagickMorphologyOptions, method),(double)
+      method_loop);
+  else
+    v_info[0] = '\0';
+}
+
+typedef struct _MorphologyPassReport
+{
+  MorphologyMethod
+    primitive;
+
+  KernelInfo
+    *this_kernel,
+    *rflt_kernel;
+
+  size_t
+    method_loop,
+    kernel_number,
+    kernel_loop,
+    count;
+
+  ssize_t
+    changed;
+} MorphologyPassReport;
+
+static void ReportMorphologyPass(const char *v_info,
+  const MorphologyPassReport *report)
+{
+  const MorphologyMethod
+    primitive = report->primitive;
+
+  KernelInfo
+    *const this_kernel = report->this_kernel,
+    *const rflt_kernel = report->rflt_kernel;
+
+  const size_t
+    method_loop = report->method_loop,
+    kernel_number = report->kernel_number,
+    kernel_loop = report->kernel_loop,
+    count = report->count;
+
+  const ssize_t
+    changed = report->changed;
+
+  if ( kernel_loop > 1 )
+    (void) FormatLocaleFile(stderr, "\n"); /* add end-of-line from previous */
+  (void) (void) FormatLocaleFile(stderr,
+    "%s%s%s:%.17g.%.17g #%.17g => Changed %.17g",
+    v_info,CommandOptionToMnemonic(MagickMorphologyOptions,
+    primitive),(this_kernel == rflt_kernel ) ? "*" : "",
+    (double) (method_loop+kernel_loop-1),(double) kernel_number,
+    (double) count,(double) changed);
+}
+
+static MagickBooleanType AcquireWorkImage(const Image *image,
+  Image **work_image,ExceptionInfo *exception)
+{
+  if ( *work_image == (Image *) NULL )
+    {
+      *work_image=CloneImage(image,0,0,MagickTrue,exception);
+      if (*work_image == (Image *) NULL)
+        return(MagickFalse);
+      if (SetImageStorageClass(*work_image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireReflectedKernel(const MorphologyMethod method,
+  const KernelInfo *kernel,KernelInfo **reflected_kernel)
+{
+  switch ( method ) {
+    case CorrelateMorphology:
+    case CloseMorphology:
+    case CloseIntensityMorphology:
+    case BottomHatMorphology:
+    case SmoothMorphology:
+      *reflected_kernel = CloneKernelInfo(kernel);
+      if (*reflected_kernel == (KernelInfo *) NULL)
+        return(MagickFalse);
+      RotateKernelInfo(*reflected_kernel,180);
+      break;
+    default:
+      break;
+  }
+  return(MagickTrue);
+}
+
+static void ReportKernelIteration(const MagickBooleanType verbose,
+  const KernelInfo *this_kernel)
+{
+  if (verbose != MagickFalse) {
+    if ( this_kernel->next != (KernelInfo *) NULL )
+      (void) FormatLocaleFile(stderr, " (re-iterate)");
+    else
+      (void) FormatLocaleFile(stderr, " (done)");
+  }
+}
+
+static void ReportSaveForCompose(const MagickBooleanType verbose)
+{
+  if (verbose != MagickFalse)
+    (void) FormatLocaleFile(stderr, " (save for compose)");
+}
+
+typedef struct _MorphologyKernelCompose
+{
+  MagickBooleanType
+    verbose;
+
+  CompositeOperator
+    rslt_compose;
+
+  Image
+    *rslt_image;
+
+  const Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} MorphologyKernelCompose;
+
+static Image *ComposeKernelResult(const MorphologyKernelCompose *kernel_compose,
+  Image *curr_image)
+{
+  const MagickBooleanType
+    verbose = kernel_compose->verbose;
+
+  const CompositeOperator
+    rslt_compose = kernel_compose->rslt_compose;
+
+  Image
+    *const rslt_image = kernel_compose->rslt_image;
+
+  const Image
+    *const image = kernel_compose->image;
+
+  ExceptionInfo
+    *const exception = kernel_compose->exception;
+
+  if (verbose != MagickFalse)
+    (void) FormatLocaleFile(stderr, " (compose \"%s\")",
+      CommandOptionToMnemonic(MagickComposeOptions, rslt_compose) );
+  (void) CompositeImage(rslt_image,curr_image,rslt_compose,MagickTrue,
+    0,0,exception);
+  curr_image = DestroyImage(curr_image);
+  curr_image = (Image *) image;  /* continue with original image */
+  return(curr_image);
+}
+
 MagickPrivate Image *MorphologyApply(const Image *image,
   const MorphologyMethod method, const ssize_t iterations,
   const KernelInfo *kernel, const CompositeOperator compose,const double bias,
@@ -4010,20 +4318,8 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
   /* Some methods require a reflected kernel to use with primitives.
    * Create the reflected kernel for those methods. */
-  switch ( method ) {
-    case CorrelateMorphology:
-    case CloseMorphology:
-    case CloseIntensityMorphology:
-    case BottomHatMorphology:
-    case SmoothMorphology:
-      reflected_kernel = CloneKernelInfo(kernel);
-      if (reflected_kernel == (KernelInfo *) NULL)
-        goto error_cleanup;
-      RotateKernelInfo(reflected_kernel,180);
-      break;
-    default:
-      break;
-  }
+  if (AcquireReflectedKernel(method,kernel,&reflected_kernel) == MagickFalse)
+    goto error_cleanup;
 
   /* Loops around more primitive morphology methods
   **  erose, dilate, open, close, smooth, edge, etc...
@@ -4042,6 +4338,9 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
     kernel_number = 0;
     while ( norm_kernel != NULL ) {
+      MorphologyKernelCompose
+        kernel_compose;
+
 
       /* Loop 3: Compound Morphology Staging - Select Primitive to apply */
       stage_loop = 0;          /* the compound morphology stage number */
@@ -4130,16 +4429,15 @@ MagickPrivate Image *MorphologyApply(const Image *image,
 
         /* Extra information for debugging compound operations */
         if (verbose != MagickFalse) {
-          if ( stage_limit > 1 )
-            (void) FormatLocaleString(v_info,MagickPathExtent,"%s:%.17g.%.17g -> ",
-             CommandOptionToMnemonic(MagickMorphologyOptions,method),(double)
-             method_loop,(double) stage_loop);
-          else if ( primitive != method )
-            (void) FormatLocaleString(v_info, MagickPathExtent, "%s:%.17g -> ",
-              CommandOptionToMnemonic(MagickMorphologyOptions, method),(double)
-              method_loop);
-          else
-            v_info[0] = '\0';
+          MorphologyStage
+            stage;
+
+          stage.method=method;
+          stage.primitive=primitive;
+          stage.method_loop=method_loop;
+          stage.stage_loop=stage_loop;
+          stage.stage_limit=stage_limit;
+          FormatMorphologyStage(v_info,&stage);
         }
 
         /* Loop 4: Iterate the kernel with primitive */
@@ -4152,28 +4450,26 @@ MagickPrivate Image *MorphologyApply(const Image *image,
           kernel_loop++;     /* the iteration of this kernel */
 
           /* Create a clone as the destination image, if not yet defined */
-          if ( work_image == (Image *) NULL )
-            {
-              work_image=CloneImage(image,0,0,MagickTrue,exception);
-              if (work_image == (Image *) NULL)
-                goto error_cleanup;
-              if (SetImageStorageClass(work_image,DirectClass,exception) == MagickFalse)
-                goto error_cleanup;
-            }
+          if (AcquireWorkImage(image,&work_image,exception) == MagickFalse)
+            goto error_cleanup;
 
           /* APPLY THE MORPHOLOGICAL PRIMITIVE (curr -> work) */
           count++;
           changed = MorphologyPrimitive(curr_image, work_image, &pass,
                        exception);
           if (verbose != MagickFalse) {
-            if ( kernel_loop > 1 )
-              (void) FormatLocaleFile(stderr, "\n"); /* add end-of-line from previous */
-            (void) (void) FormatLocaleFile(stderr,
-              "%s%s%s:%.17g.%.17g #%.17g => Changed %.17g",
-              v_info,CommandOptionToMnemonic(MagickMorphologyOptions,
-              primitive),(this_kernel == rflt_kernel ) ? "*" : "",
-              (double) (method_loop+kernel_loop-1),(double) kernel_number,
-              (double) count,(double) changed);
+            MorphologyPassReport
+              report;
+
+            report.primitive=primitive;
+            report.this_kernel=this_kernel;
+            report.rflt_kernel=rflt_kernel;
+            report.method_loop=method_loop;
+            report.kernel_number=kernel_number;
+            report.kernel_loop=kernel_loop;
+            report.count=count;
+            report.changed=changed;
+            ReportMorphologyPass(v_info,&report);
           }
           if ( changed < 0 )
             goto error_cleanup;
@@ -4241,17 +4537,11 @@ MagickPrivate Image *MorphologyApply(const Image *image,
       if ( kernel->next == (KernelInfo *) NULL )
         rslt_image = curr_image;   /* just return the resulting image */
       else if ( rslt_compose == NoCompositeOp )
-        { if (verbose != MagickFalse) {
-            if ( this_kernel->next != (KernelInfo *) NULL )
-              (void) FormatLocaleFile(stderr, " (re-iterate)");
-            else
-              (void) FormatLocaleFile(stderr, " (done)");
-          }
+        { ReportKernelIteration(verbose,this_kernel);
           rslt_image = curr_image; /* return result, and re-iterate */
         }
       else if ( rslt_image == (Image *) NULL)
-        { if (verbose != MagickFalse)
-            (void) FormatLocaleFile(stderr, " (save for compose)");
+        { ReportSaveForCompose(verbose);
           rslt_image = curr_image;
           curr_image = (Image *) image;  /* continue with original image */
         }
@@ -4263,13 +4553,12 @@ MagickPrivate Image *MorphologyApply(const Image *image,
           ** purely mathematical way, and only to the selected channels.
           ** IE: Turn off SVG composition 'alpha blending'.
           */
-          if (verbose != MagickFalse)
-            (void) FormatLocaleFile(stderr, " (compose \"%s\")",
-              CommandOptionToMnemonic(MagickComposeOptions, rslt_compose) );
-          (void) CompositeImage(rslt_image,curr_image,rslt_compose,MagickTrue,
-            0,0,exception);
-          curr_image = DestroyImage(curr_image);
-          curr_image = (Image *) image;  /* continue with original image */
+          kernel_compose.verbose=verbose;
+          kernel_compose.rslt_compose=rslt_compose;
+          kernel_compose.rslt_image=rslt_image;
+          kernel_compose.image=image;
+          kernel_compose.exception=exception;
+          curr_image=ComposeKernelResult(&kernel_compose,curr_image);
         }
       if (verbose != MagickFalse)
         (void) FormatLocaleFile(stderr, "\n");

@@ -449,6 +449,119 @@ static void SetAffineSingleCoefficients(double *coeff,const double *arguments,
   }
 }
 
+static void SetPolarSpecialRadius(const Image *image,double *coeff)
+{
+  /* Use closest edge  if radius == 0 */
+  if ( fabs(coeff[0]) < MagickEpsilon ) {
+    coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
+                       fabs(coeff[3]-image->page.y));
+    coeff[0]=MagickMin(coeff[0],
+                 fabs(coeff[2]-image->page.x-image->columns));
+    coeff[0]=MagickMin(coeff[0],
+                 fabs(coeff[3]-image->page.y-image->rows));
+  }
+  /* furthest diagonal if radius == -1 */
+  if ( fabs(-1.0-coeff[0]) < MagickEpsilon ) {
+    double rx,ry;
+    rx = coeff[2]-image->page.x;
+    ry = coeff[3]-image->page.y;
+    coeff[0] = rx*rx+ry*ry;
+    ry = coeff[3]-image->page.y-image->rows;
+    coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
+    rx = coeff[2]-image->page.x-image->columns;
+    coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
+    ry = coeff[3]-image->page.y;
+    coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
+    coeff[0] = sqrt(coeff[0]);
+  }
+}
+
+static void SetArcOuterRadius(double *coeff,const size_t number_arguments,
+  const double *arguments)
+{
+  if ( number_arguments >= 4 )
+    coeff[3] = arguments[2] - arguments[3];
+  else
+    coeff[3] *= arguments[2]/coeff[2];
+  coeff[2] = arguments[2];
+}
+
+static double *SetShepardsPower(const Image *image,double *coeff,
+  ExceptionInfo *exception)
+{
+  { const char *artifact=GetImageArtifact(image,"shepards:power");
+    if ( artifact != (const char *) NULL ) {
+      coeff[0]=StringToDouble(artifact,(char **) NULL) / 2.0;
+      if ( coeff[0] < MagickEpsilon ) {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+            OptionError,"InvalidArgument","%s", "-define shepards:power" );
+        coeff=(double *) RelinquishMagickMemory(coeff);
+        return((double *) NULL);
+      }
+    }
+    else
+      coeff[0]=1.0;  /* Default power of 2 (Inverse Squared) */
+  }
+  return(coeff);
+}
+
+typedef struct _AffineThirdPoint
+{
+  double
+    **matrix,
+    **vectors;
+
+  const double
+    *arguments;
+
+  size_t
+    number_values,
+    cp_size,
+    cp_x,
+    cp_y,
+    cp_values;
+} AffineThirdPoint;
+
+static void AddAffineThirdPoint(const AffineThirdPoint *point,double *terms)
+{
+  double
+    **const matrix = point->matrix,
+    **const vectors = point->vectors;
+
+  const double
+    *const arguments = point->arguments;
+
+  const size_t
+    number_values = point->number_values,
+    cp_size = point->cp_size,
+    cp_x = point->cp_x,
+    cp_y = point->cp_y,
+    cp_values = point->cp_values;
+
+  /* Only two pairs were given, but we need 3 to solve the affine.
+     Fake extra coordinates by rotating p1 around p0 by 90 degrees.
+       x2 = x0 - (y1-y0)   y2 = y0 + (x1-x0)
+   */
+  terms[0] = arguments[cp_x]
+           - ( arguments[cp_size+cp_y] - arguments[cp_y] ); /* x2 */
+  terms[1] = arguments[cp_y] +
+           + ( arguments[cp_size+cp_x] - arguments[cp_x] ); /* y2 */
+  terms[2] = 1;                                             /* 1 */
+  if ( cp_values == 0 ) {
+    /* Image Distortion - rotate the u,v coordinates too */
+    double
+      uv2[2];
+    uv2[0] = arguments[0] - arguments[5] + arguments[1];   /* u2 */
+    uv2[1] = arguments[1] + arguments[4] - arguments[0];   /* v2 */
+    LeastSquaresAddTerms(matrix,vectors,terms,uv2,3UL,2UL);
+  }
+  else {
+    /* Sparse Gradient - use values of p0 for linear gradient */
+    LeastSquaresAddTerms(matrix,vectors,terms,
+          &(arguments[cp_values]),3UL,number_values);
+  }
+}
+
 static double *GenerateCoefficients(const Image *image,
   DistortMethod *method,const CoefficientInput *input,ExceptionInfo *exception)
 {
@@ -603,6 +716,14 @@ static double *GenerateCoefficients(const Image *image,
          For Distort Images    u,v, x,y  ...
          For Sparse Gradients  x,y, r,g,b  ...
       */
+      double
+        **matrix,
+        **vectors,
+        terms[3];
+
+      MagickBooleanType
+        status;
+
       if ( number_arguments%cp_size != 0 ||
            number_arguments < cp_size ) {
         (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
@@ -615,79 +736,60 @@ static double *GenerateCoefficients(const Image *image,
       if ( number_arguments == cp_size ) {
         /* Only 1 CP Set Given */
         SetAffineSingleCoefficients(coeff,arguments,cp_values,number_values);
+        return(coeff);
       }
-      else {
-        /* 2 or more points (usually 3) given.
-           Solve a least squares simultaneous equation for coefficients.
-        */
-        double
-          **matrix,
-          **vectors,
-          terms[3];
-
-        MagickBooleanType
-          status;
-
-        /* create matrix, and a fake vectors matrix */
-        matrix=AcquireMagickMatrix(3UL,3UL);
-        vectors=(double **) AcquireQuantumMemory(number_values,
-          sizeof(*vectors));
-        if (matrix == (double **) NULL || vectors == (double **) NULL)
-        {
-          matrix  = RelinquishMagickMatrix(matrix, 3UL);
-          vectors = (double **) RelinquishMagickMemory(vectors);
-          coeff   = (double *) RelinquishMagickMemory(coeff);
-          (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed",
-                  "%s", "DistortCoefficients");
-          return((double *) NULL);
-        }
-        /* fake a number_values x3 vectors matrix from coefficients array */
-        for (i=0; i < number_values; i++)
-          vectors[i] = &(coeff[i*3]);
-        /* Add given control point pairs for least squares solving */
-        for (i=0; i < number_arguments; i+=cp_size) {
-          terms[0] = arguments[i+cp_x];  /* x */
-          terms[1] = arguments[i+cp_y];  /* y */
-          terms[2] = 1;                  /* 1 */
-          LeastSquaresAddTerms(matrix,vectors,terms,
-                   &(arguments[i+cp_values]),3UL,number_values);
-        }
-        if ( number_arguments == 2*cp_size ) {
-          /* Only two pairs were given, but we need 3 to solve the affine.
-             Fake extra coordinates by rotating p1 around p0 by 90 degrees.
-               x2 = x0 - (y1-y0)   y2 = y0 + (x1-x0)
-           */
-          terms[0] = arguments[cp_x]
-                   - ( arguments[cp_size+cp_y] - arguments[cp_y] ); /* x2 */
-          terms[1] = arguments[cp_y] +
-                   + ( arguments[cp_size+cp_x] - arguments[cp_x] ); /* y2 */
-          terms[2] = 1;                                             /* 1 */
-          if ( cp_values == 0 ) {
-            /* Image Distortion - rotate the u,v coordinates too */
-            double
-              uv2[2];
-            uv2[0] = arguments[0] - arguments[5] + arguments[1];   /* u2 */
-            uv2[1] = arguments[1] + arguments[4] - arguments[0];   /* v2 */
-            LeastSquaresAddTerms(matrix,vectors,terms,uv2,3UL,2UL);
-          }
-          else {
-            /* Sparse Gradient - use values of p0 for linear gradient */
-            LeastSquaresAddTerms(matrix,vectors,terms,
-                  &(arguments[cp_values]),3UL,number_values);
-          }
-        }
-        /* Solve for LeastSquares Coefficients */
-        status=GaussJordanElimination(matrix,vectors,3UL,number_values);
-        matrix = RelinquishMagickMatrix(matrix, 3UL);
+      /* 2 or more points (usually 3) given.
+         Solve a least squares simultaneous equation for coefficients.
+      */
+      /* create matrix, and a fake vectors matrix */
+      matrix=AcquireMagickMatrix(3UL,3UL);
+      vectors=(double **) AcquireQuantumMemory(number_values,
+        sizeof(*vectors));
+      if (matrix == (double **) NULL || vectors == (double **) NULL)
+      {
+        matrix  = RelinquishMagickMatrix(matrix, 3UL);
         vectors = (double **) RelinquishMagickMemory(vectors);
-        if ( status == MagickFalse ) {
-          coeff = (double *) RelinquishMagickMemory(coeff);
-          (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-              "InvalidArgument","%s : 'Unsolvable Matrix'",
-              CommandOptionToMnemonic(MagickDistortOptions, *method) );
-          return((double *) NULL);
-        }
+        coeff   = (double *) RelinquishMagickMemory(coeff);
+        (void) ThrowMagickException(exception,GetMagickModule(),
+                ResourceLimitError,"MemoryAllocationFailed",
+                "%s", "DistortCoefficients");
+        return((double *) NULL);
+      }
+      /* fake a number_values x3 vectors matrix from coefficients array */
+      for (i=0; i < number_values; i++)
+        vectors[i] = &(coeff[i*3]);
+      /* Add given control point pairs for least squares solving */
+      for (i=0; i < number_arguments; i+=cp_size) {
+        terms[0] = arguments[i+cp_x];  /* x */
+        terms[1] = arguments[i+cp_y];  /* y */
+        terms[2] = 1;                  /* 1 */
+        LeastSquaresAddTerms(matrix,vectors,terms,
+                 &(arguments[i+cp_values]),3UL,number_values);
+      }
+      if ( number_arguments == 2*cp_size ) {
+        AffineThirdPoint
+          point;
+
+        point.matrix=matrix;
+        point.vectors=vectors;
+        point.arguments=arguments;
+        point.number_values=number_values;
+        point.cp_size=cp_size;
+        point.cp_x=cp_x;
+        point.cp_y=cp_y;
+        point.cp_values=cp_values;
+        AddAffineThirdPoint(&point,terms);
+      }
+      /* Solve for LeastSquares Coefficients */
+      status=GaussJordanElimination(matrix,vectors,3UL,number_values);
+      matrix = RelinquishMagickMatrix(matrix, 3UL);
+      vectors = (double **) RelinquishMagickMemory(vectors);
+      if ( status == MagickFalse ) {
+        coeff = (double *) RelinquishMagickMemory(coeff);
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+            "InvalidArgument","%s : 'Unsolvable Matrix'",
+            CommandOptionToMnemonic(MagickDistortOptions, *method) );
+        return((double *) NULL);
       }
       return(coeff);
     }
@@ -1318,13 +1420,8 @@ static double *GenerateCoefficients(const Image *image,
       coeff[0] *= Magick2PI;  /* de-normalize back to radians */
       coeff[3] = (double)image->rows-1;
       coeff[2] = (double)image->columns/coeff[1] + coeff[3]/2.0;
-      if ( number_arguments >= 3 ) {
-        if ( number_arguments >= 4 )
-          coeff[3] = arguments[2] - arguments[3];
-        else
-          coeff[3] *= arguments[2]/coeff[2];
-        coeff[2] = arguments[2];
-      }
+      if ( number_arguments >= 3 )
+        SetArcOuterRadius(coeff,number_arguments,arguments);
       coeff[4] = ((double)image->columns-1.0)/2.0;
 
       return(coeff);
@@ -1375,31 +1472,8 @@ static double *GenerateCoefficients(const Image *image,
       if ( fabs(coeff[4]-coeff[5]) < MagickEpsilon )
         coeff[5] += Magick2PI; /* same angle is a full circle */
       /* if radius 0 or negative,  its a special value... */
-      if ( coeff[0] < MagickEpsilon ) {
-        /* Use closest edge  if radius == 0 */
-        if ( fabs(coeff[0]) < MagickEpsilon ) {
-          coeff[0]=MagickMin(fabs(coeff[2]-image->page.x),
-                             fabs(coeff[3]-image->page.y));
-          coeff[0]=MagickMin(coeff[0],
-                       fabs(coeff[2]-image->page.x-image->columns));
-          coeff[0]=MagickMin(coeff[0],
-                       fabs(coeff[3]-image->page.y-image->rows));
-        }
-        /* furthest diagonal if radius == -1 */
-        if ( fabs(-1.0-coeff[0]) < MagickEpsilon ) {
-          double rx,ry;
-          rx = coeff[2]-image->page.x;
-          ry = coeff[3]-image->page.y;
-          coeff[0] = rx*rx+ry*ry;
-          ry = coeff[3]-image->page.y-image->rows;
-          coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
-          rx = coeff[2]-image->page.x-image->columns;
-          coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
-          ry = coeff[3]-image->page.y;
-          coeff[0] = MagickMax(coeff[0],rx*rx+ry*ry);
-          coeff[0] = sqrt(coeff[0]);
-        }
-      }
+      if ( coeff[0] < MagickEpsilon )
+        SetPolarSpecialRadius(image,coeff);
       /* IF Rmax <= 0 or Rmin < 0 OR Rmax < Rmin, THEN error */
       if (IsInvalidPolarRadius(coeff) != MagickFalse) {
         (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
@@ -1568,20 +1642,7 @@ static double *GenerateCoefficients(const Image *image,
         return((double *) NULL);
       }
       /* User defined weighting power for Shepard's Method */
-      { const char *artifact=GetImageArtifact(image,"shepards:power");
-        if ( artifact != (const char *) NULL ) {
-          coeff[0]=StringToDouble(artifact,(char **) NULL) / 2.0;
-          if ( coeff[0] < MagickEpsilon ) {
-            (void) ThrowMagickException(exception,GetMagickModule(),
-                OptionError,"InvalidArgument","%s", "-define shepards:power" );
-            coeff=(double *) RelinquishMagickMemory(coeff);
-            return((double *) NULL);
-          }
-        }
-        else
-          coeff[0]=1.0;  /* Default power of 2 (Inverse Squared) */
-      }
-      return(coeff);
+      return(SetShepardsPower(image,coeff,exception));
     }
     default:
       break;
@@ -1626,6 +1687,80 @@ static double *GenerateCoefficients(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *DistortResizeAlphaImage(const Image *image,Image *tmp_image,
+  const double *distort_args,ExceptionInfo *exception)
+{
+  /*
+    Basically we need to separate Virtual-Pixel alpha in the resized
+    image, so only the actual original images alpha channel is used.
+
+    distort alpha channel separately
+  */
+  Image
+    *resize_alpha,
+    *resize_image;
+
+  (void) SetImageAlphaChannel(tmp_image,ExtractAlphaChannel,exception);
+  (void) SetImageAlphaChannel(tmp_image,OpaqueAlphaChannel,exception);
+  resize_alpha=DistortImage(tmp_image,AffineDistortion,12,distort_args,
+    MagickTrue,exception),
+  tmp_image=DestroyImage(tmp_image);
+  if (resize_alpha == (Image *) NULL)
+    return((Image *) NULL);
+
+  /* distort the actual image containing alpha + VP alpha */
+  tmp_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (tmp_image == (Image *) NULL)
+    return((Image *) NULL);
+  (void) SetImageVirtualPixelMethod(tmp_image,
+    TransparentVirtualPixelMethod,exception);
+  resize_image=DistortImage(tmp_image,AffineDistortion,12,distort_args,
+    MagickTrue,exception),
+  tmp_image=DestroyImage(tmp_image);
+  if (resize_image == (Image *) NULL)
+    {
+      resize_alpha=DestroyImage(resize_alpha);
+      return((Image *) NULL);
+    }
+  /* replace resize images alpha with the separately distorted alpha */
+  (void) SetImageAlphaChannel(resize_image,OffAlphaChannel,exception);
+  (void) SetImageAlphaChannel(resize_alpha,OffAlphaChannel,exception);
+  (void) CompositeImage(resize_image,resize_alpha,CopyAlphaCompositeOp,
+    MagickTrue,0,0,exception);
+  resize_alpha=DestroyImage(resize_alpha);
+  resize_image->alpha_trait=image->alpha_trait;
+  resize_image->compose=image->compose;
+  return(resize_image);
+}
+
+static Image *CropDistortResizeImage(Image *resize_image,
+  const size_t columns,const size_t rows,ExceptionInfo *exception)
+{
+  Image
+    *tmp_image;
+
+  RectangleInfo
+    crop_area;
+
+  /*
+    Clean up the results of the Distortion
+  */
+  crop_area.width=columns;
+  crop_area.height=rows;
+  crop_area.x=0;
+  crop_area.y=0;
+
+  tmp_image=resize_image;
+  resize_image=CropImage(tmp_image,&crop_area,exception);
+  tmp_image=DestroyImage(tmp_image);
+  if (resize_image != (Image *) NULL)
+    {
+      resize_image->page.width=0;
+      resize_image->page.height=0;
+    }
+  return(resize_image);
+}
+
 MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1634,9 +1769,6 @@ MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
   Image
     *resize_image,
     *tmp_image;
-
-  RectangleInfo
-    crop_area;
 
   double
     distort_args[12];
@@ -1688,64 +1820,14 @@ MagickExport Image *DistortResizeImage(const Image *image,const size_t columns,
     {
       /*
         Image has transparency so handle colors and alpha separately.
-        Basically we need to separate Virtual-Pixel alpha in the resized
-        image, so only the actual original images alpha channel is used.
-
-        distort alpha channel separately
       */
-      Image
-        *resize_alpha;
-
-      (void) SetImageAlphaChannel(tmp_image,ExtractAlphaChannel,exception);
-      (void) SetImageAlphaChannel(tmp_image,OpaqueAlphaChannel,exception);
-      resize_alpha=DistortImage(tmp_image,AffineDistortion,12,distort_args,
-        MagickTrue,exception),
-      tmp_image=DestroyImage(tmp_image);
-      if (resize_alpha == (Image *) NULL)
-        return((Image *) NULL);
-
-      /* distort the actual image containing alpha + VP alpha */
-      tmp_image=CloneImage(image,0,0,MagickTrue,exception);
-      if (tmp_image == (Image *) NULL)
-        return((Image *) NULL);
-      (void) SetImageVirtualPixelMethod(tmp_image,
-        TransparentVirtualPixelMethod,exception);
-      resize_image=DistortImage(tmp_image,AffineDistortion,12,distort_args,
-        MagickTrue,exception),
-      tmp_image=DestroyImage(tmp_image);
+      resize_image=DistortResizeAlphaImage(image,tmp_image,distort_args,
+        exception);
       if (resize_image == (Image *) NULL)
-        {
-          resize_alpha=DestroyImage(resize_alpha);
-          return((Image *) NULL);
-        }
-      /* replace resize images alpha with the separately distorted alpha */
-      (void) SetImageAlphaChannel(resize_image,OffAlphaChannel,exception);
-      (void) SetImageAlphaChannel(resize_alpha,OffAlphaChannel,exception);
-      (void) CompositeImage(resize_image,resize_alpha,CopyAlphaCompositeOp,
-        MagickTrue,0,0,exception);
-      resize_alpha=DestroyImage(resize_alpha);
-      resize_image->alpha_trait=image->alpha_trait;
-      resize_image->compose=image->compose;
+        return((Image *) NULL);
     }
   (void) SetImageVirtualPixelMethod(resize_image,vp_save,exception);
-
-  /*
-    Clean up the results of the Distortion
-  */
-  crop_area.width=columns;
-  crop_area.height=rows;
-  crop_area.x=0;
-  crop_area.y=0;
-
-  tmp_image=resize_image;
-  resize_image=CropImage(tmp_image,&crop_area,exception);
-  tmp_image=DestroyImage(tmp_image);
-  if (resize_image != (Image *) NULL)
-    {
-      resize_image->page.width=0;
-      resize_image->page.height=0;
-    }
-  return(resize_image);
+  return(CropDistortResizeImage(resize_image,columns,rows,exception));
 }
 
 /*
@@ -1940,6 +2022,23 @@ static void PrintBarrelFX(const Image *image,const double *coeff,
     method == BarrelDistortion ? "*" : "/",coeff[4],coeff[5],coeff[6],
     coeff[7]);
   (void) FormatLocaleFile(stderr,"       p{ii+xc,jj+yc}' \\\n");
+}
+
+static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
+  MagickBooleanType *viewport_given,ExceptionInfo *exception)
+{
+  { const char *artifact=GetImageArtifact(image,"distort:viewport");
+    *viewport_given = MagickFalse;
+    if ( artifact != (const char *) NULL ) {
+      MagickStatusType flags=ParseAbsoluteGeometry(artifact,geometry);
+      if (flags==NoValue)
+        (void) ThrowMagickException(exception,GetMagickModule(),
+             OptionWarning,"InvalidSetting","'%s' '%s'",
+             "distort:viewport",artifact);
+      else
+        *viewport_given = MagickTrue;
+    }
+  }
 }
 
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
@@ -2224,18 +2323,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
      overrides some parts of the current output image geometry.
      This also overrides its default 'bestfit' setting.
   */
-  { const char *artifact=GetImageArtifact(image,"distort:viewport");
-    viewport_given = MagickFalse;
-    if ( artifact != (const char *) NULL ) {
-      MagickStatusType flags=ParseAbsoluteGeometry(artifact,&geometry);
-      if (flags==NoValue)
-        (void) ThrowMagickException(exception,GetMagickModule(),
-             OptionWarning,"InvalidSetting","'%s' '%s'",
-             "distort:viewport",artifact);
-      else
-        viewport_given = MagickTrue;
-    }
-  }
+  GetDistortViewport(image,&geometry,&viewport_given,exception);
 
   /* Verbose output */
   if (IsStringTrue(GetImageArtifact(image,"verbose")) != MagickFalse) {
@@ -3159,6 +3247,57 @@ MagickExport Image *RotateImage(const Image *image,const double degrees,
 %    o exception: return any errors or warnings in this structure
 %
 */
+static void PrintBarycentricSparseFX(const Image *image,const double *coeff)
+{
+  ssize_t x=0;
+  (void) FormatLocaleFile(stderr, "Barycentric Sparse Color:\n");
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(stderr, "  -channel R -fx '%+lf*i %+lf*j %+lf' \\\n",
+        coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(stderr, "  -channel G -fx '%+lf*i %+lf*j %+lf' \\\n",
+        coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(stderr, "  -channel B -fx '%+lf*i %+lf*j %+lf' \\\n",
+        coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    (void) FormatLocaleFile(stderr, "  -channel K -fx '%+lf*i %+lf*j %+lf' \\\n",
+        coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->alpha_trait != UndefinedPixelTrait))
+    (void) FormatLocaleFile(stderr, "  -channel A -fx '%+lf*i %+lf*j %+lf' \\\n",
+        coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+}
+
+static void PrintBilinearSparseFX(const Image *image,const double *coeff)
+{
+  ssize_t x=0;
+  (void) FormatLocaleFile(stderr, "Bilinear Sparse Color\n");
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(stderr, "   -channel R -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(stderr, "   -channel G -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    (void) FormatLocaleFile(stderr, "   -channel B -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+  if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    (void) FormatLocaleFile(stderr, "   -channel K -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+  if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
+      (image->alpha_trait != UndefinedPixelTrait))
+    (void) FormatLocaleFile(stderr, "   -channel A -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
+        coeff[ x ], coeff[x+1],
+        coeff[x+2], coeff[x+3]),x+=4;
+}
+
 static void PrintSparseColorFX(const Image *image,const double *coeff,
   const SparseColorMethod sparse_method)
 {
@@ -3167,53 +3306,12 @@ static void PrintSparseColorFX(const Image *image,const double *coeff,
     switch (sparse_method) {
       case BarycentricColorInterpolate:
       {
-        ssize_t x=0;
-        (void) FormatLocaleFile(stderr, "Barycentric Sparse Color:\n");
-        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "  -channel R -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "  -channel G -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "  -channel B -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-        if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->colorspace == CMYKColorspace))
-          (void) FormatLocaleFile(stderr, "  -channel K -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
-        if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->alpha_trait != UndefinedPixelTrait))
-          (void) FormatLocaleFile(stderr, "  -channel A -fx '%+lf*i %+lf*j %+lf' \\\n",
-              coeff[x], coeff[x+1], coeff[x+2]),x+=3;
+        PrintBarycentricSparseFX(image,coeff);
         break;
       }
       case BilinearColorInterpolate:
       {
-        ssize_t x=0;
-        (void) FormatLocaleFile(stderr, "Bilinear Sparse Color\n");
-        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "   -channel R -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "   -channel G -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-          (void) FormatLocaleFile(stderr, "   -channel B -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if (((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->colorspace == CMYKColorspace))
-          (void) FormatLocaleFile(stderr, "   -channel K -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
-        if (((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0) &&
-            (image->alpha_trait != UndefinedPixelTrait))
-          (void) FormatLocaleFile(stderr, "   -channel A -fx '%+lf*i %+lf*j %+lf*i*j %+lf;\n",
-              coeff[ x ], coeff[x+1],
-              coeff[x+2], coeff[x+3]),x+=4;
+        PrintBilinearSparseFX(image,coeff);
         break;
       }
       default:
@@ -3242,6 +3340,129 @@ static size_t GetSparseColorCount(const Image *image)
       (image->alpha_trait != UndefinedPixelTrait))
     number_colors++;
   return(number_colors);
+}
+
+typedef struct _SparseControlColor
+{
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  const double
+    *arguments;
+} SparseControlColor;
+
+static void SetSparseControlColor(const SparseControlColor *control,
+  const size_t k,PixelInfo *pixel)
+{
+  const Image
+    *const image = control->image;
+
+  Image
+    *const sparse_image = control->sparse_image;
+
+  const double
+    *const arguments = control->arguments;
+
+  ssize_t x=(ssize_t) k+2;
+  if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel->red=arguments[x++];
+  if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel->green=arguments[x++];
+  if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel->blue=arguments[x++];
+  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    pixel->black=arguments[x++];
+  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel->alpha=arguments[x++];
+}
+
+static double ManhattanDistance(const ssize_t i,const ssize_t j,
+  const double *arguments,const size_t k)
+{
+  return(fabs((double)i-arguments[ k ])+
+    fabs((double)j-arguments[k+1]));
+}
+
+static double VoronoiDistance(const ssize_t i,const ssize_t j,
+  const double *arguments,const size_t k)
+{
+  return(
+      ((double) i-arguments[ k ])*((double) i-arguments[ k ])
+    + ((double) j-arguments[k+1])*((double) j-arguments[k+1]));
+}
+
+typedef struct _SparseColorPoint
+{
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  ssize_t
+    i,
+    j;
+} SparseColorPoint;
+
+static void ManhattanSparseColor(const SparseColorPoint *point,
+  PixelInfo *pixel)
+{
+  const Image
+    *const image = point->image;
+
+  Image
+    *const sparse_image = point->sparse_image;
+
+  const size_t
+    number_arguments = point->number_arguments;
+
+  const double
+    *const arguments = point->arguments;
+
+  const size_t
+    number_colors = point->number_colors;
+
+  const ssize_t
+    i = point->i,
+    j = point->j;
+
+  double
+    minimum = MagickMaximumValue;
+
+  size_t
+    k;
+
+  /*
+    Just use the closest control point you can find!
+  */
+  for (k=0; k<number_arguments; k+=2+number_colors)
+  {
+    double distance = ManhattanDistance(i,j,arguments,k);
+    if ( distance < minimum ) {
+      SparseControlColor
+        control;
+
+      control.image=image;
+      control.sparse_image=sparse_image;
+      control.arguments=arguments;
+      SetSparseControlColor(&control,k,pixel);
+      minimum = distance;
+    }
+  }
 }
 
 MagickExport Image *SparseColorImage(const Image *image,
@@ -3472,36 +3693,17 @@ MagickExport Image *SparseColorImage(const Image *image,
           }
           case ManhattanColorInterpolate:
           {
-            double
-              minimum = MagickMaximumValue;
+            SparseColorPoint
+              point;
 
-            size_t
-              k;
-
-            /*
-              Just use the closest control point you can find!
-            */
-            for (k=0; k<number_arguments; k+=2+number_colors)
-            {
-              double distance = fabs((double)i-arguments[ k ])+
-                fabs((double)j-arguments[k+1]);
-              if ( distance < minimum ) {
-                ssize_t x=(ssize_t) k+2;
-                if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.red=arguments[x++];
-                if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.green=arguments[x++];
-                if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.blue=arguments[x++];
-                if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                    (image->colorspace == CMYKColorspace))
-                  pixel.black=arguments[x++];
-                if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                    (sparse_image->alpha_trait != UndefinedPixelTrait))
-                  pixel.alpha=arguments[x++];
-                minimum = distance;
-              }
-            }
+            point.image=image;
+            point.sparse_image=sparse_image;
+            point.number_arguments=number_arguments;
+            point.arguments=arguments;
+            point.number_colors=number_colors;
+            point.i=i;
+            point.j=j;
+            ManhattanSparseColor(&point,&pixel);
             break;
           }
           case VoronoiColorInterpolate:
@@ -3517,23 +3719,15 @@ MagickExport Image *SparseColorImage(const Image *image,
               Just use the closest control point you can find!
             */
             for (k=0; k<number_arguments; k+=2+number_colors) {
-              double distance =
-                  ((double) i-arguments[ k ])*((double) i-arguments[ k ])
-                + ((double) j-arguments[k+1])*((double) j-arguments[k+1]);
+              double distance = VoronoiDistance(i,j,arguments,k);
               if ( distance < minimum ) {
-                ssize_t x = (ssize_t) k+2;
-                if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.red=arguments[x++];
-                if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.green=arguments[x++];
-                if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-                  pixel.blue=arguments[x++];
-                if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                    (image->colorspace == CMYKColorspace))
-                  pixel.black=arguments[x++];
-                if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                    (sparse_image->alpha_trait != UndefinedPixelTrait))
-                  pixel.alpha=arguments[x++];
+                SparseControlColor
+                  control;
+
+                control.image=image;
+                control.sparse_image=sparse_image;
+                control.arguments=arguments;
+                SetSparseControlColor(&control,k,&pixel);
                 minimum = distance;
               }
             }
