@@ -331,6 +331,27 @@ static void Export16BitPixelChannel(const Image *image,
   }
 }
 
+static void ExportFloat32BitPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  const Quantum *magick_restrict p)
+{
+  const MagickSizeType
+    number_pixels = span->number_pixels;
+
+  unsigned char
+    *magick_restrict q = span->q;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) number_pixels; x++)
+  {
+    q=PopQuantumFloatPixel(quantum_info,(float) *p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) quantum_info->pad;
+  }
+}
+
 static void Export32BitPixelChannel(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,
   const Quantum *magick_restrict p)
@@ -349,12 +370,7 @@ static void Export32BitPixelChannel(const Image *image,
 
   if (quantum_info->format == FloatingPointQuantumFormat)
     {
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        q=PopQuantumFloatPixel(quantum_info,(float) *p,q);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-        q+=(ptrdiff_t) quantum_info->pad;
-      }
+      ExportFloat32BitPixelChannel(image,quantum_info,span,p);
       return;
     }
   for (x=0; x < (ssize_t) number_pixels; x++)
