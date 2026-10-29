@@ -3498,6 +3498,26 @@ static MagickBooleanType SIMMinimaImage(const Image *image,double *minima,
   return(status);
 }
 
+static void MultiplyPixelChannels(const Image *image,const double factor,
+  const ChannelStatistics *channel_statistics,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if (channel_statistics != (const ChannelStatistics *) NULL)
+      q[i]=(Quantum) (factor*(double) q[i]*QuantumScale*
+        channel_statistics[channel].standard_deviation);
+    else
+      q[i]=(Quantum) (factor*(double) q[i]);
+  }
+}
+
 static MagickBooleanType SIMMultiplyImage(Image *image,const double factor,
   const ChannelStatistics *channel_statistics,ExceptionInfo *exception)
 {
@@ -3536,21 +3556,7 @@ static MagickBooleanType SIMMultiplyImage(Image *image,const double factor,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (channel_statistics != (const ChannelStatistics *) NULL)
-          q[i]=(Quantum) (factor*(double) q[i]*QuantumScale*
-            channel_statistics[channel].standard_deviation);
-        else
-          q[i]=(Quantum) (factor*(double) q[i]);
-      }
+      MultiplyPixelChannels(image,factor,channel_statistics,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
