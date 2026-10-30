@@ -1286,6 +1286,47 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
   }
 }
 
+#if FILTER_LUT
+static void ReportResampleFilterLUT(
+  const ResampleFilter *resample_filter)
+{
+  if (IsStringTrue(GetImageArtifact(resample_filter->image,
+      "resample:verbose")) != MagickFalse)
+    {
+      int
+        Q;
+      double
+        r_scale;
+
+      /* Debug output of the filter weighting LUT
+        Gnuplot the LUT data, the x scale index has been adjusted
+          plot [0:2][-.2:1] "lut.dat" with lines
+        The filter values should be normalized for comparison
+      */
+      printf("#\n");
+      printf("# Resampling Filter LUT (%d values) for '%s' filter\n",
+                 WLUT_WIDTH, CommandOptionToMnemonic(MagickFilterOptions,
+                 resample_filter->filter) );
+      printf("#\n");
+      printf("# Note: values in table are using a squared radius lookup.\n");
+      printf("# As such its distribution is not uniform.\n");
+      printf("#\n");
+      printf("# The X value is the support distance for the Y weight\n");
+      printf("# so you can use gnuplot to plot this cylindrical filter\n");
+      printf("#    plot [0:2][-.2:1] \"lut.dat\" with lines\n");
+      printf("#\n");
+
+      /* Scale radius so the filter LUT covers the full support range */
+      r_scale = resample_filter->support*sqrt(1.0/(double)WLUT_WIDTH);
+      for(Q=0; Q<WLUT_WIDTH; Q++)
+        printf("%8.*g %.*g\n",
+            GetMagickPrecision(),sqrt((double)Q)*r_scale,
+            GetMagickPrecision(),resample_filter->filter_lut[Q] );
+      printf("\n\n"); /* generate a 'break' in gnuplot if multiple outputs */
+    }
+}
+#endif
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1408,40 +1449,7 @@ MagickExport void SetResampleFilter(ResampleFilter *resample_filter,
   #pragma omp single
 #endif
   {
-    if (IsStringTrue(GetImageArtifact(resample_filter->image,
-        "resample:verbose")) != MagickFalse)
-      {
-        int
-          Q;
-        double
-          r_scale;
-
-        /* Debug output of the filter weighting LUT
-          Gnuplot the LUT data, the x scale index has been adjusted
-            plot [0:2][-.2:1] "lut.dat" with lines
-          The filter values should be normalized for comparison
-        */
-        printf("#\n");
-        printf("# Resampling Filter LUT (%d values) for '%s' filter\n",
-                   WLUT_WIDTH, CommandOptionToMnemonic(MagickFilterOptions,
-                   resample_filter->filter) );
-        printf("#\n");
-        printf("# Note: values in table are using a squared radius lookup.\n");
-        printf("# As such its distribution is not uniform.\n");
-        printf("#\n");
-        printf("# The X value is the support distance for the Y weight\n");
-        printf("# so you can use gnuplot to plot this cylindrical filter\n");
-        printf("#    plot [0:2][-.2:1] \"lut.dat\" with lines\n");
-        printf("#\n");
-
-        /* Scale radius so the filter LUT covers the full support range */
-        r_scale = resample_filter->support*sqrt(1.0/(double)WLUT_WIDTH);
-        for(Q=0; Q<WLUT_WIDTH; Q++)
-          printf("%8.*g %.*g\n",
-              GetMagickPrecision(),sqrt((double)Q)*r_scale,
-              GetMagickPrecision(),resample_filter->filter_lut[Q] );
-        printf("\n\n"); /* generate a 'break' in gnuplot if multiple outputs */
-      }
+    ReportResampleFilterLUT(resample_filter);
     /* Output the above once only for each image, and each setting
     (void) DeleteImageArtifact(resample_filter->image,"resample:verbose");
     */
