@@ -489,6 +489,23 @@ static MagickBooleanType CloneDisposeFrame(Image *dispose_image,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireDisposeCanvas(const Image *image,
+  Image **dispose_image,ExceptionInfo *exception)
+{
+  *dispose_image=CloneImage(image,image->page.width,image->page.height,
+    MagickTrue,exception);
+  if (*dispose_image == (Image *) NULL)
+    return(MagickFalse);
+  (*dispose_image)->page=image->page;
+  (*dispose_image)->page.x=0;
+  (*dispose_image)->page.y=0;
+  (*dispose_image)->dispose=NoneDispose;
+  (*dispose_image)->background_color.alpha_trait=BlendPixelTrait;
+  (*dispose_image)->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(*dispose_image,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
 {
   Image
@@ -512,17 +529,8 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   image=GetFirstImageInList(images);
-  dispose_image=CloneImage(image,image->page.width,image->page.height,
-    MagickTrue,exception);
-  if (dispose_image == (Image *) NULL)
+  if (AcquireDisposeCanvas(image,&dispose_image,exception) == MagickFalse)
     return((Image *) NULL);
-  dispose_image->page=image->page;
-  dispose_image->page.x=0;
-  dispose_image->page.y=0;
-  dispose_image->dispose=NoneDispose;
-  dispose_image->background_color.alpha_trait=BlendPixelTrait;
-  dispose_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(dispose_image,exception);
   dispose_images=NewImageList();
   for (next=image; image != (Image *) NULL; image=GetNextImageInList(image))
   {
