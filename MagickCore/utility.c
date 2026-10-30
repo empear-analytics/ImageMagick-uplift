@@ -1334,6 +1334,25 @@ static void GetExtensionComponent(char *component,char *p)
     (void) CopyMagickString(component,p+1,MagickPathExtent);
 }
 
+static size_t StripImageFormatPrefix(char *component,char *p,
+  size_t magick_length)
+{
+  char
+    *q;
+
+  *p='\0';
+  if (IsMagickConflict(component) != MagickFalse)
+    *p=':';
+  else
+    {
+      magick_length=(size_t) (p-component+1);
+      for (q=component; *(++p) != '\0'; q++)
+        *q=(*p);
+      *q='\0';
+    }
+  return(magick_length);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1414,16 +1433,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
         /*
           Look for image format specification (e.g. ps3:image).
         */
-        *p='\0';
-        if (IsMagickConflict(component) != MagickFalse)
-          *p=':';
-        else
-          {
-            magick_length=(size_t) (p-component+1);
-            for (q=component; *(++p) != '\0'; q++)
-              *q=(*p);
-            *q='\0';
-          }
+        magick_length=StripImageFormatPrefix(component,p,magick_length);
         break;
       }
   }
