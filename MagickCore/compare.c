@@ -485,14 +485,26 @@ static MagickBooleanType GetAESimilarity(const Image *image,
   return(status);
 }
 
+typedef struct _CorrelationSums
+{
+  double
+    *channel_similarity,
+    *channel_norm,
+    *channel_reconstruct_norm;
+} CorrelationSums;
+
 static void AccumulateCorrelationPixel(const ComparePixels *pixels,
   const ChannelStatistics *image_statistics,
-  const ChannelStatistics *reconstruct_statistics,double *channel_similarity,
-  double *channel_norm,double *channel_reconstruct_norm)
+  const ChannelStatistics *reconstruct_statistics,const CorrelationSums *sums)
 {
   const Image
     *image = pixels->image,
     *reconstruct_image = pixels->reconstruct_image;
+
+  double
+    *const channel_similarity = sums->channel_similarity,
+    *const channel_norm = sums->channel_norm,
+    *const channel_reconstruct_norm = sums->channel_reconstruct_norm;
 
   const Quantum
     *p = pixels->p,
@@ -605,6 +617,10 @@ static MagickBooleanType GetDPCSimilarity(const Image *image,
       channel_reconstruct_norm[MaxPixelChannels+1] = { 0.0 },
       channel_similarity[MaxPixelChannels+1] = { 0.0 };
 
+    const CorrelationSums
+      sums = { channel_similarity, channel_norm,
+        channel_reconstruct_norm };
+
     ssize_t
       x;
 
@@ -627,8 +643,7 @@ static MagickBooleanType GetDPCSimilarity(const Image *image,
           continue;
         }
       AccumulateCorrelationPixel(&pixels,image_statistics,
-        reconstruct_statistics,channel_similarity,channel_norm,
-        channel_reconstruct_norm);
+        reconstruct_statistics,&sums);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
     }
@@ -1404,6 +1419,10 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
       channel_similarity[MaxPixelChannels+1] = { 0.0 },
       channel_variance[MaxPixelChannels+1] = { 0.0 };
 
+    const CorrelationSums
+      sums = { channel_similarity, channel_variance,
+        channel_reconstruct_variance };
+
     ssize_t
       x;
 
@@ -1426,8 +1445,7 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
           continue;
         }
       AccumulateCorrelationPixel(&pixels,image_statistics,
-        reconstruct_statistics,channel_similarity,channel_variance,
-        channel_reconstruct_variance);
+        reconstruct_statistics,&sums);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
     }
