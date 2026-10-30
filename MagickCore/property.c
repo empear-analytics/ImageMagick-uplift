@@ -3882,6 +3882,36 @@ static inline MagickBooleanType IsEscapeEnd(const char *p)
     MagickFalse);
 }
 
+static MagickStatusType EvaluatePixelExpression(FxInfo *fx_info,
+  const Image *image,PixelInfo *pixel,ExceptionInfo *exception)
+{
+  double
+    value;
+
+  MagickStatusType
+    fx_status;
+
+  fx_status=FxEvaluateChannelExpression(fx_info,RedPixelChannel,0,0,
+    &value,exception);
+  pixel->red=(double) QuantumRange*value;
+  fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
+    GreenPixelChannel,0,0,&value,exception);
+  pixel->green=(double) QuantumRange*value;
+  fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
+    BluePixelChannel,0,0,&value,exception);
+  pixel->blue=(double) QuantumRange*value;
+  if (image->colorspace == CMYKColorspace)
+    {
+      fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
+        BlackPixelChannel,0,0,&value,exception);
+      pixel->black=(double) QuantumRange*value;
+    }
+  fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
+    AlphaPixelChannel,0,0,&value,exception);
+  pixel->alpha=(double) QuantumRange*value;
+  return(fx_status);
+}
+
 static void InterpretXMLEntity(char **q,const char **p)
 {
   if (LocaleNCompare("&lt;",(*p),4) == 0)
@@ -4232,9 +4262,6 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
         }
       if (LocaleNCompare("hex:",pattern,4) == 0)
         {
-          double
-            value;
-
           FxInfo
             *fx_info;
 
@@ -4251,24 +4278,8 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
           fx_info=AcquireFxInfo(property_image,pattern+4,exception);
           if (fx_info == (FxInfo *) NULL)
             continue;
-          fx_status=FxEvaluateChannelExpression(fx_info,RedPixelChannel,0,0,
-            &value,exception);
-          pixel.red=(double) QuantumRange*value;
-          fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-            GreenPixelChannel,0,0,&value,exception);
-          pixel.green=(double) QuantumRange*value;
-          fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-            BluePixelChannel,0,0,&value,exception);
-          pixel.blue=(double) QuantumRange*value;
-          if (property_image->colorspace == CMYKColorspace)
-            {
-              fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-                BlackPixelChannel,0,0,&value,exception);
-              pixel.black=(double) QuantumRange*value;
-            }
-          fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-            AlphaPixelChannel,0,0,&value,exception);
-          pixel.alpha=(double) QuantumRange*value;
+          fx_status=EvaluatePixelExpression(fx_info,property_image,&pixel,
+            exception);
           fx_info=DestroyFxInfo(fx_info);
           if (fx_status != MagickFalse)
             {
@@ -4282,9 +4293,6 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
         }
       if (LocaleNCompare("pixel:",pattern,6) == 0)
         {
-          double
-            value;
-
           FxInfo
             *fx_info;
 
@@ -4301,24 +4309,8 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
           fx_info=AcquireFxInfo(property_image,pattern+6,exception);
           if (fx_info == (FxInfo *) NULL)
             continue;
-          fx_status=FxEvaluateChannelExpression(fx_info,RedPixelChannel,0,0,
-            &value,exception);
-          pixel.red=(double) QuantumRange*value;
-          fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-            GreenPixelChannel,0,0,&value,exception);
-          pixel.green=(double) QuantumRange*value;
-          fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-            BluePixelChannel,0,0,&value,exception);
-          pixel.blue=(double) QuantumRange*value;
-          if (property_image->colorspace == CMYKColorspace)
-            {
-              fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-                BlackPixelChannel,0,0,&value,exception);
-              pixel.black=(double) QuantumRange*value;
-            }
-          fx_status&=(MagickStatusType) FxEvaluateChannelExpression(fx_info,
-            AlphaPixelChannel,0,0,&value,exception);
-          pixel.alpha=(double) QuantumRange*value;
+          fx_status=EvaluatePixelExpression(fx_info,property_image,&pixel,
+            exception);
           fx_info=DestroyFxInfo(fx_info);
           if (fx_status != MagickFalse)
             {
