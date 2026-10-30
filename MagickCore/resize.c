@@ -2479,6 +2479,13 @@ static inline MagickBooleanType IsReducibleBy(const ssize_t x_factor,
     MagickFalse);
 }
 
+static inline MagickBooleanType IsThumbnailResized(const Image *image,
+  const size_t columns,const size_t rows)
+{
+  return(((columns != image->columns) || (rows != image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -2496,7 +2503,7 @@ MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
   thumbnail_image=CloneImage(image,0,0,MagickTrue,exception);
   if (thumbnail_image == (Image *) NULL)
     return(thumbnail_image);
-  if ((columns != image->columns) || (rows != image->rows))
+  if (IsThumbnailResized(image,columns,rows) != MagickFalse)
     {
       Image
         *clone_image = thumbnail_image;
