@@ -288,6 +288,20 @@ static const char *ReadKernelArrayToken(const char *p,char *token)
   return(p);
 }
 
+static GeometryInfo SetKernelArraySize(KernelInfo *kernel,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  if ( (flags & WidthValue) == 0 ) /* if no width then */
+    args.rho = args.sigma;         /* then  width = height */
+  if ( args.rho < 1.0 )            /* if width too small */
+     args.rho = 1.0;               /* then  width = 1 */
+  if ( args.sigma < 1.0 )          /* if height too small */
+    args.sigma = args.rho;         /* then  height = width */
+  kernel->width = CastDoubleToSizeT(args.rho);
+  kernel->height = CastDoubleToSizeT(args.sigma);
+  return(args);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -349,14 +363,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
       flags = ParseGeometry(token, &args);
 
       /* Size handling and checks of geometry settings */
-      if ( (flags & WidthValue) == 0 ) /* if no width then */
-        args.rho = args.sigma;         /* then  width = height */
-      if ( args.rho < 1.0 )            /* if width too small */
-         args.rho = 1.0;               /* then  width = 1 */
-      if ( args.sigma < 1.0 )          /* if height too small */
-        args.sigma = args.rho;         /* then  height = width */
-      kernel->width = CastDoubleToSizeT(args.rho);
-      kernel->height = CastDoubleToSizeT(args.sigma);
+      args=SetKernelArraySize(kernel,flags,args);
 
       /* Offset Handling and Checks */
       if ( args.xi  < 0.0 || args.psi < 0.0 )
