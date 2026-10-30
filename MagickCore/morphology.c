@@ -3266,8 +3266,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
               {
                 if (!IsNaN(*k) && (*k > 0.5))
                   {
-                    if ((double) pixels[i] > pixel)
-                      pixel=(double) pixels[i];
+                    pixel=MaximizeChannelValue(pixels,i,pixel);
                   }
                 k--;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
