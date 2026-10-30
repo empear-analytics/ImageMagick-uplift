@@ -791,6 +791,17 @@ static void ColorThresholdRow(Image *image,const PixelInfo *start,
   }
 }
 
+static IlluminantType GetImageThresholdIlluminant(const Image *image,
+  IlluminantType illuminant)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"color:illuminant");
+  illuminant=GetThresholdIlluminant(artifact,illuminant);
+  return(illuminant);
+}
+
 MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   const PixelInfo *start_color,const PixelInfo *stop_color,
   ExceptionInfo *exception)
@@ -802,9 +813,6 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
 
   ColorThresholdRange
     range;
-
-  const char
-    *artifact;
 
   IlluminantType
     illuminant = D65Illuminant;
@@ -832,8 +840,7 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   status=AcquireImageColormap(image,2,exception);
   if (status == MagickFalse)
     return(status);
-  artifact=GetImageArtifact(image,"color:illuminant");
-  illuminant=GetThresholdIlluminant(artifact,illuminant);
+  illuminant=GetImageThresholdIlluminant(image,illuminant);
   start=(*start_color);
   stop=(*stop_color);
   range.image=image;
