@@ -672,6 +672,16 @@ static MagickBooleanType ReadPendingScaleRow(const ScaleRead *pending,
   return(MagickTrue);
 }
 
+static void RestartScaleRow(const Image *image,Image *scale_image,
+  PointInfo *scale,MagickBooleanType *next_row)
+{
+  if ((*scale).y <= 0)
+    {
+      (*scale).y=(double) scale_image->rows/(double) image->rows;
+      *next_row=MagickTrue;
+    }
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -832,11 +842,7 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
           break;
         BlendScaleScanline(image,span,x_vector,y_vector,scanline);
         scale.y-=span.y;
-        if (scale.y <= 0)
-          {
-            scale.y=(double) scale_image->rows/(double) image->rows;
-            next_row=MagickTrue;
-          }
+        RestartScaleRow(image,scale_image,&scale,&next_row);
         span.y=1.0;
       }
     if (scale_image->columns == image->columns)
