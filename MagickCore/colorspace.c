@@ -743,6 +743,38 @@ static inline MagickBooleanType IsTransformMapMissing(
     (z_map == (TransformPacket *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static void InitializeYCCTransformMaps(TransformPacket *x_map,
+  TransformPacket *y_map,TransformPacket *z_map)
+{
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) (0.018*MaxMap); i++)
+  {
+    x_map[i].x=0.005382*i;
+    x_map[i].y=(-0.003296)*i;
+    x_map[i].z=0.009410*i;
+    y_map[i].x=0.010566*i;
+    y_map[i].y=(-0.006471)*i;
+    y_map[i].z=(-0.007880)*i;
+    z_map[i].x=0.002052*i;
+    z_map[i].y=0.009768*i;
+    z_map[i].z=(-0.001530)*i;
+  }
+  for ( ; i <= (ssize_t) MaxMap; i++)
+  {
+    x_map[i].x=0.298839*(1.099*i-0.099);
+    x_map[i].y=(-0.298839)*(1.099*i-0.099);
+    x_map[i].z=0.70100*(1.099*i-0.099);
+    y_map[i].x=0.586811*(1.099*i-0.099);
+    y_map[i].y=(-0.586811)*(1.099*i-0.099);
+    y_map[i].z=(-0.586811)*(1.099*i-0.099);
+    z_map[i].x=0.114350*(1.099*i-0.099);
+    z_map[i].y=0.88600*(1.099*i-0.099);
+    z_map[i].z=(-0.114350)*(1.099*i-0.099);
+  }
+}
+
 static TransformPacket *RelinquishTransformMap(TransformPacket *map)
 {
   if (map != (TransformPacket *) NULL)
@@ -1379,30 +1411,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
         ScaleCharToQuantum(156));
       primary_info.z=(MagickRealType) ScaleQuantumToMap(
         ScaleCharToQuantum(137));
-      for (i=0; i <= (ssize_t) (0.018*MaxMap); i++)
-      {
-        x_map[i].x=0.005382*i;
-        x_map[i].y=(-0.003296)*i;
-        x_map[i].z=0.009410*i;
-        y_map[i].x=0.010566*i;
-        y_map[i].y=(-0.006471)*i;
-        y_map[i].z=(-0.007880)*i;
-        z_map[i].x=0.002052*i;
-        z_map[i].y=0.009768*i;
-        z_map[i].z=(-0.001530)*i;
-      }
-      for ( ; i <= (ssize_t) MaxMap; i++)
-      {
-        x_map[i].x=0.298839*(1.099*i-0.099);
-        x_map[i].y=(-0.298839)*(1.099*i-0.099);
-        x_map[i].z=0.70100*(1.099*i-0.099);
-        y_map[i].x=0.586811*(1.099*i-0.099);
-        y_map[i].y=(-0.586811)*(1.099*i-0.099);
-        y_map[i].z=(-0.586811)*(1.099*i-0.099);
-        z_map[i].x=0.114350*(1.099*i-0.099);
-        z_map[i].y=0.88600*(1.099*i-0.099);
-        z_map[i].z=(-0.114350)*(1.099*i-0.099);
-      }
+      InitializeYCCTransformMaps(x_map,y_map,z_map);
       break;
     }
     default:
