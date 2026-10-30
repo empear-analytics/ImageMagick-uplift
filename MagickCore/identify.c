@@ -1148,6 +1148,125 @@ static void PrintAlphaColor(FILE *file,const Image *image,
   (void) FormatLocaleFile(file,"  %s\n",tuple);
 }
 
+static void PrintColorspaceLocations(const Image *image,
+  const ColorspaceType colorspace,ChannelLocationsReport report)
+{
+  ssize_t
+    i;
+
+  switch (colorspace)
+  {
+    case RGBColorspace:
+    case sRGBColorspace:
+    {
+      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,RedPixelChannel,"Red");
+      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,GreenPixelChannel,"Green");
+      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,BluePixelChannel,"Blue");
+      break;
+    }
+    case CMYKColorspace:
+    {
+      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,CyanPixelChannel,"Cyan");
+      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,MagentaPixelChannel,"Magenta");
+      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,YellowPixelChannel,"Yellow");
+      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,BlackPixelChannel,"Black");
+      break;
+    }
+    case LinearGRAYColorspace:
+    case GRAYColorspace:
+    {
+      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelLocations(&report,GrayPixelChannel,"Gray");
+      break;
+    }
+    default:
+    {
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        PixelChannel channel = GetPixelChannelChannel(image,i);
+        PixelTrait traits = GetPixelChannelTraits(image,channel);
+        if ((traits & UpdatePixelTrait) != 0)
+          (void) PrintChannelLocations(&report,channel,"Channel");
+      }
+      break;
+    }
+  }
+}
+
+static void PrintImageArtifacts(FILE *file,Image *image)
+{
+  const char
+    *artifact,
+    *value;
+
+  ResetImageArtifactIterator(image);
+  artifact=GetNextImageArtifact(image);
+  if (artifact != (const char *) NULL)
+    {
+      /*
+        Display image artifacts.
+      */
+      (void) FormatLocaleFile(file,"  Artifacts:\n");
+      while (artifact != (const char *) NULL)
+      {
+        (void) FormatLocaleFile(file,"    %s: ",artifact);
+        value=GetImageArtifact(image,artifact);
+        if (value != (const char *) NULL)
+          (void) FormatLocaleFile(file,"%s\n",value);
+        artifact=GetNextImageArtifact(image);
+      }
+    }
+}
+
+static void PrintImageColormapEntries(FILE *file,Image *image,ExceptionInfo *exception)
+{
+  if (image->storage_class == PseudoClass)
+    {
+      (void) FormatLocaleFile(file,"  Colormap entries: %.17g\n",(double)
+        image->colors);
+      (void) FormatLocaleFile(file,"  Colormap:\n");
+      if (image->colors <= 1024)
+        PrintImageColormap(file,image,exception);
+    }
+}
+
+static void PrintImageTimeToLive(FILE *file,const Image *image)
+{
+  int
+    expired;
+
+  if (image->ttl != (time_t) 0)
+    {
+      char
+        iso8601[sizeof("9999-99-99T99:99:99Z")];
+
+      int
+        seconds;
+
+      struct tm
+        timestamp;
+
+      (void) GetMagickUTCTime(&image->ttl,&timestamp);
+      (void) strftime(iso8601,sizeof(iso8601),"%Y-%m-%dT%H:%M:%SZ",&timestamp);
+      seconds=MagickMax((int)(image->ttl-GetMagickTime()),0);
+      expired=' ';
+      if (seconds == 0)
+        expired='*';
+      (void) FormatLocaleFile(file,"  Time-to-live: %g:%02g:%02g:%02g%c %s\n",
+        ceil((double) (seconds/(3600*24))),
+        ceil((double) ((seconds % (24*3600))/3600)),
+        ceil((double) ((seconds % 3600)/60)),
+        ceil((double) ((seconds % 3600) % 60)),expired,iso8601);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1190,9 +1309,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
 
   ImageType
     type;
-
-  int
-    expired;
 
   MagickBooleanType
     ping;
@@ -1249,50 +1365,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       report.channel_statistics=channel_statistics;
 
       (void) FormatLocaleFile(file,"Channel %s locations:\n",locate);
-      switch (colorspace)
-      {
-        case RGBColorspace:
-        case sRGBColorspace:
-        {
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,RedPixelChannel,"Red");
-          if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,GreenPixelChannel,"Green");
-          if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,BluePixelChannel,"Blue");
-          break;
-        }
-        case CMYKColorspace:
-        {
-          if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,CyanPixelChannel,"Cyan");
-          if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,MagentaPixelChannel,"Magenta");
-          if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,YellowPixelChannel,"Yellow");
-          if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,BlackPixelChannel,"Black");
-          break;
-        }
-        case LinearGRAYColorspace:
-        case GRAYColorspace:
-        {
-          if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelLocations(&report,GrayPixelChannel,"Gray");
-          break;
-        }
-        default:
-        {
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) != 0)
-              (void) PrintChannelLocations(&report,channel,"Channel");
-          }
-          break;
-        }
-      }
+      PrintColorspaceLocations(image,colorspace,report);
       if (image->alpha_trait != UndefinedPixelTrait)
         (void) PrintChannelLocations(&report,AlphaPixelChannel,"Alpha");
       channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
@@ -1703,14 +1776,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
               GetNumberColors(image,(FILE *) NULL,exception));
         }
     }
-  if (image->storage_class == PseudoClass)
-    {
-      (void) FormatLocaleFile(file,"  Colormap entries: %.17g\n",(double)
-        image->colors);
-      (void) FormatLocaleFile(file,"  Colormap:\n");
-      if (image->colors <= 1024)
-        PrintImageColormap(file,image,exception);
-    }
+  PrintImageColormapEntries(file,image,exception);
   if (image->error.mean_error_per_pixel != 0.0)
     (void) FormatLocaleFile(file,"  Mean error per pixel: %g\n",
       image->error.mean_error_per_pixel);
@@ -1800,23 +1866,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     PrintConvexHullAndBoundingBox(file,image,exception);
   PrintImageProfiles(file,image);
   PrintImageProperties(file,image,exception);
-  ResetImageArtifactIterator(image);
-  artifact=GetNextImageArtifact(image);
-  if (artifact != (const char *) NULL)
-    {
-      /*
-        Display image artifacts.
-      */
-      (void) FormatLocaleFile(file,"  Artifacts:\n");
-      while (artifact != (const char *) NULL)
-      {
-        (void) FormatLocaleFile(file,"    %s: ",artifact);
-        value=GetImageArtifact(image,artifact);
-        if (value != (const char *) NULL)
-          (void) FormatLocaleFile(file,"%s\n",value);
-        artifact=GetNextImageArtifact(image);
-      }
-    }
+  PrintImageArtifacts(file,image);
   ResetImageRegistryIterator();
   registry=GetNextImageRegistry();
   if (registry != (const char *) NULL)
@@ -1854,29 +1904,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         image->rows/elapsed_time+0.5),MagickFalse,"P",MagickPathExtent,buffer);
       (void) FormatLocaleFile(file,"  Pixels per second: %s\n",buffer);
     }
-  if (image->ttl != (time_t) 0)
-    {
-      char
-        iso8601[sizeof("9999-99-99T99:99:99Z")];
-
-      int
-        seconds;
-
-      struct tm
-        timestamp;
-
-      (void) GetMagickUTCTime(&image->ttl,&timestamp);
-      (void) strftime(iso8601,sizeof(iso8601),"%Y-%m-%dT%H:%M:%SZ",&timestamp);
-      seconds=MagickMax((int)(image->ttl-GetMagickTime()),0);
-      expired=' ';
-      if (seconds == 0)
-        expired='*';
-      (void) FormatLocaleFile(file,"  Time-to-live: %g:%02g:%02g:%02g%c %s\n",
-        ceil((double) (seconds/(3600*24))),
-        ceil((double) ((seconds % (24*3600))/3600)),
-        ceil((double) ((seconds % 3600)/60)),
-        ceil((double) ((seconds % 3600) % 60)),expired,iso8601);
-    }
+  PrintImageTimeToLive(file,image);
   (void) FormatLocaleFile(file,"  User time: %0.3fu\n",user_time);
   (void) FormatLocaleFile(file,"  Elapsed time: %lu:%02lu.%03lu\n",
     (unsigned long) (elapsed_time/60.0),(unsigned long) ceil(fmod(elapsed_time,

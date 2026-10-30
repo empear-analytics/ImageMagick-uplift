@@ -108,6 +108,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/coder.c \
   MagickCore/coder.h \
   MagickCore/color.c \
+  MagickCore/color-equivalent.c \
   MagickCore/color.h \
   MagickCore/color-private.h \
   MagickCore/colormap.c \
@@ -299,6 +300,8 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/stream.h \
   MagickCore/stream-private.h \
   MagickCore/string.c \
+  MagickCore/string-argv.c \
+  MagickCore/string-si.c \
   MagickCore/string_.h \
   MagickCore/string-private.h \
   MagickCore/studio.h \
