@@ -1307,6 +1307,20 @@ static void RemoveRootExtension(char *component)
     *p='\0';
 }
 
+static void RemoveBaseExtension(char *component)
+{
+  char
+    *p;
+
+  if (*component != '\0')
+    for (p=component+(strlen(component)-1); p > component; p--)
+      if (*p == '.')
+        {
+          *p='\0';
+          break;
+        }
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1439,13 +1453,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
     {
       if (IsBasenameSeparator(*p) != MagickFalse)
         (void) CopyMagickString(component,p+1,MagickPathExtent);
-      if (*component != '\0')
-        for (p=component+(strlen(component)-1); p > component; p--)
-          if (*p == '.')
-            {
-              *p='\0';
-              break;
-            }
+      RemoveBaseExtension(component);
       break;
     }
     case BasePathSansCompressExtension:
