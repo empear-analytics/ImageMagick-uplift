@@ -878,6 +878,25 @@ static DoublePixelPacket AddQNodeQuantizeError(const QNodeError *node_error,
   return(error);
 }
 
+static void SumQNodeLeafColor(const QCubeInfo *cube_info,QNodeInfo *node_info,
+  const ssize_t count,const DoublePixelPacket pixel)
+{
+  node_info->number_unique=(size_t) ((ssize_t) node_info->number_unique+
+    count);
+  node_info->total_color.red+=count*QuantumScale*(double)
+    ClampPixel(pixel.red);
+  node_info->total_color.green+=count*QuantumScale*(double)
+    ClampPixel(pixel.green);
+  node_info->total_color.blue+=count*QuantumScale*(double)
+    ClampPixel(pixel.blue);
+  if (cube_info->associate_alpha != MagickFalse)
+    node_info->total_color.alpha+=count*QuantumScale*(double)
+      ClampPixel(pixel.alpha);
+  else
+    node_info->total_color.alpha+=count*QuantumScale*(double)
+      ClampPixel((double) OpaqueAlpha);
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -985,20 +1004,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
       /*
         Sum RGB for this leaf for later derivation of the mean cube color.
       */
-      node_info->number_unique=(size_t) ((ssize_t) node_info->number_unique+
-        count);
-      node_info->total_color.red+=count*QuantumScale*(double)
-        ClampPixel(pixel.red);
-      node_info->total_color.green+=count*QuantumScale*(double)
-        ClampPixel(pixel.green);
-      node_info->total_color.blue+=count*QuantumScale*(double)
-        ClampPixel(pixel.blue);
-      if (cube_info->associate_alpha != MagickFalse)
-        node_info->total_color.alpha+=count*QuantumScale*(double)
-          ClampPixel(pixel.alpha);
-      else
-        node_info->total_color.alpha+=count*QuantumScale*(double)
-          ClampPixel((double) OpaqueAlpha);
+      SumQNodeLeafColor(cube_info,node_info,count,pixel);
       p+=(ptrdiff_t) count*(ssize_t) GetPixelChannels(image);
     }
     if (cube_info->colors > cube_info->maximum_colors)
