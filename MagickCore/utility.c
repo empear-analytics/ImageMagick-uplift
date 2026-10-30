@@ -408,6 +408,14 @@ static MagickBooleanType VerifyBase64Tail(const char *p,
   return(MagickTrue);
 }
 
+static const char *SkipBase64Whitespace(const char *p)
+{
+  for ( ; *p != '\0'; p++)
+    if (isspace((int) ((unsigned char) *p)) == 0)
+      break;
+  return(p);
+}
+
 MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
 {
   int
@@ -475,9 +483,7 @@ MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
         }
         case 2:
         {
-          for ( ; *p != '\0'; p++)
-            if (isspace((int) ((unsigned char) *p)) == 0)
-              break;
+          p=SkipBase64Whitespace(p);
           if (*p != '=')
             {
               decode=(unsigned char *) RelinquishMagickMemory(decode);
