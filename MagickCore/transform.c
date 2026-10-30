@@ -2379,6 +2379,56 @@ static void OffsetTrimGeometry(const Image *image,const RectangleInfo minSize,
   }
 }
 
+static RectangleInfo ApplyTrimMinSize(const Image *image,
+  const char *artifact,RectangleInfo geometry)
+{
+  RectangleInfo
+    minSize;
+
+  /*
+    Ensure trim is not less than min size dimensions relative to gravity.
+  */
+  minSize=geometry;
+  (void) ParseAbsoluteGeometry(artifact,&minSize);
+  if ((geometry.width < minSize.width) ||
+      (geometry.height < minSize.height))
+    {
+      minSize=SetTrimShortfall(geometry,minSize);
+      switch (image->gravity)
+      {
+        case EastGravity:
+        {
+          geometry.y-=minSize.y/2;
+          break;
+        }
+        case SouthWestGravity:
+        {
+          geometry.x-=minSize.x;
+          break;
+        }
+        case SouthGravity:
+        {
+          geometry.x-=minSize.x/2;
+          break;
+        }
+        case CenterGravity:
+        {
+          geometry.x-=minSize.x/2;
+          geometry.y-=minSize.y/2;
+          break;
+        }
+        default:
+        {
+          OffsetTrimGeometry(image,minSize,&geometry);
+          break;
+        }
+      }
+      geometry=ClampTrimExtent(image,minSize,geometry);
+      geometry=ClampTrimOffset(image,geometry);
+    }
+  return(geometry);
+}
+
 MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
 {
   const char
@@ -2399,52 +2449,7 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
     return(TrimEmptyImage(image,exception));
   artifact=GetImageArtifact(image,"trim:minSize");
   if (artifact != (const char *) NULL)
-    {
-      RectangleInfo
-        minSize;
-
-      /*
-        Ensure trim is not less than min size dimensions relative to gravity.
-      */
-      minSize=geometry;
-      (void) ParseAbsoluteGeometry(artifact,&minSize);
-      if ((geometry.width < minSize.width) ||
-          (geometry.height < minSize.height))
-        {
-          minSize=SetTrimShortfall(geometry,minSize);
-          switch (image->gravity)
-          {
-            case EastGravity:
-            {
-              geometry.y-=minSize.y/2;
-              break;
-            }
-            case SouthWestGravity:
-            {
-              geometry.x-=minSize.x;
-              break;
-            }
-            case SouthGravity:
-            {
-              geometry.x-=minSize.x/2;
-              break;
-            }
-            case CenterGravity:
-            {
-              geometry.x-=minSize.x/2;
-              geometry.y-=minSize.y/2;
-              break;
-            }
-            default:
-            {
-              OffsetTrimGeometry(image,minSize,&geometry);
-              break;
-            }
-          }
-          geometry=ClampTrimExtent(image,minSize,geometry);
-          geometry=ClampTrimOffset(image,geometry);
-        }
-    }
+    geometry=ApplyTrimMinSize(image,artifact,geometry);
   geometry.x+=image->page.x;
   geometry.y+=image->page.y;
   trim_image=CropImage(image,&geometry,exception);
