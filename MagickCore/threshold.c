@@ -653,6 +653,24 @@ static MagickBooleanType IsPixelInColorRange(const Image *image,
   return(foreground);
 }
 
+static IlluminantType GetThresholdIlluminant(const char *artifact,
+  IlluminantType illuminant)
+{
+  if (artifact != (const char *) NULL)
+    {
+      ssize_t
+        illuminant_type;
+
+      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
+        artifact);
+      if (illuminant_type < 0)
+        illuminant=UndefinedIlluminant;
+      else
+        illuminant=(IlluminantType) illuminant_type;
+    }
+  return(illuminant);
+}
+
 MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   const PixelInfo *start_color,const PixelInfo *stop_color,
   ExceptionInfo *exception)
@@ -692,18 +710,7 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   if (status == MagickFalse)
     return(status);
   artifact=GetImageArtifact(image,"color:illuminant");
-  if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        illuminant_type;
-
-      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
-        artifact);
-      if (illuminant_type < 0)
-        illuminant=UndefinedIlluminant;
-      else
-        illuminant=(IlluminantType) illuminant_type;
-    }
+  illuminant=GetThresholdIlluminant(artifact,illuminant);
   start=(*start_color);
   stop=(*stop_color);
   switch (image->colorspace)
