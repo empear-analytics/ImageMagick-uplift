@@ -492,6 +492,14 @@ static MagickBooleanType SetOpaqueAlphaTrait(Image *image,
   return(status);
 }
 
+static MagickBooleanType SetMissingAlphaOpaque(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    status=SetImageAlpha(image,OpaqueAlpha,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -719,8 +727,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     case SetAlphaChannel:
     {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status=SetImageAlpha(image,OpaqueAlpha,exception);
+      status=SetMissingAlphaOpaque(image,status,exception);
       break;
     }
     case ShapeAlphaChannel:
