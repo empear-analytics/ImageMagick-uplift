@@ -453,6 +453,20 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *SelectDisposeImage(const Image *next,Image *dispose_image,
+  Image *current_image)
+{
+  if (next->dispose == PreviousDispose)
+    current_image=DestroyImage(current_image);
+  else
+    {
+      dispose_image=DestroyImage(dispose_image);
+      dispose_image=current_image;
+      current_image=(Image *) NULL;
+    }
+  return(dispose_image);
+}
+
 MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
 {
   Image
@@ -524,14 +538,7 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
     /*
       Select the appropriate previous/disposed image.
     */
-    if (next->dispose == PreviousDispose)
-      current_image=DestroyImage(current_image);
-    else
-      {
-        dispose_image=DestroyImage(dispose_image);
-        dispose_image=current_image;
-        current_image=(Image *) NULL;
-      }
+    dispose_image=SelectDisposeImage(next,dispose_image,current_image);
     /*
       Save the dispose image just calculated for return.
     */
