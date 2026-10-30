@@ -1138,6 +1138,19 @@ static Image *OptimizeImageFrames(const Image *image,RectangleInfo *bounds,
   return(GetFirstImageInList(optimized_image));
 }
 
+static MagickBooleanType ReferenceNoneDisposeImage(
+  const DisposeType *disposals,const ssize_t i,const Image *curr,
+  Image **prev_image)
+{
+  if ( disposals[i-1] == NoneDispose )
+    {
+      *prev_image=ReferenceImage(curr->previous);
+      if (*prev_image == (Image *) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1460,15 +1473,12 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
           prev_image=bgnd_image, bgnd_image=(Image *) NULL;
         if (bgnd_image != (Image *) NULL)
           bgnd_image=DestroyImage(bgnd_image);
-        if ( disposals[i-1] == NoneDispose )
+        if (ReferenceNoneDisposeImage(disposals,i,curr,&prev_image) ==
+            MagickFalse)
           {
-            prev_image=ReferenceImage(curr->previous);
-            if (prev_image == (Image *) NULL)
-              {
-                bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-                disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-                return((Image *) NULL);
-              }
+            bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+            disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+            return((Image *) NULL);
           }
 
       }
