@@ -966,10 +966,26 @@ static ssize_t GetMostFrequentOffset(const Image *linear_image,
   return(j);
 }
 
-static inline void SetOilPaintChannels(const Image *linear_image,
-  const Image *paint_image,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q,const ssize_t center,const ssize_t j)
+typedef struct _OilPaintImages
 {
+  const Image
+    *linear_image,
+    *paint_image;
+
+  ssize_t
+    center;
+} OilPaintImages;
+
+static inline void SetOilPaintChannels(const OilPaintImages *images,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,const ssize_t j)
+{
+  const Image
+    *linear_image = images->linear_image,
+    *paint_image = images->paint_image;
+
+  const ssize_t
+    center = images->center;
+
   ssize_t
     i;
 
@@ -1022,6 +1038,9 @@ static void OilPaintRow(const OilPaintRowInfo *row,
 
   for (x=0; x < (ssize_t) row->linear_image->columns; x++)
   {
+    OilPaintImages
+      images;
+
     ssize_t
       j;
 
@@ -1029,7 +1048,10 @@ static void OilPaintRow(const OilPaintRowInfo *row,
       Assign most frequent color.
     */
     j=GetMostFrequentOffset(row->linear_image,p,row->histogram,row->width);
-    SetOilPaintChannels(row->linear_image,row->paint_image,p,q,row->center,j);
+    images.linear_image=row->linear_image;
+    images.paint_image=row->paint_image;
+    images.center=row->center;
+    SetOilPaintChannels(&images,p,q,j);
     p+=(ptrdiff_t) GetPixelChannels(row->linear_image);
     q+=(ptrdiff_t) GetPixelChannels(row->paint_image);
   }
