@@ -1867,6 +1867,14 @@ static FT_Matrix GetFreetypeAffine(const DrawInfo *draw_info)
   return(affine);
 }
 
+static void RelinquishFreetypeText(GraphemeInfo *grapheme,unsigned char *utf8)
+{
+  if (grapheme != (GraphemeInfo *) NULL)
+    grapheme=(GraphemeInfo *) RelinquishMagickMemory(grapheme);
+  if (utf8 != (unsigned char *) NULL)
+    utf8=(unsigned char *) RelinquishMagickMemory(utf8);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2396,10 +2404,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     last_glyph_id=glyph.id;
     code=GetUTFCode(p+grapheme[i].cluster);
   }
-  if (grapheme != (GraphemeInfo *) NULL)
-    grapheme=(GraphemeInfo *) RelinquishMagickMemory(grapheme);
-  if (utf8 != (unsigned char *) NULL)
-    utf8=(unsigned char *) RelinquishMagickMemory(utf8);
+  RelinquishFreetypeText(grapheme,utf8);
   if (glyph.image != (FT_Glyph) NULL)
     {
       FT_Done_Glyph(glyph.image);
