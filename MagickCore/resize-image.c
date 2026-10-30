@@ -308,6 +308,18 @@ static void ClampFilterSupport(double *support,double *scale)
     }
 }
 
+static void NormalizeContributionDensity(ContributionInfo *contribution,
+  const ssize_t n,const double density)
+{
+  if ((density != 0.0) && (density != 1.0))
+    {
+      /*
+        Normalize.
+      */
+      NormalizeContributions(contribution,n,density);
+    }
+}
+
 static MagickBooleanType HorizontalFilter(
   const ResizeFilter *magick_restrict resize_filter,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
@@ -392,13 +404,7 @@ static MagickBooleanType HorizontalFilter(
     }
     if (n == 0)
       continue;
-    if ((density != 0.0) && (density != 1.0))
-      {
-        /*
-          Normalize.
-        */
-        NormalizeContributions(contribution,n,density);
-      }
+    NormalizeContributionDensity(contribution,n,density);
     p=GetCacheViewVirtualPixels(image_view,contribution[0].pixel,0,(size_t)
       (contribution[n-1].pixel-contribution[0].pixel+1),image->rows,exception);
     q=QueueCacheViewAuthenticPixels(resize_view,x,0,1,resize_image->rows,
