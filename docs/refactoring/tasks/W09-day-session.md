@@ -25,12 +25,12 @@ new recipe and amendment, and every step that read a recipe closely, before push
 | `fx.c` | 3.08 → 3.31 |
 | `colorspace.c` | 3.01 → 3.15 |
 | `composite.c` | 2.68 → 3.01 |
-| `morphology.c` | 2.62 → 2.70 |
+| `morphology.c` | 2.62 → 2.71 |
 | `compare.c` | 2.18 → 2.43 |
 | `distort.c` | 3.01 (no legal step raises it) |
 | `visual-effects.c` | 3.27 (no legal step raises it) |
 
-211 commits: 178 refactor steps, 31 playbook commits, a contract update and this report.
+219 commits: 183 refactor steps, 32 playbook commits, a contract update and three report commits.
 Ten files are now above 5. Every refactor commit ran the oracle on its function's cases (0 diverged)
 and passed the pre-commit gate, except those on functions no case reaches, which say so
 and rest on the guard or, for Recipe D, on an identical object file. The whole catalogue
