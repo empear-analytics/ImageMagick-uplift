@@ -337,6 +337,36 @@ static MagickBooleanType ParseKernelGeometry(const char *kernel_string,
   return(MagickTrue);
 }
 
+typedef struct _KernelSpecificationTargets
+{
+  MagickStatusType
+    *flags;
+
+  const char
+    **p;
+} KernelSpecificationTargets;
+
+static MagickBooleanType ParseKernelSpecification(const char *kernel_string,
+  const char *end,KernelInfo *kernel,const KernelSpecificationTargets *targets)
+{
+  MagickStatusType
+    *const flags = targets->flags;
+
+  const char
+    **const p = targets->p;
+
+  if ( *p != (char *) NULL && *p < end)
+    {
+      if (ParseKernelGeometry(kernel_string,*p,kernel,flags) == MagickFalse)
+        return(MagickFalse);
+
+      (*p)++; /* advance beyond the ':' */
+    }
+  else
+    *p=SetOddSquareKernelSize(kernel,kernel_string,end);
+  return(MagickTrue);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -357,6 +387,9 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
 
   MagickStatusType
     flags;
+
+  KernelSpecificationTargets
+    targets;
 
   kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
   if (kernel == (KernelInfo *) NULL)
@@ -382,15 +415,10 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
      FUTURE: this split on ':' could be done by StringToken()
    */
   p = strchr(kernel_string, ':');
-  if ( p != (char *) NULL && p < end)
-    {
-      if (ParseKernelGeometry(kernel_string,p,kernel,&flags) == MagickFalse)
-        return(DestroyKernelInfo(kernel));
-
-      p++; /* advance beyond the ':' */
-    }
-  else
-    p=SetOddSquareKernelSize(kernel,kernel_string,end);
+  targets.flags=(&flags);
+  targets.p=(&p);
+  if (ParseKernelSpecification(kernel_string,end,kernel,&targets) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
 
   /* Read in the kernel values from rest of input string argument */
   if (AcquireKernelValues(kernel) == MagickFalse)
