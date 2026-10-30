@@ -136,6 +136,29 @@ static inline MagickBooleanType IsKapurBufferMissing(
 
 #define MaxIntensity  255
 
+static size_t FindKapurThreshold(const double *black_entropy,
+  const double *white_entropy)
+{
+  double
+    maximum_entropy;
+
+  ssize_t
+    j;
+
+  size_t
+    threshold;
+
+  maximum_entropy=black_entropy[0]+white_entropy[0];
+  threshold=0;
+  for (j=1; j <= MaxIntensity; j++)
+    if ((black_entropy[j]+white_entropy[j]) > maximum_entropy)
+      {
+        maximum_entropy=black_entropy[j]+white_entropy[j];
+        threshold=(size_t) j;
+      }
+  return(threshold);
+}
+
 static double KapurThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
@@ -144,7 +167,6 @@ static double KapurThreshold(const Image *image,const double *histogram,
     *cumulative_histogram,
     entropy,
     epsilon,
-    maximum_entropy,
     *white_entropy;
 
   ssize_t
@@ -216,14 +238,7 @@ static double KapurThreshold(const Image *image,const double *histogram,
   /*
     Find histogram bin with maximum entropy.
   */
-  maximum_entropy=black_entropy[0]+white_entropy[0];
-  threshold=0;
-  for (j=1; j <= MaxIntensity; j++)
-    if ((black_entropy[j]+white_entropy[j]) > maximum_entropy)
-      {
-        maximum_entropy=black_entropy[j]+white_entropy[j];
-        threshold=(size_t) j;
-      }
+  threshold=FindKapurThreshold(black_entropy,white_entropy);
   /*
     Free resources.
   */
