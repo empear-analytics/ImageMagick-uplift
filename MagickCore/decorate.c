@@ -180,6 +180,57 @@ static Quantum *SetFramePixels(const Image *image,const PixelInfo *color,
   return(q);
 }
 
+typedef struct _FrameTopBevel
+{
+  Image
+    *frame_image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    accentuate,
+    highlight,
+    shadow;
+} FrameTopBevel;
+
+static Quantum *DrawFrameTopOuterBevel(const FrameTopBevel *top_bevel,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = top_bevel->frame_image;
+
+  const FrameInfo
+    *const frame_info = top_bevel->frame_info;
+
+  const PixelInfo
+    accentuate = top_bevel->accentuate,
+    highlight = top_bevel->highlight,
+    shadow = top_bevel->shadow;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) frame_info->outer_bevel; y++)
+  {
+    for (x=0; x < ((ssize_t) frame_image->columns-y); x++)
+    {
+      if (x < y)
+        SetPixelViaPixelInfo(frame_image,&highlight,q);
+      else
+        SetPixelViaPixelInfo(frame_image,&accentuate,q);
+      q+=(ptrdiff_t) GetPixelChannels(frame_image);
+    }
+    for ( ; x < (ssize_t) frame_image->columns; x++)
+    {
+      SetPixelViaPixelInfo(frame_image,&shadow,q);
+      q+=(ptrdiff_t) GetPixelChannels(frame_image);
+    }
+  }
+  return(q);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -306,6 +357,9 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     bevel_width)+frame_info->inner_bevel);
   if (height != 0)
     {
+      FrameTopBevel
+        top_bevel;
+
       Quantum
         *magick_restrict q;
 
@@ -325,22 +379,12 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
           /*
             Draw top of ornamental border.
           */
-          for (y=0; y < (ssize_t) frame_info->outer_bevel; y++)
-          {
-            for (x=0; x < ((ssize_t) frame_image->columns-y); x++)
-            {
-              if (x < y)
-                SetPixelViaPixelInfo(frame_image,&highlight,q);
-              else
-                SetPixelViaPixelInfo(frame_image,&accentuate,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for ( ; x < (ssize_t) frame_image->columns; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&shadow,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-          }
+          top_bevel.frame_image=frame_image;
+          top_bevel.frame_info=frame_info;
+          top_bevel.accentuate=accentuate;
+          top_bevel.highlight=highlight;
+          top_bevel.shadow=shadow;
+          q=DrawFrameTopOuterBevel(&top_bevel,q);
           for (y=0; y < (frame_info->y-(ssize_t) bevel_width); y++)
           {
             q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
