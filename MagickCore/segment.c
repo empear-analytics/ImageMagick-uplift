@@ -865,15 +865,17 @@ static ssize_t SelectEvenCrossing(const CrossingCandidates *candidates)
   /*
     Check left for an even number of crossings between k and j.
   */
-  if (correct == -1)
-    if (IsEvenCrossing(zero_crossing,i,k,left) != MagickFalse)
-      correct=left;
+  if (correct != -1)
+    return(correct);
+  if (IsEvenCrossing(zero_crossing,i,k,left) != MagickFalse)
+    correct=left;
   /*
     Check right for an even number of crossings between k and j.
   */
-  if (correct == -1)
-    if (IsEvenCrossing(zero_crossing,i,k,right) != MagickFalse)
-      correct=right;
+  if (correct != -1)
+    return(correct);
+  if (IsEvenCrossing(zero_crossing,i,k,right) != MagickFalse)
+    correct=right;
   return(correct);
 }
 
