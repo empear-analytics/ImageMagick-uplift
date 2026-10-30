@@ -2453,6 +2453,85 @@ static void OffsetKuwaharaQuadrant(const KuwaharaCorner *corner,
   }
 }
 
+typedef struct _KuwaharaQuadrants
+{
+  Image
+    *gaussian_image;
+
+  CacheView
+    *image_view;
+
+  size_t
+    width;
+
+  ssize_t
+    x,
+    y;
+
+  ExceptionInfo
+    *exception;
+} KuwaharaQuadrants;
+
+static void SelectKuwaharaQuadrant(const KuwaharaQuadrants *quadrants,
+  RectangleInfo *target,size_t *i)
+{
+  Image
+    *const gaussian_image = quadrants->gaussian_image;
+
+  CacheView
+    *const image_view = quadrants->image_view;
+
+  const size_t
+    width = quadrants->width;
+
+  const ssize_t
+    x = quadrants->x,
+    y = quadrants->y;
+
+  ExceptionInfo
+    *const exception = quadrants->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  double
+    min_variance;
+
+  RectangleInfo
+    quadrant;
+
+  min_variance=MagickMaximumValue;
+  SetGeometry(gaussian_image,target);
+  quadrant.width=width;
+  quadrant.height=width;
+  for (*i=0; *i < 4; (*i)++)
+  {
+    double
+      mean[MaxPixelChannels],
+      variance;
+
+    KuwaharaCorner
+      corner;
+
+    corner.x=x;
+    corner.y=y;
+    corner.width=width;
+    corner.i=(*i);
+    OffsetKuwaharaQuadrant(&corner,&quadrant);
+    p=GetCacheViewVirtualPixels(image_view,quadrant.x,quadrant.y,
+      quadrant.width,quadrant.height,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    GetKuwaharaMean(gaussian_image,p,width,mean);
+    variance=GetKuwaharaVariance(gaussian_image,p,width,mean);
+    if (variance < min_variance)
+      {
+        min_variance=variance;
+        *target=quadrant;
+      }
+  }
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -2533,49 +2612,22 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
       }
     for (x=0; x < (ssize_t) gaussian_image->columns; x++)
     {
-      const Quantum
-        *magick_restrict p;
-
-      double
-        min_variance;
+      KuwaharaQuadrants
+        quadrants;
 
       RectangleInfo
-        quadrant,
         target;
 
       size_t
         i;
 
-      min_variance=MagickMaximumValue;
-      SetGeometry(gaussian_image,&target);
-      quadrant.width=width;
-      quadrant.height=width;
-      for (i=0; i < 4; i++)
-      {
-        double
-          mean[MaxPixelChannels],
-          variance;
-
-        KuwaharaCorner
-          corner;
-
-        corner.x=x;
-        corner.y=y;
-        corner.width=width;
-        corner.i=i;
-        OffsetKuwaharaQuadrant(&corner,&quadrant);
-        p=GetCacheViewVirtualPixels(image_view,quadrant.x,quadrant.y,
-          quadrant.width,quadrant.height,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        GetKuwaharaMean(gaussian_image,p,width,mean);
-        variance=GetKuwaharaVariance(gaussian_image,p,width,mean);
-        if (variance < min_variance)
-          {
-            min_variance=variance;
-            target=quadrant;
-          }
-      }
+      quadrants.gaussian_image=gaussian_image;
+      quadrants.image_view=image_view;
+      quadrants.width=width;
+      quadrants.x=x;
+      quadrants.y=y;
+      quadrants.exception=exception;
+      SelectKuwaharaQuadrant(&quadrants,&target,&i);
       if (i < 4)
         {
           status=MagickFalse;
