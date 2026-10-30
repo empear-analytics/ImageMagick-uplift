@@ -967,6 +967,14 @@ static void SetOpaqueAlphaIfMissing(Image *image,ExceptionInfo *exception)
     (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
 }
 
+static MagickBooleanType TransformImageTosRGB(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
+    status=TransformImageColorspace(image,sRGBColorspace,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -1024,8 +1032,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     }
     case PaletteType:
     {
-      if (IssRGBCompatibleColorspace(image->colorspace) == MagickFalse)
-        status=TransformImageColorspace(image,sRGBColorspace,exception);
+      status=TransformImageTosRGB(image,status,exception);
       if ((image->storage_class == DirectClass) || (image->colors > 256))
         {
           quantize_info=AcquireQuantizeInfo(image_info);
