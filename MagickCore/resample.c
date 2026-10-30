@@ -462,6 +462,28 @@ static void NormalizeResampledPixel(PixelInfo *pixel,double divisor_m,
     pixel->black = (double) ClampToQuantum(divisor_c*pixel->black);
 }
 
+static void ResampleTiledLimitPixel(ResampleFilter *resample_filter,
+  PixelInfo *pixel,ExceptionInfo *exception,MagickBooleanType *status)
+{
+  switch ( resample_filter->virtual_pixel ) {
+    case HorizontalTileVirtualPixelMethod:
+    case VerticalTileVirtualPixelMethod:
+      /* just return the background pixel - Is there more direct way? */
+      *status=InterpolatePixelInfo(resample_filter->image,
+        resample_filter->view,IntegerInterpolatePixel,-1.0,-1.0,pixel,
+        resample_filter->exception);
+      break;
+    case TileVirtualPixelMethod:
+    case MirrorVirtualPixelMethod:
+    case RandomVirtualPixelMethod:
+    case CheckerTileVirtualPixelMethod:
+    default:
+      /* generate a average color of the WHOLE image */
+      SetWholeImageAveragePixel(resample_filter,pixel,exception);
+      break;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -610,21 +632,11 @@ MagickExport MagickBooleanType ResamplePixelColor(
           resample_filter->view,AverageInterpolatePixel,u0,v0,pixel,
           resample_filter->exception);
         break;
-      case HorizontalTileVirtualPixelMethod:
-      case VerticalTileVirtualPixelMethod:
-        /* just return the background pixel - Is there more direct way? */
-        status=InterpolatePixelInfo(resample_filter->image,
-          resample_filter->view,IntegerInterpolatePixel,-1.0,-1.0,pixel,
-          resample_filter->exception);
-        break;
-      case TileVirtualPixelMethod:
-      case MirrorVirtualPixelMethod:
-      case RandomVirtualPixelMethod:
-      case CheckerTileVirtualPixelMethod:
       default:
-        /* generate a average color of the WHOLE image */
-        SetWholeImageAveragePixel(resample_filter,pixel,exception);
+      {
+        ResampleTiledLimitPixel(resample_filter,pixel,exception,&status);
         break;
+      }
     }
     return(status);
   }
