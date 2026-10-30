@@ -1109,7 +1109,7 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   shear.x=(-tan((double) DegreesToRadians(angle)/2.0));
   shear.y=sin((double) DegreesToRadians(angle));
-  if ((shear.x == 0.0) && (shear.y == 0.0))
+  if (IsZeroShear(shear) != MagickFalse)
     return(integral_image);
   if (SetImageStorageClass(integral_image,DirectClass,exception) == MagickFalse)
     {
