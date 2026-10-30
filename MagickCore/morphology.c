@@ -280,6 +280,14 @@ static void SetKernelArrayValue(KernelInfo *kernel,const ssize_t i,
   }
 }
 
+static const char *ReadKernelArrayToken(const char *p,char *token)
+{
+  (void) GetNextToken(p,&p,MagickPathExtent,token);
+  if (*token == ',')
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+  return(p);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -374,9 +382,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   kernel->negative_range = kernel->positive_range = 0.0;
   for (i=0; (i < (ssize_t) (kernel->width*kernel->height)) && (p < end); i++)
   {
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
+    p=ReadKernelArrayToken(p,token);
     SetKernelArrayValue(kernel,i,token,nan);
   }
 
