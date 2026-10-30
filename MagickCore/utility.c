@@ -1321,6 +1321,19 @@ static void RemoveBaseExtension(char *component)
         }
 }
 
+static void GetExtensionComponent(char *component,char *p)
+{
+  if (IsBasenameSeparator(*p) != MagickFalse)
+    (void) CopyMagickString(component,p+1,MagickPathExtent);
+  if (*component != '\0')
+    for (p=component+strlen(component)-1; p > component; p--)
+      if (*p == '.')
+        break;
+  *component='\0';
+  if (*p == '.')
+    (void) CopyMagickString(component,p+1,MagickPathExtent);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1471,15 +1484,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
     }
     case ExtensionPath:
     {
-      if (IsBasenameSeparator(*p) != MagickFalse)
-        (void) CopyMagickString(component,p+1,MagickPathExtent);
-      if (*component != '\0')
-        for (p=component+strlen(component)-1; p > component; p--)
-          if (*p == '.')
-            break;
-      *component='\0';
-      if (*p == '.')
-        (void) CopyMagickString(component,p+1,MagickPathExtent);
+      GetExtensionComponent(component,p);
       break;
     }
     case SubimagePath:
