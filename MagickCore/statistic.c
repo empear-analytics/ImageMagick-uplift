@@ -950,6 +950,9 @@ MagickExport Image *EvaluateImages(const Image *images,
         const Quantum
           **p;
 
+        EvaluateFetch
+          fetch;
+
         EvaluateRow
           row;
 
@@ -973,13 +976,11 @@ MagickExport Image *EvaluateImages(const Image *images,
               images->filename);
             continue;
           }
-        for (j=0; j < (ssize_t) number_images; j++)
-        {
-          p[j]=GetCacheViewVirtualPixels(image_view[j],0,y,image->columns,1,
-            exception);
-          if (p[j] == (const Quantum *) NULL)
-            break;
-        }
+        fetch.image_view=image_view;
+        fetch.image=image;
+        fetch.y=y;
+        fetch.number_images=number_images;
+        j=GetEvaluateRows(&fetch,p,exception);
         q=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
           exception);
         if ((j < (ssize_t) number_images) || (q == (Quantum *) NULL))
