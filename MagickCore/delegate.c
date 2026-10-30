@@ -2413,6 +2413,34 @@ static void SetDelegateFormatAttribute(DelegateInfo *delegate_info,
   }
 }
 
+static void SetDelegateModeAttribute(DelegateInfo *delegate_info,
+  const char *keyword,const char *token)
+{
+  switch (*keyword)
+  {
+    case 'M':
+    case 'm':
+    {
+      if (LocaleCompare((char *) keyword,"mode") == 0)
+        {
+          delegate_info->mode=1;
+          if (LocaleCompare(token,"bi") == 0)
+            delegate_info->mode=0;
+          else
+            if (LocaleCompare(token,"encode") == 0)
+              delegate_info->mode=(-1);
+          break;
+        }
+      break;
+    }
+    default:
+    {
+      SetDelegateFormatAttribute(delegate_info,keyword,token);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2599,21 +2627,6 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
           }
         break;
       }
-      case 'M':
-      case 'm':
-      {
-        if (LocaleCompare((char *) keyword,"mode") == 0)
-          {
-            delegate_info->mode=1;
-            if (LocaleCompare(token,"bi") == 0)
-              delegate_info->mode=0;
-            else
-              if (LocaleCompare(token,"encode") == 0)
-                delegate_info->mode=(-1);
-            break;
-          }
-        break;
-      }
       case 'S':
       case 's':
       {
@@ -2631,7 +2644,7 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
       }
       default:
       {
-        SetDelegateFormatAttribute(delegate_info,keyword,token);
+        SetDelegateModeAttribute(delegate_info,keyword,token);
         break;
       }
     }
