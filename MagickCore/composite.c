@@ -2012,6 +2012,28 @@ static MagickRealType GetChannelQuotient(const MagickRealType dividend,
   return(pixel);
 }
 
+typedef struct _ChangeMaskImages
+{
+  Image
+    *image,
+    *source_image;
+} ChangeMaskImages;
+
+static MagickRealType GetChangeMaskAlpha(const ChangeMaskImages *images,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q,
+  const MagickRealType Da)
+{
+  MagickRealType
+    pixel;
+
+  if (IsFuzzyEquivalencePixel(images->source_image,p,images->image,q) !=
+      MagickFalse)
+    pixel=(MagickRealType) TransparentAlpha;
+  else
+    pixel=(double) QuantumRange*Da;
+  return(pixel);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3055,10 +3077,12 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               }
               case ChangeMaskCompositeOp:
               {
-                if (IsFuzzyEquivalencePixel(source_image,p,image,q) != MagickFalse)
-                  pixel=(MagickRealType) TransparentAlpha;
-                else
-                  pixel=(double) QuantumRange*Da;
+                ChangeMaskImages
+                  images;
+
+                images.image=image;
+                images.source_image=source_image;
+                pixel=GetChangeMaskAlpha(&images,p,q,Da);
                 break;
               }
               case ClearCompositeOp:
