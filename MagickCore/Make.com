@@ -41,6 +41,7 @@ $call Make cipher.c
 $call Make client.c
 $call Make coder.c
 $call Make color.c
+$call Make color-equivalent.c
 $call Make colormap.c
 $call Make colorspace.c
 $call Make compare.c
@@ -127,6 +128,8 @@ $call Make statistic-moments.c
 $call Make statistic-image.c
 $call Make stream.c
 $call Make string.c
+$call Make string-argv.c
+$call Make string-si.c
 $call Make thread.c
 $call Make timer.c
 $call Make token.c
