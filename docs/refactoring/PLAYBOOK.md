@@ -665,6 +665,12 @@ inside an OpenMP region; Recipe G, which removes one level of nesting, not the b
    `#pragma omp` line, so no `critical` or `atomic` block moves.
 2. The only variable declared outside the loop body that the block writes is `status`,
    and only as `status=MagickFalse;`. The block does not read `status`.
+   The loop's status may have another name or type: a variable `v` declared outside the
+   loop body, that every statement of the parallel loop writes only as `v=c;` of one
+   constant `c` (`opaque=MagickFalse;`, `type=UndefinedType;`), and that the loop body
+   reads only in its leading `if (v == c) continue;`, is the loop's status. The new
+   function is step 5's, `status=MagickFalse;` standing where the block wrote `v=c;`,
+   and the caller writes `if (Helper(...) == MagickFalse) v=c;` (step 7).
 3. Every variable of the loop body that the block writes is declared inside the block,
    or is not read after it (a row pointer `q` advanced along the row, say).
 4. The block contains no `return`, `goto`, or a `continue` or `break` of the parallel
@@ -746,6 +752,13 @@ static MagickBooleanType MagnifyImageRow(...,Quantum *q,
   depend on the shared value.
 - Variables of the loop body passed by value are copies: step 3 is what makes a write
   to the copy, such as advancing `q`, harmless.
+- Under step 2's other name, `v` plays `status`'s part exactly: the loop writes it only
+  as `v=c;`, so "the block set `v`" and "the block's local `status` became
+  `MagickFalse`" are the same event, and the caller writes the same `c` then, deferred
+  to the end of the block as everywhere in this recipe. The block does not read `v`,
+  and the only read inside the loop is the guard at the top of the next iteration, as
+  with `status`. A variable the loop also writes another value (`IdentifyImageGray`'s
+  `type=GrayscaleType;`) or reads elsewhere in the body is not a status: skip it.
 - Under step 4's exception a `continue;` of the parallel loop ends the iteration
   where it stands; `return(status);` ends the helper there, and the caller's
   `if (...) status=MagickFalse;` is the last statement of the body, so the iteration
@@ -765,7 +778,10 @@ shape in `resize.c`'s `SampleImage`, both refused by the OpenMP rule of Recipe E
 whose failures `continue` the parallel loop.) Owner's go-ahead the same day. Added by Claude
 Code (Claude Opus 5.5) during task M01, on `magnify.c`. Step 4's exception (2026-10-30,
 task W09): `paint.c`'s `FloodfillPaintImage`, whose tiling loop ends in a fetch that
-sets `status=MagickFalse;` and `continue`s on failure, a fill and a sync.
+sets `status=MagickFalse;` and `continue`s on failure, a fill and a sync. Step 2's
+other name (2026-10-30, task W09): `attribute.c`'s `IsImageOpaque` (`opaque=MagickFalse;`)
+and `IdentifyImageMonochrome` (`type=UndefinedType;`), whose row loops are T's shape with
+the flag the function returns in place of `status`.
 
 ---
 
@@ -3308,3 +3324,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | E | Step 7, `switch` form: a block with no output variable (it writes only through pointers it already uses, or into temporaries step 4 declares) moves to a `void` function; each `break;` of the `switch` becomes `return;`, and the block becomes the call alone, before the case's closing `break;` | `resample.c`'s `ResamplePixelColor`: the whole-image average in the `default` group of the limit-reached `switch` (nesting 4) leaves the `switch` through `break;` when the resize or the pixel fetch fails, after writing `*pixel` and `resample_filter->average_pixel`, and writes no local the caller reads; the form's `v` does not exist. A probe: 5.13 to 5.19, 228 to 197 lines | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | D | *One value at several positions; conditions*: the single differing value may stand at several positions of a copy when each copy has the same value at all of them (the helper takes it once); and the copies may be whole parenthesised operands of a logical or or a logical and, the helper then a predicate in Recipe P's form | `resample.c`'s `IsAreaOutsideCorner` and `IsAreaOutsideDitherCorner` (both cc 9, reported as duplicates): their first corner tests, `( u0 + resample_filter->Ulimit < 0.0 && v0 + resample_filter->Vlimit < 0.0 )` and the same with `-32.0`, differ only in that one value, at two positions. A probe: Complex Method leaves the file, 5.21 to 5.46 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | OpenMP regions: a block inside the structured block of `#pragma omp single` may be extracted by Recipe E under the parallel-loop proviso (it writes no variable declared outside the structured block, and contains no pragma); the pragma and its braces stay, holding the call | `resample.c`'s `SetResampleFilter` (Large Method, 87 lines): its `resample:verbose` dump of the filter LUT sits in an orphaned `omp single` block and writes only its own `Q` and `r_scale` and stdout. The section names only parallel loop bodies; Recipe O step 1 refuses `single` and points to E. A probe: Large Method leaves the function, 5.46 to 5.72 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | T | Step 2: the loop's status may have another name or type, a variable `v` declared outside the loop body that the parallel loop writes only as `v=c;` of one constant and the body reads only in its leading `if (v == c) continue;`; the helper is step 5's and the caller writes `if (Helper(...) == MagickFalse) v=c;`; *Careful* gives the argument and refuses a flag written another value | `attribute.c`'s `IsImageOpaque` (`opaque=MagickFalse;`) and `IdentifyImageMonochrome` (`type=UndefinedType;`), row loops of T's shape whose flag is not called `status`. A probe on `IsImageOpaque`: bumps 2 to 1, cc 10 to 9, Code Duplication leaves the file, 6.08 to 6.52 | mandate (2026-10-24) |
