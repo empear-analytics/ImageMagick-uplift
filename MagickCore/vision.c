@@ -418,6 +418,63 @@ static MagickBooleanType GetObjectCentroidSums(const Image *component_image,
   return(status);
 }
 
+typedef struct _CCMomentRow
+{
+  const Image
+    *component_image;
+
+  RectangleInfo
+    bounding_box;
+
+  ssize_t
+    i;
+
+  PointInfo
+    centroid;
+
+  ssize_t
+    y;
+} CCMomentRow;
+
+typedef struct _CCMomentSums
+{
+  double
+    *M11,
+    *M20,
+    *M02;
+
+  const Quantum
+    *magick_restrict *p;
+} CCMomentSums;
+
+static void AccumulateSecondMoments(const CCMomentRow *moment_row,
+  const CCMomentSums *moment_sums)
+{
+  double
+    *const M11 = moment_sums->M11,
+    *const M20 = moment_sums->M20,
+    *const M02 = moment_sums->M02;
+
+  const Quantum
+    *magick_restrict *const p = moment_sums->p;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) moment_row->bounding_box.width; x++)
+  {
+    if ((ssize_t) GetPixelIndex(moment_row->component_image,*p) ==
+        moment_row->i)
+      {
+        *M11+=(x-moment_row->centroid.x)*(moment_row->y-moment_row->centroid.y);
+        *M20+=(x-moment_row->centroid.x)*(x-moment_row->centroid.x);
+        *M02+=(moment_row->y-moment_row->centroid.y)*
+          (moment_row->y-moment_row->centroid.y);
+      }
+    *p+=(ptrdiff_t) GetPixelChannels(moment_row->component_image);
+  }
+}
+
 static void MajorAxisThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -455,9 +512,6 @@ static void MajorAxisThreshold(const Image *component_image,
       *magick_restrict p;
 
     ssize_t
-      x;
-
-    ssize_t
       y;
 
     /*
@@ -474,6 +528,12 @@ static void MajorAxisThreshold(const Image *component_image,
     centroid.y=M01*MagickSafeReciprocal(M00);
     for (y=0; y < (ssize_t) bounding_box.height; y++)
     {
+      CCMomentRow
+        moment_row;
+
+      const CCMomentSums
+        moment_sums = { &M11, &M20, &M02, &p };
+
       if (status == MagickFalse)
         continue;
       p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
@@ -483,16 +543,12 @@ static void MajorAxisThreshold(const Image *component_image,
           status=MagickFalse;
           break;
         }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        if ((ssize_t) GetPixelIndex(component_image,p) == i)
-          {
-            M11+=(x-centroid.x)*(y-centroid.y);
-            M20+=(x-centroid.x)*(x-centroid.x);
-            M02+=(y-centroid.y)*(y-centroid.y);
-          }
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
+      moment_row.component_image=component_image;
+      moment_row.bounding_box=bounding_box;
+      moment_row.i=i;
+      moment_row.centroid=centroid;
+      moment_row.y=y;
+      AccumulateSecondMoments(&moment_row,&moment_sums);
     }
     component_view=DestroyCacheView(component_view);
     object[i].metric[metric_index]=sqrt((2.0*MagickSafeReciprocal(M00))*
