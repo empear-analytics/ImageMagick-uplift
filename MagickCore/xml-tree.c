@@ -1173,6 +1173,17 @@ static void NormalizeAttributeSpaces(char *p)
     *xml='\0';
 }
 
+static void NormalizeLineEndings(char *xml)
+{
+  for ( ; *xml != '\0'; xml++)
+    while (*xml == '\r')
+    {
+      *(xml++)='\n';
+      if (*xml == '\n')
+        (void) memmove(xml,xml+1,strlen(xml));
+    }
+}
+
 static char *ParseEntities(char *xml,char **entities,int state)
 {
   char
@@ -1196,13 +1207,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
   */
   p=xml;
   q=xml;
-  for ( ; *xml != '\0'; xml++)
-    while (*xml == '\r')
-    {
-      *(xml++)='\n';
-      if (*xml == '\n')
-        (void) memmove(xml,xml+1,strlen(xml));
-    }
+  NormalizeLineEndings(xml);
   for (xml=p; ; )
   {
     while (IsEntityTextChar(xml,state) != MagickFalse)
