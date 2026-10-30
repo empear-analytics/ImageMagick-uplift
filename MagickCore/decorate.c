@@ -378,6 +378,48 @@ static Quantum *DrawFrameBottomInnerRow(
   return(q);
 }
 
+typedef struct _FrameBottomOuterBevel
+{
+  Image
+    *frame_image;
+
+  PixelInfo
+    highlight,
+    shadow,
+    trough;
+} FrameBottomOuterBevel;
+
+static Quantum *DrawFrameBottomOuterRow(
+  const FrameBottomOuterBevel *bottom_outer,const ssize_t y,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = bottom_outer->frame_image;
+
+  const PixelInfo
+    highlight = bottom_outer->highlight,
+    shadow = bottom_outer->shadow,
+    trough = bottom_outer->trough;
+
+  ssize_t
+    x;
+
+  for (x=0; x < y; x++)
+  {
+    SetPixelViaPixelInfo(frame_image,&highlight,q);
+    q+=(ptrdiff_t) GetPixelChannels(frame_image);
+  }
+  for ( ; x < (ssize_t) frame_image->columns; x++)
+  {
+    if (x >= ((ssize_t) frame_image->columns-y))
+      SetPixelViaPixelInfo(frame_image,&shadow,q);
+    else
+      SetPixelViaPixelInfo(frame_image,&trough,q);
+    q+=(ptrdiff_t) GetPixelChannels(frame_image);
+  }
+  return(q);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -614,9 +656,6 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
       size_t
         width;
 
-      ssize_t
-        x;
-
       Quantum
         *magick_restrict q;
 
@@ -657,19 +696,14 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
           }
           for (y=frame_info->outer_bevel-1; y >= 0; y--)
           {
-            for (x=0; x < y; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&highlight,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for ( ; x < (ssize_t) frame_image->columns; x++)
-            {
-              if (x >= ((ssize_t) frame_image->columns-y))
-                SetPixelViaPixelInfo(frame_image,&shadow,q);
-              else
-                SetPixelViaPixelInfo(frame_image,&trough,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
+            FrameBottomOuterBevel
+              bottom_outer;
+
+            bottom_outer.frame_image=frame_image;
+            bottom_outer.highlight=highlight;
+            bottom_outer.shadow=shadow;
+            bottom_outer.trough=trough;
+            q=DrawFrameBottomOuterRow(&bottom_outer,y,q);
           }
           (void) SyncCacheViewAuthenticPixels(frame_view,exception);
         }
