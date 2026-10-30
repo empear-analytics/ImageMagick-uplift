@@ -866,6 +866,12 @@ static Image *CropShearedImage(Image *shear_image,const Image *image,
   return(shear_image);
 }
 
+static MagickBooleanType IsDiscontinuousAngle(const double angle)
+{
+  return(((angle != 0.0) && (fmod(angle,90.0) == 0.0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport Image *ShearImage(const Image *image,const double x_shear,
   const double y_shear,ExceptionInfo *exception)
 {
@@ -885,9 +891,9 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((x_shear != 0.0) && (fmod(x_shear,90.0) == 0.0))
+  if (IsDiscontinuousAngle(x_shear) != MagickFalse)
     ThrowImageException(ImageError,"AngleIsDiscontinuous");
-  if ((y_shear != 0.0) && (fmod(y_shear,90.0) == 0.0))
+  if (IsDiscontinuousAngle(y_shear) != MagickFalse)
     ThrowImageException(ImageError,"AngleIsDiscontinuous");
   /*
     Initialize shear angle.
