@@ -2276,6 +2276,38 @@ static MagickBooleanType CheckChannelDepth(
   return(MagickTrue);
 }
 
+static void AccumulatePixelStatistics(const Image *image,
+  const Quantum *magick_restrict p,ChannelStatistics *channel_statistics,
+  double *histogram)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    ChannelStatistics
+      *cs;
+
+    ChannelSample
+      sample;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    cs=channel_statistics+channel;
+    if (CheckChannelDepth(channel_statistics,cs,p,i) == MagickFalse)
+      {
+        i--;
+        continue;
+      }
+    sample.image=image;
+    sample.p=p;
+    sample.i=i;
+    AccumulateChannelSample(&sample,cs,histogram);
+  }
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2336,29 +2368,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
           p+=(ptrdiff_t) GetPixelChannels(image);
           continue;
         }
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        ChannelStatistics
-          *cs;
-
-        ChannelSample
-          sample;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        cs=channel_statistics+channel;
-        if (CheckChannelDepth(channel_statistics,cs,p,i) == MagickFalse)
-          {
-            i--;
-            continue;
-          }
-        sample.image=image;
-        sample.p=p;
-        sample.i=i;
-        AccumulateChannelSample(&sample,cs,histogram);
-      }
+      AccumulatePixelStatistics(image,p,channel_statistics,histogram);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
