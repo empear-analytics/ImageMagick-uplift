@@ -364,6 +364,18 @@ static XMLTreeInfo *GetOrderedXMLNode(XMLTreeInfo *node,const char *subnode)
   return(node);
 }
 
+static XMLTreeInfo *GetOrAddXMLTreeChild(XMLTreeInfo *node,const char *tag,
+  const size_t offset)
+{
+  XMLTreeInfo
+    *child;
+
+  child=GetXMLTreeChild(node,tag);
+  if (child == (XMLTreeInfo *) NULL)
+    child=AddChildToXMLTree(node,tag,offset);
+  return(child);
+}
+
 MagickPrivate XMLTreeInfo *AddPathToXMLTree(XMLTreeInfo *xml_info,
   const char *path,const size_t offset)
 {
@@ -395,9 +407,7 @@ MagickPrivate XMLTreeInfo *AddPathToXMLTree(XMLTreeInfo *xml_info,
   {
     GetPathComponent(components[i],SubimagePath,subnode);
     GetPathComponent(components[i],CanonicalPath,tag);
-    child=GetXMLTreeChild(node,tag);
-    if (child == (XMLTreeInfo *) NULL)
-      child=AddChildToXMLTree(node,tag,offset);
+    child=GetOrAddXMLTreeChild(node,tag,offset);
     node=child;
     if (node == (XMLTreeInfo *) NULL)
       break;
