@@ -1269,6 +1269,13 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    (d) the block writes through none of its pointer members. Steps 3 to 6 then treat it
    as a scalar: a member of the struct's type, `const PixelInfo v = name->v;` or
    `name->v.m`, and `name.v=v;`, a copy taken directly before the call.
+   A plain struct local that meets (b) to (d) but not (a), some member of it never set
+   on the path to the call (`ScaleScanlineX`'s `PointInfo scale`, whose `y` nothing
+   sets), may be one of the group by address instead: a member `const T *v` (a pointer
+   to `const` of its exact type), filled `name.v=(&v);` directly before the call, bound
+   `const T *const v = name->v;`, and each use `v.m` in the block written `(*v).m`, the
+   form Recipe E step 3 gives a struct the block updates. Nothing is copied, so no
+   member is read that the block did not read.
 3. Declare `typedef struct _Name { ... } Name;` directly above the new function, one
    member per variable in the group, with the variable's exact type and name: no `size_t`
    for a `ssize_t`, no `const` added or dropped on what a pointer points to. Only a
@@ -1357,6 +1364,13 @@ static void ThresholdWaveletLevel(float *pixels,
   unwritten variable did. A variable the block writes is never a member.
 - A member keeps the variable's exact type, so the assignment and the local's
   initialisation convert nothing; under HDRI a `MagickRealType` member stays one.
+- A struct member by address (step 2's last form) reads the caller's own `v`: each
+  `(*v).m` is the object `v.m` named, read at the same point, and (b) and (c) keep
+  every write to `v` out of the block, so each read gives the value the block read.
+  Unlike `name.v=v;`, which reads every member and so would read one never set (an
+  indeterminate value), the pointer reads only the members the block reads. The
+  address is held by the caller's struct local, read by nothing but the call, as a
+  targets struct holds its addresses (Recipe I step 2's exception).
 - A struct-valued member (step 2) is a copy: `name.v=v;` copies every member's value
   at the call, and the block reads the copy where it read `v`. The copy and `v` hold the
   same values for the whole block only while nothing writes `v`, so step 2 forbids,
@@ -3738,3 +3752,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | E | Step 3: a single output that is one member of a caller's struct local, whose other members are not all set, goes by passing the struct as a pointer (`(*v).m` at each use, Recipe Q step 5's form) to a `void` function; the struct is a plain local whose address is not taken elsewhere (Recipe O step 2) | `MontageImageList`'s row end in the bounding-box pass, `if (y_offset > (ssize_t) bounds.height) bounds.height=(size_t) y_offset;`, its last depth-4 site: `bounds.x` and `bounds.y` are never set, so returning `bounds.height` through a by-value copy of `bounds` would read indeterminate members. A probe: Deep, Nested Complexity leaves, 6.87 to 7.30 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | I | Step 2: the exception for another helper's targets struct covers a struct of Recipe I, LB step 8 or Q step 8, filled directly before its own call or declared `const` with the addresses (Q step 8's `const` form), read by nothing but that call; LB step 8, which rests on step 2, takes the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleImage` (W10): Recipe Q moved the Y direction's row loop to `AccumulateScaleRows`, whose `const` targets struct holds `&n`, `&status`, `&number_rows` and `&next_row` among six; the pending read after the loop (nesting 4, the function's last depth-4 site) writes those four and ends the row loop through `break;`. Recipe LB step 8: Deep, Nested Complexity leaves `ScaleImage`, 7.40 to 7.88 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | O | Step 2: a written variable whose address the caller takes only to fill a member of another helper's targets struct (Recipe I step 2's exception: I, LB step 8 or Q step 8, the `const` form included) still qualifies; Recipes K, Q, Z and SD, which rest on O step 2, take the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleImage` (W10): the row-span restart `if (scale.y <= 0) { ... }` writes `scale` and `next_row`, whose addresses only the `const` targets structs of `AccumulateScaleRows` (Q) and `ReadPendingScaleRow` (LB) hold. Recipe O: cc 27 to 26, 7.88 to 7.90 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | N | Step 2: a plain struct local that meets (b) to (d) but not (a), a member of it never set on the path to the call, may be one of the group by address: a `const T *v` member filled `name.v=(&v);`, each `v.m` in the block written `(*v).m` (Recipe E step 3's form); Recipes Q, U, Wa, Y, Z and LB, which take their input struct from N step 2, take the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleScanlineX` (W10): its partial-column block `if (scale.x > 0) { ... }` (cc 11 in the caller, the bumps that keep Complex Method) reads `scale.x` of a `PointInfo` whose `y` is never set, so `name.scale=scale;` would read an indeterminate member, and writes `pixel`, `next_column`, `t` and `span`. A probe of Recipe Q step 8 with `scale` by address: Complex Method leaves `ScaleScanlineX`, 7.90 to 8.15 | mandate (2026-10-24) |
