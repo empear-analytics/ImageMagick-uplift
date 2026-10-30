@@ -1419,6 +1419,34 @@ static void GetSubimageSpecification(const char *path,char *component,
     }
 }
 
+static size_t GetImageFormatPrefix(char *component,size_t magick_length)
+{
+  char
+    *p;
+
+  for (p=component; *p != '\0'; p++)
+  {
+    if ((*p == '%') && (*(p+1) == '['))
+      {
+        /*
+          Skip over %[...].
+        */
+        for (p++; (*p != ']') && (*p != '\0'); p++) ;
+        if (*p == '\0')
+          break;
+      }
+    if (IsImageFormatPrefix(component,p) != MagickFalse)
+      {
+        /*
+          Look for image format specification (e.g. ps3:image).
+        */
+        magick_length=StripImageFormatPrefix(component,p,magick_length);
+        break;
+      }
+  }
+  return(magick_length);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1449,26 +1477,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
 #if defined(__OS2__)
   if (path[1] != ":")
 #endif
-  for (p=component; *p != '\0'; p++)
-  {
-    if ((*p == '%') && (*(p+1) == '['))
-      {
-        /*
-          Skip over %[...].
-        */
-        for (p++; (*p != ']') && (*p != '\0'); p++) ;
-        if (*p == '\0')
-          break;
-      }
-    if (IsImageFormatPrefix(component,p) != MagickFalse)
-      {
-        /*
-          Look for image format specification (e.g. ps3:image).
-        */
-        magick_length=StripImageFormatPrefix(component,p,magick_length);
-        break;
-      }
-  }
+  magick_length=GetImageFormatPrefix(component,magick_length);
   p=component;
   if (*p != '\0')
     for (p=component+strlen(component)-1; p > component; p--)
