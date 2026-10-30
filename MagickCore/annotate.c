@@ -1896,6 +1896,13 @@ static inline MagickBooleanType IsTransparentFill(const DrawInfo *draw_info)
     MagickFalse);
 }
 
+static inline MagickBooleanType IsColumnOutside(const Image *image,
+  const ssize_t x_offset)
+{
+  return(((x_offset < 0) || (x_offset >= (ssize_t) image->columns)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2339,7 +2346,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
           if ((y_offset < 0) || (y_offset >= (ssize_t) image->rows))
             continue;
           q=(Quantum *) NULL;
-          if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
+          if (IsColumnOutside(image,x_offset) != MagickFalse)
             active=MagickFalse;
           else
             {
@@ -2354,7 +2361,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
               raster;
 
             x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
-            if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
+            if (IsColumnOutside(image,x_offset) != MagickFalse)
               {
                 q=SkipGlyphPixel(image,q);
                 continue;
