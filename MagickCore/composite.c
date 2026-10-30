@@ -1339,6 +1339,19 @@ static void CompositeVirtualOverPixel(const VirtualOverInputs *virtual_pixel,
   }
 }
 
+static const Quantum *AdvanceOverSourcePixel(const Image *source_image,
+  const Quantum *pixels,const Quantum *p)
+{
+  size_t
+    channels;
+
+  p+=(ptrdiff_t) GetPixelChannels(source_image);
+  channels=GetPixelChannels(source_image);
+  if (p >= (pixels+channels*source_image->columns))
+    p=pixels;
+  return(p);
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1451,9 +1464,6 @@ static MagickBooleanType CompositeOverImage(Image *image,
       OverPixelInputs
         authentic;
 
-      size_t
-        channels;
-
       if (clip_to_self != MagickFalse)
         {
           if (x < x_offset)
@@ -1502,10 +1512,7 @@ static MagickBooleanType CompositeOverImage(Image *image,
       authentic.Sa=Sa;
       authentic.clamp=clamp;
       CompositeOverPixelChannels(&authentic,q);
-      p+=(ptrdiff_t) GetPixelChannels(source_image);
-      channels=GetPixelChannels(source_image);
-      if (p >= (pixels+channels*source_image->columns))
-        p=pixels;
+      p=AdvanceOverSourcePixel(source_image,pixels,p);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
