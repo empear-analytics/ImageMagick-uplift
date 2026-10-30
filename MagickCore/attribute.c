@@ -975,6 +975,14 @@ static MagickBooleanType TransformImageTosRGB(Image *image,
   return(status);
 }
 
+static MagickBooleanType SetImageDirectClass(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (image->storage_class != DirectClass)
+    status=SetImageStorageClass(image,DirectClass,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -1070,8 +1078,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     case TrueColorType:
     {
       status=TransformImageTosRGB(image,status,exception);
-      if (image->storage_class != DirectClass)
-        status=SetImageStorageClass(image,DirectClass,exception);
+      status=SetImageDirectClass(image,status,exception);
       image->alpha_trait=UndefinedPixelTrait;
       break;
     }
