@@ -180,6 +180,28 @@ static Quantum *SetFramePixels(const Image *image,const PixelInfo *color,
   return(q);
 }
 
+static PixelInfo LightenFrameColor(const PixelInfo matte,const Quantum modulate)
+{
+  PixelInfo
+    color;
+
+  color=matte;
+  color.red=(QuantumScale*(((double) QuantumRange-(double)
+    modulate)*matte.red+((double) QuantumRange*(double)
+    modulate)));
+  color.green=(QuantumScale*(((double) QuantumRange-(double)
+    modulate)*matte.green+((double) QuantumRange*(double)
+    modulate)));
+  color.blue=(QuantumScale*(((double) QuantumRange-(double)
+    modulate)*matte.blue+((double) QuantumRange*(double)
+    modulate)));
+  color.black=(QuantumScale*(((double) QuantumRange-(double)
+    modulate)*matte.black+((double) QuantumRange*(double)
+    modulate)));
+  color.alpha=matte.alpha;
+  return(color);
+}
+
 typedef struct _FrameTopBevel
 {
   Image
@@ -498,34 +520,8 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     Initialize 3D effects color.
   */
   matte=image->matte_color;
-  accentuate=matte;
-  accentuate.red=(QuantumScale*(((double) QuantumRange-(double)
-    AccentuateModulate)*matte.red+((double) QuantumRange*(double)
-    AccentuateModulate)));
-  accentuate.green=(QuantumScale*(((double) QuantumRange-(double)
-    AccentuateModulate)*matte.green+((double) QuantumRange*(double)
-    AccentuateModulate)));
-  accentuate.blue=(QuantumScale*(((double) QuantumRange-(double)
-    AccentuateModulate)*matte.blue+((double) QuantumRange*(double)
-    AccentuateModulate)));
-  accentuate.black=(QuantumScale*(((double) QuantumRange-(double)
-    AccentuateModulate)*matte.black+((double) QuantumRange*(double)
-    AccentuateModulate)));
-  accentuate.alpha=matte.alpha;
-  highlight=matte;
-  highlight.red=(QuantumScale*(((double) QuantumRange-(double)
-    HighlightModulate)*matte.red+((double) QuantumRange*(double)
-    HighlightModulate)));
-  highlight.green=(QuantumScale*(((double) QuantumRange-(double)
-    HighlightModulate)*matte.green+((double) QuantumRange*(double)
-    HighlightModulate)));
-  highlight.blue=(QuantumScale*(((double) QuantumRange-(double)
-    HighlightModulate)*matte.blue+((double) QuantumRange*(double)
-    HighlightModulate)));
-  highlight.black=(QuantumScale*(((double) QuantumRange-(double)
-    HighlightModulate)*matte.black+((double) QuantumRange*(double)
-    HighlightModulate)));
-  highlight.alpha=matte.alpha;
+  accentuate=LightenFrameColor(matte,AccentuateModulate);
+  highlight=LightenFrameColor(matte,HighlightModulate);
   shadow=matte;
   shadow.red=QuantumScale*matte.red*(double) ShadowModulate;
   shadow.green=QuantumScale*matte.green*(double) ShadowModulate;
