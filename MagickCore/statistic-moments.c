@@ -271,6 +271,18 @@ static void AccumulateCentralMoments(const MomentPixel *moment_pixel,
   }
 }
 
+static void RotateEllipseAngle(ChannelMoments *channel_moments,
+  const ssize_t c,const double *M20,const double *M02)
+{
+  if (fabs(M20[c]-M02[c]) >= 0.0)
+    {
+      if ((M20[c]-M02[c]) < 0.0)
+        channel_moments[c].ellipse_angle+=90.0;
+      else
+        channel_moments[c].ellipse_angle+=180.0;
+    }
+}
+
 MagickExport ChannelMoments *GetImageMoments(const Image *image,
   ExceptionInfo *exception)
 {
@@ -413,15 +425,7 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
       }
     else
       if (M11[c] < 0.0)
-        {
-          if (fabs(M20[c]-M02[c]) >= 0.0)
-            {
-              if ((M20[c]-M02[c]) < 0.0)
-                channel_moments[c].ellipse_angle+=90.0;
-              else
-                channel_moments[c].ellipse_angle+=180.0;
-            }
-        }
+        RotateEllipseAngle(channel_moments,c,M20,M02);
       else
         if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
           channel_moments[c].ellipse_angle+=90.0;
