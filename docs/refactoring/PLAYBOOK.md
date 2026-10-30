@@ -530,6 +530,10 @@ needs two copies of the block.
    no copy of it (`TrimImage`'s `CropImage(image,&geometry,exception)`, which reads
    `*geometry` and stores no pointer; checked by reading the callee) still qualifies,
    as in Recipe I step 8: while the new function runs, no other pointer to it exists.
+   A parameter the caller receives by value, of a struct or arithmetic type (not a
+   pointer, and not an array parameter, which is one), counts as a plain local
+   (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
+   copy, and the same rule on its address applies.
 3. The block must contain no `return`, `goto`, `continue`, or `break` that leaves the
    block; a `break` that ends a `switch` or loop inside the block is fine.
 4. Cut the block into a new `static void` function directly above the caller. Pass each
@@ -593,6 +597,11 @@ static void SelectMagnifyMethod(const char *option,
   when the new function runs, its out-parameter is the only pointer to `v`, and no two
   of its pointers name one object. A callee that stores the address (in a struct, a
   global, a cache) gives `v` a second name: the variable does not qualify.
+- A parameter received by value is an object of the function's own, initialised from
+  the argument when the call starts and gone when it returns (C11 6.9.1p9); a write to
+  it, directly or through `&v`, reaches no object of its caller. A parameter of
+  pointer type is refused: what it points to is the caller's, and writing through
+  it is not a write to a local. An array parameter is a pointer.
 - The function must be oracle-verified, with no unmatched or unreached survivor on the
   block's lines: the guard sees the moved literals but not a write that went missing.
 
@@ -3200,3 +3209,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | Q | Step 8: the `Targets` local may be declared `const` with the addresses as its initialiser, `{ &v, ... }` in member order, in the block holding the call or inside the scope of every `v`, instead of the `targets.v=(&v);` assignments before the call (Recipe B step 5's `const` form). *Careful* gives the argument: an address does not change while its variable lives, and the initialiser reads no value | `vision.c`'s four moment-threshold functions: the second-moment column loop (nesting 4 in each, inside the parallel object loop) writes `M11`, `M20`, `M02` and the cursor `p` and reads five inputs, so step 7 gives five parameters; with step 8's four assignments per call `MajorAxisThreshold` and `MinorAxisThreshold` enter Large Method (71 lines) and the other two grow. A probe of all four in the `const` form: every caller shorter, 4.30 to 4.73 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | LB | Step 8: a block writing two to four variables of the caller that the caller reads after it passes their addresses in one `const` struct, Recipe I's form (steps 3, 5, 6), after the input struct; the caller fills it before the call or declares it `const` with the addresses (Recipe Q step 8). A variable whose address the caller passes elsewhere only to calls that keep no copy of it still qualifies (Recipe I step 8). *Careful* gives the argument | `vision.c`'s `ConnectedComponentsImage`: the label pass's per-pixel body (the function's last depth-4 site but one) writes `status`, `n`, `p` and `q` and leaves the column loop through `break;` when `n` reaches `MaxColormapSize`; step 2 allows one variable, Q and I refuse the `break`, and `n`'s address goes to `SetMatrixElement` in the initialisation loop. Moving the column loop whole (Recipe Q step 8) leaves its helper a Bumpy Road (2 bumps). A probe of the body in this form: 4.73 to 4.76; with the census column loop (Recipe Q step 8), 5.07 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | O | Step 2: a written variable whose address the caller passes elsewhere, outside the block, only to calls that keep no copy of it (checked by reading the callee) still qualifies, as in Recipe I step 8; Recipes Z and SD, which rest on O steps 1 to 3, take the same reading. *Careful* gives the argument | `transform.c`'s `TrimImage`: its gravity `switch` (cc 19 in the caller, 11 labels) writes only `geometry`, whose address the caller later passes to `CropImage`, which reads `*geometry` through `GetCropPage` and `ClampCropExtent` and stores no pointer. Recipe SD on the `switch`, then E on the min-size block: 4.76 to 4.83 to 5.00 in a probe, TrimImage leaving Complex and Large Method, neither helper with a finding | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | O | Step 2: a parameter the caller receives by value, of struct or arithmetic type (not a pointer or array), counts as a plain local, under the same rule on its address; Recipes Z and SD read step 2 the same way. *Careful* gives the argument | `transform.c`'s `ApplySpliceGravity` (cc 12): its whole body is the gravity `switch` (eleven labels), which writes only `splice_geometry`, a `RectangleInfo` received by value and returned. Recipe SD (the default group and North, NorthEast and West to a helper taking `&splice_geometry`): 5.15 to 5.31 in a probe, ApplySpliceGravity leaving Complex Method, the helper with no finding | mandate (2026-10-24) |
