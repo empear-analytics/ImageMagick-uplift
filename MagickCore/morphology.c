@@ -563,6 +563,34 @@ static MagickBooleanType AppendKernelToken(const char *p,const char *token,
   return(MagickTrue);
 }
 
+typedef struct _KernelStringTargets
+{
+  char
+    **kernel_cache;
+
+  const char
+    **p;
+} KernelStringTargets;
+
+static MagickBooleanType ReadKernelCache(const char *kernel_string,
+  ExceptionInfo *exception,const KernelStringTargets *targets)
+{
+  char
+    **const kernel_cache = targets->kernel_cache;
+
+  const char
+    **const p = targets->p;
+
+  if (*kernel_string == '@')
+    {
+      *kernel_cache=FileToString(kernel_string,~0UL,exception);
+      if (*kernel_cache == (char *) NULL)
+        return(MagickFalse);
+      *p=(const char *) *kernel_cache;
+    }
+  return(MagickTrue);
+}
+
 MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
   ExceptionInfo *exception)
 {
@@ -576,17 +604,17 @@ MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
   const char
     *p;
 
+  KernelStringTargets
+    targets;
+
   if (kernel_string == (const char *) NULL)
     return(ParseKernelArray(kernel_string));
   p=kernel_string;
   kernel_cache=(char *) NULL;
-  if (*kernel_string == '@')
-    {
-      kernel_cache=FileToString(kernel_string,~0UL,exception);
-      if (kernel_cache == (char *) NULL)
-        return((KernelInfo *) NULL);
-      p=(const char *) kernel_cache;
-    }
+  targets.kernel_cache=(&kernel_cache);
+  targets.p=(&p);
+  if (ReadKernelCache(kernel_string,exception,&targets) == MagickFalse)
+    return((KernelInfo *) NULL);
   kernel=NULL;
   while (GetNextToken(p,(const char **) NULL,MagickPathExtent,token), *token != '\0')
   {
