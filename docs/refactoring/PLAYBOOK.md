@@ -412,12 +412,25 @@ a further site. Three conditions apply:
 The step stays at guard level: it moves expressions, and the script check stands in for
 reading each copy.
 
+**Leading operands of a chain.** The expression may be the leading operands of a
+longer chain of one operator (`a && b` of `a && b && c`) when the whole chain as one
+predicate would take five or more parameters (*Excess Number of Function Arguments*,
+which the pre-commit gate refuses on a new function). C groups `&&` and `||` from the
+left (C11 6.5.13, 6.5.14): `a && b && c` is `(a && b) && c`, so `a && b` is a whole
+operand of the last `&&`. The predicate returns those leading operands, copied
+character for character, in the form above, and the site becomes
+`(Pred(...) != MagickFalse) && c`. The operands still evaluate left to right, and `c`
+only when `a && b` is true, as before. Only a prefix of the chain moves: never an
+operand from its middle or its end, and never across a mix of `&&` and `||`.
+
 **Evidence level:** guard.
 
 **Provenance:** founding recipe (2026-09-29). *Several sites:* 2026-10-26. It arose from
 the question in PR #16 (segment.c, a guard-level reuse showing +1 in `--calls`) and from
 delegate.c's `GetDelegateList`, whose decode and encode tests are the same expression on
-two fields.
+two fields. *Leading operands of a chain:* 2026-10-30, from
+`attribute-bounds.c`'s `GetImageBoundingBox`, whose lower-left test reads `x`, `y`,
+`bounding_box`, `pixel` and `target` (task W10).
 
 ---
 
@@ -3930,3 +3943,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | SV | Extract Sibling Blocks Differing in One Value: copies of one block in one function, the same text except for one literal or enumeration constant and not reported as *Code Duplication*, move to one `static` function taking the value as a `const` parameter of the type it is assigned to; each copy becomes the call with its own value | `channel-alpha.c`'s `SetImageAlphaChannel` (W10): the `DeactivateAlphaChannel`, `DiscreteAlphaChannel` and `OnAlphaChannel` cases differ only in the trait assigned. Recipe E on one: 7.56 to 7.58; one helper for the three: 7.62 (cc 66 to 63) | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | SV | Step 2: the copies may read different variables, the same token sequence under Recipe D's consistent renaming, each copy passing its own; the value may then also be a member access of a variable the block does not write (`image->columns`, `image->rows`), of one type in every copy, as in Recipe TW step 2. Step 3: its parameter has the member's declared type. *Careful* gives the argument | `shear-rotate.c`'s `IntegralRotateImage` (W10): its 90- and 270-degree tile loops clip the width (`width=tile_width;` and an `if` on `tile_x` and `image->columns`) and the height (`tile_height`, `tile_y`, `image->rows`) with the same text, four copies in one function, not reported as *Code Duplication*. SV refuses the renaming, TW wants two functions and five inputs, Recipe E on the first copy alone gives 7.55 to 7.56 and would need a second helper for the height. All four as one helper: 7.55 to 7.60 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | *Use when*: in a sequential function the block may also be a running selection over an array (an argmax loop updating the best value and its index together), which folds the array into its written locals as a sum does; the steps are unchanged | `threshold-auto.c`'s `TriangleThreshold` (W10): its split-point search below the peak reads `a`, `b`, `c`, `inverse_ratio`, `histogram`, `max` and `start` and writes `threshold` and `max_distance`, refused by Recipe E step 4 (two written variables, `threshold` read after) and outside Recipe O's and Z's selection (a `switch` or `if` chain) and Q's per-pixel sum. A probe in Q's form: TriangleThreshold leaves Complex Method (cc 11), bumps 3 to 2, 8.11 to 8.36 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | P | *Leading operands of a chain*: the predicate may hold the leading operands of a chain of one operator (`a && b` of `a && b && c`, which C groups as `(a && b) && c`) when the whole chain would take five or more parameters; the site becomes `(Pred(...) != MagickFalse) && c` | `attribute-bounds.c`'s `GetImageBoundingBox` (W10): its *Complex Conditional* `(x < (ssize_t) bounding_box.width) && (y > (ssize_t) bounding_box.height) && (IsFuzzyEquivalencePixelInfo(&pixel,&target[3]) == MagickFalse)` reads five variables, so the whole chain as one predicate carries *Excess Number of Function Arguments*; its first two operands as a three-parameter predicate: 7.51 to 7.66, the file's sixth function | mandate (2026-10-24) |
