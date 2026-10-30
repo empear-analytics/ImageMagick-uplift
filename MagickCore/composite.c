@@ -4318,6 +4318,34 @@ static MagickBooleanType TileTextureImage(Image *image,Image *texture_image,
   return(status);
 }
 
+static void CopyTextureRow(Image *image,Image *texture_image,
+  const Quantum *pixels,Quantum *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  size_t
+    width;
+
+  for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) texture_image->columns)
+  {
+    TextureSpan
+      span;
+
+    p=pixels;
+    width=texture_image->columns;
+    if ((x+(ssize_t) width) > (ssize_t) image->columns)
+      width=image->columns-(size_t) x;
+    span.image=image;
+    span.texture_image=texture_image;
+    span.width=width;
+    q=CopyTextureSpan(&span,p,q);
+  }
+}
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
@@ -4367,17 +4395,10 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
       sync;
 
     const Quantum
-      *p,
       *pixels;
-
-    ssize_t
-      x;
 
     Quantum
       *q;
-
-    size_t
-      width;
 
     if (status == MagickFalse)
       continue;
@@ -4390,20 +4411,7 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) texture_image->columns)
-    {
-      TextureSpan
-        span;
-
-      p=pixels;
-      width=texture_image->columns;
-      if ((x+(ssize_t) width) > (ssize_t) image->columns)
-        width=image->columns-(size_t) x;
-      span.image=image;
-      span.texture_image=texture_image;
-      span.width=width;
-      q=CopyTextureSpan(&span,p,q);
-    }
+    CopyTextureRow(image,texture_image,pixels,q);
     sync=SyncCacheViewAuthenticPixels(image_view,exception);
     if (sync == MagickFalse)
       status=MagickFalse;
