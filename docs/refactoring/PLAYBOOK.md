@@ -1218,7 +1218,12 @@ as parameters. K then B is two commits, of which the first adds a finding.
    own variables, and nothing declared outside that body. A block in a function with no
    OpenMP region at all (a sequential pass) qualifies too: it then writes at most four
    plain locals of the caller, none a parameter, a global or a `static`, and none whose
-   address is taken elsewhere (Recipe O step 2).
+   address is taken elsewhere (Recipe O step 2). In such a function `status` is one of
+   those plain locals: it may be one of the four, passed by pointer like the others,
+   and the block may read it (`if (*status == MagickFalse) continue;`) as well as
+   write it. A pointer the block only reads, though it writes through it (the object
+   table `object` that a callee updates), is a read-only variable (step 3), not one of
+   the four.
 2. Split what the block touches in two: the variables it writes (the accumulators and
    any cursor it advances, such as `n`), and the variables it only reads. Variables it
    declares and uses alone move with it, as in Recipe K step 3. So does a variable of the
@@ -1316,8 +1321,24 @@ static void SumBilateralPixels(const BilateralSum *sum,double *pixel,
 - A cursor the block reads before writing (`n`, initialised before the block) is a
   written variable, passed by pointer, never a member: its value at the call is not one
   the struct may freeze.
-- More than four written variables, or a write to `status`, is not this recipe: skip the
-  block (Recipe J covers `status` when the inputs fit in parameters).
+- More than four written variables is not this recipe, nor, inside a parallel loop, a
+  write to `status`: skip the block (Recipe J covers `status` when the inputs fit in
+  parameters).
+- `status` in a function with no OpenMP region (step 1) is a plain local of the
+  caller, and Recipes K, J and T refuse it only because inside a parallel loop it is
+  shared between threads. Passed by pointer, every read and every write of it in the
+  block goes through `*status` to the caller's own variable, in the same order, as for
+  any written local (Recipe O); so the block may read it, and no guard proving its
+  value on entry is needed, unlike Recipe J, whose helper starts from a local
+  `MagickTrue`. A `break` or `continue` of a loop inside the block after
+  `*status=MagickFalse;` stays in the new function and ends or skips the same loop.
+  Check by reading that the function holds no `#pragma omp` line anywhere and that
+  `&status` is taken nowhere else in it.
+- A member that is a pointer (`object`, `neighbors`, a cache view, `exception`) is
+  copied, not the object it points to: writes through the copy, the block's own or a
+  callee's, reach the same object as writes through the caller's variable did, in the
+  same order. `ResolveRowEquivalences`' `equivalences` member is written through the
+  same way. The pointer itself must not be assigned in the block.
 - In a sequential function there is no thread to share with: each written local becomes
   `*v` in the callee, the same object in the same order, which is Recipe O's argument.
   A cursor the block advances and the caller reads again (a kernel pointer `k`, a window
@@ -2402,3 +2423,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | V | Step 7: a block whose every exit is the same cleanup run `S` followed by `return(v);` moves with `S` left in the caller: each exit becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) { S return(v); }`; the block may not write what `S` reads or writes. *Careful* gives the argument: the caller runs the same cleanup on the same values and returns the same variable, so nothing rests on the destroy function returning NULL | `threshold.c`'s `GetThresholdMapFile`: its level-parsing tail has four exits of `thresholds=DestroyXMLTree(thresholds); map=DestroyThresholdMap(map); return(map);`, which step 6 refuses (a variable, not a constant). A probe: cc 18 to 12, 150 to 104 lines, 4.60 to 4.71 | owner |
 | 2026-10-30 | AMEND | V | Step 7: `return(c);` of one constant `c` (step 6) may end every exit in place of `return(v);`; the caller writes `{ S return(c); }` and step 2 holds (one written variable, which `S` neither reads nor writes). *Careful*: the cleanup's writes are dead on the failure path, but the recipe does not rest on that, since `S` stays in the caller; moving `S` into the helper instead is not admitted | Owner's request of 2026-10-30 after the W08 report (V allowing dead cleanup writes on the failure path). `layer.c`'s `OptimizeLayerFrames`: the `NoneDispose` reference's failure path releases `bounds` and `disposals`, then `return((Image *) NULL);`, which step 6 refused (three written variables) and step 7 did not name (a constant, not a variable). A probe: bumps 9 to 8, 4.99 to 5.00; with `CoalesceImages`' dispose-image clone, 5.01 | owner |
 | 2026-10-30 | AMEND | N, Q, U, W, Y, Z | N step 2: a plain struct value the block only reads (`PixelInfo`, `PointInfo`, `RectangleInfo`) may be a member, copied by `name.v=v;` directly before the call, when every member is set before the call, the block assigns neither it nor a member, takes `&v` only for a callee's pointer-to-`const` parameter that only reads through it (stores and compares no address), no pointer to it is held where the block can write, and the block writes through none of its pointer members; arrays stay out. *Careful* gives the argument (a copy holds the same values while nothing writes the original; a `const` callee sees the copy's address). Q step 3, U step 2, W step 2, Y step 3 and Z step 2 name struct values as N step 2 does | Owner's request of 2026-10-30 after the W08 report (struct-valued read-only members in N and Q). `feature.c`'s `MeanShiftImage`: its convergence block reads `sum_location`, `sum_pixel`, `previous_location`, `previous_pixel` (`PointInfo`/`PixelInfo`) and `count`; `layer.c`'s `CompareImagesBounds` and `OptimizeLayerFrames` (`RectangleInfo try_bounds`, a `PixelInfo` read through `&alpha_pixel`). MeanShiftImage's block also writes the struct values `mean_location` and `mean_pixel`, which Q passes only as scalars, so this amendment alone does not admit it: a probe that also passed them by pointer measured 5.20 to 5.23 | owner |
+| 2026-10-30 | AMEND | Q | Step 1: in a function with no OpenMP region, `status` is a plain local of the caller and may be one of the four written variables, passed by pointer, its reads in the block included; a pointer the block writes through but never assigns is a read-only member, not a written variable. *Careful* gives the argument: K, J and T refuse `status` only because a parallel loop shares it; through `*status` every read and write reaches the caller's variable in the same order, so no guard on its entry value is needed | Owner's request of 2026-10-30 after the W08 report (a sequential form of J and W). `vision.c`'s `ConnectedComponentsImage`: the merge census's neighbour loop (nesting 6, no OpenMP region in the function) writes `status=MagickFalse` and `count` and tests `status`, which J, T and U refuse; in the pointer form its helper takes the struct, `&status` and `&count`. A probe: nesting 6 to 4, 4.18 to 4.21; with the neighbour fetch then moved out of the helper (Recipe E), 4.30 | owner |
