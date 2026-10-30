@@ -2809,6 +2809,28 @@ static double MinimizeKernelDistance(const MagickRealType *magick_restrict k,
   return(pixel);
 }
 
+typedef struct _MorphologyKernelTap
+{
+  const MagickRealType
+    *k;
+
+  const Quantum
+    *pixels;
+
+  ssize_t
+    i;
+} MorphologyKernelTap;
+
+static void UpdateHitAndMissExtrema(const MorphologyKernelTap *tap,
+  double *minimum,double *maximum)
+{
+  if (*tap->k > 0.7)
+    (*minimum)=MinimizeChannelValue(tap->pixels,tap->i,(*minimum));
+  else
+    if (*tap->k < 0.3)
+      (*maximum)=MaximizeChannelValue(tap->pixels,tap->i,(*maximum));
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3131,6 +3153,9 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         ssize_t
           v;
 
+        MorphologyKernelTap
+          kernel_tap;
+
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
         morphology_traits=GetPixelChannelTraits(morphology_image,channel);
@@ -3309,11 +3334,10 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
               {
                 if (!IsNaN(*k))
                   {
-                    if (*k > 0.7)
-                      minimum=MinimizeChannelValue(pixels,i,minimum);
-                    else
-                      if (*k < 0.3)
-                        maximum=MaximizeChannelValue(pixels,i,maximum);
+                    kernel_tap.k=k;
+                    kernel_tap.pixels=pixels;
+                    kernel_tap.i=i;
+                    UpdateHitAndMissExtrema(&kernel_tap,&minimum,&maximum);
                   }
                 k++;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
