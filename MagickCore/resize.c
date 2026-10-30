@@ -1212,6 +1212,17 @@ static void SetJincSupport(ResizeFilter *resize_filter,
       resize_filter->support;
 }
 
+static double GetCubicCOverride(const Image *image,double C)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"filter:c"); /* user C override */
+  if (artifact != (const char *) NULL)
+    C=StringToDouble(artifact,(char **) NULL);
+  return(C);
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1374,9 +1385,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
         {
           B=StringToDouble(artifact,(char **) NULL);
           C=(1.0-B)/2.0; /* Calculate C to get a Keys cubic filter. */
-          artifact=GetImageArtifact(image,"filter:c"); /* user C override */
-          if (artifact != (const char *) NULL)
-            C=StringToDouble(artifact,(char **) NULL);
+          C=GetCubicCOverride(image,C);
         }
       else
         {
