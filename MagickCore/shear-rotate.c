@@ -133,6 +133,37 @@ static void CopyRotatedPixelChannels(const Image *image,
   }
 }
 
+static Image *CloneRotatedImage(const Image *image,size_t rotations,
+  ExceptionInfo *exception)
+{
+  Image
+    *rotate_image;
+
+  switch (rotations)
+  {
+    case 0:
+    default:
+    {
+      rotate_image=CloneImage(image,0,0,MagickTrue,exception);
+      break;
+    }
+    case 2:
+    {
+      rotate_image=CloneImage(image,image->columns,image->rows,MagickTrue,
+        exception);
+      break;
+    }
+    case 1:
+    case 3:
+    {
+      rotate_image=CloneImage(image,image->rows,image->columns,MagickTrue,
+        exception);
+      break;
+    }
+  }
+  return(rotate_image);
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -160,28 +191,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   assert(image != (Image *) NULL);
   page=image->page;
   rotations%=4;
-  switch (rotations)
-  {
-    case 0:
-    default:
-    {
-      rotate_image=CloneImage(image,0,0,MagickTrue,exception);
-      break;
-    }
-    case 2:
-    {
-      rotate_image=CloneImage(image,image->columns,image->rows,MagickTrue,
-        exception);
-      break;
-    }
-    case 1:
-    case 3:
-    {
-      rotate_image=CloneImage(image,image->rows,image->columns,MagickTrue,
-        exception);
-      break;
-    }
-  }
+  rotate_image=CloneRotatedImage(image,rotations,exception);
   if (rotate_image == (Image *) NULL)
     return((Image *) NULL);
   if (rotations == 0)
