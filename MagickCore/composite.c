@@ -1232,6 +1232,58 @@ static void CompositeOverChannel(const OverChannelInputs *over,
     ClampToQuantum(pixel);
 }
 
+typedef struct _OverPixelInputs
+{
+  Image
+    *image;
+
+  const Image
+    *source_image;
+
+  const Quantum
+    *p;
+
+  MagickRealType
+    alpha,
+    Da,
+    Sa;
+
+  MagickBooleanType
+    clamp;
+} OverPixelInputs;
+
+static void CompositeOverPixelChannels(const OverPixelInputs *authentic,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(authentic->image); i++)
+  {
+    OverChannelInputs
+      over;
+
+    PixelChannel channel = GetPixelChannelChannel(authentic->image,i);
+    PixelTrait traits = GetPixelChannelTraits(authentic->image,channel);
+    PixelTrait source_traits=GetPixelChannelTraits(authentic->source_image,
+      channel);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    if ((source_traits == UndefinedPixelTrait) &&
+        (channel != AlphaPixelChannel))
+        continue;
+    over.source_image=authentic->source_image;
+    over.p=authentic->p;
+    over.channel=channel;
+    over.traits=traits;
+    over.alpha=authentic->alpha;
+    over.Da=authentic->Da;
+    over.Sa=authentic->Sa;
+    over.clamp=authentic->clamp;
+    CompositeOverChannel(&over,q,i);
+  }
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1341,6 +1393,9 @@ static MagickBooleanType CompositeOverImage(Image *image,
         Da,
         Sa;
 
+      OverPixelInputs
+        authentic;
+
       ssize_t
         i;
 
@@ -1400,29 +1455,14 @@ static MagickBooleanType CompositeOverImage(Image *image,
       Sa=QuantumScale*(double) GetPixelAlpha(source_image,p);
       Da=QuantumScale*(double) GetPixelAlpha(image,q);
       alpha=Sa+Da-Sa*Da;
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        OverChannelInputs
-          over;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait source_traits=GetPixelChannelTraits(source_image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        if ((source_traits == UndefinedPixelTrait) &&
-            (channel != AlphaPixelChannel))
-            continue;
-        over.source_image=source_image;
-        over.p=p;
-        over.channel=channel;
-        over.traits=traits;
-        over.alpha=alpha;
-        over.Da=Da;
-        over.Sa=Sa;
-        over.clamp=clamp;
-        CompositeOverChannel(&over,q,i);
-      }
+      authentic.image=image;
+      authentic.source_image=source_image;
+      authentic.p=p;
+      authentic.alpha=alpha;
+      authentic.Da=Da;
+      authentic.Sa=Sa;
+      authentic.clamp=clamp;
+      CompositeOverPixelChannels(&authentic,q);
       p+=(ptrdiff_t) GetPixelChannels(source_image);
       channels=GetPixelChannels(source_image);
       if (p >= (pixels+channels*source_image->columns))
