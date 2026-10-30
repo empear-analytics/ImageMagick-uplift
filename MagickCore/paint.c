@@ -516,6 +516,26 @@ static void SetGradientDirection(GradientInfo *gradient,const Image *image,
   }
 }
 
+static void SetGradientAngleVector(GradientInfo *gradient,const Image *image)
+{
+  double
+    sine,
+    cosine,
+    distance;
+
+  /*
+    Reference https://drafts.csswg.org/css-images-3/#linear-gradients.
+  */
+  sine=sin((double) DegreesToRadians(gradient->angle-90.0));
+  cosine=cos((double) DegreesToRadians(gradient->angle-90.0));
+  distance=fabs((double) (image->columns-1.0)*cosine)+
+    fabs((double) (image->rows-1.0)*sine);
+  gradient->gradient_vector.x1=0.5*((image->columns-1.0)-distance*cosine);
+  gradient->gradient_vector.y1=0.5*((image->rows-1.0)-distance*sine);
+  gradient->gradient_vector.x2=0.5*((image->columns-1.0)+distance*cosine);
+  gradient->gradient_vector.y2=0.5*((image->rows-1.0)+distance*sine);
+}
+
 static void SetGradientExtent(GradientInfo *gradient,const Image *image,
   const char *artifact)
 {
@@ -607,24 +627,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
       &gradient->center.y);
   artifact=GetImageArtifact(image,"gradient:angle");
   if ((type == LinearGradient) && (artifact != (const char *) NULL))
-    {
-      double
-        sine,
-        cosine,
-        distance;
-
-      /*
-        Reference https://drafts.csswg.org/css-images-3/#linear-gradients.
-      */
-      sine=sin((double) DegreesToRadians(gradient->angle-90.0));
-      cosine=cos((double) DegreesToRadians(gradient->angle-90.0));
-      distance=fabs((double) (image->columns-1.0)*cosine)+
-        fabs((double) (image->rows-1.0)*sine);
-      gradient->gradient_vector.x1=0.5*((image->columns-1.0)-distance*cosine);
-      gradient->gradient_vector.y1=0.5*((image->rows-1.0)-distance*sine);
-      gradient->gradient_vector.x2=0.5*((image->columns-1.0)+distance*cosine);
-      gradient->gradient_vector.y2=0.5*((image->rows-1.0)+distance*sine);
-    }
+    SetGradientAngleVector(gradient,image);
   gradient->radii.x=(double) MagickMax((image->columns-1.0),(image->rows-1.0))/
     2.0;
   gradient->radii.y=gradient->radii.x;
