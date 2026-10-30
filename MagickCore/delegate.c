@@ -1964,6 +1964,20 @@ static MagickBooleanType ConvertDelegateInput(
   return(MagickTrue);
 }
 
+static void RestoreDelegateInput(const Image *image,
+  const char *input_filename,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (IsPathAccessible(input_filename) != MagickFalse)
+    {
+      if (CopyDelegateFile(image->filename,input_filename,MagickFalse,exception) == MagickFalse)
+        {
+          (void) RelinquishUniqueFileResource(input_filename);
+          *status=MagickFalse;
+        }
+    }
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -2096,14 +2110,7 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
           WaitForDelegateInput(image);
         command=DestroyString(command);
       }
-    if (IsPathAccessible(input_filename) != MagickFalse)
-      {
-        if (CopyDelegateFile(image->filename,input_filename,MagickFalse,exception) == MagickFalse)
-          {
-            (void) RelinquishUniqueFileResource(input_filename);
-            status=MagickFalse;
-          }
-      }
+    RestoreDelegateInput(image,input_filename,exception,&status);
     if ((strcmp(input_filename,output_filename) != 0) &&
         (CopyDelegateFile(image_info->filename,output_filename,MagickTrue,exception) == MagickFalse))
       {
