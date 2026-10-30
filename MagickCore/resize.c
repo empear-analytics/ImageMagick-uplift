@@ -1182,6 +1182,18 @@ static void SetGaussianCoefficients(const Image *image,
     resize_filter->support *= 2*value;  /* increase support linearly */
 }
 
+static void SetResizeFilterLobes(ResizeFilter *resize_filter,
+  const char *artifact)
+{
+  ssize_t
+    lobes;
+
+  lobes=(ssize_t) StringToLong(artifact);
+  if (lobes < 1)
+    lobes=1;
+  resize_filter->support=(double) lobes;
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1295,15 +1307,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   /* Support Overrides */
   artifact=GetImageArtifact(image,"filter:lobes");
   if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        lobes;
-
-      lobes=(ssize_t) StringToLong(artifact);
-      if (lobes < 1)
-        lobes=1;
-      resize_filter->support=(double) lobes;
-    }
+    SetResizeFilterLobes(resize_filter,artifact);
   if (resize_filter->filter == Jinc)
     {
       /*
