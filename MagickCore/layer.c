@@ -1940,6 +1940,62 @@ static inline void CompositeCanvas(Image *destination,
     MagickFalse : MagickTrue,x_offset,y_offset,exception);
 }
 
+typedef struct _LayerCompositeInfo
+{
+  CompositeOperator
+    compose;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} LayerCompositeInfo;
+
+static void CompositeSourceListOverCanvas(Image *destination,Image *source,
+  const LayerCompositeInfo *composite)
+{
+  const CompositeOperator
+    compose = composite->compose;
+
+  const ssize_t
+    x_offset = composite->x_offset,
+    y_offset = composite->y_offset;
+
+  ExceptionInfo
+    *const exception = composite->exception;
+
+  Image *dest = CloneImage(destination,0,0,MagickTrue,exception);
+
+  if (dest != (Image *) NULL)
+    {
+      dest->background_color.alpha_trait=BlendPixelTrait;
+      CompositeCanvas(destination, compose, source, x_offset, y_offset,
+        exception);
+      /* copy source image attributes ? */
+      if ( source->next != (Image *) NULL )
+        {
+          destination->delay=source->delay;
+          destination->iterations=source->iterations;
+        }
+      source=GetNextImageInList(source);
+      while (source != (Image *) NULL)
+      {
+        AppendImageToList(&destination,
+          CloneImage(dest,0,0,MagickTrue,exception));
+        destination->background_color.alpha_trait=BlendPixelTrait;
+        destination=GetLastImageInList(destination);
+        CompositeCanvas(destination,compose,source,x_offset,y_offset,
+          exception);
+        destination->delay=source->delay;
+        destination->iterations=source->iterations;
+        source=GetNextImageInList(source);
+      }
+      dest=DestroyImage(dest);
+    }
+}
+
 MagickExport void CompositeLayers(Image *destination,
   const CompositeOperator compose, Image *source,const ssize_t x_offset,
   const ssize_t y_offset,ExceptionInfo *exception)
@@ -1973,34 +2029,14 @@ MagickExport void CompositeLayers(Image *destination,
   */
   else if ( destination->next == (Image *) NULL )
   {
-    Image *dest = CloneImage(destination,0,0,MagickTrue,exception);
+    LayerCompositeInfo
+      composite;
 
-    if (dest != (Image *) NULL)
-      {
-        dest->background_color.alpha_trait=BlendPixelTrait;
-        CompositeCanvas(destination, compose, source, x_offset, y_offset,
-          exception);
-        /* copy source image attributes ? */
-        if ( source->next != (Image *) NULL )
-          {
-            destination->delay=source->delay;
-            destination->iterations=source->iterations;
-          }
-        source=GetNextImageInList(source);
-        while (source != (Image *) NULL)
-        {
-          AppendImageToList(&destination,
-            CloneImage(dest,0,0,MagickTrue,exception));
-          destination->background_color.alpha_trait=BlendPixelTrait;
-          destination=GetLastImageInList(destination);
-          CompositeCanvas(destination,compose,source,x_offset,y_offset,
-            exception);
-          destination->delay=source->delay;
-          destination->iterations=source->iterations;
-          source=GetNextImageInList(source);
-        }
-        dest=DestroyImage(dest);
-      }
+    composite.compose=compose;
+    composite.x_offset=x_offset;
+    composite.y_offset=y_offset;
+    composite.exception=exception;
+    CompositeSourceListOverCanvas(destination,source,&composite);
   }
 
   /*
