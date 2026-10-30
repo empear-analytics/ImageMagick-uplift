@@ -644,6 +644,41 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType AcquireAdaptiveSharpenKernel(double **kernel,
+  const size_t width,const ssize_t w,const double sigma)
+{
+  double
+    normalize;
+
+  ssize_t
+    j,
+    k,
+    u,
+    v;
+
+  kernel[w]=(double *) MagickAssumeAligned(AcquireAlignedMemory((size_t)
+    (width-(size_t) w),(width-(size_t) w)*sizeof(**kernel)));
+  if (kernel[w] == (double *) NULL)
+    return(MagickFalse);
+  normalize=0.0;
+  j=((ssize_t) width-w-1)/2;
+  k=0;
+  for (v=(-j); v <= j; v++)
+  {
+    for (u=(-j); u <= j; u++)
+    {
+      kernel[w][k]=(double) (-exp(-((double) u*u+v*v)/(2.0*MagickSigma*
+        MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
+      normalize+=kernel[w][k];
+      k++;
+    }
+  }
+  kernel[w][(k-1)/2]=(double) ((-2.0)*normalize);
+  if (sigma < MagickEpsilon)
+    kernel[w][(k-1)/2]=1.0;
+  return(MagickTrue);
+}
+
 MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -656,7 +691,6 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
     *image_view;
 
   double
-    normalize,
     **kernel;
 
   Image
@@ -725,32 +759,8 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   (void) memset(kernel,0,(size_t) width*sizeof(*kernel));
   for (w=0; w < (ssize_t) width; w+=2)
   {
-    ssize_t
-      j,
-      k,
-      u,
-      v;
-
-    kernel[w]=(double *) MagickAssumeAligned(AcquireAlignedMemory((size_t)
-      (width-(size_t) w),(width-(size_t) w)*sizeof(**kernel)));
-    if (kernel[w] == (double *) NULL)
+    if (AcquireAdaptiveSharpenKernel(kernel,width,w,sigma) == MagickFalse)
       break;
-    normalize=0.0;
-    j=((ssize_t) width-w-1)/2;
-    k=0;
-    for (v=(-j); v <= j; v++)
-    {
-      for (u=(-j); u <= j; u++)
-      {
-        kernel[w][k]=(double) (-exp(-((double) u*u+v*v)/(2.0*MagickSigma*
-          MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
-        normalize+=kernel[w][k];
-        k++;
-      }
-    }
-    kernel[w][(k-1)/2]=(double) ((-2.0)*normalize);
-    if (sigma < MagickEpsilon)
-      kernel[w][(k-1)/2]=1.0;
   }
   if (w < (ssize_t) width)
     {
