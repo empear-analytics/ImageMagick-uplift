@@ -1320,6 +1320,15 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsPixelInChromaRange(const PixelInfo *pixel,
+  const PixelInfo *low,const PixelInfo *high)
+{
+  return(((pixel->red >= low->red) && (pixel->red <= high->red) &&
+    (pixel->green >= low->green) && (pixel->green <= high->green) &&
+    (pixel->blue  >= low->blue) && (pixel->blue <= high->blue)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
   const PixelInfo *low,const PixelInfo *high,const Quantum opacity,
   const MagickBooleanType invert,ExceptionInfo *exception)
@@ -1384,10 +1393,7 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       GetPixelInfoPixel(image,q,&pixel);
-      match=((pixel.red >= low->red) && (pixel.red <= high->red) &&
-        (pixel.green >= low->green) && (pixel.green <= high->green) &&
-        (pixel.blue  >= low->blue) && (pixel.blue <= high->blue)) ? MagickTrue :
-        MagickFalse;
+      match=IsPixelInChromaRange(&pixel,low,high);
       if (match != invert)
         SetPixelAlpha(image,opacity,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
