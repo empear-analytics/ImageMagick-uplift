@@ -713,6 +713,76 @@ static size_t GetTallestTileHeight(Image **image_list,const ssize_t tile,
   return(max_height);
 }
 
+typedef struct _MontageBoundsInfo
+{
+  size_t
+    tiles_per_page,
+    number_images,
+    tiles_per_row,
+    border_width,
+    number_lines;
+
+  MagickBooleanType
+    concatenate;
+
+  Image
+    **image_list;
+
+  const MontageInfo
+    *montage_info;
+
+  RectangleInfo
+    extract_info;
+
+  TypeMetric
+    metrics;
+} MontageBoundsInfo;
+
+static void GetMontageBounds(ssize_t x_offset,ssize_t y_offset,
+  const MontageBoundsInfo *bounds_info,RectangleInfo *bounds)
+{
+  size_t
+    height,
+    max_height,
+    width;
+
+  ssize_t
+    tile;
+
+  max_height=0;
+  (*bounds).width=0;
+  (*bounds).height=0;
+  width=0;
+  for (tile=0; tile < (ssize_t) bounds_info->tiles_per_page; tile++)
+  {
+    if (tile < (ssize_t) bounds_info->number_images)
+      {
+        width=GetMontageTileWidth(bounds_info->concatenate,
+          bounds_info->image_list,tile,bounds_info->extract_info);
+        max_height=GetTallestTileHeight(bounds_info->image_list,tile,
+          max_height);
+      }
+    x_offset+=((ssize_t) width+2*(bounds_info->extract_info.x+(ssize_t)
+      bounds_info->border_width));
+    if (x_offset > (ssize_t) (*bounds).width)
+      (*bounds).width=(size_t) x_offset;
+    if (((tile+1) == (ssize_t) bounds_info->tiles_per_page) ||
+        (((tile+1) % (ssize_t) bounds_info->tiles_per_row) == 0))
+      {
+        x_offset=GetMontageRowOffset(bounds_info->montage_info,
+          bounds_info->number_images);
+        height=GetMontageRowHeight(bounds_info->concatenate,max_height,
+          bounds_info->extract_info);
+        y_offset+=(ssize_t) ((ssize_t) height+(bounds_info->extract_info.y+
+          (ssize_t) bounds_info->border_width)*2+(bounds_info->metrics.ascent-
+          bounds_info->metrics.descent+4)*(ssize_t) bounds_info->number_lines+
+          (bounds_info->montage_info->shadow != MagickFalse ? 4 : 0));
+        UpdateMontageBoundsHeight(y_offset,bounds);
+        max_height=0;
+      }
+  }
+}
+
 #define MontageImageTag  "Montage/Image"
 #define TileImageTag  "Tile/Image"
 
@@ -926,6 +996,9 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   total_tiles=(size_t) number_images;
   for (i=0; i < (ssize_t) images_per_page; i++)
   {
+    MontageBoundsInfo
+      bounds_info;
+
     /*
       Determine bounding box.
     */
@@ -933,32 +1006,17 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
     tiles_per_page=tiles_per_row*tiles_per_column;
     y_offset+=(ssize_t) title_offset;
-    max_height=0;
-    bounds.width=0;
-    bounds.height=0;
-    width=0;
-    for (tile=0; tile < (ssize_t) tiles_per_page; tile++)
-    {
-      if (tile < (ssize_t) number_images)
-        {
-          width=GetMontageTileWidth(concatenate,image_list,tile,extract_info);
-          max_height=GetTallestTileHeight(image_list,tile,max_height);
-        }
-      x_offset+=((ssize_t) width+2*(extract_info.x+(ssize_t) border_width));
-      if (x_offset > (ssize_t) bounds.width)
-        bounds.width=(size_t) x_offset;
-      if (((tile+1) == (ssize_t) tiles_per_page) ||
-          (((tile+1) % (ssize_t) tiles_per_row) == 0))
-        {
-          x_offset=GetMontageRowOffset(montage_info,number_images);
-          height=GetMontageRowHeight(concatenate,max_height,extract_info);
-          y_offset+=(ssize_t) ((ssize_t) height+(extract_info.y+
-            (ssize_t) border_width)*2+(metrics.ascent-metrics.descent+4)*
-            (ssize_t) number_lines+(montage_info->shadow != MagickFalse ? 4 : 0));
-          UpdateMontageBoundsHeight(y_offset,&bounds);
-          max_height=0;
-        }
-    }
+    bounds_info.tiles_per_page=tiles_per_page;
+    bounds_info.number_images=number_images;
+    bounds_info.tiles_per_row=tiles_per_row;
+    bounds_info.border_width=border_width;
+    bounds_info.number_lines=number_lines;
+    bounds_info.concatenate=concatenate;
+    bounds_info.image_list=image_list;
+    bounds_info.montage_info=montage_info;
+    bounds_info.extract_info=extract_info;
+    bounds_info.metrics=metrics;
+    GetMontageBounds(x_offset,y_offset,&bounds_info,&bounds);
     if (montage_info->shadow != MagickFalse)
       bounds.width+=4;
     /*
