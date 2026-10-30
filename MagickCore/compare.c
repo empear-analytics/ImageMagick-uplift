@@ -1486,6 +1486,9 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
     *image_statistics,
     *reconstruct_statistics;
 
+  CorrelationStatisticsTargets
+    targets;
+
   double
     reconstruct_variance[MaxPixelChannels+1] = { 0.0 },
     variance[MaxPixelChannels+1] = { 0.0 };
@@ -1507,19 +1510,11 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
   /*
     Compute the normalized criss-correlation similarity.
   */
-  image_statistics=GetImageStatistics(image,exception);
-  reconstruct_statistics=GetImageStatistics(reconstruct_image,exception);
-  if ((image_statistics == (ChannelStatistics *) NULL) ||
-      (reconstruct_statistics == (ChannelStatistics *) NULL))
-    {
-      if (image_statistics != (ChannelStatistics *) NULL)
-        image_statistics=(ChannelStatistics *) RelinquishMagickMemory(
-          image_statistics);
-      if (reconstruct_statistics != (ChannelStatistics *) NULL)
-        reconstruct_statistics=(ChannelStatistics *) RelinquishMagickMemory(
-          reconstruct_statistics);
-      return(MagickFalse);
-    }
+  targets.image_statistics=(&image_statistics);
+  targets.reconstruct_statistics=(&reconstruct_statistics);
+  if (AcquireCorrelationStatistics(image,reconstruct_image,exception,
+        &targets) == MagickFalse)
+    return(MagickFalse);
   (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
   SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
   image_view=AcquireVirtualCacheView(image,exception);
