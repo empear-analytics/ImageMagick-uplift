@@ -220,6 +220,57 @@ static void GrowColorList(HNodeInfo *node_info,const ssize_t i)
       }
 }
 
+typedef struct _HNodeChild
+{
+  const Image
+    *image;
+
+  HCubeInfo
+    *cube_info;
+
+  HNodeInfo
+    *node_info;
+
+  size_t
+    id,
+    level;
+
+  ExceptionInfo
+    *exception;
+} HNodeChild;
+
+static MagickBooleanType AcquireHNodeChild(const HNodeChild *child)
+{
+  const Image
+    *const image = child->image;
+
+  HCubeInfo
+    *const cube_info = child->cube_info;
+
+  HNodeInfo
+    *const node_info = child->node_info;
+
+  const size_t
+    id = child->id,
+    level = child->level;
+
+  ExceptionInfo
+    *const exception = child->exception;
+
+  if (node_info->child[id] == (HNodeInfo *) NULL)
+    {
+      node_info->child[id]=GetHNodeInfo(cube_info,level);
+      if (node_info->child[id] == (HNodeInfo *) NULL)
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            ResourceLimitError,"MemoryAllocationFailed","`%s'",
+            image->filename);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
 static HCubeInfo *ClassifyImageColors(const Image *image,
   ExceptionInfo *exception)
 {
@@ -285,19 +336,19 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
       index=MaxTreeDepth-1;
       for (level=1; level < MaxTreeDepth; level++)
       {
+        HNodeChild
+          child;
+
         GetPixelInfoPixel(image,p,&pixel);
         id=ColorToNodeId(&pixel,index);
-        if (node_info->child[id] == (HNodeInfo *) NULL)
-          {
-            node_info->child[id]=GetHNodeInfo(cube_info,level);
-            if (node_info->child[id] == (HNodeInfo *) NULL)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed","`%s'",
-                  image->filename);
-                return(0);
-              }
-          }
+        child.image=image;
+        child.cube_info=cube_info;
+        child.node_info=node_info;
+        child.id=id;
+        child.level=level;
+        child.exception=exception;
+        if (AcquireHNodeChild(&child) == MagickFalse)
+          return(0);
         node_info=node_info->child[id];
         index--;
       }
