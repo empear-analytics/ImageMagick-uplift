@@ -114,6 +114,25 @@
 %    o rotations: Specifies the number of 90 degree rotations.
 %
 */
+static void CopyRotatedPixelChannels(const Image *image,
+  const Image *rotate_image,const Quantum *p,Quantum *q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait rotate_traits = GetPixelChannelTraits(rotate_image,
+      channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (rotate_traits == UndefinedPixelTrait))
+      continue;
+    SetPixelChannel(rotate_image,channel,p[i],q);
+  }
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -257,20 +276,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
               GetPixelChannels(image);
             for (x=0; x < (ssize_t) height; x++)
             {
-              ssize_t
-                i;
-
-              for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-              {
-                PixelChannel channel = GetPixelChannelChannel(image,i);
-                PixelTrait traits = GetPixelChannelTraits(image,channel);
-                PixelTrait rotate_traits = GetPixelChannelTraits(rotate_image,
-                  channel);
-                if ((traits == UndefinedPixelTrait) ||
-                    (rotate_traits == UndefinedPixelTrait))
-                  continue;
-                SetPixelChannel(rotate_image,channel,tile_pixels[i],q);
-              }
+              CopyRotatedPixelChannels(image,rotate_image,tile_pixels,q);
               tile_pixels-=width*GetPixelChannels(image);
               q+=(ptrdiff_t) GetPixelChannels(rotate_image);
             }
