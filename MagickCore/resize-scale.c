@@ -589,6 +589,89 @@ static void AccumulateScaleRows(const ScaleRows *rows,
   }
 }
 
+typedef struct _ScaleRead
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  double
+    alpha,
+    *x_vector;
+
+  ExceptionInfo
+    *exception;
+} ScaleRead;
+
+typedef struct _ScaleReadTargets
+{
+  ssize_t
+    *n;
+
+  MagickBooleanType
+    *status;
+
+  ssize_t
+    *number_rows;
+
+  MagickBooleanType
+    *next_row;
+} ScaleReadTargets;
+
+static MagickBooleanType ReadPendingScaleRow(const ScaleRead *pending,
+  const ScaleReadTargets *targets)
+{
+  const Image
+    *const image = pending->image;
+
+  CacheView
+    *const image_view = pending->image_view;
+
+  const double
+    alpha = pending->alpha;
+
+  double
+    *const x_vector = pending->x_vector;
+
+  ExceptionInfo
+    *const exception = pending->exception;
+
+  ssize_t
+    *const n = targets->n;
+
+  MagickBooleanType
+    *const status = targets->status;
+
+  ssize_t
+    *const number_rows = targets->number_rows;
+
+  MagickBooleanType
+    *const next_row = targets->next_row;
+
+  const Quantum
+    *magick_restrict p;
+
+  if (IsScaleRowPending(image,*next_row,*number_rows) != MagickFalse)
+    {
+      /*
+        Read a new scanline.
+      */
+      p=GetCacheViewVirtualPixels(image_view,0,(*n)++,image->columns,1,
+        exception);
+      if (p == (const Quantum *) NULL)
+        {
+          *status=MagickFalse;
+          return(MagickFalse);
+        }
+      ImportScaleScanline(image,p,alpha,x_vector);
+      (*number_rows)++;
+      *next_row=MagickFalse;
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -720,6 +803,12 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
         const ScaleRowTargets
           targets = { &n, &status, &number_rows, &span, &scale, &next_row };
 
+        const ScaleReadTargets
+          pending_targets = { &n, &status, &number_rows, &next_row };
+
+        ScaleRead
+          pending;
+
         ScaleRows
           scale_rows;
 
@@ -734,22 +823,13 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
         scale_rows.y_vector=y_vector;
         scale_rows.exception=exception;
         AccumulateScaleRows(&scale_rows,&targets);
-        if (IsScaleRowPending(image,next_row,number_rows) != MagickFalse)
-          {
-            /*
-              Read a new scanline.
-            */
-            p=GetCacheViewVirtualPixels(image_view,0,n++,image->columns,1,
-              exception);
-            if (p == (const Quantum *) NULL)
-              {
-                status=MagickFalse;
-                break;
-              }
-            ImportScaleScanline(image,p,alpha,x_vector);
-            number_rows++;
-            next_row=MagickFalse;
-          }
+        pending.image=image;
+        pending.image_view=image_view;
+        pending.alpha=alpha;
+        pending.x_vector=x_vector;
+        pending.exception=exception;
+        if (ReadPendingScaleRow(&pending,&pending_targets) == MagickFalse)
+          break;
         BlendScaleScanline(image,span,x_vector,y_vector,scanline);
         scale.y-=span.y;
         if (scale.y <= 0)
