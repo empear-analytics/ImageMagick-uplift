@@ -3231,6 +3231,12 @@ its declaration and the block writes it.
    member of that type. A variable the block reads on entry and then writes, and that
    nothing after the block reads, goes by value as a parameter (Recipe E step 4). With
    the struct and the pointers the block writes through, at most four parameters.
+   A `const` struct local whose members are pointers (`CorrelationSums`), which the
+   block neither assigns nor writes a member of, and whose address it takes only as `&s`
+   passed to a pointer-to-`const` parameter of a callee that reads the members and
+   writes through them, is one of those pointers: N step 2 (d) keeps it out of the
+   struct, and it goes by value as a parameter of its exact type
+   (`const CorrelationSums sums`), the block's `&sums` unchanged.
 3. Temporaries. A variable of the caller that the block writes before it reads it, on
    every path, and that nothing after the block reads, is declared in the new function
    without an initialiser, even when the caller writes it before the block (a
@@ -3360,6 +3366,10 @@ static void TransferPixelsForward(Quantum *magick_restrict p,PixelInfo pixel,
   for Recipe N.
 - `refactor_guard.py --calls` shows each new function and the callees of the removed
   copies, down by the calls the second copy made: a deduplication, as Recipe D's.
+- A struct of pointers passed by value (step 2) is a copy of the same addresses. `&sums`
+  in the new function names the copy, whose members the callee reads as it read the
+  caller's local, so every write through them lands in the same arrays in the same
+  order; nothing writes either struct, so the copy never differs from the original.
 
 **Evidence level:** oracle (the cases of both functions), with `refactor_guard.py --calls`,
 and steps 1 (by script), 2, 3 and 7 checked by reading.
@@ -3370,6 +3380,9 @@ function's direction `switch`, twins under the renaming. A probe: `XShearImage`'
 alone, 6.47 to 5.99; both functions' four cases, 6.47 to 6.63, both leaving *Deep, Nested
 Complexity*. Added by Claude Code (Claude Opus 5.5) during task W10, under the mandate of
 2026-10-24.
+Step 2's struct of pointers (2026-10-31, task W10): `compare.c`'s `GetDPCSimilarity` and
+`GetNCCSimilarity`, whose column loops are the same text, each passing its row's
+`CorrelationSums` to `AccumulateCorrelationPixel` as `&sums`.
 
 ---
 
@@ -3977,3 +3990,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | P | *Leading operands of a chain*: the predicate may hold the leading operands of a chain of one operator (`a && b` of `a && b && c`, which C groups as `(a && b) && c`) when the whole chain would take five or more parameters; the site becomes `(Pred(...) != MagickFalse) && c` | `attribute-bounds.c`'s `GetImageBoundingBox` (W10): its *Complex Conditional* `(x < (ssize_t) bounding_box.width) && (y > (ssize_t) bounding_box.height) && (IsFuzzyEquivalencePixelInfo(&pixel,&target[3]) == MagickFalse)` reads five variables, so the whole chain as one predicate carries *Excess Number of Function Arguments*; its first two operands as a three-parameter predicate: 7.51 to 7.66, the file's sixth function | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 4: a variable declared without an initialiser, which the block writes before it reads it on every path and which nothing after the block reads, is declared in the new function even when the caller writes it before the block (as Recipe TW step 3 and Recipe J step 3 say for their blocks); the 2026-10-28 condition stays for a variable with an initialiser | `decorate.c`'s `FrameImage` (W10): its bevel loops share the function's `y` (and the top band's `width`) with the loops before them; each loop sets `y` in its `for` before any read, and the next loop sets it again. The 2026-10-28 wording ("when no statement between that declaration and the block writes it") is there to keep an initialiser's value, which such a variable does not have | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | SV | Step 2: the value may also be an object-like macro of the file expanding to a call, with constant arguments, of a `static inline` function that reads and writes nothing but its parameters (`AccentuateModulate`, `ScaleCharToQuantum(80)`), its parameter of the function's return type; and a copy's one written variable, assigned whole before it is read and read by the caller afterwards, becomes the new function's local and return value (`v=Helper(...);`, Recipe E steps 3 and 4). *Careful* gives the argument | `decorate.c`'s `FrameImage` (W10): its four 3-D colours are two pairs of copies, five statements each on `matte`, differing only in the modulate macro (`AccentuateModulate`/`HighlightModulate`, `ShadowModulate`/`TroughModulate`), each copy writing its own colour. The macro is not a literal, an enumeration constant or a member access, so step 2 refused it. The lighter pair as one helper: 8.08 to 8.20; both pairs: 8.24 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | TW | Step 2: a `const` struct local of pointers that the block passes only as `&s` to a pointer-to-`const` parameter of a callee writing through its members, and neither assigns nor writes a member of, goes by value as a parameter of its exact type, its text unchanged (N step 2 (d) keeps it out of the struct). *Careful* gives the argument | `compare.c`'s `GetDPCSimilarity` and `GetNCCSimilarity` (W10): their column loops are the same text (eight inputs, depth 3, a bump each), passing the row's `CorrelationSums` as `&sums`; both as one helper, then their identical statistics blocks (Recipe I and I step 7), 2.43 to 2.54 in a probe | mandate (2026-10-24) |
