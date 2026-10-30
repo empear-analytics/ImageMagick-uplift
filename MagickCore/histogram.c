@@ -339,6 +339,79 @@ static MagickBooleanType AppendHNodeColor(const HNodeColor *color)
   return(MagickTrue);
 }
 
+typedef struct _HCubeDescent
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  HCubeInfo
+    *cube_info;
+
+  ExceptionInfo
+    *exception;
+} HCubeDescent;
+
+typedef struct _HCubeLeaf
+{
+  HNodeInfo
+    **node_info;
+
+  PixelInfo
+    *pixel;
+} HCubeLeaf;
+
+static MagickBooleanType DescendHCube(const HCubeDescent *descent,
+  const HCubeLeaf *targets)
+{
+  const Image
+    *const image = descent->image;
+
+  const Quantum
+    *const p = descent->p;
+
+  HCubeInfo
+    *const cube_info = descent->cube_info;
+
+  ExceptionInfo
+    *const exception = descent->exception;
+
+  HNodeInfo
+    **const node_info = targets->node_info;
+
+  PixelInfo
+    *const pixel = targets->pixel;
+
+  size_t
+    id,
+    index,
+    level;
+
+  (*node_info)=cube_info->root;
+  index=MaxTreeDepth-1;
+  for (level=1; level < MaxTreeDepth; level++)
+  {
+    HNodeChild
+      child;
+
+    GetPixelInfoPixel(image,p,pixel);
+    id=ColorToNodeId(pixel,index);
+    child.image=image;
+    child.cube_info=cube_info;
+    child.node_info=(*node_info);
+    child.id=id;
+    child.level=level;
+    child.exception=exception;
+    if (AcquireHNodeChild(&child) == MagickFalse)
+      return(MagickFalse);
+    (*node_info)=(*node_info)->child[id];
+    index--;
+  }
+  return(MagickTrue);
+}
+
 static HCubeInfo *ClassifyImageColors(const Image *image,
   ExceptionInfo *exception)
 {
@@ -361,11 +434,6 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
 
   const Quantum
     *p;
-
-  size_t
-    id,
-    index,
-    level;
 
   ssize_t
     i,
@@ -397,32 +465,26 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
       break;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
+      HCubeDescent
+        descent;
+
+      HCubeLeaf
+        targets;
+
       HNodeColor
         color;
 
       /*
         Start at the root and proceed level by level.
       */
-      node_info=cube_info->root;
-      index=MaxTreeDepth-1;
-      for (level=1; level < MaxTreeDepth; level++)
-      {
-        HNodeChild
-          child;
-
-        GetPixelInfoPixel(image,p,&pixel);
-        id=ColorToNodeId(&pixel,index);
-        child.image=image;
-        child.cube_info=cube_info;
-        child.node_info=node_info;
-        child.id=id;
-        child.level=level;
-        child.exception=exception;
-        if (AcquireHNodeChild(&child) == MagickFalse)
-          return(0);
-        node_info=node_info->child[id];
-        index--;
-      }
+      descent.image=image;
+      descent.p=p;
+      descent.cube_info=cube_info;
+      descent.exception=exception;
+      targets.node_info=(&node_info);
+      targets.pixel=(&pixel);
+      if (DescendHCube(&descent,&targets) == MagickFalse)
+        return(0);
       for (i=0; i < (ssize_t) node_info->number_unique; i++)
         if (IsPixelInfoColorMatch(&pixel,node_info->list+i) != MagickFalse)
           break;
