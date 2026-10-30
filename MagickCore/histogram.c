@@ -1422,6 +1422,65 @@ static void SetUniqueColorPixel(const Image *unique_image,const PixelInfo *p,
 %
 */
 
+typedef struct _HUniqueColors
+{
+  Image
+    *unique_image;
+
+  CacheView
+    *unique_view;
+
+  HCubeInfo
+    *cube_info;
+
+  const HNodeInfo
+    *node_info;
+
+  ExceptionInfo
+    *exception;
+} HUniqueColors;
+
+static void SetUniqueColorPixels(const HUniqueColors *unique)
+{
+  Image
+    *const unique_image = unique->unique_image;
+
+  CacheView
+    *const unique_view = unique->unique_view;
+
+  HCubeInfo
+    *const cube_info = unique->cube_info;
+
+  const HNodeInfo
+    *const node_info = unique->node_info;
+
+  ExceptionInfo
+    *const exception = unique->exception;
+
+  PixelInfo
+    *p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    i;
+
+  p=node_info->list;
+  for (i=0; i < (ssize_t) node_info->number_unique; i++)
+  {
+    q=QueueCacheViewAuthenticPixels(unique_view,cube_info->x,0,1,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      continue;
+    SetUniqueColorPixel(unique_image,p,q);
+    if (SyncCacheViewAuthenticPixels(unique_view,exception) == MagickFalse)
+      break;
+    cube_info->x++;
+    p++;
+  }
+}
+
 static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
   HCubeInfo *cube_info,const HNodeInfo *node_info,ExceptionInfo *exception)
 {
@@ -1446,26 +1505,16 @@ static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
         node_info->child[i],exception);
   if (node_info->level == (MaxTreeDepth-1))
     {
-      PixelInfo
-        *p;
-
-      Quantum
-        *magick_restrict q;
+      HUniqueColors
+        unique;
 
       status=MagickTrue;
-      p=node_info->list;
-      for (i=0; i < (ssize_t) node_info->number_unique; i++)
-      {
-        q=QueueCacheViewAuthenticPixels(unique_view,cube_info->x,0,1,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          continue;
-        SetUniqueColorPixel(unique_image,p,q);
-        if (SyncCacheViewAuthenticPixels(unique_view,exception) == MagickFalse)
-          break;
-        cube_info->x++;
-        p++;
-      }
+      unique.unique_image=unique_image;
+      unique.unique_view=unique_view;
+      unique.cube_info=cube_info;
+      unique.node_info=node_info;
+      unique.exception=exception;
+      SetUniqueColorPixels(&unique);
       if (unique_image->progress_monitor != (MagickProgressMonitor) NULL)
         {
           MagickBooleanType
