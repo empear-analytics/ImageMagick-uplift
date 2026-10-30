@@ -3756,18 +3756,44 @@ static void ClassifyImageSequence(const QuantizeSequence *sequence,
   }
 }
 
-MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
-  Image *images,ExceptionInfo *exception)
+static void AssignImageSequenceColors(const QuantizeSequence *sequence,
+  MagickBooleanType *status)
 {
   Image
     *image;
 
   MagickBooleanType
-    proceed,
-    status;
+    proceed;
 
   MagickProgressMonitor
     progress_monitor;
+
+  ssize_t
+    i;
+
+  image=sequence->images;
+  for (i=0; image != (Image *) NULL; i++)
+  {
+    progress_monitor=SetImageProgressMonitor(image,(MagickProgressMonitor)
+      NULL,image->client_data);
+    *status=AssignImageColors(image,sequence->cube_info,sequence->exception);
+    if (*status == MagickFalse)
+      break;
+    (void) SetImageProgressMonitor(image,progress_monitor,
+      image->client_data);
+    proceed=SetImageProgress(image,AssignImageTag,(MagickOffsetType) i,
+      sequence->number_images);
+    if (proceed == MagickFalse)
+      break;
+    image=GetNextImageInList(image);
+  }
+}
+
+MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
+  Image *images,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
 
   QCubeInfo
     *cube_info;
@@ -3779,9 +3805,6 @@ MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
     depth,
     maximum_colors,
     number_images;
-
-  ssize_t
-    i;
 
   assert(quantize_info != (const QuantizeInfo *) NULL);
   assert(quantize_info->signature == MagickCoreSignature);
@@ -3830,22 +3853,11 @@ MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
         Reduce the number of colors in an image sequence.
       */
       ReduceImageColors(images,cube_info);
-      image=images;
-      for (i=0; image != (Image *) NULL; i++)
-      {
-        progress_monitor=SetImageProgressMonitor(image,(MagickProgressMonitor)
-          NULL,image->client_data);
-        status=AssignImageColors(image,cube_info,exception);
-        if (status == MagickFalse)
-          break;
-        (void) SetImageProgressMonitor(image,progress_monitor,
-          image->client_data);
-        proceed=SetImageProgress(image,AssignImageTag,(MagickOffsetType) i,
-          number_images);
-        if (proceed == MagickFalse)
-          break;
-        image=GetNextImageInList(image);
-      }
+      sequence.images=images;
+      sequence.cube_info=cube_info;
+      sequence.number_images=number_images;
+      sequence.exception=exception;
+      AssignImageSequenceColors(&sequence,&status);
     }
   DestroyQCubeInfo(cube_info);
   return(status);
