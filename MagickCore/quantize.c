@@ -2147,11 +2147,11 @@ static void DitherFloydSteinbergPixel(const FloydSteinbergPixel *fs,
     fs->current[u].alpha=pixel.alpha-color.alpha;
 }
 
+#define DitherImageTag  "Dither/Image"
+
 static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
-#define DitherImageTag  "Dither/Image"
-
   CacheView
     *image_view;
 
