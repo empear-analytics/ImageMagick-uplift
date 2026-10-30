@@ -1370,7 +1370,12 @@ as parameters. K then B is two commits, of which the first adds a finding.
    written variable here too: its member is a pointer to the array's exact type
    (`double sum[MaxPixelChannels+1]` gives `double (*sum)[MaxPixelChannels+1]`), the
    caller writes `targets.sum=(&sum);`, and each `sum[i]` in the text becomes
-   `(*sum)[i]`; inside a parallel loop the array is declared in the loop body.
+   `(*sum)[i]`; inside a parallel loop the array is declared in the loop body. The
+   `Targets` local may instead be declared `const` with the addresses as its
+   initialiser, `const Targets targets = { &v, ... };`, one per member in member order
+   (Recipe B step 5's `const` form), among the declarations of the block holding the
+   call, every `v` declared in that block or one enclosing it; the `targets.v=(&v);`
+   assignments are then left out.
 
 **Before:**
 
@@ -1497,6 +1502,16 @@ static void SumBilateralPixels(const BilateralSum *sum,double *pixel,
   sums that bind the same locals and end in the same cursor advances are reported as
   *Code Duplication* (`SelectiveBlurImage`'s plain and blended sums: 2.77 to 2.65); with
   the second in the member form, none is (2.84).
+- A `const` `Targets` local initialised with `{ &v, ... }` holds what step 8's
+  assignments would have stored: the address of a variable is fixed while the
+  variable lives, and each `v` is declared in the block of the declaration or one
+  enclosing it, so it lives from the initialiser to every call; a `const` local is
+  never reseated. The initialiser reads no variable's value and has no call and no side
+  effect, so evaluating it at the declaration instead of before each call changes
+  nothing (Recipe B's argument). C99 admits an initialiser of an automatic aggregate
+  that is not constant, as Recipe B's `const` locals already do (`compare.c`'s `sums`).
+  Inside a parallel loop the declaration stands in the loop body, so each thread holds
+  the addresses of its own variables.
 - The four of step 1 keep the block one accumulation; with the addresses in one
   parameter the count no longer costs arguments, and step 8 allows six for a sum whose
   cursors advance in lockstep with its accumulators (`SelectiveBlurImage`'s kernel,
@@ -3146,3 +3161,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | T, U | T step 4 (U step 1): a block that ends the parallel loop body may contain `continue;` of the parallel loop; each becomes `return(status);` and the call `if (Helper(...) == MagickFalse) status=MagickFalse;` is the body's last statement (Recipe E step 7's loop-tail form); *Careful* gives the argument and excludes a block followed by a progress block | `paint.c`'s `FloodfillPaintImage`: its tiling loop body after the status test is a fetch that `continue`s on failure, a fill and a sync; a probe with Recipe U, 6.06 to 6.10 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | LB | Step 7: a block whose every exit is the same run `S` followed by `continue;` of `Lp` moves with `S continue;` left in the caller, `if (Helper(...) == MagickFalse) { S continue; }`, as Recipe V step 7 leaves its cleanup; the block writes nothing `S` reads or writes. *Careful* gives the argument, including `S` writing the loop counter | `statistic.c`'s `GetImageStatistics`: the depth check inside the channel loop (nesting 5) ends in `IncreaseChannelDepth(...); i--; continue;`, which E step 7 refuses (its counter goes by value; the block is not the body's tail) and LB step 1 refuses (a `continue`); its temporaries `depth`, `range` and `status` move with it. A probe: nesting 5 to 4, bumps 4 to 3, 4.73 to 4.76 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | K | Step 6: a block in a function with no OpenMP region (a sequential pass, as Recipe Q step 1 admits) moves the same way, writing at most four plain locals of the caller, none whose address is taken elsewhere (Recipe O step 2); the written locals may be cursors the caller reads afterwards. *Careful* gives the argument | `statistic.c`'s `GetMedianPixel` (cc 10, two bumps): its partition loop writes the cursors `l` and `h`, which E step 4 refuses (two written variables), O refuses (a loop, not a selection) and Q refuses (two inputs, so K's form has four parameters). A probe: the function leaves Complex Method and Bumpy Road Ahead, 4.91 to 5.07 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | Q | Step 8: the `Targets` local may be declared `const` with the addresses as its initialiser, `{ &v, ... }` in member order, in the block holding the call or inside the scope of every `v`, instead of the `targets.v=(&v);` assignments before the call (Recipe B step 5's `const` form). *Careful* gives the argument: an address does not change while its variable lives, and the initialiser reads no value | `vision.c`'s four moment-threshold functions: the second-moment column loop (nesting 4 in each, inside the parallel object loop) writes `M11`, `M20`, `M02` and the cursor `p` and reads five inputs, so step 7 gives five parameters; with step 8's four assignments per call `MajorAxisThreshold` and `MinorAxisThreshold` enter Large Method (71 lines) and the other two grow. A probe of all four in the `const` form: every caller shorter, 4.30 to 4.73 | mandate (2026-10-24) |
