@@ -278,6 +278,20 @@ static double EvaluateLog(const Quantum pixel,const double value,
   return(result);
 }
 
+static double EvaluateLeftShift(const Quantum pixel,const double value)
+{
+  double
+    result;
+
+  ssize_t
+    i;
+
+  result=(double) pixel;
+  for (i=0; i < (ssize_t) value; i++)
+    result*=2.0;
+  return(result);
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
@@ -362,9 +376,7 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case LeftShiftEvaluateOperator:
     {
-      result=(double) pixel;
-      for (i=0; i < (ssize_t) value; i++)
-        result*=2.0;
+      result=EvaluateLeftShift(pixel,value);
       break;
     }
     case LogEvaluateOperator:
