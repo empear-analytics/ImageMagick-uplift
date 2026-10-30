@@ -581,12 +581,18 @@ needs two copies of the block.
    pointer, and not an array parameter, which is one), counts as a plain local
    (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
    copy, and the same rule on its address applies.
+   A variable the block does not read before writing it, and that nothing after the
+   block reads (a discarded out-argument, `MontageImageList`'s `sans` in
+   `GetMontageGeometry(...,&sans,&sans)`), is not one of them: the new function
+   declares it, as Recipe E step 4 does, and it is no parameter.
 3. The block must contain no `return`, `goto`, `continue`, or `break` that leaves the
    block; a `break` that ends a `switch` or loop inside the block is fine.
 4. Cut the block into a new `static void` function directly above the caller. Pass each
    variable it only reads by value, and each variable it writes as a pointer.
 5. In the body, write `*v` for every use of a written variable `v`, reads included, so
-   a value the block does not overwrite is the caller's value. Change nothing else.
+   a value the block does not overwrite is the caller's value; its address `&v`, passed
+   on to a callee, is written `v`, the same address (Recipe Q step 5). Change nothing
+   else.
 6. Call it where the block stood, passing `&v` for each written variable, in the order
    of the parameters. Check every argument against its parameter by reading.
 
@@ -3708,3 +3714,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | H | *Use when*: also a function whose leading `#define` run holds helper macros with branches or many lines, which CodeScene counts in that function's cyclomatic complexity and length; the step is then kept for its own measured effect under rule 2. *Careful* says when the step is flat and when it is measured | `magnify.c` (W10): `Fish2XBottomRightPixel`'s `Corner` (one `if`, 16 lines), `Epbx2X`'s `HelperCond` (a conjunction and three disjunctions) and `Hq2XHelper`'s `caseA`/`caseB`; each hoist preprocessed identically. Probes from 6.90: `Fish2XBottomRightPixel` 7.19 (leaves *Large Method*), `Epbx2X` 7.11, `Hq2XHelper` 6.97 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | SD | Step 6: when the moved groups read `const` locals the caller initialises from its parameters only, the new function may take the caller's parameters and repeat the declarations of the locals it reads, initialisers unchanged; a local the caller no longer reads leaves its declaration; moved groups need not be adjacent, and the step may repeat on the same `switch`. *Careful* gives the argument, the chain, and the duplication to avoid | `magnify.c`'s `Hq2XHelper` (W10): the six neighbour offsets come from its `Hq2XNeighbours` parameter; Recipe Z's struct for nine inputs took the file over *Lines of Code in a Single File* (6.39 in a probe), step 6 twice gives 7.48 to 8.13 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | H | Step 1: a run that follows only declarations at the top of the body, none naming its macros, may be hoisted the same way, the declarations staying; *Careful*: the reach widens over those declarations too, which `pp_identical.sh` covers | `magnify.c`'s `Xbr2X` (W10): its `WeightVar` macro (a `?:`) follows the declaration of `magnify`; the hoist preprocessed identically, cc 10 to 9, 8.13 to 8.15 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | O | Step 2: a variable the block does not read before writing it, and that nothing after the block reads, is declared in the new function (Recipe E step 4) and is no out-parameter. Step 5: `&v` of a written variable, passed on to a callee, is written `v` (Recipe Q step 5) | `MontageImageList`'s three copies of `x_offset=0; y_offset=0; if (montage_info->tile != (char *) NULL) GetMontageGeometry(...,&x_offset,&y_offset,&sans,&sans);`: `sans` is a discarded out-argument that nothing reads, and as a third pointer it would give five parameters. A probe of the first copy: 6.63 to 6.65; all three, 6.68 | mandate (2026-10-24) |
