@@ -1569,12 +1569,45 @@ static void SetInverseFourierRow(const InverseFourierRow *row,ssize_t *i,
   }
 }
 
-static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
-  fftw_complex *fourier_pixels,Image *image,ExceptionInfo *exception)
+static void SetInverseFourierPixels(FourierInfo *fourier_info,
+  Image *image,double *source_pixels,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
+  Quantum
+    *q;
+
+  ssize_t
+    i,
+    y;
+
+  i=0L;
+  image_view=AcquireAuthenticCacheView(image,exception);
+  for (y=0L; y < (ssize_t) fourier_info->height; y++)
+  {
+    InverseFourierRow
+      row;
+
+    if (y >= (ssize_t) image->rows)
+      break;
+    q=GetCacheViewAuthenticPixels(image_view,0L,y,fourier_info->width >
+      image->columns ? image->columns : fourier_info->width,1UL,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.fourier_info=fourier_info;
+    row.image=image;
+    row.source_pixels=source_pixels;
+    SetInverseFourierRow(&row,&i,&q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+  image_view=DestroyCacheView(image_view);
+}
+
+static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
+  fftw_complex *fourier_pixels,Image *image,ExceptionInfo *exception)
+{
   const char
     *value;
 
@@ -1586,9 +1619,6 @@ static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
 
   MemoryInfo
     *source_info;
-
-  Quantum
-    *q;
 
   ssize_t
     i,
@@ -1644,27 +1674,7 @@ static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
     (int) fourier_info->height,fourier_pixels,source_pixels,FFTW_ESTIMATE);
   fftw_execute_dft_c2r(fftw_c2r_plan,fourier_pixels,source_pixels);
   fftw_destroy_plan(fftw_c2r_plan);
-  i=0L;
-  image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0L; y < (ssize_t) fourier_info->height; y++)
-  {
-    InverseFourierRow
-      row;
-
-    if (y >= (ssize_t) image->rows)
-      break;
-    q=GetCacheViewAuthenticPixels(image_view,0L,y,fourier_info->width >
-      image->columns ? image->columns : fourier_info->width,1UL,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.fourier_info=fourier_info;
-    row.image=image;
-    row.source_pixels=source_pixels;
-    SetInverseFourierRow(&row,&i,&q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      break;
-  }
-  image_view=DestroyCacheView(image_view);
+  SetInverseFourierPixels(fourier_info,image,source_pixels,exception);
   source_info=RelinquishVirtualMemory(source_info);
   return(MagickTrue);
 }
