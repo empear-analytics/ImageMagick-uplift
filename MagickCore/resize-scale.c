@@ -121,11 +121,58 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _ScaleImportPixel
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  double
+    alpha;
+
+  ssize_t
+    x;
+} ScaleImportPixel;
+
+static void ImportScalePixel(const ScaleImportPixel *pixel,double *x_vector)
+{
+  const Image
+    *const image = pixel->image;
+
+  const Quantum
+    *const p = pixel->p;
+
+  const double
+    alpha = pixel->alpha;
+
+  const ssize_t
+    x = pixel->x;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & BlendPixelTrait) == 0)
+      {
+        x_vector[x*(ssize_t) GetPixelChannels(image)+i]=(double) p[i];
+        continue;
+      }
+    x_vector[x*(ssize_t) GetPixelChannels(image)+i]=alpha*(double) p[i];
+  }
+}
+
 static void ImportScaleScanline(const Image *image,const Quantum *p,
   double alpha,double *x_vector)
 {
+  ScaleImportPixel
+    pixel;
+
   ssize_t
-    i,
     x;
 
   for (x=0; x < (ssize_t) image->columns; x++)
@@ -137,17 +184,11 @@ static void ImportScaleScanline(const Image *image,const Quantum *p,
       }
     if (image->alpha_trait != UndefinedPixelTrait)
       alpha=QuantumScale*(double) GetPixelAlpha(image,p);
-    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    {
-      PixelChannel channel = GetPixelChannelChannel(image,i);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      if ((traits & BlendPixelTrait) == 0)
-        {
-          x_vector[x*(ssize_t) GetPixelChannels(image)+i]=(double) p[i];
-          continue;
-        }
-      x_vector[x*(ssize_t) GetPixelChannels(image)+i]=alpha*(double) p[i];
-    }
+    pixel.image=image;
+    pixel.p=p;
+    pixel.alpha=alpha;
+    pixel.x=x;
+    ImportScalePixel(&pixel,x_vector);
     p+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
