@@ -423,6 +423,65 @@ static MagickBooleanType SetTransparentRowToBackground(Image *image,CacheView *i
   return(status);
 }
 
+typedef struct _ShapeAlphaRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  PixelInfo
+    background;
+
+  ExceptionInfo
+    *exception;
+} ShapeAlphaRow;
+
+static MagickBooleanType SetShapeAlphaRow(const ShapeAlphaRow *row)
+{
+  Image
+    *const image = row->image;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  const ssize_t
+    y = row->y;
+
+  const PixelInfo
+    background = row->background;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  MagickBooleanType
+    status;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    *magick_restrict q;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  pixel=background;
+  SetShapeAlphaPixels(image,pixel,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -681,24 +740,17 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        PixelInfo
-          pixel;
-
-        Quantum
-          *magick_restrict q;
+        ShapeAlphaRow
+          row;
 
         if (status == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        pixel=background;
-        SetShapeAlphaPixels(image,pixel,q);
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+        row.image=image;
+        row.image_view=image_view;
+        row.y=y;
+        row.background=background;
+        row.exception=exception;
+        if (SetShapeAlphaRow(&row) == MagickFalse)
           status=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);
