@@ -2291,6 +2291,35 @@ static MagickBooleanType RiemersmaDither(const RiemersmaCurve *curve,
   return(MagickTrue);
 }
 
+static void RiemersmaVerticalUnitCurve(const RiemersmaCurve *curve,
+  const unsigned int direction,MagickBooleanType *status,
+  ExceptionInfo *exception)
+{
+  switch (direction)
+  {
+    case NorthGravity:
+    {
+      *status=RiemersmaDither(curve,SouthGravity,exception);
+      if (*status != MagickFalse)
+        *status=RiemersmaDither(curve,EastGravity,exception);
+      if (*status != MagickFalse)
+        *status=RiemersmaDither(curve,NorthGravity,exception);
+      break;
+    }
+    case SouthGravity:
+    {
+      *status=RiemersmaDither(curve,NorthGravity,exception);
+      if (*status != MagickFalse)
+        *status=RiemersmaDither(curve,WestGravity,exception);
+      if (*status != MagickFalse)
+        *status=RiemersmaDither(curve,SouthGravity,exception);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
   const size_t level,const unsigned int direction,ExceptionInfo *exception)
 {
@@ -2319,26 +2348,11 @@ static MagickBooleanType Riemersma(const RiemersmaCurve *curve,
           status=RiemersmaDither(curve,EastGravity,exception);
         break;
       }
-      case NorthGravity:
-      {
-        status=RiemersmaDither(curve,SouthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,EastGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,NorthGravity,exception);
-        break;
-      }
-      case SouthGravity:
-      {
-        status=RiemersmaDither(curve,NorthGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,WestGravity,exception);
-        if (status != MagickFalse)
-          status=RiemersmaDither(curve,SouthGravity,exception);
-        break;
-      }
       default:
+      {
+        RiemersmaVerticalUnitCurve(curve,direction,&status,exception);
         break;
+      }
     }
   else
     switch (direction)
