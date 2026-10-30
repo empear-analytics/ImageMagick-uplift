@@ -2523,6 +2523,19 @@ static MagickBooleanType AppendTagAttributes(XMLTreeInfo *xml_info,
   return(MagickTrue);
 }
 
+static ssize_t FindAttributeTagIndex(char ***attributes,
+  const XMLTreeInfo *xml_info)
+{
+  ssize_t
+    i;
+
+  i=0;
+  while ((attributes[i] != (char **) NULL) &&
+         (strcmp(attributes[i][0],xml_info->tag) != 0))
+    i++;
+  return(i);
+}
+
 static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   size_t *extent,size_t start,char ***attributes)
 {
@@ -2548,10 +2561,7 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
     "<%s",xml_info->tag);
   if (AppendTagAttributes(xml_info,source,length,extent) == MagickFalse)
     return((char *) NULL);
-  i=0;
-  while ((attributes[i] != (char **) NULL) &&
-         (strcmp(attributes[i][0],xml_info->tag) != 0))
-    i++;
+  i=FindAttributeTagIndex(attributes,xml_info);
   j=1;
   while ((attributes[i] != (char **) NULL) &&
          (attributes[i][j] != (char *) NULL))
