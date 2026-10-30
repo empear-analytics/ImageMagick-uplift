@@ -1026,6 +1026,24 @@ static RectangleInfo ExpandDisposalBounds(RectangleInfo bgnd_bounds,
   return(bgnd_bounds);
 }
 
+static void MergeDeletedFrameDelays(const DisposeType *disposals,
+  Image *prev_image,const Image **curr,ssize_t *i)
+{
+  if ( disposals[*i] == DelDispose ) {
+    size_t time = 0;
+    while ( disposals[*i] == DelDispose ) {
+      time +=(size_t) ((*curr)->delay*1000*
+        MagickSafeReciprocal((double) (*curr)->ticks_per_second));
+      *curr=GetNextImageInList(*curr);
+      (*i)++;
+    }
+    time += (size_t)((*curr)->delay*1000*
+      MagickSafeReciprocal((double) (*curr)->ticks_per_second));
+    prev_image->ticks_per_second = 100L;
+    prev_image->delay = time*(size_t) prev_image->ticks_per_second/1000;
+  }
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1397,19 +1415,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     if (prev_image == (Image *) NULL)
       break;
     prev_image->background_color.alpha_trait=BlendPixelTrait;
-    if ( disposals[i] == DelDispose ) {
-      size_t time = 0;
-      while ( disposals[i] == DelDispose ) {
-        time +=(size_t) (curr->delay*1000*
-          MagickSafeReciprocal((double) curr->ticks_per_second));
-        curr=GetNextImageInList(curr);
-        i++;
-      }
-      time += (size_t)(curr->delay*1000*
-        MagickSafeReciprocal((double) curr->ticks_per_second));
-      prev_image->ticks_per_second = 100L;
-      prev_image->delay = time*(size_t) prev_image->ticks_per_second/1000;
-    }
+    MergeDeletedFrameDelays(disposals,prev_image,&curr,&i);
     bgnd_image=CropImage(prev_image,&bounds[i],sans_exception);
     prev_image=DestroyImage(prev_image);
     if (bgnd_image == (Image *) NULL)
