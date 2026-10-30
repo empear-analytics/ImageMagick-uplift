@@ -4088,6 +4088,72 @@ static fxFltType GetQualifiedValueU0 (const RpnFirstImageInputs * in,
   return(regA);
 }
 
+typedef struct _RpnInterpInputs
+{
+  FxInfo
+    *pfx;
+
+  ElementT
+    *pel;
+
+  PixelChannel
+    channel;
+
+  ssize_t
+    ImgNum;
+
+  fxFltType
+    fx,
+    fy;
+} RpnInterpInputs;
+
+static fxFltType GetInterpolatedValueUP (const RpnInterpInputs * in,
+  fxFltType regA)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    ImgNum = in->ImgNum;
+
+  const fxFltType
+    fx = in->fx,
+    fy = in->fy;
+
+  if ((int) pel->channel_qual < 0) {
+    if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
+      const fxFltXYT fxy = { fx, fy };
+      regA = GetHslFlt (pfx, ImgNum, &fxy, pel->channel_qual);
+      return(regA);
+    } else if (pel->channel_qual == INTENSITY_CHANNEL) {
+      regA = GetIntensity (pfx, ImgNum, fx, fy);
+      return(regA);
+    }
+  }
+
+  {
+    double v;
+    Image * imUP = pfx->Images[ImgNum];
+    if (! InterpolatePixelChannel (imUP, pfx->Imgs[ImgNum].View, WHICH_NON_ATTR_CHAN,
+            imUP->interpolate, (double) fx, (double) fy, &v, pfx->exception))
+    {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "fUP can't get interpolate", "%lu", (unsigned long) ImgNum);
+      return(regA);
+    }
+    regA = v * QuantumScale;
+  }
+
+  return(regA);
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -4568,6 +4634,8 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           /* 3 args are: ImgNum, x, y */
           ssize_t ImgNum = ChkImgNum (pfx, regA);
           fxFltType fx, fy;
+          RpnInterpInputs
+            up_in;
 
           if (ImgNum < 0) break;
 
@@ -4579,30 +4647,13 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
             fy = regC;
           }
 
-          if ((int) pel->channel_qual < 0) {
-            if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-              const fxFltXYT fxy = { fx, fy };
-              regA = GetHslFlt (pfx, ImgNum, &fxy, pel->channel_qual);
-              break;
-            } else if (pel->channel_qual == INTENSITY_CHANNEL) {
-              regA = GetIntensity (pfx, ImgNum, fx, fy);
-              break;
-            }
-          }
-
-          {
-            double v;
-            Image * imUP = pfx->Images[ImgNum];
-            if (! InterpolatePixelChannel (imUP, pfx->Imgs[ImgNum].View, WHICH_NON_ATTR_CHAN,
-                    imUP->interpolate, (double) fx, (double) fy, &v, pfx->exception))
-            {
-              (void) ThrowMagickException (
-                pfx->exception, GetMagickModule(), OptionError,
-                "fUP can't get interpolate", "%lu", (unsigned long) ImgNum);
-              break;
-            }
-            regA = v * QuantumScale;
-          }
+          up_in.pfx=pfx;
+          up_in.pel=pel;
+          up_in.channel=channel;
+          up_in.ImgNum=ImgNum;
+          up_in.fx=fx;
+          up_in.fy=fy;
+          regA = GetInterpolatedValueUP (&up_in, regA);
 
           break;
         }
