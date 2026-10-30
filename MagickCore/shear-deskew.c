@@ -188,6 +188,30 @@ static void MergeRadonPair(MatrixInfo *q,const RadonCell *cell)
     return;
 }
 
+typedef struct _RadonEdgeCell
+{
+  MatrixInfo
+    *p;
+
+  ssize_t
+    x,
+    i;
+} RadonEdgeCell;
+
+static void CopyRadonElement(MatrixInfo *q,const ssize_t y,
+  const RadonEdgeCell *edge)
+{
+  unsigned short
+    element;
+
+  if (GetMatrixElement(edge->p,edge->x+edge->i,y,&element) == MagickFalse)
+    return;
+  if (SetMatrixElement(q,edge->x+2*edge->i,y,&element) == MagickFalse)
+    return;
+  if (SetMatrixElement(q,edge->x+2*edge->i+1,y,&element) == MagickFalse)
+    return;
+}
+
 static void RadonProjection(MatrixInfo *source_matrices,
   MatrixInfo *destination_matrices,const ssize_t sign,size_t *projection)
 {
@@ -244,12 +268,13 @@ static void RadonProjection(MatrixInfo *source_matrices,
         }
         for ( ; y < (ssize_t) GetMatrixRows(p); y++)
         {
-          if (GetMatrixElement(p,x+i,y,&element) == MagickFalse)
-            continue;
-          if (SetMatrixElement(q,x+2*i,y,&element) == MagickFalse)
-            continue;
-          if (SetMatrixElement(q,x+2*i+1,y,&element) == MagickFalse)
-            continue;
+          RadonEdgeCell
+            edge;
+
+          edge.p=p;
+          edge.x=x;
+          edge.i=i;
+          CopyRadonElement(q,y,&edge);
         }
       }
     }
