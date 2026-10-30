@@ -284,6 +284,18 @@ static MagickBooleanType AcquireFilterContributions(const Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType SetFilterStorageClass(const Image *image,
+  Image *resize_image,const double support,ExceptionInfo *exception)
+{
+  ClassType
+    storage_class;
+
+  storage_class=support > 0.5 ? DirectClass : image->storage_class;
+  if (SetImageStorageClass(resize_image,storage_class,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType HorizontalFilter(
   const ResizeFilter *magick_restrict resize_filter,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
@@ -295,9 +307,6 @@ static MagickBooleanType HorizontalFilter(
   CacheView
     *image_view,
     *resize_view;
-
-  ClassType
-    storage_class;
 
   ContributionInfo
     **magick_restrict contributions;
@@ -317,8 +326,7 @@ static MagickBooleanType HorizontalFilter(
   */
   scale=MagickMax(1.0/x_factor+MagickEpsilon,1.0);
   support=scale*GetResizeFilterSupport(resize_filter);
-  storage_class=support > 0.5 ? DirectClass : image->storage_class;
-  if (SetImageStorageClass(resize_image,storage_class,exception) == MagickFalse)
+  if (SetFilterStorageClass(image,resize_image,support,exception) == MagickFalse)
     return(MagickFalse);
   if (support < 0.5)
     {
