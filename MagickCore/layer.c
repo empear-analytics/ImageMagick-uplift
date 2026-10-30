@@ -268,6 +268,16 @@ static void CompositeCoalescedFrame(Image *coalesce_image,const Image *next,
       exception);
 }
 
+static RectangleInfo ClipBoundsLeft(RectangleInfo bounds)
+{
+  if (bounds.x < 0)
+    {
+      bounds.width=(size_t) ((ssize_t) bounds.width+bounds.x);
+      bounds.x=0;
+    }
+  return(bounds);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -331,11 +341,7 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     bounds=previous->page;
     bounds.width=previous->columns;
     bounds.height=previous->rows;
-    if (bounds.x < 0)
-      {
-        bounds.width=(size_t) ((ssize_t) bounds.width+bounds.x);
-        bounds.x=0;
-      }
+    bounds=ClipBoundsLeft(bounds);
     if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) coalesce_image->columns)
       bounds.width=(size_t) ((ssize_t) coalesce_image->columns-bounds.x);
     if (bounds.y < 0)
