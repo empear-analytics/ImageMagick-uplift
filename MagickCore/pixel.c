@@ -770,6 +770,31 @@ MagickExport MagickRealType GetPixelIntensity(
 }
 
 
+static void LoadInterpolatePixels(const Image *magick_restrict image,
+  const PixelChannel channel,const PixelTrait traits,
+  const Quantum *magick_restrict p,const ssize_t count,double *alpha,
+  double *pixels)
+{
+  ssize_t
+    i;
+
+  if ((traits & BlendPixelTrait) == 0)
+    for (i=0; i < (ssize_t) count; i++)
+    {
+      alpha[i]=1.0;
+      pixels[i]=(double) p[i*(ssize_t) GetPixelChannels(image)+
+        GetPixelChannelOffset(image,channel)];
+    }
+  else
+    for (i=0; i < (ssize_t) count; i++)
+    {
+      alpha[i]=QuantumScale*(double) GetPixelAlpha(image,p+i*
+        (ssize_t) GetPixelChannels(image));
+      pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(image)+
+        GetPixelChannelOffset(image,channel)];
+    }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -936,21 +961,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
           break;
         }
       count*=count;  /* Number of pixels to average */
-      if ((traits & BlendPixelTrait) == 0)
-        for (i=0; i < (ssize_t) count; i++)
-        {
-          alpha[i]=1.0;
-          pixels[i]=(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
-      else
-        for (i=0; i < (ssize_t) count; i++)
-        {
-          alpha[i]=QuantumScale*(double) GetPixelAlpha(image,p+i*
-            (ssize_t) GetPixelChannels(image));
-          pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
+      LoadInterpolatePixels(image,channel,traits,p,count,alpha,pixels);
       for (i=0; i < (ssize_t) count; i++)
       {
         gamma=MagickSafeReciprocal(alpha[i])/count;
@@ -971,21 +982,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
           status=MagickFalse;
           break;
         }
-      if ((traits & BlendPixelTrait) == 0)
-        for (i=0; i < 4; i++)
-        {
-          alpha[i]=1.0;
-          pixels[i]=(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
-      else
-        for (i=0; i < 4; i++)
-        {
-          alpha[i]=QuantumScale*(double) GetPixelAlpha(image,p+i*
-            (ssize_t) GetPixelChannels(image));
-          pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
+      LoadInterpolatePixels(image,channel,traits,p,4,alpha,pixels);
       delta.x=x-x_offset;
       delta.y=y-y_offset;
       epsilon.x=1.0-delta.x;
@@ -1067,21 +1064,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
           status=MagickFalse;
           break;
         }
-      if ((traits & BlendPixelTrait) == 0)
-        for (i=0; i < 16; i++)
-        {
-          alpha[i]=1.0;
-          pixels[i]=(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
-      else
-        for (i=0; i < 16; i++)
-        {
-          alpha[i]=QuantumScale*(double) GetPixelAlpha(image,p+i*
-            (ssize_t) GetPixelChannels(image));
-          pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
+      LoadInterpolatePixels(image,channel,traits,p,16,alpha,pixels);
       CatromWeights((double) (x-x_offset),&cx);
       CatromWeights((double) (y-y_offset),&cy);
       gamma=(channel == AlphaPixelChannel ? (double) 1.0 :
@@ -1133,21 +1116,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
           status=MagickFalse;
           break;
         }
-      if ((traits & BlendPixelTrait) == 0)
-        for (i=0; i < 4; i++)
-        {
-          alpha[i]=1.0;
-          pixels[i]=(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
-      else
-        for (i=0; i < 4; i++)
-        {
-          alpha[i]=QuantumScale*(double) GetPixelAlpha(image,p+i*
-            (ssize_t) GetPixelChannels(image));
-          pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
+      LoadInterpolatePixels(image,channel,traits,p,4,alpha,pixels);
       delta.x=x-x_offset;
       delta.y=y-y_offset;
       luminance.x=GetPixelLuma(image,p)-(double)
@@ -1225,21 +1194,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
           status=MagickFalse;
           break;
         }
-      if ((traits & BlendPixelTrait) == 0)
-        for (i=0; i < 16; i++)
-        {
-          alpha[i]=1.0;
-          pixels[i]=(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
-      else
-        for (i=0; i < 16; i++)
-        {
-          alpha[i]=QuantumScale*(double) GetPixelAlpha(image,p+i*
-            (ssize_t) GetPixelChannels(image));
-          pixels[i]=alpha[i]*(double) p[i*(ssize_t) GetPixelChannels(image)+
-            GetPixelChannelOffset(image,channel)];
-        }
+      LoadInterpolatePixels(image,channel,traits,p,16,alpha,pixels);
       SplineWeights((double) (x-x_offset),&cx);
       SplineWeights((double) (y-y_offset),&cy);
       gamma=(channel == AlphaPixelChannel ? (double) 1.0 :
