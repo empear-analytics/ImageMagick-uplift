@@ -2333,6 +2333,18 @@ static void AccumulateRowStatistics(const Image *image,
   }
 }
 
+static void FinalizeChannelStatistics(const Image *image,
+  const double *histogram,ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    ComputeChannelStatisticsMoments(image,channel_statistics,i);
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    ComputeChannelEntropy(image,histogram,channel_statistics,i);
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2352,7 +2364,6 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     *median;
 
   ssize_t
-    i,
     y;
 
   assert(image != (Image *) NULL);
@@ -2385,10 +2396,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
       break;
     AccumulateRowStatistics(image,p,channel_statistics,histogram);
   }
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    ComputeChannelStatisticsMoments(image,channel_statistics,i);
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    ComputeChannelEntropy(image,histogram,channel_statistics,i);
+  FinalizeChannelStatistics(image,histogram,channel_statistics);
   histogram=(double *) RelinquishMagickMemory(histogram);
   median_info=AcquireVirtualMemory(image->columns,image->rows*sizeof(*median));
   if (median_info == (MemoryInfo *) NULL)
