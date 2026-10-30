@@ -4514,16 +4514,17 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
               regA = GetIntensity (pfx, 0, (fxFltType) imgx, (fxFltType) imgy);
             }
           } else {
-            if (pfx->ImgNum==0) {
-              regA = QuantumScale * (double) p[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-            } else {
-              rpn_in.pfx=pfx;
-              rpn_in.pel=pel;
-              rpn_in.channel=channel;
-              rpn_in.imgx=imgx;
-              rpn_in.imgy=imgy;
-              regA = GetImageZeroCacheValueU0 (&rpn_in, pimg, regA);
-            }
+            RpnFirstImageInputs
+              first_in;
+
+            first_in.pfx=pfx;
+            first_in.pel=pel;
+            first_in.p=p;
+            first_in.pimg=pimg;
+            first_in.channel=channel;
+            first_in.imgx=imgx;
+            first_in.imgy=imgy;
+            regA = GetImageZeroValueU0 (&first_in, regA);
           }
           break;
         }
