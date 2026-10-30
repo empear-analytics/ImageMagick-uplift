@@ -3881,6 +3881,29 @@ static inline MagickBooleanType IsEscapeEnd(const char *p)
     MagickFalse);
 }
 
+static void InterpretXMLEntity(char **q,const char **p)
+{
+  if (LocaleNCompare("&lt;",(*p),4) == 0)
+    {
+      *(*q)++='<';
+      (*p)+=(ptrdiff_t) 3;
+    }
+  else
+    if (LocaleNCompare("&gt;",(*p),4) == 0)
+      {
+        *(*q)++='>';
+        (*p)+=(ptrdiff_t) 3;
+      }
+    else
+      if (LocaleNCompare("&amp;",(*p),5) == 0)
+        {
+          *(*q)++='&';
+          (*p)+=(ptrdiff_t) 4;
+        }
+      else
+        *(*q)++=(*(*p));
+}
+
 MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
   const char *embed_text,ExceptionInfo *exception)
 {
@@ -4060,25 +4083,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
       }
       case '&':
       {
-        if (LocaleNCompare("&lt;",p,4) == 0)
-          {
-            *q++='<';
-            p+=(ptrdiff_t) 3;
-          }
-        else
-          if (LocaleNCompare("&gt;",p,4) == 0)
-            {
-              *q++='>';
-              p+=(ptrdiff_t) 3;
-            }
-          else
-            if (LocaleNCompare("&amp;",p,5) == 0)
-              {
-                *q++='&';
-                p+=(ptrdiff_t) 4;
-              }
-            else
-              *q++=(*p);
+        InterpretXMLEntity(&q,&p);
         continue;
       }
       case '%':
