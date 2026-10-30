@@ -2059,6 +2059,27 @@ static MagickRealType GetDarkenIntensityAlpha(
   return(pixel);
 }
 
+static MagickRealType GetLightenIntensityAlpha(
+  const IntensityAlphaInputs *intensity,MagickRealType pixel)
+{
+  const MagickBooleanType
+    compose_sync = intensity->compose_sync;
+
+  const MagickRealType
+    Sa = intensity->Sa,
+    Da = intensity->Da,
+    Si = intensity->Si,
+    Di = intensity->Di;
+
+  if (compose_sync == MagickFalse)
+    {
+      pixel=Si > Di ? Sa : Da;
+      return(pixel);
+    }
+  pixel=Sa*Si > Da*Di ? Sa : Da;
+  return(pixel);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3171,12 +3192,15 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               }
               case LightenIntensityCompositeOp:
               {
-                if (compose_sync == MagickFalse)
-                  {
-                    pixel=Si > Di ? Sa : Da;
-                    break;
-                  }
-                pixel=Sa*Si > Da*Di ? Sa : Da;
+                IntensityAlphaInputs
+                  intensity;
+
+                intensity.compose_sync=compose_sync;
+                intensity.Sa=Sa;
+                intensity.Da=Da;
+                intensity.Si=Si;
+                intensity.Di=Di;
+                pixel=GetLightenIntensityAlpha(&intensity,pixel);
                 break;
               }
               case ModulateCompositeOp:
