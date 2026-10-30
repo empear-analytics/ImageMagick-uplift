@@ -2460,48 +2460,9 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
   return(path);
 }
 
-static inline MagickBooleanType IsWildcardProperty(const char *property,
-  const size_t property_length)
+static void GetProfileProperty(const Image *image,const char *property,
+  ExceptionInfo *exception)
 {
-  return(((property_length > 2) && (*(property+(property_length-2)) == ':') &&
-    (*(property+(property_length-1)) == '*')) ? MagickTrue : MagickFalse);
-}
-
-MagickExport const char *GetImageProperty(const Image *image,
-  const char *property,ExceptionInfo *exception)
-{
-  MagickBooleanType
-    read_from_properties;
-
-  const char
-    *p;
-
-  size_t
-    property_length;
-
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((property == (const char *) NULL) || (*property == '\0'))
-    return((const char *) NULL);
-  read_from_properties=MagickTrue;
-  property_length=strlen(property);
-  if (IsWildcardProperty(property,property_length) != MagickFalse)
-    read_from_properties=MagickFalse;
-  if (read_from_properties != MagickFalse)
-    {
-      p=(const char *) NULL;
-      if (image->properties != (void *) NULL)
-        {
-          p=(const char *) GetValueFromSplayTree((SplayTreeInfo *)
-            image->properties,property);
-          if (p != (const char *) NULL)
-            return(p);
-        }
-      if (strchr(property,':') == (char *) NULL)
-        return(p);
-    }
   switch (*property)
   {
     case '8':
@@ -2554,6 +2515,51 @@ MagickExport const char *GetImageProperty(const Image *image,
     default:
       break;
   }
+}
+
+static inline MagickBooleanType IsWildcardProperty(const char *property,
+  const size_t property_length)
+{
+  return(((property_length > 2) && (*(property+(property_length-2)) == ':') &&
+    (*(property+(property_length-1)) == '*')) ? MagickTrue : MagickFalse);
+}
+
+MagickExport const char *GetImageProperty(const Image *image,
+  const char *property,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    read_from_properties;
+
+  const char
+    *p;
+
+  size_t
+    property_length;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if ((property == (const char *) NULL) || (*property == '\0'))
+    return((const char *) NULL);
+  read_from_properties=MagickTrue;
+  property_length=strlen(property);
+  if (IsWildcardProperty(property,property_length) != MagickFalse)
+    read_from_properties=MagickFalse;
+  if (read_from_properties != MagickFalse)
+    {
+      p=(const char *) NULL;
+      if (image->properties != (void *) NULL)
+        {
+          p=(const char *) GetValueFromSplayTree((SplayTreeInfo *)
+            image->properties,property);
+          if (p != (const char *) NULL)
+            return(p);
+        }
+      if (strchr(property,':') == (char *) NULL)
+        return(p);
+    }
+  GetProfileProperty(image,property,exception);
   if ((image->properties != (void *) NULL) &&
       (read_from_properties != MagickFalse))
     {
