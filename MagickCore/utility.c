@@ -1810,17 +1810,33 @@ static char *GetTemporaryDirectory(void)
   return(directory);
 }
 
-MagickExport MagickBooleanType GetPathTemplate(char *path)
+static MagickBooleanType ValidateTemporaryDirectory(char *directory)
 {
-  char
-    *directory,
-    *value;
-
   MagickBooleanType
     status;
 
   struct stat
     attributes;
+
+  if (strlen(directory) > (MagickPathExtent-25))
+    {
+      directory=DestroyString(directory);
+      return(MagickFalse);
+    }
+  status=GetPathAttributes(directory,&attributes);
+  if ((status == MagickFalse) || !S_ISDIR(attributes.st_mode))
+    {
+      directory=DestroyString(directory);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+MagickExport MagickBooleanType GetPathTemplate(char *path)
+{
+  char
+    *directory,
+    *value;
 
   (void) FormatLocaleString(path,MagickPathExtent,"magick-"
     MagickPathTemplate);
@@ -1847,17 +1863,8 @@ MagickExport MagickBooleanType GetPathTemplate(char *path)
       (void) CloneString(&directory,value);
       value=DestroyString(value);
     }
-  if (strlen(directory) > (MagickPathExtent-25))
-    {
-      directory=DestroyString(directory);
-      return(MagickFalse);
-    }
-  status=GetPathAttributes(directory,&attributes);
-  if ((status == MagickFalse) || !S_ISDIR(attributes.st_mode))
-    {
-      directory=DestroyString(directory);
-      return(MagickFalse);
-    }
+  if (ValidateTemporaryDirectory(directory) == MagickFalse)
+    return(MagickFalse);
   if (directory[strlen(directory)-1] == *DirectorySeparator)
     (void) FormatLocaleString(path,MagickPathExtent,"%smagick-"
       MagickPathTemplate,directory);
