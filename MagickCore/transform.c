@@ -461,6 +461,19 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetCMYKPlanePixel(const Image *cmyk_image,const ssize_t i,
+  const Quantum pixel,Quantum *q)
+{
+  switch (i)
+  {
+    case 0: SetPixelCyan(cmyk_image,pixel,q);  break;
+    case 1: SetPixelMagenta(cmyk_image,pixel,q);  break;
+    case 2: SetPixelYellow(cmyk_image,pixel,q);  break;
+    case 3: SetPixelBlack(cmyk_image,pixel,q);  break;
+    default: break;
+  }
+}
+
 MagickExport Image *ConsolidateCMYKImages(const Image *images,
   ExceptionInfo *exception)
 {
@@ -528,14 +541,7 @@ MagickExport Image *ConsolidateCMYKImages(const Image *images,
 
           pixel=ClampToQuantum((double) QuantumRange-
             GetPixelIntensity(images,p));
-          switch (i)
-          {
-            case 0: SetPixelCyan(cmyk_image,pixel,q);  break;
-            case 1: SetPixelMagenta(cmyk_image,pixel,q);  break;
-            case 2: SetPixelYellow(cmyk_image,pixel,q);  break;
-            case 3: SetPixelBlack(cmyk_image,pixel,q);  break;
-            default: break;
-          }
+          SetCMYKPlanePixel(cmyk_image,i,pixel,q);
           p+=(ptrdiff_t) GetPixelChannels(images);
           q+=(ptrdiff_t) GetPixelChannels(cmyk_image);
         }
