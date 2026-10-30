@@ -197,9 +197,52 @@ static void InsertIntoOrderedList(XMLTreeInfo *xml_info,XMLTreeInfo *head,
     }
 }
 
+typedef struct _SiblingListInfo
+{
+  XMLTreeInfo
+    *head;
+
+  size_t
+    offset;
+} SiblingListInfo;
+
+static void InsertIntoSiblingList(XMLTreeInfo *child,XMLTreeInfo *node,
+  XMLTreeInfo *previous,const SiblingListInfo *siblings)
+{
+  XMLTreeInfo
+    *const head = siblings->head;
+
+  const size_t
+    offset = siblings->offset;
+
+  if ((node != (XMLTreeInfo *) NULL) && (node->offset <= offset))
+    {
+      InsertIntoTagList(node,child,offset);
+    }
+  else
+    {
+      if ((previous != (XMLTreeInfo *) NULL) && (node != (XMLTreeInfo *) NULL))
+        previous->sibling=node->sibling;
+      child->next=node;
+      previous=(XMLTreeInfo *) NULL;
+      node=head;
+      while ((node != (XMLTreeInfo *) NULL) && (node->offset <= offset))
+      {
+        previous=node;
+        node=node->sibling;
+      }
+      child->sibling=node;
+      if (previous != (XMLTreeInfo *) NULL)
+        previous->sibling=child;
+    }
+}
+
 static XMLTreeInfo *InsertTagIntoXMLTree(XMLTreeInfo *xml_info,
   XMLTreeInfo *child,const size_t offset)
 {
+  SiblingListInfo
+    siblings;
+
   XMLTreeInfo
     *head,
     *node,
@@ -224,26 +267,9 @@ static XMLTreeInfo *InsertTagIntoXMLTree(XMLTreeInfo *xml_info,
     previous=node;
     node=node->sibling;
   }
-  if ((node != (XMLTreeInfo *) NULL) && (node->offset <= offset))
-    {
-      InsertIntoTagList(node,child,offset);
-    }
-  else
-    {
-      if ((previous != (XMLTreeInfo *) NULL) && (node != (XMLTreeInfo *) NULL))
-        previous->sibling=node->sibling;
-      child->next=node;
-      previous=(XMLTreeInfo *) NULL;
-      node=head;
-      while ((node != (XMLTreeInfo *) NULL) && (node->offset <= offset))
-      {
-        previous=node;
-        node=node->sibling;
-      }
-      child->sibling=node;
-      if (previous != (XMLTreeInfo *) NULL)
-        previous->sibling=child;
-    }
+  siblings.head=head;
+  siblings.offset=offset;
+  InsertIntoSiblingList(child,node,previous,&siblings);
   return(child);
 }
 
