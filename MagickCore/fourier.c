@@ -251,6 +251,78 @@ static void ApplyComplexOperator(const ComplexPixelOperands *operands,
   }
 }
 
+typedef struct _ComplexChannelOperands
+{
+  const Quantum
+    *Ai,
+    *Ar,
+    *Bi,
+    *Br;
+
+  Quantum
+    *Ci,
+    *Cr;
+
+  size_t
+    number_channels;
+
+  ComplexOperator
+    op;
+
+  double
+    snr;
+} ComplexChannelOperands;
+
+static void ApplyComplexOperatorToChannels(
+  const ComplexChannelOperands *channels)
+{
+  const Quantum
+    *const Ai = channels->Ai,
+    *const Ar = channels->Ar,
+    *const Bi = channels->Bi,
+    *const Br = channels->Br;
+
+  Quantum
+    *const Ci = channels->Ci,
+    *const Cr = channels->Cr;
+
+  const size_t
+    number_channels = channels->number_channels;
+
+  const ComplexOperator
+    op = channels->op;
+
+  const double
+    snr = channels->snr;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_channels; i++)
+  {
+    double
+      ai = QuantumScale*(double) Ai[i],
+      ar = QuantumScale*(double) Ar[i],
+      bi = QuantumScale*(double) Bi[i],
+      br = QuantumScale*(double) Br[i],
+      ci,
+      cr;
+
+    ComplexPixelOperands
+      operands;
+
+    operands.op=op;
+    operands.ai=ai;
+    operands.ar=ar;
+    operands.bi=bi;
+    operands.br=br;
+    operands.snr=snr;
+    ApplyComplexOperator(&operands,&cr,&ci);
+    Cr[i]=ClampToQuantum((double) QuantumRange*cr);
+    Ci[i]=ClampToQuantum((double) QuantumRange*ci);
+  }
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -399,32 +471,19 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
-      ssize_t
-        i;
-      
-      for (i=0; i < (ssize_t) number_channels; i++)
-      {
-        double
-          ai = QuantumScale*(double) Ai[i],
-          ar = QuantumScale*(double) Ar[i],
-          bi = QuantumScale*(double) Bi[i],
-          br = QuantumScale*(double) Br[i],
-          ci,
-          cr;
+      ComplexChannelOperands
+        channels;
 
-        ComplexPixelOperands
-          operands;
-
-        operands.op=op;
-        operands.ai=ai;
-        operands.ar=ar;
-        operands.bi=bi;
-        operands.br=br;
-        operands.snr=snr;
-        ApplyComplexOperator(&operands,&cr,&ci);
-        Cr[i]=ClampToQuantum((double) QuantumRange*cr);
-        Ci[i]=ClampToQuantum((double) QuantumRange*ci);
-      }
+      channels.Ai=Ai;
+      channels.Ar=Ar;
+      channels.Bi=Bi;
+      channels.Br=Br;
+      channels.Ci=Ci;
+      channels.Cr=Cr;
+      channels.number_channels=number_channels;
+      channels.op=op;
+      channels.snr=snr;
+      ApplyComplexOperatorToChannels(&channels);
       Ar+=(ptrdiff_t) GetPixelChannels(Ar_image);
       Ai+=(ptrdiff_t) GetPixelChannels(Ai_image);
       Br+=(ptrdiff_t) GetPixelChannels(Br_image);
