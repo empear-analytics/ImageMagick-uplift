@@ -679,7 +679,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   {
     p=GetVirtualPixels(alpha_image,x,0,1,alpha_image->rows,exception);
     q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     y=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
       alpha_image->rows,&alpha_pixel,&beta_pixel);
@@ -702,7 +702,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   {
     p=GetVirtualPixels(alpha_image,x,0,1,alpha_image->rows,exception);
     q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     y=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
       alpha_image->rows,&alpha_pixel,&beta_pixel);
@@ -714,7 +714,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   {
     p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
     q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     x=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
       alpha_image->columns,&alpha_pixel,&beta_pixel);
@@ -726,7 +726,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   {
     p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
     q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     x=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
       alpha_image->columns,&alpha_pixel,&beta_pixel);
