@@ -391,6 +391,23 @@ static void DecodeBase64Character(unsigned char *decode,const char *q,
   }
 }
 
+static MagickBooleanType VerifyBase64Tail(const char *p,
+  unsigned char *decode,const size_t i)
+{
+  for ( ; *p != '\0'; p++)
+    if (isspace((int) ((unsigned char) *p)) == 0)
+      {
+        decode=(unsigned char *) RelinquishMagickMemory(decode);
+        return(MagickFalse);
+      }
+  if ((int) decode[i] != 0)
+    {
+      decode=(unsigned char *) RelinquishMagickMemory(decode);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
 {
   int
@@ -470,17 +487,8 @@ MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
         }
         case 3:
         {
-          for ( ; *p != '\0'; p++)
-            if (isspace((int) ((unsigned char) *p)) == 0)
-              {
-                decode=(unsigned char *) RelinquishMagickMemory(decode);
-                return((unsigned char *) NULL);
-              }
-          if ((int) decode[i] != 0)
-            {
-              decode=(unsigned char *) RelinquishMagickMemory(decode);
-              return((unsigned char *) NULL);
-            }
+          if (VerifyBase64Tail(p,decode,i) == MagickFalse)
+            return((unsigned char *) NULL);
           break;
         }
       }
