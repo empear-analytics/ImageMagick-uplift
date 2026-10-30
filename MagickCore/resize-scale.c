@@ -93,6 +93,16 @@
 #endif
 
 /*
+  Typedef declarations.
+*/
+typedef struct _ScaleImagePair
+{
+  const Image
+    *image,
+    *scale_image;
+} ScaleImagePair;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -249,9 +259,13 @@ static void ExportScalePixel(const ScaleExportPixel *pixel,Quantum *q)
   }
 }
 
-static void ExportScaleScanline(const Image *image,const Image *scale_image,
+static void ExportScaleScanline(const ScaleImagePair *pair,
   const double *scanline,double alpha,Quantum *q)
 {
+  const Image
+    *const image = pair->image,
+    *const scale_image = pair->scale_image;
+
   ScaleExportPixel
     pixel;
 
@@ -712,12 +726,15 @@ static void TransferScaleScanline(const ScaleTransfer *transfer,
     *const scale_scanline = transfer->scale_scanline,
     *const scanline = transfer->scanline;
 
+  const ScaleImagePair
+    pair = { image, scale_image };
+
   if (scale_image->columns == image->columns)
     {
       /*
         Transfer scanline to scaled image.
       */
-      ExportScaleScanline(image,scale_image,scanline,alpha,q);
+      ExportScaleScanline(&pair,scanline,alpha,q);
     }
   else
     {
@@ -728,7 +745,7 @@ static void TransferScaleScanline(const ScaleTransfer *transfer,
     /*
       Transfer scanline to scaled image.
     */
-    ExportScaleScanline(image,scale_image,scale_scanline,alpha,q);
+    ExportScaleScanline(&pair,scale_scanline,alpha,q);
   }
 }
 
