@@ -1003,6 +1003,29 @@ static RectangleInfo ExpandBoundsHeight(RectangleInfo bgnd_bounds,
   return(bgnd_bounds);
 }
 
+static RectangleInfo ExpandDisposalBounds(RectangleInfo bgnd_bounds,
+  RectangleInfo try_bounds)
+{
+  if ( bgnd_bounds.x < 0 )
+    bgnd_bounds = try_bounds;
+  else
+    {
+#if DEBUG_OPT_FRAME
+      (void) FormatLocaleFile(stderr, "expand_bgnd: %.17gx%.17g%+.20g%+.20g\n",
+          (double) bgnd_bounds.width,(double) bgnd_bounds.height,
+          (double) bgnd_bounds.x,(double) bgnd_bounds.y );
+#endif
+      bgnd_bounds=ExpandBoundsWidth(bgnd_bounds,try_bounds);
+      bgnd_bounds=ExpandBoundsHeight(bgnd_bounds,try_bounds);
+#if DEBUG_OPT_FRAME
+      (void) FormatLocaleFile(stderr, "        to : %.17gx%.17g%+.20g%+.20g\n",
+          (double) bgnd_bounds.width,(double) bgnd_bounds.height,
+          (double) bgnd_bounds.x,(double) bgnd_bounds.y );
+#endif
+    }
+  return(bgnd_bounds);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1249,23 +1272,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
                 (double) try_bounds.x,(double) try_bounds.y,
                 try_bounds.x<0?"  (no expand necessary)":"");
 #endif
-            if ( bgnd_bounds.x < 0 )
-              bgnd_bounds = try_bounds;
-            else
-              {
-#if DEBUG_OPT_FRAME
-                (void) FormatLocaleFile(stderr, "expand_bgnd: %.17gx%.17g%+.20g%+.20g\n",
-                    (double) bgnd_bounds.width,(double) bgnd_bounds.height,
-                    (double) bgnd_bounds.x,(double) bgnd_bounds.y );
-#endif
-                bgnd_bounds=ExpandBoundsWidth(bgnd_bounds,try_bounds);
-                bgnd_bounds=ExpandBoundsHeight(bgnd_bounds,try_bounds);
-#if DEBUG_OPT_FRAME
-                (void) FormatLocaleFile(stderr, "        to : %.17gx%.17g%+.20g%+.20g\n",
-                    (double) bgnd_bounds.width,(double) bgnd_bounds.height,
-                    (double) bgnd_bounds.x,(double) bgnd_bounds.y );
-#endif
-              }
+            bgnd_bounds=ExpandDisposalBounds(bgnd_bounds,try_bounds);
             ClearBounds(bgnd_image,&bgnd_bounds,exception);
 #if DEBUG_OPT_FRAME
 /* Something strange is happening with a specific animation
