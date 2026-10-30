@@ -1983,6 +1983,19 @@ static void DecodeAttributeValue(XMLTreeRoot *root,char **attribute,
     ' ');
 }
 
+static size_t OpenOrIgnoreXMLTag(XMLTreeRoot *root,char *tag,
+  char **attributes,size_t ignore_depth)
+{
+  if ((ignore_depth == 0) && (IsSkipTag(tag) == MagickFalse))
+    ParseOpenTag(root,tag,attributes);
+  else
+    {
+      ignore_depth++;
+      (void) DestroyXMLTreeAttributes(attributes);
+    }
+  return(ignore_depth);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2166,13 +2179,8 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
             if (IsTagClosed(p,terminal) != MagickFalse)
               {
                 *p='\0';
-                if ((ignore_depth == 0) && (IsSkipTag(tag) == MagickFalse))
-                  ParseOpenTag(root,tag,attributes);
-                else
-                  {
-                    ignore_depth++;
-                    (void) DestroyXMLTreeAttributes(attributes);
-                  }
+                ignore_depth=OpenOrIgnoreXMLTag(root,tag,attributes,
+                  ignore_depth);
                 *p=(char) c;
               }
             else
