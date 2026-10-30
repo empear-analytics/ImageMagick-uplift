@@ -118,7 +118,8 @@ expected: the literal check `OK`, and `--calls` moving nothing but `+2` for each
 helper (its definition and its call) before its `PASS` line. Any other count that
 moves is the `WARN` that stops the commit.
 Recipes D and S fold code together or move it, the guard cannot follow them, and
-they need the oracle.
+they need the oracle. The one exception is Recipe D's *Unreached functions* form,
+whose proof is an identical object file, not the guard.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -398,7 +399,50 @@ same text once the variables each reads or writes are renamed consistently (bloc
 takes those variables as arguments. Check it by script: rename, then compare the text.
 Literals and operators are not renamed; one that differs is a differing value.
 
-**Evidence level:** oracle.
+**Unreached functions.** When no oracle case executes the function, D may still replace
+a block with a call to an existing `static` helper of the same file, under three
+conditions, all checked before the commit:
+
+- `casemap.py` shows 0 cases for the function, and for each of its callers in the
+  catalogue (a caller some case executes makes the function oracle-verified instead);
+- the block is identical to the helper's body as above (the same text once the
+  variables are renamed consistently, the helper's parameters for the block's
+  variables; checked by script); a declaration in the caller that only the block
+  used goes with it, as the helper declares its own;
+- `sh tools/obj_identical.sh MagickCore/<file>.c` prints `IDENTICAL` for the whole
+  object file, the working tree against `HEAD`.
+
+Nested replacements in one function may share the commit: an inner block becomes a call
+of one helper, and the loop around it, now the same text as a second helper's body,
+a call of that one; each replacement is checked by script, and the comparison covers
+the result. The commit carries `Verified: guard` and quotes the `IDENTICAL` line. The
+literal guard may report the dropped counts of a deduplication (`WARN` with every
+value still present), and `--calls` may move only the functions the replaced code called (each
+down by the number of calls it made) and the helper it now calls (up by one); any
+other movement stops the step.
+
+**Careful:**
+
+- Why identical object code is proof: `obj_identical.sh` compiles the file as
+  committed and as edited with the oracle build's own flags (`-O2`, the same
+  includes and defines), at `-g0`, with `__LINE__` and `__FILE__` pinned and both
+  copies under the same basename, and compares the two object files byte for byte.
+  Identical bytes are the same compiled code for every function in the file, so the
+  library built from them behaves the same on every input, reached by a case or
+  not. It is a stronger proof than the oracle's, for this build; it also covers
+  argument order, which the guard cannot see.
+- A step whose object file differs is not this form, whatever the reason (the
+  helper not inlined, blocks laid out differently): fall back to the oracle, or skip
+  the step. Do not rework the block or the helper until the files compare
+  identical: the form covers a plain replacement, nothing else.
+- The comparison build has no OpenMP. A block inside a parallel loop body moves only
+  under the OpenMP rules above, checked by reading: the helper call may write no
+  variable declared outside the loop body (Recipe E step 5).
+- The proof holds for this build. Code in a preprocessor branch it does not compile
+  stays untouched, as everywhere.
+
+**Evidence level:** oracle; or, for a function no case reaches, the identical object
+file of *Unreached functions*.
 
 **Provenance:** founding recipe (2026-09-29).
 
@@ -2690,3 +2734,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | Q | Step 8: when the written scalars as separate pointers would give five or more parameters, their addresses go in one `const` struct (Recipe I's form), bound to `*const` locals; inside a parallel loop every address is of a loop-body variable; in this form up to six written variables. *Careful* gives the argument: the variables stay the caller's own, only their addresses travel, and none of a variable the threads share | Session's brief after the W08 report (`effect.c`'s plateau: the adaptive and selective kernel sums advance four or five cursors and accumulators). `AdaptiveBlurImage`'s plain sum writes `pixel`, `gamma`, `k` and `pixels` and reads four inputs: Q gives five parameters. A probe of that sum: nesting 6 to 5, bumps 9 to 8, 2.54 to 2.59 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | Step 8: instead of binding the `*const` locals, the body may write `targets->v` for every use of `v` (`*targets->pixel+=`, `(**targets->k)`), the member form of step 4; *Careful* gives the argument and the duplication it avoids | `SelectiveBlurImage`'s plain and blended kernel sums (`pixel`, `gamma`, `k`, `pixels`, `luminance_pixels`): with bound locals in both helpers the pair is reported as Code Duplication (2.77 to 2.65); with the blended one in the member form, none, 2.77 to 2.84 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 7: a block that ends a loop's body, after statements that stay, may contain `continue;` of that loop; each becomes `return;` of a new `void` function whose call is the body's last statement (the whole-body form's conditions; step 7's first form, for a loop body instead of a `void` function) | `effect.c`'s `SelectiveBlurImage`: its channel-loop body moved whole (Recipe N) gives a helper of 79 lines (*Large Method*), refused by the gate; its tail after the trait checks (the two kernel sums and their stores, three `continue`s) moved first, then the body: the function leaves Brain Method and Deep, Nested Complexity, 2.84 to 3.12 in a probe | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | D | *Unreached functions*: in a function no oracle case executes (casemap 0 for it and its callers in the catalogue), a block identical to an existing `static` helper's body (checked by script) may become a call of that helper when `tools/obj_identical.sh` prints `IDENTICAL` for the whole object file against `HEAD`; nested replacements in one function (an inner block onto one helper, the loop around it onto another) may share the commit; the commit carries `Verified: guard` and quotes that line. *Careful* gives the argument (byte-identical object code under the oracle build's pinned flags is the same compiled code, so the same behaviour on every input) and says a step whose object file differs is not this form: fall back to the oracle or skip. *Two levels of evidence* names it as the one exception for D | `transform.c`'s `ExcerptImage` (0 cases, no in-tree caller): its pixel loop is `CopyPixelRow`'s body with `CopyPixelChannelsTo`'s written out; a probe calling `CopyPixelRow` compared `IDENTICAL` and measured 4.40 to 4.69, the file's last Deep, Nested Complexity. Under the founding evidence level neither D (oracle only) nor E (a new helper would duplicate an existing one) applied | mandate (2026-10-24) |
