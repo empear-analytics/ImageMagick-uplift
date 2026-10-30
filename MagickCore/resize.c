@@ -2462,6 +2462,16 @@ static void StripThumbnailProfiles(Image *thumbnail_image)
   }
 }
 
+static Image *KeepReducedThumbnail(Image *clone_image,Image *thumbnail_image)
+{
+  if (thumbnail_image != (Image *) NULL)
+    {
+      clone_image=DestroyImage(clone_image);
+      clone_image=thumbnail_image;
+    }
+  return(clone_image);
+}
+
 MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -2494,21 +2504,13 @@ MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
       if ((x_factor > 4) && (y_factor > 4))
         {
           thumbnail_image=SampleImage(clone_image,4*columns,4*rows,exception);
-          if (thumbnail_image != (Image *) NULL)
-            {
-              clone_image=DestroyImage(clone_image);
-              clone_image=thumbnail_image;
-            }
+          clone_image=KeepReducedThumbnail(clone_image,thumbnail_image);
         }
       if ((x_factor > 2) && (y_factor > 2))
         {
           thumbnail_image=ResizeImage(clone_image,2*columns,2*rows,BoxFilter,
             exception);
-          if (thumbnail_image != (Image *) NULL)
-            {
-              clone_image=DestroyImage(clone_image);
-              clone_image=thumbnail_image;
-            }
+          clone_image=KeepReducedThumbnail(clone_image,thumbnail_image);
         }
       thumbnail_image=ResizeImage(clone_image,columns,rows,image->filter ==
         UndefinedFilter ? LanczosSharpFilter : image->filter,exception);
