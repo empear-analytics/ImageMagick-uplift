@@ -620,6 +620,36 @@ static void SetColormapEntryDepth(Image *image,const ssize_t i,
       ClampPixel(image->colormap[i].alpha),range),range);
 }
 
+static void ScalePixelRowToDepth(const Image *image,const QuantumAny range,
+  Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel
+        channel;
+
+      PixelTrait
+        traits;
+
+      channel=GetPixelChannelChannel(image,i);
+      traits=GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      q[i]=ScaleAnyToQuantum(ScaleQuantumToAny(ClampPixel((MagickRealType)
+        q[i]),range),range);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType SetImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -752,9 +782,6 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -766,28 +793,7 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ScaleAnyToQuantum(ScaleQuantumToAny(ClampPixel((MagickRealType)
-          q[i]),range),range);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ScalePixelRowToDepth(image,range,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       {
         status=MagickFalse;
