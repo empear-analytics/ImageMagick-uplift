@@ -1147,6 +1147,32 @@ static char *WriteUTF8Sequence(char *xml,const int c)
   return(xml);
 }
 
+static void NormalizeAttributeSpaces(char *p)
+{
+  char
+    *xml;
+
+  ssize_t
+    i;
+
+  for (xml=p; *xml != '\0'; xml++)
+  {
+    char
+      accept[] = " ";
+
+    i=(ssize_t) strspn(xml,accept);
+    if (i != 0)
+      (void) memmove(xml,xml+i,strlen(xml+i)+1);
+    while ((*xml != '\0') && (*xml != ' '))
+      xml++;
+    if (*xml == '\0')
+      break;
+  }
+  xml--;
+  if ((xml >= p) && (*xml == ' '))
+    *xml='\0';
+}
+
 static char *ParseEntities(char *xml,char **entities,int state)
 {
   char
@@ -1267,22 +1293,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
       /*
         Normalize spaces for non-CDATA attributes.
       */
-      for (xml=p; *xml != '\0'; xml++)
-      {
-        char
-          accept[] = " ";
-
-        i=(ssize_t) strspn(xml,accept);
-        if (i != 0)
-          (void) memmove(xml,xml+i,strlen(xml+i)+1);
-        while ((*xml != '\0') && (*xml != ' '))
-          xml++;
-        if (*xml == '\0')
-          break;
-      }
-      xml--;
-      if ((xml >= p) && (*xml == ' '))
-        *xml='\0';
+      NormalizeAttributeSpaces(p);
     }
   return(p == q ? ConstantString(p) : p);
 }
