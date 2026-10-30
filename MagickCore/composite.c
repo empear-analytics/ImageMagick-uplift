@@ -1352,6 +1352,102 @@ static const Quantum *AdvanceOverSourcePixel(const Image *source_image,
   return(p);
 }
 
+typedef struct _OverRowInputs
+{
+  Image
+    *image;
+
+  const Image
+    *source_image;
+
+  const Quantum
+    *pixels;
+
+  MagickBooleanType
+    clip_to_self;
+
+  ssize_t
+    x_offset,
+    y_offset,
+    y;
+
+  MagickBooleanType
+    clamp;
+
+  ExceptionInfo
+    *exception;
+} OverRowInputs;
+
+static void CompositeOverRow(const OverRowInputs *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->image->columns; x++)
+  {
+    MagickRealType
+      alpha,
+      Da,
+      Sa;
+
+    OverPixelInputs
+      authentic;
+
+    if (row->clip_to_self != MagickFalse)
+      {
+        if (x < row->x_offset)
+          {
+            q+=(ptrdiff_t) GetPixelChannels(row->image);
+            continue;
+          }
+        if ((x-row->x_offset) >= (ssize_t) row->source_image->columns)
+          break;
+      }
+    if (IsOutsideSourceColumn(row->pixels,x,row->x_offset,
+          row->source_image) != MagickFalse)
+      {
+        VirtualOverInputs
+          virtual_pixel;
+
+        /*
+          Virtual composite:
+            Sc: source color.
+            Dc: canvas color.
+        */
+        virtual_pixel.image=row->image;
+        virtual_pixel.source_image=row->source_image;
+        virtual_pixel.x=x;
+        virtual_pixel.x_offset=row->x_offset;
+        virtual_pixel.y=row->y;
+        virtual_pixel.y_offset=row->y_offset;
+        virtual_pixel.clamp=row->clamp;
+        virtual_pixel.exception=row->exception;
+        CompositeVirtualOverPixel(&virtual_pixel,q);
+        q+=(ptrdiff_t) GetPixelChannels(row->image);
+        continue;
+      }
+    /*
+      Authentic composite:
+        Sa:  normalized source alpha.
+        Da:  normalized canvas alpha.
+    */
+    Sa=QuantumScale*(double) GetPixelAlpha(row->source_image,p);
+    Da=QuantumScale*(double) GetPixelAlpha(row->image,q);
+    alpha=Sa+Da-Sa*Da;
+    authentic.image=row->image;
+    authentic.source_image=row->source_image;
+    authentic.p=p;
+    authentic.alpha=alpha;
+    authentic.Da=Da;
+    authentic.Sa=Sa;
+    authentic.clamp=row->clamp;
+    CompositeOverPixelChannels(&authentic,q);
+    p=AdvanceOverSourcePixel(row->source_image,row->pixels,p);
+    q+=(ptrdiff_t) GetPixelChannels(row->image);
+  }
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1414,8 +1510,8 @@ static MagickBooleanType CompositeOverImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    OverRowInputs
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -1454,67 +1550,16 @@ static MagickBooleanType CompositeOverImage(Image *image,
       }
     GetPixelInfo(image,&canvas_pixel);
     GetPixelInfo(source_image,&source_pixel);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MagickRealType
-        alpha,
-        Da,
-        Sa;
-
-      OverPixelInputs
-        authentic;
-
-      if (clip_to_self != MagickFalse)
-        {
-          if (x < x_offset)
-            {
-              q+=(ptrdiff_t) GetPixelChannels(image);
-              continue;
-            }
-          if ((x-x_offset) >= (ssize_t) source_image->columns)
-            break;
-        }
-      if (IsOutsideSourceColumn(pixels,x,x_offset,source_image) != MagickFalse)
-        {
-          VirtualOverInputs
-            virtual_pixel;
-
-          /*
-            Virtual composite:
-              Sc: source color.
-              Dc: canvas color.
-          */
-          virtual_pixel.image=image;
-          virtual_pixel.source_image=source_image;
-          virtual_pixel.x=x;
-          virtual_pixel.x_offset=x_offset;
-          virtual_pixel.y=y;
-          virtual_pixel.y_offset=y_offset;
-          virtual_pixel.clamp=clamp;
-          virtual_pixel.exception=exception;
-          CompositeVirtualOverPixel(&virtual_pixel,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-          continue;
-        }
-      /*
-        Authentic composite:
-          Sa:  normalized source alpha.
-          Da:  normalized canvas alpha.
-      */
-      Sa=QuantumScale*(double) GetPixelAlpha(source_image,p);
-      Da=QuantumScale*(double) GetPixelAlpha(image,q);
-      alpha=Sa+Da-Sa*Da;
-      authentic.image=image;
-      authentic.source_image=source_image;
-      authentic.p=p;
-      authentic.alpha=alpha;
-      authentic.Da=Da;
-      authentic.Sa=Sa;
-      authentic.clamp=clamp;
-      CompositeOverPixelChannels(&authentic,q);
-      p=AdvanceOverSourcePixel(source_image,pixels,p);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.source_image=source_image;
+    row.pixels=pixels;
+    row.clip_to_self=clip_to_self;
+    row.x_offset=x_offset;
+    row.y_offset=y_offset;
+    row.y=y;
+    row.clamp=clamp;
+    row.exception=exception;
+    CompositeOverRow(&row,p,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
