@@ -4532,6 +4532,121 @@ static void AddSelectiveTap(const SelectiveTap *tap,double *pixel,
     }
 }
 
+typedef struct _SelectiveSum
+{
+  const Image
+    *image;
+
+  Image
+    *luminance_image;
+
+  size_t
+    width;
+
+  double
+    intensity,
+    threshold;
+
+  ssize_t
+    i;
+} SelectiveSum;
+
+typedef struct _SelectiveSumTargets
+{
+  double
+    *pixel,
+    *gamma;
+
+  const MagickRealType
+    *magick_restrict *k;
+
+  const Quantum
+    *magick_restrict *pixels,
+    *magick_restrict *luminance_pixels;
+} SelectiveSumTargets;
+
+static void SumSelectivePixels(const SelectiveSum *sum,
+  const SelectiveSumTargets *targets)
+{
+  double
+    *const pixel = targets->pixel,
+    *const gamma = targets->gamma;
+
+  const MagickRealType
+    *magick_restrict *const k = targets->k;
+
+  const Quantum
+    *magick_restrict *const pixels = targets->pixels,
+    *magick_restrict *const luminance_pixels = targets->luminance_pixels;
+
+  double
+    contrast;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < (ssize_t) sum->width; v++)
+  {
+    for (u=0; u < (ssize_t) sum->width; u++)
+    {
+      SelectiveTap
+        tap;
+
+      contrast=GetPixelIntensity(sum->luminance_image,*luminance_pixels)-
+        sum->intensity;
+      tap.contrast=contrast;
+      tap.threshold=sum->threshold;
+      tap.k=*k;
+      tap.pixels=*pixels;
+      tap.i=sum->i;
+      AddSelectiveTap(&tap,pixel,gamma);
+      (*k)++;
+      *pixels+=(ptrdiff_t) GetPixelChannels(sum->image);
+      *luminance_pixels+=(ptrdiff_t) GetPixelChannels(sum->luminance_image);
+    }
+    *pixels+=(ptrdiff_t) GetPixelChannels(sum->image)*sum->image->columns;
+    *luminance_pixels+=(ptrdiff_t) GetPixelChannels(sum->luminance_image)*
+      sum->luminance_image->columns;
+  }
+}
+
+static void SumSelectiveBlendedPixels(const SelectiveSum *sum,
+  const SelectiveSumTargets *targets)
+{
+  double
+    alpha,
+    contrast;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < (ssize_t) sum->width; v++)
+  {
+    for (u=0; u < (ssize_t) sum->width; u++)
+    {
+      contrast=GetPixelIntensity(sum->image,*targets->pixels)-sum->intensity;
+      if (fabs(contrast) < sum->threshold)
+        {
+          alpha=QuantumScale*(double) GetPixelAlpha(sum->image,
+            *targets->pixels);
+          *targets->pixel+=(**targets->k)*alpha*(double)
+            (*targets->pixels)[sum->i];
+          *targets->gamma+=(**targets->k)*alpha;
+        }
+      (*targets->k)++;
+      *targets->pixels+=(ptrdiff_t) GetPixelChannels(sum->image);
+      *targets->luminance_pixels+=(ptrdiff_t) GetPixelChannels(
+        sum->luminance_image);
+    }
+    *targets->pixels+=(ptrdiff_t) GetPixelChannels(sum->image)*
+      sum->image->columns;
+    *targets->luminance_pixels+=(ptrdiff_t) GetPixelChannels(
+      sum->luminance_image)*sum->luminance_image->columns;
+  }
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -4667,9 +4782,6 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    double
-      contrast;
-
     MagickBooleanType
       sync;
 
@@ -4708,7 +4820,6 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
         double
-          alpha,
           gamma,
           pixel;
 
@@ -4726,11 +4837,11 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
           *magick_restrict luminance_pixels,
           *magick_restrict pixels;
 
-        ssize_t
-          u;
+        SelectiveSum
+          sum;
 
-        ssize_t
-          v;
+        SelectiveSumTargets
+          targets;
 
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
@@ -4750,29 +4861,18 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
         gamma=0.0;
         if ((blur_traits & BlendPixelTrait) == 0)
           {
-            for (v=0; v < (ssize_t) width; v++)
-            {
-              for (u=0; u < (ssize_t) width; u++)
-              {
-                SelectiveTap
-                  tap;
-
-                contrast=GetPixelIntensity(luminance_image,luminance_pixels)-
-                  intensity;
-                tap.contrast=contrast;
-                tap.threshold=threshold;
-                tap.k=k;
-                tap.pixels=pixels;
-                tap.i=i;
-                AddSelectiveTap(&tap,&pixel,&gamma);
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-                luminance_pixels+=(ptrdiff_t) GetPixelChannels(luminance_image);
-              }
-              pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-              luminance_pixels+=(ptrdiff_t) GetPixelChannels(luminance_image)*
-                luminance_image->columns;
-            }
+            sum.image=image;
+            sum.luminance_image=luminance_image;
+            sum.width=width;
+            sum.intensity=intensity;
+            sum.threshold=threshold;
+            sum.i=i;
+            targets.pixel=(&pixel);
+            targets.gamma=(&gamma);
+            targets.k=(&k);
+            targets.pixels=(&pixels);
+            targets.luminance_pixels=(&luminance_pixels);
+            SumSelectivePixels(&sum,&targets);
             if (fabs((double) gamma) < MagickEpsilon)
               {
                 SetPixelChannel(blur_image,channel,p[center+i],q);
@@ -4782,25 +4882,18 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
             SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
             continue;
           }
-        for (v=0; v < (ssize_t) width; v++)
-        {
-          for (u=0; u < (ssize_t) width; u++)
-          {
-            contrast=GetPixelIntensity(image,pixels)-intensity;
-            if (fabs(contrast) < threshold)
-              {
-                alpha=QuantumScale*(double) GetPixelAlpha(image,pixels);
-                pixel+=(*k)*alpha*(double) pixels[i];
-                gamma+=(*k)*alpha;
-              }
-            k++;
-            pixels+=(ptrdiff_t) GetPixelChannels(image);
-            luminance_pixels+=(ptrdiff_t) GetPixelChannels(luminance_image);
-          }
-          pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-          luminance_pixels+=(ptrdiff_t) GetPixelChannels(luminance_image)*
-            luminance_image->columns;
-        }
+        sum.image=image;
+        sum.luminance_image=luminance_image;
+        sum.width=width;
+        sum.intensity=intensity;
+        sum.threshold=threshold;
+        sum.i=i;
+        targets.pixel=(&pixel);
+        targets.gamma=(&gamma);
+        targets.k=(&k);
+        targets.pixels=(&pixels);
+        targets.luminance_pixels=(&luminance_pixels);
+        SumSelectiveBlendedPixels(&sum,&targets);
         if (fabs((double) gamma) < MagickEpsilon)
           {
             SetPixelChannel(blur_image,channel,p[center+i],q);
