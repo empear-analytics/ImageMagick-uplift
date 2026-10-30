@@ -807,6 +807,73 @@ static void SetColorListEntry(const Image *image,const Quantum *p,
 %
 */
 
+typedef struct _HColorEntry
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  HCubeInfo
+    *cube_info;
+
+  HNodeInfo
+    *node_info;
+
+  ssize_t
+    i;
+
+  size_t
+    max_colors;
+
+  ExceptionInfo
+    *exception;
+} HColorEntry;
+
+static MagickBooleanType AddHNodeColor(const HColorEntry *entry)
+{
+  const Image
+    *const image = entry->image;
+
+  const Quantum
+    *const p = entry->p;
+
+  HCubeInfo
+    *const cube_info = entry->cube_info;
+
+  HNodeInfo
+    *const node_info = entry->node_info;
+
+  const ssize_t
+    i = entry->i;
+
+  const size_t
+    max_colors = entry->max_colors;
+
+  ExceptionInfo
+    *const exception = entry->exception;
+
+  /*
+    Add this unique color to the color list.
+  */
+  ExtendColorList(node_info,i);
+  if (node_info->list == (PixelInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",
+        image->filename);
+      return(MagickFalse);
+    }
+  SetColorListEntry(image,p,node_info,i);
+  node_info->list[i].count=1;
+  node_info->number_unique++;
+  cube_info->colors++;
+  if (cube_info->colors > max_colors)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType CheckImageColors(const Image *image,
   const size_t max_colors,ExceptionInfo *exception)
 {
@@ -860,6 +927,9 @@ static MagickBooleanType CheckImageColors(const Image *image,
       break;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
+      HColorEntry
+        entry;
+
       /*
         Start at the root and proceed level by level.
       */
@@ -895,22 +965,14 @@ static MagickBooleanType CheckImageColors(const Image *image,
         node_info->list[i].count++;
       else
         {
-          /*
-            Add this unique color to the color list.
-          */
-          ExtendColorList(node_info,i);
-          if (node_info->list == (PixelInfo *) NULL)
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                ResourceLimitError,"MemoryAllocationFailed","`%s'",
-                image->filename);
-              break;
-            }
-          SetColorListEntry(image,p,node_info,i);
-          node_info->list[i].count=1;
-          node_info->number_unique++;
-          cube_info->colors++;
-          if (cube_info->colors > max_colors)
+          entry.image=image;
+          entry.p=p;
+          entry.cube_info=cube_info;
+          entry.node_info=node_info;
+          entry.i=i;
+          entry.max_colors=max_colors;
+          entry.exception=exception;
+          if (AddHNodeColor(&entry) == MagickFalse)
             break;
         }
       p+=(ptrdiff_t) GetPixelChannels(image);
