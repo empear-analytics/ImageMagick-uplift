@@ -1501,6 +1501,48 @@ static void AddDefaultAttributeTag(XMLTreeRoot *root,const ssize_t i,
     }
 }
 
+typedef struct _DefaultAttributeInfo
+{
+  char
+    *c,
+    *n,
+    *t,
+    *v;
+
+  ssize_t
+    i;
+} DefaultAttributeInfo;
+
+static void AppendDefaultAttribute(XMLTreeRoot *root,
+  const DefaultAttributeInfo *attribute)
+{
+  char
+    *const c = attribute->c,
+    *const n = attribute->n,
+    *const t = attribute->t,
+    *const v = attribute->v;
+
+  const ssize_t
+    i = attribute->i;
+
+  ssize_t
+    j;
+
+  AddDefaultAttributeTag(root,i,t);
+  for (j=1; root->attributes[i][j] != (char *) NULL; j+=3) ;
+  root->attributes[i]=(char **) ResizeQuantumMemory(
+    root->attributes[i],(size_t) (j+4),sizeof(**root->attributes));
+  if (root->attributes[i] == (char **) NULL)
+    ThrowFatalException(ResourceLimitFatalError,
+      "MemoryAllocationFailed");
+  root->attributes[i][j+3]=(char *) NULL;
+  root->attributes[i][j+2]=ConstantString(c);
+  root->attributes[i][j+1]=(char *) NULL;
+  if (v != (char *) NULL)
+    root->attributes[i][j+1]=ParseEntities(v,root->entities,*c);
+  root->attributes[i][j]=ConstantString(n);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -1514,8 +1556,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
     *v;
 
   ssize_t
-    i,
-    j;
+    i;
 
   n=(char *) NULL;
   predefined_entities=(char **) AcquireMagickMemory(sizeof(sentinel));
@@ -1614,6 +1655,9 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
             while ((*(n=xml+strspn(xml+1,XMLWhitespace)+1) != '\0') &&
                    (*n != '>'))
             {
+              DefaultAttributeInfo
+                attribute;
+
               xml=n+strcspn(n,XMLWhitespace);
               if (*xml != '\0')
                 *xml='\0';
@@ -1661,19 +1705,12 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
                       predefined_entities);
                     return(MagickFalse);
                   }
-              AddDefaultAttributeTag(root,i,t);
-              for (j=1; root->attributes[i][j] != (char *) NULL; j+=3) ;
-              root->attributes[i]=(char **) ResizeQuantumMemory(
-                root->attributes[i],(size_t) (j+4),sizeof(**root->attributes));
-              if (root->attributes[i] == (char **) NULL)
-                ThrowFatalException(ResourceLimitFatalError,
-                  "MemoryAllocationFailed");
-              root->attributes[i][j+3]=(char *) NULL;
-              root->attributes[i][j+2]=ConstantString(c);
-              root->attributes[i][j+1]=(char *) NULL;
-              if (v != (char *) NULL)
-                root->attributes[i][j+1]=ParseEntities(v,root->entities,*c);
-              root->attributes[i][j]=ConstantString(n);
+              attribute.c=c;
+              attribute.n=n;
+              attribute.t=t;
+              attribute.v=v;
+              attribute.i=i;
+              AppendDefaultAttribute(root,&attribute);
             }
         }
       else
