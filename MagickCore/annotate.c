@@ -288,6 +288,96 @@ static void SplitTextLines(char *text,char **textlist,
   textlist[i]=(char *) NULL;
 }
 
+typedef struct _GravityTextInfo
+{
+  DrawInfo
+    *annotate,
+    *annotate_info;
+
+  RectangleInfo
+    geometry;
+
+  size_t
+    height;
+
+  ssize_t
+    i;
+
+  TypeMetric
+    metrics;
+
+  size_t
+    number_lines;
+} GravityTextInfo;
+
+static void GetGravityTextOffset(const GravityTextInfo *gravity,
+  PointInfo *offset)
+{
+  DrawInfo
+    *const annotate = gravity->annotate,
+    *const annotate_info = gravity->annotate_info;
+
+  const RectangleInfo
+    geometry = gravity->geometry;
+
+  const size_t
+    height = gravity->height;
+
+  const ssize_t
+    i = gravity->i;
+
+  const TypeMetric
+    metrics = gravity->metrics;
+
+  const size_t
+    number_lines = gravity->number_lines;
+
+  switch (annotate->gravity)
+  {
+    case UndefinedGravity:
+    default:
+    {
+      (*offset).x=annotate_info->affine.tx+i*annotate_info->affine.ry*height;
+      (*offset).y=annotate_info->affine.ty+i*annotate_info->affine.sy*height;
+      break;
+    }
+    case (GravityType) SouthWestGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
+        annotate_info->affine.ry*height-annotate_info->affine.ry*
+        (number_lines-1.0)*height;
+      (*offset).y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
+        geometry.height+i*annotate_info->affine.sy*height-
+        annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
+      break;
+    }
+    case (GravityType) SouthGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
+        geometry.width/2.0+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width/2.0-
+        annotate_info->affine.ry*(number_lines-1.0)*height/2.0;
+      (*offset).y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
+        geometry.height+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width/2.0-
+        annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
+      break;
+    }
+    case (GravityType) SouthEastGravity:
+    {
+      (*offset).x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
+        geometry.width+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width-
+        annotate_info->affine.ry*(number_lines-1.0)*height-1.0;
+      (*offset).y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
+        geometry.height+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width-
+        annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -378,6 +468,9 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   {
     const RenderTarget target = { image, annotate };
 
+    GravityTextInfo
+      gravity;
+
     if (*textlist[i] == '\0')
       continue;
     /*
@@ -395,11 +488,16 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       draw_info->interline_spacing+0.5));
     switch (annotate->gravity)
     {
-      case UndefinedGravity:
       default:
       {
-        offset.x=annotate_info->affine.tx+i*annotate_info->affine.ry*height;
-        offset.y=annotate_info->affine.ty+i*annotate_info->affine.sy*height;
+        gravity.annotate=annotate;
+        gravity.annotate_info=annotate_info;
+        gravity.geometry=geometry;
+        gravity.height=height;
+        gravity.i=i;
+        gravity.metrics=metrics;
+        gravity.number_lines=number_lines;
+        GetGravityTextOffset(&gravity,&offset);
         break;
       }
       case (GravityType) NorthWestGravity:
@@ -471,40 +569,6 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
           annotate_info->affine.rx*metrics.width+
           annotate_info->affine.sy*(metrics.ascent+metrics.descent-
           (number_lines-1.0)*height)/2.0;
-        break;
-      }
-      case (GravityType) SouthWestGravity:
-      {
-        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
-          annotate_info->affine.ry*height-annotate_info->affine.ry*
-          (number_lines-1.0)*height;
-        offset.y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
-          geometry.height+i*annotate_info->affine.sy*height-
-          annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
-        break;
-      }
-      case (GravityType) SouthGravity:
-      {
-        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
-          geometry.width/2.0+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width/2.0-
-          annotate_info->affine.ry*(number_lines-1.0)*height/2.0;
-        offset.y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
-          geometry.height+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width/2.0-
-          annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
-        break;
-      }
-      case (GravityType) SouthEastGravity:
-      {
-        offset.x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
-          geometry.width+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width-
-          annotate_info->affine.ry*(number_lines-1.0)*height-1.0;
-        offset.y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
-          geometry.height+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width-
-          annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
         break;
       }
     }
