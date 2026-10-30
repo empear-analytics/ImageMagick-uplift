@@ -2686,6 +2686,21 @@ static SymbolE FindSymbolToken (FxInfo * pfx)
   return(se);
 }
 
+static MagickBooleanType NotASymbolOperand (FxInfo * pfx)
+{
+  SymbolE se;
+  se = FindSymbolToken (pfx);
+  if (se != sNull) {
+    fxFltType val = 0;
+    (void) AddElement (pfx, val, (int) se);
+    pfx->pex += pfx->lenToken;
+
+    if (IsHslSymbol(se) != MagickFalse) pfx->NeedHsl = MagickTrue;
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
   MagickBooleanType * needPopAll)
@@ -2841,18 +2856,8 @@ static MagickBooleanType GetOperand (
 
     /* Try symbol
     */
-    {
-      SymbolE se;
-      se = FindSymbolToken (pfx);
-      if (se != sNull) {
-        fxFltType val = 0;
-        (void) AddElement (pfx, val, (int) se);
-        pfx->pex += pfx->lenToken;
-
-        if (IsHslSymbol(se) != MagickFalse) pfx->NeedHsl = MagickTrue;
-        return MagickTrue;
-      }
-    }
+    if (NotASymbolOperand (pfx) == MagickFalse)
+      return MagickTrue;
 
     /* Try constant colour.
     */
