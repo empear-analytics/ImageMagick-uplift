@@ -392,6 +392,147 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 %
 */
 
+typedef struct _DitherErrorSpread
+{
+  Image
+    *image;
+
+  double
+    *distortion;
+
+  size_t
+    channels;
+
+  ssize_t
+    x,
+    y,
+    u,
+    v;
+
+  double
+    error;
+} DitherErrorSpread;
+
+static void DistributeDitherError(const DitherErrorSpread *spread)
+{
+  if ((spread->x+1) < (ssize_t) spread->image->columns)
+    spread->distortion[spread->u+(ssize_t) spread->channels]+=7.0*
+      spread->error/16.0;
+  if ((spread->y+1) < (ssize_t) spread->image->rows)
+    {
+      /*
+        Distribute distortion for bottom left, bottom, and bottom right.
+      */
+      if (spread->x > 0)
+        spread->distortion[spread->v-(ssize_t) spread->channels]+=3.0*
+          spread->error/16.0;
+      spread->distortion[spread->v]+=5.0*spread->error/16.0;
+      if ((spread->x+1) < (ssize_t) spread->image->columns)
+        spread->distortion[spread->v+(ssize_t) spread->channels]+=1.0*
+          spread->error/16.0;
+    }
+}
+
+typedef struct _DitherRow
+{
+  Image
+    *image;
+
+  double
+    *distortion;
+
+  QuantumAny
+    range;
+
+  size_t
+    channels;
+
+  ssize_t
+    y;
+} DitherRow;
+
+static void DitherImageRow(const DitherRow *row,Quantum *q)
+{
+  Image
+    *const image = row->image;
+
+  double
+    *const distortion = row->distortion;
+
+  const QuantumAny
+    range = row->range;
+
+  const size_t
+    channels = row->channels;
+
+  const ssize_t
+    y = row->y;
+
+  ssize_t
+    u,
+    v,
+    x;
+
+  /*
+    Reset pixel distortion for current row.
+  */
+  u=(y % 3)*(ssize_t) (image->columns*channels);
+  (void) memset(distortion+u,0,image->columns*channels*sizeof(*distortion));
+  v=((y+1) % 3)*(ssize_t) (image->columns*channels);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) channels; i++)
+    {
+      DitherErrorSpread
+        spread;
+
+      double
+        error,
+        pixel;
+
+      PixelChannel
+        channel;
+
+      PixelTrait
+        traits;
+
+      /*
+        Add distortion to current pixel then distribute new distortion.
+      */
+      channel=GetPixelChannelChannel(image,i);
+      traits=GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        {
+          u++;
+          v++;
+          continue;
+        }
+      pixel=(double) q[i]+distortion[u];
+      q[i]=ScaleAnyToQuantum(ScaleQuantumToAny(ClampPixel((MagickRealType)
+        pixel),range),range);
+      /*
+        Distribute distortion for right.
+      */
+      error=pixel-(double) q[i];
+      spread.image=image;
+      spread.distortion=distortion;
+      spread.channels=channels;
+      spread.x=x;
+      spread.y=y;
+      spread.u=u;
+      spread.v=v;
+      spread.error=error;
+      DistributeDitherError(&spread);
+      u++;
+      v++;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType FloydSteinbergImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -432,10 +573,8 @@ static MagickBooleanType FloydSteinbergImageDepth(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      u,
-      v,
-      x;
+    DitherRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -445,65 +584,12 @@ static MagickBooleanType FloydSteinbergImageDepth(Image *image,
         status=MagickFalse;
         continue;
       }
-    /*
-      Reset pixel distortion for current row.
-    */
-    u=(y % 3)*(ssize_t) (image->columns*channels);
-    (void) memset(distortion+u,0,image->columns*channels*sizeof(*distortion));
-    v=((y+1) % 3)*(ssize_t) (image->columns*channels);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) channels; i++)
-      {
-        double
-          error,
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits;
-
-        /*
-          Add distortion to current pixel then distribute new distortion.
-        */
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          {
-            u++;
-            v++;
-            continue;
-          }
-        pixel=(double) q[i]+distortion[u];
-        q[i]=ScaleAnyToQuantum(ScaleQuantumToAny(ClampPixel((MagickRealType)
-          pixel),range),range);
-        /*
-          Distribute distortion for right.
-        */
-        error=pixel-(double) q[i];
-        if ((x+1) < (ssize_t) image->columns)
-          distortion[u+(ssize_t) channels]+=7.0*error/16.0;
-        if ((y+1) < (ssize_t) image->rows)
-          {
-            /*
-              Distribute distortion for bottom left, bottom, and bottom right.
-            */
-            if (x > 0)
-              distortion[v-(ssize_t) channels]+=3.0*error/16.0;
-            distortion[v]+=5.0*error/16.0;
-            if ((x+1) < (ssize_t) image->columns)
-              distortion[v+(ssize_t) channels]+=1.0*error/16.0;
-          }
-        u++;
-        v++;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.distortion=distortion;
+    row.range=range;
+    row.channels=channels;
+    row.y=y;
+    DitherImageRow(&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       {
         status=MagickFalse;
