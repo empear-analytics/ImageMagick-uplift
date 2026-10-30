@@ -1742,6 +1742,15 @@ static MagickBooleanType AuthorizeDelegateCopy(const char *source,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsKeptDestination(
+  const MagickBooleanType overwrite,const char *destination,
+  struct stat *attributes)
+{
+  return(((overwrite == MagickFalse) &&
+    (GetPathAttributes(destination,attributes) != MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
 typedef struct _DelegateFileCopy
 {
   int
@@ -1812,8 +1821,7 @@ static MagickBooleanType CopyDelegateFile(const char *source,
   */
   assert(source != (const char *) NULL);
   assert(destination != (char *) NULL);
-  if ((overwrite == MagickFalse) &&
-      (GetPathAttributes(destination,&attributes) != MagickFalse))
+  if (IsKeptDestination(overwrite,destination,&attributes) != MagickFalse)
     return(MagickTrue);
   if (IsPathAuthorized(WritePolicyRights,destination) == MagickFalse)
     ThrowPolicyException(source,MagickFalse);
