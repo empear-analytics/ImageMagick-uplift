@@ -134,11 +134,11 @@ static inline MagickBooleanType IsKapurBufferMissing(
     MagickTrue : MagickFalse);
 }
 
+#define MaxIntensity  255
+
 static double KapurThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
-#define MaxIntensity  255
-
   double
     *black_entropy,
     *cumulative_histogram,
