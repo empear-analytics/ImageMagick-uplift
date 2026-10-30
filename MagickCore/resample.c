@@ -290,11 +290,18 @@ static inline MagickBooleanType IsAreaOutsideImage(
     ) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsAreaBeyondTopLeftCorner(
+  const ResampleFilter *resample_filter,const double u0,const double v0,
+  const double edge)
+{
+  return(( u0 + resample_filter->Ulimit < edge
+    && v0 + resample_filter->Vlimit < edge ) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsAreaOutsideCorner(
   const ResampleFilter *resample_filter,const double u0,const double v0)
 {
-  return((    ( u0 + resample_filter->Ulimit < 0.0
-                && v0 + resample_filter->Vlimit < 0.0 )
+  return((    IsAreaBeyondTopLeftCorner(resample_filter,u0,v0,0.0)
            || ( u0 + resample_filter->Ulimit < 0.0
                 && v0 - resample_filter->Vlimit >
                    (double) resample_filter->image->rows-1.0 )
@@ -311,8 +318,7 @@ static inline MagickBooleanType IsAreaOutsideCorner(
 static inline MagickBooleanType IsAreaOutsideDitherCorner(
   const ResampleFilter *resample_filter,const double u0,const double v0)
 {
-  return((    ( u0 + resample_filter->Ulimit < -32.0
-                && v0 + resample_filter->Vlimit < -32.0 )
+  return((    IsAreaBeyondTopLeftCorner(resample_filter,u0,v0,-32.0)
            || ( u0 + resample_filter->Ulimit < -32.0
                 && v0 - resample_filter->Vlimit >
                    (double) resample_filter->image->rows+31.0 )
