@@ -1790,6 +1790,35 @@ static DoublePixelPacket AddPreviousRowError(
   return(pixel);
 }
 
+typedef struct _FloydSteinbergCurrentRow
+{
+  QCubeInfo
+    *cube_info;
+
+  DoublePixelPacket
+    *current;
+
+  ssize_t
+    u,
+    v;
+} FloydSteinbergCurrentRow;
+
+static DoublePixelPacket AddCurrentRowError(
+  const FloydSteinbergCurrentRow *ahead,const QCubeInfo *cube,
+  DoublePixelPacket pixel)
+{
+  pixel.red+=7.0*ahead->cube_info->diffusion*ahead->current[ahead->u-
+    ahead->v].red/16;
+  pixel.green+=7.0*ahead->cube_info->diffusion*ahead->current[ahead->u-
+    ahead->v].green/16;
+  pixel.blue+=7.0*ahead->cube_info->diffusion*ahead->current[ahead->u-
+    ahead->v].blue/16;
+  if (cube->associate_alpha != MagickFalse)
+    pixel.alpha+=7.0*ahead->cube_info->diffusion*ahead->current[ahead->u-
+      ahead->v].alpha/16;
+  return(pixel);
+}
+
 static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -1855,6 +1884,9 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
         color,
         pixel;
 
+      FloydSteinbergCurrentRow
+        ahead;
+
       FloydSteinbergPreviousRow
         row;
 
@@ -1869,11 +1901,11 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
         &pixel);
       if (x > 0)
         {
-          pixel.red+=7.0*cube_info->diffusion*current[u-v].red/16;
-          pixel.green+=7.0*cube_info->diffusion*current[u-v].green/16;
-          pixel.blue+=7.0*cube_info->diffusion*current[u-v].blue/16;
-          if (cube.associate_alpha != MagickFalse)
-            pixel.alpha+=7.0*cube_info->diffusion*current[u-v].alpha/16;
+          ahead.cube_info=cube_info;
+          ahead.current=current;
+          ahead.u=u;
+          ahead.v=v;
+          pixel=AddCurrentRowError(&ahead,&cube,pixel);
         }
       if (y > 0)
         {
