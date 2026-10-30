@@ -571,6 +571,82 @@ static Image *ReadMontageTexture(ImageInfo *clone_info,
   return(texture);
 }
 
+typedef struct _MontageTileInfo
+{
+  const MontageInfo
+    *montage_info;
+
+  Image
+    *montage;
+
+  DrawInfo
+    *draw_info;
+
+  ssize_t
+    x_offset,
+    y_offset,
+    x,
+    y,
+    bevel_width;
+
+  size_t
+    width,
+    height,
+    border_width,
+    max_height;
+
+  MagickBooleanType
+    concatenate;
+
+  RectangleInfo
+    extract_info;
+
+  TypeMetric
+    metrics;
+} MontageTileInfo;
+
+static Image *CompositeMontageTile(Image *image,
+  const MontageTileInfo *tile_info,ExceptionInfo *exception)
+{
+  char
+    tile_geometry[MagickPathExtent];
+
+  const char
+    *value;
+
+  /*
+    Composite background with tile.
+  */
+  if (tile_info->montage_info->shadow != MagickFalse)
+    image=AddTileShadow(image,exception);
+  (void) CompositeImage(tile_info->montage,image,image->compose,MagickTrue,
+    tile_info->x_offset+tile_info->x,tile_info->y_offset+tile_info->y,
+    exception);
+  value=GetImageProperty(image,"label",exception);
+  if (value != (const char *) NULL)
+    {
+      /*
+        Annotate composite tile with label.
+      */
+      (void) FormatLocaleString(tile_geometry,MagickPathExtent,
+        "%.17gx%.17g%+.20g%+.20g",(double) ((tile_info->montage_info->frame ?
+        image->columns : tile_info->width)-2*tile_info->border_width),(double)
+        (tile_info->metrics.ascent-tile_info->metrics.descent+4)*
+        MultilineCensus(value),(double) (tile_info->x_offset+(ssize_t)
+        tile_info->border_width),(double) ((tile_info->montage_info->frame ?
+        tile_info->y_offset+(ssize_t) tile_info->height+(ssize_t)
+        tile_info->border_width+4 : tile_info->y_offset+(ssize_t)
+        (tile_info->concatenate != MagickFalse ? tile_info->max_height :
+        tile_info->extract_info.height)+(ssize_t) tile_info->border_width+
+        (tile_info->montage_info->shadow != MagickFalse ? 4 : 0))+
+        tile_info->bevel_width));
+      (void) CloneString(&tile_info->draw_info->geometry,tile_geometry);
+      (void) CloneString(&tile_info->draw_info->text,value);
+      (void) AnnotateImage(tile_info->montage,tile_info->draw_info,exception);
+    }
+  return(image);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -580,9 +656,6 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
   char
     tile_geometry[MagickPathExtent],
     *title;
-
-  const char
-    *value;
 
   DrawInfo
     *draw_info;
@@ -930,33 +1003,25 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
         }
       if (LocaleCompare(image->magick,"NULL") != 0)
         {
-          /*
-            Composite background with tile.
-          */
-          if (montage_info->shadow != MagickFalse)
-            image=AddTileShadow(image,exception);
-          (void) CompositeImage(montage,image,image->compose,MagickTrue,
-            x_offset+x,y_offset+y,exception);
-          value=GetImageProperty(image,"label",exception);
-          if (value != (const char *) NULL)
-            {
-              /*
-                Annotate composite tile with label.
-              */
-              (void) FormatLocaleString(tile_geometry,MagickPathExtent,
-                "%.17gx%.17g%+.20g%+.20g",(double) ((montage_info->frame ?
-                image->columns : width)-2*border_width),(double)
-                (metrics.ascent-metrics.descent+4)*MultilineCensus(value),
-                (double) (x_offset+(ssize_t) border_width),(double)
-                ((montage_info->frame ? y_offset+(ssize_t) height+(ssize_t)
-                border_width+4 : y_offset+(ssize_t)
-                (concatenate != MagickFalse ? max_height : extract_info.height)+
-                (ssize_t) border_width+(montage_info->shadow != MagickFalse ?
-                4 : 0))+bevel_width));
-              (void) CloneString(&draw_info->geometry,tile_geometry);
-              (void) CloneString(&draw_info->text,value);
-              (void) AnnotateImage(montage,draw_info,exception);
-            }
+          MontageTileInfo
+            tile_info;
+
+          tile_info.montage_info=montage_info;
+          tile_info.montage=montage;
+          tile_info.draw_info=draw_info;
+          tile_info.x_offset=x_offset;
+          tile_info.y_offset=y_offset;
+          tile_info.x=x;
+          tile_info.y=y;
+          tile_info.bevel_width=bevel_width;
+          tile_info.width=width;
+          tile_info.height=height;
+          tile_info.border_width=border_width;
+          tile_info.max_height=max_height;
+          tile_info.concatenate=concatenate;
+          tile_info.extract_info=extract_info;
+          tile_info.metrics=metrics;
+          image=CompositeMontageTile(image,&tile_info,exception);
         }
       x_offset+=(ssize_t) width+2*(extract_info.x+(ssize_t) border_width);
       if (((tile+1) == (ssize_t) tiles_per_page) ||
