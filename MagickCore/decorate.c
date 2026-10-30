@@ -307,6 +307,77 @@ static Quantum *DrawFrameTopInnerBevel(const FrameTopInnerBevel *top_inner,
   return(q);
 }
 
+typedef struct _FrameBottomInnerBevel
+{
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    accentuate,
+    highlight,
+    matte,
+    shadow;
+
+  size_t
+    bevel_width;
+} FrameBottomInnerBevel;
+
+static Quantum *DrawFrameBottomInnerRow(
+  const FrameBottomInnerBevel *bottom_inner,const ssize_t y,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = bottom_inner->frame_image;
+
+  const Image
+    *const image = bottom_inner->image;
+
+  const FrameInfo
+    *const frame_info = bottom_inner->frame_info;
+
+  const PixelInfo
+    accentuate = bottom_inner->accentuate,
+    highlight = bottom_inner->highlight,
+    matte = bottom_inner->matte,
+    shadow = bottom_inner->shadow;
+
+  const size_t
+    bevel_width = bottom_inner->bevel_width;
+
+  size_t
+    width;
+
+  ssize_t
+    x;
+
+  q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+  q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
+  for (x=0; x < y; x++)
+  {
+    SetPixelViaPixelInfo(frame_image,&shadow,q);
+    q+=(ptrdiff_t) GetPixelChannels(frame_image);
+  }
+  for ( ; x < ((ssize_t) image->columns+2*frame_info->inner_bevel); x++)
+  {
+    if (x >= ((ssize_t) image->columns+2*frame_info->inner_bevel-y))
+      SetPixelViaPixelInfo(frame_image,&highlight,q);
+    else
+      SetPixelViaPixelInfo(frame_image,&accentuate,q);
+    q+=(ptrdiff_t) GetPixelChannels(frame_image);
+  }
+  width=(size_t) ((ssize_t) frame_info->width-frame_info->x-
+    (ssize_t) image->columns-(ssize_t) bevel_width);
+  q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+  q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+  return(q);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -561,25 +632,18 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
           */
           for (y=frame_info->inner_bevel-1; y >= 0; y--)
           {
-            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-            q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
-            for (x=0; x < y; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&shadow,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for ( ; x < ((ssize_t) image->columns+2*frame_info->inner_bevel); x++)
-            {
-              if (x >= ((ssize_t) image->columns+2*frame_info->inner_bevel-y))
-                SetPixelViaPixelInfo(frame_image,&highlight,q);
-              else
-                SetPixelViaPixelInfo(frame_image,&accentuate,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            width=(size_t) ((ssize_t) frame_info->width-frame_info->x-
-              (ssize_t) image->columns-(ssize_t) bevel_width);
-            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+            FrameBottomInnerBevel
+              bottom_inner;
+
+            bottom_inner.frame_image=frame_image;
+            bottom_inner.image=image;
+            bottom_inner.frame_info=frame_info;
+            bottom_inner.accentuate=accentuate;
+            bottom_inner.highlight=highlight;
+            bottom_inner.matte=matte;
+            bottom_inner.shadow=shadow;
+            bottom_inner.bevel_width=bevel_width;
+            q=DrawFrameBottomInnerRow(&bottom_inner,y,q);
           }
           height=(size_t) ((ssize_t) frame_info->height-frame_info->y-(ssize_t)
             image->rows-(ssize_t) bevel_width);
