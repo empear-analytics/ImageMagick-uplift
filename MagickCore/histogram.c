@@ -1183,6 +1183,49 @@ MagickExport MagickBooleanType IsPaletteImage(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _MinMaxStretch
+{
+  Image
+    *image;
+
+  double
+    black,
+    white,
+    gamma;
+
+  ExceptionInfo
+    *exception;
+} MinMaxStretch;
+
+static MagickBooleanType StretchAllChannels(const MinMaxStretch *stretch,
+  MagickStatusType status)
+{
+  Image
+    *const image = stretch->image;
+
+  const double
+    black = stretch->black,
+    white = stretch->white,
+    gamma = stretch->gamma;
+
+  ExceptionInfo
+    *const exception = stretch->exception;
+
+  double
+    min,
+    max;
+
+  /*
+    Auto-level all channels equally.
+  */
+  (void) GetImageRange(image,&min,&max,exception);
+  min+=black;
+  max-=white;
+  if (fabs(min-max) >= MagickEpsilon)
+    status&=(MagickStatusType) LevelImage(image,min,max,gamma,exception);
+  return(status != 0 ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType MinMaxStretchImage(Image *image,
   const double black,const double white,const double gamma,
   ExceptionInfo *exception)
@@ -1200,15 +1243,15 @@ MagickExport MagickBooleanType MinMaxStretchImage(Image *image,
   status=MagickTrue;
   if (image->channel_mask == AllChannels)
     {
-      /*
-        Auto-level all channels equally.
-      */
-      (void) GetImageRange(image,&min,&max,exception);
-      min+=black;
-      max-=white;
-      if (fabs(min-max) >= MagickEpsilon)
-        status&=(MagickStatusType) LevelImage(image,min,max,gamma,exception);
-      return(status != 0 ? MagickTrue : MagickFalse);
+      MinMaxStretch
+        stretch;
+
+      stretch.image=image;
+      stretch.black=black;
+      stretch.white=white;
+      stretch.gamma=gamma;
+      stretch.exception=exception;
+      return(StretchAllChannels(&stretch,status));
     }
   /*
     Auto-level each channel.
