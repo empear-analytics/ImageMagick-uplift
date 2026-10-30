@@ -2924,6 +2924,15 @@ static MagickBooleanType PopCloseParen (FxInfo * pfx, OperatorE op,
   return(MagickTrue);
 }
 
+static MagickBooleanType PushOperatorUnlessDone (FxInfo * pfx, OperatorE op,
+  MagickBooleanType DoneIt)
+{
+  if (!DoneIt) {
+    if (!PushOperatorStack (pfx, (int) op)) return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetOperator (
   FxInfo * pfx,
   MagickBooleanType * Assign, MagickBooleanType * Update, MagickBooleanType * IncrDecr)
@@ -2973,9 +2982,8 @@ static MagickBooleanType GetOperator (
   if (PopCloseParen (pfx, op, &DoneIt) == MagickFalse)
     return MagickFalse;
 
-  if (!DoneIt) {
-    if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
-  }
+  if (PushOperatorUnlessDone (pfx, op, DoneIt) == MagickFalse)
+    return MagickFalse;
 
   pfx->pex += len;
 
