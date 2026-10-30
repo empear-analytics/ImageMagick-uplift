@@ -587,7 +587,12 @@ needs two copies of the block.
    A parameter the caller receives by value, of a struct or arithmetic type (not a
    pointer, and not an array parameter, which is one), counts as a plain local
    (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
-   copy, and the same rule on its address applies.
+   copy, and the same rule on its address applies. So does a parameter of pointer type
+   (declared `T *p`, not as an array) whose own value the block assigns, a cursor such
+   as `ParseEntities`' `xml` (`xml++`, `xml=strchr(xml,';')`): it passes as `T **p`,
+   written `(*p)` at every use, so `*xml++=c` becomes `*(*xml)++=c` and `xml[i]` becomes
+   `(*xml)[i]`. Writes through it stay writes through it, to the memory the caller's
+   caller owns, as before. Recipes V, W, LB, I and OC read "plain local" the same way.
 3. The block must contain no `return`, `goto`, `continue`, or `break` that leaves the
    block; a `break` that ends a `switch` or loop inside the block is fine.
 4. Cut the block into a new `static void` function directly above the caller. Pass each
@@ -653,9 +658,13 @@ static void SelectMagnifyMethod(const char *option,
   global, a cache) gives `v` a second name: the variable does not qualify.
 - A parameter received by value is an object of the function's own, initialised from
   the argument when the call starts and gone when it returns (C11 6.9.1p9); a write to
-  it, directly or through `&v`, reaches no object of its caller. A parameter of
-  pointer type is refused: what it points to is the caller's, and writing through
-  it is not a write to a local. An array parameter is a pointer.
+  it, directly or through `&v`, reaches no object of its caller. That holds for a
+  parameter of pointer type too: the pointer is the function's own object, so
+  assigning it (`xml++`) through `&xml` reaches nothing of the caller's. What it
+  points to is the caller's, so a block whose only writes are through it never counts
+  it as written; those writes stay writes through the same pointer value, now read as
+  `(*p)`, in the same order. An array parameter is a pointer, but its declared form
+  `T p[]` is refused, to keep the helper's `T **` parameter visibly the same type.
 - The function must be oracle-verified, with no unmatched or unreached survivor on the
   block's lines: the guard sees the moved literals but not a write that went missing.
 
@@ -1908,7 +1917,8 @@ Q and U, whose first step refuses a block containing `goto`.
    `goto` in it jumps to one label `L` outside the block; it contains no `return`, and no
    `continue` or `break` that leaves it.
 2. The block writes at most one variable of the caller, `v`, a plain local (not a
-   parameter, a global or a `static`) whose address is not taken elsewhere. Writes
+   parameter, a global or a `static`; a parameter Recipe O step 2 counts as a plain
+   local qualifies) whose address is not taken elsewhere. Writes
    through pointers the block already uses stay as they are; variables it declares move
    with it. A temporary it writes before reading, and that the caller does not read
    after the block before writing it again, is declared in the new function and is not
@@ -1964,6 +1974,13 @@ Q and U, whose first step refuses a block containing `goto`.
    the same text at every exit (checked by script), left unchanged in the caller after
    `if (Helper(...) == MagickFalse)`. The block writes no variable the expression
    reads; it may write through one, a pointer passed by value (`kernel`).
+   `return(v);` after `S` may also be `return(e);`, where `e` is an expression with no
+   call, assignment, increment or decrement, the same text at every exit (checked by
+   script), and reads no variable the block writes (`NewXMLTree`'s
+   `utf8=DestroyString(utf8); return(&root->root);`, where the block writes neither
+   `utf8` nor `root`): the caller writes `if (Helper(...) == MagickFalse) { S
+   return(e); }`. As with `v`, the block may write through a pointer `e` reads, passed
+   by value.
 
 **Before:**
 
@@ -2059,6 +2076,11 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   functions with the same arguments and returns the same value (`DestroyKernelInfo`
   frees the same kernel, whose members the block wrote through the pointer before the
   exit, as before). On the success path it runs in neither version.
+- Under step 7's `return(e);` form, `e` has no side effect, so evaluating it is only
+  reading: the caller evaluates it at the point where the block returned it, after `S`,
+  as before, on variables the block did not write, and memory the block wrote through a
+  pointer `e` reads has landed before the helper returns. So `e` has the same value, and
+  the caller returns it. `&root->root` reads only `root` and computes an address.
 - Under step 6's other copy the function was cut from the first copy's text, and the
   second copy is that text with its own variables in place of the first copy's: the
   call runs the same statements on them, writes its own `v` through the pointer, and
@@ -2465,7 +2487,8 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    written variable (step 2).
    So does V step 7's single `return(<expr>);` (`return(DestroyKernelInfo(kernel));`),
    left in the caller as `{ S return(c); }` is; its expression reads no written
-   variable.
+   variable. So does V step 7's side-effect-free `S return(e);`, whose `e` reads no
+   written variable.
 
 **Before:**
 
@@ -3672,3 +3695,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | CN | Combine Nested Conditions: an `if` whose whole body is a second `if`, neither with an `else`, becomes one `if` whose condition is the two joined by `&&` in their order; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `delegate.c`'s `GetDelegateInfo` (campaign B, task M115): three such match tests, a probe gave bumps 6 to 3 and 3.26 to 3.32 with identical object code; the same shape in `IsExecutableToken` and `InvokeDelegate`. No recipe removes a nesting level that carries no statement: G and P keep both tests, E-family helpers inherit the nesting | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 4: a variable the block writes before reading it on every path, and that nothing after the block reads, is declared in the new function with its declaration and initialiser even when the caller wrote it before the block, as Recipe Y step 2, Q step 2 and J step 3 already allow for their blocks; a struct filled by a call counts as written where the block reads it only after the call succeeded | `delegate.c`'s `CopyDelegateFile` (campaign B, task M115): its buffer-size block reads `attributes` only after `fstat(source_file,&attributes) == 0`, but `IsKeptDestination` fills `attributes` earlier, which the founding wording of step 4 refuses although the block never sees that value. The block is one decision short of taking the function out of *Complex Method* (cc 9) | mandate (2026-10-24) |
 | 2026-10-30 | NEW | OC | Extract Block Ending the Iteration with Out-Parameters: a block followed directly by `continue;` of its loop, which leaves early through that `continue;` and writes the loop's cursors, moves to a `static void` function: each `continue;` becomes `return;`, written variables go by pointer as in Recipe O, and the `continue;` after the block stays after the call | `delegate.c`'s `InterpretDelegateProperties` (campaign B, task M115): the backslash case's inner `switch` advances `p` and `q` and continues the scan loop from every case; O refuses its `continue`s, E step 7 its two written cursors and its position, LB would need a struct of out-pointers and a status that always leads to the same `continue;`. Probe: nesting 4 gone, 3.83 to 4.05 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | V | Step 7: `return(v);` after the shared cleanup `S` may be `return(e);` of a side-effect-free expression (no call, assignment, increment or decrement), the same text at every exit (checked by script), reading no variable the block writes; Recipe I step 8 follows. *Careful* gives the argument | `xml-tree.c`'s `NewXMLTree` (campaign B, task M115; the owner left the ruling to the session, 2026-10-30): about twelve exits end in `utf8=DestroyString(utf8); return(&root->root);`, which is neither a local, a constant nor a call | owner |
+| 2026-10-30 | AMEND | O | Step 2: a parameter of pointer type (declared `T *p`) whose own value the block assigns counts as a plain local, passed as `T **p` and written `(*p)`; writes through it stay writes through it. Recipes V, W, LB, I and OC read "plain local" the same way (V step 2 says so). *Careful* gives the argument | `xml-tree.c`'s `ParseEntities` and `ParseInternalDoctype` (campaign B, task M115; the owner left the ruling to the session, 2026-10-30): their blocks advance the `xml` parameter itself, which step 2 refused although the pointer object is the function's own (C11 6.9.1p9) | owner |
