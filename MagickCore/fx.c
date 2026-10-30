@@ -2825,6 +2825,32 @@ static inline MagickBooleanType IsRealOperator (OperatorE op)
   return (op < oOpenParen || op > oCloseBrace) ? MagickTrue : MagickFalse;
 }
 
+static MagickBooleanType ProcessTernaryColon (FxInfo * pfx, TernaryT * ptern)
+{
+  if (pfx->OperatorStack[pfx->usedOprStack-1] == oColon) {
+    if (ptern->addr_query == NULL_ADDRESS) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Need '?' in sub-expression at", "'%s'",
+        SetShortExp(pfx));
+      return(MagickFalse);
+    }
+    if (ptern->addr_colon != NULL_ADDRESS) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Already have ':' in sub-expression at", "'%s'",
+        SetShortExp(pfx));
+      return(MagickFalse);
+    }
+    pfx->usedOprStack--;
+    ptern->addr_colon = pfx->usedElements;
+    pfx->Elements[pfx->usedElements-1].do_push = MagickTrue;
+    (void) AddAddressingElement (pfx, rGoto, NULL_ADDRESS);
+    /* address will be after the subexpression */
+  }
+  return(MagickTrue);
+}
+
 static inline MagickBooleanType ProcessTernaryOpr (FxInfo * pfx, TernaryT * ptern)
 /* Ternary operator "... ? ... : ..."
    returns false iff we have exception
@@ -2852,27 +2878,8 @@ static inline MagickBooleanType ProcessTernaryOpr (FxInfo * pfx, TernaryT * pter
     (void) AddAddressingElement (pfx, rIfZeroGoto, NULL_ADDRESS);
     /* address will be one after the Colon address. */
   }
-  else if (pfx->OperatorStack[pfx->usedOprStack-1] == oColon) {
-    if (ptern->addr_query == NULL_ADDRESS) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Need '?' in sub-expression at", "'%s'",
-        SetShortExp(pfx));
-      return MagickFalse;
-    }
-    if (ptern->addr_colon != NULL_ADDRESS) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Already have ':' in sub-expression at", "'%s'",
-        SetShortExp(pfx));
-      return MagickFalse;
-    }
-    pfx->usedOprStack--;
-    ptern->addr_colon = pfx->usedElements;
-    pfx->Elements[pfx->usedElements-1].do_push = MagickTrue;
-    (void) AddAddressingElement (pfx, rGoto, NULL_ADDRESS);
-    /* address will be after the subexpression */
-  }
+  else if (ProcessTernaryColon (pfx, ptern) == MagickFalse)
+    return MagickFalse;
   return MagickTrue;
 }
 
