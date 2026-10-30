@@ -229,6 +229,53 @@ static void RaisePixelDepth(const Image *image,const Quantum *p,
   }
 }
 
+typedef struct _DepthScan
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    *current_depth;
+
+  int
+    id;
+} DepthScan;
+
+static MagickBooleanType RaiseImageRowDepth(const DepthScan *scan)
+{
+  const Quantum
+    *magick_restrict p;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  p=GetCacheViewVirtualPixels(scan->image_view,0,scan->y,scan->image->columns,
+    1,scan->exception);
+  if (p == (const Quantum *) NULL)
+    return(status);
+  for (x=0; x < (ssize_t) scan->image->columns; x++)
+  {
+    RaisePixelDepth(scan->image,p,scan->current_depth,scan->id);
+    p+=(ptrdiff_t) GetPixelChannels(scan->image);
+  }
+  if (scan->current_depth[scan->id] == MAGICKCORE_QUANTUM_DEPTH)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -361,23 +408,18 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
     const int
       id = GetOpenMPThreadId();
 
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
+    DepthScan
+      scan;
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      RaisePixelDepth(image,p,current_depth,id);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (current_depth[id] == MAGICKCORE_QUANTUM_DEPTH)
+    scan.image=image;
+    scan.image_view=image_view;
+    scan.y=y;
+    scan.exception=exception;
+    scan.current_depth=current_depth;
+    scan.id=id;
+    if (RaiseImageRowDepth(&scan) == MagickFalse)
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
