@@ -862,6 +862,46 @@ static void DestroyOriginalArgument(char **vector,ssize_t *count,
     }
 }
 
+typedef struct _FileListParameters
+{
+  char
+    **vector,
+    **filelist;
+
+  size_t
+    number_files;
+
+  ssize_t
+    parameters;
+} FileListParameters;
+
+static void CopyFileListParameters(const FileListParameters *list,ssize_t *j,
+  ssize_t *count)
+{
+  char
+    **const vector = list->vector,
+    **const filelist = list->filelist,
+    *option;
+
+  const size_t
+    number_files = list->number_files;
+
+  const ssize_t
+    parameters = list->parameters;
+
+  ssize_t
+    k;
+
+  for (k=0; k < parameters; k++)
+  {
+    (*j)++;
+    if ((*j) == (ssize_t) number_files)
+      break;
+    option=filelist[(*j)];
+    vector[(*count)++]=ConstantString(option);
+  }
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1010,21 +1050,18 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       parameters=ParseCommandOption(MagickCommandOptions,MagickFalse,option);
       if (parameters > 0)
         {
-          ssize_t
-            k;
+          FileListParameters
+            list;
 
           /*
             Do not expand command option parameters.
           */
           vector[count++]=ConstantString(option);
-          for (k=0; k < parameters; k++)
-          {
-            j++;
-            if (j == (ssize_t) number_files)
-              break;
-            option=filelist[j];
-            vector[count++]=ConstantString(option);
-          }
+          list.vector=vector;
+          list.filelist=filelist;
+          list.number_files=number_files;
+          list.parameters=parameters;
+          CopyFileListParameters(&list,&j,&count);
           continue;
         }
       (void) CopyMagickString(filename,path,MagickPathExtent);
