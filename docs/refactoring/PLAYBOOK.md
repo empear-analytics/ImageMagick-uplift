@@ -1256,8 +1256,11 @@ as parameters. K then B is two commits, of which the first adds a finding.
    `const double *magick_restrict *k`), holding addresses only. The function takes
    `const Name *name`, then `const Targets *targets`, and binds each member once at the
    top of its body, `T *const v = targets->v;`; the text then follows step 5
-   (`(*pixels)[i]` for `pixels[i]`, the parenthesised `*v` of Recipe Z step 4). The
-   caller declares the `Targets` local beside the `Name` local, and directly before the
+   (`(*pixels)[i]` for `pixels[i]`, the parenthesised `*v` of Recipe Z step 4). Or,
+   instead of the bound locals, write `targets->v` for every use of `v` in that text
+   (`*targets->pixel+=`, `(**targets->k)`, `(*targets->k)++`,
+   `(*targets->pixels)[i]`): the member form of step 4, for the second of two sibling
+   sums. The caller declares the `Targets` local beside the `Name` local, and directly before the
    call assigns the input members, then `targets.v=(&v);` per member in member order,
    with nothing else between them and the call. Inside a parallel loop every address is
    of a variable declared in the loop body. In this form the block may write up to six
@@ -1375,6 +1378,13 @@ static void SumBilateralPixels(const BilateralSum *sum,double *pixel,
   the caller takes nowhere else, so they alias neither each other nor a member's
   pointee; a `magick_restrict` on a cursor stays on the pointed-to type of its member, so
   the cursor's qualifier and the promise it makes are unchanged.
+- In the member form of step 8, `targets->v` is the pointer the bound local would have
+  held: the struct is the caller's local, filled before the call and written by nothing
+  in the block, so each read of the member gives that address. `->` binds tighter than
+  unary `*`, so `*targets->v` is `*(targets->v)`, the object `*v` named. Two sibling
+  sums that bind the same locals and end in the same cursor advances are reported as
+  *Code Duplication* (`SelectiveBlurImage`'s plain and blended sums: 2.77 to 2.65); with
+  the second in the member form, none is (2.84).
 - The four of step 1 keep the block one accumulation; with the addresses in one
   parameter the count no longer costs arguments, and step 8 allows six for a sum whose
   cursors advance in lockstep with its accumulators (`SelectiveBlurImage`'s kernel,
@@ -2671,3 +2681,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | I | Extract Block Returning Success Through a Struct of Out-Pointers: a Recipe V block (a `goto L;` or `return(c);` exit) that writes two to four of the caller's locals or by-value parameters, which as separate pointers would give five or more parameters, moves to a `static MagickBooleanType` function taking its read-only inputs (as V, or in Y's input struct) and last a `const` struct holding only the written variables' addresses, bound to `*const` locals and used as `*v` (Recipe O). *Careful* states how it differs from the out-parameter struct Recipe E step 4 forbids: the variables stay the caller's own, only their addresses travel, and nothing is copied back | Owner's request of 2026-10-30 after the W08 report (V with an out-parameter struct). `fx.c`'s `GetFunction`: the coordinate-qualifier block (depth 4, the file's last Deep Nesting) writes `fe`, `funStr`, `chQual` and `expChLimit` and returns `MagickFalse` on one path, refused by V, Y, O, Q and E step 4. A probe: 3.08 to 3.23 | owner |
 | 2026-10-30 | AMEND | V | Step 2: a temporary the block writes before reading, and the caller does not read after it before writing it again, is declared in the new function and is not the one written variable (Recipe Y step 2, Recipe J step 3). *Careful* gives the argument: neither its entry value nor the value the block leaves is ever read | `morphology.c`'s `AcquireKernelInfo`: the token step of its kernel-list loop writes `kernel` and the parse result `new_kernel` (declared at the top of the function, used nowhere else) and returns `(KernelInfo *) NULL` when a parse fails; step 2 counted two written variables, and Recipe Y (whose step 2 already admits the temporary) needs five inputs. A probe of the token step (V) and the `@file` read (Recipe I): the function leaves Bumpy Road Ahead and Complex Method, 2.68 to 2.70 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | Step 8: when the written scalars as separate pointers would give five or more parameters, their addresses go in one `const` struct (Recipe I's form), bound to `*const` locals; inside a parallel loop every address is of a loop-body variable; in this form up to six written variables. *Careful* gives the argument: the variables stay the caller's own, only their addresses travel, and none of a variable the threads share | Session's brief after the W08 report (`effect.c`'s plateau: the adaptive and selective kernel sums advance four or five cursors and accumulators). `AdaptiveBlurImage`'s plain sum writes `pixel`, `gamma`, `k` and `pixels` and reads four inputs: Q gives five parameters. A probe of that sum: nesting 6 to 5, bumps 9 to 8, 2.54 to 2.59 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | Q | Step 8: instead of binding the `*const` locals, the body may write `targets->v` for every use of `v` (`*targets->pixel+=`, `(**targets->k)`), the member form of step 4; *Careful* gives the argument and the duplication it avoids | `SelectiveBlurImage`'s plain and blended kernel sums (`pixel`, `gamma`, `k`, `pixels`, `luminance_pixels`): with bound locals in both helpers the pair is reported as Code Duplication (2.77 to 2.65); with the blended one in the member form, none, 2.77 to 2.84 | mandate (2026-10-24) |
