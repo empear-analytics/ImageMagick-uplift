@@ -2344,6 +2344,16 @@ static void SetTrimPage(const Image *image,const RectangleInfo geometry,
     trim_image->page.y=geometry.y;
 }
 
+static RectangleInfo SetTrimShortfall(const RectangleInfo geometry,
+  RectangleInfo minSize)
+{
+  minSize.x=(geometry.width < minSize.width) ? (ssize_t)
+    (minSize.width-geometry.width) : 0;
+  minSize.y=(geometry.height < minSize.height) ? (ssize_t)
+    (minSize.height-geometry.height) : 0;
+  return(minSize);
+}
+
 MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
 {
   const char
@@ -2376,10 +2386,7 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
       if ((geometry.width < minSize.width) ||
           (geometry.height < minSize.height))
         {
-          minSize.x=(geometry.width < minSize.width) ? (ssize_t)
-            (minSize.width-geometry.width) : 0;
-          minSize.y=(geometry.height < minSize.height) ? (ssize_t)
-            (minSize.height-geometry.height) : 0;
+          minSize=SetTrimShortfall(geometry,minSize);
           switch (image->gravity)
           {
             case NorthWestGravity:
