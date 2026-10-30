@@ -474,22 +474,61 @@ static void SetCMYKPlanePixel(const Image *cmyk_image,const ssize_t i,
   }
 }
 
-MagickExport Image *ConsolidateCMYKImages(const Image *images,
-  ExceptionInfo *exception)
+static void ConsolidateCMYKPlane(const Image *images,Image *cmyk_image,
+  const ssize_t i,ExceptionInfo *exception)
 {
   CacheView
     *cmyk_view,
     *image_view;
 
+  ssize_t
+    y;
+
+  image_view=AcquireVirtualCacheView(images,exception);
+  cmyk_view=AcquireAuthenticCacheView(cmyk_image,exception);
+  for (y=0; y < (ssize_t) images->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x;
+
+    Quantum
+      *magick_restrict q;
+
+    p=GetCacheViewVirtualPixels(image_view,0,y,images->columns,1,exception);
+    q=QueueCacheViewAuthenticPixels(cmyk_view,0,y,cmyk_image->columns,1,
+      exception);
+    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+      break;
+    for (x=0; x < (ssize_t) images->columns; x++)
+    {
+      Quantum
+        pixel;
+
+      pixel=ClampToQuantum((double) QuantumRange-
+        GetPixelIntensity(images,p));
+      SetCMYKPlanePixel(cmyk_image,i,pixel,q);
+      p+=(ptrdiff_t) GetPixelChannels(images);
+      q+=(ptrdiff_t) GetPixelChannels(cmyk_image);
+    }
+    if (SyncCacheViewAuthenticPixels(cmyk_view,exception) == MagickFalse)
+      break;
+  }
+  cmyk_view=DestroyCacheView(cmyk_view);
+  image_view=DestroyCacheView(image_view);
+}
+
+MagickExport Image *ConsolidateCMYKImages(const Image *images,
+  ExceptionInfo *exception)
+{
   Image
     *cmyk_image,
     *cmyk_images;
 
   ssize_t
     j;
-
-  ssize_t
-    y;
 
   /*
     Consolidate separate C, M, Y, and K planes into a single image.
@@ -516,40 +555,7 @@ MagickExport Image *ConsolidateCMYKImages(const Image *images,
     (void) SetImageColorspace(cmyk_image,CMYKColorspace,exception);
     for (i=0; i < 4; i++)
     {
-      image_view=AcquireVirtualCacheView(images,exception);
-      cmyk_view=AcquireAuthenticCacheView(cmyk_image,exception);
-      for (y=0; y < (ssize_t) images->rows; y++)
-      {
-        const Quantum
-          *magick_restrict p;
-
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        p=GetCacheViewVirtualPixels(image_view,0,y,images->columns,1,exception);
-        q=QueueCacheViewAuthenticPixels(cmyk_view,0,y,cmyk_image->columns,1,
-          exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          break;
-        for (x=0; x < (ssize_t) images->columns; x++)
-        {
-          Quantum
-            pixel;
-
-          pixel=ClampToQuantum((double) QuantumRange-
-            GetPixelIntensity(images,p));
-          SetCMYKPlanePixel(cmyk_image,i,pixel,q);
-          p+=(ptrdiff_t) GetPixelChannels(images);
-          q+=(ptrdiff_t) GetPixelChannels(cmyk_image);
-        }
-        if (SyncCacheViewAuthenticPixels(cmyk_view,exception) == MagickFalse)
-          break;
-      }
-      cmyk_view=DestroyCacheView(cmyk_view);
-      image_view=DestroyCacheView(image_view);
+      ConsolidateCMYKPlane(images,cmyk_image,i,exception);
       images=GetNextImageInList(images);
       if (images == (Image *) NULL)
         break;
