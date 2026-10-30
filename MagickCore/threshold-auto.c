@@ -422,6 +422,23 @@ static double TriangleThreshold(const double *histogram)
   return(100.0*threshold/MaxIntensity);
 }
 
+static void NormalizeHistogram(double *histogram)
+{
+  double
+    gamma,
+    sum;
+
+  ssize_t
+    i;
+
+  sum=0.0;
+  for (i=0; i <= (ssize_t) MaxIntensity; i++)
+    sum+=histogram[i];
+  gamma=MagickSafeReciprocal(sum);
+  for (i=0; i <= (ssize_t) MaxIntensity; i++)
+    histogram[i]=gamma*histogram[i];
+}
+
 MagickExport MagickBooleanType AutoThresholdImage(Image *image,
   const AutoThresholdMethod method,ExceptionInfo *exception)
 {
@@ -432,16 +449,11 @@ MagickExport MagickBooleanType AutoThresholdImage(Image *image,
     property[MagickPathExtent];
 
   double
-    gamma,
     *histogram,
-    sum,
     threshold;
 
   MagickBooleanType
     status;
-
-  ssize_t
-    i;
 
   ssize_t
     y;
@@ -483,12 +495,7 @@ MagickExport MagickBooleanType AutoThresholdImage(Image *image,
   /*
     Normalize histogram.
   */
-  sum=0.0;
-  for (i=0; i <= (ssize_t) MaxIntensity; i++)
-    sum+=histogram[i];
-  gamma=MagickSafeReciprocal(sum);
-  for (i=0; i <= (ssize_t) MaxIntensity; i++)
-    histogram[i]=gamma*histogram[i];
+  NormalizeHistogram(histogram);
   /*
     Discover threshold from histogram.
   */
