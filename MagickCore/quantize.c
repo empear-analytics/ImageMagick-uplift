@@ -1899,6 +1899,98 @@ static DoublePixelPacket AddCurrentRowError(
   return(pixel);
 }
 
+typedef struct _FloydSteinbergPixel
+{
+  Image
+    *image;
+
+  QCubeInfo
+    *cube_info;
+
+  CacheView
+    *image_view;
+
+  DoublePixelPacket
+    *current,
+    *previous;
+
+  Quantum
+    *q;
+
+  ssize_t
+    v,
+    x,
+    y;
+
+  ExceptionInfo
+    *exception;
+} FloydSteinbergPixel;
+
+static void DitherFloydSteinbergPixel(const FloydSteinbergPixel *fs,
+  QCubeInfo *cube,MagickBooleanType *status)
+{
+  DoublePixelPacket
+    color,
+    pixel;
+
+  FloydSteinbergCurrentRow
+    ahead;
+
+  FloydSteinbergPreviousRow
+    row;
+
+  size_t
+    index;
+
+  ssize_t
+    *entry;
+
+  ssize_t
+    u;
+
+  u=(fs->y & 0x01) != 0 ? (ssize_t) fs->image->columns-1-fs->x : fs->x;
+  AssociateAlphaPixel(fs->image,cube,fs->q+u*(ssize_t)
+    GetPixelChannels(fs->image),&pixel);
+  if (fs->x > 0)
+    {
+      ahead.cube_info=fs->cube_info;
+      ahead.current=fs->current;
+      ahead.u=u;
+      ahead.v=fs->v;
+      pixel=AddCurrentRowError(&ahead,cube,pixel);
+    }
+  if (fs->y > 0)
+    {
+      row.image=fs->image;
+      row.cube_info=fs->cube_info;
+      row.previous=fs->previous;
+      row.x=fs->x;
+      row.u=u;
+      row.v=fs->v;
+      pixel=AddPreviousRowError(&row,cube,pixel);
+    }
+  pixel=ClampDitherPixel(cube,pixel);
+  entry=GetCacheEntry(cube,&pixel);
+  if ((entry == (ssize_t *) NULL) || (*entry < 0))
+    FindClosestCubeColor(fs->image,cube,pixel,entry);
+  /*
+    Assign pixel to closest colormap entry.
+  */
+  index=AssignClosestColormapEntry(fs->image,cube,entry,fs->q+u*(ssize_t)
+    GetPixelChannels(fs->image));
+  if (SyncCacheViewAuthenticPixels(fs->image_view,fs->exception) == MagickFalse)
+    *status=MagickFalse;
+  /*
+    Store the error.
+  */
+  AssociateAlphaPixelInfo(cube,fs->image->colormap+index,&color);
+  fs->current[u].red=pixel.red-color.red;
+  fs->current[u].green=pixel.green-color.green;
+  fs->current[u].blue=pixel.blue-color.blue;
+  if ((*cube).associate_alpha != MagickFalse)
+    fs->current[u].alpha=pixel.alpha-color.alpha;
+}
+
 static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -1939,9 +2031,6 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
     Quantum
       *magick_restrict q;
 
-    size_t
-      index;
-
     ssize_t
       x,
       v;
@@ -1960,63 +2049,20 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
     v=(ssize_t) ((y & 0x01) != 0 ? -1 : 1);
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      DoublePixelPacket
-        color,
-        pixel;
+      FloydSteinbergPixel
+        fs;
 
-      FloydSteinbergCurrentRow
-        ahead;
-
-      FloydSteinbergPreviousRow
-        row;
-
-      ssize_t
-        *entry;
-
-      ssize_t
-        u;
-
-      u=(y & 0x01) != 0 ? (ssize_t) image->columns-1-x : x;
-      AssociateAlphaPixel(image,&cube,q+u*(ssize_t) GetPixelChannels(image),
-        &pixel);
-      if (x > 0)
-        {
-          ahead.cube_info=cube_info;
-          ahead.current=current;
-          ahead.u=u;
-          ahead.v=v;
-          pixel=AddCurrentRowError(&ahead,&cube,pixel);
-        }
-      if (y > 0)
-        {
-          row.image=image;
-          row.cube_info=cube_info;
-          row.previous=previous;
-          row.x=x;
-          row.u=u;
-          row.v=v;
-          pixel=AddPreviousRowError(&row,&cube,pixel);
-        }
-      pixel=ClampDitherPixel(&cube,pixel);
-      entry=GetCacheEntry(&cube,&pixel);
-      if ((entry == (ssize_t *) NULL) || (*entry < 0))
-        FindClosestCubeColor(image,&cube,pixel,entry);
-      /*
-        Assign pixel to closest colormap entry.
-      */
-      index=AssignClosestColormapEntry(image,&cube,entry,q+u*(ssize_t)
-        GetPixelChannels(image));
-      if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-        status=MagickFalse;
-      /*
-        Store the error.
-      */
-      AssociateAlphaPixelInfo(&cube,image->colormap+index,&color);
-      current[u].red=pixel.red-color.red;
-      current[u].green=pixel.green-color.green;
-      current[u].blue=pixel.blue-color.blue;
-      if (cube.associate_alpha != MagickFalse)
-        current[u].alpha=pixel.alpha-color.alpha;
+      fs.image=image;
+      fs.cube_info=cube_info;
+      fs.image_view=image_view;
+      fs.current=current;
+      fs.previous=previous;
+      fs.q=q;
+      fs.v=v;
+      fs.x=x;
+      fs.y=y;
+      fs.exception=exception;
+      DitherFloydSteinbergPixel(&fs,&cube,&status);
       if (ReportImageRowProgress(image,DitherImageTag,y) == MagickFalse)
         status=MagickFalse;
     }
