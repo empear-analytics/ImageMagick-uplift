@@ -1996,6 +1996,49 @@ static void CompositeSourceListOverCanvas(Image *destination,Image *source,
     }
 }
 
+static void CompositeSourceOverList(Image *destination,Image *source,
+  const LayerCompositeInfo *composite)
+{
+  const CompositeOperator
+    compose = composite->compose;
+
+  const ssize_t
+    x_offset = composite->x_offset,
+    y_offset = composite->y_offset;
+
+  ExceptionInfo
+    *const exception = composite->exception;
+
+  while ( destination != (Image *) NULL )
+  {
+    CompositeCanvas(destination, compose, source, x_offset, y_offset,
+      exception);
+    destination=GetNextImageInList(destination);
+  }
+}
+
+static void CompositeSourceListOverList(Image *destination,Image *source,
+  const LayerCompositeInfo *composite)
+{
+  const CompositeOperator
+    compose = composite->compose;
+
+  const ssize_t
+    x_offset = composite->x_offset,
+    y_offset = composite->y_offset;
+
+  ExceptionInfo
+    *const exception = composite->exception;
+
+  while ( source != (Image *) NULL && destination != (Image *) NULL )
+  {
+    CompositeCanvas(destination, compose, source, x_offset, y_offset,
+      exception);
+    source=GetNextImageInList(source);
+    destination=GetNextImageInList(destination);
+  }
+}
+
 MagickExport void CompositeLayers(Image *destination,
   const CompositeOperator compose, Image *source,const ssize_t x_offset,
   const ssize_t y_offset,ExceptionInfo *exception)
@@ -2013,12 +2056,16 @@ MagickExport void CompositeLayers(Image *destination,
     Overlay single source image over destination image/list
   */
   if ( source->next == (Image *) NULL )
-    while ( destination != (Image *) NULL )
-    {
-      CompositeCanvas(destination, compose, source, x_offset, y_offset,
-        exception);
-      destination=GetNextImageInList(destination);
-    }
+  {
+    LayerCompositeInfo
+      composite;
+
+    composite.compose=compose;
+    composite.x_offset=x_offset;
+    composite.y_offset=y_offset;
+    composite.exception=exception;
+    CompositeSourceOverList(destination,source,&composite);
+  }
 
   /*
     Overlay source image list over single destination.
@@ -2044,13 +2091,16 @@ MagickExport void CompositeLayers(Image *destination,
     until either list runs out of images. (Does not repeat)
   */
   else
-    while ( source != (Image *) NULL && destination != (Image *) NULL )
-    {
-      CompositeCanvas(destination, compose, source, x_offset, y_offset,
-        exception);
-      source=GetNextImageInList(source);
-      destination=GetNextImageInList(destination);
-    }
+  {
+    LayerCompositeInfo
+      composite;
+
+    composite.compose=compose;
+    composite.x_offset=x_offset;
+    composite.y_offset=y_offset;
+    composite.exception=exception;
+    CompositeSourceListOverList(destination,source,&composite);
+  }
 }
 
 
