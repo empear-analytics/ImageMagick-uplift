@@ -1823,6 +1823,17 @@ static MagickBooleanType SyncGlyphPixel(const MagickBooleanType active,
   return(status);
 }
 
+static char *FindInvalidUTFCode(const DrawInfo *draw_info)
+{
+  char
+    *p;
+
+  for (p=draw_info->text; GetUTFCode(p) != 0; p+=(ptrdiff_t) GetUTFOctets(p))
+    if (GetUTFCode(p) < 0)
+      break;
+  return(p);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2152,9 +2163,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   status=MagickTrue;
   if (draw_info->render != MagickFalse)
     SetFreetypeCanvas(image,exception);
-  for (p=draw_info->text; GetUTFCode(p) != 0; p+=(ptrdiff_t) GetUTFOctets(p))
-    if (GetUTFCode(p) < 0)
-      break;
+  p=FindInvalidUTFCode(draw_info);
   utf8=(unsigned char *) NULL;
   if (GetUTFCode(p) == 0)
     p=draw_info->text;
