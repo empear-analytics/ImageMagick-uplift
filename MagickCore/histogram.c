@@ -543,6 +543,23 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
 %    o histogram: the image histogram.
 %
 */
+static void CopyHistogramColors(HNodeInfo *node_info,PixelInfo **histogram)
+{
+  PixelInfo
+    *p;
+
+  ssize_t
+    i;
+
+  p=node_info->list;
+  for (i=0; i < (ssize_t) node_info->number_unique; i++)
+  {
+    **histogram=(*p);
+    (*histogram)++;
+    p++;
+  }
+}
+
 static void DefineImageHistogram(const Image *image,HNodeInfo *node_info,
   PixelInfo **histogram)
 {
@@ -560,18 +577,7 @@ static void DefineImageHistogram(const Image *image,HNodeInfo *node_info,
     if (node_info->child[i] != (HNodeInfo *) NULL)
       DefineImageHistogram(image,node_info->child[i],histogram);
   if (node_info->level == (MaxTreeDepth-1))
-    {
-      PixelInfo
-        *p;
-
-      p=node_info->list;
-      for (i=0; i < (ssize_t) node_info->number_unique; i++)
-      {
-        **histogram=(*p);
-        (*histogram)++;
-        p++;
-      }
-    }
+    CopyHistogramColors(node_info,histogram);
 }
 
 /*
