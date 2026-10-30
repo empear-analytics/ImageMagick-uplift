@@ -745,6 +745,12 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
           gamma,
           pixel;
 
+        AdaptiveSum
+          sum;
+
+        AdaptiveSumTargets
+          targets;
+
         PixelChannel
           channel;
 
@@ -776,16 +782,15 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
             /*
               No alpha blending.
             */
-            for (v=0; v < ((ssize_t) width-j); v++)
-            {
-              for (u=0; u < ((ssize_t) width-j); u++)
-              {
-                pixel+=(*k)*(double) pixels[i];
-                gamma+=(*k);
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-            }
+            sum.image=image;
+            sum.width=width;
+            sum.j=j;
+            sum.i=i;
+            targets.pixel=(&pixel);
+            targets.gamma=(&gamma);
+            targets.k=(&k);
+            targets.pixels=(&pixels);
+            SumAdaptivePixels(&sum,&targets);
             gamma=MagickSafeReciprocal(gamma);
             SetPixelChannel(sharp_image,channel,ClampToQuantum(gamma*pixel),q);
             continue;
