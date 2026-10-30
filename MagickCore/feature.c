@@ -273,32 +273,31 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
 static CannyInfo SetCannyOrientation(CannyInfo pixel,const double dx,
   const double dy)
 {
-  if (fabs(dx) > MagickEpsilon)
-    {
-      double
-        slope;
+  double
+    slope;
 
-      slope=dy/dx;
-      if (slope < 0.0)
-        {
-          if (slope < -2.41421356237)
-            pixel.orientation=0;
-          else
-            if (slope < -0.414213562373)
-              pixel.orientation=1;
-            else
-              pixel.orientation=2;
-        }
+  if (!(fabs(dx) > MagickEpsilon))
+    return(pixel);
+  slope=dy/dx;
+  if (slope < 0.0)
+    {
+      if (slope < -2.41421356237)
+        pixel.orientation=0;
       else
-        {
-          if (slope > 2.41421356237)
-            pixel.orientation=0;
-          else
-            if (slope > 0.414213562373)
-              pixel.orientation=3;
-            else
-              pixel.orientation=2;
-        }
+        if (slope < -0.414213562373)
+          pixel.orientation=1;
+        else
+          pixel.orientation=2;
+    }
+  else
+    {
+      if (slope > 2.41421356237)
+        pixel.orientation=0;
+      else
+        if (slope > 0.414213562373)
+          pixel.orientation=3;
+        else
+          pixel.orientation=2;
     }
   return(pixel);
 }
