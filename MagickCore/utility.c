@@ -2436,6 +2436,38 @@ static MagickBooleanType ShredFilePass(const ShredPass *pass,const ssize_t i)
   return(MagickTrue);
 }
 
+static ssize_t ShredFilePasses(const int file,const MagickSizeType length,
+  const size_t quantum,const ssize_t passes)
+{
+  RandomInfo
+    *random_info;
+
+  ssize_t
+    i;
+
+  StringInfo
+    *key;
+
+  random_info=AcquireRandomInfo();
+  key=GetRandomKey(random_info,quantum);
+  for (i=0; i < passes; i++)
+  {
+    ShredPass
+      pass;
+
+    pass.file=file;
+    pass.length=length;
+    pass.random_info=random_info;
+    pass.quantum=quantum;
+    pass.key=key;
+    if (ShredFilePass(&pass,i) == MagickFalse)
+      break;
+  }
+  key=DestroyStringInfo(key);
+  random_info=DestroyRandomInfo(random_info);
+  return(i);
+}
+
 MagickPrivate MagickBooleanType ShredFile(const char *path)
 {
   int
@@ -2445,9 +2477,6 @@ MagickPrivate MagickBooleanType ShredFile(const char *path)
   MagickSizeType
     length;
 
-  RandomInfo
-    *random_info;
-
   size_t
     quantum;
 
@@ -2456,9 +2485,6 @@ MagickPrivate MagickBooleanType ShredFile(const char *path)
 
   static ssize_t
     passes = -1;
-
-  StringInfo
-    *key;
 
   struct stat
     file_stats;
@@ -2477,23 +2503,7 @@ MagickPrivate MagickBooleanType ShredFile(const char *path)
     return(MagickFalse);
   GetShredQuantum(file,&quantum,&file_stats);
   length=(MagickSizeType) file_stats.st_size;
-  random_info=AcquireRandomInfo();
-  key=GetRandomKey(random_info,quantum);
-  for (i=0; i < passes; i++)
-  {
-    ShredPass
-      pass;
-
-    pass.file=file;
-    pass.length=length;
-    pass.random_info=random_info;
-    pass.quantum=quantum;
-    pass.key=key;
-    if (ShredFilePass(&pass,i) == MagickFalse)
-      break;
-  }
-  key=DestroyStringInfo(key);
-  random_info=DestroyRandomInfo(random_info);
+  i=ShredFilePasses(file,length,quantum,passes);
   status=close_utf8(file);
   return((status == -1 || i < passes) ? MagickFalse : MagickTrue);
 }
