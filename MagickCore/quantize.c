@@ -1226,11 +1226,11 @@ static DoublePixelPacket GetQCubeMidpoint(void)
   return(midpoint);
 }
 
+#define ClassifyImageTag  "Classify/Image"
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
-#define ClassifyImageTag  "Classify/Image"
-
   CacheView
     *image_view;
 
