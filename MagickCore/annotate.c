@@ -1440,22 +1440,20 @@ static size_t ComplexTextLayout(const DrawInfo *draw_info,const char *text,
       GetUTFCode(p));
     (*grapheme)[i].x_offset=0;
     (*grapheme)[i].y_offset=0;
-    if (IsKernedGrapheme((*grapheme)[i].index,last_glyph) != MagickFalse)
+    if ((IsKernedGrapheme((*grapheme)[i].index,last_glyph) != MagickFalse) &&
+        (FT_HAS_KERNING(face)))
       {
-        if (FT_HAS_KERNING(face))
-          {
-            FT_Error
-              ft_status;
+        FT_Error
+          ft_status;
 
-            FT_Vector
-              kerning;
+        FT_Vector
+          kerning;
 
-            ft_status=FT_Get_Kerning(face,(FT_UInt) last_glyph,(FT_UInt)
-              (*grapheme)[i].index,ft_kerning_default,&kerning);
-            if (ft_status == 0)
-              (*grapheme)[i-1].x_advance+=(FT_Pos) ((draw_info->direction ==
-                RightToLeftDirection ? -1.0 : 1.0)*kerning.x);
-          }
+        ft_status=FT_Get_Kerning(face,(FT_UInt) last_glyph,(FT_UInt)
+          (*grapheme)[i].index,ft_kerning_default,&kerning);
+        if (ft_status == 0)
+          (*grapheme)[i-1].x_advance+=(FT_Pos) ((draw_info->direction ==
+            RightToLeftDirection ? -1.0 : 1.0)*kerning.x);
       }
     (void) FT_Load_Glyph(face,(FT_UInt) (*grapheme)[i].index,flags);
     (*grapheme)[i].x_advance=face->glyph->advance.x;
