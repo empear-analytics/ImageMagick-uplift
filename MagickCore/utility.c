@@ -1291,6 +1291,22 @@ static inline MagickBooleanType IsCompressionExtension(const char *extension)
     (LocaleCompare(extension,"Z") == 0)) ? MagickTrue : MagickFalse);
 }
 
+static void RemoveRootExtension(char *component)
+{
+  char
+    *p;
+
+  for (p=component+(strlen(component)-1); p > component; p--)
+  {
+    if (IsBasenameSeparator(*p) != MagickFalse)
+      break;
+    if (*p == '.')
+      break;
+  }
+  if (*p == '.')
+    *p='\0';
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1403,15 +1419,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
     {
       if (*component != '\0')
         {
-          for (p=component+(strlen(component)-1); p > component; p--)
-          {
-            if (IsBasenameSeparator(*p) != MagickFalse)
-              break;
-            if (*p == '.')
-              break;
-          }
-          if (*p == '.')
-            *p='\0';
+          RemoveRootExtension(component);
           break;
         }
       magick_fallthrough;
