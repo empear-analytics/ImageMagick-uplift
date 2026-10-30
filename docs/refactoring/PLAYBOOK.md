@@ -3403,6 +3403,14 @@ go in a struct; Recipe SD, which moves a group of different cases, not copies of
    or a member access of an unwritten variable (`image->columns` in one copy,
    `image->rows` in another), of one type in every copy, that nothing in the block
    writes (Recipe TW step 2's differing value). Each copy passes its own variables.
+   The value may also be an object-like macro the file defines whose expansion is a
+   call, with constant arguments, of a `static inline` function that reads and writes
+   nothing but its own parameters (`AccentuateModulate`, `ScaleCharToQuantum(80)`): the
+   call passes the macro's name, and the parameter has the function's return type. A
+   copy's one written variable `v`, which the copy assigns whole before it reads it
+   (`accentuate=matte;`) and the caller reads after it, is the new function's local of
+   `v`'s type and its return value; the copy becomes `v=Helper(...);` (Recipe E steps 3
+   and 4).
 3. The new function's parameters are the variables a copy reads (Recipe E step 3) and
    the value, at most four in all. The value's parameter is `const` and has the type of
    every object it is assigned to or parameter it is passed to in the block (an
@@ -3483,6 +3491,19 @@ static MagickBooleanType SetOpaqueAlphaTrait(Image *image,
   change it (Recipe TW's *Careful*); check by reading that the block writes neither the
   member nor, through any pointer, the struct that holds it. Its parameter, of the
   member's declared type, converts nothing.
+- A macro value (step 2's last form) is evaluated once, at the call, where the copy
+  evaluated it at each use. A call with constant arguments of a function that reads and
+  writes nothing but its parameters gives the same value every time, already converted
+  to the function's return type by its `return`; a parameter of that type converts
+  nothing, and each `(double) value` in the block casts the same value the call's
+  result was cast from. Read every definition of the function that a configuration can
+  compile (`ScaleCharToQuantum` has one per quantum depth, with and without HDRI, each
+  a cast of the argument times a constant) before choosing the value.
+- A returned `v` (step 2) is the copy's own work on a local: the copy assigned `v` whole
+  before reading it, so the local starts from the same value, takes the same member
+  writes, and the caller's `v=Helper(...);` copies every member back, as the copy left
+  them. Nothing in the copy may read `v` before that whole assignment or take its
+  address.
 - `refactor_guard.py` reports the removed copies as deduplication (`WARN`, every value
   still present) and `--calls` moves only the callees of the copies (down by the copies
   removed) and the helper (its definition and one call per copy); anything else stops
@@ -3501,6 +3522,10 @@ Step 2's renaming and member-access value (2026-10-30, task W10): `shear-rotate.
 `IntegralRotateImage`, whose 90- and 270-degree tile loops each clip the tile's width
 (`tile_width`, `tile_x`, `image->columns`) and height (`tile_height`, `tile_y`,
 `image->rows`) with the same two statements.
+Step 2's macro value and returned variable (2026-10-30, task W10): `decorate.c`'s
+`FrameImage`, whose `accentuate` and `highlight` colours are the same five statements on
+`matte` with `AccentuateModulate` or `HighlightModulate`, and whose `shadow` and `trough`
+colours the same with `ShadowModulate` or `TroughModulate`.
 
 ---
 
@@ -3951,3 +3976,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | Q | *Use when*: in a sequential function the block may also be a running selection over an array (an argmax loop updating the best value and its index together), which folds the array into its written locals as a sum does; the steps are unchanged | `threshold-auto.c`'s `TriangleThreshold` (W10): its split-point search below the peak reads `a`, `b`, `c`, `inverse_ratio`, `histogram`, `max` and `start` and writes `threshold` and `max_distance`, refused by Recipe E step 4 (two written variables, `threshold` read after) and outside Recipe O's and Z's selection (a `switch` or `if` chain) and Q's per-pixel sum. A probe in Q's form: TriangleThreshold leaves Complex Method (cc 11), bumps 3 to 2, 8.11 to 8.36 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | P | *Leading operands of a chain*: the predicate may hold the leading operands of a chain of one operator (`a && b` of `a && b && c`, which C groups as `(a && b) && c`) when the whole chain would take five or more parameters; the site becomes `(Pred(...) != MagickFalse) && c` | `attribute-bounds.c`'s `GetImageBoundingBox` (W10): its *Complex Conditional* `(x < (ssize_t) bounding_box.width) && (y > (ssize_t) bounding_box.height) && (IsFuzzyEquivalencePixelInfo(&pixel,&target[3]) == MagickFalse)` reads five variables, so the whole chain as one predicate carries *Excess Number of Function Arguments*; its first two operands as a three-parameter predicate: 7.51 to 7.66, the file's sixth function | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 4: a variable declared without an initialiser, which the block writes before it reads it on every path and which nothing after the block reads, is declared in the new function even when the caller writes it before the block (as Recipe TW step 3 and Recipe J step 3 say for their blocks); the 2026-10-28 condition stays for a variable with an initialiser | `decorate.c`'s `FrameImage` (W10): its bevel loops share the function's `y` (and the top band's `width`) with the loops before them; each loop sets `y` in its `for` before any read, and the next loop sets it again. The 2026-10-28 wording ("when no statement between that declaration and the block writes it") is there to keep an initialiser's value, which such a variable does not have | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | SV | Step 2: the value may also be an object-like macro of the file expanding to a call, with constant arguments, of a `static inline` function that reads and writes nothing but its parameters (`AccentuateModulate`, `ScaleCharToQuantum(80)`), its parameter of the function's return type; and a copy's one written variable, assigned whole before it is read and read by the caller afterwards, becomes the new function's local and return value (`v=Helper(...);`, Recipe E steps 3 and 4). *Careful* gives the argument | `decorate.c`'s `FrameImage` (W10): its four 3-D colours are two pairs of copies, five statements each on `matte`, differing only in the modulate macro (`AccentuateModulate`/`HighlightModulate`, `ShadowModulate`/`TroughModulate`), each copy writing its own colour. The macro is not a literal, an enumeration constant or a member access, so step 2 refused it. The lighter pair as one helper: 8.08 to 8.20; both pairs: 8.24 | mandate (2026-10-24) |
