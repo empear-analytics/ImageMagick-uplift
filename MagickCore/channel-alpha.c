@@ -482,6 +482,16 @@ static MagickBooleanType SetShapeAlphaRow(const ShapeAlphaRow *row)
   return(status);
 }
 
+static MagickBooleanType SetOpaqueAlphaTrait(Image *image,
+  const PixelTrait alpha_trait,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    status=SetImageAlpha(image,OpaqueAlpha,exception);
+  image->alpha_trait=alpha_trait;
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -577,9 +587,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     case DeactivateAlphaChannel:
     {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status=SetImageAlpha(image,OpaqueAlpha,exception);
-      image->alpha_trait=CopyPixelTrait;
+      status=SetOpaqueAlphaTrait(image,CopyPixelTrait,status,exception);
       break;
     }
     case DisassociateAlphaChannel:
@@ -609,9 +617,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     case DiscreteAlphaChannel:
     {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status=SetImageAlpha(image,OpaqueAlpha,exception);
-      image->alpha_trait=UpdatePixelTrait;
+      status=SetOpaqueAlphaTrait(image,UpdatePixelTrait,status,exception);
       break;
     }
     case ExtractAlphaChannel:
@@ -666,9 +672,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     case OnAlphaChannel:
     {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status=SetImageAlpha(image,OpaqueAlpha,exception);
-      image->alpha_trait=BlendPixelTrait;
+      status=SetOpaqueAlphaTrait(image,BlendPixelTrait,status,exception);
       break;
     }
     case OpaqueAlphaChannel:
