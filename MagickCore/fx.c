@@ -2899,6 +2899,31 @@ static void MoveHigherPrecedenceOperators (FxInfo * pfx, OperatorE op)
   }
 }
 
+static MagickBooleanType PopCloseParen (FxInfo * pfx, OperatorE op,
+  MagickBooleanType * DoneIt)
+{
+  if (op==oCloseParen) {
+    if (pfx->usedOprStack == 0) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Found ')' but nothing on stack at", "'%s'",
+        SetShortExp(pfx));
+      return(MagickFalse);
+    }
+
+    if (pfx->OperatorStack[pfx->usedOprStack-1] != oOpenParen) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Found ')' but no '(' on stack at", "'%s'",
+        SetShortExp(pfx));
+      return(MagickFalse);
+    }
+    pfx->usedOprStack--;
+    *DoneIt = MagickTrue;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetOperator (
   FxInfo * pfx,
   MagickBooleanType * Assign, MagickBooleanType * Update, MagickBooleanType * IncrDecr)
@@ -2945,25 +2970,8 @@ static MagickBooleanType GetOperator (
   /* If new op is close paren, and stack top is open paren,
      remove stack top.
   */
-  if (op==oCloseParen) {
-    if (pfx->usedOprStack == 0) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Found ')' but nothing on stack at", "'%s'",
-        SetShortExp(pfx));
-      return MagickFalse;
-    }
-
-    if (pfx->OperatorStack[pfx->usedOprStack-1] != oOpenParen) {
-      (void) ThrowMagickException (
-        pfx->exception, GetMagickModule(), OptionError,
-        "Found ')' but no '(' on stack at", "'%s'",
-        SetShortExp(pfx));
-      return MagickFalse;
-    }
-    pfx->usedOprStack--;
-    DoneIt = MagickTrue;
-  }
+  if (PopCloseParen (pfx, op, &DoneIt) == MagickFalse)
+    return MagickFalse;
 
   if (!DoneIt) {
     if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
