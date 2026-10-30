@@ -966,6 +966,79 @@ static RectangleInfo GetRotationBounds(const size_t width,
   return(bounds);
 }
 
+typedef struct _ShearRotation
+{
+  PointInfo
+    shear;
+
+  RectangleInfo
+    bounds;
+
+  size_t
+    height,
+    width;
+
+  ExceptionInfo
+    *exception;
+} ShearRotation;
+
+static MagickBooleanType ApplyRotationShears(const ShearRotation *rotation,
+  Image **rotate_image)
+{
+  const PointInfo
+    shear = rotation->shear;
+
+  const RectangleInfo
+    bounds = rotation->bounds;
+
+  const size_t
+    height = rotation->height,
+    width = rotation->width;
+
+  ExceptionInfo
+    *exception = rotation->exception;
+
+  MagickBooleanType
+    status;
+
+  ShearRegion
+    first_pass,
+    second_pass,
+    third_pass;
+
+  first_pass.width=width;
+  first_pass.height=height;
+  first_pass.x_offset=bounds.x;
+  first_pass.y_offset=(ssize_t) ((*rotate_image)->rows-height)/2;
+  status=XShearImage(*rotate_image,shear.x,&first_pass,exception);
+  if (status == MagickFalse)
+    {
+      *rotate_image=DestroyImage(*rotate_image);
+      return(MagickFalse);
+    }
+  second_pass.width=bounds.width;
+  second_pass.height=height;
+  second_pass.x_offset=(ssize_t) ((*rotate_image)->columns-bounds.width)/2;
+  second_pass.y_offset=bounds.y;
+  status=YShearImage(*rotate_image,shear.y,&second_pass,exception);
+  if (status == MagickFalse)
+    {
+      *rotate_image=DestroyImage(*rotate_image);
+      return(MagickFalse);
+    }
+  third_pass.width=bounds.width;
+  third_pass.height=bounds.height;
+  third_pass.x_offset=(ssize_t) ((*rotate_image)->columns-bounds.width)/2;
+  third_pass.y_offset=(ssize_t) ((*rotate_image)->rows-bounds.height)/2;
+  status=XShearImage(*rotate_image,shear.x,&third_pass,exception);
+  if (status == MagickFalse)
+    {
+      *rotate_image=DestroyImage(*rotate_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   ExceptionInfo *exception)
 {
@@ -976,9 +1049,6 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
     *integral_image,
     *rotate_image;
 
-  MagickBooleanType
-    status;
-
   MagickRealType
     angle;
 
@@ -988,10 +1058,8 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   RectangleInfo
     bounds;
 
-  ShearRegion
-    first_pass,
-    second_pass,
-    third_pass;
+  ShearRotation
+    rotation;
 
   size_t
     height,
@@ -1045,36 +1113,13 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   /*
     Rotate the image.
   */
-  first_pass.width=width;
-  first_pass.height=height;
-  first_pass.x_offset=bounds.x;
-  first_pass.y_offset=(ssize_t) (rotate_image->rows-height)/2;
-  status=XShearImage(rotate_image,shear.x,&first_pass,exception);
-  if (status == MagickFalse)
-    {
-      rotate_image=DestroyImage(rotate_image);
-      return((Image *) NULL);
-    }
-  second_pass.width=bounds.width;
-  second_pass.height=height;
-  second_pass.x_offset=(ssize_t) (rotate_image->columns-bounds.width)/2;
-  second_pass.y_offset=bounds.y;
-  status=YShearImage(rotate_image,shear.y,&second_pass,exception);
-  if (status == MagickFalse)
-    {
-      rotate_image=DestroyImage(rotate_image);
-      return((Image *) NULL);
-    }
-  third_pass.width=bounds.width;
-  third_pass.height=bounds.height;
-  third_pass.x_offset=(ssize_t) (rotate_image->columns-bounds.width)/2;
-  third_pass.y_offset=(ssize_t) (rotate_image->rows-bounds.height)/2;
-  status=XShearImage(rotate_image,shear.x,&third_pass,exception);
-  if (status == MagickFalse)
-    {
-      rotate_image=DestroyImage(rotate_image);
-      return((Image *) NULL);
-    }
+  rotation.shear=shear;
+  rotation.bounds=bounds;
+  rotation.height=height;
+  rotation.width=width;
+  rotation.exception=exception;
+  if (ApplyRotationShears(&rotation,&rotate_image) == MagickFalse)
+    return((Image *) NULL);
   crop_region.x_shear=shear.x;
   crop_region.y_shear=shear.y;
   crop_region.width=(MagickRealType) width;
