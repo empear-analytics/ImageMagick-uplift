@@ -2150,6 +2150,20 @@ static void CollectMedianPass(const MedianPass *pass,ssize_t *y,size_t *n)
   }
 }
 
+static ChannelStatistics *RelinquishImageStatistics(const Image *image,
+  double *histogram,ChannelStatistics *channel_statistics,
+  ExceptionInfo *exception)
+{
+  if (histogram != (double *) NULL)
+    histogram=(double *) RelinquishMagickMemory(histogram);
+  if (channel_statistics != (ChannelStatistics *) NULL)
+    channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
+      channel_statistics);
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+  return(channel_statistics);
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2188,16 +2202,8 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     MaxPixelChannels+1,sizeof(*channel_statistics));
   if ((channel_statistics == (ChannelStatistics *) NULL) ||
       (histogram == (double *) NULL))
-    {
-      if (histogram != (double *) NULL)
-        histogram=(double *) RelinquishMagickMemory(histogram);
-      if (channel_statistics != (ChannelStatistics *) NULL)
-        channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
-          channel_statistics);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(channel_statistics);
-    }
+    return(RelinquishImageStatistics(image,histogram,channel_statistics,
+      exception));
   (void) memset(channel_statistics,0,(MaxPixelChannels+1)*
     sizeof(*channel_statistics));
   ResetChannelStatistics(channel_statistics);
