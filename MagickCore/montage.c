@@ -684,6 +684,16 @@ static void UpdateMontageBoundsHeight(const ssize_t y_offset,
     (*bounds).height=(size_t) y_offset;
 }
 
+static size_t GetMontageRowHeight(const MagickBooleanType concatenate,
+  const size_t max_height,const RectangleInfo extract_info)
+{
+  size_t
+    height;
+
+  height=concatenate != MagickFalse ? max_height : extract_info.height;
+  return(height);
+}
+
 static size_t GetMontageTileWidth(const MagickBooleanType concatenate,
   Image **image_list,const ssize_t tile,const RectangleInfo extract_info)
 {
@@ -941,7 +951,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
           (((tile+1) % (ssize_t) tiles_per_row) == 0))
         {
           x_offset=GetMontageRowOffset(montage_info,number_images);
-          height=concatenate != MagickFalse ? max_height : extract_info.height;
+          height=GetMontageRowHeight(concatenate,max_height,extract_info);
           y_offset+=(ssize_t) ((ssize_t) height+(extract_info.y+
             (ssize_t) border_width)*2+(metrics.ascent-metrics.descent+4)*
             (ssize_t) number_lines+(montage_info->shadow != MagickFalse ? 4 : 0));
