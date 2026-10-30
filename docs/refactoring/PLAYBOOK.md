@@ -1890,6 +1890,11 @@ Q and U, whose first step refuses a block containing `goto`.
    `if (Helper(...) == MagickFalse)`; in that form `S` may read and write the block's
    one written variable `v`, passed as a pointer (step 4), since every write the block
    made to it has landed before the helper returns.
+   `S return(v);` may also be a single `return(<expr>);` whose expression is a call on
+   the caller's variables (`ParseKernelArray`'s `return(DestroyKernelInfo(kernel));`),
+   the same text at every exit (checked by script), left unchanged in the caller after
+   `if (Helper(...) == MagickFalse)`. The block writes no variable the expression
+   reads; it may write through one, a pointer passed by value (`kernel`).
 
 **Before:**
 
@@ -1978,6 +1983,13 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   keeping `S` in the caller needs neither. The helper's pointer copy is dead once it
   returns, before `S` frees the memory. `refactor_guard.py --calls` shows each call in
   `S` fall by one per copy that merged into the caller's single `S`.
+- Under step 7's `return(<expr>);` form the argument is the cleanup form's with the
+  cleanup folded into the return statement: the statement stays the caller's own text,
+  run by the caller at the point where the block ran it, after every statement the
+  block ran before that exit, on variables the block did not write. So it calls the same
+  functions with the same arguments and returns the same value (`DestroyKernelInfo`
+  frees the same kernel, whose members the block wrote through the pointer before the
+  exit, as before). On the success path it runs in neither version.
 - Under step 7's macro form the argument is Recipe I step 8's with one written
   variable: the helper writes `v` through its pointer, so on a failure path the macro
   in the caller reads the value the block left (`Classify`'s `head`, still NULL when
@@ -2020,6 +2032,10 @@ token step writes `kernel` and, as a temporary, the parse result `new_kernel`.
 Step 2's address passed to calls that keep no copy (2026-10-30, task W09): `fx.c`'s
 `GetProperty`, whose "not a number" branch writes `text`, whose address the other
 branch passes to `GetPropertySeconds`.
+Step 7's `return(<expr>);` (2026-10-30, task W09): `morphology.c`'s `ParseKernelArray`,
+whose `:` geometry parse (size and offset checks) and the `:`/odd-square selection
+around it leave through `return(DestroyKernelInfo(kernel));` when an offset lies
+outside the kernel.
 
 ---
 
@@ -2366,6 +2382,9 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    MagickFalse) { S return(c); }`, `S` copied unchanged (checked by script to be
    identical in every copy). Here, as in V step 7, `S` neither reads nor writes a
    written variable (step 2).
+   So does V step 7's single `return(<expr>);` (`return(DestroyKernelInfo(kernel));`),
+   left in the caller as `{ S return(c); }` is; its expression reads no written
+   variable.
 
 **Before:**
 
@@ -3257,3 +3276,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | I | Step 2: a written variable whose address the caller takes only to fill a member of another helper's targets struct under this recipe (filled directly before that call, read by nothing else) still qualifies, as Recipe LB step 2 allows for its own helpers. *Careful* gives the argument | `layer.c`'s `OptimizeLayerFrames`: the finalisation of the dispose choice writes `bgnd_image`, `prev_image`, `dup_image` and `i`, and leaves through the release of `bounds` and `disposals` and `return((Image *) NULL);`; `&dup_image` is already taken for `TryDuplicateFrame`'s targets. A probe: bumps 5 to 3, cc 39 to 33, 5.96 to 5.98 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 4: a variable the block reads on entry and then writes, and that nothing after the block reads, goes by value as an input, its text unchanged; its writes land in the new function's copy | `effect.c`'s `AdaptiveBlurImage`: its release of the kernels allocated so far (`for (w-=2; w >= 0; w-=2)`, a bump inside the failure branch) counts `w` down just before `ThrowImageException` returns; step 4 counts no output, but says only that a written temporary is declared in the new function. A probe with the kernel-building loop (Recipe LB): bumps 6 to 4, 3.12 to 3.19 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | V | Step 2: a written variable whose address the caller passes elsewhere, outside the block, only to calls that keep no copy of it (checked by reading the callee) still qualifies, as Recipe O step 2 and Recipe I step 8 already allow. *Careful* gives the argument | `fx.c`'s `GetProperty`: the "not a number" branch (`*val = strtold (text, &tailptr);`, then destroy `text`, throw and `return -1;`) writes only `text`, whose address the caller passes to `GetPropertySeconds` in the other branch; that callee reads and replaces `*text` and keeps no pointer. With the bracket scan moved (Recipes LB and K), a probe: GetProperty leaves Bumpy Road Ahead, 3.23 to 3.25 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | V, I | V step 7 (and I step 8 by reference): the exit may be a single `return(<expr>);` whose expression is a call on the caller's variables (`return(DestroyKernelInfo(kernel));`), the same text at every exit, left unchanged in the caller after `if (Helper(...) == MagickFalse)`; the block writes no variable the expression reads. *Careful* gives the argument (the cleanup form's, with the cleanup folded into the return) | `morphology.c`'s `ParseKernelArray` (cc 25, 2 bumps after three Recipe E steps): its `:` geometry parse writes `flags` and leaves through `return(DestroyKernelInfo(kernel));` twice, and the `:`/odd-square selection around it writes `flags` and `p`; neither is `S return(v);` nor `return(c);`. A probe of both: ParseKernelArray leaves Bumpy Road Ahead, 2.70 to 2.71 | mandate (2026-10-24) |
