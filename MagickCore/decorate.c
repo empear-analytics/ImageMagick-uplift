@@ -679,6 +679,23 @@ static void DrawFrameBottomBorder(const FrameBottomBorder *bottom_border,
     }
 }
 
+static void SetFrameImageAttributes(Image *frame_image,const Image *image,
+  ExceptionInfo *exception)
+{
+  if ((IsPixelInfoGray(&frame_image->border_color) == MagickFalse) &&
+      (IsGrayColorspace(frame_image->colorspace) != MagickFalse))
+    (void) SetImageColorspace(frame_image,sRGBColorspace,exception);
+  if ((frame_image->matte_color.alpha_trait != UndefinedPixelTrait) &&
+      (frame_image->alpha_trait == UndefinedPixelTrait))
+    (void) SetImageAlpha(frame_image,OpaqueAlpha,exception);
+  frame_image->page=image->page;
+  if ((image->page.width != 0) && (image->page.height != 0))
+    {
+      frame_image->page.width+=frame_image->columns-image->columns;
+      frame_image->page.height+=frame_image->rows-image->rows;
+    }
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -741,18 +758,7 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
       frame_image=DestroyImage(frame_image);
       return((Image *) NULL);
     }
-  if ((IsPixelInfoGray(&frame_image->border_color) == MagickFalse) &&
-      (IsGrayColorspace(frame_image->colorspace) != MagickFalse))
-    (void) SetImageColorspace(frame_image,sRGBColorspace,exception);
-  if ((frame_image->matte_color.alpha_trait != UndefinedPixelTrait) &&
-      (frame_image->alpha_trait == UndefinedPixelTrait))
-    (void) SetImageAlpha(frame_image,OpaqueAlpha,exception);
-  frame_image->page=image->page;
-  if ((image->page.width != 0) && (image->page.height != 0))
-    {
-      frame_image->page.width+=frame_image->columns-image->columns;
-      frame_image->page.height+=frame_image->rows-image->rows;
-    }
+  SetFrameImageAttributes(frame_image,image,exception);
   /*
     Initialize 3D effects color.
   */
