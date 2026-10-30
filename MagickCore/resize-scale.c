@@ -290,6 +290,87 @@ static void ResetScalePixel(const Image *image,double *pixel)
     pixel[i]=0.0;
 }
 
+typedef struct _ScaleColumn
+{
+  const Image
+    *image;
+
+  const double
+    *scanline;
+
+  double
+    *scale_scanline;
+
+  ssize_t
+    x;
+} ScaleColumn;
+
+typedef struct _ScaleColumnTargets
+{
+  double
+    (*pixel)[CompositePixelChannel];
+
+  ssize_t
+    *t;
+
+  PointInfo
+    *scale,
+    *span;
+
+  MagickBooleanType
+    *next_column;
+} ScaleColumnTargets;
+
+static void AccumulateScaleColumn(const ScaleColumn *column,
+  const ScaleColumnTargets *targets)
+{
+  const Image
+    *const image = column->image;
+
+  const double
+    *const scanline = column->scanline;
+
+  double
+    *const scale_scanline = column->scale_scanline;
+
+  const ssize_t
+    x = column->x;
+
+  double
+    (*const pixel)[CompositePixelChannel] = targets->pixel;
+
+  ssize_t
+    *const t = targets->t;
+
+  PointInfo
+    *const scale = targets->scale,
+    *const span = targets->span;
+
+  MagickBooleanType
+    *const next_column = targets->next_column;
+
+  ssize_t
+    i;
+
+  if (*next_column != MagickFalse)
+    {
+      ResetScalePixel(image,*pixel);
+      (*t)++;
+    }
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    (*pixel)[i]+=(*span).x*scanline[x*(ssize_t) GetPixelChannels(image)+i];
+    scale_scanline[(*t)*(ssize_t) GetPixelChannels(image)+i]=(*pixel)[i];
+  }
+  (*scale).x-=(*span).x;
+  (*span).x=1.0;
+  *next_column=MagickTrue;
+}
+
 static void ScaleScanlineX(const Image *image,const Image *scale_image,
   const double *scanline,double *scale_scanline)
 {
@@ -317,23 +398,17 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
     scale.x=(double) scale_image->columns/(double) image->columns;
     while (scale.x >= span.x)
     {
-      if (next_column != MagickFalse)
-        {
-          ResetScalePixel(image,pixel);
-          t++;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        pixel[i]+=span.x*scanline[x*(ssize_t) GetPixelChannels(image)+i];
-        scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
-      }
-      scale.x-=span.x;
-      span.x=1.0;
-      next_column=MagickTrue;
+      const ScaleColumnTargets
+        targets = { &pixel, &t, &scale, &span, &next_column };
+
+      ScaleColumn
+        column;
+
+      column.image=image;
+      column.scanline=scanline;
+      column.scale_scanline=scale_scanline;
+      column.x=x;
+      AccumulateScaleColumn(&column,&targets);
     }
     if (scale.x > 0)
       {
