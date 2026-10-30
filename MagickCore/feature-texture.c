@@ -148,17 +148,26 @@ typedef struct _FeatureStatistics
     direction[4];  /* horizontal, vertical, left and right diagonals */
 } FeatureStatistics;
 
-static inline MagickBooleanType IsFeatureMemoryMissing(
-  FeatureStatistics **cooccurrence,FeatureStatistics *density_x,
-  FeatureStatistics *density_xy,FeatureStatistics *density_y,
-  FeatureStatistics **Q,FeatureStatistics *sum)
+typedef struct _FeatureMemory
 {
-  return(((cooccurrence == (FeatureStatistics **) NULL) ||
-    (density_x == (FeatureStatistics *) NULL) ||
-    (density_xy == (FeatureStatistics *) NULL) ||
-    (density_y == (FeatureStatistics *) NULL) ||
-    (Q == (FeatureStatistics **) NULL) ||
-    (sum == (FeatureStatistics *) NULL)) ? MagickTrue : MagickFalse);
+  FeatureStatistics
+    **cooccurrence,
+    *density_x,
+    *density_xy,
+    *density_y,
+    **Q,
+    *sum;
+} FeatureMemory;
+
+static inline MagickBooleanType IsFeatureMemoryMissing(
+  const FeatureMemory *memory)
+{
+  return(((memory->cooccurrence == (FeatureStatistics **) NULL) ||
+    (memory->density_x == (FeatureStatistics *) NULL) ||
+    (memory->density_xy == (FeatureStatistics *) NULL) ||
+    (memory->density_y == (FeatureStatistics *) NULL) ||
+    (memory->Q == (FeatureStatistics **) NULL) ||
+    (memory->sum == (FeatureStatistics *) NULL)) ? MagickTrue : MagickFalse);
 }
 
 static unsigned int GetFeatureGrayLevels(const Image *image,
@@ -307,6 +316,9 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
   ChannelFeatures
     *channel_features;
 
+  FeatureMemory
+    memory;
+
   FeatureStatistics
     **cooccurrence,
     correlation,
@@ -440,8 +452,13 @@ MagickExport ChannelFeatures *GetImageFeatures(const Image *image,
     2*sizeof(*density_y));
   Q=(FeatureStatistics **) AcquireQuantumMemory(number_grays,sizeof(*Q));
   sum=(FeatureStatistics *) AcquireQuantumMemory(number_grays,sizeof(*sum));
-  if (IsFeatureMemoryMissing(cooccurrence,density_x,density_xy,density_y,Q,
-        sum) != MagickFalse)
+  memory.cooccurrence=cooccurrence;
+  memory.density_x=density_x;
+  memory.density_xy=density_xy;
+  memory.density_y=density_y;
+  memory.Q=Q;
+  memory.sum=sum;
+  if (IsFeatureMemoryMissing(&memory) != MagickFalse)
     {
       if (Q != (FeatureStatistics **) NULL)
         Q=(FeatureStatistics **) RelinquishMagickMemory(Q);
