@@ -534,6 +534,22 @@ static void ConsolidateCMYKPlane(const Image *images,Image *cmyk_image,
   image_view=DestroyCacheView(image_view);
 }
 
+static const Image *ConsolidateCMYKPlanes(const Image *images,
+  Image *cmyk_image,ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < 4; i++)
+  {
+    ConsolidateCMYKPlane(images,cmyk_image,i,exception);
+    images=GetNextImageInList(images);
+    if (images == (Image *) NULL)
+      break;
+  }
+  return(images);
+}
+
 MagickExport Image *ConsolidateCMYKImages(const Image *images,
   ExceptionInfo *exception)
 {
@@ -556,9 +572,6 @@ MagickExport Image *ConsolidateCMYKImages(const Image *images,
   cmyk_images=NewImageList();
   for (j=0; j < (ssize_t) GetImageListLength(images); j+=4)
   {
-    ssize_t
-      i;
-
     assert(images != (Image *) NULL);
     cmyk_image=CloneImage(images,0,0,MagickTrue,
       exception);
@@ -567,13 +580,7 @@ MagickExport Image *ConsolidateCMYKImages(const Image *images,
     if (SetImageStorageClass(cmyk_image,DirectClass,exception) == MagickFalse)
       break;
     (void) SetImageColorspace(cmyk_image,CMYKColorspace,exception);
-    for (i=0; i < 4; i++)
-    {
-      ConsolidateCMYKPlane(images,cmyk_image,i,exception);
-      images=GetNextImageInList(images);
-      if (images == (Image *) NULL)
-        break;
-    }
+    images=ConsolidateCMYKPlanes(images,cmyk_image,exception);
     AppendImageToList(&cmyk_images,cmyk_image);
   }
   return(cmyk_images);
