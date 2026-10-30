@@ -164,6 +164,20 @@ static Image *CloneRotatedImage(const Image *image,size_t rotations,
   return(rotate_image);
 }
 
+static void ReverseRotatedRow(const Image *image,const Image *rotate_image,
+  const Quantum *p,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    q-=GetPixelChannels(rotate_image);
+    CopyRotatedPixelChannels(image,rotate_image,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -337,9 +351,6 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -351,12 +362,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
             continue;
           }
         q+=(ptrdiff_t) GetPixelChannels(rotate_image)*image->columns;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          q-=GetPixelChannels(rotate_image);
-          CopyRotatedPixelChannels(image,rotate_image,p,q);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        ReverseRotatedRow(image,rotate_image,p,q);
         sync=SyncCacheViewAuthenticPixels(rotate_view,exception);
         if (sync == MagickFalse)
           status=MagickFalse;
