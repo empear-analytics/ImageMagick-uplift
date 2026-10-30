@@ -2248,6 +2248,34 @@ static void ComputeChannelMedians(const MedianStatistics *medians,ssize_t *y)
   }
 }
 
+static MagickBooleanType CheckChannelDepth(
+  ChannelStatistics *channel_statistics,ChannelStatistics *cs,
+  const Quantum *magick_restrict p,const ssize_t i)
+{
+  MagickStatusType
+    status;
+
+  QuantumAny
+    range;
+
+  size_t
+    depth;
+
+  if (cs->depth != MAGICKCORE_QUANTUM_DEPTH)
+    {
+      depth=cs->depth;
+      range=GetQuantumRange(depth);
+      status=p[i] != ScaleAnyToQuantum(ScaleQuantumToAny(p[i],range),
+        range) ? MagickTrue : MagickFalse;
+      if (status != MagickFalse)
+        {
+          IncreaseChannelDepth(channel_statistics,cs);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2257,9 +2285,6 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   double
     *histogram;
 
-  MagickStatusType
-    status;
-
   MedianStatistics
     medians;
 
@@ -2268,12 +2293,6 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
 
   Quantum
     *median;
-
-  QuantumAny
-    range;
-
-  size_t
-    depth;
 
   ssize_t
     i,
@@ -2330,18 +2349,10 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
         if ((traits & UpdatePixelTrait) == 0)
           continue;
         cs=channel_statistics+channel;
-        if (cs->depth != MAGICKCORE_QUANTUM_DEPTH)
+        if (CheckChannelDepth(channel_statistics,cs,p,i) == MagickFalse)
           {
-            depth=cs->depth;
-            range=GetQuantumRange(depth);
-            status=p[i] != ScaleAnyToQuantum(ScaleQuantumToAny(p[i],range),
-              range) ? MagickTrue : MagickFalse;
-            if (status != MagickFalse)
-              {
-                IncreaseChannelDepth(channel_statistics,cs);
-                i--;
-                continue;
-              }
+            i--;
+            continue;
           }
         sample.image=image;
         sample.p=p;
