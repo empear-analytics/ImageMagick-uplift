@@ -2742,6 +2742,19 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
   | (one << (size_t) (i)) : (size_t) (alpha) & ~(one << (size_t) (i)))
 #define SteganoImageTag  "Stegano/Image"
 
+static void AdvanceSteganoCursor(const Image *stegano_image,int *c,
+  ssize_t *k,ssize_t *j)
+{
+  (*c)++;
+  if (*c == 3)
+    *c=0;
+  (*k)++;
+  if (*k == (ssize_t) (stegano_image->columns*stegano_image->columns))
+    *k=0;
+  if (*k == stegano_image->offset)
+    (*j)++;
+}
+
 typedef struct _SteganoBit
 {
   Image
@@ -2894,14 +2907,7 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
         SetSteganoBit(&stegano_bit,pixel,q);
         if (SyncCacheViewAuthenticPixels(stegano_view,exception) == MagickFalse)
           break;
-        c++;
-        if (c == 3)
-          c=0;
-        k++;
-        if (k == (ssize_t) (stegano_image->columns*stegano_image->columns))
-          k=0;
-        if (k == stegano_image->offset)
-          j++;
+        AdvanceSteganoCursor(stegano_image,&c,&k,&j);
       }
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
