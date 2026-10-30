@@ -856,9 +856,6 @@ static inline MagickBooleanType IsEpbx2XBlendable(const Quantum *pixels,
   ) ? MagickTrue : MagickFalse);
 }
 
-static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
-  Quantum *result,const size_t channels)
-{
 #define HelperCond(a,b,c,d,e,f,g) ( \
   PixelsEqual(pixels,a,b,channels) && ( \
     PixelsEqual(pixels,c,d,channels) || \
@@ -868,6 +865,9 @@ static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
     ) \
   )
 
+static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
+  Quantum *result,const size_t channels)
+{
   const MagnifyPixels magnify = { pixels, result, channels };
 
   ssize_t
