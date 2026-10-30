@@ -2831,6 +2831,29 @@ static void UpdateHitAndMissExtrema(const MorphologyKernelTap *tap,
       (*maximum)=MaximizeChannelValue(tap->pixels,tap->i,(*maximum));
 }
 
+typedef struct _MorphologyIntensityTap
+{
+  const Quantum
+    *pixels;
+
+  double
+    intensity;
+
+  ssize_t
+    i;
+} MorphologyIntensityTap;
+
+static void SelectMinimumIntensityPixel(const MorphologyIntensityTap *tap,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel,double *minimum)
+{
+  if (tap->intensity < (*minimum))
+    {
+      (*quantum_pixels)=tap->pixels;
+      (*pixel)=(double) tap->pixels[tap->i];
+      (*minimum)=tap->intensity;
+    }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3153,6 +3176,9 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         ssize_t
           v;
 
+        MorphologyIntensityTap
+          intensity_tap;
+
         MorphologyKernelTap
           kernel_tap;
 
@@ -3370,12 +3396,11 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 if (!IsNaN(*k) && (*k >= 0.5))
                   {
                     intensity=(double) GetPixelIntensity(image,pixels);
-                    if (intensity < minimum)
-                      {
-                        quantum_pixels=pixels;
-                        pixel=(double) pixels[i];
-                        minimum=intensity;
-                      }
+                    intensity_tap.pixels=pixels;
+                    intensity_tap.intensity=intensity;
+                    intensity_tap.i=i;
+                    SelectMinimumIntensityPixel(&intensity_tap,&quantum_pixels,
+                      &pixel,&minimum);
                   }
                 k++;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
