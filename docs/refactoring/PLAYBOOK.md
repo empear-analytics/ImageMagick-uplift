@@ -1051,6 +1051,17 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
 2. List the variables the block only reads. Choose a group of them that are scalars or
    pointers, none written anywhere in the block, so the new function keeps at most four
    parameters: the struct and what the block writes through (a pixel buffer, say).
+   A plain struct value (a `PixelInfo`, `PointInfo` or `RectangleInfo` local or
+   parameter; not an array, an array of structs, or a pointer's target) may be one of
+   the group when, checked by reading: (a) every member of it is set on every path to
+   the call, by an initialiser, a whole-struct assignment or a fill such as
+   `GetPixelInfo(image,&v)`; (b) the block assigns neither `v` nor any member of it, and
+   takes `&v` or `&v.m` only as an argument to a pointer-to-`const` parameter of a
+   callee that only reads through it, neither storing nor comparing the address; (c) no
+   pointer to `v` or to a member of it is held anywhere the block can write through; and
+   (d) the block writes through none of its pointer members. Steps 3 to 6 then treat it
+   as a scalar: a member of the struct's type, `const PixelInfo v = name->v;` or
+   `name->v.m`, and `name.v=v;`, a copy taken directly before the call.
 3. Declare `typedef struct _Name { ... } Name;` directly above the new function, one
    member per variable in the group, with the variable's exact type and name: no `size_t`
    for a `ssize_t`, no `const` added or dropped on what a pointer points to. Only a
@@ -1139,6 +1150,23 @@ static void ThresholdWaveletLevel(float *pixels,
   unwritten variable did. A variable the block writes is never a member.
 - A member keeps the variable's exact type, so the assignment and the local's
   initialisation convert nothing; under HDRI a `MagickRealType` member stays one.
+- A struct-valued member (step 2) is a copy: `name.v=v;` copies every member's value
+  at the call, and the block reads the copy where it read `v`. The copy and `v` hold the
+  same values for the whole block only while nothing writes `v`, so step 2 forbids,
+  besides assignments to `v` and its members, every way the block could write it
+  unseen: `&v` passed to a callee that writes through it (`GetPixelInfoPixel(image,p,&v)`
+  inside the block refuses `v`), or a pointer to `v` kept elsewhere and written in the
+  block. Reads through a pointer member reach the same object from the copy as from
+  `v`, since only the pointer is copied; (d) keeps writes through it out.
+- A callee that received `&v` through a pointer-to-`const` parameter now receives the
+  copy's address: the same values at another address. That is the same behaviour only
+  while the callee uses the pointer to read: one that stores it, compares it with
+  another pointer, or prints it sees a difference. Read the callee (and what it passes
+  `&v` on to) before choosing `v`; when in doubt, leave `v` out of the group.
+- Copying a struct reads every member, where the block may have read only some, so a
+  member left unset before the call would now be read uninitialised: (a) requires
+  each to be set. Arrays stay out: one decays to a pointer, which is already a member
+  of the pointer kind, and a copy of an array of structs is not a value C assigns.
 - Every member is assigned before the call: an unassigned member is read uninitialised,
   and nothing checks it but reading (step 8). Count them against the typedef.
 - Recipe E's limit on what the block writes stands: one value returned, or writes
@@ -1198,9 +1226,10 @@ as parameters. K then B is two commits, of which the first adds a finding.
    read after the block before writing it again (a loop counter, a fetched pixel): it is
    declared in the new function instead, as Recipe J step 3 does, and is not one of the
    four.
-3. Put the read-only variables, scalars and pointers, in a struct as Recipe N steps 2
-   and 3 do: one member per variable, the variable's exact type and name, a top-level
-   `const` or `magick_restrict` left off. A written variable is never a member.
+3. Put the read-only variables, scalars, pointers and struct values (Recipe N step 2),
+   in a struct as Recipe N steps 2 and 3 do: one member per variable, the variable's
+   exact type and name, a top-level `const` or `magick_restrict` left off. A written
+   variable is never a member.
 4. Cut the block into a new `static void` function taking `const Name *name` first, then
    one pointer per written scalar, in the order the block first writes them. At the
    top of its body declare one `const` local per member, as Recipe N step 4 does, or
@@ -1334,10 +1363,11 @@ no `status`. T then B is two commits, of which the first adds a finding.
    variable it writes is declared in the block or not read after it before being
    written again (those are declared in the new function instead, with any initialiser);
    no `return`, `goto`, or `continue`/`break` of the parallel loop.
-2. Put the variables it only reads, scalars and pointers none of which the block writes,
-   in a struct as Recipe N steps 2 and 3 do: one member per variable, the variable's
-   exact type and name, a top-level `const` or `magick_restrict` left off. A variable
-   the block writes (a row pointer it advances) is never a member: it goes by value.
+2. Put the variables it only reads, scalars, pointers and struct values (Recipe N step
+   2) none of which the block writes, in a struct as Recipe N steps 2 and 3 do: one
+   member per variable, the variable's exact type and name, a top-level `const` or
+   `magick_restrict` left off. A variable the block writes (a row pointer it advances)
+   is never a member: it goes by value.
 3. Cut the block into a new `static MagickBooleanType` function taking `const Name *name`
    first and then the written-but-not-read-after variables by value, at most four
    parameters. At the top of its body declare one `const` local per member, as Recipe N
@@ -1456,10 +1486,10 @@ which refuses both. J then B is two commits, of which the first adds a finding.
    loop body's own accumulators and cursors, each read after it or read in it before it
    is written; every other loop-body variable it writes is declared in the block or not
    read after it before being written again (declared in the new function instead).
-2. Put the variables it only reads, scalars and pointers, none written in the block, in
-   a struct as Recipe N steps 2 and 3 do: one member per variable, the variable's exact
-   type and name, a top-level `const` or `magick_restrict` left off. A written variable
-   is never a member.
+2. Put the variables it only reads, scalars, pointers and struct values (Recipe N step
+   2), none written in the block, in a struct as Recipe N steps 2 and 3 do: one member
+   per variable, the variable's exact type and name, a top-level `const` or
+   `magick_restrict` left off. A written variable is never a member.
 3. Cut the block into a new `static MagickBooleanType` function taking `const Name *name`
    first, then one pointer per written accumulator or cursor, in the order the block
    first writes them, at most four parameters in all. At the top of its body declare one
@@ -1765,10 +1795,10 @@ a finding.
    in the block, and the caller does not read it after the block before writing it again
    (a pixel pointer, a coordinate): it is declared in the new function instead, as
    Recipe J step 3 and Recipe U step 1 do.
-3. Put the variables the block only reads, scalars and pointers, none written in the
-   block, in a struct as Recipe N steps 2 and 3 do: one member per variable, the
-   variable's exact type and name, a top-level `const` or `magick_restrict` left off.
-   Neither `v` nor a variable of step 2 is ever a member.
+3. Put the variables the block only reads, scalars, pointers and struct values (Recipe N
+   step 2), none written in the block, in a struct as Recipe N steps 2 and 3 do: one
+   member per variable, the variable's exact type and name, a top-level `const` or
+   `magick_restrict` left off. Neither `v` nor a variable of step 2 is ever a member.
 4. Cut the block into a new `static MagickBooleanType` function directly above the
    caller, taking `const Name *name` first and then `v` as a pointer. At the top of its
    body declare one `const` local per member, as Recipe N step 4 does (or write
@@ -1888,10 +1918,10 @@ through a jump or a `return`.
    it writes is a plain local of the caller whose address is not taken elsewhere, at
    most four of them; it contains no `return`, `goto`, or `continue` or `break` that
    leaves it.
-2. Put the variables the block only reads, scalars and pointers, none written in the
-   block, in a struct as Recipe N steps 2 and 3 do: one member per variable, the
-   variable's exact type and name, a top-level `const` or `magick_restrict` left off. A
-   written variable is never a member.
+2. Put the variables the block only reads, scalars, pointers and struct values (Recipe N
+   step 2), none written in the block, in a struct as Recipe N steps 2 and 3 do: one
+   member per variable, the variable's exact type and name, a top-level `const` or
+   `magick_restrict` left off. A written variable is never a member.
 3. Cut the block into a new `static void` function directly above the caller, taking
    `const Name *name` first, then one pointer per written variable, in the order the
    block first writes them. At the top of its body declare one `const` local per member,
@@ -2371,3 +2401,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | Z | Extract Selection with Out-Parameters Taking an Input Struct: a Recipe O selection whose inputs would give the new function five or more parameters moves to a `static void` function taking a `const` struct of the inputs it only reads (Recipe N's struct) and one pointer per local it sets (Recipe O) | `threshold.c`'s `ColorThresholdImage`: the colorspace `switch` sets `start` and `stop` and reads four inputs (six arguments under O); a probe 4.46 to 4.58 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | V | Step 7: a block whose every exit is the same cleanup run `S` followed by `return(v);` moves with `S` left in the caller: each exit becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) { S return(v); }`; the block may not write what `S` reads or writes. *Careful* gives the argument: the caller runs the same cleanup on the same values and returns the same variable, so nothing rests on the destroy function returning NULL | `threshold.c`'s `GetThresholdMapFile`: its level-parsing tail has four exits of `thresholds=DestroyXMLTree(thresholds); map=DestroyThresholdMap(map); return(map);`, which step 6 refuses (a variable, not a constant). A probe: cc 18 to 12, 150 to 104 lines, 4.60 to 4.71 | owner |
 | 2026-10-30 | AMEND | V | Step 7: `return(c);` of one constant `c` (step 6) may end every exit in place of `return(v);`; the caller writes `{ S return(c); }` and step 2 holds (one written variable, which `S` neither reads nor writes). *Careful*: the cleanup's writes are dead on the failure path, but the recipe does not rest on that, since `S` stays in the caller; moving `S` into the helper instead is not admitted | Owner's request of 2026-10-30 after the W08 report (V allowing dead cleanup writes on the failure path). `layer.c`'s `OptimizeLayerFrames`: the `NoneDispose` reference's failure path releases `bounds` and `disposals`, then `return((Image *) NULL);`, which step 6 refused (three written variables) and step 7 did not name (a constant, not a variable). A probe: bumps 9 to 8, 4.99 to 5.00; with `CoalesceImages`' dispose-image clone, 5.01 | owner |
+| 2026-10-30 | AMEND | N, Q, U, W, Y, Z | N step 2: a plain struct value the block only reads (`PixelInfo`, `PointInfo`, `RectangleInfo`) may be a member, copied by `name.v=v;` directly before the call, when every member is set before the call, the block assigns neither it nor a member, takes `&v` only for a callee's pointer-to-`const` parameter that only reads through it (stores and compares no address), no pointer to it is held where the block can write, and the block writes through none of its pointer members; arrays stay out. *Careful* gives the argument (a copy holds the same values while nothing writes the original; a `const` callee sees the copy's address). Q step 3, U step 2, W step 2, Y step 3 and Z step 2 name struct values as N step 2 does | Owner's request of 2026-10-30 after the W08 report (struct-valued read-only members in N and Q). `feature.c`'s `MeanShiftImage`: its convergence block reads `sum_location`, `sum_pixel`, `previous_location`, `previous_pixel` (`PointInfo`/`PixelInfo`) and `count`; `layer.c`'s `CompareImagesBounds` and `OptimizeLayerFrames` (`RectangleInfo try_bounds`, a `PixelInfo` read through `&alpha_pixel`). MeanShiftImage's block also writes the struct values `mean_location` and `mean_pixel`, which Q passes only as scalars, so this amendment alone does not admit it: a probe that also passed them by pointer measured 5.20 to 5.23 | owner |
