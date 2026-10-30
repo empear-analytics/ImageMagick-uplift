@@ -202,13 +202,29 @@ static MagickBooleanType CopyFileDescriptor(const int source_file,
   return(status);
 }
 
-MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
+static MagickBooleanType CopyToUniqueFile(const char *source,
   char *destination)
 {
   int
     destination_file,
     source_file;
 
+  destination_file=AcquireUniqueFileResource(destination);
+  if (destination_file == -1)
+    return(MagickFalse);
+  source_file=open_utf8(source,O_RDONLY | O_CLOEXEC | O_BINARY,0);
+  if (source_file == -1)
+    {
+      (void) close_utf8(destination_file);
+      (void) RelinquishUniqueFileResource(destination);
+      return(MagickFalse);
+    }
+  return(CopyFileDescriptor(source_file,destination_file,destination));
+}
+
+MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
+  char *destination)
+{
   MagickBooleanType
     status;
 
@@ -255,17 +271,7 @@ MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
   /*
     Copy file from source to destination.
   */
-  destination_file=AcquireUniqueFileResource(destination);
-  if (destination_file == -1)
-    return(MagickFalse);
-  source_file=open_utf8(source,O_RDONLY | O_CLOEXEC | O_BINARY,0);
-  if (source_file == -1)
-    {
-      (void) close_utf8(destination_file);
-      (void) RelinquishUniqueFileResource(destination);
-      return(MagickFalse);
-    }
-  return(CopyFileDescriptor(source_file,destination_file,destination));
+  return(CopyToUniqueFile(source,destination));
 }
 
 /*
