@@ -3542,6 +3542,164 @@ colours the same with `ShadowModulate` or `TroughModulate`.
 
 ---
 
+## Recipe AR - Extract Block Through a Struct of Array Pointers
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it reads or updates, element by
+element, several local arrays of the caller: with one pointer parameter per array
+(Recipe E step 3, Recipe K step 4) the new function would take five or more arguments,
+or the block writes more arrays than Recipe Q step 8 admits. The typical case is a
+function that keeps one family of per-channel values in parallel arrays and runs pass
+after pass over them (`statistic-moments.c`'s `GetImageMoments`: the moment sums `M00`
+to `M30` and `centroid`).
+
+**Not covered by:** Recipe E, whose block produces one value (an array included, step 3)
+and takes its inputs one parameter each; Recipe N, whose block writes one value and
+whose struct holds scalars, pointers and struct values, not arrays (its *Careful*);
+Recipes K and Q, whose block is an accumulation writing at most four variables (six
+under Q step 8, which passes each array as a pointer to the array and rewrites every use
+`v[i]` as `(*v)[i]`); Recipes O, Z and I, which write plain locals, not arrays (I step 2
+refuses arrays).
+
+**How:**
+
+1. The block lies in a function with no OpenMP region and contains no `#pragma` line,
+   no `return`, `goto`, or `break` or `continue` that leaves it. It is one nested block,
+   or a run of sibling statements named as such in the commit message (Recipe E).
+2. List the arrays of the caller the block indexes: arrays declared in the caller's body
+   (not parameters, globals or `static`s), of any element type. The block uses each only
+   as `v[e]` (read, assigned or compound-assigned) or passes it whole to a callee's
+   pointer parameter (`RotateEllipseAngle(channel_moments,c,M20,M02)`); never `&v`,
+   `sizeof v`, or `v` in any other expression.
+3. Everything else follows Recipe E steps 3 to 7: besides array elements and writes
+   through pointers the block already uses (`channel_moments[c].ellipse_angle`), it
+   writes at most one variable of the caller that the caller reads after it, which the
+   new function returns (`y=Helper(...);`); a temporary it writes before reading is
+   declared in the new function, and one it reads on entry and then writes, dead after
+   the block, goes by value (E step 4). The other inputs go by value, or in one `const`
+   input struct as Recipe N steps 2 to 8 build it; a struct type the file already
+   declares for another helper of the same caller, whose members are exactly the
+   variables the block reads (types and names), is reused, not declared twice. At most
+   four parameters in all, the struct of step 4 included.
+4. Declare `typedef struct _Name { ... } Name;` directly above the first function that
+   uses it, one member per array of the caller, a pointer to its element type under its
+   name (`double M00[2*MaxPixelChannels+1]` gives `double *M00`), in the order the
+   caller declares them, holding addresses only. One struct holds the whole family, so
+   later blocks of the same caller reuse it; a block need not use every member.
+5. In the caller, declare `const Name name = { v1, v2, ... };` after the arrays'
+   declarations, one array per member in member order: each array's name stands for the
+   address of its first element (Recipe Q step 8's `const` form). In a helper of this
+   recipe, the `const Name *name` it received stands for the struct: a block there that
+   moves on (`AdjustEllipseAngle` out of `ComputeEllipseMoments`) takes the same
+   pointer.
+6. Cut the block into a new `static` function directly above the caller, taking the
+   step-3 parameters and `const Name *name`. At the top of its body bind each array the
+   block indexes, in member order, `T *const v = name->v;`, or `const T *const v =
+   name->v;` for one it only reads (and passes only to pointer-to-`const` parameters).
+   The block's text is unchanged, except that `&name` passed on to another helper of
+   this recipe becomes `name`.
+7. Call it where the block stood, with `&name` (`name` inside a helper of this recipe),
+   and check by reading every argument against its parameter, and every member of the
+   initialiser against the array of its name.
+
+**Before:**
+
+```c
+  double
+    channels,
+    M00[2*MaxPixelChannels+1] = { 0.0 },
+    ...
+    M30[2*MaxPixelChannels+1] = { 0.0 };
+  ...
+  for (c=0; c <= MaxPixelChannels; c++)
+  {
+    /*
+      Normalize image moments.
+    */
+    M10[c]=0.0;
+    M01[c]=0.0;
+    M11[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(1.0+1.0)/2.0));
+    ...
+    M00[c]=1.0;
+  }
+```
+
+**After:**
+
+```c
+typedef struct _MomentArrays
+{
+  double
+    *M00,
+    ...
+    *M30;
+
+  PointInfo
+    *centroid;
+} MomentArrays;
+...
+static void NormalizeMoments(const MomentArrays *moments)
+{
+  double
+    *const M00 = moments->M00,
+    ...
+    *const M30 = moments->M30;
+
+  ssize_t
+    c;
+
+  for (c=0; c <= MaxPixelChannels; c++)
+  {
+    ...
+    M00[c]=1.0;
+  }
+}
+...
+  const MomentArrays
+    moments = { M00, M01, M02, M03, M10, M11, M12, M20, M21, M22, M30,
+      centroid };
+  ...
+  NormalizeMoments(&moments);
+```
+
+**Careful:**
+
+- `v[e]` is `*(v+e)` whether `v` is the array or a pointer to its first element, so each
+  use names the same element of the caller's array, read or written at the same point
+  and in the same order; nothing is copied in or back. The bound pointers are `const`
+  and the struct is a `const` local, so no pointer is reseated.
+- `&v` and `sizeof v` differ between an array and a pointer (the address of the whole
+  array, the size of the array against that of a pointer), so step 2 refuses a block
+  that uses either. An array passed whole to a callee was already converted to the same
+  pointer the bound local holds.
+- The arrays are distinct objects, so no two members alias, and none aliases a pointer
+  the block already uses; the caller's other uses of the arrays (its own indexing, other
+  helpers' parameters) see every element the helper wrote, as they saw the block's.
+- The initialiser reads no element, only addresses, fixed from the arrays' declarations
+  to the end of the function, so evaluating it once at the declaration stores what an
+  assignment before each call would (Recipe Q step 8's `const` form; C99 admits a
+  non-constant initialiser of an automatic aggregate, as `compare.c`'s `sums` already
+  has). The arrays' own initialisers (`= { 0.0 }`) run first, in declaration order.
+- `const T *const v` for an array the block only reads adds `const` to the pointed-to
+  type: reads give the same values, and the compiler refuses a write.
+- The returned variable of step 3 is Recipe E's single value: the block wrote it on
+  every path the caller reads afterwards, and `v=Helper(...);` hands the caller the
+  value the block left (`y`, the row at which a cache read stopped a pass).
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 2, 5 and 7 checked by reading.
+
+**Provenance:** 2026-10-31, from `statistic-moments.c`'s `GetImageMoments` (W10): eleven
+moment arrays and `centroid`, filled by two pixel passes, then averaged, normalised and
+read by per-channel loops. The second pass's per-pixel sum writes eight arrays (Q step 8
+admits six, and its form rewrites sixteen uses); the composite average and the
+normalisation write all eleven; the ellipse and Hu invariant loops read four and seven,
+with the result array, five or more parameters under Recipe E. A probe of the whole
+function under this recipe, Recipe E and Recipe Q: 8.05 to 10.0. Added by Claude Code
+(Claude Opus 5.5) during task W10, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -3991,3 +4149,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | E | Step 4: a variable declared without an initialiser, which the block writes before it reads it on every path and which nothing after the block reads, is declared in the new function even when the caller writes it before the block (as Recipe TW step 3 and Recipe J step 3 say for their blocks); the 2026-10-28 condition stays for a variable with an initialiser | `decorate.c`'s `FrameImage` (W10): its bevel loops share the function's `y` (and the top band's `width`) with the loops before them; each loop sets `y` in its `for` before any read, and the next loop sets it again. The 2026-10-28 wording ("when no statement between that declaration and the block writes it") is there to keep an initialiser's value, which such a variable does not have | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | SV | Step 2: the value may also be an object-like macro of the file expanding to a call, with constant arguments, of a `static inline` function that reads and writes nothing but its parameters (`AccentuateModulate`, `ScaleCharToQuantum(80)`), its parameter of the function's return type; and a copy's one written variable, assigned whole before it is read and read by the caller afterwards, becomes the new function's local and return value (`v=Helper(...);`, Recipe E steps 3 and 4). *Careful* gives the argument | `decorate.c`'s `FrameImage` (W10): its four 3-D colours are two pairs of copies, five statements each on `matte`, differing only in the modulate macro (`AccentuateModulate`/`HighlightModulate`, `ShadowModulate`/`TroughModulate`), each copy writing its own colour. The macro is not a literal, an enumeration constant or a member access, so step 2 refused it. The lighter pair as one helper: 8.08 to 8.20; both pairs: 8.24 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | TW | Step 2: a `const` struct local of pointers that the block passes only as `&s` to a pointer-to-`const` parameter of a callee writing through its members, and neither assigns nor writes a member of, goes by value as a parameter of its exact type, its text unchanged (N step 2 (d) keeps it out of the struct). *Careful* gives the argument | `compare.c`'s `GetDPCSimilarity` and `GetNCCSimilarity` (W10): their column loops are the same text (eight inputs, depth 3, a bump each), passing the row's `CorrelationSums` as `&sums`; both as one helper, then their identical statistics blocks (Recipe I and I step 7), 2.43 to 2.54 in a probe | mandate (2026-10-24) |
+| 2026-10-31 | NEW | AR | Extract Block Through a Struct of Array Pointers: a block outside OpenMP that reads or updates, element by element, several local arrays of the caller (each used only as `v[e]` or passed whole to a pointer parameter) moves to a `static` function taking one `const` struct of pointers to the arrays' first elements, initialised once in the caller (`const Name name = { v1, ... };`) and bound `T *const v = name->v;`, the block's text unchanged; other inputs and at most one returned variable as in Recipe E, or an input struct as in Recipe N | `statistic-moments.c`'s `GetImageMoments` (W10): the second pixel pass writes eight moment arrays per pixel (Q step 8 admits six), the composite average and the normalisation write eleven, the ellipse and Hu loops read four and seven; E, N, K and Q refuse them. A probe with this recipe, E and Q: 8.05 to 10.0 | mandate (2026-10-24) |
