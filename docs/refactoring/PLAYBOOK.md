@@ -1056,6 +1056,9 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
 4. Cut the block into a new `static` function taking `const Name *name` in place of the
    group. At the top of its body declare one `const` local per member, of the member's
    type and name, initialised from the member; the block's text below is unchanged.
+   Or, instead of the `const` locals, write `name->member` for every use of a member in
+   the block, as Recipe B step 3 allows (Recipe W step 3): the form for a block whose
+   sibling helper unpacks the same members or tests the same channel traits.
 5. In the caller, declare a `Name` local among the declarations at the top of the block
    that holds the call (the loop body, for a call inside a loop), never after a
    statement.
@@ -1138,6 +1141,16 @@ static void ThresholdWaveletLevel(float *pixels,
 - Recipe E's limit on what the block writes stands: one value returned, or writes
   through a pointer the block already used for pixel data. A block writing more is
   skipped, as in Recipe E.
+- In the member form of step 4 each `name->member` reads the same object the `const`
+  local would have been initialised from, at each use instead of once; the struct is
+  the caller's local, filled before the call and written by nothing in the block, so
+  every read gives the value the block's own read of the variable gave. `->` binds
+  tighter than a cast or an arithmetic operator, so `(double) name->i-x` groups as
+  `(double) i-x` did.
+- Two helpers that unpack the same members into `const` locals (the Manhattan and
+  Voronoi nearest-point searches of `SparseColorImage`), or that test the same five
+  channel traits, are reported as *Code Duplication*; the member form removes the
+  shared locals. Keep the step only when no duplication appears.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 2 and 8 checked by reading.
@@ -1183,7 +1196,8 @@ as parameters. K then B is two commits, of which the first adds a finding.
    `const` or `magick_restrict` left off. A written variable is never a member.
 4. Cut the block into a new `static void` function taking `const Name *name` first, then
    one pointer per written scalar, in the order the block first writes them. At the
-   top of its body declare one `const` local per member, as Recipe N step 4 does.
+   top of its body declare one `const` local per member, as Recipe N step 4 does, or
+   write `name->member` for every use of a member, as Recipe N step 4 also allows.
 5. In the block's text, write each written scalar `v` as `*v` (`(*v)++` for `v++`) at
    every use, reads included, as Recipe K step 4 does; nothing else in the text changes.
 6. In the caller, declare the `Name` local at the top of the block holding the call (in
@@ -2016,3 +2030,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | AMEND | W | Step 3: instead of the `const` locals, the body may write `name->member` at every use of a member (Recipe B step 3's form); *Careful* names it as the way to extract the second of a plain and a blended sum without the two helpers repeating each other's locals | `MotionBlurImage`'s blended kernel sum beside `SumMotionPixels`: with `const` locals the pair is reported as Code Duplication (2.06 to 2.01); in the member form no duplication, 2.18 to 2.20 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | U | Step 3: the member form of Recipe W step 3. Step 7: a block that is the whole body of a channel loop inside the parallel loop body may contain `continue;` of that loop, each becoming `return(status);`, as Recipe E step 7 does for a `void` function | `MotionBlurImage`'s per-channel body after both kernel sums moved: the channel loop as one helper is a Complex Method (cc 11, its `continue`s counted); the body as a helper (cc 6) called from a channel-loop helper (cc 3) takes the function out of Brain Method and Deep, Nested Complexity, 2.20 to 2.43 in a probe | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | V | Step 6: a block that leaves through `return(c);` of one constant `c` of the caller's return type, in place of `goto L;`, moves the same way; each `return(c);` becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) return(c);`. *Careful* gives the argument and notes the warning location the oracle normalises | `morphology.c`'s `MorphologyImage`: its `convolve:scale` branch (clone the kernel if it is the caller's, `return((Image *) NULL)` when the clone fails, scale it) is its only depth-4 site and both its bumps; Recipe E's step 6 covers only the throw macros' hidden returns and step 4 refuses the status plus `curr_kernel`. A probe: `MorphologyImage` keeps only its public signature's Excess Arguments, 2.55 to 2.62 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | N | Step 4: instead of the `const` locals, the body may write `name->member` at every use of a member (Recipe B step 3's form, as Recipes U and W step 3 already allow); *Careful* gives the argument and names the duplication it avoids | `distort.c`'s `SparseColorImage`: the Voronoi search beside `ManhattanSparseColor`, and the Bilinear plane beside the Barycentric one, are reported as Code Duplication with `const` locals (2.70 to 2.57); in the member form neither is (2.70 to 2.74). With the remaining cases the function leaves Brain Method and Deep, Nested Complexity, 2.70 to 3.01 in a probe | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | Q | Step 4: the member form of Recipe N step 4 | `SparseColorImage`'s inverse-distance accumulation (`pixel`, `denominator` written, eight inputs): with `const` locals its helper would repeat `ManhattanSparseColor`'s seven locals and loop header; in the member form no duplication | mandate (2026-10-24) |
