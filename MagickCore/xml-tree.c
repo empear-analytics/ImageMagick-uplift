@@ -481,29 +481,36 @@ static void DestroyXMLTreeOrdered(XMLTreeInfo *xml_info,
   }
 }
 
+static void DestroyDefaultAttributeValues(char **attributes)
+{
+  ssize_t
+    j;
+
+  for (j=1; attributes[j] != (char *) NULL; j+=3)
+  {
+    if (attributes[j] != (char *) NULL)
+      attributes[j]=DestroyString(attributes[j]);
+    if (attributes[j+1] != (char *) NULL)
+      attributes[j+1]=DestroyString(attributes[j+1]);
+    if (attributes[j+2] != (char *) NULL)
+      attributes[j+2]=DestroyString(attributes[j+2]);
+  }
+}
+
 static void DestroyXMLRootAttributes(XMLTreeRoot *root)
 {
   char
     **attributes;
 
   ssize_t
-    i,
-    j;
+    i;
 
   for (i=0; root->attributes[i] != (char **) NULL; i++)
   {
     attributes=root->attributes[i];
     if (attributes[0] != (char *) NULL)
       attributes[0]=DestroyString(attributes[0]);
-    for (j=1; attributes[j] != (char *) NULL; j+=3)
-    {
-      if (attributes[j] != (char *) NULL)
-        attributes[j]=DestroyString(attributes[j]);
-      if (attributes[j+1] != (char *) NULL)
-        attributes[j+1]=DestroyString(attributes[j+1]);
-      if (attributes[j+2] != (char *) NULL)
-        attributes[j+2]=DestroyString(attributes[j+2]);
-    }
+    DestroyDefaultAttributeValues(attributes);
     attributes=(char **) RelinquishMagickMemory(attributes);
   }
 }
