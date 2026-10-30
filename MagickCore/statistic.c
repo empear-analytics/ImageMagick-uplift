@@ -1773,6 +1773,19 @@ static ssize_t SortMedianPair(Quantum *pixels,const ssize_t low,
   return(median);
 }
 
+static void PartitionMedianPixels(Quantum *pixels,const ssize_t low,
+  ssize_t *l,ssize_t *h)
+{
+  for ( ; ; )
+  {
+    do (*l)++; while (pixels[low] > pixels[*l]);
+    do (*h)--; while (pixels[*h] > pixels[low]);
+    if (*h < *l)
+      break;
+    SwapPixels(pixels[*l],pixels[*h]);
+  }
+}
+
 static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
 {
   ssize_t
@@ -1792,14 +1805,7 @@ static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
     if (high == (low+1))
       return(SortMedianPair(pixels,low,high,median));
     SetMedianPivot(pixels,low,mid,high);
-    for ( ; ; )
-    {
-      do l++; while (pixels[low] > pixels[l]);
-      do h--; while (pixels[h] > pixels[low]);
-      if (h < l)
-        break;
-      SwapPixels(pixels[l],pixels[h]);
-    }
+    PartitionMedianPixels(pixels,low,&l,&h);
     SwapPixels(pixels[low],pixels[h]);
     if (h <= median)
       low=l;
