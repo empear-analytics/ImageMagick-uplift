@@ -383,6 +383,57 @@ static ssize_t FindTriangleMaxBin(const double *histogram)
   return(max);
 }
 
+typedef struct _TriangleLine
+{
+  double
+    a,
+    b,
+    c,
+    inverse_ratio;
+
+  const double
+    *histogram;
+
+  ssize_t
+    max,
+    start;
+} TriangleLine;
+
+static void ScanTriangleBelowPeak(const TriangleLine *line,ssize_t *threshold,
+  double *max_distance)
+{
+  const double
+    a = line->a,
+    b = line->b,
+    c = line->c,
+    inverse_ratio = line->inverse_ratio;
+
+  const double
+    *histogram = line->histogram;
+
+  const ssize_t
+    max = line->max,
+    start = line->start;
+
+  double
+    distance,
+    segment;
+
+  ssize_t
+    i;
+
+  for (i=start; i < max; i++)
+  {
+    segment=inverse_ratio*(a*i+b*histogram[i]+c);
+    distance=sqrt(segment*segment);
+    if ((distance > *max_distance) && (segment > 0.0))
+      {
+        *threshold=i;
+        *max_distance=distance;
+      }
+  }
+}
+
 static double TriangleThreshold(const double *histogram)
 {
   double
@@ -406,6 +457,9 @@ static double TriangleThreshold(const double *histogram)
     max,
     start,
     threshold;
+
+  TriangleLine
+    line;
 
   /*
     Compute optimal threshold with triangle algorithm.
@@ -435,15 +489,15 @@ static double TriangleThreshold(const double *histogram)
   threshold=0;
   max_distance=0.0;
   if (x2 == (double) start)
-    for (i=start; i < max; i++)
     {
-      segment=inverse_ratio*(a*i+b*histogram[i]+c);
-      distance=sqrt(segment*segment);
-      if ((distance > max_distance) && (segment > 0.0))
-        {
-          threshold=i;
-          max_distance=distance;
-        }
+      line.a=a;
+      line.b=b;
+      line.c=c;
+      line.inverse_ratio=inverse_ratio;
+      line.histogram=histogram;
+      line.max=max;
+      line.start=start;
+      ScanTriangleBelowPeak(&line,&threshold,&max_distance);
     }
   else
     for (i=end; i > max; i--)
