@@ -780,6 +780,32 @@ static void AdjustEllipseAngle(CCObjectInfo *object,
 }
 
 
+static void SetEllipseAngleMetric(CCObjectInfo *object,
+  const CCEllipseAngle *angle_moments)
+{
+  CCEllipseAngle
+    ellipse_angle;
+
+  object[angle_moments->i].metric[angle_moments->metric_index]=
+    RadiansToDegrees(1.0/2.0*atan(2.0*angle_moments->M11*
+    MagickSafeReciprocal(angle_moments->M20-angle_moments->M02)));
+  if (fabs(angle_moments->M11) < 0.0)
+      {
+        if (IsNegativeAxisDifference(angle_moments->M20,angle_moments->M02) !=
+            MagickFalse)
+          object[angle_moments->i].metric[angle_moments->metric_index]+=90.0;
+      }
+    else
+      {
+        ellipse_angle.M11=angle_moments->M11;
+        ellipse_angle.M20=angle_moments->M20;
+        ellipse_angle.M02=angle_moments->M02;
+        ellipse_angle.i=angle_moments->i;
+        ellipse_angle.metric_index=angle_moments->metric_index;
+        AdjustEllipseAngle(object,&ellipse_angle);
+      }
+}
+
 static void AngleThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -859,22 +885,12 @@ static void AngleThreshold(const Image *component_image,
       AccumulateSecondMoments(&moment_row,&moment_sums);
     }
     component_view=DestroyCacheView(component_view);
-    object[i].metric[metric_index]=RadiansToDegrees(1.0/2.0*atan(2.0*M11*
-      MagickSafeReciprocal(M20-M02)));
-    if (fabs(M11) < 0.0)
-        {
-          if (IsNegativeAxisDifference(M20,M02) != MagickFalse)
-            object[i].metric[metric_index]+=90.0;
-        }
-      else
-        {
-          ellipse_angle.M11=M11;
-          ellipse_angle.M20=M20;
-          ellipse_angle.M02=M02;
-          ellipse_angle.i=i;
-          ellipse_angle.metric_index=metric_index;
-          AdjustEllipseAngle(object,&ellipse_angle);
-        }
+    ellipse_angle.M11=M11;
+    ellipse_angle.M20=M20;
+    ellipse_angle.M02=M02;
+    ellipse_angle.i=i;
+    ellipse_angle.metric_index=metric_index;
+    SetEllipseAngleMetric(object,&ellipse_angle);
   }
 }
 
