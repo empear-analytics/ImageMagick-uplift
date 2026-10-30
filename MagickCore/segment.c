@@ -1978,6 +1978,21 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
 %      of pixels for each intensity of a particular color component.
 %
 */
+static double ScaleSpaceSum(const ssize_t *histogram,const double *gamma,
+  const ssize_t x)
+{
+  double
+    sum;
+
+  ssize_t
+    u;
+
+  sum=0.0;
+  for (u=0; u <= 255; u++)
+    sum+=(double) histogram[u]*gamma[MagickAbsoluteValue(x-u)];
+  return(sum);
+}
+
 static void ScaleSpace(const ssize_t *histogram,const double tau,
   double *scale_histogram)
 {
@@ -1988,7 +2003,6 @@ static void ScaleSpace(const ssize_t *histogram,const double tau,
     sum;
 
   ssize_t
-    u,
     x;
 
   gamma=(double *) AcquireQuantumMemory(256,sizeof(*gamma));
@@ -2006,9 +2020,7 @@ static void ScaleSpace(const ssize_t *histogram,const double tau,
   }
   for (x=0; x <= 255; x++)
   {
-    sum=0.0;
-    for (u=0; u <= 255; u++)
-      sum+=(double) histogram[u]*gamma[MagickAbsoluteValue(x-u)];
+    sum=ScaleSpaceSum(histogram,gamma,x);
     scale_histogram[x]=alpha*sum;
   }
   gamma=(double *) RelinquishMagickMemory(gamma);
