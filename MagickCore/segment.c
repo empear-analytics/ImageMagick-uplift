@@ -421,6 +421,26 @@ static ssize_t CountClusterPixel(Cluster *head,const PixelInfo pixel,
   return(count);
 }
 
+static ssize_t CountRowClusterPixels(const Image *image,Cluster *head,
+  const Quantum *p,ssize_t count)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PixelInfo
+      pixel;
+
+    pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,p));
+    pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
+    pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
+    count=CountClusterPixel(head,pixel,count);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(count);
+}
+
 static Cluster *ClassifyPixelByCluster(const Image *image,Cluster *head,
   const PixelInfo pixel,Quantum *magick_restrict q)
 {
@@ -618,23 +638,10 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     const Quantum
       *p;
 
-    ssize_t
-      x;
-
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PixelInfo
-        pixel;
-
-      pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,p));
-      pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
-      pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
-      count=CountClusterPixel(head,pixel,count);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    count=CountRowClusterPixels(image,head,p,count);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
