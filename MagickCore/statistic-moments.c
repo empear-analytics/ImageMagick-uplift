@@ -176,6 +176,101 @@ static void AccumulateRawMoments(const MomentPixel *moment_pixel,double *M00,
   }
 }
 
+typedef struct _MomentArrays
+{
+  double
+    *M00,
+    *M01,
+    *M02,
+    *M03,
+    *M10,
+    *M11,
+    *M12,
+    *M20,
+    *M21,
+    *M22,
+    *M30;
+
+  PointInfo
+    *centroid;
+} MomentArrays;
+
+static void AccumulateCentralMoments(const MomentPixel *moment_pixel,
+  const MomentArrays *moments)
+{
+  const Image
+    *const image = moment_pixel->image;
+
+  const Quantum
+    *const p = moment_pixel->p;
+
+  const ssize_t
+    x = moment_pixel->x,
+    y = moment_pixel->y;
+
+  double
+    *const M02 = moments->M02,
+    *const M03 = moments->M03,
+    *const M11 = moments->M11,
+    *const M12 = moments->M12,
+    *const M20 = moments->M20,
+    *const M21 = moments->M21,
+    *const M22 = moments->M22,
+    *const M30 = moments->M30;
+
+  const PointInfo
+    *const centroid = moments->centroid;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    M11[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
+      QuantumScale*(double) p[i];
+    M11[CompositePixelChannel]+=(x-centroid[channel].x)*(y-
+      centroid[channel].y)*QuantumScale*(double) p[i];
+    M20[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+      QuantumScale*(double) p[i];
+    M20[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+      centroid[channel].x)*QuantumScale*(double) p[i];
+    M02[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
+      QuantumScale*(double) p[i];
+    M02[CompositePixelChannel]+=(y-centroid[channel].y)*(y-
+      centroid[channel].y)*QuantumScale*(double) p[i];
+    M21[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+      (y-centroid[channel].y)*QuantumScale*(double) p[i];
+    M21[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+      centroid[channel].x)*(y-centroid[channel].y)*QuantumScale*(double)
+      p[i];
+    M12[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
+      (y-centroid[channel].y)*QuantumScale*(double) p[i];
+    M12[CompositePixelChannel]+=(x-centroid[channel].x)*(y-
+      centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+      p[i];
+    M22[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+      (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+      p[i];
+    M22[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+      centroid[channel].x)*(y-centroid[channel].y)*(y-centroid[channel].y)*
+      QuantumScale*(double) p[i];
+    M30[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+      (x-centroid[channel].x)*QuantumScale*(double) p[i];
+    M30[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+      centroid[channel].x)*(x-centroid[channel].x)*QuantumScale*(double)
+      p[i];
+    M03[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
+      (y-centroid[channel].y)*QuantumScale*(double) p[i];
+    M03[CompositePixelChannel]+=(y-centroid[channel].y)*(y-
+      centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+      p[i];
+  }
+}
+
 MagickExport ChannelMoments *GetImageMoments(const Image *image,
   ExceptionInfo *exception)
 {
@@ -203,6 +298,10 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
 
   PointInfo
     centroid[2*MaxPixelChannels+1] = {{ 0 }};
+
+  const MomentArrays
+    moments = { M00, M01, M02, M03, M10, M11, M12, M20, M21, M22, M30,
+      centroid };
 
   ssize_t
     c,
@@ -270,54 +369,14 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
       break;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
+      MomentPixel
+        moment_pixel;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        M11[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
-          QuantumScale*(double) p[i];
-        M11[CompositePixelChannel]+=(x-centroid[channel].x)*(y-
-          centroid[channel].y)*QuantumScale*(double) p[i];
-        M20[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          QuantumScale*(double) p[i];
-        M20[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
-          centroid[channel].x)*QuantumScale*(double) p[i];
-        M02[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
-          QuantumScale*(double) p[i];
-        M02[CompositePixelChannel]+=(y-centroid[channel].y)*(y-
-          centroid[channel].y)*QuantumScale*(double) p[i];
-        M21[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (y-centroid[channel].y)*QuantumScale*(double) p[i];
-        M21[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
-          centroid[channel].x)*(y-centroid[channel].y)*QuantumScale*(double)
-          p[i];
-        M12[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
-          (y-centroid[channel].y)*QuantumScale*(double) p[i];
-        M12[CompositePixelChannel]+=(x-centroid[channel].x)*(y-
-          centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
-          p[i];
-        M22[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
-          p[i];
-        M22[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
-          centroid[channel].x)*(y-centroid[channel].y)*(y-centroid[channel].y)*
-          QuantumScale*(double) p[i];
-        M30[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (x-centroid[channel].x)*QuantumScale*(double) p[i];
-        M30[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
-          centroid[channel].x)*(x-centroid[channel].x)*QuantumScale*(double)
-          p[i];
-        M03[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
-          (y-centroid[channel].y)*QuantumScale*(double) p[i];
-        M03[CompositePixelChannel]+=(y-centroid[channel].y)*(y-
-          centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
-          p[i];
-      }
+      moment_pixel.image=image;
+      moment_pixel.p=p;
+      moment_pixel.x=x;
+      moment_pixel.y=y;
+      AccumulateCentralMoments(&moment_pixel,&moments);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
