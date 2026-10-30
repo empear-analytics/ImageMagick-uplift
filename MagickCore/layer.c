@@ -278,6 +278,16 @@ static RectangleInfo ClipBoundsLeft(RectangleInfo bounds)
   return(bounds);
 }
 
+static RectangleInfo ClipBoundsTop(RectangleInfo bounds)
+{
+  if (bounds.y < 0)
+    {
+      bounds.height=(size_t) ((ssize_t) bounds.height+bounds.y);
+      bounds.y=0;
+    }
+  return(bounds);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -344,11 +354,7 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     bounds=ClipBoundsLeft(bounds);
     if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) coalesce_image->columns)
       bounds.width=(size_t) ((ssize_t) coalesce_image->columns-bounds.x);
-    if (bounds.y < 0)
-      {
-        bounds.height=(size_t) ((ssize_t) bounds.height+bounds.y);
-        bounds.y=0;
-      }
+    bounds=ClipBoundsTop(bounds);
     if ((bounds.y+(ssize_t) bounds.height) > (ssize_t) coalesce_image->rows)
       bounds.height=(size_t) ((ssize_t) coalesce_image->rows-bounds.y);
     /*
