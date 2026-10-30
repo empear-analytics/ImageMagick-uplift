@@ -395,6 +395,16 @@ static void BlackThresholdRow(const Image *image,const PixelInfo *threshold,
   }
 }
 
+static MagickBooleanType SetDirectColorImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType BlackThresholdImage(Image *image,
   const char *thresholds,ExceptionInfo *exception)
 {
@@ -421,10 +431,8 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (thresholds == (const char *) NULL)
     return(MagickTrue);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (SetDirectColorImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(image,sRGBColorspace,exception);
   threshold=GetThresholdLevels(image,thresholds);
   /*
     White threshold image.
