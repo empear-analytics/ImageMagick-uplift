@@ -1910,6 +1910,13 @@ static inline MagickBooleanType IsRowOutside(const Image *image,
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsNonOutlineGlyph(const FT_Glyph glyph_image,
+  FT_Outline outline)
+{
+  return(((glyph_image->format != FT_GLYPH_FORMAT_OUTLINE) &&
+    (IsEmptyOutline(outline) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2266,8 +2273,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     if (ft_status != 0)
       continue;
     outline=((FT_OutlineGlyph) glyph.image)->outline;
-    if ((glyph.image->format != FT_GLYPH_FORMAT_OUTLINE) &&
-        (IsEmptyOutline(outline) == MagickFalse))
+    if (IsNonOutlineGlyph(glyph.image,outline) != MagickFalse)
       continue;
     ft_status=FT_Outline_Get_BBox(&outline,&bounds);
     if (ft_status != 0)
