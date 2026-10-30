@@ -1190,7 +1190,11 @@ as parameters. K then B is two commits, of which the first adds a finding.
    address is taken elsewhere (Recipe O step 2).
 2. Split what the block touches in two: the variables it writes (the accumulators and
    any cursor it advances, such as `n`), and the variables it only reads. Variables it
-   declares and uses alone move with it, as in Recipe K step 3.
+   declares and uses alone move with it, as in Recipe K step 3. So does a variable of the
+   caller that the block writes before reading it there, and that the caller does not
+   read after the block before writing it again (a loop counter, a fetched pixel): it is
+   declared in the new function instead, as Recipe J step 3 does, and is not one of the
+   four.
 3. Put the read-only variables, scalars and pointers, in a struct as Recipe N steps 2
    and 3 do: one member per variable, the variable's exact type and name, a top-level
    `const` or `magick_restrict` left off. A written variable is never a member.
@@ -1199,7 +1203,8 @@ as parameters. K then B is two commits, of which the first adds a finding.
    top of its body declare one `const` local per member, as Recipe N step 4 does, or
    write `name->member` for every use of a member, as Recipe N step 4 also allows.
 5. In the block's text, write each written scalar `v` as `*v` (`(*v)++` for `v++`) at
-   every use, reads included, as Recipe K step 4 does; nothing else in the text changes.
+   every use, reads included, as Recipe K step 4 does, and its address `&v` (passed on to
+   a helper) as `v`, the same address; nothing else in the text changes.
 6. In the caller, declare the `Name` local at the top of the block holding the call (in
    the parallel loop body, so each thread fills its own), and directly before the call
    assign every member from the variable of its name, in declaration order, with nothing
@@ -2160,3 +2165,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | N | Step 4: instead of the `const` locals, the body may write `name->member` at every use of a member (Recipe B step 3's form, as Recipes U and W step 3 already allow); *Careful* gives the argument and names the duplication it avoids | `distort.c`'s `SparseColorImage`: the Voronoi search beside `ManhattanSparseColor`, and the Bilinear plane beside the Barycentric one, are reported as Code Duplication with `const` locals (2.70 to 2.57); in the member form neither is (2.70 to 2.74). With the remaining cases the function leaves Brain Method and Deep, Nested Complexity, 2.70 to 3.01 in a probe | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | Step 4: the member form of Recipe N step 4 | `SparseColorImage`'s inverse-distance accumulation (`pixel`, `denominator` written, eight inputs): with `const` locals its helper would repeat `ManhattanSparseColor`'s seven locals and loop header; in the member form no duplication | mandate (2026-10-24) |
 | 2026-10-30 | NEW | Y | Extract Block Returning Success Taking an Input Struct: a Recipe V block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and its one written variable by pointer (Recipe V); temporaries it writes before reading, and the caller does not read after it, are declared in the new function (Recipe J step 3) | `visual-effects.c`'s `PlasmaImageProxy`: its middle pixel (`return(MagickTrue)` on a failed fetch; `status` written; five inputs) needs six parameters under Recipe V. A probe: bumps 5 to 4, 3.12 to 3.19 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | Q | Step 2: a variable of the caller that the block writes before reading it, and that the caller does not read after the block before writing it again, is declared in the new function and is not one of the four written variables (Recipe J step 3). Step 5: `&v` of a written scalar becomes `v` | `visual-effects.c`'s `SteganoImage`: its column loop (sequential) advances the cursors `c`, `k` and `j` and writes the temporaries `x`, `pixel` and `q`, declared at the top of the function and used nowhere else; step 1 counted six written locals. A probe of the loop as a helper (nine inputs): the function leaves Deep, Nested Complexity, 3.19 to 3.27 | mandate (2026-10-24) |
