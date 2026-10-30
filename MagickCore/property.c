@@ -1089,6 +1089,32 @@ static char *AcquireEXIFByteValue(const unsigned char *p,
   return(value);
 }
 
+static char *AcquireEXIFStringValue(const unsigned char *p,
+  const ssize_t number_bytes)
+{
+  char
+    *value;
+
+  ssize_t
+    i;
+
+  value=(char *) NULL;
+  if (~((size_t) number_bytes) >= 1)
+    value=(char *) AcquireQuantumMemory((size_t) number_bytes+1UL,
+      sizeof(*value));
+  if (value != (char *) NULL)
+    {
+      for (i=0; i < (ssize_t) number_bytes; i++)
+      {
+        value[i]='.';
+        if ((isprint((int) p[i]) != 0) || (p[i] == '\0'))
+          value[i]=(char) p[i];
+      }
+      value[i]='\0';
+    }
+  return(value);
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1718,20 +1744,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
             {
               if ((p < exif) || (p > (exif+length-number_bytes)))
                 break;
-              value=(char *) NULL;
-              if (~((size_t) number_bytes) >= 1)
-                value=(char *) AcquireQuantumMemory((size_t) number_bytes+1UL,
-                  sizeof(*value));
-              if (value != (char *) NULL)
-                {
-                  for (i=0; i < (ssize_t) number_bytes; i++)
-                  {
-                    value[i]='.';
-                    if ((isprint((int) p[i]) != 0) || (p[i] == '\0'))
-                      value[i]=(char) p[i];
-                  }
-                  value[i]='\0';
-                }
+              value=AcquireEXIFStringValue(p,number_bytes);
               break;
             }
           }
