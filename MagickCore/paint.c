@@ -516,6 +516,40 @@ static void SetGradientDirection(GradientInfo *gradient,const Image *image,
   }
 }
 
+static void SetGradientExtent(GradientInfo *gradient,const Image *image,
+  const char *artifact)
+{
+  if (LocaleCompare(artifact,"Circle") == 0)
+    {
+      gradient->radii.x=(double) MagickMax((image->columns-1.0),
+        (image->rows-1.0))/2.0;
+      gradient->radii.y=gradient->radii.x;
+    }
+  if (LocaleCompare(artifact,"Diagonal") == 0)
+    {
+      gradient->radii.x=(double) (sqrt((double) (image->columns-1.0)*
+        (image->columns-1.0)+(image->rows-1.0)*(image->rows-1.0)))/2.0;
+      gradient->radii.y=gradient->radii.x;
+    }
+  if (LocaleCompare(artifact,"Ellipse") == 0)
+    {
+      gradient->radii.x=(double) (image->columns-1.0)/2.0;
+      gradient->radii.y=(double) (image->rows-1.0)/2.0;
+    }
+  if (LocaleCompare(artifact,"Maximum") == 0)
+    {
+      gradient->radii.x=(double) MagickMax((image->columns-1.0),
+        (image->rows-1.0))/2.0;
+      gradient->radii.y=gradient->radii.x;
+    }
+  if (LocaleCompare(artifact,"Minimum") == 0)
+    {
+      gradient->radii.x=(double) (MagickMin((image->columns-1.0),
+        (image->rows-1.0)))/2.0;
+      gradient->radii.y=gradient->radii.x;
+    }
+}
+
 MagickExport MagickBooleanType GradientImage(Image *image,
   const GradientType type,const SpreadMethod method,const StopInfo *stops,
   const size_t number_stops,ExceptionInfo *exception)
@@ -596,37 +630,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
   gradient->radii.y=gradient->radii.x;
   artifact=GetImageArtifact(image,"gradient:extent");
   if (artifact != (const char *) NULL)
-    {
-      if (LocaleCompare(artifact,"Circle") == 0)
-        {
-          gradient->radii.x=(double) MagickMax((image->columns-1.0),
-            (image->rows-1.0))/2.0;
-          gradient->radii.y=gradient->radii.x;
-        }
-      if (LocaleCompare(artifact,"Diagonal") == 0)
-        {
-          gradient->radii.x=(double) (sqrt((double) (image->columns-1.0)*
-            (image->columns-1.0)+(image->rows-1.0)*(image->rows-1.0)))/2.0;
-          gradient->radii.y=gradient->radii.x;
-        }
-      if (LocaleCompare(artifact,"Ellipse") == 0)
-        {
-          gradient->radii.x=(double) (image->columns-1.0)/2.0;
-          gradient->radii.y=(double) (image->rows-1.0)/2.0;
-        }
-      if (LocaleCompare(artifact,"Maximum") == 0)
-        {
-          gradient->radii.x=(double) MagickMax((image->columns-1.0),
-            (image->rows-1.0))/2.0;
-          gradient->radii.y=gradient->radii.x;
-        }
-      if (LocaleCompare(artifact,"Minimum") == 0)
-        {
-          gradient->radii.x=(double) (MagickMin((image->columns-1.0),
-            (image->rows-1.0)))/2.0;
-          gradient->radii.y=gradient->radii.x;
-        }
-    }
+    SetGradientExtent(gradient,image,artifact);
   artifact=GetImageArtifact(image,"gradient:radii");
   if (artifact != (const char *) NULL)
     (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->radii.x,
