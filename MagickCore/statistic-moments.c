@@ -128,6 +128,54 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _MomentPixel
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x,
+    y;
+} MomentPixel;
+
+static void AccumulateRawMoments(const MomentPixel *moment_pixel,double *M00,
+  double *M10,double *M01)
+{
+  const Image
+    *const image = moment_pixel->image;
+
+  const Quantum
+    *const p = moment_pixel->p;
+
+  const ssize_t
+    x = moment_pixel->x,
+    y = moment_pixel->y;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      pixel;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    pixel=QuantumScale*p[i];
+    M00[channel]+=pixel;
+    M00[CompositePixelChannel]+=pixel;
+    M10[channel]+=x*pixel;
+    M10[CompositePixelChannel]+=x*pixel;
+    M01[channel]+=y*pixel;
+    M01[CompositePixelChannel]+=y*pixel;
+  }
+}
+
 MagickExport ChannelMoments *GetImageMoments(const Image *image,
   ExceptionInfo *exception)
 {
@@ -187,26 +235,14 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
       break;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
+      MomentPixel
+        moment_pixel;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          pixel;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        pixel=QuantumScale*p[i];
-        M00[channel]+=pixel;
-        M00[CompositePixelChannel]+=pixel;
-        M10[channel]+=x*pixel;
-        M10[CompositePixelChannel]+=x*pixel;
-        M01[channel]+=y*pixel;
-        M01[CompositePixelChannel]+=y*pixel;
-      }
+      moment_pixel.image=image;
+      moment_pixel.p=p;
+      moment_pixel.x=x;
+      moment_pixel.y=y;
+      AccumulateRawMoments(&moment_pixel,M00,M10,M01);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
