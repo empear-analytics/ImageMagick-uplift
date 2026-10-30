@@ -958,6 +958,27 @@ static inline MagickBooleanType IsBetterFrameBounds(
     <  bounds[i].width * bounds[i].height ) ? MagickTrue : MagickFalse);
 }
 
+static RectangleInfo ExpandBoundsWidth(RectangleInfo bgnd_bounds,
+  RectangleInfo try_bounds)
+{
+  if ( try_bounds.x < bgnd_bounds.x )
+    {
+       bgnd_bounds.width=(size_t) ((ssize_t) bgnd_bounds.width+
+         bgnd_bounds.x-try_bounds.x);
+       if ( bgnd_bounds.width < try_bounds.width )
+         bgnd_bounds.width = try_bounds.width;
+       bgnd_bounds.x = try_bounds.x;
+    }
+  else
+    {
+       try_bounds.width=(size_t) ((ssize_t) try_bounds.width+
+         try_bounds.x-bgnd_bounds.x);
+       if ( bgnd_bounds.width < try_bounds.width )
+         bgnd_bounds.width = try_bounds.width;
+    }
+  return(bgnd_bounds);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1213,21 +1234,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
                     (double) bgnd_bounds.width,(double) bgnd_bounds.height,
                     (double) bgnd_bounds.x,(double) bgnd_bounds.y );
 #endif
-                if ( try_bounds.x < bgnd_bounds.x )
-                  {
-                     bgnd_bounds.width=(size_t) ((ssize_t) bgnd_bounds.width+
-                       bgnd_bounds.x-try_bounds.x);
-                     if ( bgnd_bounds.width < try_bounds.width )
-                       bgnd_bounds.width = try_bounds.width;
-                     bgnd_bounds.x = try_bounds.x;
-                  }
-                else
-                  {
-                     try_bounds.width=(size_t) ((ssize_t) try_bounds.width+
-                       try_bounds.x-bgnd_bounds.x);
-                     if ( bgnd_bounds.width < try_bounds.width )
-                       bgnd_bounds.width = try_bounds.width;
-                  }
+                bgnd_bounds=ExpandBoundsWidth(bgnd_bounds,try_bounds);
                 if ( try_bounds.y < bgnd_bounds.y )
                   {
                     bgnd_bounds.height=(size_t) ((ssize_t) bgnd_bounds.height+
