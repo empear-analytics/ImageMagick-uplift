@@ -504,6 +504,22 @@ static void NormalizeMoments(const MomentArrays *moments)
   }
 }
 
+static void ComputeCentroids(PointInfo *centroid,const double *M00,
+  const double *M10,const double *M01)
+{
+  ssize_t
+    c;
+
+  for (c=0; c <= MaxPixelChannels; c++)
+  {
+    /*
+       Compute center of mass (centroid).
+    */
+    centroid[c].x=M10[c]*MagickSafeReciprocal(M00[c]);
+    centroid[c].y=M01[c]*MagickSafeReciprocal(M00[c]);
+  }
+}
+
 MagickExport ChannelMoments *GetImageMoments(const Image *image,
   ExceptionInfo *exception)
 {
@@ -539,7 +555,6 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
       centroid };
 
   ssize_t
-    c,
     y;
 
   assert(image != (Image *) NULL);
@@ -557,14 +572,7 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
   moment_image.image_view=image_view;
   moment_image.exception=exception;
   AccumulateRawMomentRows(&moment_image,M00,M10,M01);
-  for (c=0; c <= MaxPixelChannels; c++)
-  {
-    /*
-       Compute center of mass (centroid).
-    */
-    centroid[c].x=M10[c]*MagickSafeReciprocal(M00[c]);
-    centroid[c].y=M01[c]*MagickSafeReciprocal(M00[c]);
-  }
+  ComputeCentroids(centroid,M00,M10,M01);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
     const Quantum
