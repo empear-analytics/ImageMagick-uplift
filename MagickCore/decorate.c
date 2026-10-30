@@ -754,6 +754,58 @@ static Quantum *DrawFrameSideRow(const FrameSide *frame_side,
   return(q);
 }
 
+typedef struct _FrameComposite
+{
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  CompositeOperator
+    compose;
+
+  size_t
+    bevel_width;
+
+  ExceptionInfo
+    *exception;
+} FrameComposite;
+
+static Image *CompositeFrameImage(const FrameComposite *frame_composite,
+  MagickBooleanType status,Image *frame_image)
+{
+  const Image
+    *const image = frame_composite->image;
+
+  const FrameInfo
+    *const frame_info = frame_composite->frame_info;
+
+  const CompositeOperator
+    compose = frame_composite->compose;
+
+  const size_t
+    bevel_width = frame_composite->bevel_width;
+
+  ExceptionInfo
+    *const exception = frame_composite->exception;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  x_offset=frame_info->outer_bevel+(frame_info->x-(ssize_t) bevel_width)+
+    frame_info->inner_bevel;
+  y_offset=frame_info->outer_bevel+(frame_info->y-(ssize_t) bevel_width)+
+    frame_info->inner_bevel;
+  if (status != MagickFalse)
+    status=CompositeImage(frame_image,image,compose,MagickTrue,x_offset,
+      y_offset,exception);
+  if (status == MagickFalse)
+    frame_image=DestroyImage(frame_image);
+  return(frame_image);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -765,6 +817,9 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
 
   Image
     *frame_image;
+
+  FrameComposite
+    frame_composite;
 
   MagickBooleanType
     status;
@@ -924,15 +979,11 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     }
   frame_view=DestroyCacheView(frame_view);
   image_view=DestroyCacheView(image_view);
-  x_offset=frame_info->outer_bevel+(frame_info->x-(ssize_t) bevel_width)+
-    frame_info->inner_bevel;
-  y_offset=frame_info->outer_bevel+(frame_info->y-(ssize_t) bevel_width)+
-    frame_info->inner_bevel;
-  if (status != MagickFalse)
-    status=CompositeImage(frame_image,image,compose,MagickTrue,x_offset,
-      y_offset,exception);
-  if (status == MagickFalse)
-    frame_image=DestroyImage(frame_image);
-  return(frame_image);
+  frame_composite.image=image;
+  frame_composite.frame_info=frame_info;
+  frame_composite.compose=compose;
+  frame_composite.bevel_width=bevel_width;
+  frame_composite.exception=exception;
+  return(CompositeFrameImage(&frame_composite,status,frame_image));
 }
 
