@@ -851,6 +851,17 @@ static char **DestroyFileList(char **filelist,const size_t number_files)
   return(filelist);
 }
 
+static void DestroyOriginalArgument(char **vector,ssize_t *count,
+  MagickBooleanType *destroy)
+{
+  if ((*destroy) != MagickFalse)
+    {
+      (*count)--;
+      vector[(*count)]=DestroyString(vector[(*count)]);
+      (*destroy)=MagickFalse;
+    }
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1033,12 +1044,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
           FormatExpandedPath(file_path,magick,filename,subimage);
           if (strlen(file_path) >= (MagickPathExtent-1))
             ThrowFatalException(OptionFatalError,"FilenameTruncated");
-          if (destroy != MagickFalse)
-            {
-              count--;
-              vector[count]=DestroyString(vector[count]);
-              destroy=MagickFalse;
-            }
+          DestroyOriginalArgument(vector,&count,&destroy);
           vector[count++]=ConstantString(file_path);
         }
     }
