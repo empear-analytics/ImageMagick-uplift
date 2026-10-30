@@ -17,6 +17,11 @@
 #   - the bytes of every other data section, sorted, so that a table moved within its
 #     section compares equal but a changed entry does not.
 set -e
+# otool is macOS's. Without it every listing below comes out empty on both sides
+# (the failure is inside a pipeline, which set -e does not see) and the two would
+# compare equal: refuse instead of printing a SAME CODE that compared nothing.
+command -v otool >/dev/null 2>&1 || {
+  echo "obj_same_code.sh: needs otool (macOS); nothing compared" >&2; exit 2; }
 file=$1
 rev=${2:-HEAD}
 root=$(git rev-parse --show-toplevel)
