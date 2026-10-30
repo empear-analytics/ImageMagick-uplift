@@ -2446,13 +2446,26 @@ static void SetThumbnailProperties(const Image *image,Image *thumbnail_image,
     (double) GetImageListLength(image));
 }
 
+static void StripThumbnailProfiles(Image *thumbnail_image)
+{
+  const char
+    *name;
+
+  for (name=GetNextImageProfile(thumbnail_image); name != (const char *) NULL; )
+  {
+    if ((LocaleCompare(name,"icc") != 0) && (LocaleCompare(name,"icm") != 0))
+     {
+       (void) DeleteImageProfile(thumbnail_image,name);
+       ResetImageProfileIterator(thumbnail_image);
+     }
+    name=GetNextImageProfile(thumbnail_image);
+  }
+}
+
 MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
 #define SampleFactor  5
-
-  const char
-    *name;
 
   Image
     *thumbnail_image;
@@ -2510,15 +2523,7 @@ MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
     Strip all profiles except color profiles.
   */
   ResetImageProfileIterator(thumbnail_image);
-  for (name=GetNextImageProfile(thumbnail_image); name != (const char *) NULL; )
-  {
-    if ((LocaleCompare(name,"icc") != 0) && (LocaleCompare(name,"icm") != 0))
-     {
-       (void) DeleteImageProfile(thumbnail_image,name);
-       ResetImageProfileIterator(thumbnail_image);
-     }
-    name=GetNextImageProfile(thumbnail_image);
-  }
+  StripThumbnailProfiles(thumbnail_image);
   SetThumbnailProperties(image,thumbnail_image,exception);
   return(thumbnail_image);
 }
