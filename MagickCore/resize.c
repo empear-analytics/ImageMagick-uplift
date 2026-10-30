@@ -1090,6 +1090,28 @@ static struct
   { MagicKernelSharp2021, 4.5, 1.0, 0.0, 0.0, MagicKernelSharpWeightingFunction }, /* MagicKernelSharp2021 */
 };
 
+static void ApplyFilterOverride(const Image *image,const char *artifact,
+  FilterType *filter_type,FilterType *window_type)
+{
+  ssize_t
+    option;
+
+  option=ParseCommandOption(MagickFilterOptions,MagickFalse,artifact);
+  if (IsFilterOption(option) != MagickFalse)
+    { /* Raw filter request - no window function. */
+      *filter_type=(FilterType) option;
+      *window_type=BoxFilter;
+    }
+  /* Filter override with a specific window function. */
+  artifact=GetImageArtifact(image,"filter:window");
+  if (artifact != (const char *) NULL)
+    {
+      option=ParseCommandOption(MagickFilterOptions,MagickFalse,artifact);
+      if (IsFilterOption(option) != MagickFalse)
+        *window_type=(FilterType) option;
+    }
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1167,25 +1189,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   /* Expert filter setting override */
   artifact=GetImageArtifact(image,"filter:filter");
   if (IsStringTrue(artifact) != MagickFalse)
-    {
-      ssize_t
-        option;
-
-      option=ParseCommandOption(MagickFilterOptions,MagickFalse,artifact);
-      if (IsFilterOption(option) != MagickFalse)
-        { /* Raw filter request - no window function. */
-          filter_type=(FilterType) option;
-          window_type=BoxFilter;
-        }
-      /* Filter override with a specific window function. */
-      artifact=GetImageArtifact(image,"filter:window");
-      if (artifact != (const char *) NULL)
-        {
-          option=ParseCommandOption(MagickFilterOptions,MagickFalse,artifact);
-          if (IsFilterOption(option) != MagickFalse)
-            window_type=(FilterType) option;
-        }
-    }
+    ApplyFilterOverride(image,artifact,&filter_type,&window_type);
   else
     {
       /* Window specified, but no filter function?  Assume Sinc/Jinc. */
