@@ -958,6 +958,13 @@ static inline MagickBooleanType IsBetterFrameBounds(
     <  bounds[i].width * bounds[i].height ) ? MagickTrue : MagickFalse);
 }
 
+static size_t GrowExtent(size_t extent,const size_t try_extent)
+{
+  if (extent < try_extent)
+    extent=try_extent;
+  return(extent);
+}
+
 static RectangleInfo ExpandBoundsWidth(RectangleInfo bgnd_bounds,
   RectangleInfo try_bounds)
 {
@@ -965,16 +972,14 @@ static RectangleInfo ExpandBoundsWidth(RectangleInfo bgnd_bounds,
     {
        bgnd_bounds.width=(size_t) ((ssize_t) bgnd_bounds.width+
          bgnd_bounds.x-try_bounds.x);
-       if ( bgnd_bounds.width < try_bounds.width )
-         bgnd_bounds.width = try_bounds.width;
+       bgnd_bounds.width=GrowExtent(bgnd_bounds.width,try_bounds.width);
        bgnd_bounds.x = try_bounds.x;
     }
   else
     {
        try_bounds.width=(size_t) ((ssize_t) try_bounds.width+
          try_bounds.x-bgnd_bounds.x);
-       if ( bgnd_bounds.width < try_bounds.width )
-         bgnd_bounds.width = try_bounds.width;
+       bgnd_bounds.width=GrowExtent(bgnd_bounds.width,try_bounds.width);
     }
   return(bgnd_bounds);
 }
