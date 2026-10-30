@@ -1296,6 +1296,21 @@ MagickExport const char *GetDelegateCommands(const DelegateInfo *delegate_info)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType IsBidirectionalMismatch(
+  const DelegateInfo *delegate_info,const char *decode,const char *encode)
+{
+  if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
+      (LocaleCompare(encode,delegate_info->encode) == 0))
+    return(MagickFalse);
+  if ((LocaleCompare(decode,"*") == 0) &&
+      (LocaleCompare(encode,delegate_info->encode) == 0))
+    return(MagickFalse);
+  if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
+      (LocaleCompare(encode,"*") == 0))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport const DelegateInfo *GetDelegateInfo(const char *decode,
   const char *encode,ExceptionInfo *exception)
 {
@@ -1338,14 +1353,7 @@ MagickExport const DelegateInfo *GetDelegateInfo(const char *decode,
         p=p->next;
         continue;
       }
-    if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
-        (LocaleCompare(encode,delegate_info->encode) == 0))
-      break;
-    if ((LocaleCompare(decode,"*") == 0) &&
-        (LocaleCompare(encode,delegate_info->encode) == 0))
-      break;
-    if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
-        (LocaleCompare(encode,"*") == 0))
+    if (IsBidirectionalMismatch(delegate_info,decode,encode) == MagickFalse)
       break;
     p=p->next;
   }
