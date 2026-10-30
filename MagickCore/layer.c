@@ -304,6 +304,15 @@ static RectangleInfo ClipBoundsBottom(RectangleInfo bounds,
   return(bounds);
 }
 
+static void SetCoalescedDispose(const Image *previous,Image *coalesce_image,
+  RectangleInfo *bounds,ExceptionInfo *exception)
+{
+  if (IsBoundsCleared(previous,coalesce_image,bounds,exception) != MagickFalse)
+    coalesce_image->dispose=BackgroundDispose;
+  else
+    coalesce_image->dispose=NoneDispose;
+}
+
 static MagickBooleanType ReplaceDisposeImage(const Image *next,
   const Image *coalesce_image,Image **dispose_image,ExceptionInfo *exception)
 {
@@ -417,10 +426,7 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     /*
       If a pixel goes opaque to transparent, use background dispose.
     */
-    if (IsBoundsCleared(previous,coalesce_image,&bounds,exception) != MagickFalse)
-      coalesce_image->dispose=BackgroundDispose;
-    else
-      coalesce_image->dispose=NoneDispose;
+    SetCoalescedDispose(previous,coalesce_image,&bounds,exception);
     previous->dispose=coalesce_image->dispose;
   }
   dispose_image=DestroyImage(dispose_image);
