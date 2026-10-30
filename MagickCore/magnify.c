@@ -619,10 +619,6 @@ static void Fish2XBottomRightBlend(const Fish2XLadder *ladder,
 #undef Line
 }
 
-static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
-  const Quantum *pixels,const size_t channels,
-  const MagickFloatType *intensities)
-{
 #define Corner(A,B,C,D) \
   { \
     if (intensities[B] > intensities[A]) \
@@ -641,6 +637,10 @@ static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
       } \
   }
 
+static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
+  const Quantum *pixels,const size_t channels,
+  const MagickFloatType *intensities)
+{
   const ssize_t
     pixels_offsets[4] = { 0, 1, 3, 4 };
 
