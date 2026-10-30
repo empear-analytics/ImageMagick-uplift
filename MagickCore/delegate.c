@@ -1729,6 +1729,19 @@ static MagickBooleanType IsDelegateCacheInstantiated(ExceptionInfo *exception)
 %
 */
 
+static MagickBooleanType AuthorizeDelegateCopy(const char *source,
+  const char *destination,const int destination_file,ExceptionInfo *exception)
+{
+  if (IsPathAuthorized(WritePolicyRights,destination) == MagickFalse)
+    ThrowPolicyException(destination,MagickFalse);
+  if (IsPathAuthorized(ReadPolicyRights,source) == MagickFalse)
+    {
+      (void) close_utf8(destination_file);
+      ThrowPolicyException(source,MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType CopyDelegateFile(const char *source,
   const char *destination,const MagickBooleanType overwrite,
   ExceptionInfo *exception)
@@ -1766,13 +1779,9 @@ static MagickBooleanType CopyDelegateFile(const char *source,
     O_NOFOLLOW,S_MODE);
   if (destination_file == -1)
     return(MagickFalse);
-  if (IsPathAuthorized(WritePolicyRights,destination) == MagickFalse)
-    ThrowPolicyException(destination,MagickFalse);
-  if (IsPathAuthorized(ReadPolicyRights,source) == MagickFalse)
-    {
-      (void) close_utf8(destination_file);
-      ThrowPolicyException(source,MagickFalse);
-    }
+  if (AuthorizeDelegateCopy(source,destination,destination_file,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   source_file=open_utf8(source,O_RDONLY | O_CLOEXEC | O_BINARY,0);
   if (source_file == -1)
     {
