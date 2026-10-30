@@ -733,6 +733,24 @@ static inline MagickBooleanType IsTransformMapMissing(
     (z_map == (TransformPacket *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static void GetIlluminantArtifact(const Image *image,const char **artifact,
+  IlluminantType *illuminant)
+{
+  *artifact=GetImageArtifact(image,"color:illuminant");
+  if (*artifact != (const char *) NULL)
+    {
+      ssize_t
+        illuminant_type;
+
+      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
+        *artifact);
+      if (illuminant_type < 0)
+        *illuminant=UndefinedIlluminant;
+      else
+        *illuminant=(IlluminantType) illuminant_type;
+    }
+}
+
 static MagickBooleanType SyncImageToDirectClass(Image *image,
   ExceptionInfo *exception)
 {
@@ -785,19 +803,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
   assert(colorspace != UndefinedColorspace);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  artifact=GetImageArtifact(image,"color:illuminant");
-  if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        illuminant_type;
-
-      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
-        artifact);
-      if (illuminant_type < 0)
-        illuminant=UndefinedIlluminant;
-      else
-        illuminant=(IlluminantType) illuminant_type;
-    }
+  GetIlluminantArtifact(image,&artifact,&illuminant);
   status=MagickTrue;
   progress=0;
   switch (colorspace)
