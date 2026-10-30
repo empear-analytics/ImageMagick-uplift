@@ -425,6 +425,20 @@ anything but a plain variable, is a differing value. A block whose every path en
 `return(<expr>);` becomes `return(<call>);` in each copy, the helper having the
 callers' return type, as Recipe E step 7 says.
 
+**One value at several positions; conditions.** The single differing value may stand
+at more than one position of the block, when each copy has the same value at every one
+of them (`0.0` at both comparisons of one copy, `-32.0` at both of the other; a negated
+constant is one value): the helper takes it as one parameter of the constant's type
+(`const double` for a `double` constant), written at each of those positions. The copies
+may also be operands of a condition rather than statements: a parenthesised operand of
+`||` or `&&` (a whole operand, not part of a longer chain of the same operator). The
+helper is then a predicate in Recipe P's form, `return((<expr>) ? MagickTrue :
+MagickFalse);` with the expression copied character for character, and each copy becomes
+its call, which `||` and `&&` test for nonzero as they tested the comparison's `0` or
+`1`. Check by script that each copy equals the helper's expression with its arguments
+substituted, as Recipe P's *Several sites* does; the literal guard reports the removed
+copies of the value as deduplication (`WARN`, every value still present).
+
 **Unreached functions.** When no oracle case executes the function, D may still replace
 a block with a call to an existing `static` helper of the same file, under three
 conditions, all checked before the commit:
@@ -3285,3 +3299,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | V | Step 2: a written variable whose address the caller passes elsewhere, outside the block, only to calls that keep no copy of it (checked by reading the callee) still qualifies, as Recipe O step 2 and Recipe I step 8 already allow. *Careful* gives the argument | `fx.c`'s `GetProperty`: the "not a number" branch (`*val = strtold (text, &tailptr);`, then destroy `text`, throw and `return -1;`) writes only `text`, whose address the caller passes to `GetPropertySeconds` in the other branch; that callee reads and replaces `*text` and keeps no pointer. With the bracket scan moved (Recipes LB and K), a probe: GetProperty leaves Bumpy Road Ahead, 3.23 to 3.25 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | V, I | V step 7 (and I step 8 by reference): the exit may be a single `return(<expr>);` whose expression is a call on the caller's variables (`return(DestroyKernelInfo(kernel));`), the same text at every exit, left unchanged in the caller after `if (Helper(...) == MagickFalse)`; the block writes no variable the expression reads. *Careful* gives the argument (the cleanup form's, with the cleanup folded into the return) | `morphology.c`'s `ParseKernelArray` (cc 25, 2 bumps after three Recipe E steps): its `:` geometry parse writes `flags` and leaves through `return(DestroyKernelInfo(kernel));` twice, and the `:`/odd-square selection around it writes `flags` and `p`; neither is `S return(v);` nor `return(c);`. A probe of both: ParseKernelArray leaves Bumpy Road Ahead, 2.70 to 2.71 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 7, `switch` form: a block with no output variable (it writes only through pointers it already uses, or into temporaries step 4 declares) moves to a `void` function; each `break;` of the `switch` becomes `return;`, and the block becomes the call alone, before the case's closing `break;` | `resample.c`'s `ResamplePixelColor`: the whole-image average in the `default` group of the limit-reached `switch` (nesting 4) leaves the `switch` through `break;` when the resize or the pixel fetch fails, after writing `*pixel` and `resample_filter->average_pixel`, and writes no local the caller reads; the form's `v` does not exist. A probe: 5.13 to 5.19, 228 to 197 lines | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | D | *One value at several positions; conditions*: the single differing value may stand at several positions of a copy when each copy has the same value at all of them (the helper takes it once); and the copies may be whole parenthesised operands of a logical or or a logical and, the helper then a predicate in Recipe P's form | `resample.c`'s `IsAreaOutsideCorner` and `IsAreaOutsideDitherCorner` (both cc 9, reported as duplicates): their first corner tests, `( u0 + resample_filter->Ulimit < 0.0 && v0 + resample_filter->Vlimit < 0.0 )` and the same with `-32.0`, differ only in that one value, at two positions. A probe: Complex Method leaves the file, 5.21 to 5.46 | mandate (2026-10-24) |
