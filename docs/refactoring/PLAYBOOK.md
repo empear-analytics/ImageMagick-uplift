@@ -2525,6 +2525,20 @@ the block's depth.
    script to be identical in every copy). The block writes no variable `S` reads or
    writes, and contains no `break` that leaves it; steps 1 to 4 hold as written, with
    `S continue;` in place of `break;`. A bare `continue;` is the form with `S` empty.
+8. A block that writes two to four variables of the caller that the caller reads after
+   it (step 2's `v`, more than one) passes their addresses in one `const` struct,
+   Recipe I's form (steps 3, 5 and 6): a `typedef struct` directly above the new
+   function with one member per written variable, in the order the block first writes
+   them, a pointer to the variable's exact type under its name, holding addresses only;
+   the function takes the input struct (step 4), then `const Targets *targets`, and
+   binds each member once at the top of its body, `T *const v = targets->v;`, each `v`
+   then written `*v` as step 3 says. The caller assigns `targets.v=(&v);` per member
+   directly before the call (Recipe I step 6), or declares the local `const` with the
+   addresses as its initialiser (Recipe Q step 8's `const` form). Each written variable
+   meets Recipe I step 2, except that one whose address the caller passes elsewhere only
+   as an argument of calls that keep no copy of it (`SetMatrixElement`'s `value`, which
+   it copies from and does not store; checked by reading the callee) still qualifies,
+   as in Recipe I step 8. Steps 1, 3, 5 and 6 hold as written.
 
 **Before:**
 
@@ -2608,9 +2622,19 @@ static MagickBooleanType FillFloodplaneRun(const FloodfillRow *row,ssize_t *x)
   of them, so `S` reads the values it read before. When `S` writes `Lp`'s counter
   (`i--;`, so that the increment repeats the same `i`), the counter goes to the helper
   by value and only the caller writes it.
+- Under step 8 the variables stay the caller's own locals, read and written directly
+  everywhere else; only their addresses travel, fixed before the call and dead after
+  it, bound once to `*const` locals, so each `*v` is the object `v` named, in the same
+  order (Recipe I's argument). On the `return(MagickFalse);` path every write the block
+  made before its `break` has landed through its member before the caller's `break`.
+  A call that only copies from or into `&v` while it runs and keeps no copy of the
+  address (`GetMatrixElement` and `SetMatrixElement` `memcpy` into or from `value`, or
+  write it to a file, and return) gives `v` no second name, so no two pointers the
+  helper holds name one object, which is what Recipe O step 2 protects.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new
-function, nothing else moved), and steps 1, 2 and 5 checked by reading.
+function, nothing else moved), and steps 1, 2 and 5 checked by reading (step 8: every
+member and address, and each callee that receives `&v` elsewhere).
 
 **Provenance:** 2026-10-30, from `paint.c`'s `FloodfillPaintImage`, whose last two
 depth-4 sites, the right-hand fill and the skip scan inside the segment loop's
@@ -2619,7 +2643,10 @@ plateau W08 recorded. A probe of both: Brain Method and Deep, Nested Complexity 
 5.10 to 5.77. Added by Claude Code (Claude Opus 5.5) during task W09, under the mandate
 of 2026-10-24. Step 7 (2026-10-30, task W09): `statistic.c`'s `GetImageStatistics`,
 whose depth check (nesting 5, the file's deepest site) raises a channel's depth and
-retries the pixel through `i--; continue;` of the channel loop.
+retries the pixel through `i--; continue;` of the channel loop. Step 8 (2026-10-30,
+task W09): `vision.c`'s `ConnectedComponentsImage`, whose label pass (nesting 4) labels
+each pixel, writing `status`, the object count `n` and the row cursors `p` and `q`, and
+ends the column loop through `break;` when the count reaches `MaxColormapSize`.
 
 ---
 
@@ -3162,3 +3189,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | LB | Step 7: a block whose every exit is the same run `S` followed by `continue;` of `Lp` moves with `S continue;` left in the caller, `if (Helper(...) == MagickFalse) { S continue; }`, as Recipe V step 7 leaves its cleanup; the block writes nothing `S` reads or writes. *Careful* gives the argument, including `S` writing the loop counter | `statistic.c`'s `GetImageStatistics`: the depth check inside the channel loop (nesting 5) ends in `IncreaseChannelDepth(...); i--; continue;`, which E step 7 refuses (its counter goes by value; the block is not the body's tail) and LB step 1 refuses (a `continue`); its temporaries `depth`, `range` and `status` move with it. A probe: nesting 5 to 4, bumps 4 to 3, 4.73 to 4.76 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | K | Step 6: a block in a function with no OpenMP region (a sequential pass, as Recipe Q step 1 admits) moves the same way, writing at most four plain locals of the caller, none whose address is taken elsewhere (Recipe O step 2); the written locals may be cursors the caller reads afterwards. *Careful* gives the argument | `statistic.c`'s `GetMedianPixel` (cc 10, two bumps): its partition loop writes the cursors `l` and `h`, which E step 4 refuses (two written variables), O refuses (a loop, not a selection) and Q refuses (two inputs, so K's form has four parameters). A probe: the function leaves Complex Method and Bumpy Road Ahead, 4.91 to 5.07 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | Step 8: the `Targets` local may be declared `const` with the addresses as its initialiser, `{ &v, ... }` in member order, in the block holding the call or inside the scope of every `v`, instead of the `targets.v=(&v);` assignments before the call (Recipe B step 5's `const` form). *Careful* gives the argument: an address does not change while its variable lives, and the initialiser reads no value | `vision.c`'s four moment-threshold functions: the second-moment column loop (nesting 4 in each, inside the parallel object loop) writes `M11`, `M20`, `M02` and the cursor `p` and reads five inputs, so step 7 gives five parameters; with step 8's four assignments per call `MajorAxisThreshold` and `MinorAxisThreshold` enter Large Method (71 lines) and the other two grow. A probe of all four in the `const` form: every caller shorter, 4.30 to 4.73 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | LB | Step 8: a block writing two to four variables of the caller that the caller reads after it passes their addresses in one `const` struct, Recipe I's form (steps 3, 5, 6), after the input struct; the caller fills it before the call or declares it `const` with the addresses (Recipe Q step 8). A variable whose address the caller passes elsewhere only to calls that keep no copy of it still qualifies (Recipe I step 8). *Careful* gives the argument | `vision.c`'s `ConnectedComponentsImage`: the label pass's per-pixel body (the function's last depth-4 site but one) writes `status`, `n`, `p` and `q` and leaves the column loop through `break;` when `n` reaches `MaxColormapSize`; step 2 allows one variable, Q and I refuse the `break`, and `n`'s address goes to `SetMatrixElement` in the initialisation loop. Moving the column loop whole (Recipe Q step 8) leaves its helper a Bumpy Road (2 bumps). A probe of the body in this form: 4.73 to 4.76; with the census column loop (Recipe Q step 8), 5.07 | mandate (2026-10-24) |
