@@ -942,6 +942,23 @@ static MagickBooleanType AddHNodeColor(const HColorEntry *entry)
   return(MagickTrue);
 }
 
+static ssize_t FindHNodeColor(HNodeInfo *node_info,const PixelInfo pixel)
+{
+  PixelInfo
+    target;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) node_info->number_unique; i++)
+  {
+    target=node_info->list[i];
+    if (IsPixelInfoColorMatch(&pixel,&target) != MagickFalse)
+      break;
+  }
+  return(i);
+}
+
 static MagickBooleanType CheckImageColors(const Image *image,
   const size_t max_colors,ExceptionInfo *exception)
 {
@@ -1023,12 +1040,7 @@ static MagickBooleanType CheckImageColors(const Image *image,
       }
       if (level < MaxTreeDepth)
         break;
-      for (i=0; i < (ssize_t) node_info->number_unique; i++)
-      {
-        target=node_info->list[i];
-        if (IsPixelInfoColorMatch(&pixel,&target) != MagickFalse)
-          break;
-      }
+      i=FindHNodeColor(node_info,pixel);
       if (i < (ssize_t) node_info->number_unique)
         node_info->list[i].count++;
       else
