@@ -707,6 +707,25 @@ static void StatisticImagePixel(const Image *image,
   }
 }
 
+static MagickBooleanType AcquireStatisticImage(const Image *image,
+  Image **statistic_image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  *statistic_image=CloneImage(image,0,0,MagickTrue,
+    exception);
+  if (*statistic_image == (Image *) NULL)
+    return(MagickFalse);
+  status=SetImageStorageClass(*statistic_image,DirectClass,exception);
+  if (status == MagickFalse)
+    {
+      *statistic_image=DestroyImage(*statistic_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
   const size_t width,const size_t height,ExceptionInfo *exception)
 {
@@ -741,16 +760,8 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
-  statistic_image=CloneImage(image,0,0,MagickTrue,
-    exception);
-  if (statistic_image == (Image *) NULL)
+  if (AcquireStatisticImage(image,&statistic_image,exception) == MagickFalse)
     return((Image *) NULL);
-  status=SetImageStorageClass(statistic_image,DirectClass,exception);
-  if (status == MagickFalse)
-    {
-      statistic_image=DestroyImage(statistic_image);
-      return((Image *) NULL);
-    }
   pixel_list=AcquirePixelListTLS(MagickMax(width,1),MagickMax(height,1));
   if (pixel_list == (PixelList **) NULL)
     {
