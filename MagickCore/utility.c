@@ -666,6 +666,24 @@ MagickPrivate void ChopPathComponents(char *path,const size_t components)
 %      path.
 %
 */
+static void ExpandHomeDirectory(const char *path,char *expand_path)
+{
+  char
+    *home;
+
+  (void) CopyMagickString(expand_path,".",MagickPathExtent);
+  (void) ConcatenateMagickString(expand_path,path+1,MagickPathExtent);
+  home=GetEnvironmentValue("HOME");
+  if (home == (char *) NULL)
+    home=GetEnvironmentValue("USERPROFILE");
+  if (home != (char *) NULL)
+    {
+      (void) CopyMagickString(expand_path,home,MagickPathExtent);
+      (void) ConcatenateMagickString(expand_path,path+1,MagickPathExtent);
+      home=DestroyString(home);
+    }
+}
+
 MagickPrivate void ExpandFilename(char *path)
 {
   char
@@ -678,23 +696,10 @@ MagickPrivate void ExpandFilename(char *path)
   (void) CopyMagickString(expand_path,path,MagickPathExtent);
   if ((*(path+1) == *DirectorySeparator) || (*(path+1) == '\0'))
     {
-      char
-        *home;
-
       /*
         Substitute ~ with $HOME.
       */
-      (void) CopyMagickString(expand_path,".",MagickPathExtent);
-      (void) ConcatenateMagickString(expand_path,path+1,MagickPathExtent);
-      home=GetEnvironmentValue("HOME");
-      if (home == (char *) NULL)
-        home=GetEnvironmentValue("USERPROFILE");
-      if (home != (char *) NULL)
-        {
-          (void) CopyMagickString(expand_path,home,MagickPathExtent);
-          (void) ConcatenateMagickString(expand_path,path+1,MagickPathExtent);
-          home=DestroyString(home);
-        }
+      ExpandHomeDirectory(path,expand_path);
     }
   else
     {
