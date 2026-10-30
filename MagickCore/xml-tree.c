@@ -1472,6 +1472,35 @@ static inline MagickBooleanType IsOtherAttributeList(XMLTreeRoot *root,
     (strcmp(n,root->attributes[i][0]) != 0)) ? MagickTrue : MagickFalse);
 }
 
+static void AddDefaultAttributeTag(XMLTreeRoot *root,const ssize_t i,
+  const char *t)
+{
+  if (root->attributes[i] == (char **) NULL)
+    {
+      /*
+        New attribute tag.
+      */
+      if (i == 0)
+        root->attributes=(char ***) AcquireQuantumMemory(2,
+          sizeof(*root->attributes));
+      else
+        root->attributes=(char ***) ResizeQuantumMemory(
+          root->attributes,(size_t) (i+2),
+          sizeof(*root->attributes));
+      if (root->attributes == (char ***) NULL)
+        ThrowFatalException(ResourceLimitFatalError,
+          "MemoryAllocationFailed");
+      root->attributes[i]=(char **) AcquireQuantumMemory(2,
+        sizeof(**root->attributes));
+      if (root->attributes[i] == (char **) NULL)
+        ThrowFatalException(ResourceLimitFatalError,
+          "MemoryAllocationFailed");
+      root->attributes[i][0]=ConstantString(t);
+      root->attributes[i][1]=(char *) NULL;
+      root->attributes[i+1]=(char **) NULL;
+    }
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -1632,30 +1661,7 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
                       predefined_entities);
                     return(MagickFalse);
                   }
-              if (root->attributes[i] == (char **) NULL)
-                {
-                  /*
-                    New attribute tag.
-                  */
-                  if (i == 0)
-                    root->attributes=(char ***) AcquireQuantumMemory(2,
-                      sizeof(*root->attributes));
-                  else
-                    root->attributes=(char ***) ResizeQuantumMemory(
-                      root->attributes,(size_t) (i+2),
-                      sizeof(*root->attributes));
-                  if (root->attributes == (char ***) NULL)
-                    ThrowFatalException(ResourceLimitFatalError,
-                      "MemoryAllocationFailed");
-                  root->attributes[i]=(char **) AcquireQuantumMemory(2,
-                    sizeof(**root->attributes));
-                  if (root->attributes[i] == (char **) NULL)
-                    ThrowFatalException(ResourceLimitFatalError,
-                      "MemoryAllocationFailed");
-                  root->attributes[i][0]=ConstantString(t);
-                  root->attributes[i][1]=(char *) NULL;
-                  root->attributes[i+1]=(char **) NULL;
-                }
+              AddDefaultAttributeTag(root,i,t);
               for (j=1; root->attributes[i][j] != (char *) NULL; j+=3) ;
               root->attributes[i]=(char **) ResizeQuantumMemory(
                 root->attributes[i],(size_t) (j+4),sizeof(**root->attributes));
