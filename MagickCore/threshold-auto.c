@@ -422,56 +422,15 @@ static double TriangleThreshold(const double *histogram)
   return(100.0*threshold/MaxIntensity);
 }
 
-static void NormalizeHistogram(double *histogram)
-{
-  double
-    gamma,
-    sum;
-
-  ssize_t
-    i;
-
-  sum=0.0;
-  for (i=0; i <= (ssize_t) MaxIntensity; i++)
-    sum+=histogram[i];
-  gamma=MagickSafeReciprocal(sum);
-  for (i=0; i <= (ssize_t) MaxIntensity; i++)
-    histogram[i]=gamma*histogram[i];
-}
-
-MagickExport MagickBooleanType AutoThresholdImage(Image *image,
-  const AutoThresholdMethod method,ExceptionInfo *exception)
+static void FormIntensityHistogram(const Image *image,double *histogram,
+  ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
-  char
-    property[MagickPathExtent];
-
-  double
-    *histogram,
-    threshold;
-
-  MagickBooleanType
-    status;
-
   ssize_t
     y;
 
-  /*
-    Form histogram.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  histogram=(double *) AcquireQuantumMemory(MaxIntensity+1UL,
-    sizeof(*histogram));
-  if (histogram == (double *) NULL)
-    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-      image->filename);
-  status=MagickTrue;
-  (void) memset(histogram,0,(MaxIntensity+1UL)*sizeof(*histogram));
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
@@ -492,6 +451,53 @@ MagickExport MagickBooleanType AutoThresholdImage(Image *image,
     }
   }
   image_view=DestroyCacheView(image_view);
+}
+
+static void NormalizeHistogram(double *histogram)
+{
+  double
+    gamma,
+    sum;
+
+  ssize_t
+    i;
+
+  sum=0.0;
+  for (i=0; i <= (ssize_t) MaxIntensity; i++)
+    sum+=histogram[i];
+  gamma=MagickSafeReciprocal(sum);
+  for (i=0; i <= (ssize_t) MaxIntensity; i++)
+    histogram[i]=gamma*histogram[i];
+}
+
+MagickExport MagickBooleanType AutoThresholdImage(Image *image,
+  const AutoThresholdMethod method,ExceptionInfo *exception)
+{
+  char
+    property[MagickPathExtent];
+
+  double
+    *histogram,
+    threshold;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Form histogram.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  histogram=(double *) AcquireQuantumMemory(MaxIntensity+1UL,
+    sizeof(*histogram));
+  if (histogram == (double *) NULL)
+    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
+  status=MagickTrue;
+  (void) memset(histogram,0,(MaxIntensity+1UL)*sizeof(*histogram));
+  FormIntensityHistogram(image,histogram,exception);
   /*
     Normalize histogram.
   */
