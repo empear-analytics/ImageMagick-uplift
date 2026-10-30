@@ -171,6 +171,27 @@ static void RaiseColormapEntryDepth(const Image *image,size_t *current_depth,
   }
 }
 
+static size_t GetColormapDepth(const Image *image,size_t *current_depth,
+  const size_t number_threads)
+{
+  size_t
+    depth;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    RaiseColormapEntryDepth(image,current_depth,id,i);
+  }
+  depth=GetMaximumDepth(current_depth,number_threads);
+  current_depth=(size_t *) RelinquishMagickMemory(current_depth);
+  return(depth);
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -208,16 +229,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
   if ((image->storage_class == PseudoClass) &&
       ((image->alpha_trait & BlendPixelTrait) == 0))
     {
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        RaiseColormapEntryDepth(image,current_depth,id,i);
-      }
-      depth=GetMaximumDepth(current_depth,number_threads);
-      current_depth=(size_t *) RelinquishMagickMemory(current_depth);
-      return(depth);
+      return(GetColormapDepth(image,current_depth,number_threads));
     }
   image_view=AcquireVirtualCacheView(image,exception);
 #if !defined(MAGICKCORE_HDRI_SUPPORT)
