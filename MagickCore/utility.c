@@ -1770,6 +1770,22 @@ MagickExport void GetPathComponent(const char *path,PathType type,
 %    o number_components:  return the number of components in the list
 %
 */
+static MagickBooleanType CheckPathComponent(char **components,
+  const ssize_t i)
+{
+  if (components[i] == (char*)NULL)
+    {
+      ssize_t
+        j;
+
+      for (j=0; j < i; j++)
+        components[j]=DestroyString(components[j]);
+      components=(char **) RelinquishMagickMemory(components);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate char **GetPathComponents(const char *path,
   size_t *number_components)
 {
@@ -1801,16 +1817,8 @@ MagickPrivate char **GetPathComponents(const char *path,
         break;
     components[i]=(char *) AcquireQuantumMemory((size_t) (q-p)+MagickPathExtent,
       sizeof(**components));
-    if (components[i] == (char*)NULL)
-      {
-        ssize_t
-          j;
-
-        for (j=0; j < i; j++)
-          components[j]=DestroyString(components[j]);
-        components=(char **) RelinquishMagickMemory(components);
-        return((char **) NULL);
-      }
+    if (CheckPathComponent(components,i) == MagickFalse)
+      return((char **) NULL);
     (void) CopyMagickString(components[i],p,(size_t) (q-p+1));
     p=q+1;
   }
