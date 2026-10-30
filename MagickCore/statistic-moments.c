@@ -283,6 +283,57 @@ static void RotateEllipseAngle(ChannelMoments *channel_moments,
     }
 }
 
+static void ComputeEllipseMoments(ChannelMoments *channel_moments,
+  const MomentArrays *moments)
+{
+  const double
+    *const M00 = moments->M00,
+    *const M02 = moments->M02,
+    *const M11 = moments->M11,
+    *const M20 = moments->M20;
+
+  const PointInfo
+    *const centroid = moments->centroid;
+
+  ssize_t
+    c;
+
+  for (c=0; c <= MaxPixelChannels; c++)
+  {
+    /*
+      Compute elliptical angle, major and minor axes, eccentricity, & intensity.
+    */
+    channel_moments[c].centroid=centroid[c];
+    channel_moments[c].ellipse_axis.x=sqrt((2.0*MagickSafeReciprocal(M00[c]))*
+      ((M20[c]+M02[c])+sqrt(4.0*M11[c]*M11[c]+(M20[c]-M02[c])*
+       (M20[c]-M02[c]))));
+    channel_moments[c].ellipse_axis.y=sqrt((2.0*MagickSafeReciprocal(M00[c]))*
+      ((M20[c]+M02[c])-sqrt(4.0*M11[c]*M11[c]+(M20[c]-M02[c])*
+       (M20[c]-M02[c]))));
+    channel_moments[c].ellipse_angle=RadiansToDegrees(1.0/2.0*atan(2.0*
+      M11[c]*MagickSafeReciprocal(M20[c]-M02[c])));
+    if (fabs(M11[c]) < 0.0)
+      {
+        if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+          channel_moments[c].ellipse_angle+=90.0;
+      }
+    else
+      if (M11[c] < 0.0)
+        RotateEllipseAngle(channel_moments,c,M20,M02);
+      else
+        if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
+          channel_moments[c].ellipse_angle+=90.0;
+    channel_moments[c].ellipse_eccentricity=sqrt(1.0-(
+      channel_moments[c].ellipse_axis.y*
+      channel_moments[c].ellipse_axis.y*MagickSafeReciprocal(
+      channel_moments[c].ellipse_axis.x*
+      channel_moments[c].ellipse_axis.x)));
+    channel_moments[c].ellipse_intensity=M00[c]*
+      MagickSafeReciprocal(MagickPI*channel_moments[c].ellipse_axis.x*
+      channel_moments[c].ellipse_axis.y+MagickEpsilon);
+  }
+}
+
 MagickExport ChannelMoments *GetImageMoments(const Image *image,
   ExceptionInfo *exception)
 {
@@ -404,40 +455,7 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
   M21[CompositePixelChannel]/=channels;
   M22[CompositePixelChannel]/=channels;
   M30[CompositePixelChannel]/=channels;
-  for (c=0; c <= MaxPixelChannels; c++)
-  {
-    /*
-      Compute elliptical angle, major and minor axes, eccentricity, & intensity.
-    */
-    channel_moments[c].centroid=centroid[c];
-    channel_moments[c].ellipse_axis.x=sqrt((2.0*MagickSafeReciprocal(M00[c]))*
-      ((M20[c]+M02[c])+sqrt(4.0*M11[c]*M11[c]+(M20[c]-M02[c])*
-       (M20[c]-M02[c]))));
-    channel_moments[c].ellipse_axis.y=sqrt((2.0*MagickSafeReciprocal(M00[c]))*
-      ((M20[c]+M02[c])-sqrt(4.0*M11[c]*M11[c]+(M20[c]-M02[c])*
-       (M20[c]-M02[c]))));
-    channel_moments[c].ellipse_angle=RadiansToDegrees(1.0/2.0*atan(2.0*
-      M11[c]*MagickSafeReciprocal(M20[c]-M02[c])));
-    if (fabs(M11[c]) < 0.0)
-      {
-        if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
-          channel_moments[c].ellipse_angle+=90.0;
-      }
-    else
-      if (M11[c] < 0.0)
-        RotateEllipseAngle(channel_moments,c,M20,M02);
-      else
-        if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
-          channel_moments[c].ellipse_angle+=90.0;
-    channel_moments[c].ellipse_eccentricity=sqrt(1.0-(
-      channel_moments[c].ellipse_axis.y*
-      channel_moments[c].ellipse_axis.y*MagickSafeReciprocal(
-      channel_moments[c].ellipse_axis.x*
-      channel_moments[c].ellipse_axis.x)));
-    channel_moments[c].ellipse_intensity=M00[c]*
-      MagickSafeReciprocal(MagickPI*channel_moments[c].ellipse_axis.x*
-      channel_moments[c].ellipse_axis.y+MagickEpsilon);
-  }
+  ComputeEllipseMoments(channel_moments,&moments);
   for (c=0; c <= MaxPixelChannels; c++)
   {
     /*
