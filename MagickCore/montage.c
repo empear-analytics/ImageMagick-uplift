@@ -684,6 +684,17 @@ static void UpdateMontageBoundsHeight(const ssize_t y_offset,
     (*bounds).height=(size_t) y_offset;
 }
 
+static size_t GetMontageTileWidth(const MagickBooleanType concatenate,
+  Image **image_list,const ssize_t tile,const RectangleInfo extract_info)
+{
+  size_t
+    width;
+
+  width=concatenate != MagickFalse ? image_list[tile]->columns :
+    extract_info.width;
+  return(width);
+}
+
 static size_t GetTallestTileHeight(Image **image_list,const ssize_t tile,
   size_t max_height)
 {
@@ -920,8 +931,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     {
       if (tile < (ssize_t) number_images)
         {
-          width=concatenate != MagickFalse ? image_list[tile]->columns :
-            extract_info.width;
+          width=GetMontageTileWidth(concatenate,image_list,tile,extract_info);
           max_height=GetTallestTileHeight(image_list,tile,max_height);
         }
       x_offset+=((ssize_t) width+2*(extract_info.x+(ssize_t) border_width));
