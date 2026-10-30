@@ -682,6 +682,56 @@ static void RestartScaleRow(const Image *image,Image *scale_image,
     }
 }
 
+typedef struct _ScaleTransfer
+{
+  const Image
+    *image;
+
+  Image
+    *scale_image;
+
+  double
+    alpha,
+    *scale_scanline,
+    *scanline;
+} ScaleTransfer;
+
+static void TransferScaleScanline(const ScaleTransfer *transfer,
+  Quantum *magick_restrict q)
+{
+  const Image
+    *const image = transfer->image;
+
+  Image
+    *const scale_image = transfer->scale_image;
+
+  const double
+    alpha = transfer->alpha;
+
+  double
+    *const scale_scanline = transfer->scale_scanline,
+    *const scanline = transfer->scanline;
+
+  if (scale_image->columns == image->columns)
+    {
+      /*
+        Transfer scanline to scaled image.
+      */
+      ExportScaleScanline(image,scale_image,scanline,alpha,q);
+    }
+  else
+    {
+      /*
+        Scale X direction.
+      */
+      ScaleScanlineX(image,scale_image,scanline,scale_scanline);
+    /*
+      Transfer scanline to scaled image.
+    */
+    ExportScaleScanline(image,scale_image,scale_scanline,alpha,q);
+  }
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -784,6 +834,9 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
     Quantum
       *magick_restrict q;
 
+    ScaleTransfer
+      transfer;
+
     if (status == MagickFalse)
       break;
     q=QueueCacheViewAuthenticPixels(scale_view,0,y,scale_image->columns,1,
@@ -845,24 +898,12 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
         RestartScaleRow(image,scale_image,&scale,&next_row);
         span.y=1.0;
       }
-    if (scale_image->columns == image->columns)
-      {
-        /*
-          Transfer scanline to scaled image.
-        */
-        ExportScaleScanline(image,scale_image,scanline,alpha,q);
-      }
-    else
-      {
-        /*
-          Scale X direction.
-        */
-        ScaleScanlineX(image,scale_image,scanline,scale_scanline);
-      /*
-        Transfer scanline to scaled image.
-      */
-      ExportScaleScanline(image,scale_image,scale_scanline,alpha,q);
-    }
+    transfer.image=image;
+    transfer.scale_image=scale_image;
+    transfer.alpha=alpha;
+    transfer.scale_scanline=scale_scanline;
+    transfer.scanline=scanline;
+    TransferScaleScanline(&transfer,q);
     if (SyncCacheViewAuthenticPixels(scale_view,exception) == MagickFalse)
       {
         status=MagickFalse;
