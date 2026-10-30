@@ -1378,6 +1378,18 @@ static XMLTreeInfo *ParseCloseTag(XMLTreeRoot *root,char *tag,
   return((XMLTreeInfo *) NULL);
 }
 
+static ssize_t SkipMatchingEntities(char **entities,const char *xml)
+{
+  ssize_t
+    i;
+
+  i=0;
+  while ((entities[i] != (char *) NULL) &&
+         (strncmp(entities[i],xml+1,strlen(entities[i])) == 0))
+    i+=2;
+  return(i);
+}
+
 static MagickBooleanType ValidateEntities(char *tag,char *xml,
   const int delimiter,const size_t depth,char **entities)
 {
@@ -1397,10 +1409,7 @@ static MagickBooleanType ValidateEntities(char *tag,char *xml,
       return(MagickTrue);
     if (strncmp(xml+1,tag,strlen(tag)) == 0)
       return(MagickFalse);
-    i=0;
-    while ((entities[i] != (char *) NULL) &&
-           (strncmp(entities[i],xml+1,strlen(entities[i])) == 0))
-      i+=2;
+    i=SkipMatchingEntities(entities,xml);
     if ((entities[i] != (char *) NULL) &&
         (ValidateEntities(tag,entities[i+1],delimiter,depth+1,entities) == MagickFalse))
       return(MagickFalse);
