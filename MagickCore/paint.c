@@ -588,6 +588,40 @@ static inline MagickBooleanType IsGradientDefaultDirection(const Image *image)
     (const char *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static void SetGradientSouthDirection(GradientInfo *gradient,
+  const Image *image,const GravityType direction)
+{
+  switch (direction)
+  {
+    case SouthWestGravity:
+    {
+      gradient->gradient_vector.x1=(double) image->columns-1;
+      gradient->gradient_vector.y1=0.0;
+      gradient->gradient_vector.x2=0.0;
+      gradient->gradient_vector.y2=(double) image->rows-1;
+      break;
+    }
+    case SouthGravity:
+    {
+      gradient->gradient_vector.x1=0.0;
+      gradient->gradient_vector.y1=0.0;
+      gradient->gradient_vector.x2=0.0;
+      gradient->gradient_vector.y2=(double) image->rows-1;
+      break;
+    }
+    case SouthEastGravity:
+    {
+      gradient->gradient_vector.x1=0.0;
+      gradient->gradient_vector.y1=0.0;
+      gradient->gradient_vector.x2=(double) image->columns-1;
+      gradient->gradient_vector.y2=(double) image->rows-1;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static void SetGradientDirection(GradientInfo *gradient,const Image *image,
   const char *artifact)
 {
@@ -638,32 +672,11 @@ static void SetGradientDirection(GradientInfo *gradient,const Image *image,
       gradient->gradient_vector.y2=0.0;
       break;
     }
-    case SouthWestGravity:
-    {
-      gradient->gradient_vector.x1=(double) image->columns-1;
-      gradient->gradient_vector.y1=0.0;
-      gradient->gradient_vector.x2=0.0;
-      gradient->gradient_vector.y2=(double) image->rows-1;
-      break;
-    }
-    case SouthGravity:
-    {
-      gradient->gradient_vector.x1=0.0;
-      gradient->gradient_vector.y1=0.0;
-      gradient->gradient_vector.x2=0.0;
-      gradient->gradient_vector.y2=(double) image->rows-1;
-      break;
-    }
-    case SouthEastGravity:
-    {
-      gradient->gradient_vector.x1=0.0;
-      gradient->gradient_vector.y1=0.0;
-      gradient->gradient_vector.x2=(double) image->columns-1;
-      gradient->gradient_vector.y2=(double) image->rows-1;
-      break;
-    }
     default:
+    {
+      SetGradientSouthDirection(gradient,image,direction);
       break;
+    }
   }
 }
 
