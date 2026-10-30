@@ -2472,6 +2472,13 @@ static Image *KeepReducedThumbnail(Image *clone_image,Image *thumbnail_image)
   return(clone_image);
 }
 
+static inline MagickBooleanType IsReducibleBy(const ssize_t x_factor,
+  const ssize_t y_factor,const ssize_t factor)
+{
+  return(((x_factor > factor) && (y_factor > factor)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -2501,12 +2508,12 @@ MagickExport Image *ThumbnailImage(const Image *image,const size_t columns,
       x_factor=(ssize_t) (image->columns*MagickSafeReciprocal((double) 
         columns));
       y_factor=(ssize_t) (image->rows*MagickSafeReciprocal((double) rows));
-      if ((x_factor > 4) && (y_factor > 4))
+      if (IsReducibleBy(x_factor,y_factor,4) != MagickFalse)
         {
           thumbnail_image=SampleImage(clone_image,4*columns,4*rows,exception);
           clone_image=KeepReducedThumbnail(clone_image,thumbnail_image);
         }
-      if ((x_factor > 2) && (y_factor > 2))
+      if (IsReducibleBy(x_factor,y_factor,2) != MagickFalse)
         {
           thumbnail_image=ResizeImage(clone_image,2*columns,2*rows,BoxFilter,
             exception);
