@@ -2378,6 +2378,41 @@ static void SetDelegateThreadSupport(DelegateInfo *delegate_info,
   }
 }
 
+static void SetDelegateFormatAttribute(DelegateInfo *delegate_info,
+  const char *keyword,const char *token)
+{
+  switch (*keyword)
+  {
+    case 'D':
+    case 'd':
+    {
+      if (LocaleCompare((char *) keyword,"decode") == 0)
+        {
+          delegate_info->decode=ConstantString(token);
+          delegate_info->mode=1;
+          break;
+        }
+      break;
+    }
+    case 'E':
+    case 'e':
+    {
+      if (LocaleCompare((char *) keyword,"encode") == 0)
+        {
+          delegate_info->encode=ConstantString(token);
+          delegate_info->mode=(-1);
+          break;
+        }
+      break;
+    }
+    default:
+    {
+      SetDelegateThreadSupport(delegate_info,keyword,token);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2564,28 +2599,6 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
           }
         break;
       }
-      case 'D':
-      case 'd':
-      {
-        if (LocaleCompare((char *) keyword,"decode") == 0)
-          {
-            delegate_info->decode=ConstantString(token);
-            delegate_info->mode=1;
-            break;
-          }
-        break;
-      }
-      case 'E':
-      case 'e':
-      {
-        if (LocaleCompare((char *) keyword,"encode") == 0)
-          {
-            delegate_info->encode=ConstantString(token);
-            delegate_info->mode=(-1);
-            break;
-          }
-        break;
-      }
       case 'M':
       case 'm':
       {
@@ -2618,7 +2631,7 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
       }
       default:
       {
-        SetDelegateThreadSupport(delegate_info,keyword,token);
+        SetDelegateFormatAttribute(delegate_info,keyword,token);
         break;
       }
     }
