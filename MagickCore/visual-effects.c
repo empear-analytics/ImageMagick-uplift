@@ -2810,6 +2810,97 @@ static void SetSteganoBit(const SteganoBit *stegano_bit,const PixelInfo pixel,
   }
 }
 
+typedef struct _SteganoRow
+{
+  const Image
+    *watermark;
+
+  CacheView
+    *watermark_view;
+
+  Image
+    *stegano_image;
+
+  CacheView
+    *stegano_view;
+
+  size_t
+    depth,
+    one;
+
+  ssize_t
+    i,
+    y;
+
+  ExceptionInfo
+    *exception;
+} SteganoRow;
+
+static void HideSteganoRow(const SteganoRow *stegano_row,int *c,ssize_t *k,
+  ssize_t *j)
+{
+  const Image
+    *const watermark = stegano_row->watermark;
+
+  CacheView
+    *const watermark_view = stegano_row->watermark_view;
+
+  Image
+    *const stegano_image = stegano_row->stegano_image;
+
+  CacheView
+    *const stegano_view = stegano_row->stegano_view;
+
+  const size_t
+    depth = stegano_row->depth,
+    one = stegano_row->one;
+
+  const ssize_t
+    i = stegano_row->i,
+    y = stegano_row->y;
+
+  ExceptionInfo
+    *const exception = stegano_row->exception;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    *q;
+
+  ssize_t
+    x;
+
+  for (x=0; (x < (ssize_t) watermark->columns) && ((*j) < (ssize_t) depth); x++)
+  {
+    ssize_t
+      offset;
+
+    SteganoBit
+      stegano_bit;
+
+    (void) GetOneCacheViewVirtualPixelInfo(watermark_view,x,y,&pixel,
+      exception);
+    offset=(*k)/(ssize_t) stegano_image->columns;
+    if (offset >= (ssize_t) stegano_image->rows)
+      break;
+    q=GetCacheViewAuthenticPixels(stegano_view,(*k) % (ssize_t)
+      stegano_image->columns,(*k)/(ssize_t) stegano_image->columns,1,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      break;
+    stegano_bit.stegano_image=stegano_image;
+    stegano_bit.c=(*c);
+    stegano_bit.one=one;
+    stegano_bit.i=i;
+    stegano_bit.j=(*j);
+    SetSteganoBit(&stegano_bit,pixel,q);
+    if (SyncCacheViewAuthenticPixels(stegano_view,exception) == MagickFalse)
+      break;
+    AdvanceSteganoCursor(stegano_image,c,k,j);
+  }
+}
+
 MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   ExceptionInfo *exception)
 {
@@ -2825,15 +2916,6 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
 
   MagickBooleanType
     status;
-
-  PixelInfo
-    pixel;
-
-  Quantum
-    *q;
-
-  ssize_t
-    x;
 
   size_t
     depth,
@@ -2881,34 +2963,19 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   {
     for (y=0; (y < (ssize_t) watermark->rows) && (j < (ssize_t) depth); y++)
     {
-      for (x=0; (x < (ssize_t) watermark->columns) && (j < (ssize_t) depth); x++)
-      {
-        ssize_t
-          offset;
+      SteganoRow
+        stegano_row;
 
-        SteganoBit
-          stegano_bit;
-
-        (void) GetOneCacheViewVirtualPixelInfo(watermark_view,x,y,&pixel,
-          exception);
-        offset=k/(ssize_t) stegano_image->columns;
-        if (offset >= (ssize_t) stegano_image->rows)
-          break;
-        q=GetCacheViewAuthenticPixels(stegano_view,k % (ssize_t)
-          stegano_image->columns,k/(ssize_t) stegano_image->columns,1,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          break;
-        stegano_bit.stegano_image=stegano_image;
-        stegano_bit.c=c;
-        stegano_bit.one=one;
-        stegano_bit.i=i;
-        stegano_bit.j=j;
-        SetSteganoBit(&stegano_bit,pixel,q);
-        if (SyncCacheViewAuthenticPixels(stegano_view,exception) == MagickFalse)
-          break;
-        AdvanceSteganoCursor(stegano_image,&c,&k,&j);
-      }
+      stegano_row.watermark=watermark;
+      stegano_row.watermark_view=watermark_view;
+      stegano_row.stegano_image=stegano_image;
+      stegano_row.stegano_view=stegano_view;
+      stegano_row.depth=depth;
+      stegano_row.one=one;
+      stegano_row.i=i;
+      stegano_row.y=y;
+      stegano_row.exception=exception;
+      HideSteganoRow(&stegano_row,&c,&k,&j);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
