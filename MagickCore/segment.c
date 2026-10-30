@@ -1371,10 +1371,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     /*
       Delete cluster.
     */
-    if (cluster == head)
-      head=next_cluster;
-    else
-      last_cluster->next=next_cluster;
+    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
     cluster=(Cluster *) RelinquishMagickMemory(cluster);
   }
   object=head;
