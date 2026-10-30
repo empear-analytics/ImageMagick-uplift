@@ -671,6 +671,87 @@ static IlluminantType GetThresholdIlluminant(const char *artifact,
   return(illuminant);
 }
 
+typedef struct _ColorThresholdRange
+{
+  Image
+    *image;
+
+  const PixelInfo
+    *start_color,
+    *stop_color;
+
+  IlluminantType
+    illuminant;
+} ColorThresholdRange;
+
+static void ConvertColorThresholdRange(const ColorThresholdRange *range,
+  PixelInfo *start,PixelInfo *stop)
+{
+  switch (range->image->colorspace)
+  {
+    case HCLColorspace:
+    {
+      ConvertRGBToHCL(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHCL(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case HSBColorspace:
+    {
+      ConvertRGBToHSB(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHSB(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case HSLColorspace:
+    {
+      ConvertRGBToHSL(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHSL(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case HSVColorspace:
+    {
+      ConvertRGBToHSV(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHSV(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case HWBColorspace:
+    {
+      ConvertRGBToHWB(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHWB(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case LabColorspace:
+    {
+      ConvertRGBToLab(range->start_color->red,range->start_color->green,
+        range->start_color->blue,range->illuminant,&(*start).red,
+        &(*start).green,&(*start).blue);
+      ConvertRGBToLab(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,range->illuminant,&(*stop).red,
+        &(*stop).green,&(*stop).blue);
+      break;
+    }
+    default:
+    {
+      (*start).red*=QuantumScale;
+      (*start).green*=QuantumScale;
+      (*start).blue*=QuantumScale;
+      (*stop).red*=QuantumScale;
+      (*stop).green*=QuantumScale;
+      (*stop).blue*=QuantumScale;
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   const PixelInfo *start_color,const PixelInfo *stop_color,
   ExceptionInfo *exception)
@@ -679,6 +760,9 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
 
   CacheView
     *image_view;
+
+  ColorThresholdRange
+    range;
 
   const char
     *artifact;
@@ -713,67 +797,11 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   illuminant=GetThresholdIlluminant(artifact,illuminant);
   start=(*start_color);
   stop=(*stop_color);
-  switch (image->colorspace)
-  {
-    case HCLColorspace:
-    {
-      ConvertRGBToHCL(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHCL(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case HSBColorspace:
-    {
-      ConvertRGBToHSB(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHSB(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case HSLColorspace:
-    {
-      ConvertRGBToHSL(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHSL(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case HSVColorspace:
-    {
-      ConvertRGBToHSV(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHSV(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case HWBColorspace:
-    {
-      ConvertRGBToHWB(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHWB(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case LabColorspace:
-    {
-      ConvertRGBToLab(start_color->red,start_color->green,start_color->blue,
-        illuminant,&start.red,&start.green,&start.blue);
-      ConvertRGBToLab(stop_color->red,stop_color->green,stop_color->blue,
-        illuminant,&stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    default:
-    {
-      start.red*=QuantumScale;
-      start.green*=QuantumScale;
-      start.blue*=QuantumScale;
-      stop.red*=QuantumScale;
-      stop.green*=QuantumScale;
-      stop.blue*=QuantumScale;
-      break;
-    }
-  }
+  range.image=image;
+  range.start_color=start_color;
+  range.stop_color=stop_color;
+  range.illuminant=illuminant;
+  ConvertColorThresholdRange(&range,&start,&stop);
   start.red*=(double) QuantumRange;
   start.green*=(double) QuantumRange;
   start.blue*=(double) QuantumRange;
