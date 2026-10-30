@@ -122,6 +122,34 @@
 %
 */
 
+static size_t SumRadonColumnDeltas(MatrixInfo *p,const ssize_t x)
+{
+  size_t
+    sum;
+
+  ssize_t
+    y;
+
+  sum=0;
+  for (y=0; y < (ssize_t) (GetMatrixRows(p)-1); y++)
+  {
+    ssize_t
+      delta;
+
+    unsigned short
+      element,
+      neighbor;
+
+    if (GetMatrixElement(p,x,y,&element) == MagickFalse)
+      continue;
+    if (GetMatrixElement(p,x,y+1,&neighbor) == MagickFalse)
+      continue;
+    delta=(ssize_t) element-(ssize_t) neighbor;
+    sum+=(size_t) (delta*delta);
+  }
+  return(sum);
+}
+
 static void RadonProjection(MatrixInfo *source_matrices,
   MatrixInfo *destination_matrices,const ssize_t sign,size_t *projection)
 {
@@ -203,26 +231,7 @@ static void RadonProjection(MatrixInfo *source_matrices,
     size_t
       sum;
 
-    ssize_t
-      y;
-
-    sum=0;
-    for (y=0; y < (ssize_t) (GetMatrixRows(p)-1); y++)
-    {
-      ssize_t
-        delta;
-
-      unsigned short
-        element,
-        neighbor;
-
-      if (GetMatrixElement(p,x,y,&element) == MagickFalse)
-        continue;
-      if (GetMatrixElement(p,x,y+1,&neighbor) == MagickFalse)
-        continue;
-      delta=(ssize_t) element-(ssize_t) neighbor;
-      sum+=(size_t) (delta*delta);
-    }
+    sum=SumRadonColumnDeltas(p,x);
     projection[(ssize_t) GetMatrixColumns(p)+sign*x-1]=sum;
   }
 }
@@ -234,6 +243,26 @@ static inline MagickBooleanType IsPixelBelowThreshold(const Image *image,
     ((MagickRealType) GetPixelGreen(image,p) < threshold) ||
     ((MagickRealType) GetPixelBlue(image,p) < threshold)) ?
     MagickTrue : MagickFalse);
+}
+
+static void FillBitCountTable(unsigned short *bits)
+{
+  size_t
+    count;
+
+  ssize_t
+    j;
+
+  unsigned char
+    c;
+
+  for (j=0; j < 256; j++)
+  {
+    c=(unsigned char) j;
+    for (count=0; c != 0; c>>=1)
+      count+=c & 0x01;
+    bits[j]=(unsigned short) count;
+  }
 }
 
 static MagickBooleanType RadonTransform(const Image *image,
@@ -250,15 +279,10 @@ static MagickBooleanType RadonTransform(const Image *image,
     status;
 
   size_t
-    count,
     width;
 
   ssize_t
-    j,
     y;
-
-  unsigned char
-    c;
 
   unsigned short
     bits[256];
@@ -283,13 +307,7 @@ static MagickBooleanType RadonTransform(const Image *image,
       source_matrices=DestroyMatrixInfo(source_matrices);
       return(MagickFalse);
     }
-  for (j=0; j < 256; j++)
-  {
-    c=(unsigned char) j;
-    for (count=0; c != 0; c>>=1)
-      count+=c & 0x01;
-    bits[j]=(unsigned short) count;
-  }
+  FillBitCountTable(bits);
   status=MagickTrue;
   image_view=AcquireVirtualCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -407,6 +425,20 @@ static MagickBooleanType RadonTransform(const Image *image,
   return(MagickTrue);
 }
 
+static void SetAverageBackgroundColor(Image *image,const PixelInfo background,
+  const double count)
+{
+  image->background_color.red=(double) ClampToQuantum((double) QuantumRange*
+    (double) background.red/count);
+  image->background_color.green=(double) ClampToQuantum((double) QuantumRange*
+    (double) background.green/count);
+  image->background_color.blue=(double) ClampToQuantum((double) QuantumRange*
+    (double) background.blue/count);
+  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+    image->background_color.alpha=(double) ClampToQuantum((double) QuantumRange*
+      (double) background.alpha/count);
+}
+
 static void GetImageBackgroundColor(Image *image,const ssize_t offset,
   ExceptionInfo *exception)
 {
@@ -457,15 +489,7 @@ static void GetImageBackgroundColor(Image *image,const ssize_t offset,
     }
   }
   image_view=DestroyCacheView(image_view);
-  image->background_color.red=(double) ClampToQuantum((double) QuantumRange*
-    (double) background.red/count);
-  image->background_color.green=(double) ClampToQuantum((double) QuantumRange*
-    (double) background.green/count);
-  image->background_color.blue=(double) ClampToQuantum((double) QuantumRange*
-    (double) background.blue/count);
-  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-    image->background_color.alpha=(double) ClampToQuantum((double) QuantumRange*
-      (double) background.alpha/count);
+  SetAverageBackgroundColor(image,background,count);
 }
 
 static ssize_t FindDeskewSkew(const size_t *projection,const size_t width)
@@ -490,6 +514,38 @@ static ssize_t FindDeskewSkew(const size_t *projection,const size_t width)
   return(skew);
 }
 
+static Image *AutoCropDeskewImage(const Image *image,Image *clone_image,
+  AffineMatrix affine_matrix,ExceptionInfo *exception)
+{
+  Image
+    *crop_image,
+    *deskew_image,
+    *median_image;
+
+  RectangleInfo
+    geometry;
+
+  deskew_image=AffineTransformImage(clone_image,&affine_matrix,exception);
+  clone_image=DestroyImage(clone_image);
+  if (deskew_image == (Image *) NULL)
+    return((Image *) NULL);
+  median_image=StatisticImage(deskew_image,MedianStatistic,3,3,exception);
+  if (median_image == (Image *) NULL)
+    {
+      deskew_image=DestroyImage(deskew_image);
+      return((Image *) NULL);
+    }
+  geometry=GetImageBoundingBox(median_image,exception);
+  median_image=DestroyImage(median_image);
+  if (image->debug != MagickFalse)
+    (void) LogMagickEvent(TransformEvent,GetMagickModule(),"  Deskew geometry: "
+      "%.17gx%.17g%+.20g%+.20g",(double) geometry.width,(double)
+      geometry.height,(double) geometry.x,(double) geometry.y);
+  crop_image=CropImage(deskew_image,&geometry,exception);
+  deskew_image=DestroyImage(deskew_image);
+  return(crop_image);
+}
+
 MagickExport Image *DeskewImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -504,15 +560,10 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
 
   Image
     *clone_image,
-    *crop_image,
-    *deskew_image,
-    *median_image;
+    *deskew_image;
 
   MagickBooleanType
     status;
-
-  RectangleInfo
-    geometry;
 
   size_t
     *projection,
@@ -574,23 +625,5 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
   */
   GetImageBackgroundColor(clone_image,(ssize_t) StringToLong(artifact),
     exception);
-  deskew_image=AffineTransformImage(clone_image,&affine_matrix,exception);
-  clone_image=DestroyImage(clone_image);
-  if (deskew_image == (Image *) NULL)
-    return((Image *) NULL);
-  median_image=StatisticImage(deskew_image,MedianStatistic,3,3,exception);
-  if (median_image == (Image *) NULL)
-    {
-      deskew_image=DestroyImage(deskew_image);
-      return((Image *) NULL);
-    }
-  geometry=GetImageBoundingBox(median_image,exception);
-  median_image=DestroyImage(median_image);
-  if (image->debug != MagickFalse)
-    (void) LogMagickEvent(TransformEvent,GetMagickModule(),"  Deskew geometry: "
-      "%.17gx%.17g%+.20g%+.20g",(double) geometry.width,(double)
-      geometry.height,(double) geometry.x,(double) geometry.y);
-  crop_image=CropImage(deskew_image,&geometry,exception);
-  deskew_image=DestroyImage(deskew_image);
-  return(crop_image);
+  return(AutoCropDeskewImage(image,clone_image,affine_matrix,exception));
 }
