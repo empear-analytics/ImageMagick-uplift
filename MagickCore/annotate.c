@@ -1407,6 +1407,12 @@ cleanup:
 }
 #endif
 
+static inline MagickBooleanType IsKernedGrapheme(const ssize_t index,
+  const ssize_t last_glyph)
+{
+  return(((index != 0) && (last_glyph != 0)) ? MagickTrue : MagickFalse);
+}
+
 static size_t ComplexTextLayout(const DrawInfo *draw_info,const char *text,
   const size_t length,const FT_Face face,const FT_Int32 flags,
   GraphemeInfo **grapheme)
@@ -1434,7 +1440,7 @@ static size_t ComplexTextLayout(const DrawInfo *draw_info,const char *text,
       GetUTFCode(p));
     (*grapheme)[i].x_offset=0;
     (*grapheme)[i].y_offset=0;
-    if (((*grapheme)[i].index != 0) && (last_glyph != 0))
+    if (IsKernedGrapheme((*grapheme)[i].index,last_glyph) != MagickFalse)
       {
         if (FT_HAS_KERNING(face))
           {
