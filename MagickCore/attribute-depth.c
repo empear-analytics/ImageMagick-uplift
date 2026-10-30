@@ -798,6 +798,13 @@ static MagickBooleanType SetImageRowDepth(const DepthRow *row)
   return(status);
 }
 
+static inline MagickBooleanType IsFloydSteinbergDither(const char *artifact)
+{
+  return(((artifact != (const char *) NULL) &&
+    (LocaleCompare(artifact,"FloydSteinberg") == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType SetImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -826,8 +833,7 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
       return(MagickTrue);
     }
   artifact=GetImageArtifact(image,"dither");
-  if ((artifact != (const char *) NULL) &&
-      (LocaleCompare(artifact,"FloydSteinberg") == 0))
+  if (IsFloydSteinbergDither(artifact) != MagickFalse)
     return(FloydSteinbergImageDepth(image,depth,exception));
   range=GetQuantumRange(depth);
   if (image->storage_class == PseudoClass)
