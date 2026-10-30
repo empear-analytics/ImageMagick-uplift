@@ -703,8 +703,9 @@ inside an OpenMP region; Recipe G, which removes one level of nesting, not the b
    The loop's status may have another name or type: a variable `v` declared outside the
    loop body, that every statement of the parallel loop writes only as `v=c;` of one
    constant `c` (`opaque=MagickFalse;`, `type=UndefinedType;`), and that the loop body
-   reads only in its leading `if (v == c) continue;`, is the loop's status. The new
-   function is step 5's, `status=MagickFalse;` standing where the block wrote `v=c;`,
+   reads only in its leading `if (v == c) continue;`, or in a leading
+   `if ((status == MagickFalse) || (v == c)) continue;` that tests the loop's `status`
+   too, is the loop's status. The new function is step 5's, `status=MagickFalse;` standing where the block wrote `v=c;`,
    and the caller writes `if (Helper(...) == MagickFalse) v=c;` (step 7).
 3. Every variable of the loop body that the block writes is declared inside the block,
    or is not read after it (a row pointer `q` advanced along the row, say).
@@ -792,7 +793,11 @@ static MagickBooleanType MagnifyImageRow(...,Quantum *q,
   `MagickFalse`" are the same event, and the caller writes the same `c` then, deferred
   to the end of the block as everywhere in this recipe. The block does not read `v`,
   and the only read inside the loop is the guard at the top of the next iteration, as
-  with `status`. A variable the loop also writes another value (`IdentifyImageGray`'s
+  with `status`. A guard that tests `status` and `v` together is still that one read:
+  it skips the iteration on either value, before any statement of the body, and the
+  block reads neither, so deferring the block's write of `v` to the end of the block
+  changes what that guard sees no more than deferring a write of `status` does. A
+  variable the loop also writes another value (`IdentifyImageGray`'s
   `type=GrayscaleType;`) or reads elsewhere in the body is not a status: skip it.
 - Under step 4's exception a `continue;` of the parallel loop ends the iteration
   where it stands; `return(status);` ends the helper there, and the caller's
@@ -816,7 +821,10 @@ task W09): `paint.c`'s `FloodfillPaintImage`, whose tiling loop ends in a fetch 
 sets `status=MagickFalse;` and `continue`s on failure, a fill and a sync. Step 2's
 other name (2026-10-30, task W09): `attribute.c`'s `IsImageOpaque` (`opaque=MagickFalse;`)
 and `IdentifyImageMonochrome` (`type=UndefinedType;`), whose row loops are T's shape with
-the flag the function returns in place of `status`.
+the flag the function returns in place of `status`. Step 2's combined guard (2026-10-30,
+task W10): `channel-alpha.c`'s `SetImageAlphaChannel`, whose `OffIfOpaqueAlphaChannel`
+row loop skips on `status` or `opaque` and writes `opaque=MagickFalse;` at the first
+pixel that is not opaque, its only depth-4 site.
 
 ---
 
@@ -3771,3 +3779,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | O | Step 2: a written variable whose address the caller takes only to fill a member of another helper's targets struct (Recipe I step 2's exception: I, LB step 8 or Q step 8, the `const` form included) still qualifies; Recipes K, Q, Z and SD, which rest on O step 2, take the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleImage` (W10): the row-span restart `if (scale.y <= 0) { ... }` writes `scale` and `next_row`, whose addresses only the `const` targets structs of `AccumulateScaleRows` (Q) and `ReadPendingScaleRow` (LB) hold. Recipe O: cc 27 to 26, 7.88 to 7.90 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | N | Step 2: a plain struct local that meets (b) to (d) but not (a), a member of it never set on the path to the call, may be one of the group by address: a `const T *v` member filled `name.v=(&v);`, each `v.m` in the block written `(*v).m` (Recipe E step 3's form); Recipes Q, U, Wa, Y, Z and LB, which take their input struct from N step 2, take the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleScanlineX` (W10): its partial-column block `if (scale.x > 0) { ... }` (cc 11 in the caller, the bumps that keep Complex Method) reads `scale.x` of a `PointInfo` whose `y` is never set, so `name.scale=scale;` would read an indeterminate member, and writes `pixel`, `next_column`, `t` and `span`. A probe of Recipe Q step 8 with `scale` by address: Complex Method leaves `ScaleScanlineX`, 7.90 to 8.15 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | I | Step 1: in a `void` function a plain `return;` at every exit stands for `return(c);`, each becoming `return(MagickFalse);` with `return;` in the caller (step 7). Step 7: a block of another function whose step-5 text equals, under Recipe D's renaming (checked by script), the body of a function this recipe made calls that function, one commit per caller, as W step 7 and LB step 6 allow. *Careful* gives both arguments | `shear-deskew.c`'s `RadonProjection` (W10): its pair-merge row loops (nesting 5) share a head (two reads, a sum, a write) that leaves through `continue;`; once the first loop's body moved to the `void` `MergeRadonPair` (Recipe N with E step 7) the head leaves through `return;` and writes `element` and `neighbor`, which the tail reads, so W step 3 and LB step 1 refuse it. Moving the second loop's body as it is gives *Code Duplication* with `MergeRadonPair` (7.39 in a probe); with the head moved first and the second body calling it, `RadonProjection` leaves Complex Method and Bumpy Road Ahead, 7.78 to 7.86 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | T | Step 2: the other name's one read may be a leading guard that tests the loop's `status` and `v` together and `continue`s on either; *Careful* gives the argument | `channel-alpha.c`'s `SetImageAlphaChannel` (W10): the `OffIfOpaqueAlphaChannel` row loop guards on `status` and `opaque` together and writes `opaque=MagickFalse;` in its column scan (nesting 4). Probe of the scan as `IsAlphaRowOpaque`: *Deep, Nested Complexity* leaves, bumps 8 to 7, but as the file's seventh function it switches on *Overall Code Complexity*: 6.96 to 6.77 alone, 7.00 with Recipe E on the `AssociateAlphaChannel` column loop | mandate (2026-10-24) |
