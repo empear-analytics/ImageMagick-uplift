@@ -1151,6 +1151,13 @@ static Image *OptimizeImageFrames(const Image *image,RectangleInfo *bounds,
   return(GetFirstImageInList(optimized_image));
 }
 
+static Image *DestroyImageIfSet(Image *image)
+{
+  if (image != (Image *) NULL)
+    image=DestroyImage(image);
+  return(image);
+}
+
 static MagickBooleanType ReferenceNoneDisposeImage(
   const DisposeType *disposals,const ssize_t i,const Image *curr,
   Image **prev_image)
@@ -1378,8 +1385,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
             bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
             disposals=(DisposeType *) RelinquishMagickMemory(disposals);
             prev_image=DestroyImage(prev_image);
-            if ( dup_image != (Image *) NULL)
-              dup_image=DestroyImage(dup_image);
+            dup_image=DestroyImageIfSet(dup_image);
             return((Image *) NULL);
           }
         bgnd_image->background_color.alpha_trait=BlendPixelTrait;
