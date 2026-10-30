@@ -2497,14 +2497,37 @@ static char *EncodePredefinedEntities(const char *source,ssize_t offset,
   return(*destination);
 }
 
+static MagickBooleanType AppendTagAttributes(XMLTreeInfo *xml_info,
+  char **source,size_t *length,size_t *extent)
+{
+  const char
+    *attribute;
+
+  ssize_t
+    i;
+
+  for (i=0; xml_info->attributes[i]; i+=2)
+  {
+    attribute=GetXMLTreeAttribute(xml_info,xml_info->attributes[i]);
+    if (attribute != xml_info->attributes[i+1])
+      continue;
+    if (ExtendXMLBuffer(source,length,extent,
+          xml_info->attributes[i]) == MagickFalse)
+      return(MagickFalse);
+    *length+=(size_t) FormatLocaleString(*source+(*length),*extent," %s=\"",
+      xml_info->attributes[i]);
+    (void) EncodePredefinedEntities(xml_info->attributes[i+1],-1,source,length,
+      extent,MagickTrue);
+    *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"\"");
+  }
+  return(MagickTrue);
+}
+
 static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   size_t *extent,size_t start,char ***attributes)
 {
   char
     *content;
-
-  const char
-    *attribute;
 
   size_t
     offset;
@@ -2523,20 +2546,8 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
     return(*source);
   *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
     "<%s",xml_info->tag);
-  for (i=0; xml_info->attributes[i]; i+=2)
-  {
-    attribute=GetXMLTreeAttribute(xml_info,xml_info->attributes[i]);
-    if (attribute != xml_info->attributes[i+1])
-      continue;
-    if (ExtendXMLBuffer(source,length,extent,
-          xml_info->attributes[i]) == MagickFalse)
-      return((char *) NULL);
-    *length+=(size_t) FormatLocaleString(*source+(*length),*extent," %s=\"",
-      xml_info->attributes[i]);
-    (void) EncodePredefinedEntities(xml_info->attributes[i+1],-1,source,length,
-      extent,MagickTrue);
-    *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"\"");
-  }
+  if (AppendTagAttributes(xml_info,source,length,extent) == MagickFalse)
+    return((char *) NULL);
   i=0;
   while ((attributes[i] != (char **) NULL) &&
          (strcmp(attributes[i][0],xml_info->tag) != 0))
