@@ -1709,6 +1709,24 @@ static MagickBooleanType ParseISO860(const char* text,struct tm* tp)
   return(MagickTrue);
 }
 
+static MagickBooleanType GetPropertySeconds (FxInfo * pfx, char ** text,
+  fxFltType *val, fxFltType *seconds)
+{
+  struct tm tp;
+  if (ParseISO860(*text,&tp) == MagickFalse) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Function 'epoch' expected date property, found ", "'%s' at '%s'",
+      *text, SetShortExp(pfx));
+    *text = DestroyString(*text);
+    *seconds = SECONDS_ERR;
+    return(MagickFalse);
+  }
+  *seconds = (fxFltType)mktime (&tp);
+  *val = *seconds;
+  return(MagickTrue);
+}
+
 static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
 /* Returns number of characters to swallow.
    Returns "-1" means invalid input.
@@ -1770,18 +1788,8 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
     }
 
     if (seconds != NULL) {
-      struct tm tp;
-      if (ParseISO860(text,&tp) == MagickFalse) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Function 'epoch' expected date property, found ", "'%s' at '%s'",
-          text, SetShortExp(pfx));
-        text = DestroyString(text);
-        *seconds = SECONDS_ERR;
+      if (GetPropertySeconds (pfx, &text, val, seconds) == MagickFalse)
         return -1;
-      }
-      *seconds = (fxFltType)mktime (&tp);
-      *val = *seconds;
     } else {
       *val = strtold (text, &tailptr);
       if (text == tailptr) {
