@@ -1492,23 +1492,22 @@ static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
       node=head;
       for (k=head->left+1; k < head->right; k++)
       {
-        if (zero_crossing[i+1].crossings[k] != 0)
+        if (zero_crossing[i+1].crossings[k] == 0)
+          continue;
+        node=AppendIntervalNode(head,node);
+        if (node == (IntervalTree *) NULL)
           {
-            node=AppendIntervalNode(head,node);
-            if (node == (IntervalTree *) NULL)
-              {
-                list=(IntervalTree **) RelinquishMagickMemory(list);
-                FreeNodes(root);
-                return((IntervalTree *) NULL);
-              }
-            node->tau=zero_crossing[i+1].tau;
-            node->child=(IntervalTree *) NULL;
-            node->sibling=(IntervalTree *) NULL;
-            node->left=left;
-            node->right=k;
-            left=k;
+            list=(IntervalTree **) RelinquishMagickMemory(list);
+            FreeNodes(root);
+            return((IntervalTree *) NULL);
           }
-        }
+        node->tau=zero_crossing[i+1].tau;
+        node->child=(IntervalTree *) NULL;
+        node->sibling=(IntervalTree *) NULL;
+        node->left=left;
+        node->right=k;
+        left=k;
+      }
       if (left != head->left)
         {
           node->sibling=(IntervalTree *) AcquireQuantumMemory(1,
