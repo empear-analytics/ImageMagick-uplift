@@ -2656,6 +2656,75 @@ static inline double UpdateMaximumError(const double distance,
   return(maximum_error);
 }
 
+typedef struct _QuantizeErrorRow
+{
+  Image
+    *image;
+} QuantizeErrorRow;
+
+typedef struct _QuantizeErrorTargets
+{
+  double
+    *alpha,
+    *beta,
+    *mean_error_per_pixel,
+    *mean_error,
+    *maximum_error;
+
+  const Quantum
+    *magick_restrict *p;
+} QuantizeErrorTargets;
+
+static void AccumulateQuantizeErrorRow(const QuantizeErrorRow *errors,
+  const QuantizeErrorTargets *targets)
+{
+  Image
+    *const image = errors->image;
+
+  double
+    *const alpha = targets->alpha,
+    *const beta = targets->beta,
+    *const mean_error_per_pixel = targets->mean_error_per_pixel,
+    *const mean_error = targets->mean_error,
+    *const maximum_error = targets->maximum_error;
+
+  const Quantum
+    *magick_restrict *const p = targets->p;
+
+  double
+    distance;
+
+  ssize_t
+    index,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    index=(ssize_t) GetPixelIndex(image,*p);
+    if (image->alpha_trait != UndefinedPixelTrait)
+      {
+        *alpha=(double) (QuantumScale*(double) GetPixelAlpha(image,*p));
+        *beta=(double) (QuantumScale*image->colormap[index].alpha);
+      }
+    distance=fabs((double) ((*alpha)*(double) GetPixelRed(image,*p)-(*beta)*
+      image->colormap[index].red));
+    *mean_error_per_pixel+=distance;
+    *mean_error+=distance*distance;
+    *maximum_error=UpdateMaximumError(distance,*maximum_error);
+    distance=fabs((double) ((*alpha)*(double) GetPixelGreen(image,*p)-(*beta)*
+      image->colormap[index].green));
+    *mean_error_per_pixel+=distance;
+    *mean_error+=distance*distance;
+    *maximum_error=UpdateMaximumError(distance,*maximum_error);
+    distance=fabs((double) ((*alpha)*(double) GetPixelBlue(image,*p)-(*beta)*
+      image->colormap[index].blue));
+    *mean_error_per_pixel+=distance;
+    *mean_error+=distance*distance;
+    *maximum_error=UpdateMaximumError(distance,*maximum_error);
+    *p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType GetImageQuantizeError(Image *image,
   ExceptionInfo *exception)
 {
@@ -2666,13 +2735,11 @@ MagickExport MagickBooleanType GetImageQuantizeError(Image *image,
     alpha,
     area,
     beta,
-    distance,
     maximum_error,
     mean_error,
     mean_error_per_pixel;
 
   ssize_t
-    index,
     y;
 
   assert(image != (Image *) NULL);
@@ -2695,37 +2762,23 @@ MagickExport MagickBooleanType GetImageQuantizeError(Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
+    QuantizeErrorRow
+      errors;
+
+    QuantizeErrorTargets
+      targets;
 
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      index=(ssize_t) GetPixelIndex(image,p);
-      if (image->alpha_trait != UndefinedPixelTrait)
-        {
-          alpha=(double) (QuantumScale*(double) GetPixelAlpha(image,p));
-          beta=(double) (QuantumScale*image->colormap[index].alpha);
-        }
-      distance=fabs((double) (alpha*(double) GetPixelRed(image,p)-beta*
-        image->colormap[index].red));
-      mean_error_per_pixel+=distance;
-      mean_error+=distance*distance;
-      maximum_error=UpdateMaximumError(distance,maximum_error);
-      distance=fabs((double) (alpha*(double) GetPixelGreen(image,p)-beta*
-        image->colormap[index].green));
-      mean_error_per_pixel+=distance;
-      mean_error+=distance*distance;
-      maximum_error=UpdateMaximumError(distance,maximum_error);
-      distance=fabs((double) (alpha*(double) GetPixelBlue(image,p)-beta*
-        image->colormap[index].blue));
-      mean_error_per_pixel+=distance;
-      mean_error+=distance*distance;
-      maximum_error=UpdateMaximumError(distance,maximum_error);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    errors.image=image;
+    targets.alpha=(&alpha);
+    targets.beta=(&beta);
+    targets.mean_error_per_pixel=(&mean_error_per_pixel);
+    targets.mean_error=(&mean_error);
+    targets.maximum_error=(&maximum_error);
+    targets.p=(&p);
+    AccumulateQuantizeErrorRow(&errors,&targets);
   }
   image_view=DestroyCacheView(image_view);
   image->error.mean_error_per_pixel=(double) mean_error_per_pixel/area;
