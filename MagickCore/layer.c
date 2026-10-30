@@ -1642,18 +1642,10 @@ MagickExport void OptimizeImageTransparency(const Image *image,
 
         bounds.width=next->columns;
         bounds.height=next->rows;
-        if (bounds.x < 0)
-          {
-            bounds.width=(size_t) ((ssize_t) bounds.width+bounds.x);
-            bounds.x=0;
-          }
+        bounds=ClipBoundsLeft(bounds);
         if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) current_image->columns)
           bounds.width=(size_t) ((ssize_t) current_image->columns-bounds.x);
-        if (bounds.y < 0)
-          {
-            bounds.height=(size_t) ((ssize_t) bounds.height+bounds.y);
-            bounds.y=0;
-          }
+        bounds=ClipBoundsTop(bounds);
         if ((bounds.y+(ssize_t) bounds.height) > (ssize_t) current_image->rows)
           bounds.height=(size_t) ((ssize_t) current_image->rows-bounds.y);
         ClearBounds(current_image,&bounds,exception);
