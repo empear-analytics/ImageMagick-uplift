@@ -1000,6 +1000,41 @@ static Image *DestroyOilPaintClones(Image *linear_image,Image *paint_image)
   return((Image *) NULL);
 }
 
+typedef struct _OilPaintRowInfo
+{
+  Image
+    *linear_image,
+    *paint_image;
+
+  size_t
+    *histogram,
+    width;
+
+  ssize_t
+    center;
+} OilPaintRowInfo;
+
+static void OilPaintRow(const OilPaintRowInfo *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->linear_image->columns; x++)
+  {
+    ssize_t
+      j;
+
+    /*
+      Assign most frequent color.
+    */
+    j=GetMostFrequentOffset(row->linear_image,p,row->histogram,row->width);
+    SetOilPaintChannels(row->linear_image,row->paint_image,p,q,row->center,j);
+    p+=(ptrdiff_t) GetPixelChannels(row->linear_image);
+    q+=(ptrdiff_t) GetPixelChannels(row->paint_image);
+  }
+}
+
 MagickExport Image *OilPaintImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1070,14 +1105,14 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
     const Quantum
       *magick_restrict p;
 
+    OilPaintRowInfo
+      row;
+
     Quantum
       *magick_restrict q;
 
     size_t
       *histogram;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1091,19 +1126,12 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
         continue;
       }
     histogram=histograms[GetOpenMPThreadId()];
-    for (x=0; x < (ssize_t) linear_image->columns; x++)
-    {
-      ssize_t
-        j;
-
-      /*
-        Assign most frequent color.
-      */
-      j=GetMostFrequentOffset(linear_image,p,histogram,width);
-      SetOilPaintChannels(linear_image,paint_image,p,q,center,j);
-      p+=(ptrdiff_t) GetPixelChannels(linear_image);
-      q+=(ptrdiff_t) GetPixelChannels(paint_image);
-    }
+    row.linear_image=linear_image;
+    row.paint_image=paint_image;
+    row.histogram=histogram;
+    row.width=width;
+    row.center=center;
+    OilPaintRow(&row,p,q);
     if (SyncCacheViewAuthenticPixels(paint_view,exception) == MagickFalse)
       status=MagickFalse;
     if (linear_image->progress_monitor != (MagickProgressMonitor) NULL)
