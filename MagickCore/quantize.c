@@ -1339,6 +1339,72 @@ MagickExport MagickBooleanType CompressImageColormap(Image *image,
 %      node in the color cube tree that is to be pruned.
 %
 */
+typedef struct _ColormapEntryInputs
+{
+  Image
+    *image;
+
+  QCubeInfo
+    *cube_info;
+
+  QNodeInfo
+    *node_info;
+
+  double
+    alpha;
+} ColormapEntryInputs;
+
+static void SetAlphaColormapEntry(const ColormapEntryInputs *entry,
+  PixelInfo *magick_restrict q)
+{
+  Image
+    *const image = entry->image;
+
+  QCubeInfo
+    *const cube_info = entry->cube_info;
+
+  QNodeInfo
+    *const node_info = entry->node_info;
+
+  const double
+    alpha = entry->alpha;
+
+  double
+    opacity;
+
+  opacity=(double) (alpha*(double) QuantumRange*
+    node_info->total_color.alpha);
+  q->alpha=(double) ClampToQuantum(opacity);
+  if (q->alpha == (double) OpaqueAlpha)
+    {
+      q->red=(double) ClampToQuantum(alpha*(double) QuantumRange*
+        node_info->total_color.red);
+      q->green=(double) ClampToQuantum(alpha*(double) QuantumRange*
+        node_info->total_color.green);
+      q->blue=(double) ClampToQuantum(alpha*(double) QuantumRange*
+        node_info->total_color.blue);
+    }
+  else
+    {
+      double
+        gamma;
+
+      gamma=(double) (QuantumScale*q->alpha);
+      gamma=MagickSafeReciprocal(gamma);
+      q->red=(double) ClampToQuantum(alpha*gamma*(double) QuantumRange*
+        node_info->total_color.red);
+      q->green=(double) ClampToQuantum(alpha*gamma*(double)
+        QuantumRange*node_info->total_color.green);
+      q->blue=(double) ClampToQuantum(alpha*gamma*(double) QuantumRange*
+        node_info->total_color.blue);
+      if (node_info->number_unique > cube_info->transparent_pixels)
+        {
+          cube_info->transparent_pixels=node_info->number_unique;
+          cube_info->transparent_index=(ssize_t) image->colors;
+        }
+    }
+}
+
 static void DefineImageColormap(Image *image,QCubeInfo *cube_info,
   QNodeInfo *node_info)
 {
@@ -1381,40 +1447,14 @@ static void DefineImageColormap(Image *image,QCubeInfo *cube_info,
     }
   else
     {
-      double
-        opacity;
+      ColormapEntryInputs
+        entry;
 
-      opacity=(double) (alpha*(double) QuantumRange*
-        node_info->total_color.alpha);
-      q->alpha=(double) ClampToQuantum(opacity);
-      if (q->alpha == (double) OpaqueAlpha)
-        {
-          q->red=(double) ClampToQuantum(alpha*(double) QuantumRange*
-            node_info->total_color.red);
-          q->green=(double) ClampToQuantum(alpha*(double) QuantumRange*
-            node_info->total_color.green);
-          q->blue=(double) ClampToQuantum(alpha*(double) QuantumRange*
-            node_info->total_color.blue);
-        }
-      else
-        {
-          double
-            gamma;
-
-          gamma=(double) (QuantumScale*q->alpha);
-          gamma=MagickSafeReciprocal(gamma);
-          q->red=(double) ClampToQuantum(alpha*gamma*(double) QuantumRange*
-            node_info->total_color.red);
-          q->green=(double) ClampToQuantum(alpha*gamma*(double)
-            QuantumRange*node_info->total_color.green);
-          q->blue=(double) ClampToQuantum(alpha*gamma*(double) QuantumRange*
-            node_info->total_color.blue);
-          if (node_info->number_unique > cube_info->transparent_pixels)
-            {
-              cube_info->transparent_pixels=node_info->number_unique;
-              cube_info->transparent_index=(ssize_t) image->colors;
-            }
-        }
+      entry.image=image;
+      entry.cube_info=cube_info;
+      entry.node_info=node_info;
+      entry.alpha=alpha;
+      SetAlphaColormapEntry(&entry,q);
     }
   node_info->color_number=image->colors++;
 }
