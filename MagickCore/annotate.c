@@ -1848,6 +1848,25 @@ static void SelectFreetypeText(const DrawInfo *draw_info,
     }
 }
 
+static FT_Matrix GetFreetypeAffine(const DrawInfo *draw_info)
+{
+  FT_Matrix
+    affine;
+
+  affine.xx=65536L;
+  affine.yx=0L;
+  affine.xy=0L;
+  affine.yy=65536L;
+  if (draw_info->render != MagickFalse)
+    {
+      affine.xx=(FT_Fixed) (65536L*draw_info->affine.sx+0.5);
+      affine.yx=(FT_Fixed) (-65536L*draw_info->affine.rx+0.5);
+      affine.xy=(FT_Fixed) (-65536L*draw_info->affine.ry+0.5);
+      affine.yy=(FT_Fixed) (65536L*draw_info->affine.sy+0.5);
+    }
+  return(affine);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2159,17 +2178,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   last_glyph_id=0;
   origin.x=0;
   origin.y=0;
-  affine.xx=65536L;
-  affine.yx=0L;
-  affine.xy=0L;
-  affine.yy=65536L;
-  if (draw_info->render != MagickFalse)
-    {
-      affine.xx=(FT_Fixed) (65536L*draw_info->affine.sx+0.5);
-      affine.yx=(FT_Fixed) (-65536L*draw_info->affine.rx+0.5);
-      affine.xy=(FT_Fixed) (-65536L*draw_info->affine.ry+0.5);
-      affine.yy=(FT_Fixed) (65536L*draw_info->affine.sy+0.5);
-    }
+  affine=GetFreetypeAffine(draw_info);
   annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
   if (annotate_info->dash_pattern != (double *) NULL)
     annotate_info->dash_pattern[0]=0.0;
