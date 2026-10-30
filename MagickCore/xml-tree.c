@@ -1834,6 +1834,17 @@ static char *SkipProcessingInstruction(char *p)
   return(p);
 }
 
+static char **GrowAttributeList(char **attributes,const ssize_t l)
+{
+  if (l == 0)
+    attributes=(char **) AcquireQuantumMemory(4,
+      sizeof(*attributes));
+  else
+    attributes=(char **) ResizeQuantumMemory(attributes,(size_t)
+      (l+4),sizeof(*attributes));
+  return(attributes);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -1940,12 +1951,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
               /*
                 Attribute.
               */
-              if (l == 0)
-                attributes=(char **) AcquireQuantumMemory(4,
-                  sizeof(*attributes));
-              else
-                attributes=(char **) ResizeQuantumMemory(attributes,(size_t)
-                  (l+4),sizeof(*attributes));
+              attributes=GrowAttributeList(attributes,l);
               if (attributes == (char **) NULL)
                 {
                   (void) ThrowMagickException(exception,GetMagickModule(),
