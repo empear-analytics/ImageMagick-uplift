@@ -1308,6 +1308,18 @@ static double
     16.247661874700962
  };
 
+static void GetCubicBCDefaults(const FilterType filter_type,
+  const FilterType window_type,double *B,double *C)
+{
+  *B=filters[filter_type].B;
+  *C=filters[filter_type].C;
+  if (filters[window_type].function == CubicBC)
+    {
+      *B=filters[window_type].B;
+      *C=filters[window_type].C;
+    }
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1406,13 +1418,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   C=0.0;
   if (IsCubicBCResizeFilter(resize_filter) != MagickFalse)
     {
-      B=filters[filter_type].B;
-      C=filters[filter_type].C;
-      if (filters[window_type].function == CubicBC)
-        {
-          B=filters[window_type].B;
-          C=filters[window_type].C;
-        }
+      GetCubicBCDefaults(filter_type,window_type,&B,&C);
       GetCubicBCOverrides(image,&B,&C);
       SetCubicBCCoefficients(resize_filter,B,C);
     }
