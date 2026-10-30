@@ -3493,6 +3493,53 @@ static PixelInfo VoronoiSparseColor(const SparseColorPoint *point,
   return(pixel);
 }
 
+typedef struct _SparseColorPlane
+{
+  Image
+    *sparse_image;
+
+  double
+    *coeff;
+
+  ssize_t
+    i,
+    j;
+} SparseColorPlane;
+
+static PixelInfo BarycentricSparseColor(const SparseColorPlane *plane,
+  PixelInfo pixel)
+{
+  Image
+    *const sparse_image = plane->sparse_image;
+
+  double
+    *const coeff = plane->coeff;
+
+  const ssize_t
+    i = plane->i,
+    j = plane->j;
+
+  ssize_t x=0;
+  if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red     = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green   = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue    = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (sparse_image->colorspace == CMYKColorspace))
+    pixel.black   = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  return(pixel);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3618,24 +3665,14 @@ MagickExport Image *SparseColorImage(const Image *image,
         {
           case BarycentricColorInterpolate:
           {
-            ssize_t x=0;
-            if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.red     = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
-            if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.green   = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
-            if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.blue    = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
-            if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (sparse_image->colorspace == CMYKColorspace))
-              pixel.black   = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
-            if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (sparse_image->alpha_trait != UndefinedPixelTrait))
-              pixel.alpha = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
+            SparseColorPlane
+              plane;
+
+            plane.sparse_image=sparse_image;
+            plane.coeff=coeff;
+            plane.i=i;
+            plane.j=j;
+            pixel=BarycentricSparseColor(&plane,pixel);
             break;
           }
           case BilinearColorInterpolate:
