@@ -470,6 +470,35 @@ static void NormalizeHistogram(double *histogram)
     histogram[i]=gamma*histogram[i];
 }
 
+static double DiscoverHistogramThreshold(const Image *image,
+  const AutoThresholdMethod method,const double *histogram,
+  ExceptionInfo *exception)
+{
+  double
+    threshold;
+
+  switch (method)
+  {
+    case KapurThresholdMethod:
+    {
+      threshold=KapurThreshold(image,histogram,exception);
+      break;
+    }
+    case OTSUThresholdMethod:
+    default:
+    {
+      threshold=OTSUThreshold(image,histogram,exception);
+      break;
+    }
+    case TriangleThresholdMethod:
+    {
+      threshold=TriangleThreshold(histogram);
+      break;
+    }
+  }
+  return(threshold);
+}
+
 MagickExport MagickBooleanType AutoThresholdImage(Image *image,
   const AutoThresholdMethod method,ExceptionInfo *exception)
 {
@@ -505,25 +534,7 @@ MagickExport MagickBooleanType AutoThresholdImage(Image *image,
   /*
     Discover threshold from histogram.
   */
-  switch (method)
-  {
-    case KapurThresholdMethod:
-    {
-      threshold=KapurThreshold(image,histogram,exception);
-      break;
-    }
-    case OTSUThresholdMethod:
-    default:
-    {
-      threshold=OTSUThreshold(image,histogram,exception);
-      break;
-    }
-    case TriangleThresholdMethod:
-    {
-      threshold=TriangleThreshold(histogram);
-      break;
-    }
-  }
+  threshold=DiscoverHistogramThreshold(image,method,histogram,exception);
   histogram=(double *) RelinquishMagickMemory(histogram);
   if (threshold < 0.0)
     status=MagickFalse;
