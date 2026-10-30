@@ -1353,6 +1353,34 @@ static size_t StripImageFormatPrefix(char *component,char *p,
   return(magick_length);
 }
 
+typedef struct _SubimageBrackets
+{
+  char
+    *component,
+    *p,
+    *q;
+} SubimageBrackets;
+
+static void GetSceneSpecification(const SubimageBrackets *brackets,
+  size_t *subimage_length,size_t *subimage_offset)
+{
+  char
+    *const component = brackets->component,
+    *const p = brackets->p,
+    *const q = brackets->q;
+
+  *p='\0';
+  if ((IsSceneGeometry(q+1,MagickFalse) == MagickFalse) &&
+      (IsGeometry(q+1) == MagickFalse))
+    *p=']';
+  else
+    {
+      (*subimage_length)=(size_t) (p-q);
+      (*subimage_offset)=(size_t) (q-component+1);
+      *q='\0';
+    }
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1394,19 +1422,17 @@ MagickExport void GetPathComponent(const char *path,PathType type,
               if ((IsStringTrue(literal) == MagickFalse) ||
                   (IsPathAccessible(path) == MagickFalse))
                 {
+                  SubimageBrackets
+                    brackets;
+
                   /*
                     Look for scene specification (e.g. img0001.pcd[4]).
                   */
-                  *p='\0';
-                  if ((IsSceneGeometry(q+1,MagickFalse) == MagickFalse) &&
-                      (IsGeometry(q+1) == MagickFalse))
-                    *p=']';
-                  else
-                    {
-                      subimage_length=(size_t) (p-q);
-                      subimage_offset=(size_t) (q-component+1);
-                      *q='\0';
-                    }
+                  brackets.component=component;
+                  brackets.p=p;
+                  brackets.q=q;
+                  GetSceneSpecification(&brackets,&subimage_length,
+                    &subimage_offset);
                 }
               if (literal != (char *) NULL)
                 literal=DestroyString(literal);
