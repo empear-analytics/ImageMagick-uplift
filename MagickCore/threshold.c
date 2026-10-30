@@ -957,6 +957,29 @@ MagickExport ThresholdMap *GetThresholdMap(const char *map_id,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static XMLTreeInfo *FindThresholdMap(XMLTreeInfo *thresholds,
+  const char *map_id)
+{
+  const char
+    *attribute;
+
+  XMLTreeInfo
+    *threshold;
+
+  for (threshold=GetXMLTreeChild(thresholds,"threshold");
+       threshold != (XMLTreeInfo *) NULL;
+       threshold=GetNextXMLTreeTag(threshold))
+  {
+    attribute=GetXMLTreeAttribute(threshold,"map");
+    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
+      break;
+    attribute=GetXMLTreeAttribute(threshold,"alias");
+    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
+      break;
+  }
+  return(threshold);
+}
+
 static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
   const char *map_id,ExceptionInfo *exception)
 {
@@ -988,17 +1011,7 @@ static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
   thresholds=NewXMLTree(xml,exception);
   if (thresholds == (XMLTreeInfo *) NULL)
     return(map);
-  for (threshold=GetXMLTreeChild(thresholds,"threshold");
-       threshold != (XMLTreeInfo *) NULL;
-       threshold=GetNextXMLTreeTag(threshold))
-  {
-    attribute=GetXMLTreeAttribute(threshold,"map");
-    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
-      break;
-    attribute=GetXMLTreeAttribute(threshold,"alias");
-    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
-      break;
-  }
+  threshold=FindThresholdMap(thresholds,map_id);
   if (threshold == (XMLTreeInfo *) NULL)
     {
       thresholds=DestroyXMLTree(thresholds);
