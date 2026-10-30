@@ -1300,11 +1300,11 @@ static void MorphPixelChannels(const Image *morph_image,
   }
 }
 
+#define MorphImageTag  "Morph/Image"
+
 MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   ExceptionInfo *exception)
 {
-#define MorphImageTag  "Morph/Image"
-
   double
     alpha,
     beta;
