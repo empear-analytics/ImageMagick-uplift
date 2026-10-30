@@ -511,6 +511,116 @@ static Quantum GetStatisticPixel(const StatisticType type,
   return(pixel);
 }
 
+typedef struct _StatisticChannel
+{
+  const Image
+    *image,
+    *statistic_image;
+
+  StatisticType
+    type;
+
+  size_t
+    width,
+    height;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    i;
+
+  PixelList
+    **magick_restrict pixel_list;
+
+  int
+    id;
+
+  PixelChannel
+    channel;
+} StatisticChannel;
+
+static void SetStatisticChannel(const StatisticChannel *statistic,
+  Quantum *magick_restrict q)
+{
+  const Image
+    *const image = statistic->image,
+    *const statistic_image = statistic->statistic_image;
+
+  const StatisticType
+    type = statistic->type;
+
+  const size_t
+    width = statistic->width,
+    height = statistic->height;
+
+  const Quantum
+    *magick_restrict const p = statistic->p;
+
+  const ssize_t
+    i = statistic->i;
+
+  PixelList
+    **magick_restrict const pixel_list = statistic->pixel_list;
+
+  const int
+    id = statistic->id;
+
+  const PixelChannel
+    channel = statistic->channel;
+
+  double
+    area,
+    maximum,
+    minimum,
+    sum,
+    sum_squared;
+
+  Quantum
+    pixel;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  ssize_t
+    u;
+
+  ssize_t
+    v;
+
+  pixels=p;
+  area=0.0;
+  minimum=pixels[i];
+  maximum=pixels[i];
+  sum=0.0;
+  sum_squared=0.0;
+  ResetPixelList(pixel_list[id]);
+  for (v=0; v < (ssize_t) MagickMax(height,1); v++)
+  {
+    for (u=0; u < (ssize_t) MagickMax(width,1); u++)
+    {
+      if (IsPixelListStatistic(type) != MagickFalse)
+        {
+          InsertPixelList(pixels[i],pixel_list[id]);
+          pixels+=(ptrdiff_t) GetPixelChannels(image);
+          continue;
+        }
+      area++;
+      if ((double) pixels[i] < minimum)
+        minimum=(double) pixels[i];
+      if ((double) pixels[i] > maximum)
+        maximum=(double) pixels[i];
+      sum+=(double) pixels[i];
+      sum_squared+=(double) pixels[i]*(double) pixels[i];
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
+  }
+  pixel=GetStatisticPixel(type,pixel_list,id,area,minimum,maximum,sum,
+    sum_squared);
+  SetPixelChannel(statistic_image,channel,pixel,q);
+}
+
 static void StatisticImagePixel(const Image *image,
   const Image *statistic_image,const StatisticType type,const size_t width,
   const size_t height,const ssize_t center,const Quantum *magick_restrict p,
@@ -522,24 +632,8 @@ static void StatisticImagePixel(const Image *image,
 
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    double
-      area,
-      maximum,
-      minimum,
-      sum,
-      sum_squared;
-
-    Quantum
-      pixel;
-
-    const Quantum
-      *magick_restrict pixels;
-
-    ssize_t
-      u;
-
-    ssize_t
-      v;
+    StatisticChannel
+      statistic;
 
     PixelChannel channel = GetPixelChannelChannel(image,i);
     PixelTrait traits = GetPixelChannelTraits(image,channel);
@@ -554,37 +648,17 @@ static void StatisticImagePixel(const Image *image,
         SetPixelChannel(statistic_image,channel,p[center+i],q);
         continue;
       }
-    pixels=p;
-    area=0.0;
-    minimum=pixels[i];
-    maximum=pixels[i];
-    sum=0.0;
-    sum_squared=0.0;
-    ResetPixelList(pixel_list[id]);
-    for (v=0; v < (ssize_t) MagickMax(height,1); v++)
-    {
-      for (u=0; u < (ssize_t) MagickMax(width,1); u++)
-      {
-        if (IsPixelListStatistic(type) != MagickFalse)
-          {
-            InsertPixelList(pixels[i],pixel_list[id]);
-            pixels+=(ptrdiff_t) GetPixelChannels(image);
-            continue;
-          }
-        area++;
-        if ((double) pixels[i] < minimum)
-          minimum=(double) pixels[i];
-        if ((double) pixels[i] > maximum)
-          maximum=(double) pixels[i];
-        sum+=(double) pixels[i];
-        sum_squared+=(double) pixels[i]*(double) pixels[i];
-        pixels+=(ptrdiff_t) GetPixelChannels(image);
-      }
-      pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-    }
-    pixel=GetStatisticPixel(type,pixel_list,id,area,minimum,maximum,sum,
-      sum_squared);
-    SetPixelChannel(statistic_image,channel,pixel,q);
+    statistic.image=image;
+    statistic.statistic_image=statistic_image;
+    statistic.type=type;
+    statistic.width=width;
+    statistic.height=height;
+    statistic.p=p;
+    statistic.i=i;
+    statistic.pixel_list=pixel_list;
+    statistic.id=id;
+    statistic.channel=channel;
+    SetStatisticChannel(&statistic,q);
   }
 }
 
