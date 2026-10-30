@@ -994,6 +994,17 @@ static MagickBooleanType ReadFileList(const char *option,
   return(MagickTrue);
 }
 
+static ssize_t FindNonDirectory(char **filelist,const size_t number_files)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) number_files; j++)
+    if (IsPathDirectory(filelist[j]) <= 0)
+      break;
+  return(j);
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1103,9 +1114,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       }
     if (filelist == (char **) NULL)
       continue;
-    for (j=0; j < (ssize_t) number_files; j++)
-      if (IsPathDirectory(filelist[j]) <= 0)
-        break;
+    j=FindNonDirectory(filelist,number_files);
     if (j == (ssize_t) number_files)
       {
         filelist=DestroyFileList(filelist,number_files);
