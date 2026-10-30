@@ -4647,6 +4647,112 @@ static void SumSelectiveBlendedPixels(const SelectiveSum *sum,
   }
 }
 
+typedef struct _SelectiveChannelSum
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image,
+    *luminance_image;
+
+  MagickRealType
+    *kernel;
+
+  const Quantum
+    *p,
+    *l;
+
+  ssize_t
+    center;
+
+  double
+    intensity,
+    threshold;
+
+  size_t
+    width;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    blur_traits;
+} SelectiveChannelSum;
+
+static void BlurSelectiveChannelSum(const SelectiveChannelSum *blur,
+  const ssize_t i,Quantum *magick_restrict q)
+{
+  double
+    gamma,
+    pixel;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  const Quantum
+    *magick_restrict luminance_pixels,
+    *magick_restrict pixels;
+
+  SelectiveSum
+    sum;
+
+  SelectiveSumTargets
+    targets;
+
+  k=blur->kernel;
+  pixel=0.0;
+  pixels=blur->p;
+  luminance_pixels=blur->l;
+  gamma=0.0;
+  if ((blur->blur_traits & BlendPixelTrait) == 0)
+    {
+      sum.image=blur->image;
+      sum.luminance_image=blur->luminance_image;
+      sum.width=blur->width;
+      sum.intensity=blur->intensity;
+      sum.threshold=blur->threshold;
+      sum.i=i;
+      targets.pixel=(&pixel);
+      targets.gamma=(&gamma);
+      targets.k=(&k);
+      targets.pixels=(&pixels);
+      targets.luminance_pixels=(&luminance_pixels);
+      SumSelectivePixels(&sum,&targets);
+      if (fabs((double) gamma) < MagickEpsilon)
+        {
+          SetPixelChannel(blur->blur_image,blur->channel,
+            blur->p[blur->center+i],q);
+          return;
+        }
+      gamma=MagickSafeReciprocal(gamma);
+      SetPixelChannel(blur->blur_image,blur->channel,ClampToQuantum(
+        gamma*pixel),q);
+      return;
+    }
+  sum.image=blur->image;
+  sum.luminance_image=blur->luminance_image;
+  sum.width=blur->width;
+  sum.intensity=blur->intensity;
+  sum.threshold=blur->threshold;
+  sum.i=i;
+  targets.pixel=(&pixel);
+  targets.gamma=(&gamma);
+  targets.k=(&k);
+  targets.pixels=(&pixels);
+  targets.luminance_pixels=(&luminance_pixels);
+  SumSelectiveBlendedPixels(&sum,&targets);
+  if (fabs((double) gamma) < MagickEpsilon)
+    {
+      SetPixelChannel(blur->blur_image,blur->channel,blur->p[blur->center+i],
+        q);
+      return;
+    }
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(blur->blur_image,blur->channel,ClampToQuantum(gamma*pixel),
+    q);
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -4819,10 +4925,6 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
       intensity=GetPixelIntensity(image,p+center);
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
-        double
-          gamma,
-          pixel;
-
         PixelChannel
           channel;
 
@@ -4830,18 +4932,8 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
           blur_traits,
           traits;
 
-        const MagickRealType
-          *magick_restrict k;
-
-        const Quantum
-          *magick_restrict luminance_pixels,
-          *magick_restrict pixels;
-
-        SelectiveSum
-          sum;
-
-        SelectiveSumTargets
-          targets;
+        SelectiveChannelSum
+          blur;
 
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
@@ -4854,53 +4946,19 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
             SetPixelChannel(blur_image,channel,p[center+i],q);
             continue;
           }
-        k=kernel;
-        pixel=0.0;
-        pixels=p;
-        luminance_pixels=l;
-        gamma=0.0;
-        if ((blur_traits & BlendPixelTrait) == 0)
-          {
-            sum.image=image;
-            sum.luminance_image=luminance_image;
-            sum.width=width;
-            sum.intensity=intensity;
-            sum.threshold=threshold;
-            sum.i=i;
-            targets.pixel=(&pixel);
-            targets.gamma=(&gamma);
-            targets.k=(&k);
-            targets.pixels=(&pixels);
-            targets.luminance_pixels=(&luminance_pixels);
-            SumSelectivePixels(&sum,&targets);
-            if (fabs((double) gamma) < MagickEpsilon)
-              {
-                SetPixelChannel(blur_image,channel,p[center+i],q);
-                continue;
-              }
-            gamma=MagickSafeReciprocal(gamma);
-            SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
-            continue;
-          }
-        sum.image=image;
-        sum.luminance_image=luminance_image;
-        sum.width=width;
-        sum.intensity=intensity;
-        sum.threshold=threshold;
-        sum.i=i;
-        targets.pixel=(&pixel);
-        targets.gamma=(&gamma);
-        targets.k=(&k);
-        targets.pixels=(&pixels);
-        targets.luminance_pixels=(&luminance_pixels);
-        SumSelectiveBlendedPixels(&sum,&targets);
-        if (fabs((double) gamma) < MagickEpsilon)
-          {
-            SetPixelChannel(blur_image,channel,p[center+i],q);
-            continue;
-          }
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
+        blur.image=image;
+        blur.blur_image=blur_image;
+        blur.luminance_image=luminance_image;
+        blur.kernel=kernel;
+        blur.p=p;
+        blur.l=l;
+        blur.center=center;
+        blur.intensity=intensity;
+        blur.threshold=threshold;
+        blur.width=width;
+        blur.channel=channel;
+        blur.blur_traits=blur_traits;
+        BlurSelectiveChannelSum(&blur,i,q);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
       l+=(ptrdiff_t) GetPixelChannels(luminance_image);
