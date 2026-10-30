@@ -401,18 +401,12 @@ static inline MagickBooleanType IsExecutableToken(const char *token)
   if ((*token == '\'') || (*token == '"'))
     return(MagickFalse);
   length=strlen(token);
-  if (length >= 3)
-    {
-      if (IsWindowsDrivePath(token) != MagickFalse)
-        return(MagickTrue);
-    }
+  if ((length >= 3) && (IsWindowsDrivePath(token) != MagickFalse))
+    return(MagickTrue);
   if (*token == '/')
     return(MagickTrue);
-  if (length >= 2)
-    {
-      if (IsDotRelativePath(token) != MagickFalse)
-        return(MagickTrue);
-    }
+  if ((length >= 2) && (IsDotRelativePath(token) != MagickFalse))
+    return(MagickTrue);
   if (isalnum((int) *token))
     return(MagickTrue);
   return(MagickFalse);
