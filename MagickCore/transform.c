@@ -718,6 +718,20 @@ static RectangleInfo GetCropBoundingBox(const Image *image)
   return(bounding_box);
 }
 
+static RectangleInfo GetCropPage(const RectangleInfo *geometry,
+  const RectangleInfo bounding_box)
+{
+  RectangleInfo
+    page;
+
+  page=(*geometry);
+  if (page.width == 0)
+    page.width=bounding_box.width;
+  if (page.height == 0)
+    page.height=bounding_box.height;
+  return(page);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -754,11 +768,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   bounding_box=GetCropBoundingBox(image);
-  page=(*geometry);
-  if (page.width == 0)
-    page.width=bounding_box.width;
-  if (page.height == 0)
-    page.height=bounding_box.height;
+  page=GetCropPage(geometry,bounding_box);
   if (IsCropOutsideImage(image,bounding_box,page) != MagickFalse)
     {
       /*
