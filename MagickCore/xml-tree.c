@@ -1845,6 +1845,18 @@ static char **GrowAttributeList(char **attributes,const ssize_t l)
   return(attributes);
 }
 
+static char **FindDefaultAttributes(XMLTreeRoot *root,const char *tag)
+{
+  ssize_t
+    i;
+
+  i=0;
+  while ((root->attributes[i] != (char **) NULL) &&
+         (strcmp(root->attributes[i][0],tag) != 0))
+    i++;
+  return(root->attributes[i]);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -1866,7 +1878,6 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
     length;
 
   ssize_t
-    i,
     j,
     l;
 
@@ -1940,11 +1951,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                 /*
                   Find tag in default attributes list.
                 */
-                i=0;
-                while ((root->attributes[i] != (char **) NULL) &&
-                       (strcmp(root->attributes[i][0],tag) != 0))
-                  i++;
-                attribute=root->attributes[i];
+                attribute=FindDefaultAttributes(root,tag);
               }
             for (l=0; IsInsideXMLTag(p) != MagickFalse; l+=2)
             {
