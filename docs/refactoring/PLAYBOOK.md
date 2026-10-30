@@ -3071,6 +3071,125 @@ the mandate of 2026-10-24.
 
 ---
 
+## Recipe OC - Extract Block Ending the Iteration with Out-Parameters
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it sits in a loop body, is
+followed directly by that loop's `continue;` (so every path out of it ends the
+iteration), leaves early through `continue;` itself, and moves the loop's cursors: a
+character decoder's inner `switch` that advances the input and output pointers, as
+`InterpretDelegateProperties`' backslash escapes do.
+
+**Not covered by:** Recipe O, whose step 3 refuses a block containing a `continue` that
+leaves it; Recipe E step 7, whose `continue` forms need the block to be the loop's whole
+body or its tail and to write at most one variable (step 4); Recipe LB step 7, whose
+helper returns a status the caller tests, which here would always lead to the same
+`continue;`, and which needs a struct of out-pointers for two written cursors (step 8).
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. It is
+   followed directly by `continue;` of the innermost loop around it, `Lp`; every
+   `continue;` in it that leaves it continues `Lp`. It contains no `return`, no `goto`,
+   and no `break` that leaves it; a `break` or `continue` of a loop or `switch` nested
+   inside it stays as it is.
+2. The variables of the caller it writes meet Recipe O step 2 (plain locals, addresses
+   not taken elsewhere); with those it only reads, at most four parameters.
+3. Cut the block into a new `static void` function directly above the caller. Each
+   `continue;` that continued `Lp` becomes `return;`, one for one. Write `*v` for every
+   use of a written variable `v`, reads included (`(*v)++` for `v++`, `*(*v)++` for
+   `*v++`, `**v` for `*v`, `*(*v+1)` for `*(v+1)`). Nothing else in the text changes.
+4. Pass the variables it only reads by value and each written variable as a pointer,
+   in the order the block first writes them.
+5. Where the block stood, write the call. The `continue;` that followed the block stays,
+   directly after the call. Check every argument against its parameter by reading.
+
+**Before:**
+
+```c
+      case '\\':
+      {
+        switch (*(p+1))
+        {
+          case '\0':
+            continue;
+          case 'r':  /* convert to RETURN */
+          {
+            *q++='\r';
+            p++;
+            continue;
+          }
+          ...
+          default:
+          {
+            p++;
+            *q++=(*p);
+          }
+        }
+        continue;
+      }
+```
+
+**After:**
+
+```c
+static void DecodeDelegateEscape(const char **p,char **q)
+{
+  switch (*(*p+1))
+  {
+    case '\0':
+      return;
+    case 'r':  /* convert to RETURN */
+    {
+      *(*q)++='\r';
+      (*p)++;
+      return;
+    }
+    ...
+    default:
+    {
+      (*p)++;
+      *(*q)++=(**p);
+    }
+  }
+}
+...
+      case '\\':
+      {
+        DecodeDelegateEscape(&p,&q);
+        continue;
+      }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Before, every path out of the block reached a
+  `continue;` of `Lp`: one inside it, or the one that follows it. After, every path out
+  of the function (a `return;` where a `continue;` stood, or the end of the body where
+  the block fell through) returns to the call, and the caller runs the `continue;` that
+  followed the block. The statements before each exit are the same, in the same order,
+  and every write to a written variable has landed through its pointer when the
+  function returns (Recipe O).
+- `continue;` in a `for` loop runs the loop's increment expression; it still runs, in the
+  caller, after the helper has written the cursors it reads.
+- The rewriting of step 3 is mechanical but easy to get wrong in precedence: `*v++` with
+  `v` a pointer parameter is `*(*v)++`, not `**v++`. Check each by reading, and let the
+  oracle cover the reached paths.
+- A block not followed by `continue;` (one after which the loop body goes on) is not this
+  recipe.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 3 and 5 checked by reading.
+
+**Provenance:** 2026-10-30, from `delegate.c`'s `InterpretDelegateProperties`, whose
+backslash case is an inner `switch` on the next character that advances `p` and `q` and
+ends each case with `continue;` of the scan loop, followed by a `continue;` for the
+`default` path; it holds the function's nesting of 4. A probe: nesting 4 gone, cc 45 to
+33, delegate.c 3.83 to 4.05. Added by Claude Code (Claude Opus 5.5) during task M115
+(campaign B), under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -3552,3 +3671,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | I | Step 2: a written variable whose address the caller passes elsewhere only as an argument of calls that keep no copy of it (checked by reading the callee) still qualifies, as Recipe V step 2 and Recipe LB step 8 allow; in the block, `&v` becomes `v`, as step 8 already says for its form; *Careful* gives the argument | `histogram.c`'s `ClassifyImageColors`: its tree descent (the level loop at depth 3, its exit at depth 4) writes the node cursor and `pixel`, whose address the caller also passes to `GetPixelInfo` and `IsPixelInfoColorMatch`, neither of which keeps it, and leaves through `return(0);`. A probe: 6.43 to 6.47 | mandate (2026-10-24) |
 | 2026-10-30 | NEW | CN | Combine Nested Conditions: an `if` whose whole body is a second `if`, neither with an `else`, becomes one `if` whose condition is the two joined by `&&` in their order; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `delegate.c`'s `GetDelegateInfo` (campaign B, task M115): three such match tests, a probe gave bumps 6 to 3 and 3.26 to 3.32 with identical object code; the same shape in `IsExecutableToken` and `InvokeDelegate`. No recipe removes a nesting level that carries no statement: G and P keep both tests, E-family helpers inherit the nesting | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 4: a variable the block writes before reading it on every path, and that nothing after the block reads, is declared in the new function with its declaration and initialiser even when the caller wrote it before the block, as Recipe Y step 2, Q step 2 and J step 3 already allow for their blocks; a struct filled by a call counts as written where the block reads it only after the call succeeded | `delegate.c`'s `CopyDelegateFile` (campaign B, task M115): its buffer-size block reads `attributes` only after `fstat(source_file,&attributes) == 0`, but `IsKeptDestination` fills `attributes` earlier, which the founding wording of step 4 refuses although the block never sees that value. The block is one decision short of taking the function out of *Complex Method* (cc 9) | mandate (2026-10-24) |
+| 2026-10-30 | NEW | OC | Extract Block Ending the Iteration with Out-Parameters: a block followed directly by `continue;` of its loop, which leaves early through that `continue;` and writes the loop's cursors, moves to a `static void` function: each `continue;` becomes `return;`, written variables go by pointer as in Recipe O, and the `continue;` after the block stays after the call | `delegate.c`'s `InterpretDelegateProperties` (campaign B, task M115): the backslash case's inner `switch` advances `p` and `q` and continues the scan loop from every case; O refuses its `continue`s, E step 7 its two written cursors and its position, LB would need a struct of out-pointers and a status that always leads to the same `continue;`. Probe: nesting 4 gone, 3.83 to 4.05 | mandate (2026-10-24) |
