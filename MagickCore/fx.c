@@ -1274,6 +1274,15 @@ static void DestroyFxRt (fxRtT * pfxrt)
   pfxrt->random_info = DestroyRandomInfo (pfxrt->random_info);
 }
 
+static size_t ScanPlainTokenLength (char * p, size_t len)
+{
+  while (isalpha ((int)*p)) { len++; p++; }
+  if (*p == '_')            { len++; p++; }
+  while (isalpha ((int)*p)) { len++; p++; }
+  while (isdigit ((int)*p)) { len++; p++; }
+  return(len);
+}
+
 static size_t GetToken (FxInfo * pfx)
 /* Returns length of token that starts with an alpha,
      or 0 if it isn't a token that starts with an alpha.
@@ -1305,10 +1314,7 @@ static size_t GetToken (FxInfo * pfx)
     p += 7;
     while (isalpha ((int)*p)) { len++; p++; }
   } else {
-    while (isalpha ((int)*p)) { len++; p++; }
-    if (*p == '_')            { len++; p++; }
-    while (isalpha ((int)*p)) { len++; p++; }
-    while (isdigit ((int)*p)) { len++; p++; }
+    len = ScanPlainTokenLength (p, len);
   }
   if (len >= MaxTokenLen) {
     (void) ThrowMagickException (
