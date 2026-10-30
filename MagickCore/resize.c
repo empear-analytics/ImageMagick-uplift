@@ -961,6 +961,12 @@ static void ReportResizeFilter(const Image *image,
   (void) DeleteImageArtifact((Image *) image,"filter:verbose");
 }
 
+static inline MagickBooleanType IsFilterOption(const ssize_t option)
+{
+  return(((UndefinedFilter < option) && (option < SentinelFilter)) ?
+    MagickTrue : MagickFalse);
+}
+
 /*
   Table Mapping given Filter, into Weighting and Windowing functions.
   A 'Box' windowing function means its a simple non-windowed filter.
@@ -1166,7 +1172,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
         option;
 
       option=ParseCommandOption(MagickFilterOptions,MagickFalse,artifact);
-      if ((UndefinedFilter < option) && (option < SentinelFilter))
+      if (IsFilterOption(option) != MagickFalse)
         { /* Raw filter request - no window function. */
           filter_type=(FilterType) option;
           window_type=BoxFilter;
@@ -1176,7 +1182,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
       if (artifact != (const char *) NULL)
         {
           option=ParseCommandOption(MagickFilterOptions,MagickFalse,artifact);
-          if ((UndefinedFilter < option) && (option < SentinelFilter))
+          if (IsFilterOption(option) != MagickFalse)
             window_type=(FilterType) option;
         }
     }
@@ -1190,7 +1196,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
             option;
 
           option=ParseCommandOption(MagickFilterOptions,MagickFalse,artifact);
-          if ((UndefinedFilter < option) && (option < SentinelFilter))
+          if (IsFilterOption(option) != MagickFalse)
             {
               filter_type= cylindrical != MagickFalse ? JincFilter
                                                      : SincFastFilter;
