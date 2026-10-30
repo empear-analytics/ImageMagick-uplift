@@ -2674,6 +2674,18 @@ static MagickBooleanType AddArtifactOperand (FxInfo * pfx, const char * artifact
   return MagickTrue;
 }
 
+static SymbolE FindSymbolToken (FxInfo * pfx)
+{
+  SymbolE se;
+  for (se = FirstSym; se < sNull; se=(SymbolE) (se+1)) {
+    const char * seStr = Symbols[se-(int) FirstSym].str;
+    if (LocaleCompare (seStr, pfx->token)==0) {
+      break;
+    }
+  }
+  return(se);
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
   MagickBooleanType * needPopAll)
@@ -2831,12 +2843,7 @@ static MagickBooleanType GetOperand (
     */
     {
       SymbolE se;
-      for (se = FirstSym; se < sNull; se=(SymbolE) (se+1)) {
-        const char * seStr = Symbols[se-(int) FirstSym].str;
-        if (LocaleCompare (seStr, pfx->token)==0) {
-          break;
-        }
-      }
+      se = FindSymbolToken (pfx);
       if (se != sNull) {
         fxFltType val = 0;
         (void) AddElement (pfx, val, (int) se);
