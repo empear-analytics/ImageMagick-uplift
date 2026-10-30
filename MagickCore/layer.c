@@ -1275,6 +1275,14 @@ if ( add_frames )
   return(MagickTrue);
 }
 
+static Image *DestroyDuplicateImage(const DisposeType *disposals,
+  const ssize_t i,Image *dup_image)
+{
+  if ( disposals[i-1] == DupDispose )
+    dup_image=DestroyImage(dup_image);
+  return(dup_image);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1555,8 +1563,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
             cleared=MagickFalse;
             bounds[i-1]=bgnd_bounds;
             bounds[i]=try_bounds;
-            if ( disposals[i-1] == DupDispose )
-              dup_image=DestroyImage(dup_image);
+            dup_image=DestroyDuplicateImage(disposals,i,dup_image);
             disposals[i-1]=BackgroundDispose;
 #if DEBUG_OPT_FRAME
     (void) FormatLocaleFile(stderr,"expand_bgnd: accepted\n");
