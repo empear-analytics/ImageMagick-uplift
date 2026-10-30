@@ -390,6 +390,120 @@ static void AccumulateRawMomentRows(const MomentImage *moment_image,
   }
 }
 
+static void ComputeHuInvariants(ChannelMoments *channel_moments,
+  const MomentArrays *moments)
+{
+  const double
+    *const M02 = moments->M02,
+    *const M03 = moments->M03,
+    *const M11 = moments->M11,
+    *const M12 = moments->M12,
+    *const M20 = moments->M20,
+    *const M21 = moments->M21,
+    *const M30 = moments->M30;
+
+  ssize_t
+    c;
+
+  for (c=0; c <= MaxPixelChannels; c++)
+  {
+    /*
+      Compute Hu invariant moments.
+    */
+    channel_moments[c].invariant[0]=M20[c]+M02[c];
+    channel_moments[c].invariant[1]=(M20[c]-M02[c])*(M20[c]-M02[c])+4.0*M11[c]*
+      M11[c];
+    channel_moments[c].invariant[2]=(M30[c]-3.0*M12[c])*(M30[c]-3.0*M12[c])+
+      (3.0*M21[c]-M03[c])*(3.0*M21[c]-M03[c]);
+    channel_moments[c].invariant[3]=(M30[c]+M12[c])*(M30[c]+M12[c])+(M21[c]+
+      M03[c])*(M21[c]+M03[c]);
+    channel_moments[c].invariant[4]=(M30[c]-3.0*M12[c])*(M30[c]+M12[c])*
+      ((M30[c]+M12[c])*(M30[c]+M12[c])-3.0*(M21[c]+M03[c])*(M21[c]+M03[c]))+
+      (3.0*M21[c]-M03[c])*(M21[c]+M03[c])*(3.0*(M30[c]+M12[c])*(M30[c]+M12[c])-
+      (M21[c]+M03[c])*(M21[c]+M03[c]));
+    channel_moments[c].invariant[5]=(M20[c]-M02[c])*((M30[c]+M12[c])*(M30[c]+
+      M12[c])-(M21[c]+M03[c])*(M21[c]+M03[c]))+4.0*M11[c]*(M30[c]+M12[c])*
+      (M21[c]+M03[c]);
+    channel_moments[c].invariant[6]=(3.0*M21[c]-M03[c])*(M30[c]+M12[c])*
+      ((M30[c]+M12[c])*(M30[c]+M12[c])-3.0*(M21[c]+M03[c])*(M21[c]+M03[c]))-
+      (M30[c]-3*M12[c])*(M21[c]+M03[c])*(3.0*(M30[c]+M12[c])*(M30[c]+M12[c])-
+      (M21[c]+M03[c])*(M21[c]+M03[c]));
+    channel_moments[c].invariant[7]=M11[c]*((M30[c]+M12[c])*(M30[c]+M12[c])-
+      (M03[c]+M21[c])*(M03[c]+M21[c]))-(M20[c]-M02[c])*(M30[c]+M12[c])*
+      (M03[c]+M21[c]);
+  }
+}
+
+static void AverageCompositeMoments(const Image *image,
+  const MomentArrays *moments)
+{
+  double
+    *const M00 = moments->M00,
+    *const M01 = moments->M01,
+    *const M02 = moments->M02,
+    *const M03 = moments->M03,
+    *const M10 = moments->M10,
+    *const M11 = moments->M11,
+    *const M12 = moments->M12,
+    *const M20 = moments->M20,
+    *const M21 = moments->M21,
+    *const M22 = moments->M22,
+    *const M30 = moments->M30;
+
+  double
+    channels;
+
+  channels=(double) GetImageChannels(image);
+  M00[CompositePixelChannel]/=channels;
+  M01[CompositePixelChannel]/=channels;
+  M02[CompositePixelChannel]/=channels;
+  M03[CompositePixelChannel]/=channels;
+  M10[CompositePixelChannel]/=channels;
+  M11[CompositePixelChannel]/=channels;
+  M12[CompositePixelChannel]/=channels;
+  M20[CompositePixelChannel]/=channels;
+  M21[CompositePixelChannel]/=channels;
+  M22[CompositePixelChannel]/=channels;
+  M30[CompositePixelChannel]/=channels;
+}
+
+static void NormalizeMoments(const MomentArrays *moments)
+{
+  double
+    *const M00 = moments->M00,
+    *const M01 = moments->M01,
+    *const M02 = moments->M02,
+    *const M03 = moments->M03,
+    *const M10 = moments->M10,
+    *const M11 = moments->M11,
+    *const M12 = moments->M12,
+    *const M20 = moments->M20,
+    *const M21 = moments->M21,
+    *const M22 = moments->M22,
+    *const M30 = moments->M30;
+
+  ssize_t
+    c;
+
+  for (c=0; c <= MaxPixelChannels; c++)
+  {
+    /*
+      Normalize image moments.
+    */
+    M10[c]=0.0;
+    M01[c]=0.0;
+    M11[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(1.0+1.0)/2.0));
+    M20[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+0.0)/2.0));
+    M02[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(0.0+2.0)/2.0));
+    M21[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+1.0)/2.0));
+    M12[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(1.0+2.0)/2.0));
+    M22[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+2.0)/2.0));
+    M30[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(3.0+0.0)/2.0));
+    M03[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(0.0+3.0)/2.0));
+    M00[c]=1.0;
+  }
+}
+
 MagickExport ChannelMoments *GetImageMoments(const Image *image,
   ExceptionInfo *exception)
 {
@@ -405,7 +519,6 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
     moment_image;
 
   double
-    channels,
     M00[2*MaxPixelChannels+1] = { 0.0 },
     M01[2*MaxPixelChannels+1] = { 0.0 },
     M02[2*MaxPixelChannels+1] = { 0.0 },
@@ -479,64 +592,11 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
-  channels=(double) GetImageChannels(image);
-  M00[CompositePixelChannel]/=channels;
-  M01[CompositePixelChannel]/=channels;
-  M02[CompositePixelChannel]/=channels;
-  M03[CompositePixelChannel]/=channels;
-  M10[CompositePixelChannel]/=channels;
-  M11[CompositePixelChannel]/=channels;
-  M12[CompositePixelChannel]/=channels;
-  M20[CompositePixelChannel]/=channels;
-  M21[CompositePixelChannel]/=channels;
-  M22[CompositePixelChannel]/=channels;
-  M30[CompositePixelChannel]/=channels;
+  AverageCompositeMoments(image,&moments);
   ComputeEllipseMoments(channel_moments,&moments);
-  for (c=0; c <= MaxPixelChannels; c++)
-  {
-    /*
-      Normalize image moments.
-    */
-    M10[c]=0.0;
-    M01[c]=0.0;
-    M11[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(1.0+1.0)/2.0));
-    M20[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+0.0)/2.0));
-    M02[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(0.0+2.0)/2.0));
-    M21[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+1.0)/2.0));
-    M12[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(1.0+2.0)/2.0));
-    M22[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+2.0)/2.0));
-    M30[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(3.0+0.0)/2.0));
-    M03[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(0.0+3.0)/2.0));
-    M00[c]=1.0;
-  }
+  NormalizeMoments(&moments);
   image_view=DestroyCacheView(image_view);
-  for (c=0; c <= MaxPixelChannels; c++)
-  {
-    /*
-      Compute Hu invariant moments.
-    */
-    channel_moments[c].invariant[0]=M20[c]+M02[c];
-    channel_moments[c].invariant[1]=(M20[c]-M02[c])*(M20[c]-M02[c])+4.0*M11[c]*
-      M11[c];
-    channel_moments[c].invariant[2]=(M30[c]-3.0*M12[c])*(M30[c]-3.0*M12[c])+
-      (3.0*M21[c]-M03[c])*(3.0*M21[c]-M03[c]);
-    channel_moments[c].invariant[3]=(M30[c]+M12[c])*(M30[c]+M12[c])+(M21[c]+
-      M03[c])*(M21[c]+M03[c]);
-    channel_moments[c].invariant[4]=(M30[c]-3.0*M12[c])*(M30[c]+M12[c])*
-      ((M30[c]+M12[c])*(M30[c]+M12[c])-3.0*(M21[c]+M03[c])*(M21[c]+M03[c]))+
-      (3.0*M21[c]-M03[c])*(M21[c]+M03[c])*(3.0*(M30[c]+M12[c])*(M30[c]+M12[c])-
-      (M21[c]+M03[c])*(M21[c]+M03[c]));
-    channel_moments[c].invariant[5]=(M20[c]-M02[c])*((M30[c]+M12[c])*(M30[c]+
-      M12[c])-(M21[c]+M03[c])*(M21[c]+M03[c]))+4.0*M11[c]*(M30[c]+M12[c])*
-      (M21[c]+M03[c]);
-    channel_moments[c].invariant[6]=(3.0*M21[c]-M03[c])*(M30[c]+M12[c])*
-      ((M30[c]+M12[c])*(M30[c]+M12[c])-3.0*(M21[c]+M03[c])*(M21[c]+M03[c]))-
-      (M30[c]-3*M12[c])*(M21[c]+M03[c])*(3.0*(M30[c]+M12[c])*(M30[c]+M12[c])-
-      (M21[c]+M03[c])*(M21[c]+M03[c]));
-    channel_moments[c].invariant[7]=M11[c]*((M30[c]+M12[c])*(M30[c]+M12[c])-
-      (M03[c]+M21[c])*(M03[c]+M21[c]))-(M20[c]-M02[c])*(M30[c]+M12[c])*
-      (M03[c]+M21[c]);
-  }
+  ComputeHuInvariants(channel_moments,&moments);
   if (y < (ssize_t) image->rows)
     channel_moments=(ChannelMoments *) RelinquishMagickMemory(channel_moments);
   return(channel_moments);
