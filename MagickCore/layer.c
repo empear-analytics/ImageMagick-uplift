@@ -164,6 +164,21 @@ static void ClearBounds(Image *image,RectangleInfo *bounds,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsPixelCleared(const Image *image1,
+  const Quantum *p,const Image *image2,const Quantum *q)
+{
+  return(((GetPixelAlpha(image1,p) >= (Quantum) (QuantumRange/2)) &&
+    (GetPixelAlpha(image2,q) < (Quantum) (QuantumRange/2))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsEitherRowMissing(const Quantum *p,
+  const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType IsBoundsCleared(const Image *image1,
   const Image *image2,RectangleInfo *bounds,ExceptionInfo *exception)
 {
@@ -183,12 +198,11 @@ static MagickBooleanType IsBoundsCleared(const Image *image1,
   {
     p=GetVirtualPixels(image1,bounds->x,bounds->y+y,bounds->width,1,exception);
     q=GetVirtualPixels(image2,bounds->x,bounds->y+y,bounds->width,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     for (x=0; x < (ssize_t) bounds->width; x++)
     {
-      if ((GetPixelAlpha(image1,p) >= (Quantum) (QuantumRange/2)) &&
-          (GetPixelAlpha(image2,q) < (Quantum) (QuantumRange/2)))
+      if (IsPixelCleared(image1,p,image2,q) != MagickFalse)
         break;
       p+=(ptrdiff_t) GetPixelChannels(image1);
       q+=(ptrdiff_t) GetPixelChannels(image2);
