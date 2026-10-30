@@ -4753,6 +4753,73 @@ static void BlurSelectiveChannelSum(const SelectiveChannelSum *blur,
     q);
 }
 
+typedef struct _SelectiveChannel
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image,
+    *luminance_image;
+
+  MagickRealType
+    *kernel;
+
+  const Quantum
+    *p,
+    *l;
+
+  ssize_t
+    center;
+
+  double
+    intensity,
+    threshold;
+
+  size_t
+    width;
+} SelectiveChannel;
+
+static void BlurSelectiveChannel(const SelectiveChannel *selective,
+  const ssize_t i,Quantum *magick_restrict q)
+{
+  PixelChannel
+    channel;
+
+  PixelTrait
+    blur_traits,
+    traits;
+
+  SelectiveChannelSum
+    blur;
+
+  channel=GetPixelChannelChannel(selective->image,i);
+  traits=GetPixelChannelTraits(selective->image,channel);
+  blur_traits=GetPixelChannelTraits(selective->blur_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (blur_traits == UndefinedPixelTrait))
+    return;
+  if ((blur_traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(selective->blur_image,channel,
+        selective->p[selective->center+i],q);
+      return;
+    }
+  blur.image=selective->image;
+  blur.blur_image=selective->blur_image;
+  blur.luminance_image=selective->luminance_image;
+  blur.kernel=selective->kernel;
+  blur.p=selective->p;
+  blur.l=selective->l;
+  blur.center=selective->center;
+  blur.intensity=selective->intensity;
+  blur.threshold=selective->threshold;
+  blur.width=selective->width;
+  blur.channel=channel;
+  blur.blur_traits=blur_traits;
+  BlurSelectiveChannelSum(&blur,i,q);
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -4925,40 +4992,20 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
       intensity=GetPixelIntensity(image,p+center);
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
-        PixelChannel
-          channel;
+        SelectiveChannel
+          selective;
 
-        PixelTrait
-          blur_traits,
-          traits;
-
-        SelectiveChannelSum
-          blur;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        blur_traits=GetPixelChannelTraits(blur_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (blur_traits == UndefinedPixelTrait))
-          continue;
-        if ((blur_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(blur_image,channel,p[center+i],q);
-            continue;
-          }
-        blur.image=image;
-        blur.blur_image=blur_image;
-        blur.luminance_image=luminance_image;
-        blur.kernel=kernel;
-        blur.p=p;
-        blur.l=l;
-        blur.center=center;
-        blur.intensity=intensity;
-        blur.threshold=threshold;
-        blur.width=width;
-        blur.channel=channel;
-        blur.blur_traits=blur_traits;
-        BlurSelectiveChannelSum(&blur,i,q);
+        selective.image=image;
+        selective.blur_image=blur_image;
+        selective.luminance_image=luminance_image;
+        selective.kernel=kernel;
+        selective.p=p;
+        selective.l=l;
+        selective.center=center;
+        selective.intensity=intensity;
+        selective.threshold=threshold;
+        selective.width=width;
+        BlurSelectiveChannel(&selective,i,q);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
       l+=(ptrdiff_t) GetPixelChannels(luminance_image);
