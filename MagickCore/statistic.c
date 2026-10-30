@@ -810,6 +810,20 @@ static void AcquireEvaluateViews(const Image *images,
   }
 }
 
+static MagickBooleanType AcquireDirectImageCanvas(const Image *images,
+  Image **image,ExceptionInfo *exception)
+{
+  *image=AcquireImageCanvas(images,exception);
+  if (*image == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+    {
+      *image=DestroyImage(*image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -852,14 +866,8 @@ MagickExport Image *EvaluateImages(const Image *images,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
-  image=AcquireImageCanvas(images,exception);
-  if (image == (Image *) NULL)
+  if (AcquireDirectImageCanvas(images,&image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    {
-      image=DestroyImage(image);
-      return((Image *) NULL);
-    }
   number_images=GetImageListLength(images);
   evaluate_pixels=AcquirePixelTLS(images);
   if (evaluate_pixels == (PixelChannels **) NULL)
