@@ -1789,23 +1789,14 @@ MagickPrivate char **GetPathComponents(const char *path,
 %
 %
 */
-MagickExport MagickBooleanType GetPathTemplate(char *path)
+static char *GetTemporaryDirectory(void)
 {
   char
-    *directory,
-    *value;
+    *directory;
 
   ExceptionInfo
     *exception;
 
-  MagickBooleanType
-    status;
-
-  struct stat
-    attributes;
-
-  (void) FormatLocaleString(path,MagickPathExtent,"magick-"
-    MagickPathTemplate);
   exception=AcquireExceptionInfo();
   directory=(char *) GetImageRegistry(StringRegistryType,"temporary-path",
     exception);
@@ -1816,6 +1807,24 @@ MagickExport MagickBooleanType GetPathTemplate(char *path)
     directory=GetEnvironmentValue("MAGICK_TMPDIR");
   if (directory == (char *) NULL)
     directory=GetEnvironmentValue("TMPDIR");
+  return(directory);
+}
+
+MagickExport MagickBooleanType GetPathTemplate(char *path)
+{
+  char
+    *directory,
+    *value;
+
+  MagickBooleanType
+    status;
+
+  struct stat
+    attributes;
+
+  (void) FormatLocaleString(path,MagickPathExtent,"magick-"
+    MagickPathTemplate);
+  directory=GetTemporaryDirectory();
 #if defined(MAGICKCORE_WINDOWS_SUPPORT) || defined(__OS2__) || defined(__CYGWIN__)
   if (directory == (char *) NULL)
     directory=GetEnvironmentValue("TMP");
