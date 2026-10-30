@@ -1565,6 +1565,73 @@ static void SetObjectMeanColors(Image *component_image,
     component_image->colormap[i]=object[i].color;
 }
 
+typedef struct _CCAdjacentCensus
+{
+  Image
+    *component_image;
+
+  CacheView
+    *object_view;
+
+  CCObjectInfo
+    *object;
+
+  size_t
+    *neighbors;
+
+  RectangleInfo
+    bounding_box;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    x,
+    y,
+    i;
+
+  ExceptionInfo
+    *exception;
+} CCAdjacentCensus;
+
+static void CountAdjacentObjects(const CCAdjacentCensus *census,
+  MagickBooleanType *status,size_t *count)
+{
+  ssize_t
+    dx,
+    dy,
+    j,
+    k;
+
+  for (k=0; k < (ssize_t) (census->connectivity > 4 ? 4 : 2); k++)
+  {
+    const Quantum
+      *q;
+
+    /*
+      Compute area of adjacent objects.
+    */
+    if (*status == MagickFalse)
+      continue;
+    dx=census->connectivity > 4 ? census->connect8[k][1] :
+      census->connect4[k][1];
+    dy=census->connectivity > 4 ? census->connect8[k][0] :
+      census->connect4[k][0];
+    q=GetCacheViewVirtualPixels(census->object_view,census->bounding_box.x+
+      census->x+dx,census->bounding_box.y+census->y+dy,1,1,census->exception);
+    if (q == (const Quantum *) NULL)
+      {
+        *status=MagickFalse;
+        break;
+      }
+    j=(ssize_t) GetPixelIndex(census->component_image,q);
+    if (j != census->i)
+      *count=AddAdjacentObject(census->object,census->neighbors,j,*count);
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2062,35 +2129,27 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         }
       for (x=0; x < (ssize_t) bounding_box.width; x++)
       {
-        ssize_t
-          k;
+        CCAdjacentCensus
+          census;
 
         if (status == MagickFalse)
           continue;
         j=(ssize_t) GetPixelIndex(component_image,p);
         if (j == i)
-          for (k=0; k < (ssize_t) (connectivity > 4 ? 4 : 2); k++)
           {
-            const Quantum
-              *q;
-
-            /*
-              Compute area of adjacent objects.
-            */
-            if (status == MagickFalse)
-              continue;
-            dx=connectivity > 4 ? connect8[k][1] : connect4[k][1];
-            dy=connectivity > 4 ? connect8[k][0] : connect4[k][0];
-            q=GetCacheViewVirtualPixels(object_view,bounding_box.x+x+dx,
-              bounding_box.y+y+dy,1,1,exception);
-            if (q == (const Quantum *) NULL)
-              {
-                status=MagickFalse;
-                break;
-              }
-            j=(ssize_t) GetPixelIndex(component_image,q);
-            if (j != i)
-              count=AddAdjacentObject(object,neighbors,j,count);
+            census.component_image=component_image;
+            census.object_view=object_view;
+            census.object=object;
+            census.neighbors=neighbors;
+            census.bounding_box=bounding_box;
+            census.connectivity=connectivity;
+            census.connect4=connect4;
+            census.connect8=connect8;
+            census.x=x;
+            census.y=y;
+            census.i=i;
+            census.exception=exception;
+            CountAdjacentObjects(&census,&status,&count);
           }
         p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
