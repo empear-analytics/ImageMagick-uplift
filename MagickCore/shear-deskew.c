@@ -150,6 +150,44 @@ static size_t SumRadonColumnDeltas(MatrixInfo *p,const ssize_t x)
   return(sum);
 }
 
+typedef struct _RadonCell
+{
+  MatrixInfo
+    *p;
+
+  ssize_t
+    x,
+    i;
+
+  size_t
+    step;
+
+  ssize_t
+    y;
+} RadonCell;
+
+static void MergeRadonPair(MatrixInfo *q,const RadonCell *cell)
+{
+  unsigned short
+    element,
+    neighbor;
+
+  if (GetMatrixElement(cell->p,cell->x+cell->i,cell->y,&element) == MagickFalse)
+    return;
+  if (GetMatrixElement(cell->p,cell->x+cell->i+(ssize_t) cell->step,
+      cell->y+cell->i,&neighbor) == MagickFalse)
+    return;
+  neighbor+=element;
+  if (SetMatrixElement(q,cell->x+2*cell->i,cell->y,&neighbor) == MagickFalse)
+    return;
+  if (GetMatrixElement(cell->p,cell->x+cell->i+(ssize_t) cell->step,
+      cell->y+cell->i+1,&neighbor) == MagickFalse)
+    return;
+  neighbor+=element;
+  if (SetMatrixElement(q,cell->x+2*cell->i+1,cell->y,&neighbor) == MagickFalse)
+    return;
+}
+
 static void RadonProjection(MatrixInfo *source_matrices,
   MatrixInfo *destination_matrices,const ssize_t sign,size_t *projection)
 {
@@ -182,18 +220,15 @@ static void RadonProjection(MatrixInfo *source_matrices,
       {
         for (y=0; y < ((ssize_t) GetMatrixRows(p)-i-1); y++)
         {
-          if (GetMatrixElement(p,x+i,y,&element) == MagickFalse)
-            continue;
-          if (GetMatrixElement(p,x+i+(ssize_t) step,y+i,&neighbor) == MagickFalse)
-            continue;
-          neighbor+=element;
-          if (SetMatrixElement(q,x+2*i,y,&neighbor) == MagickFalse)
-            continue;
-          if (GetMatrixElement(p,x+i+(ssize_t) step,y+i+1,&neighbor) == MagickFalse)
-            continue;
-          neighbor+=element;
-          if (SetMatrixElement(q,x+2*i+1,y,&neighbor) == MagickFalse)
-            continue;
+          RadonCell
+            cell;
+
+          cell.p=p;
+          cell.x=x;
+          cell.i=i;
+          cell.step=step;
+          cell.y=y;
+          MergeRadonPair(q,&cell);
         }
         for ( ; y < ((ssize_t) GetMatrixRows(p)-i); y++)
         {
