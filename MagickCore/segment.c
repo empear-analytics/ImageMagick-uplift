@@ -1445,6 +1445,44 @@ static IntervalTree *AcquireRootInterval(void)
   return(root);
 }
 
+typedef struct _IntervalSplit
+{
+  const ZeroCrossing
+    *zero_crossing;
+
+  IntervalTree
+    *head,
+    ***list,
+    *root;
+
+  ssize_t
+    i,
+    left;
+} IntervalSplit;
+
+static MagickBooleanType AppendLastInterval(const IntervalSplit *split,
+  IntervalTree **node)
+{
+  if (split->left != split->head->left)
+    {
+      (*node)->sibling=(IntervalTree *) AcquireQuantumMemory(1,
+        sizeof(*(*node)->sibling));
+      *node=(*node)->sibling;
+      if (*node == (IntervalTree *) NULL)
+        {
+          *split->list=(IntervalTree **) RelinquishMagickMemory(*split->list);
+          FreeNodes(split->root);
+          return(MagickFalse);
+        }
+      (*node)->tau=split->zero_crossing[split->i+1].tau;
+      (*node)->child=(IntervalTree *) NULL;
+      (*node)->sibling=(IntervalTree *) NULL;
+      (*node)->left=split->left;
+      (*node)->right=split->head->right;
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType SplitIntervalList(const ZeroCrossing *zero_crossing,
   const ssize_t i,IntervalTree *root,IntervalTree ***list)
 {
@@ -1468,6 +1506,9 @@ static MagickBooleanType SplitIntervalList(const ZeroCrossing *zero_crossing,
   */
   for (j=0; j < number_nodes; j++)
   {
+    IntervalSplit
+      split;
+
     head=(*list)[j];
     left=head->left;
     node=head;
@@ -1489,23 +1530,14 @@ static MagickBooleanType SplitIntervalList(const ZeroCrossing *zero_crossing,
       node->right=k;
       left=k;
     }
-    if (left != head->left)
-      {
-        node->sibling=(IntervalTree *) AcquireQuantumMemory(1,
-          sizeof(*node->sibling));
-        node=node->sibling;
-        if (node == (IntervalTree *) NULL)
-          {
-            *list=(IntervalTree **) RelinquishMagickMemory(*list);
-            FreeNodes(root);
-            return(MagickFalse);
-          }
-        node->tau=zero_crossing[i+1].tau;
-        node->child=(IntervalTree *) NULL;
-        node->sibling=(IntervalTree *) NULL;
-        node->left=left;
-        node->right=head->right;
-      }
+    split.zero_crossing=zero_crossing;
+    split.head=head;
+    split.list=list;
+    split.root=root;
+    split.i=i;
+    split.left=left;
+    if (AppendLastInterval(&split,&node) == MagickFalse)
+      return(MagickFalse);
   }
   return(MagickTrue);
 }
