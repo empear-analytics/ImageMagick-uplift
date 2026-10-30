@@ -1049,9 +1049,6 @@ static void DecodeDelegateEntity(const char **p,char **q)
         *(*q)++=(**p);
 }
 
-static char *InterpretDelegateProperties(ImageInfo *image_info,
-  Image *image,const char *embed_text,ExceptionInfo *exception)
-{
 #define ExtendInterpretText(string_length) \
 { \
   size_t length=(string_length); \
@@ -1097,6 +1094,9 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
   q+=(ptrdiff_t) length; \
 }
 
+static char *InterpretDelegateProperties(ImageInfo *image_info,
+  Image *image,const char *embed_text,ExceptionInfo *exception)
+{
   char
     *interpret_text,
     *string;
