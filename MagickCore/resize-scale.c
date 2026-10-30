@@ -460,6 +460,47 @@ static void AccumulatePartialScaleColumn(const ScalePartialColumn *partial,
     }
 }
 
+typedef struct _ScaleColumnTail
+{
+  const Image
+    *image;
+
+  const PointInfo
+    *span;
+
+  const double
+    *scanline;
+
+  ssize_t
+    x;
+} ScaleColumnTail;
+
+static void AccumulateScaleColumnTail(const ScaleColumnTail *tail,
+  double *pixel)
+{
+  const Image
+    *const image = tail->image;
+
+  const PointInfo
+    *const span = tail->span;
+
+  const double
+    *const scanline = tail->scanline;
+
+  const ssize_t
+    x = tail->x;
+
+  ssize_t
+    i;
+
+  if ((*span).x > 0)
+    {
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+        pixel[i]+=(*span).x*
+          scanline[(x-1)*(ssize_t) GetPixelChannels(image)+i];
+    }
+}
+
 static void ScaleScanlineX(const Image *image,const Image *scale_image,
   const double *scanline,double *scale_scanline)
 {
@@ -472,6 +513,9 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
   PointInfo
     scale,
     span;
+
+  ScaleColumnTail
+    tail;
 
   ssize_t
     i,
@@ -511,12 +555,11 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
     partial.x=x;
     AccumulatePartialScaleColumn(&partial,&partial_targets);
   }
-  if (span.x > 0)
-    {
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-        pixel[i]+=span.x*
-          scanline[(x-1)*(ssize_t) GetPixelChannels(image)+i];
-    }
+  tail.image=image;
+  tail.span=(&span);
+  tail.scanline=scanline;
+  tail.x=x;
+  AccumulateScaleColumnTail(&tail,pixel);
   if ((next_column == MagickFalse) && (t < (ssize_t) scale_image->columns))
     for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
