@@ -1761,6 +1761,24 @@ static void ScanPropertyBrackets (int * level, char ** p)
   }
 }
 
+static MagickBooleanType GetPropertyNumber (FxInfo * pfx,
+  const char * sProperty, char ** text, fxFltType *val)
+{
+  char * tailptr;
+
+  *val = strtold (*text, &tailptr);
+  if (*text == tailptr) {
+    *text = DestroyString(*text);
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Property", "'%s' text '%s' is not a number at '%s'",
+      sProperty, *text, SetShortExp(pfx));
+    *text = DestroyString(*text);
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
 /* Returns number of characters to swallow.
    Returns "-1" means invalid input.
@@ -1800,7 +1818,6 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
   (void) CopyMagickString (sProperty, pfx->pex, len+1);
   sProperty[len] = '\0';
   {
-    char * tailptr;
     char * text;
     text = InterpretImageProperties (pfx->image->image_info, pfx->image,
        sProperty, pfx->exception);
@@ -1816,18 +1833,8 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
     if (seconds != NULL) {
       if (GetPropertySeconds (pfx, &text, val, seconds) == MagickFalse)
         return -1;
-    } else {
-      *val = strtold (text, &tailptr);
-      if (text == tailptr) {
-        text = DestroyString(text);
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Property", "'%s' text '%s' is not a number at '%s'",
-          sProperty, text, SetShortExp(pfx));
-        text = DestroyString(text);
-        return -1;
-      }
-    }
+    } else if (GetPropertyNumber (pfx, sProperty, &text, val) == MagickFalse)
+      return -1;
     text = DestroyString(text);
   }
   return ((ssize_t) len);
