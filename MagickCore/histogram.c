@@ -271,6 +271,74 @@ static MagickBooleanType AcquireHNodeChild(const HNodeChild *child)
   return(MagickTrue);
 }
 
+typedef struct _HNodeColor
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  HCubeInfo
+    *cube_info;
+
+  HNodeInfo
+    *node_info;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} HNodeColor;
+
+static MagickBooleanType AppendHNodeColor(const HNodeColor *color)
+{
+  const Image
+    *const image = color->image;
+
+  const Quantum
+    *const p = color->p;
+
+  HCubeInfo
+    *const cube_info = color->cube_info;
+
+  HNodeInfo
+    *const node_info = color->node_info;
+
+  const PixelInfo
+    pixel = color->pixel;
+
+  const ssize_t
+    i = color->i;
+
+  ExceptionInfo
+    *const exception = color->exception;
+
+  GrowColorList(node_info,i);
+  if (node_info->list == (PixelInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",
+        image->filename);
+      return(MagickFalse);
+    }
+  node_info->list[i]=pixel;
+  node_info->list[i].red=(double) GetPixelRed(image,p);
+  node_info->list[i].green=(double) GetPixelGreen(image,p);
+  node_info->list[i].blue=(double) GetPixelBlue(image,p);
+  if (image->colorspace == CMYKColorspace)
+    node_info->list[i].black=(double) GetPixelBlack(image,p);
+  node_info->list[i].alpha=(double) GetPixelAlpha(image,p);
+  node_info->list[i].count=1;
+  node_info->number_unique++;
+  cube_info->colors++;
+  return(MagickTrue);
+}
+
 static HCubeInfo *ClassifyImageColors(const Image *image,
   ExceptionInfo *exception)
 {
@@ -329,6 +397,9 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
       break;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
+      HNodeColor
+        color;
+
       /*
         Start at the root and proceed level by level.
       */
@@ -359,24 +430,15 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
         node_info->list[i].count++;
       else
         {
-          GrowColorList(node_info,i);
-          if (node_info->list == (PixelInfo *) NULL)
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                ResourceLimitError,"MemoryAllocationFailed","`%s'",
-                image->filename);
-              return(0);
-            }
-          node_info->list[i]=pixel;
-          node_info->list[i].red=(double) GetPixelRed(image,p);
-          node_info->list[i].green=(double) GetPixelGreen(image,p);
-          node_info->list[i].blue=(double) GetPixelBlue(image,p);
-          if (image->colorspace == CMYKColorspace)
-            node_info->list[i].black=(double) GetPixelBlack(image,p);
-          node_info->list[i].alpha=(double) GetPixelAlpha(image,p);
-          node_info->list[i].count=1;
-          node_info->number_unique++;
-          cube_info->colors++;
+          color.image=image;
+          color.p=p;
+          color.cube_info=cube_info;
+          color.node_info=node_info;
+          color.pixel=pixel;
+          color.i=i;
+          color.exception=exception;
+          if (AppendHNodeColor(&color) == MagickFalse)
+            return(0);
         }
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
