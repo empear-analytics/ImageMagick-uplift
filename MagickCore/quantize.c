@@ -919,6 +919,95 @@ static DoublePixelPacket MoveQNodeMidpoint(DoublePixelPacket mid,
   return(mid);
 }
 
+typedef struct _QNodeDescent
+{
+  QCubeInfo
+    *cube_info;
+
+  const Image
+    *image;
+
+  DoublePixelPacket
+    pixel,
+    midpoint;
+
+  ssize_t
+    count;
+
+  ExceptionInfo
+    *exception;
+} QNodeDescent;
+
+static void DescendClassifyTree(const QNodeDescent *descent,
+  QNodeInfo **node_info,DoublePixelPacket *error)
+{
+  QCubeInfo
+    *const cube_info = descent->cube_info;
+
+  const Image
+    *const image = descent->image;
+
+  const DoublePixelPacket
+    pixel = descent->pixel,
+    midpoint = descent->midpoint;
+
+  const ssize_t
+    count = descent->count;
+
+  ExceptionInfo
+    *const exception = descent->exception;
+
+  double
+    bisect;
+
+  DoublePixelPacket
+    mid;
+
+  size_t
+    id,
+    index,
+    level;
+
+  index=MaxTreeDepth-1;
+  bisect=((double) QuantumRange+1.0)/2.0;
+  mid=midpoint;
+  *node_info=cube_info->root;
+  for (level=1; level <= MaxTreeDepth; level++)
+  {
+    QNodeError
+      node_error;
+
+    bisect*=0.5;
+    id=ColorToQNodeId(cube_info,&pixel,index);
+    mid=MoveQNodeMidpoint(mid,id,bisect);
+    if ((*node_info)->child[id] == (QNodeInfo *) NULL)
+      {
+        /*
+          Set colors of new node to contain pixel.
+        */
+        (*node_info)->child[id]=GetQNodeInfo(cube_info,id,level,*node_info);
+        if ((*node_info)->child[id] == (QNodeInfo *) NULL)
+          {
+            (void) ThrowMagickException(exception,GetMagickModule(),
+              ResourceLimitError,"MemoryAllocationFailed","`%s'",
+              image->filename);
+            continue;
+          }
+        if (level == MaxTreeDepth)
+          cube_info->colors++;
+      }
+    /*
+      Approximate the quantization error represented by this node.
+    */
+    *node_info=(*node_info)->child[id];
+    node_error.cube_info=cube_info;
+    node_error.node_info=*node_info;
+    node_error.count=count;
+    *error=AddQNodeQuantizeError(&node_error,pixel,mid,*error);
+    index--;
+  }
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -938,6 +1027,9 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
 
   MagickBooleanType
     proceed;
+
+  QNodeDescent
+    descent;
 
   QNodeInfo
     *node_info;
@@ -982,44 +1074,13 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
       */
       count=GetPixelRunLength(image,p,x);
       AssociateAlphaPixel(image,cube_info,p,&pixel);
-      index=MaxTreeDepth-1;
-      bisect=((double) QuantumRange+1.0)/2.0;
-      mid=midpoint;
-      node_info=cube_info->root;
-      for (level=1; level <= MaxTreeDepth; level++)
-      {
-        QNodeError
-          node_error;
-
-        bisect*=0.5;
-        id=ColorToQNodeId(cube_info,&pixel,index);
-        mid=MoveQNodeMidpoint(mid,id,bisect);
-        if (node_info->child[id] == (QNodeInfo *) NULL)
-          {
-            /*
-              Set colors of new node to contain pixel.
-            */
-            node_info->child[id]=GetQNodeInfo(cube_info,id,level,node_info);
-            if (node_info->child[id] == (QNodeInfo *) NULL)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed","`%s'",
-                  image->filename);
-                continue;
-              }
-            if (level == MaxTreeDepth)
-              cube_info->colors++;
-          }
-        /*
-          Approximate the quantization error represented by this node.
-        */
-        node_info=node_info->child[id];
-        node_error.cube_info=cube_info;
-        node_error.node_info=node_info;
-        node_error.count=count;
-        error=AddQNodeQuantizeError(&node_error,pixel,mid,error);
-        index--;
-      }
+      descent.cube_info=cube_info;
+      descent.image=image;
+      descent.pixel=pixel;
+      descent.midpoint=midpoint;
+      descent.count=count;
+      descent.exception=exception;
+      DescendClassifyTree(&descent,&node_info,&error);
       /*
         Sum RGB for this leaf for later derivation of the mean cube color.
       */
