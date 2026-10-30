@@ -2371,6 +2371,14 @@ MagickExport size_t MultilineCensus(const char *label)
 %    o path:  Specifies a path to a file.
 %
 */
+static void GetShredQuantum(const int file,size_t *quantum,
+  struct stat *file_stats)
+{
+  (*quantum)=(size_t) MagickMinBufferExtent;
+  if ((fstat(file,&(*file_stats)) == 0) && ((*file_stats).st_size > 0))
+    (*quantum)=(size_t) MagickMin((*file_stats).st_size,MagickMinBufferExtent);
+}
+
 typedef struct _ShredPass
 {
   int
@@ -2467,9 +2475,7 @@ MagickPrivate MagickBooleanType ShredFile(const char *path)
   file=open_utf8(path,O_WRONLY | O_CLOEXEC | O_EXCL | O_BINARY,S_MODE);
   if (file == -1)
     return(MagickFalse);
-  quantum=(size_t) MagickMinBufferExtent;
-  if ((fstat(file,&file_stats) == 0) && (file_stats.st_size > 0))
-    quantum=(size_t) MagickMin(file_stats.st_size,MagickMinBufferExtent);
+  GetShredQuantum(file,&quantum,&file_stats);
   length=(MagickSizeType) file_stats.st_size;
   random_info=AcquireRandomInfo();
   key=GetRandomKey(random_info,quantum);
