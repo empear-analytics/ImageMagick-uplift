@@ -823,6 +823,23 @@ static void Scale2X(const Image *magick_unused(source),const Quantum *pixels,
       CopyPixels(&magnify,4,3);
 }
 
+static inline MagickBooleanType IsEpbx2XCornerConsistent(
+  const Quantum *pixels,const size_t channels)
+{
+  return((
+        (
+          !PixelsEqual(pixels,0,8,channels) ||
+           PixelsEqual(pixels,4,6,channels) ||
+           PixelsEqual(pixels,3,2,channels)
+        ) &&
+        (
+          !PixelsEqual(pixels,6,2,channels) ||
+           PixelsEqual(pixels,4,0,channels) ||
+           PixelsEqual(pixels,4,8,channels)
+        )
+  ) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsEpbx2XBlendable(const Quantum *pixels,
   const size_t channels)
 {
@@ -834,18 +851,7 @@ static inline MagickBooleanType IsEpbx2XBlendable(const Quantum *pixels,
       PixelsEqual(pixels,4,7,channels) ||
       PixelsEqual(pixels,4,5,channels) ||
       PixelsEqual(pixels,4,1,channels) ||
-      (
-        (
-          !PixelsEqual(pixels,0,8,channels) ||
-           PixelsEqual(pixels,4,6,channels) ||
-           PixelsEqual(pixels,3,2,channels)
-        ) &&
-        (
-          !PixelsEqual(pixels,6,2,channels) ||
-           PixelsEqual(pixels,4,0,channels) ||
-           PixelsEqual(pixels,4,8,channels)
-        )
-      )
+      (IsEpbx2XCornerConsistent(pixels,channels) != MagickFalse)
     )
   ) ? MagickTrue : MagickFalse);
 }
