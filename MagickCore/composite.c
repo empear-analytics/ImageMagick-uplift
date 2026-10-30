@@ -1023,6 +1023,35 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
   return(mean_image);
 }
 
+typedef struct _ResidualPixels
+{
+  const Image
+    *beta_image;
+
+  const Quantum
+    *p,
+    *q;
+
+  double
+    Da,
+    Sa;
+} ResidualPixels;
+
+static double GetResidualDistance(const ResidualPixels *residual,
+  const PixelChannel channel,const ssize_t i)
+{
+  double
+    distance;
+
+  if (channel == AlphaPixelChannel)
+    distance=QuantumScale*((double) residual->p[i]-(double) GetPixelChannel(
+      residual->beta_image,channel,residual->q));
+  else
+    distance=QuantumScale*(residual->Sa*(double) residual->p[i]-residual->Da*
+      (double) GetPixelChannel(residual->beta_image,channel,residual->q));
+  return(distance);
+}
+
 static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
   const Image *beta_image,double *residual,ExceptionInfo *exception)
 {
@@ -1093,17 +1122,20 @@ static MagickBooleanType BlendRMSEResidual(const Image *alpha_image,
         double
           distance;
 
+        ResidualPixels
+          residual;
+
         PixelChannel channel = GetPixelChannelChannel(alpha_image,i);
         PixelTrait traits = GetPixelChannelTraits(alpha_image,channel);
         PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
         if (IsBlendChannelSkipped(traits,beta_traits) != MagickFalse)
           continue;
-        if (channel == AlphaPixelChannel)
-          distance=QuantumScale*((double) p[i]-(double) GetPixelChannel(
-            beta_image,channel,q));
-        else
-          distance=QuantumScale*(Sa*(double) p[i]-Da*(double) GetPixelChannel(
-            beta_image,channel,q));
+        residual.beta_image=beta_image;
+        residual.p=p;
+        residual.q=q;
+        residual.Da=Da;
+        residual.Sa=Sa;
+        distance=GetResidualDistance(&residual,channel,i);
         channel_residual+=distance*distance;
       }
       area++;
