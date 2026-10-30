@@ -591,6 +591,15 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
 %
 */
 
+static MagickBooleanType IsOverlayPixelChanged(const double o2,
+  const PixelInfo *p,const PixelInfo *q)
+{
+  if (o2 < ((double) QuantumRange/2.0))
+    return MagickFalse;
+  return(IsFuzzyEquivalencePixelInfo(p,q) == MagickFalse ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType ComparePixels(const LayerMethod method,
   const PixelInfo *p,const PixelInfo *q)
 {
@@ -617,12 +626,7 @@ static MagickBooleanType ComparePixels(const LayerMethod method,
     Overlay would change first pixel by second.
   */
   if (method == CompareOverlayLayer)
-    {
-      if (o2 < ((double) QuantumRange/2.0))
-        return MagickFalse;
-      return(IsFuzzyEquivalencePixelInfo(p,q) == MagickFalse ? MagickTrue :
-        MagickFalse);
-    }
+    return(IsOverlayPixelChanged(o2,p,q));
   return(MagickFalse);
 }
 
