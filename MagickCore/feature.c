@@ -1292,6 +1292,18 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static double GetMeanShiftColorDistance(const PixelInfo mean_pixel,
+  const PixelInfo pixel)
+{
+  double
+    distance;
+
+  distance=(mean_pixel.red-pixel.red)*(mean_pixel.red-pixel.red)+
+    (mean_pixel.green-pixel.green)*(mean_pixel.green-pixel.green)+
+    (mean_pixel.blue-pixel.blue)*(mean_pixel.blue-pixel.blue);
+  return(distance);
+}
+
 static double GetMeanShiftDistance(const PointInfo mean_location,
   const PointInfo previous_location,const PixelInfo mean_pixel,
   const PixelInfo previous_pixel)
@@ -1442,9 +1454,7 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
             status=GetOneCacheViewVirtualPixelInfo(pixel_view,(ssize_t)
               MagickRound(mean_location.x+u),(ssize_t) MagickRound(
               mean_location.y+v),&pixel,exception);
-            distance=(mean_pixel.red-pixel.red)*(mean_pixel.red-pixel.red)+
-              (mean_pixel.green-pixel.green)*(mean_pixel.green-pixel.green)+
-              (mean_pixel.blue-pixel.blue)*(mean_pixel.blue-pixel.blue);
+            distance=GetMeanShiftColorDistance(mean_pixel,pixel);
             if (!(distance <= (color_distance*color_distance)))
               continue;
             sum_location.x+=mean_location.x+u;
