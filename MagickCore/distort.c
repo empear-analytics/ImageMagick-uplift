@@ -3582,6 +3582,57 @@ static PixelInfo AddWeightedControlColor(const SparseControlColor *control,
   return(pixel);
 }
 
+typedef struct _SparseColorWeights
+{
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  double
+    *coeff;
+
+  ssize_t
+    i,
+    j;
+} SparseColorWeights;
+
+static void AccumulateInverseSparseColor(const SparseColorWeights *weights,
+  PixelInfo *pixel,double *denominator)
+{
+  size_t
+    k;
+
+  for (k=0; k<weights->number_arguments; k+=2+weights->number_colors)
+  {
+    double weight =
+        ((double) weights->i-weights->arguments[ k ])*((double) weights->i-weights->arguments[ k ])
+      + ((double) weights->j-weights->arguments[k+1])*((double) weights->j-weights->arguments[k+1]);
+    ssize_t x = (ssize_t) k+2;
+
+    SparseControlColor
+      control;
+
+    weight = pow(weight,weights->coeff[0]); /* inverse of power factor */
+    weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
+    control.image=weights->image;
+    control.sparse_image=weights->sparse_image;
+    control.arguments=weights->arguments;
+    *pixel=AddWeightedControlColor(&control,x,weight,*pixel);
+    *denominator += weight;
+  }
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3735,8 +3786,8 @@ MagickExport Image *SparseColorImage(const Image *image,
             double
               denominator;
 
-            size_t
-              k;
+            SparseColorWeights
+              weights;
 
             if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
               pixel.red=0.0;
@@ -3751,24 +3802,15 @@ MagickExport Image *SparseColorImage(const Image *image,
                 (sparse_image->alpha_trait != UndefinedPixelTrait))
               pixel.alpha=0.0;
             denominator = 0.0;
-            for (k=0; k<number_arguments; k+=2+number_colors)
-            {
-              double weight =
-                  ((double) i-arguments[ k ])*((double) i-arguments[ k ])
-                + ((double) j-arguments[k+1])*((double) j-arguments[k+1]);
-              ssize_t x = (ssize_t) k+2;
-
-              SparseControlColor
-                control;
-
-              weight = pow(weight,coeff[0]); /* inverse of power factor */
-              weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
-              control.image=image;
-              control.sparse_image=sparse_image;
-              control.arguments=arguments;
-              pixel=AddWeightedControlColor(&control,x,weight,pixel);
-              denominator += weight;
-            }
+            weights.image=image;
+            weights.sparse_image=sparse_image;
+            weights.number_arguments=number_arguments;
+            weights.arguments=arguments;
+            weights.number_colors=number_colors;
+            weights.coeff=coeff;
+            weights.i=i;
+            weights.j=j;
+            AccumulateInverseSparseColor(&weights,&pixel,&denominator);
             if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
               pixel.red/=denominator;
             if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
