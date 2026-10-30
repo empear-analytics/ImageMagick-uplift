@@ -985,6 +985,29 @@ MagickExport ThresholdMap *GetThresholdMap(const char *map_id,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ThresholdMap *AcquireThresholdMap(XMLTreeInfo *threshold,
+  XMLTreeInfo *description)
+{
+  const char
+    *attribute,
+    *content;
+
+  ThresholdMap
+    *map;
+
+  map=(ThresholdMap *) AcquireCriticalMemory(sizeof(*map));
+  map->map_id=(char *) NULL;
+  map->description=(char *) NULL;
+  map->levels=(ssize_t *) NULL;
+  attribute=GetXMLTreeAttribute(threshold,"map");
+  if (attribute != (char *) NULL)
+    map->map_id=ConstantString(attribute);
+  content=GetXMLTreeContent(description);
+  if (content != (char *) NULL)
+    map->description=ConstantString(content);
+  return(map);
+}
+
 static XMLTreeInfo *FindThresholdMap(XMLTreeInfo *thresholds,
   const char *map_id)
 {
@@ -1061,16 +1084,7 @@ static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
       thresholds=DestroyXMLTree(thresholds);
       return(map);
     }
-  map=(ThresholdMap *) AcquireCriticalMemory(sizeof(*map));
-  map->map_id=(char *) NULL;
-  map->description=(char *) NULL;
-  map->levels=(ssize_t *) NULL;
-  attribute=GetXMLTreeAttribute(threshold,"map");
-  if (attribute != (char *) NULL)
-    map->map_id=ConstantString(attribute);
-  content=GetXMLTreeContent(description);
-  if (content != (char *) NULL)
-    map->description=ConstantString(content);
+  map=AcquireThresholdMap(threshold,description);
   attribute=GetXMLTreeAttribute(levels,"width");
   if (attribute == (char *) NULL)
     {
