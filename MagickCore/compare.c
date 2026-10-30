@@ -1815,6 +1815,88 @@ static inline MagickBooleanType IsPhaseRowMissing(const Quantum *p,
     MagickTrue : MagickFalse);
 }
 
+typedef struct _PHASEPixel
+{
+  Image
+    *edge_image,
+    *edge_reconstruct;
+
+  const Quantum
+    *p,
+    *q;
+} PHASEPixel;
+
+typedef struct _PHASEPixelTargets
+{
+  double
+    (*channel_image_sum)[MaxPixelChannels+1],
+    (*channel_image_sum_squared)[MaxPixelChannels+1],
+    (*channel_reconstruct_sum)[MaxPixelChannels+1],
+    (*channel_reconstruct_sum_squared)[MaxPixelChannels+1],
+    (*channel_correlation)[MaxPixelChannels+1];
+} PHASEPixelTargets;
+
+static void AccumulatePHASEPixel(const PHASEPixel *phase,
+  const PHASEPixelTargets *targets)
+{
+  Image
+    *const edge_image = phase->edge_image,
+    *const edge_reconstruct = phase->edge_reconstruct;
+
+  const Quantum
+    *const p = phase->p,
+    *const q = phase->q;
+
+  double
+    (*const channel_image_sum)[MaxPixelChannels+1] =
+      targets->channel_image_sum,
+    (*const channel_image_sum_squared)[MaxPixelChannels+1] =
+      targets->channel_image_sum_squared,
+    (*const channel_reconstruct_sum)[MaxPixelChannels+1] =
+      targets->channel_reconstruct_sum,
+    (*const channel_reconstruct_sum_squared)[MaxPixelChannels+1] =
+      targets->channel_reconstruct_sum_squared,
+    (*const channel_correlation)[MaxPixelChannels+1] =
+      targets->channel_correlation;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(edge_image); i++)
+  {
+    double
+      alpha,
+      beta;
+
+    PixelChannel
+      channel;
+
+    PixelTrait
+      reconstruct_traits,
+      traits;
+
+    ssize_t
+      offset;
+
+    channel=GetPixelChannelChannel(edge_image,i);
+    traits=GetPixelChannelTraits(edge_image,channel);
+    reconstruct_traits=GetPixelChannelTraits(edge_reconstruct,channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    offset=GetPixelChannelOffset(edge_reconstruct,channel);
+    if (offset < 0)
+      continue;
+    alpha=QuantumScale*(double) p[i];
+    beta=QuantumScale*(double) q[offset];
+    (*channel_image_sum)[i]+=alpha;
+    (*channel_image_sum_squared)[i]+=alpha*alpha;
+    (*channel_reconstruct_sum)[i]+=beta;
+    (*channel_reconstruct_sum_squared)[i]+=beta*beta;
+    (*channel_correlation)[i]+=alpha*beta;
+  }
+}
+
 static MagickBooleanType GetPHASESimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -1904,6 +1986,12 @@ static MagickBooleanType GetPHASESimilarity(const Image *image,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
+      PHASEPixel
+        phase;
+
+      PHASEPixelTargets
+        targets;
+
       if ((GetPixelReadMask(image,pm) <= (QuantumRange/2)) ||
           (GetPixelReadMask(reconstruct_image,qm) <= (QuantumRange/2)))
         {
@@ -1913,39 +2001,17 @@ static MagickBooleanType GetPHASESimilarity(const Image *image,
           qm+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
           continue;
         }
-      for (i=0; i < (ssize_t) GetPixelChannels(edge_image); i++)
-      {
-        double
-          alpha,
-          beta;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          reconstruct_traits,
-          traits;
-
-        ssize_t
-          offset;
-
-        channel=GetPixelChannelChannel(edge_image,i);
-        traits=GetPixelChannelTraits(edge_image,channel);
-        reconstruct_traits=GetPixelChannelTraits(edge_reconstruct,channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        offset=GetPixelChannelOffset(edge_reconstruct,channel);
-        if (offset < 0)
-          continue;
-        alpha=QuantumScale*(double) p[i];
-        beta=QuantumScale*(double) q[offset];
-        channel_image_sum[i]+=alpha;
-        channel_image_sum_squared[i]+=alpha*alpha;
-        channel_reconstruct_sum[i]+=beta;
-        channel_reconstruct_sum_squared[i]+=beta*beta;
-        channel_correlation[i]+=alpha*beta;
-      }
+      phase.edge_image=edge_image;
+      phase.edge_reconstruct=edge_reconstruct;
+      phase.p=p;
+      phase.q=q;
+      targets.channel_image_sum=(&channel_image_sum);
+      targets.channel_image_sum_squared=(&channel_image_sum_squared);
+      targets.channel_reconstruct_sum=(&channel_reconstruct_sum);
+      targets.channel_reconstruct_sum_squared=
+        (&channel_reconstruct_sum_squared);
+      targets.channel_correlation=(&channel_correlation);
+      AccumulatePHASEPixel(&phase,&targets);
       channel_area++;
       p+=(ptrdiff_t) GetPixelChannels(edge_image);
       q+=(ptrdiff_t) GetPixelChannels(edge_reconstruct);
