@@ -334,6 +334,62 @@ static void ComputeEllipseMoments(ChannelMoments *channel_moments,
   }
 }
 
+typedef struct _MomentImage
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} MomentImage;
+
+static void AccumulateRawMomentRows(const MomentImage *moment_image,
+  double *M00,double *M10,double *M01)
+{
+  const Image
+    *const image = moment_image->image;
+
+  CacheView
+    *const image_view = moment_image->image_view;
+
+  ExceptionInfo
+    *const exception = moment_image->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x;
+
+    /*
+      Compute center of mass (centroid).
+    */
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      MomentPixel
+        moment_pixel;
+
+      moment_pixel.image=image;
+      moment_pixel.p=p;
+      moment_pixel.x=x;
+      moment_pixel.y=y;
+      AccumulateRawMoments(&moment_pixel,M00,M10,M01);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+}
+
 MagickExport ChannelMoments *GetImageMoments(const Image *image,
   ExceptionInfo *exception)
 {
@@ -344,6 +400,9 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
 
   ChannelMoments
     *channel_moments;
+
+  MomentImage
+    moment_image;
 
   double
     channels,
@@ -381,33 +440,10 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
   (void) memset(channel_moments,0,(MaxPixelChannels+1)*
     sizeof(*channel_moments));
   image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
-
-    /*
-      Compute center of mass (centroid).
-    */
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MomentPixel
-        moment_pixel;
-
-      moment_pixel.image=image;
-      moment_pixel.p=p;
-      moment_pixel.x=x;
-      moment_pixel.y=y;
-      AccumulateRawMoments(&moment_pixel,M00,M10,M01);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
+  moment_image.image=image;
+  moment_image.image_view=image_view;
+  moment_image.exception=exception;
+  AccumulateRawMomentRows(&moment_image,M00,M10,M01);
   for (c=0; c <= MaxPixelChannels; c++)
   {
     /*
