@@ -655,6 +655,37 @@ static void AccumulateCorrelationRow(const CorrelationRow *row,
   }
 }
 
+typedef struct _CorrelationStatisticsTargets
+{
+  ChannelStatistics
+    **image_statistics,
+    **reconstruct_statistics;
+} CorrelationStatisticsTargets;
+
+static MagickBooleanType AcquireCorrelationStatistics(const Image *image,
+  const Image *reconstruct_image,ExceptionInfo *exception,
+  const CorrelationStatisticsTargets *targets)
+{
+  ChannelStatistics
+    **const image_statistics = targets->image_statistics,
+    **const reconstruct_statistics = targets->reconstruct_statistics;
+
+  *image_statistics=GetImageStatistics(image,exception);
+  *reconstruct_statistics=GetImageStatistics(reconstruct_image,exception);
+  if ((*image_statistics == (ChannelStatistics *) NULL) ||
+      (*reconstruct_statistics == (ChannelStatistics *) NULL))
+    {
+      if (*image_statistics != (ChannelStatistics *) NULL)
+        *image_statistics=(ChannelStatistics *) RelinquishMagickMemory(
+          *image_statistics);
+      if (*reconstruct_statistics != (ChannelStatistics *) NULL)
+        *reconstruct_statistics=(ChannelStatistics *) RelinquishMagickMemory(
+          *reconstruct_statistics);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetDPCSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -667,6 +698,9 @@ static MagickBooleanType GetDPCSimilarity(const Image *image,
   ChannelStatistics
     *image_statistics,
     *reconstruct_statistics;
+
+  CorrelationStatisticsTargets
+    targets;
 
   double
     norm[MaxPixelChannels+1] = { 0.0 },
@@ -689,19 +723,11 @@ static MagickBooleanType GetDPCSimilarity(const Image *image,
   /*
     Compute the dot product correlation similarity.
   */
-  image_statistics=GetImageStatistics(image,exception);
-  reconstruct_statistics=GetImageStatistics(reconstruct_image,exception);
-  if ((image_statistics == (ChannelStatistics *) NULL) ||
-      (reconstruct_statistics == (ChannelStatistics *) NULL))
-    {
-      if (image_statistics != (ChannelStatistics *) NULL)
-        image_statistics=(ChannelStatistics *) RelinquishMagickMemory(
-          image_statistics);
-      if (reconstruct_statistics != (ChannelStatistics *) NULL)
-        reconstruct_statistics=(ChannelStatistics *) RelinquishMagickMemory(
-          reconstruct_statistics);
-      return(MagickFalse);
-    }
+  targets.image_statistics=(&image_statistics);
+  targets.reconstruct_statistics=(&reconstruct_statistics);
+  if (AcquireCorrelationStatistics(image,reconstruct_image,exception,
+        &targets) == MagickFalse)
+    return(MagickFalse);
   (void) memset(similarity,0,(MaxPixelChannels+1)*sizeof(*similarity));
   SetImageCompareBounds(image,reconstruct_image,&columns,&rows);
   image_view=AcquireVirtualCacheView(image,exception);
