@@ -2237,6 +2237,19 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    assignments and the call.
 7. Where the block stood, write `if (Helper(...,&targets) == MagickFalse) goto L;` (or
    `return(c);`), and check every argument, member and address by reading.
+8. A block whose every exit is the same call of a function-local cleanup-and-throw
+   macro `M(...)`, whose expansion is a run of cleanup statements ending in
+   `return(c);` of one constant `c` (`Classify`'s `ThrowClassifyException`, which frees
+   the cluster list and the `squares` table, then `ThrowBinaryException`), moves with
+   the macro call left in the caller, as Recipe V step 7 leaves `S`: check by script
+   that every exit is the same call with the same arguments; each becomes
+   `return(MagickFalse);`, and the caller writes `if (Helper(...,&targets) ==
+   MagickFalse)` followed by that call, unchanged. Unlike V step 7, the macro may read
+   and write the written variables (step 2): their writes have landed through the
+   members before the helper returns. In this form, a written variable whose address
+   the caller passes only as an argument of calls that keep no copy of it (`memset`, a
+   `static` function of the file that does not store its pointer parameter, checked by
+   reading) still meets step 2; in the block, `&v` becomes `v`.
 
 **Before:**
 
@@ -2363,6 +2376,17 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   fall-through path, with a case that takes the block's writes where one exists; each
   exit is checked by reading against its `return(MagickFalse);`, and
   `refactor_guard.py --calls` moves only `+2`.
+- Under step 8 the macro call does not move: the caller runs the same cleanup and
+  throw, on its own variables, at the same point. On a failure path the helper has run
+  every statement the block ran before that exit, its writes landed in the caller's
+  variables through the members, and it returns at once; the caller runs nothing
+  between the call and the macro, so the macro reads the values it read before (the
+  list `head` starts, the `cluster` the failed allocation left NULL). Whatever the
+  macro writes afterwards is the caller's own business, as before; the helper's
+  pointers are dead by then. A variable whose address went only to `memset` or to a
+  callee that keeps no copy has no second name when the helper runs, so its member
+  aliases nothing; `&v` in the block and `v` (the member's value) are the same address,
+  so the callee receives the same argument.
 - More than four written variables, two labels, two different constants, or a written
   variable whose address the caller takes elsewhere: skip the block.
 
@@ -2910,3 +2934,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | Q | Step 8: an array the block updates element by element counts as one written variable; its member is a pointer to the array's type, `targets.v=(&v);`, and `v[i]` becomes `(*v)[i]` | `compare.c`'s `GetSSIMSimularity` and `GetPHASESimilarity`: five accumulators per pixel, some of them per-channel arrays; step 8 said "written scalar" while step 1 (through Recipe K step 2) already counts such arrays among the written variables. The address of an array points to the same elements, so every update reaches the caller's array in the same order | mandate (2026-10-24) |
 | 2026-10-30 | NEW | SD | Split a Selection at its Default: a `switch` whose groups all end in `break;` moves some of its groups, the `default` group among them, into a new `static void` function with the same `switch (e)` (built as Recipe O or Z builds one); the caller's `switch` keeps the other groups and a `default:` that calls it | `ComplexImages`' operator `switch` (eight labels, depth 4 in the parallel loop): Recipe Z on the whole `switch` gives a cc-9 helper the gate refuses (5.09); the unary group as its own function, then Z on the binary rest, leaves no helper finding, 4.83 to 5.21 in a probe | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | Step 5: a written variable may be a plain struct value the block assigns whole (`error=f(...,error);`); it goes by pointer like a scalar, `*v` at every use, parenthesised before `->` or `.` (`(*node_info)->child[id]`), as Recipe Z does for `start` and `stop`. *Careful* gives the argument: the pointer names the caller's own object, so every member is read and assigned where it was, and nothing is copied in or out | `quantize.c`'s `ClassifyImageColors`: each row loop's tree descent (the level loop with its node creation, nesting 5, a `continue` of the level loop inside) writes the cursor `node_info` and the struct `error` (`DoublePixelPacket`) and reads six inputs; step 5 named only scalars, as the N row of 2026-10-30 noted for `MeanShiftImage`. A probe of both descents: the function leaves Deep, Nested Complexity, cc 26 to 16, 4.05 to 4.24 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | I | Step 8: a block whose every exit is the same call of a function-local cleanup-and-throw macro (cleanup statements, then `return(c);`) moves with the call left in the caller, as V step 7 leaves `S`; the macro may read and write the written variables, whose writes have landed through the members. In this form a written variable whose address the caller passes only to calls that keep no copy (`memset`, a `static` callee that does not store it) meets step 2, `&v` becoming `v` in the block. *Careful* gives the argument | `segment.c`'s `Classify`: the cluster allocation inside its triple `while` (the file's last depth-4 site in an oracle-reached function) writes `cluster`, `head` and, through `DefineRegion(extrema[Blue],&blue)`, `blue`, and leaves through `ThrowClassifyException`, which frees the list from `head`; step 1 refused V step 7's form and step 2 the address of `blue` (passed to `memset` and `DefineRegion`). A probe of the innermost `while`: `Classify` leaves Deep, Nested Complexity, cc 35 to 33, 4.93 to 4.96 | mandate (2026-10-24) |
