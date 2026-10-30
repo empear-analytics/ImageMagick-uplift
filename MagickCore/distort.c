@@ -3651,6 +3651,41 @@ static PixelInfo ClearSparseColor(const Image *image,
   return(pixel);
 }
 
+static PixelInfo InverseSparseColor(const SparseColorWeights *inverse,
+  PixelInfo pixel)
+{
+  double
+    denominator;
+
+  SparseColorWeights
+    weights;
+
+  pixel=ClearSparseColor(inverse->image,inverse->sparse_image,pixel);
+  denominator = 0.0;
+  weights.image=inverse->image;
+  weights.sparse_image=inverse->sparse_image;
+  weights.number_arguments=inverse->number_arguments;
+  weights.arguments=inverse->arguments;
+  weights.number_colors=inverse->number_colors;
+  weights.coeff=inverse->coeff;
+  weights.i=inverse->i;
+  weights.j=inverse->j;
+  AccumulateInverseSparseColor(&weights,&pixel,&denominator);
+  if ((GetPixelRedTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red/=denominator;
+  if ((GetPixelGreenTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green/=denominator;
+  if ((GetPixelBlueTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue/=denominator;
+  if (((GetPixelBlackTraits(inverse->sparse_image) & UpdatePixelTrait) != 0) &&
+      (inverse->image->colorspace == CMYKColorspace))
+    pixel.black/=denominator;
+  if (((GetPixelAlphaTraits(inverse->sparse_image) & UpdatePixelTrait) != 0) &&
+      (inverse->sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha/=denominator;
+  return(pixel);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3801,35 +3836,18 @@ MagickExport Image *SparseColorImage(const Image *image,
           case InverseColorInterpolate:
           case ShepardsColorInterpolate:
           { /* Inverse (Squared) Distance weights average (IDW) */
-            double
-              denominator;
-
             SparseColorWeights
-              weights;
+              inverse;
 
-            pixel=ClearSparseColor(image,sparse_image,pixel);
-            denominator = 0.0;
-            weights.image=image;
-            weights.sparse_image=sparse_image;
-            weights.number_arguments=number_arguments;
-            weights.arguments=arguments;
-            weights.number_colors=number_colors;
-            weights.coeff=coeff;
-            weights.i=i;
-            weights.j=j;
-            AccumulateInverseSparseColor(&weights,&pixel,&denominator);
-            if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.red/=denominator;
-            if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.green/=denominator;
-            if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.blue/=denominator;
-            if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (image->colorspace == CMYKColorspace))
-              pixel.black/=denominator;
-            if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (sparse_image->alpha_trait != UndefinedPixelTrait))
-              pixel.alpha/=denominator;
+            inverse.image=image;
+            inverse.sparse_image=sparse_image;
+            inverse.number_arguments=number_arguments;
+            inverse.arguments=arguments;
+            inverse.number_colors=number_colors;
+            inverse.coeff=coeff;
+            inverse.i=i;
+            inverse.j=j;
+            pixel=InverseSparseColor(&inverse,pixel);
             break;
           }
           case ManhattanColorInterpolate:
