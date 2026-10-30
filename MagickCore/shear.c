@@ -1062,12 +1062,5 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   crop_region.width=(MagickRealType) width;
   crop_region.height=(MagickRealType) height;
   crop_region.rotate=MagickTrue;
-  status=CropToFitImage(&rotate_image,&crop_region,exception);
-  rotate_image->alpha_trait=image->alpha_trait;
-  rotate_image->compose=image->compose;
-  rotate_image->page.width=0;
-  rotate_image->page.height=0;
-  if (status == MagickFalse)
-    rotate_image=DestroyImage(rotate_image);
-  return(rotate_image);
+  return(CropShearedImage(rotate_image,image,crop_region,exception));
 }
