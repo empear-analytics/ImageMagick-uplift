@@ -431,6 +431,17 @@ static MagickBooleanType RadonTransform(const Image *image,
   return(MagickTrue);
 }
 
+static PixelInfo AccumulateBackgroundPixel(const Image *image,
+  const Quantum *magick_restrict p,PixelInfo background)
+{
+  background.red+=QuantumScale*(double) GetPixelRed(image,p);
+  background.green+=QuantumScale*(double) GetPixelGreen(image,p);
+  background.blue+=QuantumScale*(double) GetPixelBlue(image,p);
+  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+    background.alpha+=QuantumScale*(double) GetPixelAlpha(image,p);
+  return(background);
+}
+
 static void SetAverageBackgroundColor(Image *image,const PixelInfo background,
   const double count)
 {
@@ -485,11 +496,7 @@ static void GetImageBackgroundColor(Image *image,const ssize_t offset,
     {
       if ((x >= offset) && (x < ((ssize_t) image->columns-offset)))
         continue;
-      background.red+=QuantumScale*(double) GetPixelRed(image,p);
-      background.green+=QuantumScale*(double) GetPixelGreen(image,p);
-      background.blue+=QuantumScale*(double) GetPixelBlue(image,p);
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        background.alpha+=QuantumScale*(double) GetPixelAlpha(image,p);
+      background=AccumulateBackgroundPixel(image,p,background);
       count++;
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
