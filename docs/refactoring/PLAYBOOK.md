@@ -1609,7 +1609,19 @@ Q and U, whose first step refuses a block containing `goto`.
    `return(c);` becomes `return(MagickFalse);`, one for one, and the caller writes
    `if (Helper(...) == MagickFalse) return(c);`. Steps 1, 2 and 4 hold as written, with
    `return(c);` in place of `goto L;`. A block returning a variable, or two different
-   values, is not this recipe.
+   values, is not this recipe, except under step 7.
+7. A block whose every exit is the same run of cleanup statements `S` followed by
+   `return(v);`, `v` a local of the caller (`GetThresholdMapFile`'s
+   `thresholds=DestroyXMLTree(thresholds); map=DestroyThresholdMap(map); return(map);`),
+   moves with `S` left in the caller: each `S` plus `return(v);` becomes
+   `return(MagickFalse);`, one for one, and the caller writes
+   `if (Helper(...) == MagickFalse) { S return(v); }`, `S` copied unchanged. Check by
+   script that every copy of `S` is identical up to indentation. The block writes no
+   variable `S` or `return(v);` reads or writes (it may write through `v` when `v` is a
+   pointer, passed by value), contains no other `return` and no `goto`, and the caller
+   does nothing after the block but its own statements. Temporaries it writes before
+   reading, and the caller does not read after it, are declared in the new function
+   (Recipe Y). Steps 1 and 4 hold as written, with `S return(v);` in place of `goto L;`.
 
 **Before:**
 
@@ -1670,9 +1682,24 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   `return(c);`. A warning the block throws with `GetMagickModule()` now names the helper
   as its location, which the oracle normalises (`@ warning/LOCATION`); the message text
   is compared as before.
+- Under step 7 the cleanup does not move, so nothing depends on what it computes: the
+  caller runs the same `S` and returns the same `v` as the block did, at the same point.
+  On a failure path the helper runs every statement the block ran before that exit and
+  returns at once; the caller runs nothing between the call and `S`. `S` reads only
+  variables the block does not write, so it sees the values it saw before: the same
+  `thresholds` tree, the same `map` pointer (the block wrote only `map->` members, now
+  through the copy of the pointer). Nor does it matter whether `S` makes `v` NULL:
+  `return(v);` stays the caller's own text. The alternative, the helper running `S` and
+  the caller returning `(ThresholdMap *) NULL`, would rest on reading that
+  `DestroyThresholdMap` returns NULL on every path and would pass `map` by pointer;
+  keeping `S` in the caller needs neither. The helper's pointer copy is dead once it
+  returns, before `S` frees the memory. `refactor_guard.py --calls` shows each call in
+  `S` fall by one per copy that merged into the caller's single `S`.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
-nothing else moved), and steps 1, 2 and 5 checked by reading.
+nothing else moved; under step 7 also `-(k-1)` for each call in `S`, where `k` is the
+number of exits), and steps 1, 2 and 5 (step 7: the identical copies of `S`) checked by
+reading.
 
 **Provenance:** 2026-10-29, from `morphology.c`'s `MorphologyApply`, whose deepest sites
 inside its four nested loops (kernel, stage, compound method, kernel iteration) leave
@@ -1681,7 +1708,10 @@ probe of the work-image clone: nesting 6 to 5, 2.46 to 2.51. Cleanup labels reac
 `goto` also occur in `property.c` and `annotate.c`. Added by Claude Code (Claude Opus
 5.5) during task W07, under the mandate of 2026-10-24. Step 6 (2026-10-29, task W08):
 `MorphologyImage`'s `convolve:scale` setting, which leaves through
-`return((Image *) NULL);` when the kernel clone fails (nesting 4, two bumps).
+`return((Image *) NULL);` when the kernel clone fails (nesting 4, two bumps). Step 7
+(2026-10-30, task W09): `threshold.c`'s `GetThresholdMapFile` (cc 18, 150 lines), whose
+ten validation exits each throw a warning and end in the same destroy of the XML tree
+and the map, then `return(map);`.
 
 ---
 
@@ -2317,3 +2347,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | Q | Step 2: a variable of the caller that the block writes before reading it, and that the caller does not read after the block before writing it again, is declared in the new function and is not one of the four written variables (Recipe J step 3). Step 5: `&v` of a written scalar becomes `v` | `visual-effects.c`'s `SteganoImage`: its column loop (sequential) advances the cursors `c`, `k` and `j` and writes the temporaries `x`, `pixel` and `q`, declared at the top of the function and used nowhere else; step 1 counted six written locals. A probe of the loop as a helper (nine inputs): the function leaves Deep, Nested Complexity, 3.19 to 3.27 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | F | Step 2: a non-`const` array whose every use is an element read or an argument to a `const`-qualified pointer parameter counts as never written, and moves unchanged | `resize.c`'s `AcquireResizeFilter`: its `static double jinc_zeros[16]` (18 lines of Bessel zeros) is only indexed, and passed to `SetJincSupport`'s `const double *`; it is the last data in the function. A probe: with it and four extractions the function leaves Large Method, 5.83 to 6.18. Machine code and data unchanged (objdump on Linux) | mandate (2026-10-24) |
 | 2026-10-30 | NEW | Z | Extract Selection with Out-Parameters Taking an Input Struct: a Recipe O selection whose inputs would give the new function five or more parameters moves to a `static void` function taking a `const` struct of the inputs it only reads (Recipe N's struct) and one pointer per local it sets (Recipe O) | `threshold.c`'s `ColorThresholdImage`: the colorspace `switch` sets `start` and `stop` and reads four inputs (six arguments under O); a probe 4.46 to 4.58 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | V | Step 7: a block whose every exit is the same cleanup run `S` followed by `return(v);` moves with `S` left in the caller: each exit becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) { S return(v); }`; the block may not write what `S` reads or writes. *Careful* gives the argument: the caller runs the same cleanup on the same values and returns the same variable, so nothing rests on the destroy function returning NULL | `threshold.c`'s `GetThresholdMapFile`: its level-parsing tail has four exits of `thresholds=DestroyXMLTree(thresholds); map=DestroyThresholdMap(map); return(map);`, which step 6 refuses (a variable, not a constant). A probe: cc 18 to 12, 150 to 104 lines, 4.60 to 4.71 | owner |
