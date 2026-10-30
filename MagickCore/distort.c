@@ -3465,6 +3465,34 @@ static void ManhattanSparseColor(const SparseColorPoint *point,
   }
 }
 
+static PixelInfo VoronoiSparseColor(const SparseColorPoint *point,
+  PixelInfo pixel)
+{
+  double
+    minimum = MagickMaximumValue;
+
+  size_t
+    k;
+
+  /*
+    Just use the closest control point you can find!
+  */
+  for (k=0; k<point->number_arguments; k+=2+point->number_colors) {
+    double distance = VoronoiDistance(point->i,point->j,point->arguments,k);
+    if ( distance < minimum ) {
+      SparseControlColor
+        control;
+
+      control.image=point->image;
+      control.sparse_image=point->sparse_image;
+      control.arguments=point->arguments;
+      SetSparseControlColor(&control,k,&pixel);
+      minimum = distance;
+    }
+  }
+  return(pixel);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3709,28 +3737,17 @@ MagickExport Image *SparseColorImage(const Image *image,
           case VoronoiColorInterpolate:
           default:
           {
-            double
-              minimum = MagickMaximumValue;
+            SparseColorPoint
+              point;
 
-            size_t
-              k;
-
-            /*
-              Just use the closest control point you can find!
-            */
-            for (k=0; k<number_arguments; k+=2+number_colors) {
-              double distance = VoronoiDistance(i,j,arguments,k);
-              if ( distance < minimum ) {
-                SparseControlColor
-                  control;
-
-                control.image=image;
-                control.sparse_image=sparse_image;
-                control.arguments=arguments;
-                SetSparseControlColor(&control,k,&pixel);
-                minimum = distance;
-              }
-            }
+            point.image=image;
+            point.sparse_image=sparse_image;
+            point.number_arguments=number_arguments;
+            point.arguments=arguments;
+            point.number_colors=number_colors;
+            point.i=i;
+            point.j=j;
+            pixel=VoronoiSparseColor(&point,pixel);
             break;
           }
         }
