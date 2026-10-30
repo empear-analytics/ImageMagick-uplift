@@ -988,6 +988,29 @@ static inline MagickBooleanType IsPropertyEnd(const char *p)
     MagickFalse);
 }
 
+static void DecodeDelegateEntity(const char **p,char **q)
+{
+  if (LocaleNCompare("&lt;",*p,4) == 0)
+    {
+      *(*q)++='<';
+      *p+=(ptrdiff_t) 3;
+    }
+  else
+    if (LocaleNCompare("&gt;",*p,4) == 0)
+      {
+        *(*q)++='>';
+        *p+=(ptrdiff_t) 3;
+      }
+    else
+      if (LocaleNCompare("&amp;",*p,5) == 0)
+        {
+          *(*q)++='&';
+          *p+=(ptrdiff_t) 4;
+        }
+      else
+        *(*q)++=(**p);
+}
+
 static char *InterpretDelegateProperties(ImageInfo *image_info,
   Image *image,const char *embed_text,ExceptionInfo *exception)
 {
@@ -1122,25 +1145,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
       }
       case '&':
       {
-        if (LocaleNCompare("&lt;",p,4) == 0)
-          {
-            *q++='<';
-            p+=(ptrdiff_t) 3;
-          }
-        else
-          if (LocaleNCompare("&gt;",p,4) == 0)
-            {
-              *q++='>';
-              p+=(ptrdiff_t) 3;
-            }
-          else
-            if (LocaleNCompare("&amp;",p,5) == 0)
-              {
-                *q++='&';
-                p+=(ptrdiff_t) 4;
-              }
-            else
-              *q++=(*p);
+        DecodeDelegateEntity(&p,&q);
         continue;
       }
       case '%':
