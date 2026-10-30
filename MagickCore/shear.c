@@ -872,6 +872,11 @@ static MagickBooleanType IsDiscontinuousAngle(const double angle)
     MagickFalse);
 }
 
+static MagickBooleanType IsZeroShear(const PointInfo shear)
+{
+  return(((shear.x == 0.0) && (shear.y == 0.0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ShearImage(const Image *image,const double x_shear,
   const double y_shear,ExceptionInfo *exception)
 {
@@ -903,7 +908,7 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   shear.x=(-tan(DegreesToRadians(fmod(x_shear,360.0))));
   shear.y=tan(DegreesToRadians(fmod(y_shear,360.0)));
-  if ((shear.x == 0.0) && (shear.y == 0.0))
+  if (IsZeroShear(shear) != MagickFalse)
     return(integral_image);
   if (SetImageStorageClass(integral_image,DirectClass,exception) == MagickFalse)
     {
