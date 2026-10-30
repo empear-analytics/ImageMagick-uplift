@@ -254,6 +254,20 @@ static size_t GetCanvasExtent(size_t extent,const size_t size,
   return(extent);
 }
 
+static void CompositeCoalescedFrame(Image *coalesce_image,const Image *next,
+  const char *attribute,ExceptionInfo *exception)
+{
+  if (attribute == (const char *) NULL)
+    (void) CompositeImage(coalesce_image,next,
+      next->alpha_trait != UndefinedPixelTrait ? OverCompositeOp :
+      CopyCompositeOp,MagickTrue,next->page.x,next->page.y,exception);
+  else
+    (void) CompositeImage(coalesce_image,next,
+      LocaleCompare(attribute,"AtopBackgroundAlphaBlend") == 0 ?
+      OverCompositeOp : CopyCompositeOp,MagickTrue,next->page.x,next->page.y,
+      exception);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -360,15 +374,7 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     coalesce_image=GetNextImageInList(coalesce_image);
     coalesce_image->background_color.alpha_trait=BlendPixelTrait;
     attribute=GetImageProperty(next,"webp:mux-blend",exception);
-    if (attribute == (const char *) NULL)
-      (void) CompositeImage(coalesce_image,next,
-        next->alpha_trait != UndefinedPixelTrait ? OverCompositeOp :
-        CopyCompositeOp,MagickTrue,next->page.x,next->page.y,exception);
-    else
-      (void) CompositeImage(coalesce_image,next,
-        LocaleCompare(attribute,"AtopBackgroundAlphaBlend") == 0 ?
-        OverCompositeOp : CopyCompositeOp,MagickTrue,next->page.x,next->page.y,
-        exception);
+    CompositeCoalescedFrame(coalesce_image,next,attribute,exception);
     (void) CloneImageProfiles(coalesce_image,next);
     (void) CloneImageProperties(coalesce_image,next);
     (void) CloneImageArtifacts(coalesce_image,next);
