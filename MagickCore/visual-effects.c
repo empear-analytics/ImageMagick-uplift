@@ -102,6 +102,26 @@
 #include "MagickCore/transform-private.h"
 #include "MagickCore/utility.h"
 #include "MagickCore/visual-effects.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _PlasmaContext
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view,
+    *u_view,
+    *v_view;
+
+  RandomInfo
+    *magick_restrict random_info;
+
+  ExceptionInfo
+    *exception;
+} PlasmaContext;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -1570,10 +1590,8 @@ static void SetPlasmaPixelChannels(const Image *image,
   }
 }
 
-static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
-  CacheView *u_view,CacheView *v_view,RandomInfo *magick_restrict random_info,
-  const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth,
-  ExceptionInfo *exception)
+static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
+  const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
 {
   double
     plasma;
@@ -1612,23 +1630,19 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
       local_info=(*segment);
       local_info.x2=(double) x_mid;
       local_info.y2=(double) y_mid;
-      status=PlasmaImageProxy(image,image_view,u_view,v_view,random_info,
-        &local_info,attenuate,depth,exception);
+      status=PlasmaImageProxy(context,&local_info,attenuate,depth);
       local_info=(*segment);
       local_info.y1=(double) y_mid;
       local_info.x2=(double) x_mid;
-      status&=(MagickStatusType) PlasmaImageProxy(image,image_view,u_view,
-        v_view,random_info,&local_info,attenuate,depth,exception);
+      status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
       local_info=(*segment);
       local_info.x1=(double) x_mid;
       local_info.y2=(double) y_mid;
-      status&=(MagickStatusType) PlasmaImageProxy(image,image_view,u_view,
-        v_view,random_info,&local_info,attenuate,depth,exception);
+      status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
       local_info=(*segment);
       local_info.x1=(double) x_mid;
       local_info.y1=(double) y_mid;
-      status&=(MagickStatusType) PlasmaImageProxy(image,image_view,u_view,
-        v_view,random_info,&local_info,attenuate,depth,exception);
+      status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
       return(status == 0 ? MagickFalse : MagickTrue);
     }
   x_mid=CastDoubleToSsizeT(ceil((segment->x1+segment->x2)/2-0.5));
@@ -1647,30 +1661,31 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
         Left pixel.
       */
       x=CastDoubleToSsizeT(ceil(segment->x1-0.5));
-      u=GetCacheViewVirtualPixels(u_view,x,CastDoubleToSsizeT(ceil(
-        segment->y1-0.5)),1,1,exception);
-      v=GetCacheViewVirtualPixels(v_view,x,CastDoubleToSsizeT(ceil(
-        segment->y2-0.5)),1,1,exception);
-      q=QueueCacheViewAuthenticPixels(image_view,x,y_mid,1,1,exception);
+      u=GetCacheViewVirtualPixels(context->u_view,x,CastDoubleToSsizeT(ceil(
+        segment->y1-0.5)),1,1,context->exception);
+      v=GetCacheViewVirtualPixels(context->v_view,x,CastDoubleToSsizeT(ceil(
+        segment->y2-0.5)),1,1,context->exception);
+      q=QueueCacheViewAuthenticPixels(context->image_view,x,y_mid,1,1,context->exception);
       if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
         return(MagickTrue);
-      SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-      status=SyncCacheViewAuthenticPixels(image_view,exception);
+      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+      status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
       if (fabs(segment->x1-segment->x2) >= MagickEpsilon)
         {
           /*
             Right pixel.
           */
           x=CastDoubleToSsizeT(ceil(segment->x2-0.5));
-          u=GetCacheViewVirtualPixels(u_view,x,CastDoubleToSsizeT(ceil(
-            segment->y1-0.5)),1,1,exception);
-          v=GetCacheViewVirtualPixels(v_view,x,CastDoubleToSsizeT(ceil(
-            segment->y2-0.5)),1,1,exception);
-          q=QueueCacheViewAuthenticPixels(image_view,x,y_mid,1,1,exception);
+          u=GetCacheViewVirtualPixels(context->u_view,x,CastDoubleToSsizeT(ceil(
+            segment->y1-0.5)),1,1,context->exception);
+          v=GetCacheViewVirtualPixels(context->v_view,x,CastDoubleToSsizeT(ceil(
+            segment->y2-0.5)),1,1,context->exception);
+          q=QueueCacheViewAuthenticPixels(context->image_view,x,y_mid,1,1,
+            context->exception);
           if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
             return(MagickFalse);
-          SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-          status=SyncCacheViewAuthenticPixels(image_view,exception);
+          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
         }
     }
   if ((fabs(segment->y1-y_mid) >= MagickEpsilon) ||
@@ -1683,15 +1698,16 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
             Bottom pixel.
           */
           y=CastDoubleToSsizeT(ceil(segment->y2-0.5));
-          u=GetCacheViewVirtualPixels(u_view,CastDoubleToSsizeT(ceil(
-            segment->x1-0.5)),y,1,1,exception);
-          v=GetCacheViewVirtualPixels(v_view,CastDoubleToSsizeT(ceil(
-            segment->x2-0.5)),y,1,1,exception);
-          q=QueueCacheViewAuthenticPixels(image_view,x_mid,y,1,1,exception);
+          u=GetCacheViewVirtualPixels(context->u_view,CastDoubleToSsizeT(ceil(
+            segment->x1-0.5)),y,1,1,context->exception);
+          v=GetCacheViewVirtualPixels(context->v_view,CastDoubleToSsizeT(ceil(
+            segment->x2-0.5)),y,1,1,context->exception);
+          q=QueueCacheViewAuthenticPixels(context->image_view,x_mid,y,1,1,
+            context->exception);
           if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
             return(MagickTrue);
-          SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-          status=SyncCacheViewAuthenticPixels(image_view,exception);
+          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
         }
       if (fabs(segment->y1-segment->y2) >= MagickEpsilon)
         {
@@ -1699,15 +1715,16 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
             Top pixel.
           */
           y=CastDoubleToSsizeT(ceil(segment->y1-0.5));
-          u=GetCacheViewVirtualPixels(u_view,CastDoubleToSsizeT(ceil(
-            segment->x1-0.5)),y,1,1,exception);
-          v=GetCacheViewVirtualPixels(v_view,CastDoubleToSsizeT(ceil(
-            segment->x2-0.5)),y,1,1,exception);
-          q=QueueCacheViewAuthenticPixels(image_view,x_mid,y,1,1,exception);
+          u=GetCacheViewVirtualPixels(context->u_view,CastDoubleToSsizeT(ceil(
+            segment->x1-0.5)),y,1,1,context->exception);
+          v=GetCacheViewVirtualPixels(context->v_view,CastDoubleToSsizeT(ceil(
+            segment->x2-0.5)),y,1,1,context->exception);
+          q=QueueCacheViewAuthenticPixels(context->image_view,x_mid,y,1,1,
+            context->exception);
           if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
             return(MagickTrue);
-          SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-          status=SyncCacheViewAuthenticPixels(image_view,exception);
+          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
         }
     }
   if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) ||
@@ -1718,15 +1735,16 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
       */
       x=CastDoubleToSsizeT(ceil(segment->x1-0.5));
       y=CastDoubleToSsizeT(ceil(segment->y1-0.5));
-      u=GetCacheViewVirtualPixels(u_view,x,y,1,1,exception);
+      u=GetCacheViewVirtualPixels(context->u_view,x,y,1,1,context->exception);
       x=CastDoubleToSsizeT(ceil(segment->x2-0.5));
       y=CastDoubleToSsizeT(ceil(segment->y2-0.5));
-      v=GetCacheViewVirtualPixels(v_view,x,y,1,1,exception);
-      q=QueueCacheViewAuthenticPixels(image_view,x_mid,y_mid,1,1,exception);
+      v=GetCacheViewVirtualPixels(context->v_view,x,y,1,1,context->exception);
+      q=QueueCacheViewAuthenticPixels(context->image_view,x_mid,y_mid,1,1,
+        context->exception);
       if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
         return(MagickTrue);
-      SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-      status=SyncCacheViewAuthenticPixels(image_view,exception);
+      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+      status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
     }
   if ((fabs(segment->x2-segment->x1) < 3.0) &&
       (fabs(segment->y2-segment->y1) < 3.0))
@@ -1746,6 +1764,9 @@ MagickExport MagickBooleanType PlasmaImage(Image *image,
   MagickBooleanType
     status;
 
+  PlasmaContext
+    plasma_context;
+
   RandomInfo
     *random_info;
 
@@ -1759,8 +1780,13 @@ MagickExport MagickBooleanType PlasmaImage(Image *image,
   u_view=AcquireVirtualCacheView(image,exception);
   v_view=AcquireVirtualCacheView(image,exception);
   random_info=AcquireRandomInfo();
-  status=PlasmaImageProxy(image,image_view,u_view,v_view,random_info,segment,
-    attenuate,depth,exception);
+  plasma_context.image=image;
+  plasma_context.image_view=image_view;
+  plasma_context.u_view=u_view;
+  plasma_context.v_view=v_view;
+  plasma_context.random_info=random_info;
+  plasma_context.exception=exception;
+  status=PlasmaImageProxy(&plasma_context,segment,attenuate,depth);
   random_info=DestroyRandomInfo(random_info);
   v_view=DestroyCacheView(v_view);
   u_view=DestroyCacheView(u_view);
