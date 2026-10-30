@@ -347,6 +347,62 @@ static MagickBooleanType FillFloodplaneLeft(const FloodfillRow *row,
   return(MagickTrue);
 }
 
+typedef struct _FloodfillTileView
+{
+  Image
+    *image,
+    *floodplane_image;
+
+  CacheView
+    *floodplane_view,
+    *image_view;
+
+  const DrawInfo
+    *draw_info;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} FloodfillTileView;
+
+static MagickBooleanType TileFloodplaneView(const FloodfillTileView *view)
+{
+  const Quantum
+    *magick_restrict p;
+
+  FloodfillTile
+    tile;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  status=MagickTrue;
+  p=GetCacheViewVirtualPixels(view->floodplane_view,0,view->y,
+    view->image->columns,1,view->exception);
+  q=GetCacheViewAuthenticPixels(view->image_view,0,view->y,view->image->columns,
+    1,view->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  tile.image=view->image;
+  tile.floodplane_image=view->floodplane_image;
+  tile.draw_info=view->draw_info;
+  tile.y=view->y;
+  tile.exception=view->exception;
+  TileFloodplaneRow(&tile,p,q);
+  if (SyncCacheViewAuthenticPixels(view->image_view,view->exception) ==
+      MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -525,34 +581,22 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
-    FloodfillTile
-      tile;
-
-    Quantum
-      *magick_restrict q;
+    FloodfillTileView
+      view;
 
     /*
       Tile fill color onto floodplane.
     */
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(floodplane_view,0,y,image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    tile.image=image;
-    tile.floodplane_image=floodplane_image;
-    tile.draw_info=draw_info;
-    tile.y=y;
-    tile.exception=exception;
-    TileFloodplaneRow(&tile,p,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    view.image=image;
+    view.floodplane_image=floodplane_image;
+    view.floodplane_view=floodplane_view;
+    view.image_view=image_view;
+    view.draw_info=draw_info;
+    view.y=y;
+    view.exception=exception;
+    if (TileFloodplaneView(&view) == MagickFalse)
       status=MagickFalse;
   }
   floodplane_view=DestroyCacheView(floodplane_view);
