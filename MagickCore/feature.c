@@ -417,6 +417,55 @@ static void SetCannyGradientRow(const Image *edge_image,
   }
 }
 
+typedef struct _CannyHysteresis
+{
+  Image
+    *edge_image;
+
+  CacheView
+    *edge_view;
+
+  MatrixInfo
+    *canny_cache;
+
+  double
+    upper_threshold;
+
+  ssize_t
+    y;
+} CannyHysteresis;
+
+static MagickBooleanType TraceCannyEdgeRow(const CannyHysteresis *hysteresis,
+  CannyTrace trace,MagickBooleanType status,ExceptionInfo *exception)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) hysteresis->edge_image->columns; x++)
+  {
+    CannyInfo
+      pixel;
+
+    const Quantum
+      *magick_restrict p;
+
+    /*
+      Edge if pixel gradient higher than upper threshold.
+    */
+    p=GetCacheViewVirtualPixels(hysteresis->edge_view,x,hysteresis->y,1,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      continue;
+    status=GetMatrixElement(hysteresis->canny_cache,x,hysteresis->y,&pixel);
+    if (status == MagickFalse)
+      continue;
+    if ((GetPixelIntensity(hysteresis->edge_image,p) == 0.0) &&
+        (pixel.intensity >= hysteresis->upper_threshold))
+      status=TraceEdges(&trace,x,hysteresis->y,exception);
+  }
+  return(status);
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -592,32 +641,17 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
 
   for (y=0; y < (ssize_t) edge_image->rows; y++)
   {
-    ssize_t
-      x;
+    CannyHysteresis
+      hysteresis;
 
     if (status == MagickFalse)
       continue;
-    for (x=0; x < (ssize_t) edge_image->columns; x++)
-    {
-      CannyInfo
-        pixel;
-
-      const Quantum
-        *magick_restrict p;
-
-      /*
-        Edge if pixel gradient higher than upper threshold.
-      */
-      p=GetCacheViewVirtualPixels(edge_view,x,y,1,1,exception);
-      if (p == (const Quantum *) NULL)
-        continue;
-      status=GetMatrixElement(canny_cache,x,y,&pixel);
-      if (status == MagickFalse)
-        continue;
-      if ((GetPixelIntensity(edge_image,p) == 0.0) &&
-          (pixel.intensity >= upper_threshold))
-        status=TraceEdges(&trace,x,y,exception);
-    }
+    hysteresis.edge_image=edge_image;
+    hysteresis.edge_view=edge_view;
+    hysteresis.canny_cache=canny_cache;
+    hysteresis.upper_threshold=upper_threshold;
+    hysteresis.y=y;
+    status=TraceCannyEdgeRow(&hysteresis,trace,status,exception);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
