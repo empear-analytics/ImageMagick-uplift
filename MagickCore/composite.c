@@ -2080,6 +2080,29 @@ static MagickRealType GetLightenIntensityAlpha(
   return(pixel);
 }
 
+typedef struct _MultiplyAlphaInputs
+{
+  MagickBooleanType
+    compose_sync;
+
+  MagickRealType
+    alpha,
+    Sa,
+    Da;
+} MultiplyAlphaInputs;
+
+static MagickRealType GetMultiplyAlpha(const MultiplyAlphaInputs *multiply,
+  MagickRealType pixel)
+{
+  if (multiply->compose_sync == MagickFalse)
+    {
+      pixel=(double) QuantumRange*multiply->Sa*multiply->Da;
+      return(pixel);
+    }
+  pixel=(double) QuantumRange*multiply->alpha;
+  return(pixel);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3210,12 +3233,14 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               }
               case MultiplyCompositeOp:
               {
-                if (compose_sync == MagickFalse)
-                  {
-                    pixel=(double) QuantumRange*Sa*Da;
-                    break;
-                  }
-                pixel=(double) QuantumRange*alpha;
+                MultiplyAlphaInputs
+                  multiply;
+
+                multiply.compose_sync=compose_sync;
+                multiply.alpha=alpha;
+                multiply.Sa=Sa;
+                multiply.Da=Da;
+                pixel=GetMultiplyAlpha(&multiply,pixel);
                 break;
               }
               case NegateCompositeOp:
