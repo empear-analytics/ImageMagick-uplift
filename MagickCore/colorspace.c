@@ -2122,13 +2122,8 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       /*
         Transform image from CMYK to sRGB.
       */
-      if (image->storage_class == PseudoClass)
-        {
-          if (SyncImage(image,exception) == MagickFalse)
-            return(MagickFalse);
-          if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-            return(MagickFalse);
-        }
+      if (SyncImageToDirectClass(image,exception) == MagickFalse)
+        return(MagickFalse);
       GetPixelInfo(image,&zero);
       image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2180,13 +2175,8 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       /*
         Transform linear GRAY to sRGB colorspace.
       */
-      if (image->storage_class == PseudoClass)
-        {
-          if (SyncImage(image,exception) == MagickFalse)
-            return(MagickFalse);
-          if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-            return(MagickFalse);
-        }
+      if (SyncImageToDirectClass(image,exception) == MagickFalse)
+        return(MagickFalse);
       if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
         return(MagickFalse);
       image_view=AcquireAuthenticCacheView(image,exception);
@@ -2241,13 +2231,8 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       /*
         Transform linear GRAY to sRGB colorspace.
       */
-      if (image->storage_class == PseudoClass)
-        {
-          if (SyncImage(image,exception) == MagickFalse)
-            return(MagickFalse);
-          if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-            return(MagickFalse);
-        }
+      if (SyncImageToDirectClass(image,exception) == MagickFalse)
+        return(MagickFalse);
       if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
         return(MagickFalse);
       image_view=AcquireAuthenticCacheView(image,exception);
@@ -2338,13 +2323,8 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       value=GetImageProperty(image,"white-luminance",exception);
       if (value != (const char *) NULL)
         white_luminance=StringToDouble(value,(char **) NULL);
-      if (image->storage_class == PseudoClass)
-        {
-          if (SyncImage(image,exception) == MagickFalse)
-            return(MagickFalse);
-          if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-            return(MagickFalse);
-        }
+      if (SyncImageToDirectClass(image,exception) == MagickFalse)
+        return(MagickFalse);
       image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static) shared(status) \
@@ -2520,13 +2500,8 @@ static MagickBooleanType TransformsRGBImage(Image *image,
       /*
         Transform linear RGB to sRGB colorspace.
       */
-      if (image->storage_class == PseudoClass)
-        {
-          if (SyncImage(image,exception) == MagickFalse)
-            return(MagickFalse);
-          if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-            return(MagickFalse);
-        }
+      if (SyncImageToDirectClass(image,exception) == MagickFalse)
+        return(MagickFalse);
       image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static) shared(status) \
