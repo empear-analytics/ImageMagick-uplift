@@ -1158,6 +1158,17 @@ static const TypeInfo *GetTypeInfoByFamilyList(const DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static const TypeInfo *GetFamilyTypeInfo(const DrawInfo *draw_info,
+  const TypeInfo *type_info,ExceptionInfo *exception)
+{
+  if (strpbrk(draw_info->family,",'\"") == (char *) NULL)
+    type_info=GetTypeInfoByFamily(draw_info->family,draw_info->style,
+      draw_info->stretch,draw_info->weight,exception);
+  if (type_info == (const TypeInfo *) NULL)
+    type_info=GetTypeInfoByFamilyList(draw_info,type_info,exception);
+  return(type_info);
+}
+
 static MagickBooleanType RenderType(const RenderTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1209,13 +1220,7 @@ static MagickBooleanType RenderType(const RenderTarget *target,
     }
   if ((type_info == (const TypeInfo *) NULL) &&
       (draw_info->family != (const char *) NULL))
-    {
-      if (strpbrk(draw_info->family,",'\"") == (char *) NULL)
-        type_info=GetTypeInfoByFamily(draw_info->family,draw_info->style,
-          draw_info->stretch,draw_info->weight,exception);
-      if (type_info == (const TypeInfo *) NULL)
-        type_info=GetTypeInfoByFamilyList(draw_info,type_info,exception);
-    }
+    type_info=GetFamilyTypeInfo(draw_info,type_info,exception);
   font=GetPolicyValue("system:font");
   if (font != (char *) NULL)
     {
