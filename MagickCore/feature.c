@@ -472,6 +472,25 @@ static MagickBooleanType TraceCannyEdgeRow(const CannyHysteresis *hysteresis,
   return(status);
 }
 
+static CannyInfo SuppressCannyNonMaxima(MatrixInfo *canny_cache,
+  const ssize_t x,const ssize_t y)
+{
+  CannyInfo
+    alpha_pixel,
+    beta_pixel,
+    pixel;
+
+  (void) GetMatrixElement(canny_cache,x,y,&pixel);
+  GetCannyNeighbors(canny_cache,x,y,pixel.orientation,&alpha_pixel,
+    &beta_pixel);
+  pixel.intensity=pixel.magnitude;
+  if ((pixel.magnitude < alpha_pixel.magnitude) ||
+      (pixel.magnitude < beta_pixel.magnitude))
+    pixel.intensity=0;
+  (void) SetMatrixElement(canny_cache,x,y,&pixel);
+  return(pixel);
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -603,18 +622,9 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
     for (x=0; x < (ssize_t) edge_image->columns; x++)
     {
       CannyInfo
-        alpha_pixel,
-        beta_pixel,
         pixel;
 
-      (void) GetMatrixElement(canny_cache,x,y,&pixel);
-      GetCannyNeighbors(canny_cache,x,y,pixel.orientation,&alpha_pixel,
-        &beta_pixel);
-      pixel.intensity=pixel.magnitude;
-      if ((pixel.magnitude < alpha_pixel.magnitude) ||
-          (pixel.magnitude < beta_pixel.magnitude))
-        pixel.intensity=0;
-      (void) SetMatrixElement(canny_cache,x,y,&pixel);
+      pixel=SuppressCannyNonMaxima(canny_cache,x,y);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp critical (MagickCore_CannyEdgeImage)
 #endif
