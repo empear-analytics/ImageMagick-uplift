@@ -840,6 +840,17 @@ static inline MagickBooleanType IsTextMagick(const char *magick)
     (LocaleCompare(magick,"VID") == 0)) ? MagickTrue : MagickFalse);
 }
 
+static char **DestroyFileList(char **filelist,const size_t number_files)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) number_files; j++)
+    filelist[j]=DestroyString(filelist[j]);
+  filelist=(char **) RelinquishMagickMemory(filelist);
+  return(filelist);
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -969,9 +980,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
         break;
     if (j == (ssize_t) number_files)
       {
-        for (j=0; j < (ssize_t) number_files; j++)
-          filelist[j]=DestroyString(filelist[j]);
-        filelist=(char **) RelinquishMagickMemory(filelist);
+        filelist=DestroyFileList(filelist,number_files);
         continue;
       }
     /*
@@ -981,9 +990,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       *number_arguments+count+(ssize_t) number_files+1),sizeof(*vector));
     if (vector == (char **) NULL)
       {
-        for (j=0; j < (ssize_t) number_files; j++)
-          filelist[j]=DestroyString(filelist[j]);
-        filelist=(char **) RelinquishMagickMemory(filelist);
+        filelist=DestroyFileList(filelist,number_files);
         return(MagickFalse);
       }
     for (j=0; j < (ssize_t) number_files; j++)
