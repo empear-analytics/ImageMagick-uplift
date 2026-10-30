@@ -1684,6 +1684,46 @@ MagickExport MagickBooleanType PerceptibleImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _RandomThreshold
+{
+  double
+    min_threshold,
+    max_threshold;
+
+  RandomInfo
+    **random_info;
+
+  int
+    id;
+} RandomThreshold;
+
+static void RandomThresholdPixel(const Image *image,
+  const RandomThreshold *random_threshold,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      threshold;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if ((double) q[i] < random_threshold->min_threshold)
+      threshold=random_threshold->min_threshold;
+    else
+      if ((double) q[i] > random_threshold->max_threshold)
+        threshold=random_threshold->max_threshold;
+      else
+        threshold=((double) QuantumRange*GetPseudoRandomValue(
+          random_threshold->random_info[random_threshold->id]));
+    q[i]=(double) q[i] <= threshold ? 0 : QuantumRange;
+  }
+}
+
 MagickExport MagickBooleanType RandomThresholdImage(Image *image,
   const double min_threshold, const double max_threshold,ExceptionInfo *exception)
 {
@@ -1737,6 +1777,9 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    RandomThreshold
+      random_threshold;
+
     ssize_t
       x;
 
@@ -1750,28 +1793,11 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          threshold;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if ((double) q[i] < min_threshold)
-          threshold=min_threshold;
-        else
-          if ((double) q[i] > max_threshold)
-            threshold=max_threshold;
-          else
-            threshold=((double) QuantumRange*
-              GetPseudoRandomValue(random_info[id]));
-        q[i]=(double) q[i] <= threshold ? 0 : QuantumRange;
-      }
+      random_threshold.min_threshold=min_threshold;
+      random_threshold.max_threshold=max_threshold;
+      random_threshold.random_info=random_info;
+      random_threshold.id=id;
+      RandomThresholdPixel(image,&random_threshold,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
