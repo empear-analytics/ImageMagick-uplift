@@ -634,6 +634,26 @@ static char *Trace8BIMClippath(const Image *image,const char *format,
   return(path);
 }
 
+static void Read8BIMResourceName(char **resource,const unsigned char **info,
+  size_t *length,const ssize_t count)
+{
+  ssize_t
+    i;
+
+  if ((count != 0) && ((size_t) count <= (*length)))
+    {
+      if (~((size_t) count) >= (MagickPathExtent-1))
+        *resource=(char *) AcquireQuantumMemory((size_t) count+
+          MagickPathExtent,sizeof(*(*resource)));
+      if (*resource != (char *) NULL)
+        {
+          for (i=0; i < (ssize_t) count; i++)
+            (*resource)[i]=(char) ReadPropertyByte(&(*info),&(*length));
+          (*resource)[count]='\0';
+        }
+    }
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -662,7 +682,6 @@ static void Get8BIMProperty(const Image *image,const char *key,
 
   ssize_t
     count,
-    i,
     id,
     sub_number;
 
@@ -707,18 +726,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
     if (resource != (char *) NULL)
       resource=DestroyString(resource);
     count=(ssize_t) ReadPropertyByte(&info,&length);
-    if ((count != 0) && ((size_t) count <= length))
-      {
-        if (~((size_t) count) >= (MagickPathExtent-1))
-          resource=(char *) AcquireQuantumMemory((size_t) count+
-            MagickPathExtent,sizeof(*resource));
-        if (resource != (char *) NULL)
-          {
-            for (i=0; i < (ssize_t) count; i++)
-              resource[i]=(char) ReadPropertyByte(&info,&length);
-            resource[count]='\0';
-          }
-      }
+    Read8BIMResourceName(&resource,&info,&length,count);
     if ((count & 0x01) == 0)
       (void) ReadPropertyByte(&info,&length);
     count=(ssize_t) ReadPropertyMSBLong(&info,&length);
