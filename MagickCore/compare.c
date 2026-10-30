@@ -133,6 +133,71 @@ static inline MagickBooleanType IsCompareRowMissing(const Quantum *p,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _CompareHighlightRow
+{
+  Image
+    *image;
+
+  const Image
+    *reconstruct_image;
+
+  Image
+    *highlight_image;
+
+  PixelInfo
+    highlight,
+    lowlight,
+    masklight;
+
+  size_t
+    columns;
+} CompareHighlightRow;
+
+static void HighlightCompareRow(const CompareHighlightRow *row,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q,
+  Quantum *magick_restrict r)
+{
+  Image
+    *const image = row->image;
+
+  const Image
+    *const reconstruct_image = row->reconstruct_image;
+
+  Image
+    *const highlight_image = row->highlight_image;
+
+  const PixelInfo
+    highlight = row->highlight,
+    lowlight = row->lowlight,
+    masklight = row->masklight;
+
+  const size_t
+    columns = row->columns;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
+        (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
+      {
+        SetPixelViaPixelInfo(highlight_image,&masklight,r);
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
+        r+=(ptrdiff_t) GetPixelChannels(highlight_image);
+        continue;
+      }
+    if (IsFuzzyEquivalencePixel(image,p,reconstruct_image,q) == MagickFalse)
+      SetPixelViaPixelInfo(highlight_image,&highlight,r);
+    else
+      SetPixelViaPixelInfo(highlight_image,&lowlight,r);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
+    r+=(ptrdiff_t) GetPixelChannels(highlight_image);
+  }
+}
+
 MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
   const MetricType metric,double *distortion,ExceptionInfo *exception)
 {
@@ -236,14 +301,14 @@ MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
       *magick_restrict p,
       *magick_restrict q;
 
+    CompareHighlightRow
+      row;
+
     MagickBooleanType
       sync;
 
     Quantum
       *magick_restrict r;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -255,25 +320,14 @@ MagickExport Image *CompareImages(Image *image,const Image *reconstruct_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
-        {
-          SetPixelViaPixelInfo(highlight_image,&masklight,r);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-          r+=(ptrdiff_t) GetPixelChannels(highlight_image);
-          continue;
-        }
-      if (IsFuzzyEquivalencePixel(image,p,reconstruct_image,q) == MagickFalse)
-        SetPixelViaPixelInfo(highlight_image,&highlight,r);
-      else
-        SetPixelViaPixelInfo(highlight_image,&lowlight,r);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-      r+=(ptrdiff_t) GetPixelChannels(highlight_image);
-    }
+    row.image=image;
+    row.reconstruct_image=reconstruct_image;
+    row.highlight_image=highlight_image;
+    row.highlight=highlight;
+    row.lowlight=lowlight;
+    row.masklight=masklight;
+    row.columns=columns;
+    HighlightCompareRow(&row,p,q,r);
     sync=SyncCacheViewAuthenticPixels(highlight_view,exception);
     if (sync == MagickFalse)
       status=MagickFalse;
