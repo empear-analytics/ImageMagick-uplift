@@ -637,6 +637,19 @@ static void MinorAxisThreshold(const Image *component_image,
   }
 }
 
+static PointInfo GetEllipseAxes(const double M00,const double M11,
+  const double M20,const double M02)
+{
+  PointInfo
+    ellipse_axis = { 0.0, 0.0 };
+
+  ellipse_axis.x=sqrt((2.0*MagickSafeReciprocal(M00))*((M20+M02)+
+    sqrt(4.0*M11*M11+(M20-M02)*(M20-M02))));
+  ellipse_axis.y=sqrt((2.0*MagickSafeReciprocal(M00))*((M20+M02)-
+    sqrt(4.0*M11*M11+(M20-M02)*(M20-M02))));
+  return(ellipse_axis);
+}
+
 static void EccentricityThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -714,10 +727,7 @@ static void EccentricityThreshold(const Image *component_image,
       AccumulateSecondMoments(&moment_row,&moment_sums);
     }
     component_view=DestroyCacheView(component_view);
-    ellipse_axis.x=sqrt((2.0*MagickSafeReciprocal(M00))*((M20+M02)+
-      sqrt(4.0*M11*M11+(M20-M02)*(M20-M02))));
-    ellipse_axis.y=sqrt((2.0*MagickSafeReciprocal(M00))*((M20+M02)-
-      sqrt(4.0*M11*M11+(M20-M02)*(M20-M02))));
+    ellipse_axis=GetEllipseAxes(M00,M11,M20,M02);
     object[i].metric[metric_index]=sqrt(1.0-(ellipse_axis.y*ellipse_axis.y*
       MagickSafeReciprocal(ellipse_axis.x*ellipse_axis.x)));
   }
