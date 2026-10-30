@@ -242,6 +242,18 @@ static MagickBooleanType IsBoundsCleared(const Image *image1,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static size_t GetCanvasExtent(size_t extent,const size_t size,
+  const ssize_t offset)
+{
+  if (extent == 0)
+    {
+      extent=size;
+      if (offset > 0)
+        extent+=(size_t) offset;
+    }
+  return(extent);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -266,18 +278,8 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   next=GetFirstImageInList(image);
   bounds=next->page;
-  if (bounds.width == 0)
-    {
-      bounds.width=next->columns;
-      if (bounds.x > 0)
-        bounds.width+=(size_t) bounds.x;
-    }
-  if (bounds.height == 0)
-    {
-      bounds.height=next->rows;
-      if (bounds.y > 0)
-        bounds.height+=(size_t) bounds.y;
-    }
+  bounds.width=GetCanvasExtent(bounds.width,next->columns,bounds.x);
+  bounds.height=GetCanvasExtent(bounds.height,next->rows,bounds.y);
   bounds.x=0;
   bounds.y=0;
   coalesce_image=CloneImage(next,bounds.width,bounds.height,MagickTrue,
