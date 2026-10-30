@@ -1066,6 +1066,9 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
 4. Cut the block into a new `static` function taking `const Name *name` in place of the
    group. At the top of its body declare one `const` local per member, of the member's
    type and name, initialised from the member; the block's text below is unchanged.
+   Or, instead of the `const` locals, write `name->member` for every use of a member in
+   the block, as Recipe B step 3 allows (Recipe W step 3): the form for a block whose
+   sibling helper unpacks the same members or tests the same channel traits.
 5. In the caller, declare a `Name` local among the declarations at the top of the block
    that holds the call (the loop body, for a call inside a loop), never after a
    statement.
@@ -1148,6 +1151,16 @@ static void ThresholdWaveletLevel(float *pixels,
 - Recipe E's limit on what the block writes stands: one value returned, or writes
   through a pointer the block already used for pixel data. A block writing more is
   skipped, as in Recipe E.
+- In the member form of step 4 each `name->member` reads the same object the `const`
+  local would have been initialised from, at each use instead of once; the struct is
+  the caller's local, filled before the call and written by nothing in the block, so
+  every read gives the value the block's own read of the variable gave. `->` binds
+  tighter than a cast or an arithmetic operator, so `(double) name->i-x` groups as
+  `(double) i-x` did.
+- Two helpers that unpack the same members into `const` locals (the Manhattan and
+  Voronoi nearest-point searches of `SparseColorImage`), or that test the same five
+  channel traits, are reported as *Code Duplication*; the member form removes the
+  shared locals. Keep the step only when no duplication appears.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 2 and 8 checked by reading.
@@ -1187,15 +1200,21 @@ as parameters. K then B is two commits, of which the first adds a finding.
    address is taken elsewhere (Recipe O step 2).
 2. Split what the block touches in two: the variables it writes (the accumulators and
    any cursor it advances, such as `n`), and the variables it only reads. Variables it
-   declares and uses alone move with it, as in Recipe K step 3.
+   declares and uses alone move with it, as in Recipe K step 3. So does a variable of the
+   caller that the block writes before reading it there, and that the caller does not
+   read after the block before writing it again (a loop counter, a fetched pixel): it is
+   declared in the new function instead, as Recipe J step 3 does, and is not one of the
+   four.
 3. Put the read-only variables, scalars and pointers, in a struct as Recipe N steps 2
    and 3 do: one member per variable, the variable's exact type and name, a top-level
    `const` or `magick_restrict` left off. A written variable is never a member.
 4. Cut the block into a new `static void` function taking `const Name *name` first, then
    one pointer per written scalar, in the order the block first writes them. At the
-   top of its body declare one `const` local per member, as Recipe N step 4 does.
+   top of its body declare one `const` local per member, as Recipe N step 4 does, or
+   write `name->member` for every use of a member, as Recipe N step 4 also allows.
 5. In the block's text, write each written scalar `v` as `*v` (`(*v)++` for `v++`) at
-   every use, reads included, as Recipe K step 4 does; nothing else in the text changes.
+   every use, reads included, as Recipe K step 4 does, and its address `&v` (passed on to
+   a helper) as `v`, the same address; nothing else in the text changes.
 6. In the caller, declare the `Name` local at the top of the block holding the call (in
    the parallel loop body, so each thread fills its own), and directly before the call
    assign every member from the variable of its name, in declaration order, with nothing
@@ -1331,12 +1350,20 @@ no `status`. T then B is two commits, of which the first adds a finding.
    parameters. At the top of its body declare one `const` local per member, as Recipe N
    step 4 does; then a local `status` set to `MagickTrue` first, as Recipe T step 5
    does. The block's text is unchanged, and the function ends with `return(status);`.
+   Or, instead of the `const` locals, write `name->member` for every use of a member in
+   the block, as Recipe B step 3 allows (Recipe W step 3).
 4. In the caller, declare the `Name` local among the declarations at the top of the
    block holding the call, inside the parallel loop body, so each thread fills its own.
 5. Directly before the call, assign every member from the variable of its name, in
    declaration order, with nothing between the assignments and the call.
 6. Where the block stood, write `if (Helper(&name,...) == MagickFalse)
    status=MagickFalse;`, and check every member and argument by reading.
+7. A block that is the whole body of a loop inside the parallel loop body (a channel
+   loop), declarations included, may contain `continue;` statements of that loop: each
+   becomes `return(status);`, and the body becomes the declaration of the `Name` local,
+   its assignments and the call, as Recipe E step 7 does for a `void` function. The
+   loop's counter goes by value. The block contains no `break` or `return` of its own,
+   and no `continue` of a loop nested inside it changes.
 
 **Before:**
 
@@ -1411,6 +1438,149 @@ the function leaves Deep, Nested Complexity, fx.c 2.74 to 2.80. Added by Claude 
 
 ---
 
+## Recipe W - Extract Accumulating Block Returning the Loop Status Taking an Input Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
+Method*, *Complex Method* or *Large Method*, and the block that would fix it meets Recipe J
+in every respect but one: with the variables it only reads as parameters, the new
+function would take five or more arguments (*Excess Number of Function Arguments*, which
+the pre-commit gate refuses on a new function). The typical case is a filter's
+per-channel kernel sum that fetches each tap from a cache view (`status=MagickFalse;` when
+the fetch fails) and adds into `pixel` and a kernel cursor `k`, reading the view, the
+offsets, the coordinates, the channel and `exception`.
+
+**Not covered by:** Recipe J, which passes every input as a parameter (nine to eleven
+arguments on `MotionBlurImage`'s kernel loops, M101); Recipe Q, whose block may not write
+`status`; Recipe U, which returns the status but passes no accumulator back; Recipe N,
+which refuses both. J then B is two commits, of which the first adds a finding.
+
+**How:**
+
+1. The block meets Recipe J steps 1 to 3: it lies in one iteration of a parallel loop
+   body with no `#pragma omp` line, no `return` or `goto`, and no `continue` or `break`
+   that leaves it; its only write to a variable declared outside the loop body is
+   `status=MagickFalse;`, and it does not read `status`; it writes at most four of the
+   loop body's own accumulators and cursors, each read after it or read in it before it
+   is written; every other loop-body variable it writes is declared in the block or not
+   read after it before being written again (declared in the new function instead).
+2. Put the variables it only reads, scalars and pointers, none written in the block, in
+   a struct as Recipe N steps 2 and 3 do: one member per variable, the variable's exact
+   type and name, a top-level `const` or `magick_restrict` left off. A written variable
+   is never a member.
+3. Cut the block into a new `static MagickBooleanType` function taking `const Name *name`
+   first, then one pointer per written accumulator or cursor, in the order the block
+   first writes them, at most four parameters in all. At the top of its body declare one
+   `const` local per member, as Recipe N step 4 does, then a local `status` set to
+   `MagickTrue` first, as Recipe J step 4 does. Or, instead of the `const` locals, write
+   `name->member` for every use of a member in the block, as Recipe B step 3 allows:
+   the form for a block whose sibling helper unpacks the same members.
+4. In the block's text write each written variable `v` as `*v` at every use, reads
+   included (`(*v)++` for `v++`, `(**k)` for `(*k)` where `k` is a pointer cursor), as
+   Recipe K step 4 does; every `status=MagickFalse;` stays; the function ends with
+   `return(status);`. Nothing else in the text changes.
+5. In the caller, declare the `Name` local at the top of the block holding the call, in
+   the parallel loop body, so each thread fills its own.
+6. Directly before the call, assign every member from the variable of its name, in
+   declaration order, with nothing between the assignments and the call.
+7. Where the block stood, write `if (Helper(&name,&v,...) == MagickFalse)
+   status=MagickFalse;`, and check every member and argument by reading.
+
+**Before:**
+
+```c
+        k=kernel;
+        pixel=0.0;
+        if ((blur_traits & BlendPixelTrait) == 0)
+          {
+            for (j=0; j < (ssize_t) width; j++)
+            {
+              r=GetCacheViewVirtualPixels(motion_view,x+offset[j].x,y+
+                offset[j].y,1,1,exception);
+              if (r == (const Quantum *) NULL)
+                {
+                  status=MagickFalse;
+                  continue;
+                }
+              pixel+=(*k)*(double) r[i];
+              k++;
+            }
+            SetPixelChannel(blur_image,channel,ClampToQuantum(pixel),q);
+            continue;
+          }
+```
+
+**After:**
+
+```c
+static MagickBooleanType SumMotionPixels(const MotionSum *sum,double *pixel,
+  MagickRealType **k)
+{
+  CacheView
+    *const motion_view = sum->motion_view;
+  ...
+  status=MagickTrue;
+  for (j=0; j < (ssize_t) width; j++)
+  {
+    r=GetCacheViewVirtualPixels(motion_view,x+offset[j].x,y+
+      offset[j].y,1,1,exception);
+    if (r == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    *pixel+=(**k)*(double) r[i];
+    (*k)++;
+  }
+  return(status);
+}
+...
+        if ((blur_traits & BlendPixelTrait) == 0)
+          {
+            sum.motion_view=motion_view;
+            ...
+            sum.exception=exception;
+            if (SumMotionPixels(&sum,&pixel,&k) == MagickFalse)
+              status=MagickFalse;
+            SetPixelChannel(blur_image,channel,ClampToQuantum(pixel),q);
+            continue;
+          }
+```
+
+**Careful:**
+
+- The three parts keep the arguments of the recipes they come from. The write to the
+  shared `status` moves to the end of the block (Recipe T): the block does not read
+  `status`, and OpenMP orders this unsynchronised write against no other thread. The
+  accumulators and cursors are the iteration's own and change through `*v`, the same
+  operations on the same objects in the same order (Recipe K). The members are copied
+  directly before the call from variables the block does not write (Recipe N).
+- A `continue` of a loop inside the block after `status=MagickFalse;` stays in the new
+  function and skips the same iteration of the same loop; a block that tests `status` is
+  not this recipe.
+- A cursor the block reads before it writes it (`k`, set to `kernel` before the block) is
+  a written variable, passed by pointer, never a member. A pointer cursor becomes a
+  pointer to a pointer: `(*k)` reads as `(**k)` and `k++` as `(*k)++`.
+- Two blocks that differ only by a line or two (a plain and an alpha-blended sum, which
+  share the fetch and the member locals) become helpers CodeScene reports as *Code
+  Duplication*: extracting both measured 2.06 to 2.01 on `MotionBlurImage` and 2.02 to
+  1.95 on `RotationalBlurImage`. The shared lines are mostly the `const` locals: write
+  the second helper in the member form of step 3 (on `MotionBlurImage`, no duplication,
+  2.18 to 2.20), and keep the step only when no duplication appears.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 7 checked by reading: the oracle runs
+single-threaded.
+
+**Provenance:** 2026-10-29, from `effect.c`'s `MotionBlurImage`, whose plain kernel sum
+(nesting 6: row, column, channel, blend test, tap loop, fetch test) writes `pixel`, the
+cursor `k` and `status` and reads seven variables: Recipe J gives the helper ten
+parameters (refused in M101), Recipes Q and U refuse the status or the accumulator. A
+probe of the plain sum: nesting 6 to 5, effect.c 2.06 to 2.10. The same shape is
+`RotationalBlurImage`'s plain sum. Added by Claude Code (Claude Opus 5.5) during task
+W08, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe V - Extract Block Returning Success for a Cleanup Jump
 
 **Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
@@ -1440,6 +1610,13 @@ Q and U, whose first step refuses a block containing `goto`.
    otherwise skip the block.
 5. Where the block stood, write `if (Helper(...) == MagickFalse) goto L;`, and check
    every argument against its parameter by reading.
+6. A block that leaves the function instead through `return(c);`, where every `return`
+   in the block returns the same constant `c` (a literal, an enum value or a cast null
+   pointer such as `(Image *) NULL`) and contains no `goto`, moves the same way: each
+   `return(c);` becomes `return(MagickFalse);`, one for one, and the caller writes
+   `if (Helper(...) == MagickFalse) return(c);`. Steps 1, 2 and 4 hold as written, with
+   `return(c);` in place of `goto L;`. A block returning a variable, or two different
+   values, is not this recipe.
 
 **Before:**
 
@@ -1494,6 +1671,12 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   against its `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2`.
 - A block that jumps to two labels, or writes two of the caller's variables, is not this
   recipe: skip it.
+- Under step 6 the caller returns the same constant from the same point: every statement
+  the original ran before its `return(c);` has run in the helper, with its writes to `v`
+  landed through the pointer, and the caller runs nothing between the call and its own
+  `return(c);`. A warning the block throws with `GetMagickModule()` now names the helper
+  as its location, which the oracle normalises (`@ warning/LOCATION`); the message text
+  is compared as before.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 2 and 5 checked by reading.
@@ -1503,7 +1686,279 @@ inside its four nested loops (kernel, stage, compound method, kernel iteration) 
 through `goto error_cleanup`, the plateau the earlier W07 pass on the file recorded. A
 probe of the work-image clone: nesting 6 to 5, 2.46 to 2.51. Cleanup labels reached by
 `goto` also occur in `property.c` and `annotate.c`. Added by Claude Code (Claude Opus
-5.5) during task W07, under the mandate of 2026-10-24.
+5.5) during task W07, under the mandate of 2026-10-24. Step 6 (2026-10-29, task W08):
+`MorphologyImage`'s `convolve:scale` setting, which leaves through
+`return((Image *) NULL);` when the kernel clone fails (nesting 4, two bumps).
+
+---
+
+## Recipe Y - Extract Block Returning Success Taking an Input Struct
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Complex
+Method* or *Large Method*, and the block that would fix it meets Recipe V in every respect
+but one: with the variables it only reads as parameters and its written variable as a
+pointer, the new function would take five or more arguments (*Excess Number of Function
+Arguments*, which the pre-commit gate refuses on a new function). The typical case is one
+pixel of a recursive subdivision that fetches its neighbours from cache views and leaves
+through `return(c);` when a fetch fails, reading the views, the segment, the midpoint and
+the noise amplitude.
+
+**Not covered by:** Recipe V, which passes every input as a parameter and skips a block
+that needs more than four (step 4); Recipe N, whose block meets Recipe E and so leaves
+through no `goto` and no `return` of its own; Recipe U, whose block lies in a parallel loop
+and returns the loop status, not a jump. V then B is two commits, of which the first adds
+a finding.
+
+**How:**
+
+1. The block meets Recipe V steps 1 and 2: it lies outside every OpenMP region with no
+   `#pragma` line; it leaves the function only through `goto L;` to one label, or only
+   through `return(c);` of one constant `c` (Recipe V step 6); it writes at most one
+   variable `v` of the caller that the caller reads after it, a plain local whose address
+   is not taken elsewhere.
+2. Every other variable of the caller that the block writes, it writes before reading it
+   in the block, and the caller does not read it after the block before writing it again
+   (a pixel pointer, a coordinate): it is declared in the new function instead, as
+   Recipe J step 3 and Recipe U step 1 do.
+3. Put the variables the block only reads, scalars and pointers, none written in the
+   block, in a struct as Recipe N steps 2 and 3 do: one member per variable, the
+   variable's exact type and name, a top-level `const` or `magick_restrict` left off.
+   Neither `v` nor a variable of step 2 is ever a member.
+4. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller, taking `const Name *name` first and then `v` as a pointer. At the top of its
+   body declare one `const` local per member, as Recipe N step 4 does (or write
+   `name->member` at every use, its member form), then the variables of step 2. In the
+   text write `*v` for every use of `v`, reads included (Recipe V step 4); each `goto L;`
+   or `return(c);` becomes `return(MagickFalse);`, one for one; the function ends with
+   `return(MagickTrue);`. Nothing else in the text changes.
+5. In the caller, declare the `Name` local among the declarations at the top of the block
+   that holds the call. Directly before the call, assign every member from the variable
+   of its name, in declaration order, with nothing between the assignments and the call.
+6. Where the block stood, write `if (Helper(&name,&v) == MagickFalse) goto L;` (or
+   `return(c);`), and check every member and argument by reading.
+
+**Before:**
+
+```c
+  if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) ||
+      (fabs(segment->y1-segment->y2) >= MagickEpsilon))
+    {
+      /*
+        Middle pixel.
+      */
+      x=CastDoubleToSsizeT(ceil(segment->x1-0.5));
+      y=CastDoubleToSsizeT(ceil(segment->y1-0.5));
+      u=GetCacheViewVirtualPixels(context->u_view,x,y,1,1,context->exception);
+      ...
+      if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
+        return(MagickTrue);
+      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+      status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
+    }
+```
+
+**After:**
+
+```c
+static MagickBooleanType SetPlasmaMiddlePixel(const PlasmaMidpoint *midpoint,
+  MagickStatusType *status)
+{
+  const PlasmaContext
+    *const context = midpoint->context;
+  ...
+  ssize_t
+    x,
+    y;
+
+  if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) ||
+      (fabs(segment->y1-segment->y2) >= MagickEpsilon))
+    {
+      ...
+      if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
+        return(MagickFalse);
+      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+      *status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
+    }
+  return(MagickTrue);
+}
+...
+  midpoint.context=context;
+  ...
+  midpoint.plasma=plasma;
+  if (SetPlasmaMiddlePixel(&midpoint,&status) == MagickFalse)
+    return(MagickTrue);
+```
+
+**Careful:**
+
+- The three parts keep the arguments of the recipes they come from. The caller jumps or
+  returns from the same point as before, after every write the block made to `v` has
+  landed through the pointer, and goes on with the next statement where the block fell
+  through (Recipe V). The members are copied directly before the call from variables the
+  block does not write (Recipe N).
+- A variable of step 2 holds nothing the caller reads: the block writes it before its
+  own first read, and the caller writes it again before its next read. The new function's
+  own copy therefore changes no value anyone sees. A variable the block reads before
+  writing it (a cursor carried in) is not one: skip the block.
+- `return(c);` with `c` itself `MagickTrue` becomes `return(MagickFalse);` like any
+  other constant: the helper's result says whether the block fell through, and the
+  caller returns `c` when it did not.
+- The failure paths are mostly cache fetches that no case makes fail: the oracle checks
+  the fall-through path; the jumps are checked by reading, each against its
+  `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2`.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 6 checked by reading.
+
+**Provenance:** 2026-10-30, from `visual-effects.c`'s `PlasmaImageProxy`, whose middle
+pixel leaves through `return(MagickTrue);` when a fetch fails, writes `status` and the
+temporaries `x`, `y`, `u`, `v` and `q`, and reads the context, the segment, both
+midpoints and the plasma amplitude: Recipe V gives the helper six parameters. A probe:
+bumps 5 to 4, 3.12 to 3.19. Its bottom and top pixels have the same shape. Added by
+Claude Code (Claude Opus 5.5) during task W08, under the mandate of 2026-10-24.
+
+---
+
+## Recipe Z - Extract Selection with Out-Parameters Taking an Input Struct
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*,
+and the block that would fix it meets Recipe O in every respect but one: with the
+variables it only reads as parameters and the locals it sets as pointers, the new
+function would take five or more arguments (*Excess Number of Function Arguments*, which
+the pre-commit gate refuses on a new function). The typical case is a colorspace
+`switch` that converts a start and a stop colour together, reading the image, both
+source colours and an illuminant.
+
+**Not covered by:** Recipe O, which passes every input as a parameter (O then B is two
+commits, of which the first adds a finding); Recipe N, whose block writes one value or
+through a pixel pointer, and keeps written variables out of its struct; Recipe Q, whose
+block is a per-pixel accumulation in a parallel loop body or in a function with no
+OpenMP region, not a selection beside a parallel loop; Recipe Y, whose block leaves
+through a jump or a `return`.
+
+**How:**
+
+1. The block meets Recipe O steps 1 to 3: it lies outside every OpenMP region (or in a
+   parallel loop body under O step 1's condition) with no `#pragma` line; every variable
+   it writes is a plain local of the caller whose address is not taken elsewhere, at
+   most four of them; it contains no `return`, `goto`, or `continue` or `break` that
+   leaves it.
+2. Put the variables the block only reads, scalars and pointers, none written in the
+   block, in a struct as Recipe N steps 2 and 3 do: one member per variable, the
+   variable's exact type and name, a top-level `const` or `magick_restrict` left off. A
+   written variable is never a member.
+3. Cut the block into a new `static void` function directly above the caller, taking
+   `const Name *name` first, then one pointer per written variable, in the order the
+   block first writes them. At the top of its body declare one `const` local per member,
+   as Recipe N step 4 does, or write `name->member` at every use of a member.
+4. In the block's text write each written variable `v` as `(*v)` at every use, reads
+   and address-of included (`&start.red` becomes `&(*start).red`), as Recipe O step 5
+   does. Nothing else in the text changes.
+5. In the caller, declare the `Name` local among the declarations at the top of the
+   block that holds the call. Directly before the call, assign every member from the
+   variable of its name, in declaration order, with nothing between the assignments and
+   the call.
+6. Call it where the block stood with `&name` and `&v` for each written variable, at
+   most four arguments in all; check every member and argument by reading.
+
+**Before:**
+
+```c
+  start=(*start_color);
+  stop=(*stop_color);
+  switch (image->colorspace)
+  {
+    case HCLColorspace:
+    {
+      ConvertRGBToHCL(start_color->red,start_color->green,start_color->blue,
+        &start.red,&start.green,&start.blue);
+      ConvertRGBToHCL(stop_color->red,stop_color->green,stop_color->blue,
+        &stop.red,&stop.green,&stop.blue);
+      break;
+    }
+    ...
+    case LabColorspace:
+    {
+      ConvertRGBToLab(start_color->red,start_color->green,start_color->blue,
+        illuminant,&start.red,&start.green,&start.blue);
+      ...
+    }
+    default:
+    {
+      start.red*=QuantumScale;
+      ...
+    }
+  }
+  start.red*=(double) QuantumRange;
+```
+
+**After:**
+
+```c
+typedef struct _ColorThresholdRange
+{
+  Image
+    *image;
+
+  const PixelInfo
+    *start_color,
+    *stop_color;
+
+  IlluminantType
+    illuminant;
+} ColorThresholdRange;
+
+static void ConvertColorThresholdRange(const ColorThresholdRange *range,
+  PixelInfo *start,PixelInfo *stop)
+{
+  switch (range->image->colorspace)
+  {
+    case HCLColorspace:
+    {
+      ConvertRGBToHCL(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ...
+    }
+    ...
+  }
+}
+...
+  start=(*start_color);
+  stop=(*stop_color);
+  range.image=image;
+  range.start_color=start_color;
+  range.stop_color=stop_color;
+  range.illuminant=illuminant;
+  ConvertColorThresholdRange(&range,&start,&stop);
+  start.red*=(double) QuantumRange;
+```
+
+**Careful:**
+
+- The two parts keep the arguments of the recipes they come from. Every write of the
+  block stays a write through the pointer and nothing more, so a field a path leaves
+  alone keeps the caller's value, and reads go through the pointer too (Recipe O). The
+  members are copied directly before the call from variables the block does not write,
+  so each holds the value the block's own read gave (Recipe N).
+- `(*v).m` is `v->m`; the parenthesised form is the literal `*v` of step 4, which keeps
+  the text a one-for-one substitution the reader can check.
+- Prefer the member form when the `const` locals would push the new function over
+  *Large Method*'s 70 lines: in `ColorThresholdImage` they did (72 lines, 4.42), the
+  member form did not (4.58). Re-wrap a line the prefix pushes past 80 columns; the
+  tokens and their order stay as they were.
+- Out-parameters must name different objects: two locals of the caller whose addresses
+  are not taken elsewhere cannot alias, nor alias a member's pointee.
+- The function must be oracle-verified, with a case for each branch the score rests on
+  where one exists; the guard sees the moved literals but not a write that went missing.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 6 checked by reading.
+
+**Provenance:** 2026-10-30, from `threshold.c`'s `ColorThresholdImage`, whose colorspace
+`switch` sets `start` and `stop` and reads the image, both source colours and the
+illuminant: six arguments under Recipe O. A probe: cc 20 to 13, 146 to 92 lines, 4.46 to
+4.58. Added by Claude Code (Claude Opus 5.5) during task W08, under the mandate of
+2026-10-24.
 
 ---
 
@@ -1794,6 +2249,10 @@ statements, never declarations. No other recipe moves a variable.
    constant expressions, the `#if` lines inside it, and the addresses of other file-scope
    data.
 2. The variable is never written: its type is `const`, or it is a pointer to `const` that
+   no statement assigns. A static the function updates (a counter, a cache, a flag set
+   once) does not move. A non-`const` array counts as never written when every use of
+   its name is an element read or an argument to a `const`-qualified pointer parameter;
+   check each use by `grep`. It moves as written, without adding `const`.
    no statement assigns, or every use of it is `sizeof`, an argument to a parameter of
    pointer-to-`const` type (`SetsRGBImageProfile`'s `sRGBProfile`, passed only as
    `const void *blob`), or an element read by subscript that is not assigned, incremented
@@ -1946,6 +2405,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-28 | AMEND | J | Step 5: an array accumulator goes as a pointer with its uses unchanged, as Recipe K already allows | `PerimeterThreshold`'s row loop counts into `pattern[4]`, the object's own array, and writes `status=MagickFalse` | mandate (2026-10-24) |
 | 2026-10-28 | AMEND | S | Scope: any MagickCore file whose family splits cleanly, not only the approved list; a split may lower MagickCore's per-file mean (the new file starts red) when it raises the original file; *Careful*'s new-file gate procedure confirmed | statistic.c's `StatisticImage` family (dry run 2.29 → 2.61); the per-file mean dip of the first three splits (4.97 → 4.96, line-weighted 3.149 → 3.200) | owner |
 | 2026-10-28 | AMEND | B | Step 5: the struct is declared among the declarations at the top of the block holding its calls, `const` with its initialiser where its operands are final there, otherwise filled member by member where it takes its values; `tools/ci_warnings.sh` joins the verification loop | `Main`'s macOS arm64 job (`-Wdeclaration-after-statement -Werror`) has failed on every merge since #31: 40 structs declared after statements in 20 files, as step 4's "directly before the call" placed them | mandate (2026-10-24) |
+| 2026-10-28 | AMEND | E | Step 4: a variable the block writes but nothing after it reads is not counted; the new function declares it with its initialiser, when nothing between that declaration and the block writes it (Recipes T and J already say "or is not read after it"); `tools/extract_case.py` applies it to one case of a function's closing `switch` | quantum-import.c's `Import*Quantum`: each depth case advances the span's `p` and `q` to the end of the function; extracting the cases raised the file 1.88 → 2.34, the fallthrough chains (24, 64, default) 2.34 → 2.59 in a probe | mandate (2026-10-24) |
 | 2026-10-29 | NEW | N | Extract Function Taking an Input Struct: an E-legal block whose inputs would give the new function five or more parameters moves to a `static` function taking a `const` struct of the inputs it only reads, filled member by member directly before the call; `const` locals of the old names keep the block text unchanged | `WaveletDenoiseImage`'s threshold loop (six inputs; with Recipe E 2.41 to 2.36 in M05, with the struct 2.84 to 2.90); M05's `SteganoImage` bit switch and M101's `MotionBlurImage` kernel loops refused for the same reason | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | E | Step 3: a block whose single output is an array of the caller's, updated element by element, takes the array as a pointer with its uses unchanged, as Recipe K does for arrays | `BlendMeanImage`'s serial first pass sums each channel into `mean[MaxPixelChannels]`; outside OpenMP, so Recipe K (parallel loop bodies) does not name it, and E's "return the single value" cannot return an array. A probe: the function's last depth-4 site goes, 2.43 to 2.49 | mandate (2026-10-24) |
 | 2026-10-29 | AMEND | E | Step 7: a loop's whole body may move even when it `continue`s that loop; each such `continue;` becomes `return;` of the new `void` function, whose call is the whole body, so both end the iteration at the same point | `statistic.c`'s GetImageStatistics entropy pass (W06: moving the outer loop gives the helper a Bumpy Road; moving the inner loop needs six parameters), and the per-channel bodies of `effect.c`'s blur family (W07), both refused for want of this | mandate (2026-10-24) |
@@ -1958,4 +2418,13 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | AMEND | W | Step 3: a local nothing reads after the block does not count (as in Recipe E step 4), and neither does one the block writes only on paths that leave through `return(R);`, which goes by value | `SetImageInfo`'s copy to a seekable file writes `status` (not read afterwards) and `image` (destroyed only before a `return`) | mandate (2026-10-24) |
 | 2026-10-29 | NEW | W | Extract Block Returning Success for an Early Return: a block outside OpenMP that leaves through `return(R);`, `R` a constant or read through a pointer the caller holds, and writes no caller local, moves to a `static MagickBooleanType` function, each `return(R);` becoming `return(MagickFalse);`; the caller writes `if (Helper(...) == MagickFalse) return(R);`, and identical copies call the same function (D) | `xml-tree.c`'s five buffer-growing blocks in `XMLTreeTagToXML` and `EncodePredefinedEntities`, refused by E (a mid-function `return`) and V (no `goto`). A probe of all five: 2.39 to 2.44 | mandate (2026-10-24) |
 | 2026-10-29 | NEW | V | Extract Block Returning Success for a Cleanup Jump: a block outside OpenMP that leaves through `goto L;` and writes at most one caller local moves to a `static MagickBooleanType` function, each `goto L;` becoming `return(MagickFalse);`, the local passed by pointer; the caller writes `if (Helper(...) == MagickFalse) goto L;` | `MorphologyApply`'s work-image clone inside four nested loops (nesting 6), refused by every extraction recipe for its `goto error_cleanup`; the plateau of the earlier W07 pass on `morphology.c`. A probe: nesting 6 to 5, 2.46 to 2.51 | mandate (2026-10-24) |
-| 2026-10-28 | AMEND | E | Step 4: a variable the block writes but nothing after it reads is not counted; the new function declares it with its initialiser, when nothing between that declaration and the block writes it (Recipes T and J already say "or is not read after it"); `tools/extract_case.py` applies it to one case of a function's closing `switch` | quantum-import.c's `Import*Quantum`: each depth case advances the span's `p` and `q` to the end of the function; extracting the cases raised the file 1.88 → 2.34, the fallthrough chains (24, 64, default) 2.34 → 2.59 in a probe | mandate (2026-10-24) |
+| 2026-10-29 | NEW | W | Extract Accumulating Block Returning the Loop Status Taking an Input Struct: a Recipe J block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and a pointer per written accumulator or cursor (Recipe K); the caller writes `status=MagickFalse` from its result (Recipe T) | `MotionBlurImage`'s plain kernel sum (nesting 6; `pixel`, `k` and `status` written, seven inputs): J gives ten parameters (M101), Q and U refuse the status or the accumulator. A probe: nesting 6 to 5, 2.06 to 2.10 | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | W | Step 3: instead of the `const` locals, the body may write `name->member` at every use of a member (Recipe B step 3's form); *Careful* names it as the way to extract the second of a plain and a blended sum without the two helpers repeating each other's locals | `MotionBlurImage`'s blended kernel sum beside `SumMotionPixels`: with `const` locals the pair is reported as Code Duplication (2.06 to 2.01); in the member form no duplication, 2.18 to 2.20 | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | U | Step 3: the member form of Recipe W step 3. Step 7: a block that is the whole body of a channel loop inside the parallel loop body may contain `continue;` of that loop, each becoming `return(status);`, as Recipe E step 7 does for a `void` function | `MotionBlurImage`'s per-channel body after both kernel sums moved: the channel loop as one helper is a Complex Method (cc 11, its `continue`s counted); the body as a helper (cc 6) called from a channel-loop helper (cc 3) takes the function out of Brain Method and Deep, Nested Complexity, 2.20 to 2.43 in a probe | mandate (2026-10-24) |
+| 2026-10-29 | AMEND | V | Step 6: a block that leaves through `return(c);` of one constant `c` of the caller's return type, in place of `goto L;`, moves the same way; each `return(c);` becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) return(c);`. *Careful* gives the argument and notes the warning location the oracle normalises | `morphology.c`'s `MorphologyImage`: its `convolve:scale` branch (clone the kernel if it is the caller's, `return((Image *) NULL)` when the clone fails, scale it) is its only depth-4 site and both its bumps; Recipe E's step 6 covers only the throw macros' hidden returns and step 4 refuses the status plus `curr_kernel`. A probe: `MorphologyImage` keeps only its public signature's Excess Arguments, 2.55 to 2.62 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | N | Step 4: instead of the `const` locals, the body may write `name->member` at every use of a member (Recipe B step 3's form, as Recipes U and W step 3 already allow); *Careful* gives the argument and names the duplication it avoids | `distort.c`'s `SparseColorImage`: the Voronoi search beside `ManhattanSparseColor`, and the Bilinear plane beside the Barycentric one, are reported as Code Duplication with `const` locals (2.70 to 2.57); in the member form neither is (2.70 to 2.74). With the remaining cases the function leaves Brain Method and Deep, Nested Complexity, 2.70 to 3.01 in a probe | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | Q | Step 4: the member form of Recipe N step 4 | `SparseColorImage`'s inverse-distance accumulation (`pixel`, `denominator` written, eight inputs): with `const` locals its helper would repeat `ManhattanSparseColor`'s seven locals and loop header; in the member form no duplication | mandate (2026-10-24) |
+| 2026-10-30 | NEW | Y | Extract Block Returning Success Taking an Input Struct: a Recipe V block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and its one written variable by pointer (Recipe V); temporaries it writes before reading, and the caller does not read after it, are declared in the new function (Recipe J step 3) | `visual-effects.c`'s `PlasmaImageProxy`: its middle pixel (`return(MagickTrue)` on a failed fetch; `status` written; five inputs) needs six parameters under Recipe V. A probe: bumps 5 to 4, 3.12 to 3.19 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | Q | Step 2: a variable of the caller that the block writes before reading it, and that the caller does not read after the block before writing it again, is declared in the new function and is not one of the four written variables (Recipe J step 3). Step 5: `&v` of a written scalar becomes `v` | `visual-effects.c`'s `SteganoImage`: its column loop (sequential) advances the cursors `c`, `k` and `j` and writes the temporaries `x`, `pixel` and `q`, declared at the top of the function and used nowhere else; step 1 counted six written locals. A probe of the loop as a helper (nine inputs): the function leaves Deep, Nested Complexity, 3.19 to 3.27 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | F | Step 2: a non-`const` array whose every use is an element read or an argument to a `const`-qualified pointer parameter counts as never written, and moves unchanged | `resize.c`'s `AcquireResizeFilter`: its `static double jinc_zeros[16]` (18 lines of Bessel zeros) is only indexed, and passed to `SetJincSupport`'s `const double *`; it is the last data in the function. A probe: with it and four extractions the function leaves Large Method, 5.83 to 6.18. Machine code and data unchanged (objdump on Linux) | mandate (2026-10-24) |
+| 2026-10-30 | NEW | Z | Extract Selection with Out-Parameters Taking an Input Struct: a Recipe O selection whose inputs would give the new function five or more parameters moves to a `static void` function taking a `const` struct of the inputs it only reads (Recipe N's struct) and one pointer per local it sets (Recipe O) | `threshold.c`'s `ColorThresholdImage`: the colorspace `switch` sets `start` and `stop` and reads four inputs (six arguments under O); a probe 4.46 to 4.58 | mandate (2026-10-24) |

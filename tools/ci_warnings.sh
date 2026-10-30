@@ -12,12 +12,14 @@
 #
 # Uses the candidate build's configuration (tools/oracle/build.sh cand) for the
 # include paths and defines; checks only, writes no object file. Prints the
-# diagnostics and exits non-zero if any file has one.
+# diagnostics and exits non-zero if any file has one. WIDE=1 uses the wide
+# build's (build.sh wide) instead, which compiles the X11 and OpenCL code.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 B="$ROOT/build-oracle/cand"
-[ -f "$B/Makefile" ] || { echo "no $B/Makefile: run tools/oracle/build.sh cand first" >&2; exit 2; }
+[ -n "${WIDE:-}" ] && B="$ROOT/build-oracle/wide"
+[ -f "$B/Makefile" ] || { echo "no $B/Makefile: run tools/oracle/build.sh cand (or wide) first" >&2; exit 2; }
 [ $# -gt 0 ] || { sed -n '2,15p' "$0" >&2; exit 2; }
 
 # The job adds -Werror; here every diagnostic is reported, so all of a file's show at once.

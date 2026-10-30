@@ -125,6 +125,103 @@ static inline void SetMaskedFillChannels(const Image *image,
     SetPixelAlpha(image,(Quantum) fill_color->alpha,q);
 }
 
+typedef struct _FloodfillScan
+{
+  Image
+    *image,
+    *floodplane_image;
+
+  const PixelInfo
+    *target;
+
+  MagickBooleanType
+    invert;
+} FloodfillScan;
+
+static ssize_t FillFloodplaneSpan(const FloodfillScan *scan,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,ssize_t x)
+{
+  PixelInfo
+    pixel;
+
+  for ( ; x < (ssize_t) scan->image->columns; x++)
+  {
+    if (GetPixelGray(scan->floodplane_image,q) != 0)
+      break;
+    GetPixelInfoPixel(scan->image,p,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,scan->target) == scan->invert)
+      break;
+    SetPixelGray(scan->floodplane_image,QuantumRange,q);
+    p+=(ptrdiff_t) GetPixelChannels(scan->image);
+    q+=(ptrdiff_t) GetPixelChannels(scan->floodplane_image);
+  }
+  return(x);
+}
+
+static MagickBooleanType PrepareFloodfillImage(Image *image,
+  const DrawInfo *draw_info,ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+  if (((image->alpha_trait & BlendPixelTrait) == 0) &&
+      (draw_info->fill.alpha_trait != UndefinedPixelTrait))
+    (void) SetImageAlpha(image,OpaqueAlpha,exception);
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireFloodplaneImage(Image *image,
+  Image **floodplane_image,ExceptionInfo *exception)
+{
+  *floodplane_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*floodplane_image == (Image *) NULL)
+    return(MagickFalse);
+  (*floodplane_image)->alpha_trait=UndefinedPixelTrait;
+  (*floodplane_image)->colorspace=GRAYColorspace;
+  (void) QueryColorCompliance("#000",AllCompliance,
+    &(*floodplane_image)->background_color,exception);
+  (void) SetImageBackgroundColor(*floodplane_image,exception);
+  return(MagickTrue);
+}
+
+typedef struct _FloodfillTile
+{
+  Image
+    *image,
+    *floodplane_image;
+
+  const DrawInfo
+    *draw_info;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} FloodfillTile;
+
+static void TileFloodplaneRow(const FloodfillTile *tile,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) tile->image->columns; x++)
+  {
+    if (GetPixelGray(tile->floodplane_image,p) != 0)
+      {
+        PixelInfo
+          fill_color;
+
+        GetFillColor(tile->draw_info,x,tile->y,&fill_color,tile->exception);
+        SetMaskedFillChannels(tile->image,&fill_color,q);
+      }
+    p+=(ptrdiff_t) GetPixelChannels(tile->floodplane_image);
+    q+=(ptrdiff_t) GetPixelChannels(tile->image);
+  }
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -197,24 +294,13 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     return(MagickFalse);
   if ((y_offset < 0) || (y_offset >= (ssize_t) image->rows))
     return(MagickFalse);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (PrepareFloodfillImage(image,draw_info,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(image,sRGBColorspace,exception);
-  if (((image->alpha_trait & BlendPixelTrait) == 0) &&
-      (draw_info->fill.alpha_trait != UndefinedPixelTrait))
-    (void) SetImageAlpha(image,OpaqueAlpha,exception);
   /*
     Set floodfill state.
   */
-  floodplane_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (floodplane_image == (Image *) NULL)
+  if (AcquireFloodplaneImage(image,&floodplane_image,exception) == MagickFalse)
     return(MagickFalse);
-  floodplane_image->alpha_trait=UndefinedPixelTrait;
-  floodplane_image->colorspace=GRAYColorspace;
-  (void) QueryColorCompliance("#000",AllCompliance,
-    &floodplane_image->background_color,exception);
-  (void) SetImageBackgroundColor(floodplane_image,exception);
   segment_info=AcquireVirtualMemory(MaxStacksize,sizeof(*segment_stack));
   if (segment_info == (MemoryInfo *) NULL)
     {
@@ -238,6 +324,9 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   {
     const Quantum
       *magick_restrict p;
+
+    FloodfillScan
+      scan;
 
     Quantum
       *magick_restrict q;
@@ -296,17 +385,11 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
                 ((ssize_t) image->columns-x),1,exception);
               if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
                 break;
-              for ( ; x < (ssize_t) image->columns; x++)
-              {
-                if (GetPixelGray(floodplane_image,q) != 0)
-                  break;
-                GetPixelInfoPixel(image,p,&pixel);
-                if (IsFuzzyEquivalencePixelInfo(&pixel,target) == invert)
-                  break;
-                SetPixelGray(floodplane_image,QuantumRange,q);
-                p+=(ptrdiff_t) GetPixelChannels(image);
-                q+=(ptrdiff_t) GetPixelChannels(floodplane_image);
-              }
+              scan.image=image;
+              scan.floodplane_image=floodplane_image;
+              scan.target=target;
+              scan.invert=invert;
+              x=FillFloodplaneSpan(&scan,p,q,x);
               status=SyncCacheViewAuthenticPixels(floodplane_view,exception);
               if (status == MagickFalse)
                 break;
@@ -349,11 +432,11 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     const Quantum
       *magick_restrict p;
 
+    FloodfillTile
+      tile;
+
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     /*
       Tile fill color onto floodplane.
@@ -367,19 +450,12 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelGray(floodplane_image,p) != 0)
-        {
-          PixelInfo
-            fill_color;
-
-          GetFillColor(draw_info,x,y,&fill_color,exception);
-          SetMaskedFillChannels(image,&fill_color,q);
-        }
-      p+=(ptrdiff_t) GetPixelChannels(floodplane_image);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    tile.image=image;
+    tile.floodplane_image=floodplane_image;
+    tile.draw_info=draw_info;
+    tile.y=y;
+    tile.exception=exception;
+    TileFloodplaneRow(&tile,p,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
@@ -516,6 +592,102 @@ static void SetGradientDirection(GradientInfo *gradient,const Image *image,
   }
 }
 
+static void SetGradientAngleVector(GradientInfo *gradient,const Image *image)
+{
+  double
+    sine,
+    cosine,
+    distance;
+
+  /*
+    Reference https://drafts.csswg.org/css-images-3/#linear-gradients.
+  */
+  sine=sin((double) DegreesToRadians(gradient->angle-90.0));
+  cosine=cos((double) DegreesToRadians(gradient->angle-90.0));
+  distance=fabs((double) (image->columns-1.0)*cosine)+
+    fabs((double) (image->rows-1.0)*sine);
+  gradient->gradient_vector.x1=0.5*((image->columns-1.0)-distance*cosine);
+  gradient->gradient_vector.y1=0.5*((image->rows-1.0)-distance*sine);
+  gradient->gradient_vector.x2=0.5*((image->columns-1.0)+distance*cosine);
+  gradient->gradient_vector.y2=0.5*((image->rows-1.0)+distance*sine);
+}
+
+static void SetGradientExtent(GradientInfo *gradient,const Image *image,
+  const char *artifact)
+{
+  if (LocaleCompare(artifact,"Circle") == 0)
+    {
+      gradient->radii.x=(double) MagickMax((image->columns-1.0),
+        (image->rows-1.0))/2.0;
+      gradient->radii.y=gradient->radii.x;
+    }
+  if (LocaleCompare(artifact,"Diagonal") == 0)
+    {
+      gradient->radii.x=(double) (sqrt((double) (image->columns-1.0)*
+        (image->columns-1.0)+(image->rows-1.0)*(image->rows-1.0)))/2.0;
+      gradient->radii.y=gradient->radii.x;
+    }
+  if (LocaleCompare(artifact,"Ellipse") == 0)
+    {
+      gradient->radii.x=(double) (image->columns-1.0)/2.0;
+      gradient->radii.y=(double) (image->rows-1.0)/2.0;
+    }
+  if (LocaleCompare(artifact,"Maximum") == 0)
+    {
+      gradient->radii.x=(double) MagickMax((image->columns-1.0),
+        (image->rows-1.0))/2.0;
+      gradient->radii.y=gradient->radii.x;
+    }
+  if (LocaleCompare(artifact,"Minimum") == 0)
+    {
+      gradient->radii.x=(double) (MagickMin((image->columns-1.0),
+        (image->rows-1.0)))/2.0;
+      gradient->radii.y=gradient->radii.x;
+    }
+}
+
+static void SetGradientRadii(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  gradient->radii.x=(double) MagickMax((image->columns-1.0),(image->rows-1.0))/
+    2.0;
+  gradient->radii.y=gradient->radii.x;
+  artifact=GetImageArtifact(image,"gradient:extent");
+  if (artifact != (const char *) NULL)
+    SetGradientExtent(gradient,image,artifact);
+  artifact=GetImageArtifact(image,"gradient:radii");
+  if (artifact != (const char *) NULL)
+    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->radii.x,
+      &gradient->radii.y);
+  gradient->radius=MagickMax(gradient->radii.x,gradient->radii.y);
+}
+
+static void SetGradientVector(GradientInfo *gradient,const Image *image,
+  const GradientType type)
+{
+  const char
+    *artifact;
+
+  gradient->gradient_vector.x2=(double) image->columns-1;
+  gradient->gradient_vector.y2=(double) image->rows-1;
+  artifact=GetImageArtifact(image,"gradient:direction");
+  if (artifact != (const char *) NULL)
+    SetGradientDirection(gradient,image,artifact);
+  artifact=GetImageArtifact(image,"gradient:angle");
+  if (artifact != (const char *) NULL)
+    gradient->angle=StringToDouble(artifact,(char **) NULL);
+  artifact=GetImageArtifact(image,"gradient:vector");
+  if (artifact != (const char *) NULL)
+    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf%*[ ,]%lf%*[ ,]%lf",
+      &gradient->gradient_vector.x1,&gradient->gradient_vector.y1,
+      &gradient->gradient_vector.x2,&gradient->gradient_vector.y2);
+  if (IsGradientDefaultDirection(image) != MagickFalse)
+    if ((type == LinearGradient) && (gradient->gradient_vector.y2 != 0.0))
+      gradient->gradient_vector.x2=0.0;
+}
+
 MagickExport MagickBooleanType GradientImage(Image *image,
   const GradientType type,const SpreadMethod method,const StopInfo *stops,
   const size_t number_stops,ExceptionInfo *exception)
@@ -549,22 +721,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
   artifact=GetImageArtifact(image,"gradient:bounding-box");
   if (artifact != (const char *) NULL)
     (void) ParseAbsoluteGeometry(artifact,&gradient->bounding_box);
-  gradient->gradient_vector.x2=(double) image->columns-1;
-  gradient->gradient_vector.y2=(double) image->rows-1;
-  artifact=GetImageArtifact(image,"gradient:direction");
-  if (artifact != (const char *) NULL)
-    SetGradientDirection(gradient,image,artifact);
-  artifact=GetImageArtifact(image,"gradient:angle");
-  if (artifact != (const char *) NULL)
-    gradient->angle=StringToDouble(artifact,(char **) NULL);
-  artifact=GetImageArtifact(image,"gradient:vector");
-  if (artifact != (const char *) NULL)
-    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf%*[ ,]%lf%*[ ,]%lf",
-      &gradient->gradient_vector.x1,&gradient->gradient_vector.y1,
-      &gradient->gradient_vector.x2,&gradient->gradient_vector.y2);
-  if (IsGradientDefaultDirection(image) != MagickFalse)
-    if ((type == LinearGradient) && (gradient->gradient_vector.y2 != 0.0))
-      gradient->gradient_vector.x2=0.0;
+  SetGradientVector(gradient,image,type);
   gradient->center.x=(double) gradient->gradient_vector.x2/2.0;
   gradient->center.y=(double) gradient->gradient_vector.y2/2.0;
   artifact=GetImageArtifact(image,"gradient:center");
@@ -573,65 +730,8 @@ MagickExport MagickBooleanType GradientImage(Image *image,
       &gradient->center.y);
   artifact=GetImageArtifact(image,"gradient:angle");
   if ((type == LinearGradient) && (artifact != (const char *) NULL))
-    {
-      double
-        sine,
-        cosine,
-        distance;
-
-      /*
-        Reference https://drafts.csswg.org/css-images-3/#linear-gradients.
-      */
-      sine=sin((double) DegreesToRadians(gradient->angle-90.0));
-      cosine=cos((double) DegreesToRadians(gradient->angle-90.0));
-      distance=fabs((double) (image->columns-1.0)*cosine)+
-        fabs((double) (image->rows-1.0)*sine);
-      gradient->gradient_vector.x1=0.5*((image->columns-1.0)-distance*cosine);
-      gradient->gradient_vector.y1=0.5*((image->rows-1.0)-distance*sine);
-      gradient->gradient_vector.x2=0.5*((image->columns-1.0)+distance*cosine);
-      gradient->gradient_vector.y2=0.5*((image->rows-1.0)+distance*sine);
-    }
-  gradient->radii.x=(double) MagickMax((image->columns-1.0),(image->rows-1.0))/
-    2.0;
-  gradient->radii.y=gradient->radii.x;
-  artifact=GetImageArtifact(image,"gradient:extent");
-  if (artifact != (const char *) NULL)
-    {
-      if (LocaleCompare(artifact,"Circle") == 0)
-        {
-          gradient->radii.x=(double) MagickMax((image->columns-1.0),
-            (image->rows-1.0))/2.0;
-          gradient->radii.y=gradient->radii.x;
-        }
-      if (LocaleCompare(artifact,"Diagonal") == 0)
-        {
-          gradient->radii.x=(double) (sqrt((double) (image->columns-1.0)*
-            (image->columns-1.0)+(image->rows-1.0)*(image->rows-1.0)))/2.0;
-          gradient->radii.y=gradient->radii.x;
-        }
-      if (LocaleCompare(artifact,"Ellipse") == 0)
-        {
-          gradient->radii.x=(double) (image->columns-1.0)/2.0;
-          gradient->radii.y=(double) (image->rows-1.0)/2.0;
-        }
-      if (LocaleCompare(artifact,"Maximum") == 0)
-        {
-          gradient->radii.x=(double) MagickMax((image->columns-1.0),
-            (image->rows-1.0))/2.0;
-          gradient->radii.y=gradient->radii.x;
-        }
-      if (LocaleCompare(artifact,"Minimum") == 0)
-        {
-          gradient->radii.x=(double) (MagickMin((image->columns-1.0),
-            (image->rows-1.0)))/2.0;
-          gradient->radii.y=gradient->radii.x;
-        }
-    }
-  artifact=GetImageArtifact(image,"gradient:radii");
-  if (artifact != (const char *) NULL)
-    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->radii.x,
-      &gradient->radii.y);
-  gradient->radius=MagickMax(gradient->radii.x,gradient->radii.y);
+    SetGradientAngleVector(gradient,image);
+  SetGradientRadii(gradient,image);
   gradient->spread=method;
   /*
     Define the gradient to fill between the stops.
@@ -782,6 +882,15 @@ static inline void SetOilPaintChannels(const Image *linear_image,
   }
 }
 
+static Image *DestroyOilPaintClones(Image *linear_image,Image *paint_image)
+{
+  if (linear_image != (Image *) NULL)
+    linear_image=DestroyImage(linear_image);
+  if (paint_image != (Image *) NULL)
+    linear_image=DestroyImage(paint_image);
+  return((Image *) NULL);
+}
+
 MagickExport Image *OilPaintImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -820,13 +929,7 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
   linear_image=CloneImage(image,0,0,MagickTrue,exception);
   paint_image=CloneImage(image,0,0,MagickTrue,exception);
   if ((linear_image == (Image *) NULL) || (paint_image == (Image *) NULL))
-    {
-      if (linear_image != (Image *) NULL)
-        linear_image=DestroyImage(linear_image);
-      if (paint_image != (Image *) NULL)
-        linear_image=DestroyImage(paint_image);
-      return((Image *) NULL);
-    }
+    return(DestroyOilPaintClones(linear_image,paint_image));
   if (SetImageStorageClass(paint_image,DirectClass,exception) == MagickFalse)
     {
       linear_image=DestroyImage(linear_image);
@@ -1242,6 +1345,15 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsPixelInChromaRange(const PixelInfo *pixel,
+  const PixelInfo *low,const PixelInfo *high)
+{
+  return(((pixel->red >= low->red) && (pixel->red <= high->red) &&
+    (pixel->green >= low->green) && (pixel->green <= high->green) &&
+    (pixel->blue  >= low->blue) && (pixel->blue <= high->blue)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
   const PixelInfo *low,const PixelInfo *high,const Quantum opacity,
   const MagickBooleanType invert,ExceptionInfo *exception)
@@ -1306,10 +1418,7 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       GetPixelInfoPixel(image,q,&pixel);
-      match=((pixel.red >= low->red) && (pixel.red <= high->red) &&
-        (pixel.green >= low->green) && (pixel.green <= high->green) &&
-        (pixel.blue  >= low->blue) && (pixel.blue <= high->blue)) ? MagickTrue :
-        MagickFalse;
+      match=IsPixelInChromaRange(&pixel,low,high);
       if (match != invert)
         SetPixelAlpha(image,opacity,q);
       q+=(ptrdiff_t) GetPixelChannels(image);

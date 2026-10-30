@@ -136,6 +136,22 @@ typedef struct _CCNeighborDirection
 %
 */
 
+static int CCObjectInfoCompareIncreasing(CCObjectInfo *p,CCObjectInfo *q)
+{
+  if (p->key == 1)
+    return((int) (p->area-(ssize_t) q->area));
+  if (p->key == 2)
+    return((int) (p->bounding_box.width-q->bounding_box.width));
+  if (p->key == 3)
+    return((int) (p->bounding_box.height-q->bounding_box.height));
+  if (p->key == 4)
+    return((int) (p->bounding_box.x-(ssize_t) q->bounding_box.x));
+  if (p->key == 5)
+    return((int) (p->bounding_box.y-(ssize_t) q->bounding_box.y));
+  return((int) (q->area-(ssize_t) p->area));
+}
+
+
 static int CCObjectInfoCompare(const void *x,const void *y)
 {
   CCObjectInfo
@@ -154,17 +170,7 @@ static int CCObjectInfoCompare(const void *x,const void *y)
     return((int) (q->bounding_box.width-p->bounding_box.width));
   if (p->key == -1)
     return((int) (q->area-(ssize_t) p->area));
-  if (p->key == 1)
-    return((int) (p->area-(ssize_t) q->area));
-  if (p->key == 2)
-    return((int) (p->bounding_box.width-q->bounding_box.width));
-  if (p->key == 3)
-    return((int) (p->bounding_box.height-q->bounding_box.height));
-  if (p->key == 4)
-    return((int) (p->bounding_box.x-(ssize_t) q->bounding_box.x));
-  if (p->key == 5)
-    return((int) (p->bounding_box.y-(ssize_t) q->bounding_box.y));
-  return((int) (q->area-(ssize_t) p->area));
+  return(CCObjectInfoCompareIncreasing(p,q));
 }
 
 static inline MagickBooleanType IsDiagonalPair(const Quantum *pixels,
@@ -174,6 +180,25 @@ static inline MagickBooleanType IsDiagonalPair(const Quantum *pixels,
     (((ssize_t) pixels[1] == i) && ((ssize_t) pixels[2] == i))) ? MagickTrue :
     MagickFalse);
 }
+
+static void AddPerimeterPattern(const Quantum *pixels,const size_t foreground,
+  const ssize_t i,size_t *pattern)
+{
+  if (foreground == 1)
+    pattern[1]++;
+  else
+    if (foreground == 2)
+      {
+        if (IsDiagonalPair(pixels,i) != MagickFalse)
+          pattern[0]++;  /* diagonal */
+        else
+          pattern[2]++;
+      }
+    else
+      if (foreground == 3)
+        pattern[3]++;
+}
+
 
 static void CountPerimeterPattern(const Image *component_image,
   const Quantum *magick_restrict p,const size_t width,const ssize_t i,
@@ -211,19 +236,7 @@ static void CountPerimeterPattern(const Image *component_image,
         foreground++;
     }
   }
-  if (foreground == 1)
-    pattern[1]++;
-  else
-    if (foreground == 2)
-      {
-        if (IsDiagonalPair(pixels,i) != MagickFalse)
-          pattern[0]++;  /* diagonal */
-        else
-          pattern[2]++;
-      }
-    else
-      if (foreground == 3)
-        pattern[3]++;
+  AddPerimeterPattern(pixels,foreground,i,pattern);
 }
 
 static MagickBooleanType CountObjectPerimeterPatterns(
@@ -656,6 +669,53 @@ static void EccentricityThreshold(const Image *component_image,
   }
 }
 
+static inline MagickBooleanType IsNegativeAxisDifference(const double M20,
+  const double M02)
+{
+  return(((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0)) ? MagickTrue :
+    MagickFalse);
+}
+
+typedef struct _CCEllipseAngle
+{
+  double
+    M11,
+    M20,
+    M02;
+
+  ssize_t
+    i,
+    metric_index;
+} CCEllipseAngle;
+
+static void AdjustEllipseAngle(CCObjectInfo *object,
+  const CCEllipseAngle *ellipse_angle)
+{
+  const double
+    M11 = ellipse_angle->M11,
+    M20 = ellipse_angle->M20,
+    M02 = ellipse_angle->M02;
+
+  const ssize_t
+    i = ellipse_angle->i,
+    metric_index = ellipse_angle->metric_index;
+
+  if (M11 < 0.0)
+    {
+      if (fabs(M20-M02) >= 0.0)
+        {
+          if ((M20-M02) < 0.0)
+            object[i].metric[metric_index]+=90.0;
+          else
+            object[i].metric[metric_index]+=180.0;
+        }
+    }
+  else
+    if (IsNegativeAxisDifference(M20,M02) != MagickFalse)
+      object[i].metric[metric_index]+=90.0;
+}
+
+
 static void AngleThreshold(const Image *component_image,
   CCObjectInfo *object,const ssize_t metric_index,ExceptionInfo *exception)
 {
@@ -672,6 +732,9 @@ static void AngleThreshold(const Image *component_image,
 #endif
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
+    CCEllipseAngle
+      ellipse_angle;
+
     CacheView
       *component_view;
 
@@ -737,23 +800,18 @@ static void AngleThreshold(const Image *component_image,
       MagickSafeReciprocal(M20-M02)));
     if (fabs(M11) < 0.0)
         {
-          if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
+          if (IsNegativeAxisDifference(M20,M02) != MagickFalse)
             object[i].metric[metric_index]+=90.0;
         }
       else
-        if (M11 < 0.0)
-          {
-            if (fabs(M20-M02) >= 0.0)
-              {
-                if ((M20-M02) < 0.0)
-                  object[i].metric[metric_index]+=90.0;
-                else
-                  object[i].metric[metric_index]+=180.0;
-              }
-          }
-        else
-          if ((fabs(M20-M02) >= 0.0) && ((M20-M02) < 0.0))
-            object[i].metric[metric_index]+=90.0;
+        {
+          ellipse_angle.M11=M11;
+          ellipse_angle.M20=M20;
+          ellipse_angle.M02=M02;
+          ellipse_angle.i=i;
+          ellipse_angle.metric_index=metric_index;
+          AdjustEllipseAngle(object,&ellipse_angle);
+        }
   }
 }
 
@@ -1039,6 +1097,474 @@ static void PrintObject(const Image *image,const CCObjectInfo *object,
   (void) fprintf(stdout,"\n");
 }
 
+static size_t AddAdjacentObject(CCObjectInfo *object,size_t *neighbors,
+  const ssize_t j,size_t count)
+{
+  if (object[j].census == 0.0)
+    neighbors[count++]=(size_t) j;
+  object[j].census++;
+  return(count);
+}
+
+static void AddObjectPixel(CCObjectInfo *object,const size_t id,
+  const ssize_t x,const ssize_t y)
+{
+  if (x < object[id].bounding_box.x)
+    object[id].bounding_box.x=x;
+  if (x > (ssize_t) object[id].bounding_box.width)
+    object[id].bounding_box.width=(size_t) x;
+  if (y < object[id].bounding_box.y)
+    object[id].bounding_box.y=y;
+  if (y > (ssize_t) object[id].bounding_box.height)
+    object[id].bounding_box.height=(size_t) y;
+  object[id].centroid.x+=x;
+  object[id].centroid.y+=y;
+  object[id].area++;
+}
+
+typedef struct _CCObjectPixel
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x,
+    y,
+    id;
+} CCObjectPixel;
+
+static void AddLabeledObjectPixel(CCObjectInfo *object,
+  const CCObjectPixel *object_pixel)
+{
+  const Image
+    *const image = object_pixel->image;
+
+  const Quantum
+    *const p = object_pixel->p;
+
+  const ssize_t
+    x = object_pixel->x,
+    y = object_pixel->y,
+    id = object_pixel->id;
+
+  if (x < object[id].bounding_box.x)
+    object[id].bounding_box.x=x;
+  if (x >= (ssize_t) object[id].bounding_box.width)
+    object[id].bounding_box.width=(size_t) x;
+  if (y < object[id].bounding_box.y)
+    object[id].bounding_box.y=y;
+  if (y >= (ssize_t) object[id].bounding_box.height)
+    object[id].bounding_box.height=(size_t) y;
+  object[id].color.red+=QuantumScale*(double) GetPixelRed(image,p);
+  object[id].color.green+=QuantumScale*(double) GetPixelGreen(image,p);
+  object[id].color.blue+=QuantumScale*(double) GetPixelBlue(image,p);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    object[id].color.alpha+=QuantumScale*(double) GetPixelAlpha(image,p);
+  if (image->colorspace == CMYKColorspace)
+    object[id].color.black+=QuantumScale*(double) GetPixelBlack(image,p);
+  object[id].centroid.x+=x;
+  object[id].centroid.y+=y;
+  object[id].area++;
+}
+
+typedef struct _CCEquivalencePixel
+{
+  const Image
+    *image;
+
+  ssize_t
+    x,
+    y,
+    dx,
+    dy;
+} CCEquivalencePixel;
+
+static MagickBooleanType ResolveEquivalence(MatrixInfo *equivalences,
+  const CCEquivalencePixel *equivalence_pixel)
+{
+  const Image
+    *const image = equivalence_pixel->image;
+
+  const ssize_t
+    x = equivalence_pixel->x,
+    y = equivalence_pixel->y,
+    dx = equivalence_pixel->dx,
+    dy = equivalence_pixel->dy;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    neighbor_offset,
+    obj,
+    offset,
+    ox,
+    oy,
+    root;
+
+  offset=y*(ssize_t) image->columns+x;
+  neighbor_offset=dy*(ssize_t) image->columns+dx;
+  ox=offset;
+  status=GetMatrixElement(equivalences,ox,0,&obj);
+  while (obj != ox)
+  {
+    ox=obj;
+    status=GetMatrixElement(equivalences,ox,0,&obj);
+  }
+  oy=offset+neighbor_offset;
+  status=GetMatrixElement(equivalences,oy,0,&obj);
+  while (obj != oy)
+  {
+    oy=obj;
+    status=GetMatrixElement(equivalences,oy,0,&obj);
+  }
+  if (ox < oy)
+    {
+      status=SetMatrixElement(equivalences,oy,0,&ox);
+      root=ox;
+    }
+  else
+    {
+      status=SetMatrixElement(equivalences,ox,0,&oy);
+      root=oy;
+    }
+  ox=offset;
+  status=SetEquivalencePathRoot(equivalences,ox,root);
+  oy=offset+neighbor_offset;
+  status=SetEquivalencePathRoot(equivalences,oy,root);
+  status=SetMatrixElement(equivalences,y*(ssize_t) image->columns+x,0,
+    &root);
+  return(status);
+}
+
+typedef struct _CCObjectRelabel
+{
+  Image
+    *component_image;
+
+  ssize_t
+    i;
+
+  size_t
+    id;
+} CCObjectRelabel;
+
+static void RelabelObjectRow(const CCObjectRelabel *object_relabel,
+  const RectangleInfo bounding_box,Quantum *q)
+{
+  Image
+    *const component_image = object_relabel->component_image;
+
+  const ssize_t
+    i = object_relabel->i;
+
+  const size_t
+    id = object_relabel->id;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) bounding_box.width; x++)
+  {
+    if ((ssize_t) GetPixelIndex(component_image,q) == i)
+      SetPixelIndex(component_image,(Quantum) id,q);
+    q+=(ptrdiff_t) GetPixelChannels(component_image);
+  }
+}
+
+static void MergeObjectsBelowTop(const Image *component_image,
+  CCObjectInfo *object,CCObjectInfo *top_objects,const ssize_t top_ids)
+{
+  ssize_t
+    i;
+
+  (void) memcpy(top_objects,object,component_image->colors*sizeof(*object));
+  qsort((void *) top_objects,component_image->colors,sizeof(*top_objects),
+    CCObjectInfoCompare);
+  for (i=top_ids+1; i < (ssize_t) component_image->colors; i++)
+  {
+    ssize_t id = (ssize_t) top_objects[i].id;
+    if ((id >= 0) && (id < (ssize_t) component_image->colors))
+      object[id].merge=MagickTrue;
+  }
+}
+
+static ssize_t GetTopObjectIds(const Image *component_image,
+  const char *artifact)
+{
+  ssize_t
+    top_ids;
+
+  top_ids=(ssize_t) StringToLong(artifact);
+  if (top_ids < 0)
+    top_ids=0;
+  if (top_ids >= (ssize_t) component_image->colors)
+    top_ids=(ssize_t) component_image->colors-1;
+  return(top_ids);
+}
+
+static void DiameterThreshold(const Image *component_image,
+  CCObjectInfo *object,const ssize_t n,const CCThresholdRange range)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+  {
+    object[i].metric[n]=ceil(sqrt(4.0*object[i].area/MagickPI)-0.5);
+    if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
+      object[i].merge=MagickTrue;
+  }
+}
+
+static void NormalizeLabeledObject(const Image *image,CCObjectInfo *object,
+  const ssize_t i)
+{
+  object[i].bounding_box.width=(size_t) ((ssize_t)
+    object[i].bounding_box.width-(object[i].bounding_box.x-1));
+  object[i].bounding_box.height=(size_t) ((ssize_t)
+    object[i].bounding_box.height-(object[i].bounding_box.y-1));
+  object[i].color.red/=(QuantumScale*object[i].area);
+  object[i].color.green/=(QuantumScale*object[i].area);
+  object[i].color.blue/=(QuantumScale*object[i].area);
+  if (image->alpha_trait != UndefinedPixelTrait)
+    object[i].color.alpha/=(QuantumScale*object[i].area);
+  if (image->colorspace == CMYKColorspace)
+    object[i].color.black/=(QuantumScale*object[i].area);
+  object[i].centroid.x/=object[i].area;
+  object[i].centroid.y/=object[i].area;
+}
+
+typedef struct _CCObjectStatistics
+{
+  Image
+    *component_image;
+
+  CacheView
+    *component_view;
+
+  ExceptionInfo
+    *exception;
+} CCObjectStatistics;
+
+static MagickBooleanType AccumulateObjectStatistics(CCObjectInfo *object,
+  const CCObjectStatistics *object_statistics,MagickBooleanType status)
+{
+  Image
+    *const component_image = object_statistics->component_image;
+
+  CacheView
+    *const component_view = object_statistics->component_view;
+
+  ExceptionInfo
+    *const exception = object_statistics->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) component_image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(component_view,0,y,component_image->columns,
+      1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    for (x=0; x < (ssize_t) component_image->columns; x++)
+    {
+      size_t
+        id;
+
+      id=(size_t) GetPixelIndex(component_image,p);
+      AddObjectPixel(object,id,x,y);
+      p+=(ptrdiff_t) GetPixelChannels(component_image);
+    }
+  }
+  return(status);
+}
+
+static void InitializeObjects(const Image *image,CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) MaxColormapSize; i++)
+  {
+    object[i].id=i;
+    object[i].bounding_box.x=(ssize_t) image->columns;
+    object[i].bounding_box.y=(ssize_t) image->rows;
+    GetPixelInfo(image,&object[i].color);
+  }
+}
+
+typedef struct _CCEquivalenceRow
+{
+  const Image
+    *image;
+
+  MatrixInfo
+    *equivalences;
+
+  ssize_t
+    y,
+    dx,
+    dy;
+} CCEquivalenceRow;
+
+static MagickBooleanType ResolveRowEquivalences(
+  const CCEquivalenceRow *equivalence_row,const CCNeighborDirection direction,
+  const Quantum *p,MagickBooleanType status)
+{
+  const Image
+    *const image = equivalence_row->image;
+
+  MatrixInfo
+    *const equivalences = equivalence_row->equivalences;
+
+  const ssize_t
+    y = equivalence_row->y,
+    dx = equivalence_row->dx,
+    dy = equivalence_row->dy;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    CCEquivalencePixel
+      equivalence_pixel;
+
+    PixelInfo
+      pixel,
+      target;
+
+    ssize_t
+      neighbor_offset;
+
+    /*
+      Is neighbor an authentic pixel and a different color than the pixel?
+    */
+    GetPixelInfoPixel(image,p,&pixel);
+    if (IsNeighborOutsideImage(image,x,y,&direction) != MagickFalse)
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    neighbor_offset=dy*((ssize_t) GetPixelChannels(image)*(ssize_t)
+      image->columns)+dx*(ssize_t) GetPixelChannels(image);
+    GetPixelInfoPixel(image,p+neighbor_offset,&target);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&target) == MagickFalse)
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    /*
+      Resolve this equivalence.
+    */
+    equivalence_pixel.image=image;
+    equivalence_pixel.x=x;
+    equivalence_pixel.y=y;
+    equivalence_pixel.dx=dx;
+    equivalence_pixel.dy=dy;
+    status=ResolveEquivalence(equivalences,&equivalence_pixel);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(status);
+}
+
+static void RemoveObjectsByColor(const Image *component_image,
+  CCObjectInfo *object,const char *artifact,ExceptionInfo *exception)
+{
+  const char
+    *p;
+
+  for (p=artifact;  ; )
+  {
+    char
+      color[MagickPathExtent];
+
+    PixelInfo
+      pixel;
+
+    const char
+      *q;
+
+    for (q=p; *q != '\0'; q++)
+      if (*q == ';')
+        break;
+    (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
+      MagickPathExtent));
+    (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
+    SetObjectMergeByColor(object,component_image->colors,&pixel,MagickTrue);
+    if (*q == '\0')
+      break;
+    p=q+1;
+  }
+}
+
+static void AreaThreshold(const Image *component_image,CCObjectInfo *object,
+  const CCThresholdRange range)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+    if (IsAreaOutsideRange(object,i,&range) != MagickFalse)
+      object[i].merge=MagickTrue;
+}
+
+static void PrintObjects(const Image *image,const Image *component_image,
+  const CCObjectInfo *object,const ssize_t n)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+    if (object[i].census > 0.0)
+      PrintObject(image,object,i,n);
+}
+
+static void ResetAdjacentCensus(CCObjectInfo *object,const size_t *neighbors,
+  const size_t count)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) count; j++)
+    object[neighbors[j]].census=0.0;
+}
+
+static void MergeAllObjects(const Image *component_image,CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+    object[i].merge=MagickTrue;
+}
+
+static void SetObjectMeanColors(Image *component_image,
+  const CCObjectInfo *object)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+    component_image->colormap[i]=object[i].color;
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1131,13 +1657,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
   (void) memset(object,0,MaxColormapSize*sizeof(*object));
-  for (i=0; i < (ssize_t) MaxColormapSize; i++)
-  {
-    object[i].id=i;
-    object[i].bounding_box.x=(ssize_t) image->columns;
-    object[i].bounding_box.y=(ssize_t) image->rows;
-    GetPixelInfo(image,&object[i].color);
-  }
+  InitializeObjects(image,object);
   /*
     Find connected components.
   */
@@ -1157,11 +1677,11 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 
     for (y=0; y < (ssize_t) image->rows; y++)
     {
+      CCEquivalenceRow
+        equivalence_row;
+
       const Quantum
         *magick_restrict p;
-
-      ssize_t
-        x;
 
       if (status == MagickFalse)
         continue;
@@ -1172,74 +1692,12 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           continue;
         }
       p+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        PixelInfo
-          pixel,
-          target;
-
-        ssize_t
-          neighbor_offset,
-          obj,
-          offset,
-          ox,
-          oy,
-          root;
-
-        /*
-          Is neighbor an authentic pixel and a different color than the pixel?
-        */
-        GetPixelInfoPixel(image,p,&pixel);
-        if (IsNeighborOutsideImage(image,x,y,&direction) != MagickFalse)
-          {
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            continue;
-          }
-        neighbor_offset=dy*((ssize_t) GetPixelChannels(image)*(ssize_t)
-          image->columns)+dx*(ssize_t) GetPixelChannels(image);
-        GetPixelInfoPixel(image,p+neighbor_offset,&target);
-        if (IsFuzzyEquivalencePixelInfo(&pixel,&target) == MagickFalse)
-          {
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            continue;
-          }
-        /*
-          Resolve this equivalence.
-        */
-        offset=y*(ssize_t) image->columns+x;
-        neighbor_offset=dy*(ssize_t) image->columns+dx;
-        ox=offset;
-        status=GetMatrixElement(equivalences,ox,0,&obj);
-        while (obj != ox)
-        {
-          ox=obj;
-          status=GetMatrixElement(equivalences,ox,0,&obj);
-        }
-        oy=offset+neighbor_offset;
-        status=GetMatrixElement(equivalences,oy,0,&obj);
-        while (obj != oy)
-        {
-          oy=obj;
-          status=GetMatrixElement(equivalences,oy,0,&obj);
-        }
-        if (ox < oy)
-          {
-            status=SetMatrixElement(equivalences,oy,0,&ox);
-            root=ox;
-          }
-        else
-          {
-            status=SetMatrixElement(equivalences,ox,0,&oy);
-            root=oy;
-          }
-        ox=offset;
-        status=SetEquivalencePathRoot(equivalences,ox,root);
-        oy=offset+neighbor_offset;
-        status=SetEquivalencePathRoot(equivalences,oy,root);
-        status=SetMatrixElement(equivalences,y*(ssize_t) image->columns+x,0,
-          &root);
-        p+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      equivalence_row.image=image;
+      equivalence_row.equivalences=equivalences;
+      equivalence_row.y=y;
+      equivalence_row.dx=dx;
+      equivalence_row.dy=dy;
+      status=ResolveRowEquivalences(&equivalence_row,direction,p,status);
     }
   }
   /*
@@ -1270,6 +1728,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       }
     for (x=0; x < (ssize_t) component_image->columns; x++)
     {
+      CCObjectPixel
+        object_pixel;
+
       ssize_t
         id,
         offset;
@@ -1285,24 +1746,12 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
             break;
         }
       status=SetMatrixElement(equivalences,offset,0,&id);
-      if (x < object[id].bounding_box.x)
-        object[id].bounding_box.x=x;
-      if (x >= (ssize_t) object[id].bounding_box.width)
-        object[id].bounding_box.width=(size_t) x;
-      if (y < object[id].bounding_box.y)
-        object[id].bounding_box.y=y;
-      if (y >= (ssize_t) object[id].bounding_box.height)
-        object[id].bounding_box.height=(size_t) y;
-      object[id].color.red+=QuantumScale*(double) GetPixelRed(image,p);
-      object[id].color.green+=QuantumScale*(double) GetPixelGreen(image,p);
-      object[id].color.blue+=QuantumScale*(double) GetPixelBlue(image,p);
-      if (image->alpha_trait != UndefinedPixelTrait)
-        object[id].color.alpha+=QuantumScale*(double) GetPixelAlpha(image,p);
-      if (image->colorspace == CMYKColorspace)
-        object[id].color.black+=QuantumScale*(double) GetPixelBlack(image,p);
-      object[id].centroid.x+=x;
-      object[id].centroid.y+=y;
-      object[id].area++;
+      object_pixel.image=image;
+      object_pixel.p=p;
+      object_pixel.x=x;
+      object_pixel.y=y;
+      object_pixel.id=id;
+      AddLabeledObjectPixel(object,&object_pixel);
       SetPixelIndex(component_image,(Quantum) id,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(component_image);
@@ -1338,19 +1787,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   component_image->colors=(size_t) n;
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
-    object[i].bounding_box.width=(size_t) ((ssize_t)
-      object[i].bounding_box.width-(object[i].bounding_box.x-1));
-    object[i].bounding_box.height=(size_t) ((ssize_t)
-      object[i].bounding_box.height-(object[i].bounding_box.y-1));
-    object[i].color.red/=(QuantumScale*object[i].area);
-    object[i].color.green/=(QuantumScale*object[i].area);
-    object[i].color.blue/=(QuantumScale*object[i].area);
-    if (image->alpha_trait != UndefinedPixelTrait)
-      object[i].color.alpha/=(QuantumScale*object[i].area);
-    if (image->colorspace == CMYKColorspace)
-      object[i].color.black/=(QuantumScale*object[i].area);
-    object[i].centroid.x/=object[i].area;
-    object[i].centroid.y/=object[i].area;
+    NormalizeLabeledObject(image,object,i);
     max_threshold+=object[i].area;
     if (object[i].area > object[background_id].area)
       background_id=i;
@@ -1372,9 +1809,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.min_threshold=min_threshold;
       range.max_threshold=max_threshold;
       range.background_id=background_id;
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        if (IsAreaOutsideRange(object,i,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
+      AreaThreshold(component_image,object,range);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-colors");
   if (artifact != (const char *) NULL)
@@ -1385,8 +1820,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Keep selected objects based on color, merge others.
       */
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        object[i].merge=MagickTrue;
+      MergeAllObjects(component_image,object);
       for (p=artifact;  ; )
       {
         char
@@ -1418,8 +1852,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Keep selected objects based on id, merge others.
       */
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        object[i].merge=MagickTrue;
+      MergeAllObjects(component_image,object);
       SetObjectMergeByIds(object,component_image->colors,artifact,MagickFalse);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-top");
@@ -1434,11 +1867,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Keep top objects.
       */
-      top_ids=(ssize_t) StringToLong(artifact);
-      if (top_ids < 0)
-        top_ids=0;
-      if (top_ids >= (ssize_t) component_image->colors)
-        top_ids=(ssize_t) component_image->colors-1;
+      top_ids=GetTopObjectIds(component_image,artifact);
       top_objects=(CCObjectInfo *) AcquireQuantumMemory(component_image->colors,
         sizeof(*top_objects));
       if (top_objects == (CCObjectInfo *) NULL)
@@ -1447,48 +1876,16 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           component_image=DestroyImage(component_image);
           ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
         }
-      (void) memcpy(top_objects,object,component_image->colors*sizeof(*object));
-      qsort((void *) top_objects,component_image->colors,sizeof(*top_objects),
-        CCObjectInfoCompare);
-      for (i=top_ids+1; i < (ssize_t) component_image->colors; i++)
-      {
-        ssize_t id = (ssize_t) top_objects[i].id;
-        if ((id >= 0) && (id < (ssize_t) component_image->colors))
-          object[id].merge=MagickTrue;
-      }
+      MergeObjectsBelowTop(component_image,object,top_objects,top_ids);
       top_objects=(CCObjectInfo *) RelinquishMagickMemory(top_objects);
     }
   artifact=GetImageArtifact(image,"connected-components:remove-colors");
   if (artifact != (const char *) NULL)
     {
-      const char
-        *p;
-
       /*
         Remove selected objects based on color, keep others.
       */
-      for (p=artifact;  ; )
-      {
-        char
-          color[MagickPathExtent];
-
-        PixelInfo
-          pixel;
-
-        const char
-          *q;
-
-        for (q=p; *q != '\0'; q++)
-          if (*q == ';')
-            break;
-        (void) CopyMagickString(color,p,(size_t) MagickMin(q-p+1,
-          MagickPathExtent));
-        (void) QueryColorCompliance(color,AllCompliance,&pixel,exception);
-        SetObjectMergeByColor(object,component_image->colors,&pixel,MagickTrue);
-        if (*q == '\0')
-          break;
-        p=q+1;
-      }
+      RemoveObjectsByColor(component_image,object,artifact,exception);
     }
   artifact=GetImageArtifact(image,"connected-components:remove-ids");
   if (artifact == (const char *) NULL)
@@ -1545,12 +1942,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       range.max_threshold=max_threshold;
       range.background_id=background_id;
       metrics[++n]="diameter";
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-      {
-        object[i].metric[n]=ceil(sqrt(4.0*object[i].area/MagickPI)-0.5);
-        if (IsMetricOutsideRange(object,i,n,&range) != MagickFalse)
-          object[i].merge=MagickTrue;
-      }
+      DiameterThreshold(component_image,object,n,range);
     }
   artifact=GetImageArtifact(image,"connected-components:major-axis-threshold");
   if (artifact != (const char *) NULL)
@@ -1698,11 +2090,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
               }
             j=(ssize_t) GetPixelIndex(component_image,q);
             if (j != i)
-              {
-                if (object[j].census == 0.0)
-                  neighbors[count++]=(size_t) j;
-                object[j].census++;
-              }
+              count=AddAdjacentObject(object,neighbors,j,count);
           }
         p+=(ptrdiff_t) GetPixelChannels(component_image);
       }
@@ -1711,16 +2099,15 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       Merge with object of greatest adjacent area.
     */
     id=GetGreatestAdjacentObject(object,neighbors,count);
-    for (j=0; j < (ssize_t) count; j++)
-      object[neighbors[j]].census=0.0;
+    ResetAdjacentCensus(object,neighbors,count);
     object[i].area=0.0;
     for (y=0; y < (ssize_t) bounding_box.height; y++)
     {
+      CCObjectRelabel
+        object_relabel;
+
       Quantum
         *magick_restrict q;
-
-      ssize_t
-        x;
 
       if (status == MagickFalse)
         continue;
@@ -1731,12 +2118,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           status=MagickFalse;
           continue;
         }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        if ((ssize_t) GetPixelIndex(component_image,q) == i)
-          SetPixelIndex(component_image,(Quantum) id,q);
-        q+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
+      object_relabel.component_image=component_image;
+      object_relabel.i=i;
+      object_relabel.id=id;
+      RelabelObjectRow(&object_relabel,bounding_box,q);
       if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
         status=MagickFalse;
     }
@@ -1750,14 +2135,16 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Replace object with mean color.
       */
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-        component_image->colormap[i]=object[i].color;
+      SetObjectMeanColors(component_image,object);
     }
   (void) SyncImage(component_image,exception);
   artifact=GetImageArtifact(image,"connected-components:verbose");
   if ((IsStringTrue(artifact) != MagickFalse) ||
       (objects != (CCObjectInfo **) NULL))
     {
+      CCObjectStatistics
+        object_statistics;
+
       ssize_t
         key,
         order;
@@ -1767,43 +2154,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       */
       ResetObjectStatistics(component_image,object);
       component_view=AcquireVirtualCacheView(component_image,exception);
-      for (y=0; y < (ssize_t) component_image->rows; y++)
-      {
-        const Quantum
-          *magick_restrict p;
-
-        ssize_t
-          x;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(component_view,0,y,component_image->columns,
-          1,exception);
-        if (p == (const Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) component_image->columns; x++)
-        {
-          size_t
-            id;
-
-          id=(size_t) GetPixelIndex(component_image,p);
-          if (x < object[id].bounding_box.x)
-            object[id].bounding_box.x=x;
-          if (x > (ssize_t) object[id].bounding_box.width)
-            object[id].bounding_box.width=(size_t) x;
-          if (y < object[id].bounding_box.y)
-            object[id].bounding_box.y=y;
-          if (y > (ssize_t) object[id].bounding_box.height)
-            object[id].bounding_box.height=(size_t) y;
-          object[id].centroid.x+=x;
-          object[id].centroid.y+=y;
-          object[id].area++;
-          p+=(ptrdiff_t) GetPixelChannels(component_image);
-        }
-      }
+      object_statistics.component_image=component_image;
+      object_statistics.component_view=component_view;
+      object_statistics.exception=exception;
+      status=AccumulateObjectStatistics(object,&object_statistics,status);
       NormalizeObjectStatistics(component_image,object);
       component_view=DestroyCacheView(component_view);
       order=GetObjectSortOrder(image);
@@ -1815,9 +2169,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       if (objects == (CCObjectInfo **) NULL)
         {
           PrintObjectsHeader(image,metrics,n);
-          for (i=0; i < (ssize_t) component_image->colors; i++)
-            if (object[i].census > 0.0)
-              PrintObject(image,object,i,n);
+          PrintObjects(image,component_image,object,n);
         }
     }
   if (objects == (CCObjectInfo **) NULL)
@@ -1851,6 +2203,94 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _IntegralChannel
+{
+  Image
+    *integral_image;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x,
+    y,
+    i;
+} IntegralChannel;
+
+static void IntegratePixelChannel(Quantum *q,
+  const IntegralChannel *integral_channel)
+{
+  Image
+    *const integral_image = integral_channel->integral_image;
+
+  const Quantum
+    *const p = integral_channel->p;
+
+  const ssize_t
+    x = integral_channel->x,
+    y = integral_channel->y,
+    i = integral_channel->i;
+
+  double
+    sum;
+
+  PixelTrait traits = GetPixelChannelTraits(integral_image,
+    (PixelChannel) i);
+  if (traits == UndefinedPixelTrait)
+    return;
+  if ((traits & CopyPixelTrait) != 0)
+    return;
+  sum=(double) q[i];
+  if (x > 0)
+    sum+=(double) (q-GetPixelChannels(integral_image))[i];
+  if (y > 0)
+    sum+=(double) p[i];
+  if ((x > 0) && (y > 0))
+    sum-=(double) (p-GetPixelChannels(integral_image))[i];
+  q[i]=ClampToQuantum(sum);
+}
+
+
+static void IntegrateRow(Image *integral_image,const Quantum *p,Quantum *q,
+  const ssize_t y)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) integral_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(integral_image); i++)
+    {
+      IntegralChannel
+        integral_channel;
+
+      integral_channel.integral_image=integral_image;
+      integral_channel.p=p;
+      integral_channel.x=x;
+      integral_channel.y=y;
+      integral_channel.i=i;
+      IntegratePixelChannel(q,&integral_channel);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(integral_image);
+    q+=(ptrdiff_t) GetPixelChannels(integral_image);
+  }
+}
+
+
+static Image *DestroyIntegralViews(CacheView *image_view,
+  CacheView *integral_view,Image *integral_image,const MagickBooleanType status)
+{
+  integral_view=DestroyCacheView(integral_view);
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    integral_image=DestroyImage(integral_image);
+  return(integral_image);
+}
+
+
 MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
 {
 #define IntegralImageTag  "Integral/Image"
@@ -1906,9 +2346,6 @@ MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(integral_view,0,y-1,integral_image->columns,1,
@@ -1920,34 +2357,7 @@ MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) integral_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(integral_image); i++)
-      {
-        double
-          sum;
-
-        PixelTrait traits = GetPixelChannelTraits(integral_image,
-          (PixelChannel) i);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        if ((traits & CopyPixelTrait) != 0)
-          continue;
-        sum=(double) q[i];
-        if (x > 0)
-          sum+=(double) (q-GetPixelChannels(integral_image))[i];
-        if (y > 0)
-          sum+=(double) p[i];
-        if ((x > 0) && (y > 0))
-          sum-=(double) (p-GetPixelChannels(integral_image))[i];
-        q[i]=ClampToQuantum(sum);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(integral_image);
-      q+=(ptrdiff_t) GetPixelChannels(integral_image);
-    }
+    IntegrateRow(integral_image,p,q,y);
     sync=SyncCacheViewAuthenticPixels(integral_view,exception);
     if (sync == MagickFalse)
       status=MagickFalse;
@@ -1963,9 +2373,5 @@ MagickExport Image *IntegralImage(const Image *image,ExceptionInfo *exception)
           status=MagickFalse;
       }
   }
-  integral_view=DestroyCacheView(integral_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    integral_image=DestroyImage(integral_image);
-  return(integral_image);
+  return(DestroyIntegralViews(image_view,integral_view,integral_image,status));
 }

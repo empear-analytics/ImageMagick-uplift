@@ -3465,6 +3465,227 @@ static void ManhattanSparseColor(const SparseColorPoint *point,
   }
 }
 
+static PixelInfo VoronoiSparseColor(const SparseColorPoint *point,
+  PixelInfo pixel)
+{
+  double
+    minimum = MagickMaximumValue;
+
+  size_t
+    k;
+
+  /*
+    Just use the closest control point you can find!
+  */
+  for (k=0; k<point->number_arguments; k+=2+point->number_colors) {
+    double distance = VoronoiDistance(point->i,point->j,point->arguments,k);
+    if ( distance < minimum ) {
+      SparseControlColor
+        control;
+
+      control.image=point->image;
+      control.sparse_image=point->sparse_image;
+      control.arguments=point->arguments;
+      SetSparseControlColor(&control,k,&pixel);
+      minimum = distance;
+    }
+  }
+  return(pixel);
+}
+
+typedef struct _SparseColorPlane
+{
+  Image
+    *sparse_image;
+
+  double
+    *coeff;
+
+  ssize_t
+    i,
+    j;
+} SparseColorPlane;
+
+static PixelInfo BarycentricSparseColor(const SparseColorPlane *plane,
+  PixelInfo pixel)
+{
+  Image
+    *const sparse_image = plane->sparse_image;
+
+  double
+    *const coeff = plane->coeff;
+
+  const ssize_t
+    i = plane->i,
+    j = plane->j;
+
+  ssize_t x=0;
+  if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red     = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green   = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue    = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (sparse_image->colorspace == CMYKColorspace))
+    pixel.black   = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha = coeff[x]*i +coeff[x+1]*j
+                    +coeff[x+2], x+=3;
+  return(pixel);
+}
+
+static PixelInfo BilinearSparseColor(const SparseColorPlane *plane,
+  const Image *image,PixelInfo pixel)
+{
+  ssize_t x=0;
+  if ((GetPixelRedTraits(plane->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red     = plane->coeff[x]*plane->i     + plane->coeff[x+1]*plane->j +
+                    plane->coeff[x+2]*plane->i*plane->j + plane->coeff[x+3], x+=4;
+  if ((GetPixelGreenTraits(plane->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green   = plane->coeff[x]*plane->i     + plane->coeff[x+1]*plane->j +
+                    plane->coeff[x+2]*plane->i*plane->j + plane->coeff[x+3], x+=4;
+  if ((GetPixelBlueTraits(plane->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue    = plane->coeff[x]*plane->i     + plane->coeff[x+1]*plane->j +
+                    plane->coeff[x+2]*plane->i*plane->j + plane->coeff[x+3], x+=4;
+  if (((GetPixelBlackTraits(plane->sparse_image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    pixel.black   = plane->coeff[x]*plane->i     + plane->coeff[x+1]*plane->j +
+                    plane->coeff[x+2]*plane->i*plane->j + plane->coeff[x+3], x+=4;
+  if (((GetPixelAlphaTraits(plane->sparse_image) & UpdatePixelTrait) != 0) &&
+      (plane->sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha = plane->coeff[x]*plane->i     + plane->coeff[x+1]*plane->j +
+                    plane->coeff[x+2]*plane->i*plane->j + plane->coeff[x+3], x+=4;
+  return(pixel);
+}
+
+static PixelInfo AddWeightedControlColor(const SparseControlColor *control,
+  ssize_t x,const double weight,PixelInfo pixel)
+{
+  if ((GetPixelRedTraits(control->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red     += control->arguments[x++]*weight;
+  if ((GetPixelGreenTraits(control->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green   += control->arguments[x++]*weight;
+  if ((GetPixelBlueTraits(control->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue    += control->arguments[x++]*weight;
+  if (((GetPixelBlackTraits(control->sparse_image) & UpdatePixelTrait) != 0) &&
+      (control->image->colorspace == CMYKColorspace))
+    pixel.black   += control->arguments[x++]*weight;
+  if (((GetPixelAlphaTraits(control->sparse_image) & UpdatePixelTrait) != 0) &&
+      (control->sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha += control->arguments[x++]*weight;
+  return(pixel);
+}
+
+typedef struct _SparseColorWeights
+{
+  const Image
+    *image;
+
+  Image
+    *sparse_image;
+
+  size_t
+    number_arguments;
+
+  const double
+    *arguments;
+
+  size_t
+    number_colors;
+
+  double
+    *coeff;
+
+  ssize_t
+    i,
+    j;
+} SparseColorWeights;
+
+static void AccumulateInverseSparseColor(const SparseColorWeights *weights,
+  PixelInfo *pixel,double *denominator)
+{
+  size_t
+    k;
+
+  for (k=0; k<weights->number_arguments; k+=2+weights->number_colors)
+  {
+    double weight =
+        ((double) weights->i-weights->arguments[ k ])*((double) weights->i-weights->arguments[ k ])
+      + ((double) weights->j-weights->arguments[k+1])*((double) weights->j-weights->arguments[k+1]);
+    ssize_t x = (ssize_t) k+2;
+
+    SparseControlColor
+      control;
+
+    weight = pow(weight,weights->coeff[0]); /* inverse of power factor */
+    weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
+    control.image=weights->image;
+    control.sparse_image=weights->sparse_image;
+    control.arguments=weights->arguments;
+    *pixel=AddWeightedControlColor(&control,x,weight,*pixel);
+    *denominator += weight;
+  }
+}
+
+static PixelInfo ClearSparseColor(const Image *image,
+  const Image *sparse_image,PixelInfo pixel)
+{
+  if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red=0.0;
+  if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green=0.0;
+  if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue=0.0;
+  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    pixel.black=0.0;
+  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha=0.0;
+  return(pixel);
+}
+
+static PixelInfo InverseSparseColor(const SparseColorWeights *inverse,
+  PixelInfo pixel)
+{
+  double
+    denominator;
+
+  SparseColorWeights
+    weights;
+
+  pixel=ClearSparseColor(inverse->image,inverse->sparse_image,pixel);
+  denominator = 0.0;
+  weights.image=inverse->image;
+  weights.sparse_image=inverse->sparse_image;
+  weights.number_arguments=inverse->number_arguments;
+  weights.arguments=inverse->arguments;
+  weights.number_colors=inverse->number_colors;
+  weights.coeff=inverse->coeff;
+  weights.i=inverse->i;
+  weights.j=inverse->j;
+  AccumulateInverseSparseColor(&weights,&pixel,&denominator);
+  if ((GetPixelRedTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red/=denominator;
+  if ((GetPixelGreenTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green/=denominator;
+  if ((GetPixelBlueTraits(inverse->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue/=denominator;
+  if (((GetPixelBlackTraits(inverse->sparse_image) & UpdatePixelTrait) != 0) &&
+      (inverse->image->colorspace == CMYKColorspace))
+    pixel.black/=denominator;
+  if (((GetPixelAlphaTraits(inverse->sparse_image) & UpdatePixelTrait) != 0) &&
+      (inverse->sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha/=denominator;
+  return(pixel);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3590,105 +3811,43 @@ MagickExport Image *SparseColorImage(const Image *image,
         {
           case BarycentricColorInterpolate:
           {
-            ssize_t x=0;
-            if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.red     = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
-            if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.green   = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
-            if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.blue    = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
-            if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (sparse_image->colorspace == CMYKColorspace))
-              pixel.black   = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
-            if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (sparse_image->alpha_trait != UndefinedPixelTrait))
-              pixel.alpha = coeff[x]*i +coeff[x+1]*j
-                              +coeff[x+2], x+=3;
+            SparseColorPlane
+              plane;
+
+            plane.sparse_image=sparse_image;
+            plane.coeff=coeff;
+            plane.i=i;
+            plane.j=j;
+            pixel=BarycentricSparseColor(&plane,pixel);
             break;
           }
           case BilinearColorInterpolate:
           {
-            ssize_t x=0;
-            if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.red     = coeff[x]*i     + coeff[x+1]*j +
-                              coeff[x+2]*i*j + coeff[x+3], x+=4;
-            if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.green   = coeff[x]*i     + coeff[x+1]*j +
-                              coeff[x+2]*i*j + coeff[x+3], x+=4;
-            if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.blue    = coeff[x]*i     + coeff[x+1]*j +
-                              coeff[x+2]*i*j + coeff[x+3], x+=4;
-            if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (image->colorspace == CMYKColorspace))
-              pixel.black   = coeff[x]*i     + coeff[x+1]*j +
-                              coeff[x+2]*i*j + coeff[x+3], x+=4;
-            if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (sparse_image->alpha_trait != UndefinedPixelTrait))
-              pixel.alpha = coeff[x]*i     + coeff[x+1]*j +
-                              coeff[x+2]*i*j + coeff[x+3], x+=4;
+            SparseColorPlane
+              plane;
+
+            plane.sparse_image=sparse_image;
+            plane.coeff=coeff;
+            plane.i=i;
+            plane.j=j;
+            pixel=BilinearSparseColor(&plane,image,pixel);
             break;
           }
           case InverseColorInterpolate:
           case ShepardsColorInterpolate:
           { /* Inverse (Squared) Distance weights average (IDW) */
-            double
-              denominator;
+            SparseColorWeights
+              inverse;
 
-            size_t
-              k;
-
-            if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.red=0.0;
-            if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.green=0.0;
-            if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.blue=0.0;
-            if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (image->colorspace == CMYKColorspace))
-              pixel.black=0.0;
-            if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (sparse_image->alpha_trait != UndefinedPixelTrait))
-              pixel.alpha=0.0;
-            denominator = 0.0;
-            for (k=0; k<number_arguments; k+=2+number_colors)
-            {
-              double weight =
-                  ((double) i-arguments[ k ])*((double) i-arguments[ k ])
-                + ((double) j-arguments[k+1])*((double) j-arguments[k+1]);
-              ssize_t x = (ssize_t) k+2;
-
-              weight = pow(weight,coeff[0]); /* inverse of power factor */
-              weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
-              if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-                pixel.red     += arguments[x++]*weight;
-              if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-                pixel.green   += arguments[x++]*weight;
-              if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-                pixel.blue    += arguments[x++]*weight;
-              if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                  (image->colorspace == CMYKColorspace))
-                pixel.black   += arguments[x++]*weight;
-              if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                  (sparse_image->alpha_trait != UndefinedPixelTrait))
-                pixel.alpha += arguments[x++]*weight;
-              denominator += weight;
-            }
-            if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.red/=denominator;
-            if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.green/=denominator;
-            if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.blue/=denominator;
-            if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (image->colorspace == CMYKColorspace))
-              pixel.black/=denominator;
-            if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (sparse_image->alpha_trait != UndefinedPixelTrait))
-              pixel.alpha/=denominator;
+            inverse.image=image;
+            inverse.sparse_image=sparse_image;
+            inverse.number_arguments=number_arguments;
+            inverse.arguments=arguments;
+            inverse.number_colors=number_colors;
+            inverse.coeff=coeff;
+            inverse.i=i;
+            inverse.j=j;
+            pixel=InverseSparseColor(&inverse,pixel);
             break;
           }
           case ManhattanColorInterpolate:
@@ -3709,28 +3868,17 @@ MagickExport Image *SparseColorImage(const Image *image,
           case VoronoiColorInterpolate:
           default:
           {
-            double
-              minimum = MagickMaximumValue;
+            SparseColorPoint
+              point;
 
-            size_t
-              k;
-
-            /*
-              Just use the closest control point you can find!
-            */
-            for (k=0; k<number_arguments; k+=2+number_colors) {
-              double distance = VoronoiDistance(i,j,arguments,k);
-              if ( distance < minimum ) {
-                SparseControlColor
-                  control;
-
-                control.image=image;
-                control.sparse_image=sparse_image;
-                control.arguments=arguments;
-                SetSparseControlColor(&control,k,&pixel);
-                minimum = distance;
-              }
-            }
+            point.image=image;
+            point.sparse_image=sparse_image;
+            point.number_arguments=number_arguments;
+            point.arguments=arguments;
+            point.number_colors=number_colors;
+            point.i=i;
+            point.j=j;
+            pixel=VoronoiSparseColor(&point,pixel);
             break;
           }
         }

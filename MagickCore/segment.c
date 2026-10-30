@@ -441,6 +441,14 @@ static Cluster *ClassifyPixelByCluster(const Image *image,Cluster *head,
   return(c);
 }
 
+static inline MagickBooleanType IsClusterAboveThreshold(const Cluster *cluster,
+  const ssize_t count,const double cluster_threshold)
+{
+  return(((cluster->count > 0) &&
+    (cluster->count >= (count*cluster_threshold/100.0))) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -619,8 +627,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
   {
     next_cluster=cluster->next;
-    if ((cluster->count > 0) &&
-        (cluster->count >= (count*cluster_threshold/100.0)))
+    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
       {
         /*
           Initialize cluster.
@@ -789,20 +796,112 @@ static MagickBooleanType IsEvenCrossing(const ZeroCrossing *zero_crossing,
   return((((count % 2) == 0) && (candidate != k)) ? MagickTrue : MagickFalse);
 }
 
+static ssize_t FindCrossingBelow(const ZeroCrossing *zero_crossing,
+  const ssize_t i,const ssize_t j)
+{
+  ssize_t
+    k;
+
+  for (k=j-1; k > 0; k--)
+    if (zero_crossing[i].crossings[k] != 0)
+      break;
+  return(k);
+}
+
+static ssize_t FindCrossingAbove(const ZeroCrossing *zero_crossing,
+  const ssize_t i,const ssize_t j)
+{
+  ssize_t
+    k;
+
+  for (k=j+1; k < 255; k++)
+    if (zero_crossing[i+1].crossings[k] != 0)
+      break;
+  return(k);
+}
+
+static void MoveCrossing(ZeroCrossing *zero_crossing,const ssize_t i,
+  const ssize_t j,const ssize_t correct)
+{
+  ssize_t
+    l;
+
+  l=(ssize_t) zero_crossing[i].crossings[j];
+  zero_crossing[i].crossings[j]=0;
+  if (correct != -1)
+    zero_crossing[i].crossings[correct]=(short) l;
+}
+
+typedef struct _CrossingCandidates
+{
+  const ZeroCrossing
+    *zero_crossing;
+
+  ssize_t
+    i,
+    j,
+    k,
+    center,
+    left,
+    right;
+} CrossingCandidates;
+
+static ssize_t SelectEvenCrossing(const CrossingCandidates *candidates)
+{
+  const ZeroCrossing
+    *const zero_crossing = candidates->zero_crossing;
+
+  const ssize_t
+    i = candidates->i,
+    j = candidates->j,
+    k = candidates->k,
+    center = candidates->center,
+    left = candidates->left,
+    right = candidates->right;
+
+  ssize_t
+    correct;
+
+  /*
+    Check center for an even number of crossings between k and j.
+  */
+  correct=(-1);
+  if (zero_crossing[i+1].crossings[j] != 0)
+    if (IsEvenCrossing(zero_crossing,i,k,center) != MagickFalse)
+      correct=center;
+  /*
+    Check left for an even number of crossings between k and j.
+  */
+  if (correct != -1)
+    return(correct);
+  if (IsEvenCrossing(zero_crossing,i,k,left) != MagickFalse)
+    correct=left;
+  /*
+    Check right for an even number of crossings between k and j.
+  */
+  if (correct != -1)
+    return(correct);
+  if (IsEvenCrossing(zero_crossing,i,k,right) != MagickFalse)
+    correct=right;
+  return(correct);
+}
+
 static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
   ssize_t
     i,
     j,
-    k,
-    l;
+    k;
 
   ssize_t
     center,
     correct,
     left,
     right;
+
+  CrossingCandidates
+    candidates;
 
   /*
     Consolidate zero crossings.
@@ -817,46 +916,26 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
         property that there are an even number of crossings between
         intervals.
       */
-      for (k=j-1; k > 0; k--)
-        if (zero_crossing[i+1].crossings[k] != 0)
-          break;
+      k=FindCrossingBelow(zero_crossing,i+1,j);
       left=MagickMax(k,0);
       center=j;
-      for (k=j+1; k < 255; k++)
-        if (zero_crossing[i+1].crossings[k] != 0)
-          break;
+      k=FindCrossingAbove(zero_crossing,i,j);
       right=MagickMin(k,255);
       /*
         K is the zero crossing just left of j.
       */
-      for (k=j-1; k > 0; k--)
-        if (zero_crossing[i].crossings[k] != 0)
-          break;
+      k=FindCrossingBelow(zero_crossing,i,j);
       if (k < 0)
         k=0;
-      /*
-        Check center for an even number of crossings between k and j.
-      */
-      correct=(-1);
-      if (zero_crossing[i+1].crossings[j] != 0)
-        if (IsEvenCrossing(zero_crossing,i,k,center) != MagickFalse)
-          correct=center;
-      /*
-        Check left for an even number of crossings between k and j.
-      */
-      if (correct == -1)
-        if (IsEvenCrossing(zero_crossing,i,k,left) != MagickFalse)
-          correct=left;
-      /*
-        Check right for an even number of crossings between k and j.
-      */
-      if (correct == -1)
-        if (IsEvenCrossing(zero_crossing,i,k,right) != MagickFalse)
-          correct=right;
-      l=(ssize_t) zero_crossing[i].crossings[j];
-      zero_crossing[i].crossings[j]=0;
-      if (correct != -1)
-        zero_crossing[i].crossings[correct]=(short) l;
+      candidates.zero_crossing=zero_crossing;
+      candidates.i=i;
+      candidates.j=j;
+      candidates.k=k;
+      candidates.center=center;
+      candidates.left=left;
+      candidates.right=right;
+      correct=SelectEvenCrossing(&candidates);
+      MoveCrossing(zero_crossing,i,j,correct);
     }
 }
 
@@ -887,6 +966,13 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
 %      of a particular peak or valley of a color component.
 %
 */
+static void SkipToRegionMinimum(const short *extrema,ExtentPacket *extents)
+{
+  for ( ; extents->index <= 255; extents->index++)
+    if (extrema[extents->index] < 0)
+      break;
+}
+
 static ssize_t DefineRegion(const short *extrema,ExtentPacket *extents)
 {
   /*
@@ -907,9 +993,7 @@ static ssize_t DefineRegion(const short *extrema,ExtentPacket *extents)
   /*
     Find the right side (minima).
   */
-  for ( ; extents->index <= 255; extents->index++)
-    if (extrema[extents->index] < 0)
-      break;
+  SkipToRegionMinimum(extrema,extents);
   extents->right=extents->index-1;
   return(MagickTrue);
 }
@@ -1005,6 +1089,22 @@ static inline MagickBooleanType HasObjectAndBackgroundClusters(
 {
   return(((count > 1) && (head != (Cluster *) NULL) &&
     (head->next != (Cluster *) NULL)) ? MagickTrue : MagickFalse);
+}
+
+static Cluster *FindObjectCluster(Cluster *head)
+{
+  Cluster
+    *object,
+    *cluster;
+
+  object=head->next;
+  for (cluster=object; cluster->next != (Cluster *) NULL; )
+  {
+    if (cluster->count < object->count)
+      object=cluster;
+    cluster=cluster->next;
+  }
+  return(object);
 }
 
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
@@ -1197,8 +1297,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
   {
     next_cluster=cluster->next;
-    if ((cluster->count > 0) &&
-        (cluster->count >= (count*cluster_threshold/100.0)))
+    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
       {
         /*
           Initialize cluster.
@@ -1224,13 +1323,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   background=head;
   if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
     {
-      object=head->next;
-      for (cluster=object; cluster->next != (Cluster *) NULL; )
-      {
-        if (cluster->count < object->count)
-          object=cluster;
-        cluster=cluster->next;
-      }
+      object=FindObjectCluster(head);
       background=head->next;
       for (cluster=background; cluster->next != (Cluster *) NULL; )
       {
@@ -1445,23 +1538,112 @@ static IntervalTree *AcquireRootInterval(void)
   return(root);
 }
 
-static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
-  const size_t number_crossings)
+typedef struct _IntervalSplit
 {
+  const ZeroCrossing
+    *zero_crossing;
+
   IntervalTree
     *head,
-    **list,
-    *node,
+    ***list,
     *root;
 
   ssize_t
-    i;
+    i,
+    left;
+} IntervalSplit;
+
+static MagickBooleanType AppendLastInterval(const IntervalSplit *split,
+  IntervalTree **node)
+{
+  if (split->left != split->head->left)
+    {
+      (*node)->sibling=(IntervalTree *) AcquireQuantumMemory(1,
+        sizeof(*(*node)->sibling));
+      *node=(*node)->sibling;
+      if (*node == (IntervalTree *) NULL)
+        {
+          *split->list=(IntervalTree **) RelinquishMagickMemory(*split->list);
+          FreeNodes(split->root);
+          return(MagickFalse);
+        }
+      (*node)->tau=split->zero_crossing[split->i+1].tau;
+      (*node)->child=(IntervalTree *) NULL;
+      (*node)->sibling=(IntervalTree *) NULL;
+      (*node)->left=split->left;
+      (*node)->right=split->head->right;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SplitIntervalList(const ZeroCrossing *zero_crossing,
+  const ssize_t i,IntervalTree *root,IntervalTree ***list)
+{
+  IntervalTree
+    *head,
+    *node;
 
   ssize_t
     j,
     k,
     left,
     number_nodes;
+
+  /*
+    Initialize list with all nodes with no children.
+  */
+  number_nodes=0;
+  InitializeList(*list,&number_nodes,root);
+  /*
+    Split list.
+  */
+  for (j=0; j < number_nodes; j++)
+  {
+    IntervalSplit
+      split;
+
+    head=(*list)[j];
+    left=head->left;
+    node=head;
+    for (k=head->left+1; k < head->right; k++)
+    {
+      if (zero_crossing[i+1].crossings[k] == 0)
+        continue;
+      node=AppendIntervalNode(head,node);
+      if (node == (IntervalTree *) NULL)
+        {
+          *list=(IntervalTree **) RelinquishMagickMemory(*list);
+          FreeNodes(root);
+          return(MagickFalse);
+        }
+      node->tau=zero_crossing[i+1].tau;
+      node->child=(IntervalTree *) NULL;
+      node->sibling=(IntervalTree *) NULL;
+      node->left=left;
+      node->right=k;
+      left=k;
+    }
+    split.zero_crossing=zero_crossing;
+    split.head=head;
+    split.list=list;
+    split.root=root;
+    split.i=i;
+    split.left=left;
+    if (AppendLastInterval(&split,&node) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
+  const size_t number_crossings)
+{
+  IntervalTree
+    **list,
+    *root;
+
+  ssize_t
+    i;
 
   /*
     Allocate interval tree.
@@ -1477,56 +1659,8 @@ static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
   (void) memset(list,0,(size_t) TreeLength*sizeof(*list));
   for (i=(-1); i < (ssize_t) number_crossings; i++)
   {
-    /*
-      Initialize list with all nodes with no children.
-    */
-    number_nodes=0;
-    InitializeList(list,&number_nodes,root);
-    /*
-      Split list.
-    */
-    for (j=0; j < number_nodes; j++)
-    {
-      head=list[j];
-      left=head->left;
-      node=head;
-      for (k=head->left+1; k < head->right; k++)
-      {
-        if (zero_crossing[i+1].crossings[k] != 0)
-          {
-            node=AppendIntervalNode(head,node);
-            if (node == (IntervalTree *) NULL)
-              {
-                list=(IntervalTree **) RelinquishMagickMemory(list);
-                FreeNodes(root);
-                return((IntervalTree *) NULL);
-              }
-            node->tau=zero_crossing[i+1].tau;
-            node->child=(IntervalTree *) NULL;
-            node->sibling=(IntervalTree *) NULL;
-            node->left=left;
-            node->right=k;
-            left=k;
-          }
-        }
-      if (left != head->left)
-        {
-          node->sibling=(IntervalTree *) AcquireQuantumMemory(1,
-            sizeof(*node->sibling));
-          node=node->sibling;
-          if (node == (IntervalTree *) NULL)
-            {
-              list=(IntervalTree **) RelinquishMagickMemory(list);
-              FreeNodes(root);
-              return((IntervalTree *) NULL);
-            }
-          node->tau=zero_crossing[i+1].tau;
-          node->child=(IntervalTree *) NULL;
-          node->sibling=(IntervalTree *) NULL;
-          node->left=left;
-          node->right=head->right;
-        }
-    }
+    if (SplitIntervalList(zero_crossing,i,root,&list) == MagickFalse)
+      return((IntervalTree *) NULL);
   }
   /*
     Determine the stability: difference between a nodes tau and its child.
@@ -1865,6 +1999,21 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
 %      of pixels for each intensity of a particular color component.
 %
 */
+static double ScaleSpaceSum(const ssize_t *histogram,const double *gamma,
+  const ssize_t x)
+{
+  double
+    sum;
+
+  ssize_t
+    u;
+
+  sum=0.0;
+  for (u=0; u <= 255; u++)
+    sum+=(double) histogram[u]*gamma[MagickAbsoluteValue(x-u)];
+  return(sum);
+}
+
 static void ScaleSpace(const ssize_t *histogram,const double tau,
   double *scale_histogram)
 {
@@ -1875,7 +2024,6 @@ static void ScaleSpace(const ssize_t *histogram,const double tau,
     sum;
 
   ssize_t
-    u,
     x;
 
   gamma=(double *) AcquireQuantumMemory(256,sizeof(*gamma));
@@ -1893,9 +2041,7 @@ static void ScaleSpace(const ssize_t *histogram,const double tau,
   }
   for (x=0; x <= 255; x++)
   {
-    sum=0.0;
-    for (u=0; u <= 255; u++)
-      sum+=(double) histogram[u]*gamma[MagickAbsoluteValue(x-u)];
+    sum=ScaleSpaceSum(histogram,gamma,x);
     scale_histogram[x]=alpha*sum;
   }
   gamma=(double *) RelinquishMagickMemory(gamma);
@@ -2058,6 +2204,24 @@ static void MergeSmallDerivatives(double *second_derivative,
 %      of a particular color component.
 %
 */
+static ssize_t MarkFallingCrossing(short *crossings,const ssize_t i,
+  ssize_t parity)
+{
+  if (parity > 0)
+    crossings[i]=(-1);
+  parity=1;
+  return(parity);
+}
+
+static ssize_t MarkRisingCrossing(short *crossings,const ssize_t i,
+  ssize_t parity)
+{
+  if (parity < 0)
+    crossings[i]=1;
+  parity=(-1);
+  return(parity);
+}
+
 static void ZeroCrossHistogram(double *second_derivative,
   const double smooth_threshold,short *crossings)
 {
@@ -2079,17 +2243,9 @@ static void ZeroCrossHistogram(double *second_derivative,
   {
     crossings[i]=0;
     if (second_derivative[i] < 0.0)
-      {
-        if (parity > 0)
-          crossings[i]=(-1);
-        parity=1;
-      }
+      parity=MarkFallingCrossing(crossings,i,parity);
     else
       if (second_derivative[i] > 0.0)
-        {
-          if (parity < 0)
-            crossings[i]=1;
-          parity=(-1);
-        }
+        parity=MarkRisingCrossing(crossings,i,parity);
   }
 }

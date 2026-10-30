@@ -48,8 +48,11 @@ JOBS=${JOBS:-$(sysctl -n hw.ncpu 2>/dev/null || nproc)}
 # Fixed configuration for all oracle builds.
 #  --disable-openmp   thread scheduling must not be able to change results
 #  --disable-shared   one self-contained binary, no libtool wrapper scripts
+#  --with-fftw        configure leaves FFTW out unless asked; with it, fourier.c and
+#                     compare.c's FFT similarity functions compile where libfftw3 is
+#                     installed (Linux), and nothing changes where it is not (the Mac)
 CONFIG_FLAGS=(--disable-shared --enable-static --disable-openmp --without-perl
-              --disable-docs)
+              --disable-docs --with-fftw)
 SUFFIX=""
 if [ -n "${WIDE:-}" ]; then
   CONFIG_FLAGS+=(--with-x --enable-opencl)

@@ -164,6 +164,21 @@ static void ClearBounds(Image *image,RectangleInfo *bounds,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsPixelCleared(const Image *image1,
+  const Quantum *p,const Image *image2,const Quantum *q)
+{
+  return(((GetPixelAlpha(image1,p) >= (Quantum) (QuantumRange/2)) &&
+    (GetPixelAlpha(image2,q) < (Quantum) (QuantumRange/2))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsEitherRowMissing(const Quantum *p,
+  const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType IsBoundsCleared(const Image *image1,
   const Image *image2,RectangleInfo *bounds,ExceptionInfo *exception)
 {
@@ -183,12 +198,11 @@ static MagickBooleanType IsBoundsCleared(const Image *image1,
   {
     p=GetVirtualPixels(image1,bounds->x,bounds->y+y,bounds->width,1,exception);
     q=GetVirtualPixels(image2,bounds->x,bounds->y+y,bounds->width,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     for (x=0; x < (ssize_t) bounds->width; x++)
     {
-      if ((GetPixelAlpha(image1,p) >= (Quantum) (QuantumRange/2)) &&
-          (GetPixelAlpha(image2,q) < (Quantum) (QuantumRange/2)))
+      if (IsPixelCleared(image1,p,image2,q) != MagickFalse)
         break;
       p+=(ptrdiff_t) GetPixelChannels(image1);
       q+=(ptrdiff_t) GetPixelChannels(image2);
@@ -228,6 +242,68 @@ static MagickBooleanType IsBoundsCleared(const Image *image1,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static size_t GetCanvasExtent(size_t extent,const size_t size,
+  const ssize_t offset)
+{
+  if (extent == 0)
+    {
+      extent=size;
+      if (offset > 0)
+        extent+=(size_t) offset;
+    }
+  return(extent);
+}
+
+static void CompositeCoalescedFrame(Image *coalesce_image,const Image *next,
+  const char *attribute,ExceptionInfo *exception)
+{
+  if (attribute == (const char *) NULL)
+    (void) CompositeImage(coalesce_image,next,
+      next->alpha_trait != UndefinedPixelTrait ? OverCompositeOp :
+      CopyCompositeOp,MagickTrue,next->page.x,next->page.y,exception);
+  else
+    (void) CompositeImage(coalesce_image,next,
+      LocaleCompare(attribute,"AtopBackgroundAlphaBlend") == 0 ?
+      OverCompositeOp : CopyCompositeOp,MagickTrue,next->page.x,next->page.y,
+      exception);
+}
+
+static RectangleInfo ClipBoundsLeft(RectangleInfo bounds)
+{
+  if (bounds.x < 0)
+    {
+      bounds.width=(size_t) ((ssize_t) bounds.width+bounds.x);
+      bounds.x=0;
+    }
+  return(bounds);
+}
+
+static RectangleInfo ClipBoundsTop(RectangleInfo bounds)
+{
+  if (bounds.y < 0)
+    {
+      bounds.height=(size_t) ((ssize_t) bounds.height+bounds.y);
+      bounds.y=0;
+    }
+  return(bounds);
+}
+
+static RectangleInfo ClipBoundsRight(RectangleInfo bounds,
+  const Image *image)
+{
+  if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) image->columns)
+    bounds.width=(size_t) ((ssize_t) image->columns-bounds.x);
+  return(bounds);
+}
+
+static RectangleInfo ClipBoundsBottom(RectangleInfo bounds,
+  const Image *image)
+{
+  if ((bounds.y+(ssize_t) bounds.height) > (ssize_t) image->rows)
+    bounds.height=(size_t) ((ssize_t) image->rows-bounds.y);
+  return(bounds);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -252,18 +328,8 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   next=GetFirstImageInList(image);
   bounds=next->page;
-  if (bounds.width == 0)
-    {
-      bounds.width=next->columns;
-      if (bounds.x > 0)
-        bounds.width+=(size_t) bounds.x;
-    }
-  if (bounds.height == 0)
-    {
-      bounds.height=next->rows;
-      if (bounds.y > 0)
-        bounds.height+=(size_t) bounds.y;
-    }
+  bounds.width=GetCanvasExtent(bounds.width,next->columns,bounds.x);
+  bounds.height=GetCanvasExtent(bounds.height,next->rows,bounds.y);
   bounds.x=0;
   bounds.y=0;
   coalesce_image=CloneImage(next,bounds.width,bounds.height,MagickTrue,
@@ -301,20 +367,10 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     bounds=previous->page;
     bounds.width=previous->columns;
     bounds.height=previous->rows;
-    if (bounds.x < 0)
-      {
-        bounds.width=(size_t) ((ssize_t) bounds.width+bounds.x);
-        bounds.x=0;
-      }
-    if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) coalesce_image->columns)
-      bounds.width=(size_t) ((ssize_t) coalesce_image->columns-bounds.x);
-    if (bounds.y < 0)
-      {
-        bounds.height=(size_t) ((ssize_t) bounds.height+bounds.y);
-        bounds.y=0;
-      }
-    if ((bounds.y+(ssize_t) bounds.height) > (ssize_t) coalesce_image->rows)
-      bounds.height=(size_t) ((ssize_t) coalesce_image->rows-bounds.y);
+    bounds=ClipBoundsLeft(bounds);
+    bounds=ClipBoundsRight(bounds,coalesce_image);
+    bounds=ClipBoundsTop(bounds);
+    bounds=ClipBoundsBottom(bounds,coalesce_image);
     /*
       Replace the dispose image with the new coalesced image.
     */
@@ -344,15 +400,7 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     coalesce_image=GetNextImageInList(coalesce_image);
     coalesce_image->background_color.alpha_trait=BlendPixelTrait;
     attribute=GetImageProperty(next,"webp:mux-blend",exception);
-    if (attribute == (const char *) NULL)
-      (void) CompositeImage(coalesce_image,next,
-        next->alpha_trait != UndefinedPixelTrait ? OverCompositeOp :
-        CopyCompositeOp,MagickTrue,next->page.x,next->page.y,exception);
-    else
-      (void) CompositeImage(coalesce_image,next,
-        LocaleCompare(attribute,"AtopBackgroundAlphaBlend") == 0 ?
-        OverCompositeOp : CopyCompositeOp,MagickTrue,next->page.x,next->page.y,
-        exception);
+    CompositeCoalescedFrame(coalesce_image,next,attribute,exception);
     (void) CloneImageProfiles(coalesce_image,next);
     (void) CloneImageProperties(coalesce_image,next);
     (void) CloneImageArtifacts(coalesce_image,next);
@@ -458,20 +506,10 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
         bounds=next->page;
         bounds.width=next->columns;
         bounds.height=next->rows;
-        if (bounds.x < 0)
-          {
-            bounds.width=(size_t) ((ssize_t) bounds.width+bounds.x);
-            bounds.x=0;
-          }
-        if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) current_image->columns)
-          bounds.width=(size_t) ((ssize_t) current_image->columns-bounds.x);
-        if (bounds.y < 0)
-          {
-            bounds.height=(size_t) ((ssize_t) bounds.height+bounds.y);
-            bounds.y=0;
-          }
-        if ((bounds.y+(ssize_t) bounds.height) > (ssize_t) current_image->rows)
-          bounds.height=(size_t) ((ssize_t) current_image->rows-bounds.y);
+        bounds=ClipBoundsLeft(bounds);
+        bounds=ClipBoundsRight(bounds,current_image);
+        bounds=ClipBoundsTop(bounds);
+        bounds=ClipBoundsBottom(bounds,current_image);
         ClearBounds(current_image,&bounds,exception);
       }
     /*
@@ -665,7 +703,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   {
     p=GetVirtualPixels(alpha_image,x,0,1,alpha_image->rows,exception);
     q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     y=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
       alpha_image->rows,&alpha_pixel,&beta_pixel);
@@ -688,7 +726,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   {
     p=GetVirtualPixels(alpha_image,x,0,1,alpha_image->rows,exception);
     q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     y=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
       alpha_image->rows,&alpha_pixel,&beta_pixel);
@@ -700,7 +738,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   {
     p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
     q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     x=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
       alpha_image->columns,&alpha_pixel,&beta_pixel);
@@ -712,7 +750,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   {
     p=GetVirtualPixels(alpha_image,0,y,alpha_image->columns,1,exception);
     q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
     x=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
       alpha_image->columns,&alpha_pixel,&beta_pixel);
@@ -958,6 +996,148 @@ static inline MagickBooleanType IsBetterFrameBounds(
     <  bounds[i].width * bounds[i].height ) ? MagickTrue : MagickFalse);
 }
 
+static size_t GrowExtent(size_t extent,const size_t try_extent)
+{
+  if (extent < try_extent)
+    extent=try_extent;
+  return(extent);
+}
+
+static RectangleInfo ExpandBoundsWidth(RectangleInfo bgnd_bounds,
+  RectangleInfo try_bounds)
+{
+  if ( try_bounds.x < bgnd_bounds.x )
+    {
+       bgnd_bounds.width=(size_t) ((ssize_t) bgnd_bounds.width+
+         bgnd_bounds.x-try_bounds.x);
+       bgnd_bounds.width=GrowExtent(bgnd_bounds.width,try_bounds.width);
+       bgnd_bounds.x = try_bounds.x;
+    }
+  else
+    {
+       try_bounds.width=(size_t) ((ssize_t) try_bounds.width+
+         try_bounds.x-bgnd_bounds.x);
+       bgnd_bounds.width=GrowExtent(bgnd_bounds.width,try_bounds.width);
+    }
+  return(bgnd_bounds);
+}
+
+static RectangleInfo ExpandBoundsHeight(RectangleInfo bgnd_bounds,
+  RectangleInfo try_bounds)
+{
+  if ( try_bounds.y < bgnd_bounds.y )
+    {
+      bgnd_bounds.height=(size_t) ((ssize_t) bgnd_bounds.height+
+        bgnd_bounds.y-try_bounds.y);
+      bgnd_bounds.height=GrowExtent(bgnd_bounds.height,try_bounds.height);
+      bgnd_bounds.y=try_bounds.y;
+    }
+  else
+    {
+      try_bounds.height=(size_t) ((ssize_t) try_bounds.height+
+        try_bounds.y-bgnd_bounds.y);
+      bgnd_bounds.height=GrowExtent(bgnd_bounds.height,try_bounds.height);
+    }
+  return(bgnd_bounds);
+}
+
+static RectangleInfo ExpandDisposalBounds(RectangleInfo bgnd_bounds,
+  RectangleInfo try_bounds)
+{
+  if ( bgnd_bounds.x < 0 )
+    bgnd_bounds = try_bounds;
+  else
+    {
+#if DEBUG_OPT_FRAME
+      (void) FormatLocaleFile(stderr, "expand_bgnd: %.17gx%.17g%+.20g%+.20g\n",
+          (double) bgnd_bounds.width,(double) bgnd_bounds.height,
+          (double) bgnd_bounds.x,(double) bgnd_bounds.y );
+#endif
+      bgnd_bounds=ExpandBoundsWidth(bgnd_bounds,try_bounds);
+      bgnd_bounds=ExpandBoundsHeight(bgnd_bounds,try_bounds);
+#if DEBUG_OPT_FRAME
+      (void) FormatLocaleFile(stderr, "        to : %.17gx%.17g%+.20g%+.20g\n",
+          (double) bgnd_bounds.width,(double) bgnd_bounds.height,
+          (double) bgnd_bounds.x,(double) bgnd_bounds.y );
+#endif
+    }
+  return(bgnd_bounds);
+}
+
+static void MergeDeletedFrameDelays(const DisposeType *disposals,
+  Image *prev_image,const Image **curr,ssize_t *i)
+{
+  if ( disposals[*i] == DelDispose ) {
+    size_t time = 0;
+    while ( disposals[*i] == DelDispose ) {
+      time +=(size_t) ((*curr)->delay*1000*
+        MagickSafeReciprocal((double) (*curr)->ticks_per_second));
+      *curr=GetNextImageInList(*curr);
+      (*i)++;
+    }
+    time += (size_t)((*curr)->delay*1000*
+      MagickSafeReciprocal((double) (*curr)->ticks_per_second));
+    prev_image->ticks_per_second = 100L;
+    prev_image->delay = time*(size_t) prev_image->ticks_per_second/1000;
+  }
+}
+
+static Image *OptimizeImageFrames(const Image *image,RectangleInfo *bounds,
+  DisposeType *disposals,ExceptionInfo *exception)
+{
+  const Image
+    *curr;
+
+  ExceptionInfo
+    *sans_exception;
+
+  Image
+    *prev_image,
+    *bgnd_image,
+    *optimized_image;
+
+  ssize_t
+    i;
+
+  /*
+    Optimize all images in sequence.
+  */
+  sans_exception=AcquireExceptionInfo();
+  i=0;
+  curr=GetFirstImageInList(image);
+  optimized_image=NewImageList();
+  while ( curr != (const Image *) NULL )
+  {
+    prev_image=CloneImage(curr,0,0,MagickTrue,exception);
+    if (prev_image == (Image *) NULL)
+      break;
+    prev_image->background_color.alpha_trait=BlendPixelTrait;
+    MergeDeletedFrameDelays(disposals,prev_image,&curr,&i);
+    bgnd_image=CropImage(prev_image,&bounds[i],sans_exception);
+    prev_image=DestroyImage(prev_image);
+    if (bgnd_image == (Image *) NULL)
+      break;
+    bgnd_image->dispose=disposals[i];
+    if ( disposals[i] == DupDispose ) {
+      bgnd_image->delay=0;
+      bgnd_image->dispose=NoneDispose;
+    }
+    else
+      curr=GetNextImageInList(curr);
+    AppendImageToList(&optimized_image,bgnd_image);
+    i++;
+  }
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+  if (curr != (Image *) NULL)
+    {
+      optimized_image=DestroyImageList(optimized_image);
+      return((Image *) NULL);
+    }
+  return(GetFirstImageInList(optimized_image));
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -967,14 +1147,10 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   DisposeType
     *disposals;
 
-  ExceptionInfo
-    *sans_exception;
-
   Image
     *prev_image,
     *dup_image,
-    *bgnd_image,
-    *optimized_image;
+    *bgnd_image;
 
   RectangleInfo
     try_bounds,
@@ -1204,51 +1380,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
                 (double) try_bounds.x,(double) try_bounds.y,
                 try_bounds.x<0?"  (no expand necessary)":"");
 #endif
-            if ( bgnd_bounds.x < 0 )
-              bgnd_bounds = try_bounds;
-            else
-              {
-#if DEBUG_OPT_FRAME
-                (void) FormatLocaleFile(stderr, "expand_bgnd: %.17gx%.17g%+.20g%+.20g\n",
-                    (double) bgnd_bounds.width,(double) bgnd_bounds.height,
-                    (double) bgnd_bounds.x,(double) bgnd_bounds.y );
-#endif
-                if ( try_bounds.x < bgnd_bounds.x )
-                  {
-                     bgnd_bounds.width=(size_t) ((ssize_t) bgnd_bounds.width+
-                       bgnd_bounds.x-try_bounds.x);
-                     if ( bgnd_bounds.width < try_bounds.width )
-                       bgnd_bounds.width = try_bounds.width;
-                     bgnd_bounds.x = try_bounds.x;
-                  }
-                else
-                  {
-                     try_bounds.width=(size_t) ((ssize_t) try_bounds.width+
-                       try_bounds.x-bgnd_bounds.x);
-                     if ( bgnd_bounds.width < try_bounds.width )
-                       bgnd_bounds.width = try_bounds.width;
-                  }
-                if ( try_bounds.y < bgnd_bounds.y )
-                  {
-                    bgnd_bounds.height=(size_t) ((ssize_t) bgnd_bounds.height+
-                      bgnd_bounds.y-try_bounds.y);
-                    if (bgnd_bounds.height < try_bounds.height)
-                      bgnd_bounds.height=try_bounds.height;
-                    bgnd_bounds.y=try_bounds.y;
-                  }
-                else
-                  {
-                    try_bounds.height=(size_t) ((ssize_t) try_bounds.height+
-                      try_bounds.y-bgnd_bounds.y);
-                    if ( bgnd_bounds.height < try_bounds.height )
-                      bgnd_bounds.height = try_bounds.height;
-                  }
-#if DEBUG_OPT_FRAME
-                (void) FormatLocaleFile(stderr, "        to : %.17gx%.17g%+.20g%+.20g\n",
-                    (double) bgnd_bounds.width,(double) bgnd_bounds.height,
-                    (double) bgnd_bounds.x,(double) bgnd_bounds.y );
-#endif
-              }
+            bgnd_bounds=ExpandDisposalBounds(bgnd_bounds,try_bounds);
             ClearBounds(bgnd_image,&bgnd_bounds,exception);
 #if DEBUG_OPT_FRAME
 /* Something strange is happening with a specific animation
@@ -1360,55 +1492,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     i++;
   }
   prev_image=DestroyImage(prev_image);
-  /*
-    Optimize all images in sequence.
-  */
-  sans_exception=AcquireExceptionInfo();
-  i=0;
-  curr=GetFirstImageInList(image);
-  optimized_image=NewImageList();
-  while ( curr != (const Image *) NULL )
-  {
-    prev_image=CloneImage(curr,0,0,MagickTrue,exception);
-    if (prev_image == (Image *) NULL)
-      break;
-    prev_image->background_color.alpha_trait=BlendPixelTrait;
-    if ( disposals[i] == DelDispose ) {
-      size_t time = 0;
-      while ( disposals[i] == DelDispose ) {
-        time +=(size_t) (curr->delay*1000*
-          MagickSafeReciprocal((double) curr->ticks_per_second));
-        curr=GetNextImageInList(curr);
-        i++;
-      }
-      time += (size_t)(curr->delay*1000*
-        MagickSafeReciprocal((double) curr->ticks_per_second));
-      prev_image->ticks_per_second = 100L;
-      prev_image->delay = time*(size_t) prev_image->ticks_per_second/1000;
-    }
-    bgnd_image=CropImage(prev_image,&bounds[i],sans_exception);
-    prev_image=DestroyImage(prev_image);
-    if (bgnd_image == (Image *) NULL)
-      break;
-    bgnd_image->dispose=disposals[i];
-    if ( disposals[i] == DupDispose ) {
-      bgnd_image->delay=0;
-      bgnd_image->dispose=NoneDispose;
-    }
-    else
-      curr=GetNextImageInList(curr);
-    AppendImageToList(&optimized_image,bgnd_image);
-    i++;
-  }
-  sans_exception=DestroyExceptionInfo(sans_exception);
-  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-  if (curr != (Image *) NULL)
-    {
-      optimized_image=DestroyImageList(optimized_image);
-      return((Image *) NULL);
-    }
-  return(GetFirstImageInList(optimized_image));
+  return(OptimizeImageFrames(image,bounds,disposals,exception));
 }
 
 /*
@@ -1570,20 +1654,10 @@ MagickExport void OptimizeImageTransparency(const Image *image,
 
         bounds.width=next->columns;
         bounds.height=next->rows;
-        if (bounds.x < 0)
-          {
-            bounds.width=(size_t) ((ssize_t) bounds.width+bounds.x);
-            bounds.x=0;
-          }
-        if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) current_image->columns)
-          bounds.width=(size_t) ((ssize_t) current_image->columns-bounds.x);
-        if (bounds.y < 0)
-          {
-            bounds.height=(size_t) ((ssize_t) bounds.height+bounds.y);
-            bounds.y=0;
-          }
-        if ((bounds.y+(ssize_t) bounds.height) > (ssize_t) current_image->rows)
-          bounds.height=(size_t) ((ssize_t) current_image->rows-bounds.y);
+        bounds=ClipBoundsLeft(bounds);
+        bounds=ClipBoundsRight(bounds,current_image);
+        bounds=ClipBoundsTop(bounds);
+        bounds=ClipBoundsBottom(bounds,current_image);
         ClearBounds(current_image,&bounds,exception);
       }
     if (next->dispose != PreviousDispose)

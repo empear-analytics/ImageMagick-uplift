@@ -102,6 +102,26 @@
 #include "MagickCore/transform-private.h"
 #include "MagickCore/utility.h"
 #include "MagickCore/visual-effects.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _PlasmaContext
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view,
+    *u_view,
+    *v_view;
+
+  RandomInfo
+    *magick_restrict random_info;
+
+  ExceptionInfo
+    *exception;
+} PlasmaContext;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -813,6 +833,91 @@ static PixelInfo SetColorMatrixChannel(PixelInfo pixel,const ssize_t h,
   return(pixel);
 }
 
+static void LogColorMatrix(double ColorMatrix[][6])
+{
+  char
+    format[MagickPathExtent],
+    *message;
+
+  ssize_t
+    u,
+    v;
+
+  (void) LogMagickEvent(TransformEvent,GetMagickModule(),
+    "  ColorMatrix image with color matrix:");
+  message=AcquireString("");
+  for (v=0; v < 6; v++)
+  {
+    *message='\0';
+    (void) FormatLocaleString(format,MagickPathExtent,"%.17g: ",(double) v);
+    (void) ConcatenateString(&message,format);
+    for (u=0; u < 6; u++)
+    {
+      (void) FormatLocaleString(format,MagickPathExtent,"%+f ",
+        ColorMatrix[v][u]);
+      (void) ConcatenateString(&message,format);
+    }
+    (void) LogMagickEvent(TransformEvent,GetMagickModule(),"%s",message);
+  }
+  message=DestroyString(message);
+}
+
+typedef struct _ColorMatrixRow
+{
+  const Image
+    *image;
+
+  Image
+    *color_image;
+
+  const KernelInfo
+    *color_matrix;
+} ColorMatrixRow;
+
+static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
+  double ColorMatrix[][6],const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  const Image
+    *const image = color_row->image;
+
+  Image
+    *const color_image = color_row->color_image;
+
+  const KernelInfo
+    *const color_matrix = color_row->color_matrix;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  GetPixelInfo(image,&pixel);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      h;
+
+    size_t
+      height;
+
+    GetPixelInfoPixel(image,p,&pixel);
+    height=color_matrix->height > 6 ? 6UL : color_matrix->height;
+    for (h=0; h < (ssize_t) height; h++)
+    {
+      double
+        sum;
+
+      sum=GetColorMatrixSum(image,p,ColorMatrix[h]);
+      pixel=SetColorMatrixChannel(pixel,h,sum);
+    }
+    SetPixelViaPixelInfo(color_image,&pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(color_image);
+  }
+}
+
 MagickExport Image *ColorMatrixImage(const Image *image,
   const KernelInfo *color_matrix,ExceptionInfo *exception)
 {
@@ -843,8 +948,6 @@ MagickExport Image *ColorMatrixImage(const Image *image,
     progress;
 
   ssize_t
-    u,
-    v,
     y;
 
   /*
@@ -869,29 +972,7 @@ MagickExport Image *ColorMatrixImage(const Image *image,
       return((Image *) NULL);
     }
   if (image->debug != MagickFalse)
-    {
-      char
-        format[MagickPathExtent],
-        *message;
-
-      (void) LogMagickEvent(TransformEvent,GetMagickModule(),
-        "  ColorMatrix image with color matrix:");
-      message=AcquireString("");
-      for (v=0; v < 6; v++)
-      {
-        *message='\0';
-        (void) FormatLocaleString(format,MagickPathExtent,"%.17g: ",(double) v);
-        (void) ConcatenateString(&message,format);
-        for (u=0; u < 6; u++)
-        {
-          (void) FormatLocaleString(format,MagickPathExtent,"%+f ",
-            ColorMatrix[v][u]);
-          (void) ConcatenateString(&message,format);
-        }
-        (void) LogMagickEvent(TransformEvent,GetMagickModule(),"%s",message);
-      }
-      message=DestroyString(message);
-    }
+    LogColorMatrix(ColorMatrix);
   /*
     Apply the ColorMatrix to image.
   */
@@ -905,17 +986,14 @@ MagickExport Image *ColorMatrixImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    PixelInfo
-      pixel;
+    ColorMatrixRow
+      color_row;
 
     const Quantum
       *magick_restrict p;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -927,29 +1005,10 @@ MagickExport Image *ColorMatrixImage(const Image *image,
         status=MagickFalse;
         continue;
       }
-    GetPixelInfo(image,&pixel);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        h;
-
-      size_t
-        height;
-
-      GetPixelInfoPixel(image,p,&pixel);
-      height=color_matrix->height > 6 ? 6UL : color_matrix->height;
-      for (h=0; h < (ssize_t) height; h++)
-      {
-        double
-          sum;
-
-        sum=GetColorMatrixSum(image,p,ColorMatrix[h]);
-        pixel=SetColorMatrixChannel(pixel,h,sum);
-      }
-      SetPixelViaPixelInfo(color_image,&pixel,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(color_image);
-    }
+    color_row.image=image;
+    color_row.color_image=color_image;
+    color_row.color_matrix=color_matrix;
+    ApplyColorMatrixRow(&color_row,ColorMatrix,p,q);
     if (SyncCacheViewAuthenticPixels(color_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -1261,11 +1320,27 @@ static void MorphPixelChannels(const Image *morph_image,
   }
 }
 
+#define MorphImageTag  "Morph/Image"
+
+static MagickBooleanType ReportMorphProgress(const Image *image,
+  const MagickOffsetType scene,MagickBooleanType status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,MorphImageTag,scene,
+        GetImageListLength(image));
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   ExceptionInfo *exception)
 {
-#define MorphImageTag  "Morph/Image"
-
   double
     alpha,
     beta;
@@ -1425,16 +1500,7 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
       }
     AppendImageToList(&morph_images,morph_image);
     morph_images=GetLastImageInList(morph_images);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,MorphImageTag,scene,
-          GetImageListLength(image));
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    status=ReportMorphProgress(image,scene,status);
     scene++;
   }
   if (GetNextImageInList(next) != (Image *) NULL)
@@ -1524,16 +1590,124 @@ static void SetPlasmaPixelChannels(const Image *image,
   }
 }
 
-static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
-  CacheView *u_view,CacheView *v_view,RandomInfo *magick_restrict random_info,
-  const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth,
-  ExceptionInfo *exception)
+static MagickBooleanType PlasmaImageProxy(const PlasmaContext *,
+  const SegmentInfo *magick_restrict,size_t,size_t);
+
+static MagickBooleanType DividePlasmaSegment(const PlasmaContext *context,
+  const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
+{
+  MagickStatusType
+    status;
+
+  SegmentInfo
+    local_info;
+
+  ssize_t
+    x_mid,
+    y_mid;
+
+  /*
+    Divide the area into quadrants and recurse.
+  */
+  depth--;
+  attenuate++;
+  x_mid=CastDoubleToSsizeT(ceil((segment->x1+segment->x2)/2-0.5));
+  y_mid=CastDoubleToSsizeT(ceil((segment->y1+segment->y2)/2-0.5));
+  local_info=(*segment);
+  local_info.x2=(double) x_mid;
+  local_info.y2=(double) y_mid;
+  status=PlasmaImageProxy(context,&local_info,attenuate,depth);
+  local_info=(*segment);
+  local_info.y1=(double) y_mid;
+  local_info.x2=(double) x_mid;
+  status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
+  local_info=(*segment);
+  local_info.x1=(double) x_mid;
+  local_info.y2=(double) y_mid;
+  status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
+  local_info=(*segment);
+  local_info.x1=(double) x_mid;
+  local_info.y1=(double) y_mid;
+  status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
+  return(status == 0 ? MagickFalse : MagickTrue);
+}
+
+typedef struct _PlasmaMidpoint
+{
+  const PlasmaContext
+    *context;
+
+  const SegmentInfo
+    *segment;
+
+  ssize_t
+    x_mid,
+    y_mid;
+
+  double
+    plasma;
+} PlasmaMidpoint;
+
+static MagickBooleanType SetPlasmaMiddlePixel(const PlasmaMidpoint *midpoint,
+  MagickStatusType *status)
+{
+  const PlasmaContext
+    *const context = midpoint->context;
+
+  const SegmentInfo
+    *const segment = midpoint->segment;
+
+  const ssize_t
+    x_mid = midpoint->x_mid,
+    y_mid = midpoint->y_mid;
+
+  const double
+    plasma = midpoint->plasma;
+
+  const Quantum
+    *magick_restrict u,
+    *magick_restrict v;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x,
+    y;
+
+  if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) ||
+      (fabs(segment->y1-segment->y2) >= MagickEpsilon))
+    {
+      /*
+        Middle pixel.
+      */
+      x=CastDoubleToSsizeT(ceil(segment->x1-0.5));
+      y=CastDoubleToSsizeT(ceil(segment->y1-0.5));
+      u=GetCacheViewVirtualPixels(context->u_view,x,y,1,1,context->exception);
+      x=CastDoubleToSsizeT(ceil(segment->x2-0.5));
+      y=CastDoubleToSsizeT(ceil(segment->y2-0.5));
+      v=GetCacheViewVirtualPixels(context->v_view,x,y,1,1,context->exception);
+      q=QueueCacheViewAuthenticPixels(context->image_view,x_mid,y_mid,1,1,
+        context->exception);
+      if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
+        return(MagickFalse);
+      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+      *status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
+  const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
 {
   double
     plasma;
 
   MagickStatusType
     status;
+
+  PlasmaMidpoint
+    midpoint;
 
   const Quantum
     *magick_restrict u,
@@ -1552,39 +1726,7 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
       (fabs(segment->y2-segment->y1) < MagickEpsilon))
     return(MagickTrue);
   if (depth != 0)
-    {
-      SegmentInfo
-        local_info;
-
-      /*
-        Divide the area into quadrants and recurse.
-      */
-      depth--;
-      attenuate++;
-      x_mid=CastDoubleToSsizeT(ceil((segment->x1+segment->x2)/2-0.5));
-      y_mid=CastDoubleToSsizeT(ceil((segment->y1+segment->y2)/2-0.5));
-      local_info=(*segment);
-      local_info.x2=(double) x_mid;
-      local_info.y2=(double) y_mid;
-      status=PlasmaImageProxy(image,image_view,u_view,v_view,random_info,
-        &local_info,attenuate,depth,exception);
-      local_info=(*segment);
-      local_info.y1=(double) y_mid;
-      local_info.x2=(double) x_mid;
-      status&=(MagickStatusType) PlasmaImageProxy(image,image_view,u_view,
-        v_view,random_info,&local_info,attenuate,depth,exception);
-      local_info=(*segment);
-      local_info.x1=(double) x_mid;
-      local_info.y2=(double) y_mid;
-      status&=(MagickStatusType) PlasmaImageProxy(image,image_view,u_view,
-        v_view,random_info,&local_info,attenuate,depth,exception);
-      local_info=(*segment);
-      local_info.x1=(double) x_mid;
-      local_info.y1=(double) y_mid;
-      status&=(MagickStatusType) PlasmaImageProxy(image,image_view,u_view,
-        v_view,random_info,&local_info,attenuate,depth,exception);
-      return(status == 0 ? MagickFalse : MagickTrue);
-    }
+    return(DividePlasmaSegment(context,segment,attenuate,depth));
   x_mid=CastDoubleToSsizeT(ceil((segment->x1+segment->x2)/2-0.5));
   y_mid=CastDoubleToSsizeT(ceil((segment->y1+segment->y2)/2-0.5));
   if (IsPlasmaSegmentAtMidpoint(segment,x_mid,y_mid) != MagickFalse)
@@ -1601,30 +1743,31 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
         Left pixel.
       */
       x=CastDoubleToSsizeT(ceil(segment->x1-0.5));
-      u=GetCacheViewVirtualPixels(u_view,x,CastDoubleToSsizeT(ceil(
-        segment->y1-0.5)),1,1,exception);
-      v=GetCacheViewVirtualPixels(v_view,x,CastDoubleToSsizeT(ceil(
-        segment->y2-0.5)),1,1,exception);
-      q=QueueCacheViewAuthenticPixels(image_view,x,y_mid,1,1,exception);
+      u=GetCacheViewVirtualPixels(context->u_view,x,CastDoubleToSsizeT(ceil(
+        segment->y1-0.5)),1,1,context->exception);
+      v=GetCacheViewVirtualPixels(context->v_view,x,CastDoubleToSsizeT(ceil(
+        segment->y2-0.5)),1,1,context->exception);
+      q=QueueCacheViewAuthenticPixels(context->image_view,x,y_mid,1,1,context->exception);
       if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
         return(MagickTrue);
-      SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-      status=SyncCacheViewAuthenticPixels(image_view,exception);
+      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+      status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
       if (fabs(segment->x1-segment->x2) >= MagickEpsilon)
         {
           /*
             Right pixel.
           */
           x=CastDoubleToSsizeT(ceil(segment->x2-0.5));
-          u=GetCacheViewVirtualPixels(u_view,x,CastDoubleToSsizeT(ceil(
-            segment->y1-0.5)),1,1,exception);
-          v=GetCacheViewVirtualPixels(v_view,x,CastDoubleToSsizeT(ceil(
-            segment->y2-0.5)),1,1,exception);
-          q=QueueCacheViewAuthenticPixels(image_view,x,y_mid,1,1,exception);
+          u=GetCacheViewVirtualPixels(context->u_view,x,CastDoubleToSsizeT(ceil(
+            segment->y1-0.5)),1,1,context->exception);
+          v=GetCacheViewVirtualPixels(context->v_view,x,CastDoubleToSsizeT(ceil(
+            segment->y2-0.5)),1,1,context->exception);
+          q=QueueCacheViewAuthenticPixels(context->image_view,x,y_mid,1,1,
+            context->exception);
           if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
             return(MagickFalse);
-          SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-          status=SyncCacheViewAuthenticPixels(image_view,exception);
+          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
         }
     }
   if ((fabs(segment->y1-y_mid) >= MagickEpsilon) ||
@@ -1637,15 +1780,16 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
             Bottom pixel.
           */
           y=CastDoubleToSsizeT(ceil(segment->y2-0.5));
-          u=GetCacheViewVirtualPixels(u_view,CastDoubleToSsizeT(ceil(
-            segment->x1-0.5)),y,1,1,exception);
-          v=GetCacheViewVirtualPixels(v_view,CastDoubleToSsizeT(ceil(
-            segment->x2-0.5)),y,1,1,exception);
-          q=QueueCacheViewAuthenticPixels(image_view,x_mid,y,1,1,exception);
+          u=GetCacheViewVirtualPixels(context->u_view,CastDoubleToSsizeT(ceil(
+            segment->x1-0.5)),y,1,1,context->exception);
+          v=GetCacheViewVirtualPixels(context->v_view,CastDoubleToSsizeT(ceil(
+            segment->x2-0.5)),y,1,1,context->exception);
+          q=QueueCacheViewAuthenticPixels(context->image_view,x_mid,y,1,1,
+            context->exception);
           if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
             return(MagickTrue);
-          SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-          status=SyncCacheViewAuthenticPixels(image_view,exception);
+          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
         }
       if (fabs(segment->y1-segment->y2) >= MagickEpsilon)
         {
@@ -1653,35 +1797,25 @@ static MagickBooleanType PlasmaImageProxy(Image *image,CacheView *image_view,
             Top pixel.
           */
           y=CastDoubleToSsizeT(ceil(segment->y1-0.5));
-          u=GetCacheViewVirtualPixels(u_view,CastDoubleToSsizeT(ceil(
-            segment->x1-0.5)),y,1,1,exception);
-          v=GetCacheViewVirtualPixels(v_view,CastDoubleToSsizeT(ceil(
-            segment->x2-0.5)),y,1,1,exception);
-          q=QueueCacheViewAuthenticPixels(image_view,x_mid,y,1,1,exception);
+          u=GetCacheViewVirtualPixels(context->u_view,CastDoubleToSsizeT(ceil(
+            segment->x1-0.5)),y,1,1,context->exception);
+          v=GetCacheViewVirtualPixels(context->v_view,CastDoubleToSsizeT(ceil(
+            segment->x2-0.5)),y,1,1,context->exception);
+          q=QueueCacheViewAuthenticPixels(context->image_view,x_mid,y,1,1,
+            context->exception);
           if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
             return(MagickTrue);
-          SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-          status=SyncCacheViewAuthenticPixels(image_view,exception);
+          SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+          status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
         }
     }
-  if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) ||
-      (fabs(segment->y1-segment->y2) >= MagickEpsilon))
-    {
-      /*
-        Middle pixel.
-      */
-      x=CastDoubleToSsizeT(ceil(segment->x1-0.5));
-      y=CastDoubleToSsizeT(ceil(segment->y1-0.5));
-      u=GetCacheViewVirtualPixels(u_view,x,y,1,1,exception);
-      x=CastDoubleToSsizeT(ceil(segment->x2-0.5));
-      y=CastDoubleToSsizeT(ceil(segment->y2-0.5));
-      v=GetCacheViewVirtualPixels(v_view,x,y,1,1,exception);
-      q=QueueCacheViewAuthenticPixels(image_view,x_mid,y_mid,1,1,exception);
-      if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
-        return(MagickTrue);
-      SetPlasmaPixelChannels(image,random_info,u,v,q,plasma);
-      status=SyncCacheViewAuthenticPixels(image_view,exception);
-    }
+  midpoint.context=context;
+  midpoint.segment=segment;
+  midpoint.x_mid=x_mid;
+  midpoint.y_mid=y_mid;
+  midpoint.plasma=plasma;
+  if (SetPlasmaMiddlePixel(&midpoint,&status) == MagickFalse)
+    return(MagickTrue);
   if ((fabs(segment->x2-segment->x1) < 3.0) &&
       (fabs(segment->y2-segment->y1) < 3.0))
     return(status == 0 ? MagickFalse : MagickTrue);
@@ -1700,6 +1834,9 @@ MagickExport MagickBooleanType PlasmaImage(Image *image,
   MagickBooleanType
     status;
 
+  PlasmaContext
+    plasma_context;
+
   RandomInfo
     *random_info;
 
@@ -1713,8 +1850,13 @@ MagickExport MagickBooleanType PlasmaImage(Image *image,
   u_view=AcquireVirtualCacheView(image,exception);
   v_view=AcquireVirtualCacheView(image,exception);
   random_info=AcquireRandomInfo();
-  status=PlasmaImageProxy(image,image_view,u_view,v_view,random_info,segment,
-    attenuate,depth,exception);
+  plasma_context.image=image;
+  plasma_context.image_view=image_view;
+  plasma_context.u_view=u_view;
+  plasma_context.v_view=v_view;
+  plasma_context.random_info=random_info;
+  plasma_context.exception=exception;
+  status=PlasmaImageProxy(&plasma_context,segment,attenuate,depth);
   random_info=DestroyRandomInfo(random_info);
   v_view=DestroyCacheView(v_view);
   u_view=DestroyCacheView(u_view);
@@ -2595,14 +2737,173 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
-  ExceptionInfo *exception)
-{
 #define GetBit(alpha,i) ((((size_t) (alpha) >> (size_t) (i)) & 0x01) != 0)
 #define SetBit(alpha,i,set) (Quantum) ((set) != 0 ? (size_t) (alpha) \
   | (one << (size_t) (i)) : (size_t) (alpha) & ~(one << (size_t) (i)))
 #define SteganoImageTag  "Stegano/Image"
 
+static void AdvanceSteganoCursor(const Image *stegano_image,int *c,
+  ssize_t *k,ssize_t *j)
+{
+  (*c)++;
+  if (*c == 3)
+    *c=0;
+  (*k)++;
+  if (*k == (ssize_t) (stegano_image->columns*stegano_image->columns))
+    *k=0;
+  if (*k == stegano_image->offset)
+    (*j)++;
+}
+
+typedef struct _SteganoBit
+{
+  Image
+    *stegano_image;
+
+  int
+    c;
+
+  size_t
+    one;
+
+  ssize_t
+    i,
+    j;
+} SteganoBit;
+
+static void SetSteganoBit(const SteganoBit *stegano_bit,const PixelInfo pixel,
+  Quantum *q)
+{
+  Image
+    *const stegano_image = stegano_bit->stegano_image;
+
+  const int
+    c = stegano_bit->c;
+
+  const size_t
+    one = stegano_bit->one;
+
+  const ssize_t
+    i = stegano_bit->i,
+    j = stegano_bit->j;
+
+  switch (c)
+  {
+    case 0:
+    {
+      SetPixelRed(stegano_image,SetBit(GetPixelRed(stegano_image,q),j,
+        GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
+      break;
+    }
+    case 1:
+    {
+      SetPixelGreen(stegano_image,SetBit(GetPixelGreen(stegano_image,q),j,
+        GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
+      break;
+    }
+    case 2:
+    {
+      SetPixelBlue(stegano_image,SetBit(GetPixelBlue(stegano_image,q),j,
+        GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
+      break;
+    }
+  }
+}
+
+typedef struct _SteganoRow
+{
+  const Image
+    *watermark;
+
+  CacheView
+    *watermark_view;
+
+  Image
+    *stegano_image;
+
+  CacheView
+    *stegano_view;
+
+  size_t
+    depth,
+    one;
+
+  ssize_t
+    i,
+    y;
+
+  ExceptionInfo
+    *exception;
+} SteganoRow;
+
+static void HideSteganoRow(const SteganoRow *stegano_row,int *c,ssize_t *k,
+  ssize_t *j)
+{
+  const Image
+    *const watermark = stegano_row->watermark;
+
+  CacheView
+    *const watermark_view = stegano_row->watermark_view;
+
+  Image
+    *const stegano_image = stegano_row->stegano_image;
+
+  CacheView
+    *const stegano_view = stegano_row->stegano_view;
+
+  const size_t
+    depth = stegano_row->depth,
+    one = stegano_row->one;
+
+  const ssize_t
+    i = stegano_row->i,
+    y = stegano_row->y;
+
+  ExceptionInfo
+    *const exception = stegano_row->exception;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    *q;
+
+  ssize_t
+    x;
+
+  for (x=0; (x < (ssize_t) watermark->columns) && ((*j) < (ssize_t) depth); x++)
+  {
+    ssize_t
+      offset;
+
+    SteganoBit
+      stegano_bit;
+
+    (void) GetOneCacheViewVirtualPixelInfo(watermark_view,x,y,&pixel,
+      exception);
+    offset=(*k)/(ssize_t) stegano_image->columns;
+    if (offset >= (ssize_t) stegano_image->rows)
+      break;
+    q=GetCacheViewAuthenticPixels(stegano_view,(*k) % (ssize_t)
+      stegano_image->columns,(*k)/(ssize_t) stegano_image->columns,1,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      break;
+    stegano_bit.stegano_image=stegano_image;
+    stegano_bit.c=(*c);
+    stegano_bit.one=one;
+    stegano_bit.i=i;
+    stegano_bit.j=(*j);
+    SetSteganoBit(&stegano_bit,pixel,q);
+    if (SyncCacheViewAuthenticPixels(stegano_view,exception) == MagickFalse)
+      break;
+    AdvanceSteganoCursor(stegano_image,c,k,j);
+  }
+}
+
+MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
+  ExceptionInfo *exception)
+{
   CacheView
     *stegano_view,
     *watermark_view;
@@ -2615,15 +2916,6 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
 
   MagickBooleanType
     status;
-
-  PixelInfo
-    pixel;
-
-  Quantum
-    *q;
-
-  ssize_t
-    x;
 
   size_t
     depth,
@@ -2671,53 +2963,19 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   {
     for (y=0; (y < (ssize_t) watermark->rows) && (j < (ssize_t) depth); y++)
     {
-      for (x=0; (x < (ssize_t) watermark->columns) && (j < (ssize_t) depth); x++)
-      {
-        ssize_t
-          offset;
+      SteganoRow
+        stegano_row;
 
-        (void) GetOneCacheViewVirtualPixelInfo(watermark_view,x,y,&pixel,
-          exception);
-        offset=k/(ssize_t) stegano_image->columns;
-        if (offset >= (ssize_t) stegano_image->rows)
-          break;
-        q=GetCacheViewAuthenticPixels(stegano_view,k % (ssize_t)
-          stegano_image->columns,k/(ssize_t) stegano_image->columns,1,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          break;
-        switch (c)
-        {
-          case 0:
-          {
-            SetPixelRed(stegano_image,SetBit(GetPixelRed(stegano_image,q),j,
-              GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
-            break;
-          }
-          case 1:
-          {
-            SetPixelGreen(stegano_image,SetBit(GetPixelGreen(stegano_image,q),j,
-              GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
-            break;
-          }
-          case 2:
-          {
-            SetPixelBlue(stegano_image,SetBit(GetPixelBlue(stegano_image,q),j,
-              GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
-            break;
-          }
-        }
-        if (SyncCacheViewAuthenticPixels(stegano_view,exception) == MagickFalse)
-          break;
-        c++;
-        if (c == 3)
-          c=0;
-        k++;
-        if (k == (ssize_t) (stegano_image->columns*stegano_image->columns))
-          k=0;
-        if (k == stegano_image->offset)
-          j++;
-      }
+      stegano_row.watermark=watermark;
+      stegano_row.watermark_view=watermark_view;
+      stegano_row.stegano_image=stegano_image;
+      stegano_row.stegano_view=stegano_view;
+      stegano_row.depth=depth;
+      stegano_row.one=one;
+      stegano_row.i=i;
+      stegano_row.y=y;
+      stegano_row.exception=exception;
+      HideSteganoRow(&stegano_row,&c,&k,&j);
     }
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {

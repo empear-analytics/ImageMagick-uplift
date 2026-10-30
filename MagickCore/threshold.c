@@ -653,6 +653,105 @@ static MagickBooleanType IsPixelInColorRange(const Image *image,
   return(foreground);
 }
 
+static IlluminantType GetThresholdIlluminant(const char *artifact,
+  IlluminantType illuminant)
+{
+  if (artifact != (const char *) NULL)
+    {
+      ssize_t
+        illuminant_type;
+
+      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
+        artifact);
+      if (illuminant_type < 0)
+        illuminant=UndefinedIlluminant;
+      else
+        illuminant=(IlluminantType) illuminant_type;
+    }
+  return(illuminant);
+}
+
+typedef struct _ColorThresholdRange
+{
+  Image
+    *image;
+
+  const PixelInfo
+    *start_color,
+    *stop_color;
+
+  IlluminantType
+    illuminant;
+} ColorThresholdRange;
+
+static void ConvertColorThresholdRange(const ColorThresholdRange *range,
+  PixelInfo *start,PixelInfo *stop)
+{
+  switch (range->image->colorspace)
+  {
+    case HCLColorspace:
+    {
+      ConvertRGBToHCL(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHCL(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case HSBColorspace:
+    {
+      ConvertRGBToHSB(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHSB(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case HSLColorspace:
+    {
+      ConvertRGBToHSL(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHSL(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case HSVColorspace:
+    {
+      ConvertRGBToHSV(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHSV(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case HWBColorspace:
+    {
+      ConvertRGBToHWB(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ConvertRGBToHWB(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,&(*stop).red,&(*stop).green,&(*stop).blue);
+      break;
+    }
+    case LabColorspace:
+    {
+      ConvertRGBToLab(range->start_color->red,range->start_color->green,
+        range->start_color->blue,range->illuminant,&(*start).red,
+        &(*start).green,&(*start).blue);
+      ConvertRGBToLab(range->stop_color->red,range->stop_color->green,
+        range->stop_color->blue,range->illuminant,&(*stop).red,
+        &(*stop).green,&(*stop).blue);
+      break;
+    }
+    default:
+    {
+      (*start).red*=QuantumScale;
+      (*start).green*=QuantumScale;
+      (*start).blue*=QuantumScale;
+      (*stop).red*=QuantumScale;
+      (*stop).green*=QuantumScale;
+      (*stop).blue*=QuantumScale;
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   const PixelInfo *start_color,const PixelInfo *stop_color,
   ExceptionInfo *exception)
@@ -661,6 +760,9 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
 
   CacheView
     *image_view;
+
+  ColorThresholdRange
+    range;
 
   const char
     *artifact;
@@ -692,81 +794,14 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   if (status == MagickFalse)
     return(status);
   artifact=GetImageArtifact(image,"color:illuminant");
-  if (artifact != (const char *) NULL)
-    {
-      ssize_t
-        illuminant_type;
-
-      illuminant_type=ParseCommandOption(MagickIlluminantOptions,MagickFalse,
-        artifact);
-      if (illuminant_type < 0)
-        illuminant=UndefinedIlluminant;
-      else
-        illuminant=(IlluminantType) illuminant_type;
-    }
+  illuminant=GetThresholdIlluminant(artifact,illuminant);
   start=(*start_color);
   stop=(*stop_color);
-  switch (image->colorspace)
-  {
-    case HCLColorspace:
-    {
-      ConvertRGBToHCL(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHCL(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case HSBColorspace:
-    {
-      ConvertRGBToHSB(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHSB(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case HSLColorspace:
-    {
-      ConvertRGBToHSL(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHSL(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case HSVColorspace:
-    {
-      ConvertRGBToHSV(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHSV(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case HWBColorspace:
-    {
-      ConvertRGBToHWB(start_color->red,start_color->green,start_color->blue,
-        &start.red,&start.green,&start.blue);
-      ConvertRGBToHWB(stop_color->red,stop_color->green,stop_color->blue,
-        &stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    case LabColorspace:
-    {
-      ConvertRGBToLab(start_color->red,start_color->green,start_color->blue,
-        illuminant,&start.red,&start.green,&start.blue);
-      ConvertRGBToLab(stop_color->red,stop_color->green,stop_color->blue,
-        illuminant,&stop.red,&stop.green,&stop.blue);
-      break;
-    }
-    default:
-    {
-      start.red*=QuantumScale;
-      start.green*=QuantumScale;
-      start.blue*=QuantumScale;
-      stop.red*=QuantumScale;
-      stop.green*=QuantumScale;
-      stop.blue*=QuantumScale;
-      break;
-    }
-  }
+  range.image=image;
+  range.start_color=start_color;
+  range.stop_color=stop_color;
+  range.illuminant=illuminant;
+  ConvertColorThresholdRange(&range,&start,&stop);
   start.red*=(double) QuantumRange;
   start.green*=(double) QuantumRange;
   start.blue*=(double) QuantumRange;
@@ -950,6 +985,52 @@ MagickExport ThresholdMap *GetThresholdMap(const char *map_id,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ThresholdMap *AcquireThresholdMap(XMLTreeInfo *threshold,
+  XMLTreeInfo *description)
+{
+  const char
+    *attribute,
+    *content;
+
+  ThresholdMap
+    *map;
+
+  map=(ThresholdMap *) AcquireCriticalMemory(sizeof(*map));
+  map->map_id=(char *) NULL;
+  map->description=(char *) NULL;
+  map->levels=(ssize_t *) NULL;
+  attribute=GetXMLTreeAttribute(threshold,"map");
+  if (attribute != (char *) NULL)
+    map->map_id=ConstantString(attribute);
+  content=GetXMLTreeContent(description);
+  if (content != (char *) NULL)
+    map->description=ConstantString(content);
+  return(map);
+}
+
+static XMLTreeInfo *FindThresholdMap(XMLTreeInfo *thresholds,
+  const char *map_id)
+{
+  const char
+    *attribute;
+
+  XMLTreeInfo
+    *threshold;
+
+  for (threshold=GetXMLTreeChild(thresholds,"threshold");
+       threshold != (XMLTreeInfo *) NULL;
+       threshold=GetNextXMLTreeTag(threshold))
+  {
+    attribute=GetXMLTreeAttribute(threshold,"map");
+    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
+      break;
+    attribute=GetXMLTreeAttribute(threshold,"alias");
+    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
+      break;
+  }
+  return(threshold);
+}
+
 static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
   const char *map_id,ExceptionInfo *exception)
 {
@@ -981,17 +1062,7 @@ static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
   thresholds=NewXMLTree(xml,exception);
   if (thresholds == (XMLTreeInfo *) NULL)
     return(map);
-  for (threshold=GetXMLTreeChild(thresholds,"threshold");
-       threshold != (XMLTreeInfo *) NULL;
-       threshold=GetNextXMLTreeTag(threshold))
-  {
-    attribute=GetXMLTreeAttribute(threshold,"map");
-    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
-      break;
-    attribute=GetXMLTreeAttribute(threshold,"alias");
-    if ((attribute != (char *) NULL) && (LocaleCompare(map_id,attribute) == 0))
-      break;
-  }
+  threshold=FindThresholdMap(thresholds,map_id);
   if (threshold == (XMLTreeInfo *) NULL)
     {
       thresholds=DestroyXMLTree(thresholds);
@@ -1013,16 +1084,7 @@ static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
       thresholds=DestroyXMLTree(thresholds);
       return(map);
     }
-  map=(ThresholdMap *) AcquireCriticalMemory(sizeof(*map));
-  map->map_id=(char *) NULL;
-  map->description=(char *) NULL;
-  map->levels=(ssize_t *) NULL;
-  attribute=GetXMLTreeAttribute(threshold,"map");
-  if (attribute != (char *) NULL)
-    map->map_id=ConstantString(attribute);
-  content=GetXMLTreeContent(description);
-  if (content != (char *) NULL)
-    map->description=ConstantString(content);
+  map=AcquireThresholdMap(threshold,description);
   attribute=GetXMLTreeAttribute(levels,"width");
   if (attribute == (char *) NULL)
     {
@@ -1329,11 +1391,28 @@ static inline MagickBooleanType IsThresholdMapNameCharacter(const char *p)
     (*p != '\0')) ? MagickTrue : MagickFalse);
 }
 
-static void GetDitherLevels(const char *threshold_map,double *levels)
+static void ParseDitherLevels(const char *p,double *levels)
 {
   char
     token[MagickPathExtent];
 
+  ssize_t
+    i;
+
+  (void) GetNextToken(p,&p,MagickPathExtent,token);
+  for (i=0; (i < MaxPixelChannels); i++)
+    levels[i]=StringToDouble(token,(char **) NULL);
+  for (i=0; (*p != '\0') && (i < MaxPixelChannels); i++)
+  {
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+    if (*token == ',')
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+    levels[i]=StringToDouble(token,(char **) NULL);
+  }
+}
+
+static void GetDitherLevels(const char *threshold_map,double *levels)
+{
   const char
     *p;
 
@@ -1344,21 +1423,74 @@ static void GetDitherLevels(const char *threshold_map,double *levels)
     levels[i]=2.0;
   p=strchr((char *) threshold_map,',');
   if ((p != (char *) NULL) && (isdigit((int) ((unsigned char) *(++p))) != 0))
-    {
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-      for (i=0; (i < MaxPixelChannels); i++)
-        levels[i]=StringToDouble(token,(char **) NULL);
-      for (i=0; (*p != '\0') && (i < MaxPixelChannels); i++)
-      {
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-        if (*token == ',')
-          (void) GetNextToken(p,&p,MagickPathExtent,token);
-        levels[i]=StringToDouble(token,(char **) NULL);
-      }
-    }
+    ParseDitherLevels(p,levels);
   for (i=0; i < MaxPixelChannels; i++)
     if (fabs(levels[i]) >= 1)
       levels[i]-=1.0;
+}
+
+typedef struct _OrderedDither
+{
+  ThresholdMap
+    *map;
+
+  ssize_t
+    x,
+    y;
+} OrderedDither;
+
+static void OrderedDitherPixel(const Image *image,const double *levels,
+  const OrderedDither *ordered_dither,Quantum *magick_restrict q)
+{
+  ThresholdMap
+    *const map = ordered_dither->map;
+
+  const ssize_t
+    x = ordered_dither->x,
+    y = ordered_dither->y;
+
+  ssize_t
+    j,
+    n;
+
+  n=0;
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    ssize_t
+      level,
+      threshold;
+
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if (fabs(levels[n]) < MagickEpsilon)
+      {
+        n++;
+        continue;
+      }
+    threshold=(ssize_t) (QuantumScale*(double) q[j]*(levels[n]*
+      (map->divisor-1)+1));
+    level=threshold/(map->divisor-1);
+    threshold-=level*(map->divisor-1);
+    q[j]=ClampToQuantum((double) (level+(threshold >=
+      map->levels[(x % (ssize_t) map->width)+(ssize_t) map->width*
+      (y % (ssize_t) map->height)]))*(double) QuantumRange/levels[n]);
+    n++;
+  }
+}
+
+static const char *CopyThresholdMapName(const char *threshold_map,
+  const char *p,char *token)
+{
+  while (IsThresholdMapNameCharacter(p) != MagickFalse)
+  {
+    if ((p-threshold_map) >= (MagickPathExtent-1))
+      break;
+    token[p-threshold_map]=(*p);
+    p++;
+  }
+  return(p);
 }
 
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
@@ -1402,13 +1534,7 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   while (IsThresholdMapSeparator(p) != MagickFalse)
     p++;
   threshold_map=p;
-  while (IsThresholdMapNameCharacter(p) != MagickFalse)
-  {
-    if ((p-threshold_map) >= (MagickPathExtent-1))
-      break;
-    token[p-threshold_map]=(*p);
-    p++;
-  }
+  p=CopyThresholdMapName(threshold_map,p,token);
   token[p-threshold_map]='\0';
   map=GetThresholdMap(token,exception);
   if (map == (ThresholdMap *) NULL)
@@ -1429,6 +1555,9 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    OrderedDither
+      ordered_dither;
+
     ssize_t
       x;
 
@@ -1445,35 +1574,10 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        j,
-        n;
-
-      n=0;
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        ssize_t
-          level,
-          threshold;
-
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (fabs(levels[n]) < MagickEpsilon)
-          {
-            n++;
-            continue;
-          }
-        threshold=(ssize_t) (QuantumScale*(double) q[j]*(levels[n]*
-          (map->divisor-1)+1));
-        level=threshold/(map->divisor-1);
-        threshold-=level*(map->divisor-1);
-        q[j]=ClampToQuantum((double) (level+(threshold >=
-          map->levels[(x % (ssize_t) map->width)+(ssize_t) map->width*
-          (y % (ssize_t) map->height)]))*(double) QuantumRange/levels[n]);
-        n++;
-      }
+      ordered_dither.map=map;
+      ordered_dither.x=x;
+      ordered_dither.y=y;
+      OrderedDitherPixel(image,levels,&ordered_dither,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -1684,6 +1788,46 @@ MagickExport MagickBooleanType PerceptibleImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _RandomThreshold
+{
+  double
+    min_threshold,
+    max_threshold;
+
+  RandomInfo
+    **random_info;
+
+  int
+    id;
+} RandomThreshold;
+
+static void RandomThresholdPixel(const Image *image,
+  const RandomThreshold *random_threshold,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      threshold;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if ((double) q[i] < random_threshold->min_threshold)
+      threshold=random_threshold->min_threshold;
+    else
+      if ((double) q[i] > random_threshold->max_threshold)
+        threshold=random_threshold->max_threshold;
+      else
+        threshold=((double) QuantumRange*GetPseudoRandomValue(
+          random_threshold->random_info[random_threshold->id]));
+    q[i]=(double) q[i] <= threshold ? 0 : QuantumRange;
+  }
+}
+
 MagickExport MagickBooleanType RandomThresholdImage(Image *image,
   const double min_threshold, const double max_threshold,ExceptionInfo *exception)
 {
@@ -1737,6 +1881,9 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    RandomThreshold
+      random_threshold;
+
     ssize_t
       x;
 
@@ -1750,28 +1897,11 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          threshold;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if ((double) q[i] < min_threshold)
-          threshold=min_threshold;
-        else
-          if ((double) q[i] > max_threshold)
-            threshold=max_threshold;
-          else
-            threshold=((double) QuantumRange*
-              GetPseudoRandomValue(random_info[id]));
-        q[i]=(double) q[i] <= threshold ? 0 : QuantumRange;
-      }
+      random_threshold.min_threshold=min_threshold;
+      random_threshold.max_threshold=max_threshold;
+      random_threshold.random_info=random_info;
+      random_threshold.id=id;
+      RandomThresholdPixel(image,&random_threshold,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)

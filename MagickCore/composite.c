@@ -561,6 +561,14 @@ static void SumBlendRow(const SumBlendInputs *row,
   }
 }
 
+static Image *FinishBlendImage(Image *sum_image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    sum_image=DestroyImage(sum_image);
+  return(sum_image);
+}
+
 static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
   const BlendSumWeights *weights,ExceptionInfo *exception)
 {
@@ -631,9 +639,7 @@ static Image *BlendSumImage(const Image *alpha_image,const Image *beta_image,
   sum_view=DestroyCacheView(sum_view);
   beta_view=DestroyCacheView(beta_view);
   alpha_view=DestroyCacheView(alpha_view);
-  if (status == MagickFalse)
-    sum_image=DestroyImage(sum_image);
-  return(sum_image);
+  return(FinishBlendImage(sum_image,status));
 }
 
 static Image *BlendDivergentImage(const Image *alpha_image,
@@ -767,6 +773,13 @@ static Image *BlendDivergentImage(const Image *alpha_image,
   return(divergent_image);
 }
 
+static inline MagickBooleanType IsBlendRowPairMissing(const Quantum *p,
+  const Quantum *q)
+{
+  return(((p == (const Quantum *) NULL) || (q == (Quantum *) NULL)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void ClearMaskedAlphaRow(const Image *image,const Image *mask_image,
   const Quantum *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -824,7 +837,7 @@ static MagickBooleanType BlendMaskAlphaChannel(Image *image,
       continue;
     p=GetCacheViewVirtualPixels(mask_view,0,y,image->columns,1,exception);
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    if (IsBlendRowPairMissing(p,q) != MagickFalse)
       {
         status=MagickFalse;
         continue;
@@ -908,11 +921,37 @@ static void AccumulateMeanRow(const Image *image,
   }
 }
 
+static MagickBooleanType SumImageChannels(const Image *image,double *mean,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *alpha_view;
+
+  ssize_t
+    y;
+
+  alpha_view=AcquireVirtualCacheView(image,exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    p=GetCacheViewVirtualPixels(alpha_view,0,y,image->columns,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    AccumulateMeanRow(image,p,mean);
+  }
+  alpha_view=DestroyCacheView(alpha_view);
+  if (y < (ssize_t) image->rows)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static Image *BlendMeanImage(Image *image,const Image *mask_image,
   ExceptionInfo *exception)
 {
   CacheView
-    *alpha_view,
     *mask_view,
     *mean_view;
 
@@ -933,20 +972,7 @@ static Image *BlendMeanImage(Image *image,const Image *mask_image,
     Compute the mean of the image.
   */
   (void) memset(mean,0,MaxPixelChannels*sizeof(*mean));
-  alpha_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    p=GetCacheViewVirtualPixels(alpha_view,0,y,image->columns,1,
-      exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    AccumulateMeanRow(image,p,mean);
-  }
-  alpha_view=DestroyCacheView(alpha_view);
-  if (y < (ssize_t) image->rows)
+  if (SumImageChannels(image,mean,exception) == MagickFalse)
     return((Image *) NULL);
   for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
     mean[j]=(double) QuantumRange*mean[j]/image->columns/
@@ -1881,6 +1907,98 @@ static MagickRealType GetReflectBlend(const MagickRealType Sc,
   return(blend);
 }
 
+static MagickRealType GetHueAlpha(const MagickRealType Sa,
+  const MagickRealType Da,MagickRealType pixel)
+{
+  if (fabs((double) QuantumRange*Sa-(double) TransparentAlpha) < MagickEpsilon)
+    {
+      pixel=(double) QuantumRange*Da;
+      return(pixel);
+    }
+  if (fabs((double) QuantumRange*Da-(double) TransparentAlpha) < MagickEpsilon)
+    {
+      pixel=(double) QuantumRange*Sa;
+      return(pixel);
+    }
+  if (Sa < Da)
+    {
+      pixel=(double) QuantumRange*Da;
+      return(pixel);
+    }
+  pixel=(double) QuantumRange*Sa;
+  return(pixel);
+}
+
+static MagickRealType GetCopyAlpha(const Image *source_image,
+  const MagickRealType Si,const MagickRealType Sa)
+{
+  MagickRealType
+    pixel;
+
+  if (source_image->alpha_trait == UndefinedPixelTrait)
+    pixel=Si;
+  else
+    pixel=(double) QuantumRange*Sa;
+  return(pixel);
+}
+
+static MagickRealType GetFreezeAlpha(const MagickRealType Sa,
+  const MagickRealType Da)
+{
+  MagickRealType
+    pixel;
+
+  pixel=(double) QuantumRange*(1.0-(1.0-Sa)*(1.0-Sa)*
+    MagickSafeReciprocal(Da));
+  if (pixel < 0.0)
+    pixel=0.0;
+  return(pixel);
+}
+
+static MagickRealType GetReflectAlpha(const MagickRealType Sa,
+  const MagickRealType Da)
+{
+  MagickRealType
+    pixel;
+
+  pixel=(double) QuantumRange*(Sa*Sa*
+    MagickSafeReciprocal(1.0-Da));
+  if (pixel > (double) QuantumRange)
+    pixel=(double) QuantumRange;
+  return(pixel);
+}
+
+static void SetDissolveFactors(const GeometryInfo geometry_info,
+  const MagickStatusType flags,MagickRealType *source_dissolve,
+  MagickRealType *canvas_dissolve)
+{
+  *source_dissolve=geometry_info.rho/100.0;
+  *canvas_dissolve=1.0;
+  if ((*source_dissolve-MagickEpsilon) < 0.0)
+    *source_dissolve=0.0;
+  if ((*source_dissolve+MagickEpsilon) > 1.0)
+    {
+      *canvas_dissolve=2.0-*source_dissolve;
+      *source_dissolve=1.0;
+    }
+  if ((flags & SigmaValue) != 0)
+    *canvas_dissolve=geometry_info.sigma/100.0;
+  if ((*canvas_dissolve-MagickEpsilon) < 0.0)
+    *canvas_dissolve=0.0;
+  if ((*canvas_dissolve+MagickEpsilon) > 1.0)
+    *canvas_dissolve=1.0;
+}
+
+static void SetBlendFactors(const GeometryInfo geometry_info,
+  const MagickStatusType flags,MagickRealType *source_dissolve,
+  MagickRealType *canvas_dissolve)
+{
+  *source_dissolve=geometry_info.rho/100.0;
+  *canvas_dissolve=1.0-*source_dissolve;
+  if ((flags & SigmaValue) != 0)
+    *canvas_dissolve=geometry_info.sigma/100.0;
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -2491,21 +2609,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       if (artifact != (char *) NULL)
         {
           flags=ParseGeometry(artifact,&geometry_info);
-          source_dissolve=geometry_info.rho/100.0;
-          canvas_dissolve=1.0;
-          if ((source_dissolve-MagickEpsilon) < 0.0)
-            source_dissolve=0.0;
-          if ((source_dissolve+MagickEpsilon) > 1.0)
-            {
-              canvas_dissolve=2.0-source_dissolve;
-              source_dissolve=1.0;
-            }
-          if ((flags & SigmaValue) != 0)
-            canvas_dissolve=geometry_info.sigma/100.0;
-          if ((canvas_dissolve-MagickEpsilon) < 0.0)
-            canvas_dissolve=0.0;
-          if ((canvas_dissolve+MagickEpsilon) > 1.0)
-            canvas_dissolve=1.0;
+          SetDissolveFactors(geometry_info,flags,&source_dissolve,
+            &canvas_dissolve);
         }
       break;
     }
@@ -2515,10 +2620,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       if (artifact != (char *) NULL)
         {
           flags=ParseGeometry(artifact,&geometry_info);
-          source_dissolve=geometry_info.rho/100.0;
-          canvas_dissolve=1.0-source_dissolve;
-          if ((flags & SigmaValue) != 0)
-            canvas_dissolve=geometry_info.sigma/100.0;
+          SetBlendFactors(geometry_info,flags,&source_dissolve,
+            &canvas_dissolve);
         }
       break;
     }
@@ -2956,30 +3059,12 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               case RMSECompositeOp:
               case SaturateCompositeOp:
               {
-                if (fabs((double) QuantumRange*Sa-(double) TransparentAlpha) < MagickEpsilon)
-                  {
-                    pixel=(double) QuantumRange*Da;
-                    break;
-                  }
-                if (fabs((double) QuantumRange*Da-(double) TransparentAlpha) < MagickEpsilon)
-                  {
-                    pixel=(double) QuantumRange*Sa;
-                    break;
-                  }
-                if (Sa < Da)
-                  {
-                    pixel=(double) QuantumRange*Da;
-                    break;
-                  }
-                pixel=(double) QuantumRange*Sa;
+                pixel=GetHueAlpha(Sa,Da,pixel);
                 break;
               }
               case CopyAlphaCompositeOp:
               {
-                if (source_image->alpha_trait == UndefinedPixelTrait)
-                  pixel=Si;
-                else
-                  pixel=(double) QuantumRange*Sa;
+                pixel=GetCopyAlpha(source_image,Si,Sa);
                 break;
               }
               case BlurCompositeOp:
@@ -3010,10 +3095,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               }
               case FreezeCompositeOp:
               {
-                pixel=(double) QuantumRange*(1.0-(1.0-Sa)*(1.0-Sa)*
-                  MagickSafeReciprocal(Da));
-                if (pixel < 0.0)
-                  pixel=0.0;
+                pixel=GetFreezeAlpha(Sa,Da);
                 break;
               }
               case InterpolateCompositeOp:
@@ -3054,10 +3136,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               }
               case ReflectCompositeOp:
               {
-                pixel=(double) QuantumRange*(Sa*Sa*
-                  MagickSafeReciprocal(1.0-Da));
-                if (pixel > (double) QuantumRange)
-                  pixel=(double) QuantumRange;
+                pixel=GetReflectAlpha(Sa,Da);
                 break;
               }
               case StampCompositeOp:
@@ -4024,11 +4103,30 @@ static Quantum *CopyTextureSpan(const TextureSpan *span,const Quantum *p,
   return(q);
 }
 
+#define TextureImageTag  "Texture/Image"
+
+static MagickBooleanType ReportTextureProgress(Image *image,const ssize_t y)
+{
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,TextureImageTag,(MagickOffsetType) y,
+        image->rows);
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
-#define TextureImageTag  "Texture/Image"
-
   CacheView
     *image_view,
     *texture_view;
@@ -4083,16 +4181,8 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
               break;
             }
         }
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            MagickBooleanType
-              proceed;
-
-            proceed=SetImageProgress(image,TextureImageTag,(MagickOffsetType) y,
-              image->rows);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
-          }
+        if (ReportTextureProgress(image,y) == MagickFalse)
+          status=MagickFalse;
       }
       (void) SetImageProgress(image,TextureImageTag,(MagickOffsetType)
         image->rows,image->rows);
@@ -4155,16 +4245,8 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
     sync=SyncCacheViewAuthenticPixels(image_view,exception);
     if (sync == MagickFalse)
       status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,TextureImageTag,(MagickOffsetType) y,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    if (ReportTextureProgress(image,y) == MagickFalse)
+      status=MagickFalse;
   }
   texture_view=DestroyCacheView(texture_view);
   image_view=DestroyCacheView(image_view);

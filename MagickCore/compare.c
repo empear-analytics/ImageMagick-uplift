@@ -2089,6 +2089,13 @@ static void NormalizePHashSimilarity(const Image *image,
     (double) channel_phash[0].number_colorspaces);
 }
 
+static inline MagickBooleanType IsChannelSkipped(const PixelTrait traits,
+  const PixelTrait reconstruct_traits)
+{
+  return((((traits & UpdatePixelTrait) == 0) ||
+    ((reconstruct_traits & UpdatePixelTrait) == 0)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType GetPHASHSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -2125,8 +2132,7 @@ static MagickBooleanType GetPHASHSimilarity(const Image *image,
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
       channel);
-    if (((traits & UpdatePixelTrait) == 0) ||
-        ((reconstruct_traits & UpdatePixelTrait) == 0))
+    if (IsChannelSkipped(traits,reconstruct_traits) != MagickFalse)
       continue;
     difference=AddPHashDifferences(channel_phash,reconstruct_phash,i,
       difference);
@@ -3026,6 +3032,35 @@ static Image *SIMDerivativeImage(const Image *image,const char *kernel,
   return(derivative_image);
 }
 
+static void DivideRow(const Image *divide_image,
+  const Image *denominator_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) divide_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(divide_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(divide_image,i);
+      PixelTrait traits = GetPixelChannelTraits(divide_image,channel);
+      PixelTrait denominator_traits = GetPixelChannelTraits(denominator_image,
+        channel);
+      if (((traits & UpdatePixelTrait) == 0) ||
+          ((denominator_traits & UpdatePixelTrait) == 0))
+        continue;
+      q[i]=(Quantum) ((double) q[i]*MagickSafeReciprocal(QuantumScale*
+        (double) GetPixelChannel(denominator_image,channel,p)));
+    }
+    p+=(ptrdiff_t) GetPixelChannels(denominator_image);
+    q+=(ptrdiff_t) GetPixelChannels(divide_image);
+  }
+}
+
 static Image *SIMDivideImage(const Image *numerator_image,
   const Image *denominator_image,ExceptionInfo *exception)
 {
@@ -3062,9 +3097,6 @@ static Image *SIMDivideImage(const Image *numerator_image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(denominator_view,0,y,
@@ -3076,26 +3108,7 @@ static Image *SIMDivideImage(const Image *numerator_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) divide_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(divide_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(divide_image,i);
-        PixelTrait traits = GetPixelChannelTraits(divide_image,channel);
-        PixelTrait denominator_traits = GetPixelChannelTraits(denominator_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((denominator_traits & UpdatePixelTrait) == 0))
-          continue;
-        q[i]=(Quantum) ((double) q[i]*MagickSafeReciprocal(QuantumScale*
-          (double) GetPixelChannel(denominator_image,channel,p)));
-      }
-      p+=(ptrdiff_t) GetPixelChannels(denominator_image);
-      q+=(ptrdiff_t) GetPixelChannels(divide_image);
-    }
+    DivideRow(divide_image,denominator_image,p,q);
     if (SyncCacheViewAuthenticPixels(numerator_view,exception) == MagickFalse)
       status=MagickFalse;
   }
@@ -3188,6 +3201,22 @@ static MagickBooleanType SIMFilterImageNaNs(Image *image,
   return(status);
 }
 
+static void SquarePixelChannels(const Image *square_image,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(square_image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(square_image,i);
+    PixelTrait traits = GetPixelChannelTraits(square_image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=(Quantum) (QuantumScale*(double) q[i]*(double) q[i]);
+  }
+}
+
 static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -3232,17 +3261,7 @@ static Image *SIMSquareImage(const Image *image,ExceptionInfo *exception)
       }
     for (x=0; x < (ssize_t) square_image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(square_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(square_image,i);
-        PixelTrait traits = GetPixelChannelTraits(square_image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=(Quantum) (QuantumScale*(double) q[i]*(double) q[i]);
-      }
+      SquarePixelChannels(square_image,q);
       q+=(ptrdiff_t) GetPixelChannels(square_image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -3294,24 +3313,69 @@ static Image *SIMMagnitudeImage(Image *alpha_image,Image *beta_image,
   return(magnitude_image);
 }
 
+typedef struct
+{
+  double
+    maxima;
+
+  ssize_t
+    x,
+    y;
+} MaximaInfo;
+
+static MaximaInfo SeedMaximaInfo(CacheView *image_view,
+  MaximaInfo maxima_info,ExceptionInfo *exception)
+{
+  const Quantum
+    *magick_restrict q;
+
+  q=GetCacheViewVirtualPixels(image_view,maxima_info.x,maxima_info.y,1,1,
+    exception);
+  if (q != (const Quantum *) NULL)
+    maxima_info.maxima=IsNaN((double) q[0]) != 0 ? 0.0 : (double) q[0];
+  return(maxima_info);
+}
+
+static MaximaInfo FindRowMaxima(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t y,MaximaInfo channel_maxima)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      double
+        pixel;
+
+      PixelChannel channel = GetPixelChannelChannel(image,i);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      pixel=(double) p[i];
+      if (IsNaN(pixel) != 0)
+        pixel=0.0;
+      if (pixel > channel_maxima.maxima)
+        {
+          channel_maxima.maxima=(double) p[i];
+          channel_maxima.x=x;
+          channel_maxima.y=y;
+        }
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(channel_maxima);
+}
+
 static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
   RectangleInfo *offset,ExceptionInfo *exception)
 {
-  typedef struct
-  {
-    double
-      maxima;
-
-    ssize_t
-      x,
-      y;
-  } MaximaInfo;
-
   CacheView
     *image_view;
-
-  const Quantum
-    *magick_restrict q;
 
   MagickBooleanType
     status = MagickTrue;
@@ -3326,10 +3390,7 @@ static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
     Identify the maxima value in the image and its location.
   */
   image_view=AcquireVirtualCacheView(image,exception);
-  q=GetCacheViewVirtualPixels(image_view,maxima_info.x,maxima_info.y,1,1,
-    exception);
-  if (q != (const Quantum *) NULL)
-    maxima_info.maxima=IsNaN((double) q[0]) != 0 ? 0.0 : (double) q[0];
+  maxima_info=SeedMaximaInfo(image_view,maxima_info,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(maxima_info,status) \
     magick_number_threads(image,image,image->rows,1)
@@ -3342,9 +3403,6 @@ static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
     MaximaInfo
       channel_maxima = { -MagickMaximumValue, 0, 0 };
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -3354,32 +3412,7 @@ static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
         continue;
       }
     channel_maxima=maxima_info;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          pixel;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        pixel=(double) p[i];
-        if (IsNaN(pixel) != 0)
-          pixel=0.0;
-        if (pixel > channel_maxima.maxima)
-          {
-            channel_maxima.maxima=(double) p[i];
-            channel_maxima.x=x;
-            channel_maxima.y=y;
-          }
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    channel_maxima=FindRowMaxima(image,p,y,channel_maxima);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_SIMMaximaImage)
 #endif
@@ -3393,19 +3426,70 @@ static MagickBooleanType SIMMaximaImage(const Image *image,double *maxima,
   return(status);
 }
 
+typedef struct
+{
+  double
+    minima;
+
+  ssize_t
+    x,
+    y;
+} MinimaInfo;
+
+typedef struct _MinimaPixelInfo
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    x,
+    y;
+} MinimaPixelInfo;
+
+static MinimaInfo FindPixelMinima(const MinimaPixelInfo *minima_pixel,
+  MinimaInfo channel_minima)
+{
+  const Image
+    *const image = minima_pixel->image;
+
+  const Quantum
+    *const p = minima_pixel->p;
+
+  const ssize_t
+    x = minima_pixel->x,
+    y = minima_pixel->y;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      pixel;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    pixel=(double) p[i];
+    if (IsNaN(pixel) != 0)
+      pixel=0.0;
+    if (pixel < channel_minima.minima)
+      {
+        channel_minima.minima=pixel;
+        channel_minima.x=x;
+        channel_minima.y=y;
+      }
+  }
+  return(channel_minima);
+}
+
 static MagickBooleanType SIMMinimaImage(const Image *image,double *minima,
   RectangleInfo *offset,ExceptionInfo *exception)
 {
-  typedef struct
-  {
-    double
-      minima;
-
-    ssize_t
-      x,
-      y;
-  } MinimaInfo;
-
   CacheView
     *image_view;
 
@@ -3455,28 +3539,14 @@ static MagickBooleanType SIMMinimaImage(const Image *image,double *minima,
     channel_minima=minima_info;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
+      MinimaPixelInfo
+        minima_pixel;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          pixel;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        pixel=(double) p[i];
-        if (IsNaN(pixel) != 0)
-          pixel=0.0;
-        if (pixel < channel_minima.minima)
-          {
-            channel_minima.minima=pixel;
-            channel_minima.x=x;
-            channel_minima.y=y;
-          }
-      }
+      minima_pixel.image=image;
+      minima_pixel.p=p;
+      minima_pixel.x=x;
+      minima_pixel.y=y;
+      channel_minima=FindPixelMinima(&minima_pixel,channel_minima);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -3490,6 +3560,26 @@ static MagickBooleanType SIMMinimaImage(const Image *image,double *minima,
   offset->x=minima_info.x;
   offset->y=minima_info.y;
   return(status);
+}
+
+static void MultiplyPixelChannels(const Image *image,const double factor,
+  const ChannelStatistics *channel_statistics,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if (channel_statistics != (const ChannelStatistics *) NULL)
+      q[i]=(Quantum) (factor*(double) q[i]*QuantumScale*
+        channel_statistics[channel].standard_deviation);
+    else
+      q[i]=(Quantum) (factor*(double) q[i]);
+  }
 }
 
 static MagickBooleanType SIMMultiplyImage(Image *image,const double factor,
@@ -3530,21 +3620,7 @@ static MagickBooleanType SIMMultiplyImage(Image *image,const double factor,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (channel_statistics != (const ChannelStatistics *) NULL)
-          q[i]=(Quantum) (factor*(double) q[i]*QuantumScale*
-            channel_statistics[channel].standard_deviation);
-        else
-          q[i]=(Quantum) (factor*(double) q[i]);
-      }
+      MultiplyPixelChannels(image,factor,channel_statistics,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -3634,6 +3710,22 @@ static Image *SIMPhaseCorrelationImage(const Image *target_image,
   return(cross_correlation);
 }
 
+static void SetPixelChannelsMean(const Image *image,
+  const ChannelStatistics *channel_statistics,Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=(Quantum) channel_statistics[channel].mean;
+  }
+}
+
 static MagickBooleanType SIMSetImageMean(Image *image,
   const ChannelStatistics *channel_statistics,ExceptionInfo *exception)
 {
@@ -3672,17 +3764,7 @@ static MagickBooleanType SIMSetImageMean(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=(Quantum) channel_statistics[channel].mean;
-      }
+      SetPixelChannelsMean(image,channel_statistics,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
@@ -3690,6 +3772,64 @@ static MagickBooleanType SIMSetImageMean(Image *image,
   }
   image_view=DestroyCacheView(image_view);
   return(status);
+}
+
+typedef struct _SubtractMeanRowInfo
+{
+  Image
+    *subtract_image;
+
+  const Image
+    *beta_image;
+
+  const ChannelStatistics
+    *channel_statistics;
+
+  ssize_t
+    y;
+} SubtractMeanRowInfo;
+
+static void SubtractMeanRow(const SubtractMeanRowInfo *subtract_row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  Image
+    *const subtract_image = subtract_row->subtract_image;
+
+  const Image
+    *const beta_image = subtract_row->beta_image;
+
+  const ChannelStatistics
+    *const channel_statistics = subtract_row->channel_statistics;
+
+  const ssize_t
+    y = subtract_row->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) subtract_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(subtract_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(subtract_image,i);
+      PixelTrait traits = GetPixelChannelTraits(subtract_image,channel);
+      PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
+      if (((traits & UpdatePixelTrait) == 0) ||
+          ((beta_traits & UpdatePixelTrait) == 0))
+        continue;
+      if ((x >= (ssize_t) beta_image->columns) ||
+          (y >= (ssize_t) beta_image->rows))
+        q[i]=(Quantum) 0;
+      else
+        q[i]=(Quantum) ((double) GetPixelChannel(beta_image,channel,p)-
+          channel_statistics[channel].mean);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(beta_image);
+    q+=(ptrdiff_t) GetPixelChannels(subtract_image);
+  }
 }
 
 static Image *SIMSubtractImageMean(const Image *alpha_image,
@@ -3730,8 +3870,8 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    SubtractMeanRowInfo
+      subtract_row;
 
     if (status == MagickFalse)
       continue;
@@ -3743,29 +3883,11 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) subtract_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(subtract_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(subtract_image,i);
-        PixelTrait traits = GetPixelChannelTraits(subtract_image,channel);
-        PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
-          continue;
-        if ((x >= (ssize_t) beta_image->columns) ||
-            (y >= (ssize_t) beta_image->rows))
-          q[i]=(Quantum) 0;
-        else
-          q[i]=(Quantum) ((double) GetPixelChannel(beta_image,channel,p)-
-            channel_statistics[channel].mean);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(beta_image);
-      q+=(ptrdiff_t) GetPixelChannels(subtract_image);
-    }
+    subtract_row.subtract_image=subtract_image;
+    subtract_row.beta_image=beta_image;
+    subtract_row.channel_statistics=channel_statistics;
+    subtract_row.y=y;
+    SubtractMeanRow(&subtract_row,p,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
@@ -3774,6 +3896,33 @@ static Image *SIMSubtractImageMean(const Image *alpha_image,
   if (status == MagickFalse)
     subtract_image=DestroyImage(subtract_image);
   return(subtract_image);
+}
+
+static void SetUnityRow(const Image *unity_image,
+  const Image *beta_image,const ssize_t y,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) unity_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(unity_image); i++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(unity_image,i);
+      PixelTrait traits = GetPixelChannelTraits(unity_image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      if ((x >= (ssize_t) beta_image->columns) ||
+          (y >= (ssize_t) beta_image->rows))
+        q[i]=(Quantum) 0;
+      else
+        q[i]=QuantumRange;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(unity_image);
+  }
 }
 
 static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
@@ -3810,9 +3959,6 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,unity_image->columns,1,
@@ -3822,25 +3968,7 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) unity_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(unity_image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(unity_image,i);
-        PixelTrait traits = GetPixelChannelTraits(unity_image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if ((x >= (ssize_t) beta_image->columns) ||
-            (y >= (ssize_t) beta_image->rows))
-          q[i]=(Quantum) 0;
-        else
-          q[i]=QuantumRange;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(unity_image);
-    }
+    SetUnityRow(unity_image,beta_image,y,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
@@ -3848,6 +3976,38 @@ static Image *SIMUnityImage(const Image *alpha_image,const Image *beta_image,
   if (status == MagickFalse)
     unity_image=DestroyImage(unity_image);
   return(unity_image);
+}
+
+static void VarianceRow(const Image *variance_image,
+  const Image *beta_image,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) variance_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(variance_image); i++)
+    {
+      double
+        error;
+
+      PixelChannel channel = GetPixelChannelChannel(variance_image,i);
+      PixelTrait traits = GetPixelChannelTraits(variance_image,channel);
+      PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
+      if (((traits & UpdatePixelTrait) == 0) ||
+          ((beta_traits & UpdatePixelTrait) == 0))
+        continue;
+      error=(double) q[i]-(double) GetPixelChannel(beta_image,channel,p);
+      q[i]=(Quantum) ((double) ClampToQuantum((double) QuantumRange*
+        (sqrt(fabs(QuantumScale*error))/sqrt((double) QuantumRange))));
+    }
+    p+=(ptrdiff_t) GetPixelChannels(beta_image);
+    q+=(ptrdiff_t) GetPixelChannels(variance_image);
+  }
 }
 
 static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
@@ -3886,9 +4046,6 @@ static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(beta_view,0,y,beta_image->columns,1,
@@ -3900,29 +4057,7 @@ static Image *SIMVarianceImage(Image *alpha_image,const Image *beta_image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) variance_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(variance_image); i++)
-      {
-        double
-          error;
-
-        PixelChannel channel = GetPixelChannelChannel(variance_image,i);
-        PixelTrait traits = GetPixelChannelTraits(variance_image,channel);
-        PixelTrait beta_traits = GetPixelChannelTraits(beta_image,channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((beta_traits & UpdatePixelTrait) == 0))
-          continue;
-        error=(double) q[i]-(double) GetPixelChannel(beta_image,channel,p);
-        q[i]=(Quantum) ((double) ClampToQuantum((double) QuantumRange*
-          (sqrt(fabs(QuantumScale*error))/sqrt((double) QuantumRange))));
-      }
-      p+=(ptrdiff_t) GetPixelChannels(beta_image);
-      q+=(ptrdiff_t) GetPixelChannels(variance_image);
-    }
+    VarianceRow(variance_image,beta_image,p,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
@@ -4621,6 +4756,14 @@ static Image *RMSESimilarityImage(const Image *image,const Image *reconstruct,
   *similarity_metric=sqrt(*similarity_metric);
   return(rmse_image);
 }
+
+static inline MagickBooleanType IsFrequencyDomainSimilarity(
+  const Image *image,const char *artifact)
+{
+  return((((artifact == (const char *) NULL) ||
+    (IsStringTrue(artifact) != MagickFalse)) &&
+    ((image->channels & ReadMaskChannel) == 0)) ? MagickTrue : MagickFalse);
+}
 #endif
 
 static double GetSimilarityMetric(const Image *image,
@@ -4725,9 +4868,7 @@ MagickExport Image *SimilarityImage(const Image *image,const Image *reconstruct,
   const char *artifact = GetImageArtifact(image,"compare:frequency-domain");
   if (artifact == (const char *) NULL)
     artifact=GetImageArtifact(image,"compare:accelerate-ncc");
-  if (((artifact == (const char *) NULL) ||
-       (IsStringTrue(artifact) != MagickFalse)) &&
-      ((image->channels & ReadMaskChannel) == 0))
+  if (IsFrequencyDomainSimilarity(image,artifact) != MagickFalse)
     switch (metric)
     {
       case DotProductCorrelationErrorMetric:
