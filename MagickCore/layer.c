@@ -473,6 +473,22 @@ static Image *SelectDisposeImage(const Image *next,Image *dispose_image,
   return(dispose_image);
 }
 
+static MagickBooleanType CloneDisposeFrame(Image *dispose_image,
+  const Image *next,Image **dispose,ExceptionInfo *exception)
+{
+  *dispose=CloneImage(dispose_image,0,0,MagickTrue,exception);
+  if (*dispose == (Image *) NULL)
+    return(MagickFalse);
+  dispose_image->background_color.alpha_trait=BlendPixelTrait;
+  (void) CloneImageProfiles(*dispose,next);
+  (void) CloneImageProperties(*dispose,next);
+  (void) CloneImageArtifacts(*dispose,next);
+  (*dispose)->page.x=0;
+  (*dispose)->page.y=0;
+  (*dispose)->dispose=next->dispose;
+  return(MagickTrue);
+}
+
 MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
 {
   Image
@@ -552,20 +568,13 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
       Image
         *dispose;
 
-      dispose=CloneImage(dispose_image,0,0,MagickTrue,exception);
-      if (dispose == (Image *) NULL)
+      if (CloneDisposeFrame(dispose_image,next,&dispose,exception) ==
+          MagickFalse)
         {
           dispose_images=DestroyImageList(dispose_images);
           dispose_image=DestroyImage(dispose_image);
           return((Image *) NULL);
         }
-      dispose_image->background_color.alpha_trait=BlendPixelTrait;
-      (void) CloneImageProfiles(dispose,next);
-      (void) CloneImageProperties(dispose,next);
-      (void) CloneImageArtifacts(dispose,next);
-      dispose->page.x=0;
-      dispose->page.y=0;
-      dispose->dispose=next->dispose;
       AppendImageToList(&dispose_images,dispose);
     }
   }
