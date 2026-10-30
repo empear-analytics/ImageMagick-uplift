@@ -531,12 +531,43 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
   return(kernel);
 }
 
+static MagickBooleanType AppendKernelToken(const char *p,const char *token,
+  KernelInfo **kernel,ExceptionInfo *exception)
+{
+  KernelInfo
+    *new_kernel;
+
+  /* ignore extra or multiple ';' kernel separators */
+  if (*token != ';')
+    {
+      /* tokens starting with alpha is a Named kernel */
+      if (isalpha((int) ((unsigned char) *token)) != 0)
+        new_kernel=ParseKernelName(p,exception);
+      else /* otherwise a user defined kernel array */
+        new_kernel=ParseKernelArray(p);
+
+      /* Error handling -- this is not proper error handling! */
+      if (new_kernel == (KernelInfo *) NULL)
+        {
+          if (*kernel != (KernelInfo *) NULL)
+            *kernel=DestroyKernelInfo(*kernel);
+          return(MagickFalse);
+        }
+
+      /* initialise or append the kernel list */
+      if (*kernel == (KernelInfo *) NULL)
+        *kernel=new_kernel;
+      else
+        LastKernelInfo(*kernel)->next=new_kernel;
+    }
+  return(MagickTrue);
+}
+
 MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
   ExceptionInfo *exception)
 {
   KernelInfo
-    *kernel,
-    *new_kernel;
+    *kernel;
 
   char
     *kernel_cache,
@@ -559,29 +590,8 @@ MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
   kernel=NULL;
   while (GetNextToken(p,(const char **) NULL,MagickPathExtent,token), *token != '\0')
   {
-    /* ignore extra or multiple ';' kernel separators */
-    if (*token != ';')
-      {
-        /* tokens starting with alpha is a Named kernel */
-        if (isalpha((int) ((unsigned char) *token)) != 0)
-          new_kernel=ParseKernelName(p,exception);
-        else /* otherwise a user defined kernel array */
-          new_kernel=ParseKernelArray(p);
-
-        /* Error handling -- this is not proper error handling! */
-        if (new_kernel == (KernelInfo *) NULL)
-          {
-            if (kernel != (KernelInfo *) NULL)
-              kernel=DestroyKernelInfo(kernel);
-            return((KernelInfo *) NULL);
-          }
-
-        /* initialise or append the kernel list */
-        if (kernel == (KernelInfo *) NULL)
-          kernel=new_kernel;
-        else
-          LastKernelInfo(kernel)->next=new_kernel;
-      }
+    if (AppendKernelToken(p,token,&kernel,exception) == MagickFalse)
+      return((KernelInfo *) NULL);
 
     /* look for the next kernel in list */
     p=strchr(p,';');
