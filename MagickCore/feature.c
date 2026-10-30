@@ -1292,6 +1292,15 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetMeanShiftPixel(const Image *mean_image,
+  const PixelInfo mean_pixel,Quantum *magick_restrict q)
+{
+  SetPixelRed(mean_image,ClampToQuantum(mean_pixel.red),q);
+  SetPixelGreen(mean_image,ClampToQuantum(mean_pixel.green),q);
+  SetPixelBlue(mean_image,ClampToQuantum(mean_pixel.blue),q);
+  SetPixelAlpha(mean_image,ClampToQuantum(mean_pixel.alpha),q);
+}
+
 MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
   const size_t height,const double color_distance,ExceptionInfo *exception)
 {
@@ -1448,10 +1457,7 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
         if (distance <= 3.0)
           break;
       }
-      SetPixelRed(mean_image,ClampToQuantum(mean_pixel.red),q);
-      SetPixelGreen(mean_image,ClampToQuantum(mean_pixel.green),q);
-      SetPixelBlue(mean_image,ClampToQuantum(mean_pixel.blue),q);
-      SetPixelAlpha(mean_image,ClampToQuantum(mean_pixel.alpha),q);
+      SetMeanShiftPixel(mean_image,mean_pixel,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(mean_image);
     }
