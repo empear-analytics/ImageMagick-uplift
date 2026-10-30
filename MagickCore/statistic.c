@@ -736,6 +736,37 @@ static void EvaluateMedianRow(const EvaluateMedian *median,const Quantum **p,
   }
 }
 
+typedef struct _EvaluateFetch
+{
+  CacheView
+    **image_view;
+
+  Image
+    *image;
+
+  ssize_t
+    y;
+
+  size_t
+    number_images;
+} EvaluateFetch;
+
+static ssize_t GetEvaluateRows(const EvaluateFetch *fetch,const Quantum **p,
+  ExceptionInfo *exception)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) fetch->number_images; j++)
+  {
+    p[j]=GetCacheViewVirtualPixels(fetch->image_view[j],0,fetch->y,
+      fetch->image->columns,1,exception);
+    if (p[j] == (const Quantum *) NULL)
+      break;
+  }
+  return(j);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -836,6 +867,9 @@ MagickExport Image *EvaluateImages(const Image *images,
         const Quantum
           **p;
 
+        EvaluateFetch
+          fetch;
+
         EvaluateMedian
           median;
 
@@ -859,13 +893,11 @@ MagickExport Image *EvaluateImages(const Image *images,
               images->filename);
             continue;
           }
-        for (j=0; j < (ssize_t) number_images; j++)
-        {
-          p[j]=GetCacheViewVirtualPixels(image_view[j],0,y,image->columns,1,
-            exception);
-          if (p[j] == (const Quantum *) NULL)
-            break;
-        }
+        fetch.image_view=image_view;
+        fetch.image=image;
+        fetch.y=y;
+        fetch.number_images=number_images;
+        j=GetEvaluateRows(&fetch,p,exception);
         q=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
           exception);
         if ((j < (ssize_t) number_images) || (q == (Quantum *) NULL))
