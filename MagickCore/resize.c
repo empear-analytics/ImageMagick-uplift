@@ -1160,6 +1160,28 @@ static void SetCylindricalResizeFilter(ResizeFilter *resize_filter,
   }
 }
 
+static void SetGaussianCoefficients(const Image *image,
+  ResizeFilter *resize_filter)
+{
+  const char
+    *artifact;
+
+  double
+    value;
+
+  value=0.5;    /* gaussian sigma default, half pixel */
+  artifact=GetImageArtifact(image,"filter:sigma");
+  if (artifact != (const char *) NULL)
+    value=StringToDouble(artifact,(char **) NULL);
+  /* Define coefficients for Gaussian */
+  resize_filter->coefficient[0]=value;                 /* note sigma too */
+  resize_filter->coefficient[1]=MagickSafeReciprocal(2.0*value*value); /* sigma scaling */
+  resize_filter->coefficient[2]=MagickSafeReciprocal(Magick2PI*value*value);
+     /* normalization - not actually needed or used! */
+  if ( value > 0.5 )
+    resize_filter->support *= 2*value;  /* increase support linearly */
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1169,8 +1191,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
 
   double
     B,
-    C,
-    value;
+    C;
 
   FilterType
     filter_type,
@@ -1263,17 +1284,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   /* User Gaussian Sigma Override - no support change */
   if ((resize_filter->filter == Gaussian) ||
       (resize_filter->window == Gaussian) ) {
-    value=0.5;    /* gaussian sigma default, half pixel */
-    artifact=GetImageArtifact(image,"filter:sigma");
-    if (artifact != (const char *) NULL)
-      value=StringToDouble(artifact,(char **) NULL);
-    /* Define coefficients for Gaussian */
-    resize_filter->coefficient[0]=value;                 /* note sigma too */
-    resize_filter->coefficient[1]=MagickSafeReciprocal(2.0*value*value); /* sigma scaling */
-    resize_filter->coefficient[2]=MagickSafeReciprocal(Magick2PI*value*value);
-       /* normalization - not actually needed or used! */
-    if ( value > 0.5 )
-      resize_filter->support *= 2*value;  /* increase support linearly */
+    SetGaussianCoefficients(image,resize_filter);
   }
 
   /* User Kaiser Alpha Override - no support change */
