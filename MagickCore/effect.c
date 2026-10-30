@@ -182,19 +182,256 @@ static ssize_t GetAdaptiveKernelIndex(const Image *edge_image,
   return(j);
 }
 
-MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
-  const double sigma,ExceptionInfo *exception)
+typedef struct _AdaptiveSum
 {
+  const Image
+    *image;
+
+  size_t
+    width;
+
+  ssize_t
+    j,
+    i;
+} AdaptiveSum;
+
+typedef struct _AdaptiveSumTargets
+{
+  double
+    *pixel,
+    *gamma;
+
+  const double
+    *magick_restrict *k;
+
+  const Quantum
+    *magick_restrict *pixels;
+} AdaptiveSumTargets;
+
+static void SumAdaptivePixels(const AdaptiveSum *sum,
+  const AdaptiveSumTargets *targets)
+{
+  const Image
+    *const image = sum->image;
+
+  const size_t
+    width = sum->width;
+
+  const ssize_t
+    j = sum->j,
+    i = sum->i;
+
+  double
+    *const pixel = targets->pixel,
+    *const gamma = targets->gamma;
+
+  const double
+    *magick_restrict *const k = targets->k;
+
+  const Quantum
+    *magick_restrict *const pixels = targets->pixels;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < ((ssize_t) width-j); v++)
+  {
+    for (u=0; u < ((ssize_t) width-j); u++)
+    {
+      *pixel+=(**k)*(double) (*pixels)[i];
+      *gamma+=(**k);
+      (*k)++;
+      *pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+  }
+}
+
+static void SumAdaptiveBlendedPixels(const AdaptiveSum *sum,
+  const AdaptiveSumTargets *targets)
+{
+  double
+    *const pixel = targets->pixel,
+    *const gamma = targets->gamma;
+
+  const double
+    *magick_restrict *const k = targets->k;
+
+  const Quantum
+    *magick_restrict *const pixels = targets->pixels;
+
+  double
+    alpha;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < ((ssize_t) sum->width-sum->j); v++)
+  {
+    for (u=0; u < ((ssize_t) sum->width-sum->j); u++)
+    {
+      alpha=(double) (QuantumScale*(double) GetPixelAlpha(sum->image,*pixels));
+      *pixel+=(**k)*alpha*(double) (*pixels)[sum->i];
+      *gamma+=(**k)*alpha;
+      (*k)++;
+      *pixels+=(ptrdiff_t) GetPixelChannels(sum->image);
+    }
+  }
+}
+
+typedef struct _AdaptiveChannel
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  double
+    **kernel;
+
+  const Quantum
+    *p;
+
+  size_t
+    width;
+
+  ssize_t
+    j,
+    center;
+} AdaptiveChannel;
+
+static void BlurAdaptiveChannel(const AdaptiveChannel *adaptive,
+  const ssize_t i,Quantum *magick_restrict q)
+{
+  const double
+    *magick_restrict k;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  double
+    gamma,
+    pixel;
+
+  AdaptiveSum
+    sum;
+
+  AdaptiveSumTargets
+    targets;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    blur_traits,
+    traits;
+
+  channel=GetPixelChannelChannel(adaptive->image,i);
+  traits=GetPixelChannelTraits(adaptive->image,channel);
+  blur_traits=GetPixelChannelTraits(adaptive->blur_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (blur_traits == UndefinedPixelTrait))
+    return;
+  if ((blur_traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(adaptive->blur_image,channel,
+        adaptive->p[adaptive->center+i],q);
+      return;
+    }
+  k=adaptive->kernel[adaptive->j];
+  pixels=adaptive->p;
+  pixel=0.0;
+  gamma=0.0;
+  if ((blur_traits & BlendPixelTrait) == 0)
+    {
+      /*
+        No alpha blending.
+      */
+      sum.image=adaptive->image;
+      sum.width=adaptive->width;
+      sum.j=adaptive->j;
+      sum.i=i;
+      targets.pixel=(&pixel);
+      targets.gamma=(&gamma);
+      targets.k=(&k);
+      targets.pixels=(&pixels);
+      SumAdaptivePixels(&sum,&targets);
+      gamma=MagickSafeReciprocal(gamma);
+      SetPixelChannel(adaptive->blur_image,channel,ClampToQuantum(gamma*pixel),
+        q);
+      return;
+    }
+  /*
+    Alpha blending.
+  */
+  sum.image=adaptive->image;
+  sum.width=adaptive->width;
+  sum.j=adaptive->j;
+  sum.i=i;
+  targets.pixel=(&pixel);
+  targets.gamma=(&gamma);
+  targets.k=(&k);
+  targets.pixels=(&pixels);
+  SumAdaptiveBlendedPixels(&sum,&targets);
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(adaptive->blur_image,channel,ClampToQuantum(gamma*pixel),q);
+}
+
+static void RelinquishAdaptiveKernels(double **kernel,ssize_t w)
+{
+  for (w-=2; w >= 0; w-=2)
+    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+}
+
 #define AdaptiveBlurImageTag  "Convolve/Image"
 #define MagickSigma  (fabs(sigma) < MagickEpsilon ? MagickEpsilon : sigma)
 
+static MagickBooleanType AcquireAdaptiveBlurKernel(double **kernel,
+  const size_t width,const ssize_t w,const double sigma)
+{
+  double
+    normalize;
+
+  ssize_t
+    j,
+    k,
+    u,
+    v;
+
+  kernel[w]=(double *) MagickAssumeAligned(AcquireAlignedMemory(
+    (width-(size_t) w),(width-(size_t) w)*sizeof(**kernel)));
+  if (kernel[w] == (double *) NULL)
+    return(MagickFalse);
+  normalize=0.0;
+  j=((ssize_t) width-w-1)/2;
+  k=0;
+  for (v=(-j); v <= j; v++)
+  {
+    for (u=(-j); u <= j; u++)
+    {
+      kernel[w][k]=(double) (exp(-((double) u*u+v*v)/(2.0*MagickSigma*
+        MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
+      normalize+=kernel[w][k];
+      k++;
+    }
+  }
+  kernel[w][(k-1)/2]+=(double) (1.0-normalize);
+  if (sigma < MagickEpsilon)
+    kernel[w][(k-1)/2]=1.0;
+  return(MagickTrue);
+}
+
+MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
+  const double sigma,ExceptionInfo *exception)
+{
   CacheView
     *blur_view,
     *edge_view,
     *image_view;
 
   double
-    normalize,
     **kernel;
 
   Image
@@ -263,37 +500,12 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   (void) memset(kernel,0,(size_t) width*sizeof(*kernel));
   for (w=0; w < (ssize_t) width; w+=2)
   {
-    ssize_t
-      j,
-      k,
-      u,
-      v;
-
-    kernel[w]=(double *) MagickAssumeAligned(AcquireAlignedMemory(
-      (width-(size_t) w),(width-(size_t) w)*sizeof(**kernel)));
-    if (kernel[w] == (double *) NULL)
+    if (AcquireAdaptiveBlurKernel(kernel,width,w,sigma) == MagickFalse)
       break;
-    normalize=0.0;
-    j=((ssize_t) width-w-1)/2;
-    k=0;
-    for (v=(-j); v <= j; v++)
-    {
-      for (u=(-j); u <= j; u++)
-      {
-        kernel[w][k]=(double) (exp(-((double) u*u+v*v)/(2.0*MagickSigma*
-          MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
-        normalize+=kernel[w][k];
-        k++;
-      }
-    }
-    kernel[w][(k-1)/2]+=(double) (1.0-normalize);
-    if (sigma < MagickEpsilon)
-      kernel[w][(k-1)/2]=1.0;
   }
   if (w < (ssize_t) width)
     {
-      for (w-=2; w >= 0; w-=2)
-        kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+      RelinquishAdaptiveKernels(kernel,w);
       kernel=(double **) RelinquishAlignedMemory(kernel);
       edge_image=DestroyImage(edge_image);
       blur_image=DestroyImage(blur_image);
@@ -353,78 +565,17 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
         ((width-(size_t) j)/2L)+GetPixelChannels(image)*((width-(size_t) j)/2));
       for (i=0; i < (ssize_t) GetPixelChannels(blur_image); i++)
       {
-        const double
-          *magick_restrict k;
+        AdaptiveChannel
+          adaptive;
 
-        const Quantum
-          *magick_restrict pixels;
-
-        double
-          alpha,
-          gamma,
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          blur_traits,
-          traits;
-
-        ssize_t
-          u,
-          v;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        blur_traits=GetPixelChannelTraits(blur_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (blur_traits == UndefinedPixelTrait))
-          continue;
-        if ((blur_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(blur_image,channel,p[center+i],q);
-            continue;
-          }
-        k=kernel[j];
-        pixels=p;
-        pixel=0.0;
-        gamma=0.0;
-        if ((blur_traits & BlendPixelTrait) == 0)
-          {
-            /*
-              No alpha blending.
-            */
-            for (v=0; v < ((ssize_t) width-j); v++)
-            {
-              for (u=0; u < ((ssize_t) width-j); u++)
-              {
-                pixel+=(*k)*(double) pixels[i];
-                gamma+=(*k);
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-            }
-            gamma=MagickSafeReciprocal(gamma);
-            SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
-            continue;
-          }
-        /*
-          Alpha blending.
-        */
-        for (v=0; v < ((ssize_t) width-j); v++)
-        {
-          for (u=0; u < ((ssize_t) width-j); u++)
-          {
-            alpha=(double) (QuantumScale*(double) GetPixelAlpha(image,pixels));
-            pixel+=(*k)*alpha*(double) pixels[i];
-            gamma+=(*k)*alpha;
-            k++;
-            pixels+=(ptrdiff_t) GetPixelChannels(image);
-          }
-        }
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
+        adaptive.image=image;
+        adaptive.blur_image=blur_image;
+        adaptive.kernel=kernel;
+        adaptive.p=p;
+        adaptive.width=width;
+        adaptive.j=j;
+        adaptive.center=center;
+        BlurAdaptiveChannel(&adaptive,i,q);
       }
       q+=(ptrdiff_t) GetPixelChannels(blur_image);
       r+=(ptrdiff_t) GetPixelChannels(edge_image);
@@ -493,6 +644,41 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType AcquireAdaptiveSharpenKernel(double **kernel,
+  const size_t width,const ssize_t w,const double sigma)
+{
+  double
+    normalize;
+
+  ssize_t
+    j,
+    k,
+    u,
+    v;
+
+  kernel[w]=(double *) MagickAssumeAligned(AcquireAlignedMemory((size_t)
+    (width-(size_t) w),(width-(size_t) w)*sizeof(**kernel)));
+  if (kernel[w] == (double *) NULL)
+    return(MagickFalse);
+  normalize=0.0;
+  j=((ssize_t) width-w-1)/2;
+  k=0;
+  for (v=(-j); v <= j; v++)
+  {
+    for (u=(-j); u <= j; u++)
+    {
+      kernel[w][k]=(double) (-exp(-((double) u*u+v*v)/(2.0*MagickSigma*
+        MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
+      normalize+=kernel[w][k];
+      k++;
+    }
+  }
+  kernel[w][(k-1)/2]=(double) ((-2.0)*normalize);
+  if (sigma < MagickEpsilon)
+    kernel[w][(k-1)/2]=1.0;
+  return(MagickTrue);
+}
+
 MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -505,7 +691,6 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
     *image_view;
 
   double
-    normalize,
     **kernel;
 
   Image
@@ -574,37 +759,12 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   (void) memset(kernel,0,(size_t) width*sizeof(*kernel));
   for (w=0; w < (ssize_t) width; w+=2)
   {
-    ssize_t
-      j,
-      k,
-      u,
-      v;
-
-    kernel[w]=(double *) MagickAssumeAligned(AcquireAlignedMemory((size_t)
-      (width-(size_t) w),(width-(size_t) w)*sizeof(**kernel)));
-    if (kernel[w] == (double *) NULL)
+    if (AcquireAdaptiveSharpenKernel(kernel,width,w,sigma) == MagickFalse)
       break;
-    normalize=0.0;
-    j=((ssize_t) width-w-1)/2;
-    k=0;
-    for (v=(-j); v <= j; v++)
-    {
-      for (u=(-j); u <= j; u++)
-      {
-        kernel[w][k]=(double) (-exp(-((double) u*u+v*v)/(2.0*MagickSigma*
-          MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
-        normalize+=kernel[w][k];
-        k++;
-      }
-    }
-    kernel[w][(k-1)/2]=(double) ((-2.0)*normalize);
-    if (sigma < MagickEpsilon)
-      kernel[w][(k-1)/2]=1.0;
   }
   if (w < (ssize_t) width)
     {
-      for (w-=2; w >= 0; w-=2)
-        kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+      RelinquishAdaptiveKernels(kernel,w);
       kernel=(double **) RelinquishAlignedMemory(kernel);
       edge_image=DestroyImage(edge_image);
       sharp_image=DestroyImage(sharp_image);
@@ -664,78 +824,17 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
        ((width-(size_t) j)/2L)+GetPixelChannels(image)*((width-(size_t) j)/2));
       for (i=0; i < (ssize_t) GetPixelChannels(sharp_image); i++)
       {
-        const double
-          *magick_restrict k;
+        AdaptiveChannel
+          adaptive;
 
-        const Quantum
-          *magick_restrict pixels;
-
-        double
-          alpha,
-          gamma,
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          sharp_traits,
-          traits;
-
-        ssize_t
-          u,
-          v;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        sharp_traits=GetPixelChannelTraits(sharp_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (sharp_traits == UndefinedPixelTrait))
-          continue;
-        if ((sharp_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(sharp_image,channel,p[center+i],q);
-            continue;
-          }
-        k=kernel[j];
-        pixels=p;
-        pixel=0.0;
-        gamma=0.0;
-        if ((sharp_traits & BlendPixelTrait) == 0)
-          {
-            /*
-              No alpha blending.
-            */
-            for (v=0; v < ((ssize_t) width-j); v++)
-            {
-              for (u=0; u < ((ssize_t) width-j); u++)
-              {
-                pixel+=(*k)*(double) pixels[i];
-                gamma+=(*k);
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-              }
-            }
-            gamma=MagickSafeReciprocal(gamma);
-            SetPixelChannel(sharp_image,channel,ClampToQuantum(gamma*pixel),q);
-            continue;
-          }
-        /*
-          Alpha blending.
-        */
-        for (v=0; v < ((ssize_t) width-j); v++)
-        {
-          for (u=0; u < ((ssize_t) width-j); u++)
-          {
-            alpha=(double) (QuantumScale*(double) GetPixelAlpha(image,pixels));
-            pixel+=(*k)*alpha*(double) pixels[i];
-            gamma+=(*k)*alpha;
-            k++;
-            pixels+=(ptrdiff_t) GetPixelChannels(image);
-          }
-        }
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(sharp_image,channel,ClampToQuantum(gamma*pixel),q);
+        adaptive.image=image;
+        adaptive.blur_image=sharp_image;
+        adaptive.kernel=kernel;
+        adaptive.p=p;
+        adaptive.width=width;
+        adaptive.j=j;
+        adaptive.center=center;
+        BlurAdaptiveChannel(&adaptive,i,q);
       }
       q+=(ptrdiff_t) GetPixelChannels(sharp_image);
       r+=(ptrdiff_t) GetPixelChannels(edge_image);
@@ -2306,6 +2405,133 @@ static double GetKuwaharaVariance(const Image *gaussian_image,
   return(variance);
 }
 
+typedef struct _KuwaharaCorner
+{
+  ssize_t
+    x,
+    y;
+
+  size_t
+    width,
+    i;
+} KuwaharaCorner;
+
+static void OffsetKuwaharaQuadrant(const KuwaharaCorner *corner,
+  RectangleInfo *quadrant)
+{
+  const ssize_t
+    x = corner->x,
+    y = corner->y;
+
+  const size_t
+    width = corner->width,
+    i = corner->i;
+
+  (*quadrant).x=x;
+  (*quadrant).y=y;
+  switch (i)
+  {
+    case 0:
+    {
+      (*quadrant).x=x-(ssize_t) (width-1);
+      (*quadrant).y=y-(ssize_t) (width-1);
+      break;
+    }
+    case 1:
+    {
+      (*quadrant).y=y-(ssize_t) (width-1);
+      break;
+    }
+    case 2:
+    {
+      (*quadrant).x=x-(ssize_t) (width-1);
+      break;
+    }
+    case 3:
+    default:
+      break;
+  }
+}
+
+typedef struct _KuwaharaQuadrants
+{
+  Image
+    *gaussian_image;
+
+  CacheView
+    *image_view;
+
+  size_t
+    width;
+
+  ssize_t
+    x,
+    y;
+
+  ExceptionInfo
+    *exception;
+} KuwaharaQuadrants;
+
+static void SelectKuwaharaQuadrant(const KuwaharaQuadrants *quadrants,
+  RectangleInfo *target,size_t *i)
+{
+  Image
+    *const gaussian_image = quadrants->gaussian_image;
+
+  CacheView
+    *const image_view = quadrants->image_view;
+
+  const size_t
+    width = quadrants->width;
+
+  const ssize_t
+    x = quadrants->x,
+    y = quadrants->y;
+
+  ExceptionInfo
+    *const exception = quadrants->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  double
+    min_variance;
+
+  RectangleInfo
+    quadrant;
+
+  min_variance=MagickMaximumValue;
+  SetGeometry(gaussian_image,target);
+  quadrant.width=width;
+  quadrant.height=width;
+  for (*i=0; *i < 4; (*i)++)
+  {
+    double
+      mean[MaxPixelChannels],
+      variance;
+
+    KuwaharaCorner
+      corner;
+
+    corner.x=x;
+    corner.y=y;
+    corner.width=width;
+    corner.i=(*i);
+    OffsetKuwaharaQuadrant(&corner,&quadrant);
+    p=GetCacheViewVirtualPixels(image_view,quadrant.x,quadrant.y,
+      quadrant.width,quadrant.height,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    GetKuwaharaMean(gaussian_image,p,width,mean);
+    variance=GetKuwaharaVariance(gaussian_image,p,width,mean);
+    if (variance < min_variance)
+      {
+        min_variance=variance;
+        *target=quadrant;
+      }
+  }
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -2386,65 +2612,22 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
       }
     for (x=0; x < (ssize_t) gaussian_image->columns; x++)
     {
-      const Quantum
-        *magick_restrict p;
-
-      double
-        min_variance;
+      KuwaharaQuadrants
+        quadrants;
 
       RectangleInfo
-        quadrant,
         target;
 
       size_t
         i;
 
-      min_variance=MagickMaximumValue;
-      SetGeometry(gaussian_image,&target);
-      quadrant.width=width;
-      quadrant.height=width;
-      for (i=0; i < 4; i++)
-      {
-        double
-          mean[MaxPixelChannels],
-          variance;
-
-        quadrant.x=x;
-        quadrant.y=y;
-        switch (i)
-        {
-          case 0:
-          {
-            quadrant.x=x-(ssize_t) (width-1);
-            quadrant.y=y-(ssize_t) (width-1);
-            break;
-          }
-          case 1:
-          {
-            quadrant.y=y-(ssize_t) (width-1);
-            break;
-          }
-          case 2:
-          {
-            quadrant.x=x-(ssize_t) (width-1);
-            break;
-          }
-          case 3:
-          default:
-            break;
-        }
-        p=GetCacheViewVirtualPixels(image_view,quadrant.x,quadrant.y,
-          quadrant.width,quadrant.height,exception);
-        if (p == (const Quantum *) NULL)
-          break;
-        GetKuwaharaMean(gaussian_image,p,width,mean);
-        variance=GetKuwaharaVariance(gaussian_image,p,width,mean);
-        if (variance < min_variance)
-          {
-            min_variance=variance;
-            target=quadrant;
-          }
-      }
+      quadrants.gaussian_image=gaussian_image;
+      quadrants.image_view=image_view;
+      quadrants.width=width;
+      quadrants.x=x;
+      quadrants.y=y;
+      quadrants.exception=exception;
+      SelectKuwaharaQuadrant(&quadrants,&target,&i);
       if (i < 4)
         {
           status=MagickFalse;
@@ -4457,6 +4640,315 @@ static void AddSelectiveTap(const SelectiveTap *tap,double *pixel,
     }
 }
 
+typedef struct _SelectiveSum
+{
+  const Image
+    *image;
+
+  Image
+    *luminance_image;
+
+  size_t
+    width;
+
+  double
+    intensity,
+    threshold;
+
+  ssize_t
+    i;
+} SelectiveSum;
+
+typedef struct _SelectiveSumTargets
+{
+  double
+    *pixel,
+    *gamma;
+
+  const MagickRealType
+    *magick_restrict *k;
+
+  const Quantum
+    *magick_restrict *pixels,
+    *magick_restrict *luminance_pixels;
+} SelectiveSumTargets;
+
+static void SumSelectivePixels(const SelectiveSum *sum,
+  const SelectiveSumTargets *targets)
+{
+  double
+    *const pixel = targets->pixel,
+    *const gamma = targets->gamma;
+
+  const MagickRealType
+    *magick_restrict *const k = targets->k;
+
+  const Quantum
+    *magick_restrict *const pixels = targets->pixels,
+    *magick_restrict *const luminance_pixels = targets->luminance_pixels;
+
+  double
+    contrast;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < (ssize_t) sum->width; v++)
+  {
+    for (u=0; u < (ssize_t) sum->width; u++)
+    {
+      SelectiveTap
+        tap;
+
+      contrast=GetPixelIntensity(sum->luminance_image,*luminance_pixels)-
+        sum->intensity;
+      tap.contrast=contrast;
+      tap.threshold=sum->threshold;
+      tap.k=*k;
+      tap.pixels=*pixels;
+      tap.i=sum->i;
+      AddSelectiveTap(&tap,pixel,gamma);
+      (*k)++;
+      *pixels+=(ptrdiff_t) GetPixelChannels(sum->image);
+      *luminance_pixels+=(ptrdiff_t) GetPixelChannels(sum->luminance_image);
+    }
+    *pixels+=(ptrdiff_t) GetPixelChannels(sum->image)*sum->image->columns;
+    *luminance_pixels+=(ptrdiff_t) GetPixelChannels(sum->luminance_image)*
+      sum->luminance_image->columns;
+  }
+}
+
+static void SumSelectiveBlendedPixels(const SelectiveSum *sum,
+  const SelectiveSumTargets *targets)
+{
+  double
+    alpha,
+    contrast;
+
+  ssize_t
+    u,
+    v;
+
+  for (v=0; v < (ssize_t) sum->width; v++)
+  {
+    for (u=0; u < (ssize_t) sum->width; u++)
+    {
+      contrast=GetPixelIntensity(sum->image,*targets->pixels)-sum->intensity;
+      if (fabs(contrast) < sum->threshold)
+        {
+          alpha=QuantumScale*(double) GetPixelAlpha(sum->image,
+            *targets->pixels);
+          *targets->pixel+=(**targets->k)*alpha*(double)
+            (*targets->pixels)[sum->i];
+          *targets->gamma+=(**targets->k)*alpha;
+        }
+      (*targets->k)++;
+      *targets->pixels+=(ptrdiff_t) GetPixelChannels(sum->image);
+      *targets->luminance_pixels+=(ptrdiff_t) GetPixelChannels(
+        sum->luminance_image);
+    }
+    *targets->pixels+=(ptrdiff_t) GetPixelChannels(sum->image)*
+      sum->image->columns;
+    *targets->luminance_pixels+=(ptrdiff_t) GetPixelChannels(
+      sum->luminance_image)*sum->luminance_image->columns;
+  }
+}
+
+typedef struct _SelectiveChannelSum
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image,
+    *luminance_image;
+
+  MagickRealType
+    *kernel;
+
+  const Quantum
+    *p,
+    *l;
+
+  ssize_t
+    center;
+
+  double
+    intensity,
+    threshold;
+
+  size_t
+    width;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    blur_traits;
+} SelectiveChannelSum;
+
+static void BlurSelectiveChannelSum(const SelectiveChannelSum *blur,
+  const ssize_t i,Quantum *magick_restrict q)
+{
+  double
+    gamma,
+    pixel;
+
+  const MagickRealType
+    *magick_restrict k;
+
+  const Quantum
+    *magick_restrict luminance_pixels,
+    *magick_restrict pixels;
+
+  SelectiveSum
+    sum;
+
+  SelectiveSumTargets
+    targets;
+
+  k=blur->kernel;
+  pixel=0.0;
+  pixels=blur->p;
+  luminance_pixels=blur->l;
+  gamma=0.0;
+  if ((blur->blur_traits & BlendPixelTrait) == 0)
+    {
+      sum.image=blur->image;
+      sum.luminance_image=blur->luminance_image;
+      sum.width=blur->width;
+      sum.intensity=blur->intensity;
+      sum.threshold=blur->threshold;
+      sum.i=i;
+      targets.pixel=(&pixel);
+      targets.gamma=(&gamma);
+      targets.k=(&k);
+      targets.pixels=(&pixels);
+      targets.luminance_pixels=(&luminance_pixels);
+      SumSelectivePixels(&sum,&targets);
+      if (fabs((double) gamma) < MagickEpsilon)
+        {
+          SetPixelChannel(blur->blur_image,blur->channel,
+            blur->p[blur->center+i],q);
+          return;
+        }
+      gamma=MagickSafeReciprocal(gamma);
+      SetPixelChannel(blur->blur_image,blur->channel,ClampToQuantum(
+        gamma*pixel),q);
+      return;
+    }
+  sum.image=blur->image;
+  sum.luminance_image=blur->luminance_image;
+  sum.width=blur->width;
+  sum.intensity=blur->intensity;
+  sum.threshold=blur->threshold;
+  sum.i=i;
+  targets.pixel=(&pixel);
+  targets.gamma=(&gamma);
+  targets.k=(&k);
+  targets.pixels=(&pixels);
+  targets.luminance_pixels=(&luminance_pixels);
+  SumSelectiveBlendedPixels(&sum,&targets);
+  if (fabs((double) gamma) < MagickEpsilon)
+    {
+      SetPixelChannel(blur->blur_image,blur->channel,blur->p[blur->center+i],
+        q);
+      return;
+    }
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(blur->blur_image,blur->channel,ClampToQuantum(gamma*pixel),
+    q);
+}
+
+typedef struct _SelectiveChannel
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image,
+    *luminance_image;
+
+  MagickRealType
+    *kernel;
+
+  const Quantum
+    *p,
+    *l;
+
+  ssize_t
+    center;
+
+  double
+    intensity,
+    threshold;
+
+  size_t
+    width;
+} SelectiveChannel;
+
+static void BlurSelectiveChannel(const SelectiveChannel *selective,
+  const ssize_t i,Quantum *magick_restrict q)
+{
+  PixelChannel
+    channel;
+
+  PixelTrait
+    blur_traits,
+    traits;
+
+  SelectiveChannelSum
+    blur;
+
+  channel=GetPixelChannelChannel(selective->image,i);
+  traits=GetPixelChannelTraits(selective->image,channel);
+  blur_traits=GetPixelChannelTraits(selective->blur_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (blur_traits == UndefinedPixelTrait))
+    return;
+  if ((blur_traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(selective->blur_image,channel,
+        selective->p[selective->center+i],q);
+      return;
+    }
+  blur.image=selective->image;
+  blur.blur_image=selective->blur_image;
+  blur.luminance_image=selective->luminance_image;
+  blur.kernel=selective->kernel;
+  blur.p=selective->p;
+  blur.l=selective->l;
+  blur.center=selective->center;
+  blur.intensity=selective->intensity;
+  blur.threshold=selective->threshold;
+  blur.width=selective->width;
+  blur.channel=channel;
+  blur.blur_traits=blur_traits;
+  BlurSelectiveChannelSum(&blur,i,q);
+}
+
+static void BuildSelectiveKernel(MagickRealType *kernel,const size_t width,
+  const double sigma)
+{
+  ssize_t
+    i,
+    j,
+    v;
+
+  j=(ssize_t) (width-1)/2;
+  i=0;
+  for (v=(-j); v <= j; v++)
+  {
+    ssize_t
+      u;
+
+    for (u=(-j); u <= j; u++)
+      kernel[i++]=(MagickRealType) (exp(-((double) u*u+v*v)/(2.0*MagickSigma*
+        MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
+  }
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -4501,24 +4993,7 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
     width,width*sizeof(*kernel)));
   if (kernel == (MagickRealType *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  {
-    ssize_t
-      i,
-      j,
-      v;
-
-    j=(ssize_t) (width-1)/2;
-    i=0;
-    for (v=(-j); v <= j; v++)
-    {
-      ssize_t
-        u;
-
-      for (u=(-j); u <= j; u++)
-        kernel[i++]=(MagickRealType) (exp(-((double) u*u+v*v)/(2.0*MagickSigma*
-          MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
-    }
-  }
+  BuildSelectiveKernel(kernel,width,sigma);
   if (image->debug != MagickFalse)
     {
       char
@@ -4592,9 +5067,6 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    double
-      contrast;
-
     MagickBooleanType
       sync;
 
@@ -4632,107 +5104,20 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
       intensity=GetPixelIntensity(image,p+center);
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
-        double
-          alpha,
-          gamma,
-          pixel;
+        SelectiveChannel
+          selective;
 
-        PixelChannel
-          channel;
-
-        PixelTrait
-          blur_traits,
-          traits;
-
-        const MagickRealType
-          *magick_restrict k;
-
-        const Quantum
-          *magick_restrict luminance_pixels,
-          *magick_restrict pixels;
-
-        ssize_t
-          u;
-
-        ssize_t
-          v;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        blur_traits=GetPixelChannelTraits(blur_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (blur_traits == UndefinedPixelTrait))
-          continue;
-        if ((blur_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(blur_image,channel,p[center+i],q);
-            continue;
-          }
-        k=kernel;
-        pixel=0.0;
-        pixels=p;
-        luminance_pixels=l;
-        gamma=0.0;
-        if ((blur_traits & BlendPixelTrait) == 0)
-          {
-            for (v=0; v < (ssize_t) width; v++)
-            {
-              for (u=0; u < (ssize_t) width; u++)
-              {
-                SelectiveTap
-                  tap;
-
-                contrast=GetPixelIntensity(luminance_image,luminance_pixels)-
-                  intensity;
-                tap.contrast=contrast;
-                tap.threshold=threshold;
-                tap.k=k;
-                tap.pixels=pixels;
-                tap.i=i;
-                AddSelectiveTap(&tap,&pixel,&gamma);
-                k++;
-                pixels+=(ptrdiff_t) GetPixelChannels(image);
-                luminance_pixels+=(ptrdiff_t) GetPixelChannels(luminance_image);
-              }
-              pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-              luminance_pixels+=(ptrdiff_t) GetPixelChannels(luminance_image)*
-                luminance_image->columns;
-            }
-            if (fabs((double) gamma) < MagickEpsilon)
-              {
-                SetPixelChannel(blur_image,channel,p[center+i],q);
-                continue;
-              }
-            gamma=MagickSafeReciprocal(gamma);
-            SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
-            continue;
-          }
-        for (v=0; v < (ssize_t) width; v++)
-        {
-          for (u=0; u < (ssize_t) width; u++)
-          {
-            contrast=GetPixelIntensity(image,pixels)-intensity;
-            if (fabs(contrast) < threshold)
-              {
-                alpha=QuantumScale*(double) GetPixelAlpha(image,pixels);
-                pixel+=(*k)*alpha*(double) pixels[i];
-                gamma+=(*k)*alpha;
-              }
-            k++;
-            pixels+=(ptrdiff_t) GetPixelChannels(image);
-            luminance_pixels+=(ptrdiff_t) GetPixelChannels(luminance_image);
-          }
-          pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-          luminance_pixels+=(ptrdiff_t) GetPixelChannels(luminance_image)*
-            luminance_image->columns;
-        }
-        if (fabs((double) gamma) < MagickEpsilon)
-          {
-            SetPixelChannel(blur_image,channel,p[center+i],q);
-            continue;
-          }
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
+        selective.image=image;
+        selective.blur_image=blur_image;
+        selective.luminance_image=luminance_image;
+        selective.kernel=kernel;
+        selective.p=p;
+        selective.l=l;
+        selective.center=center;
+        selective.intensity=intensity;
+        selective.threshold=threshold;
+        selective.width=width;
+        BlurSelectiveChannel(&selective,i,q);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
       l+=(ptrdiff_t) GetPixelChannels(luminance_image);

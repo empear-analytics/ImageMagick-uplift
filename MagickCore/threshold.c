@@ -206,6 +206,16 @@ static void BilevelPixel(const Image *image,const double threshold,
   }
 }
 
+static MagickBooleanType SetDirectNonGrayImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (IsGrayColorspace(image->colorspace) == MagickFalse)
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType BilevelImage(Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -227,10 +237,8 @@ MagickExport MagickBooleanType BilevelImage(Image *image,const double threshold,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (SetDirectNonGrayImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) == MagickFalse)
-    (void) SetImageColorspace(image,sRGBColorspace,exception);
   /*
     Bilevel threshold image.
   */
@@ -378,6 +386,33 @@ static void BlackThresholdPixel(const Image *image,const PixelInfo *threshold,
   }
 }
 
+static void BlackThresholdRow(const Image *image,const PixelInfo *threshold,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      pixel;
+
+    pixel=GetPixelIntensity(image,q);
+    BlackThresholdPixel(image,threshold,pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static MagickBooleanType SetDirectColorImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType BlackThresholdImage(Image *image,
   const char *thresholds,ExceptionInfo *exception)
 {
@@ -404,10 +439,8 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (thresholds == (const char *) NULL)
     return(MagickTrue);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (SetDirectColorImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(image,sRGBColorspace,exception);
   threshold=GetThresholdLevels(image,thresholds);
   /*
     White threshold image.
@@ -421,9 +454,6 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -435,15 +465,7 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        pixel;
-
-      pixel=GetPixelIntensity(image,q);
-      BlackThresholdPixel(image,&threshold,pixel,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    BlackThresholdRow(image,&threshold,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -752,6 +774,34 @@ static void ConvertColorThresholdRange(const ColorThresholdRange *range,
   }
 }
 
+static void ColorThresholdRow(Image *image,const PixelInfo *start,
+  const PixelInfo *stop,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MagickBooleanType
+      foreground = MagickTrue;
+
+    foreground=IsPixelInColorRange(image,start,stop,q);
+    SetPixelIndex(image,(Quantum) (foreground != MagickFalse ? 1 : 0),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static IlluminantType GetImageThresholdIlluminant(const Image *image,
+  IlluminantType illuminant)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"color:illuminant");
+  illuminant=GetThresholdIlluminant(artifact,illuminant);
+  return(illuminant);
+}
+
 MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   const PixelInfo *start_color,const PixelInfo *stop_color,
   ExceptionInfo *exception)
@@ -763,9 +813,6 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
 
   ColorThresholdRange
     range;
-
-  const char
-    *artifact;
 
   IlluminantType
     illuminant = D65Illuminant;
@@ -793,8 +840,7 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   status=AcquireImageColormap(image,2,exception);
   if (status == MagickFalse)
     return(status);
-  artifact=GetImageArtifact(image,"color:illuminant");
-  illuminant=GetThresholdIlluminant(artifact,illuminant);
+  illuminant=GetImageThresholdIlluminant(image,illuminant);
   start=(*start_color);
   stop=(*stop_color);
   range.image=image;
@@ -816,9 +862,6 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -830,15 +873,7 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MagickBooleanType
-        foreground = MagickTrue;
-
-      foreground=IsPixelInColorRange(image,&start,&stop,q);
-      SetPixelIndex(image,(Quantum) (foreground != MagickFalse ? 1 : 0),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ColorThresholdRow(image,&start,&stop,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -1031,14 +1066,13 @@ static XMLTreeInfo *FindThresholdMap(XMLTreeInfo *thresholds,
   return(threshold);
 }
 
-static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
-  const char *map_id,ExceptionInfo *exception)
+static MagickBooleanType ReadThresholdLevels(ThresholdMap *map,
+  XMLTreeInfo *levels,const char *map_id,ExceptionInfo *exception)
 {
   char
     *p;
 
   const char
-    *attribute,
     *content;
 
   double
@@ -1047,6 +1081,100 @@ static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
   ssize_t
     i;
 
+  content=GetXMLTreeContent(levels);
+  if (content == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlMissingContent", "<levels>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  map->levels=(ssize_t *) AcquireQuantumMemory((size_t) map->width,map->height*
+    sizeof(*map->levels));
+  if (map->levels == (ssize_t *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"UnableToAcquireThresholdMap");
+  for (i=0; i < (ssize_t) (map->width*map->height); i++)
+  {
+    map->levels[i]=(ssize_t) strtol(content,&p,10);
+    if (p == content)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "XmlInvalidContent", "<level> too few values, map \"%s\"",map_id);
+        return(MagickFalse);
+      }
+    if ((map->levels[i] < 0) || (map->levels[i] > map->divisor))
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "XmlInvalidContent", "<level> %.17g out of range, map \"%s\"",
+          (double) map->levels[i],map_id);
+        return(MagickFalse);
+      }
+    content=p;
+  }
+  value=(double) strtol(content,&p,10);
+  (void) value;
+  if (p != content)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlInvalidContent", "<level> too many values, map \"%s\"",map_id);
+     return(MagickFalse);
+   }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ReadThresholdLevelsSize(ThresholdMap *map,
+  XMLTreeInfo *levels,const char *map_id,ExceptionInfo *exception)
+{
+  const char
+    *attribute;
+
+  attribute=GetXMLTreeAttribute(levels,"width");
+  if (attribute == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlMissingAttribute", "<levels width>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  map->width=StringToUnsignedLong(attribute);
+  if (map->width == 0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+       "XmlInvalidAttribute", "<levels width>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  attribute=GetXMLTreeAttribute(levels,"height");
+  if (attribute == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlMissingAttribute", "<levels height>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  map->height=StringToUnsignedLong(attribute);
+  if (map->height == 0)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlInvalidAttribute", "<levels height>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  attribute=GetXMLTreeAttribute(levels,"divisor");
+  if (attribute == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlMissingAttribute", "<levels divisor>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  map->divisor=(ssize_t) StringToLong(attribute);
+  if (map->divisor < 2)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlInvalidAttribute", "<levels divisor>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
+  const char *map_id,ExceptionInfo *exception)
+{
   ThresholdMap
     *map;
 
@@ -1085,105 +1213,18 @@ static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
       return(map);
     }
   map=AcquireThresholdMap(threshold,description);
-  attribute=GetXMLTreeAttribute(levels,"width");
-  if (attribute == (char *) NULL)
+  if (ReadThresholdLevelsSize(map,levels,map_id,exception) == MagickFalse)
     {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlMissingAttribute", "<levels width>, map \"%s\"",map_id);
       thresholds=DestroyXMLTree(thresholds);
       map=DestroyThresholdMap(map);
       return(map);
     }
-  map->width=StringToUnsignedLong(attribute);
-  if (map->width == 0)
+  if (ReadThresholdLevels(map,levels,map_id,exception) == MagickFalse)
     {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-       "XmlInvalidAttribute", "<levels width>, map \"%s\"",map_id);
       thresholds=DestroyXMLTree(thresholds);
       map=DestroyThresholdMap(map);
       return(map);
     }
-  attribute=GetXMLTreeAttribute(levels,"height");
-  if (attribute == (char *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlMissingAttribute", "<levels height>, map \"%s\"",map_id);
-      thresholds=DestroyXMLTree(thresholds);
-      map=DestroyThresholdMap(map);
-      return(map);
-    }
-  map->height=StringToUnsignedLong(attribute);
-  if (map->height == 0)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlInvalidAttribute", "<levels height>, map \"%s\"",map_id);
-      thresholds=DestroyXMLTree(thresholds);
-      map=DestroyThresholdMap(map);
-      return(map);
-    }
-  attribute=GetXMLTreeAttribute(levels,"divisor");
-  if (attribute == (char *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlMissingAttribute", "<levels divisor>, map \"%s\"",map_id);
-      thresholds=DestroyXMLTree(thresholds);
-      map=DestroyThresholdMap(map);
-      return(map);
-    }
-  map->divisor=(ssize_t) StringToLong(attribute);
-  if (map->divisor < 2)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlInvalidAttribute", "<levels divisor>, map \"%s\"",map_id);
-      thresholds=DestroyXMLTree(thresholds);
-      map=DestroyThresholdMap(map);
-      return(map);
-    }
-  content=GetXMLTreeContent(levels);
-  if (content == (char *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlMissingContent", "<levels>, map \"%s\"",map_id);
-      thresholds=DestroyXMLTree(thresholds);
-      map=DestroyThresholdMap(map);
-      return(map);
-    }
-  map->levels=(ssize_t *) AcquireQuantumMemory((size_t) map->width,map->height*
-    sizeof(*map->levels));
-  if (map->levels == (ssize_t *) NULL)
-    ThrowFatalException(ResourceLimitFatalError,"UnableToAcquireThresholdMap");
-  for (i=0; i < (ssize_t) (map->width*map->height); i++)
-  {
-    map->levels[i]=(ssize_t) strtol(content,&p,10);
-    if (p == content)
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "XmlInvalidContent", "<level> too few values, map \"%s\"",map_id);
-        thresholds=DestroyXMLTree(thresholds);
-        map=DestroyThresholdMap(map);
-        return(map);
-      }
-    if ((map->levels[i] < 0) || (map->levels[i] > map->divisor))
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "XmlInvalidContent", "<level> %.17g out of range, map \"%s\"",
-          (double) map->levels[i],map_id);
-        thresholds=DestroyXMLTree(thresholds);
-        map=DestroyThresholdMap(map);
-        return(map);
-      }
-    content=p;
-  }
-  value=(double) strtol(content,&p,10);
-  (void) value;
-  if (p != content)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlInvalidContent", "<level> too many values, map \"%s\"",map_id);
-     thresholds=DestroyXMLTree(thresholds);
-     map=DestroyThresholdMap(map);
-     return(map);
-   }
   thresholds=DestroyXMLTree(thresholds);
   return(map);
 }
@@ -1493,6 +1534,17 @@ static const char *CopyThresholdMapName(const char *threshold_map,
   return(p);
 }
 
+static ThresholdMap *GetNamedThresholdMap(const char *threshold_map,
+  const char *p,ExceptionInfo *exception)
+{
+  char
+    token[MagickPathExtent];
+
+  p=CopyThresholdMapName(threshold_map,p,token);
+  token[p-threshold_map]='\0';
+  return(GetThresholdMap(token,exception));
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1500,9 +1552,6 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
 
   CacheView
     *image_view;
-
-  char
-    token[MagickPathExtent];
 
   const char
     *p;
@@ -1534,9 +1583,7 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   while (IsThresholdMapSeparator(p) != MagickFalse)
     p++;
   threshold_map=p;
-  p=CopyThresholdMapName(threshold_map,p,token);
-  token[p-threshold_map]='\0';
-  map=GetThresholdMap(token,exception);
+  map=GetNamedThresholdMap(threshold_map,p,exception);
   if (map == (ThresholdMap *) NULL)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
@@ -1960,6 +2007,23 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType SetDirectRGBImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType IsRangeThresholdWhite(const double pixel,
+  const double low_white,const double high_white)
+{
+  return(((pixel >= low_white) && (pixel <= high_white)) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline Quantum RangeThresholdValue(const double pixel,
   const double low_black,const double low_white,const double high_white,
   const double high_black)
@@ -1971,7 +2035,7 @@ static inline Quantum RangeThresholdValue(const double pixel,
       return(ClampToQuantum((double) QuantumRange*
         MagickSafeReciprocal(low_white-low_black)*(pixel-low_black)));
     else
-      if ((pixel >= low_white) && (pixel <= high_white))
+      if (IsRangeThresholdWhite(pixel,low_white,high_white) != MagickFalse)
         return(QuantumRange);
       else
         if ((pixel > high_white) && (pixel <= high_black))
@@ -2031,10 +2095,8 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (SetDirectRGBImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
   /*
     Range threshold image.
   */
@@ -2136,6 +2198,16 @@ static void WhiteThresholdPixel(const Image *image,const PixelInfo *threshold,
   }
 }
 
+static void WhiteThresholdIntensity(const Image *image,
+  const PixelInfo *threshold,Quantum *magick_restrict q)
+{
+  double
+    pixel;
+
+  pixel=GetPixelIntensity(image,q);
+  WhiteThresholdPixel(image,threshold,pixel,q);
+}
+
 MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
   const char *thresholds,ExceptionInfo *exception)
 {
@@ -2162,10 +2234,8 @@ MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (thresholds == (const char *) NULL)
     return(MagickTrue);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (SetDirectRGBImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
   threshold=GetThresholdLevels(image,thresholds);
   /*
     White threshold image.
@@ -2195,11 +2265,7 @@ MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      double
-        pixel;
-
-      pixel=GetPixelIntensity(image,q);
-      WhiteThresholdPixel(image,&threshold,pixel,q);
+      WhiteThresholdIntensity(image,&threshold,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)

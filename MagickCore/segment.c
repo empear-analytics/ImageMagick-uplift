@@ -421,6 +421,26 @@ static ssize_t CountClusterPixel(Cluster *head,const PixelInfo pixel,
   return(count);
 }
 
+static ssize_t CountRowClusterPixels(const Image *image,Cluster *head,
+  const Quantum *p,ssize_t count)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PixelInfo
+      pixel;
+
+    pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,p));
+    pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
+    pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
+    count=CountClusterPixel(head,pixel,count);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(count);
+}
+
 static Cluster *ClassifyPixelByCluster(const Image *image,Cluster *head,
   const PixelInfo pixel,Quantum *magick_restrict q)
 {
@@ -447,6 +467,138 @@ static inline MagickBooleanType IsClusterAboveThreshold(const Cluster *cluster,
   return(((cluster->count > 0) &&
     (cluster->count >= (count*cluster_threshold/100.0))) ? MagickTrue :
     MagickFalse);
+}
+
+typedef struct _ClassifyRowInputs
+{
+  Cluster
+    *head;
+
+  double
+    *squares;
+
+  double
+    weighting_exponent;
+} ClassifyRowInputs;
+
+static void ClassifyRowPixels(Image *image,const ClassifyRowInputs *inputs,
+  Quantum *magick_restrict q)
+{
+  Cluster
+    *const head = inputs->head;
+
+  double
+    *const squares = inputs->squares;
+
+  const double
+    weighting_exponent = inputs->weighting_exponent;
+
+  Cluster
+    *c;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PixelInfo
+      pixel;
+
+    SetPixelIndex(image,(Quantum) 0,q);
+    pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,q));
+    pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,q));
+    pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,q));
+    c=ClassifyPixelByCluster(image,head,pixel,q);
+    if (c == (Cluster *) NULL)
+      ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static Cluster *UnlinkCluster(Cluster *head,Cluster *last_cluster,
+  const Cluster *cluster,Cluster *next_cluster)
+{
+  if (cluster == head)
+    head=next_cluster;
+  else
+    last_cluster->next=next_cluster;
+  return(head);
+}
+
+typedef struct _ClusterTargets
+{
+  Cluster
+    **cluster,
+    **head;
+
+  ExtentPacket
+    *blue;
+} ClusterTargets;
+
+static MagickBooleanType FormBlueClusters(short **extrema,
+  const ExtentPacket red,const ExtentPacket green,
+  const ClusterTargets *targets)
+{
+  Cluster
+    **const cluster = targets->cluster,
+    **const head = targets->head;
+
+  ExtentPacket
+    *const blue = targets->blue;
+
+  while (DefineRegion(extrema[Blue],blue) != 0)
+  {
+    /*
+      Allocate a new class.
+    */
+    if (*head != (Cluster *) NULL)
+      {
+        (*cluster)->next=(Cluster *) AcquireQuantumMemory(1,
+          sizeof(*(*cluster)->next));
+        *cluster=(*cluster)->next;
+      }
+    else
+      {
+        *cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(**cluster));
+        *head=*cluster;
+      }
+    if (*cluster == (Cluster *) NULL)
+      return(MagickFalse);
+    /*
+      Initialize a new class.
+    */
+    (void) memset(*cluster,0,sizeof(**cluster));
+    (*cluster)->red=red;
+    (*cluster)->green=green;
+    (*cluster)->blue=*blue;
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireDefaultCluster(const ExtentPacket red,
+  const ExtentPacket green,const ExtentPacket blue,Cluster **head)
+{
+  Cluster
+    *cluster;
+
+  if (*head == (Cluster *) NULL)
+    {
+      /*
+        No classes were identified-- create one.
+      */
+      cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster));
+      if (cluster == (Cluster *) NULL)
+        return(MagickFalse);
+      /*
+        Initialize a new class.
+      */
+      (void) memset(cluster,0,sizeof(*cluster));
+      cluster->red=red;
+      cluster->green=green;
+      cluster->blue=blue;
+      *head=cluster;
+    }
+  return(MagickTrue);
 }
 
 static MagickBooleanType Classify(Image *image,short **extrema,
@@ -526,54 +678,21 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     green.index=0;
     while (DefineRegion(extrema[Green],&green) != 0)
     {
+      ClusterTargets
+        targets;
+
       blue.index=0;
-      while (DefineRegion(extrema[Blue],&blue) != 0)
-      {
-        /*
-          Allocate a new class.
-        */
-        if (head != (Cluster *) NULL)
-          {
-            cluster->next=(Cluster *) AcquireQuantumMemory(1,
-              sizeof(*cluster->next));
-            cluster=cluster->next;
-          }
-        else
-          {
-            cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster));
-            head=cluster;
-          }
-        if (cluster == (Cluster *) NULL)
-          ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-            image->filename);
-        /*
-          Initialize a new class.
-        */
-        (void) memset(cluster,0,sizeof(*cluster));
-        cluster->red=red;
-        cluster->green=green;
-        cluster->blue=blue;
-      }
-    }
-  }
-  if (head == (Cluster *) NULL)
-    {
-      /*
-        No classes were identified-- create one.
-      */
-      cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster));
-      if (cluster == (Cluster *) NULL)
+      targets.cluster=(&cluster);
+      targets.head=(&head);
+      targets.blue=(&blue);
+      if (FormBlueClusters(extrema,red,green,&targets) == MagickFalse)
         ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
           image->filename);
-      /*
-        Initialize a new class.
-      */
-      (void) memset(cluster,0,sizeof(*cluster));
-      cluster->red=red;
-      cluster->green=green;
-      cluster->blue=blue;
-      head=cluster;
     }
+  }
+  if (AcquireDefaultCluster(red,green,blue,&head) == MagickFalse)
+    ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
   /*
     Count the pixels for each cluster.
   */
@@ -586,23 +705,10 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     const Quantum
       *p;
 
-    ssize_t
-      x;
-
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PixelInfo
-        pixel;
-
-      pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,p));
-      pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
-      pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
-      count=CountClusterPixel(head,pixel,count);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    count=CountRowClusterPixels(image,head,p,count);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -643,10 +749,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     /*
       Delete cluster.
     */
-    if (cluster == head)
-      head=next_cluster;
-    else
-      last_cluster->next=next_cluster;
+    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
     cluster=(Cluster *) RelinquishMagickMemory(cluster);
   }
   number_clusters=(size_t) count;
@@ -682,11 +785,8 @@ static MagickBooleanType Classify(Image *image,short **extrema,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Cluster
-      *c;
-
-    ssize_t
-      x;
+    ClassifyRowInputs
+      inputs;
 
     Quantum
       *magick_restrict q;
@@ -699,20 +799,10 @@ static MagickBooleanType Classify(Image *image,short **extrema,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PixelInfo
-        pixel;
-
-      SetPixelIndex(image,(Quantum) 0,q);
-      pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,q));
-      pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,q));
-      pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,q));
-      c=ClassifyPixelByCluster(image,head,pixel,q);
-      if (c == (Cluster *) NULL)
-        ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    inputs.head=head;
+    inputs.squares=squares;
+    inputs.weighting_exponent=weighting_exponent;
+    ClassifyRowPixels(image,&inputs,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -1107,6 +1197,43 @@ static Cluster *FindObjectCluster(Cluster *head)
   return(object);
 }
 
+static ssize_t CountRowPixelsByRGB(const Image *image,Cluster *head,
+  const Quantum *p,ssize_t count)
+{
+  Cluster
+    *cluster;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      b,
+      g,
+      r;
+
+    r=(double) ScaleQuantumToChar(GetPixelRed(image,p));
+    g=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
+    b=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
+    for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
+      if (IsPixelInCluster(cluster,r,g,b) != MagickFalse)
+        {
+          /*
+            Count this pixel.
+          */
+          count++;
+          cluster->red.center+=r;
+          cluster->green.center+=g;
+          cluster->blue.center+=b;
+          cluster->count++;
+          break;
+        }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(count);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1134,8 +1261,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     *p;
 
   ssize_t
-    i,
-    x;
+    i;
 
   short
     *extrema[MaxDimension];
@@ -1258,31 +1384,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     p=GetVirtualPixels(image,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        b,
-        g,
-        r;
-
-      r=(double) ScaleQuantumToChar(GetPixelRed(image,p));
-      g=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
-      b=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
-      for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-        if (IsPixelInCluster(cluster,r,g,b) != MagickFalse)
-          {
-            /*
-              Count this pixel.
-            */
-            count++;
-            cluster->red.center+=r;
-            cluster->green.center+=g;
-            cluster->blue.center+=b;
-            cluster->count++;
-            break;
-          }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    count=CountRowPixelsByRGB(image,head,p,count);
     proceed=SetImageProgress(image,SegmentImageTag,(MagickOffsetType) y,
       2*image->rows);
     if (proceed == MagickFalse)
@@ -1313,10 +1415,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     /*
       Delete cluster.
     */
-    if (cluster == head)
-      head=next_cluster;
-    else
-      last_cluster->next=next_cluster;
+    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
     cluster=(Cluster *) RelinquishMagickMemory(cluster);
   }
   object=head;
@@ -1833,6 +1932,67 @@ static ssize_t FindTauIndex(const ZeroCrossing *zero_crossing,
   return(k);
 }
 
+typedef struct _ActiveNodeInputs
+{
+  IntervalTree
+    **list;
+
+  ssize_t
+    number_nodes;
+
+  ZeroCrossing
+    *zero_crossing;
+
+  size_t
+    number_crossings;
+} ActiveNodeInputs;
+
+static void SetActiveNodeExtrema(const ActiveNodeInputs *inputs,
+  short *extrema)
+{
+  IntervalTree
+    **const list = inputs->list;
+
+  const ssize_t
+    number_nodes = inputs->number_nodes;
+
+  ZeroCrossing
+    *const zero_crossing = inputs->zero_crossing;
+
+  const size_t
+    number_crossings = inputs->number_crossings;
+
+  IntervalTree
+    *node;
+
+  MagickBooleanType
+    peak;
+
+  ssize_t
+    i,
+    index,
+    k;
+
+  for (i=0; i <= 255; i++)
+    extrema[i]=0;
+  for (i=0; i < number_nodes; i++)
+  {
+    /*
+      Find this tau in zero crossings list.
+    */
+    k=0;
+    node=list[i];
+    k=FindTauIndex(zero_crossing,number_crossings,node,k);
+    /*
+      Find the value of the peak.
+    */
+    peak=zero_crossing[k].crossings[node->right] == -1 ? MagickTrue :
+      MagickFalse;
+    index=FindPeakIndex(zero_crossing,k,node,peak);
+    SetNodeExtrema(extrema,node,index,peak);
+  }
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
@@ -1843,13 +2003,12 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     *second_derivative,
     tau;
 
+  ActiveNodeInputs
+    inputs;
+
   IntervalTree
     **list,
-    *node,
     *root;
-
-  MagickBooleanType
-    peak;
 
   ssize_t
     i;
@@ -1859,9 +2018,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     number_crossings;
 
   ssize_t
-    index,
     j,
-    k,
     number_nodes;
 
   ZeroCrossing
@@ -1944,24 +2101,11 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
   /*
     Initialize extrema.
   */
-  for (i=0; i <= 255; i++)
-    extrema[i]=0;
-  for (i=0; i < number_nodes; i++)
-  {
-    /*
-      Find this tau in zero crossings list.
-    */
-    k=0;
-    node=list[i];
-    k=FindTauIndex(zero_crossing,number_crossings,node,k);
-    /*
-      Find the value of the peak.
-    */
-    peak=zero_crossing[k].crossings[node->right] == -1 ? MagickTrue :
-      MagickFalse;
-    index=FindPeakIndex(zero_crossing,k,node,peak);
-    SetNodeExtrema(extrema,node,index,peak);
-  }
+  inputs.list=list;
+  inputs.number_nodes=number_nodes;
+  inputs.zero_crossing=zero_crossing;
+  inputs.number_crossings=number_crossings;
+  SetActiveNodeExtrema(&inputs,extrema);
   /*
     Determine the average tau.
   */
@@ -2089,6 +2233,30 @@ static void ScaleSpace(const ssize_t *histogram,const double tau,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType AcquireSegmentHistograms(const Image *image,
+  ssize_t **histogram,short **extrema,ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < MaxDimension; i++)
+  {
+    histogram[i]=(ssize_t *) AcquireQuantumMemory(256,sizeof(**histogram));
+    extrema[i]=(short *) AcquireQuantumMemory(256,sizeof(**extrema));
+    if ((histogram[i] == (ssize_t *) NULL) || (extrema[i] == (short *) NULL))
+      {
+        for (i-- ; i >= 0; i--)
+        {
+          extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
+          histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
+        }
+        ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+          image->filename)
+      }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SegmentImage(Image *image,
   const ColorspaceType colorspace,const MagickBooleanType verbose,
   const double cluster_threshold,const double smooth_threshold,
@@ -2119,21 +2287,9 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  for (i=0; i < MaxDimension; i++)
-  {
-    histogram[i]=(ssize_t *) AcquireQuantumMemory(256,sizeof(**histogram));
-    extrema[i]=(short *) AcquireQuantumMemory(256,sizeof(**extrema));
-    if ((histogram[i] == (ssize_t *) NULL) || (extrema[i] == (short *) NULL))
-      {
-        for (i-- ; i >= 0; i--)
-        {
-          extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
-          histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
-        }
-        ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-          image->filename)
-      }
-  }
+  if (AcquireSegmentHistograms(image,histogram,extrema,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   /*
     Initialize histogram.
   */

@@ -788,6 +788,10 @@ static MagickBooleanType TranslateExpression
 
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe);
 
+static MagickBooleanType GetOperand (
+  FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
+  MagickBooleanType * needPopAll);
+
 static inline MagickBooleanType IsHslOrIntensityChannel(const PixelChannel pc)
 {
   return((pc==HUE_CHANNEL || pc==SAT_CHANNEL || pc==LIGHT_CHANNEL ||
@@ -1741,6 +1745,44 @@ static MagickBooleanType GetPropertySeconds (FxInfo * pfx, char ** text,
   return(MagickTrue);
 }
 
+static MagickBooleanType CountPropertyBracket (const char * p, int * level)
+{
+  if (*p == '[') (*level)++;
+  else if (*p == ']') {
+    if (*level == 0) return(MagickFalse);
+    (*level)--;
+  }
+  return(MagickTrue);
+}
+
+static void ScanPropertyBrackets (int * level, char ** p)
+{
+  while (**p) {
+
+    if (CountPropertyBracket (*p, &(*level)) == MagickFalse)
+      break;
+    (*p)++;
+  }
+}
+
+static MagickBooleanType GetPropertyNumber (FxInfo * pfx,
+  const char * sProperty, char ** text, fxFltType *val)
+{
+  char * tailptr;
+
+  *val = strtold (*text, &tailptr);
+  if (*text == tailptr) {
+    *text = DestroyString(*text);
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Property", "'%s' text '%s' is not a number at '%s'",
+      sProperty, *text, SetShortExp(pfx));
+    *text = DestroyString(*text);
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
 /* Returns number of characters to swallow.
    Returns "-1" means invalid input.
@@ -1759,15 +1801,7 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
     return 0;
   p = pfx->pex + 2;
 
-  while (*p) {
-
-    if (*p == '[') level++;
-    else if (*p == ']') {
-      if (level == 0) break;
-      level--;
-    }
-    p++;
-  }
+  ScanPropertyBrackets (&level, &p);
   if (!*p || level != 0) {
     (void) ThrowMagickException (
       pfx->exception, GetMagickModule(), OptionError,
@@ -1788,7 +1822,6 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
   (void) CopyMagickString (sProperty, pfx->pex, len+1);
   sProperty[len] = '\0';
   {
-    char * tailptr;
     char * text;
     text = InterpretImageProperties (pfx->image->image_info, pfx->image,
        sProperty, pfx->exception);
@@ -1804,18 +1837,8 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
     if (seconds != NULL) {
       if (GetPropertySeconds (pfx, &text, val, seconds) == MagickFalse)
         return -1;
-    } else {
-      *val = strtold (text, &tailptr);
-      if (text == tailptr) {
-        text = DestroyString(text);
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Property", "'%s' text '%s' is not a number at '%s'",
-          sProperty, text, SetShortExp(pfx));
-        text = DestroyString(text);
-        return -1;
-      }
-    }
+    } else if (GetPropertyNumber (pfx, sProperty, &text, val) == MagickFalse)
+      return -1;
     text = DestroyString(text);
   }
   return ((ssize_t) len);
@@ -2151,6 +2174,58 @@ static MagickBooleanType CheckAttrChannelQualifier (FxInfo * pfx,
   return MagickTrue;
 }
 
+typedef struct _CoordQualifierTargets
+{
+  FunctionE
+    *fe;
+
+  const char
+    **funStr;
+
+  PixelChannel
+    *chQual;
+
+  char
+    *expChLimit;
+} CoordQualifierTargets;
+
+static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
+  const MagickBooleanType coordQual,const CoordQualifierTargets *targets)
+{
+  FunctionE
+    *const fe = targets->fe;
+
+  const char
+    **const funStr = targets->funStr;
+
+  PixelChannel
+    *const chQual = targets->chQual;
+
+  char
+    *const expChLimit = targets->expChLimit;
+
+  if (coordQual) {
+
+    /* Remove last element, which should be fP */
+    ElementT * pel = &pfx->Elements[pfx->usedElements-1];
+    if (pel->operator_index != fP) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Bug: For function", "'%s' last element not 'p' at '%s'",
+        *funStr, SetShortExp(pfx));
+      return(MagickFalse);
+    }
+    *chQual = pel->channel_qual;
+    *expChLimit = (pel->is_relative) ? ']' : '}';
+    pfx->usedElements--;
+    if (*fe == fU) *fe = fUP;
+    else if (*fe == fV) *fe = fVP;
+    else if (*fe == fS) *fe = fSP;
+    *funStr = Functions[*fe-(int) FirstFunc].str;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2366,27 +2441,16 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
     if (IsCoordFunction(fe) != MagickFalse) {
 
+      CoordQualifierTargets targets;
+
       coordQual = (GetCoordQualifier (pfx, (int) fe) == 1) ? MagickTrue : MagickFalse;
 
-      if (coordQual) {
-
-        /* Remove last element, which should be fP */
-        ElementT * pel = &pfx->Elements[pfx->usedElements-1];
-        if (pel->operator_index != fP) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Bug: For function", "'%s' last element not 'p' at '%s'",
-            funStr, SetShortExp(pfx));
-          return MagickFalse;
-        }
-        chQual = pel->channel_qual;
-        expChLimit = (pel->is_relative) ? ']' : '}';
-        pfx->usedElements--;
-        if (fe == fU) fe = fUP;
-        else if (fe == fV) fe = fVP;
-        else if (fe == fS) fe = fSP;
-        funStr = Functions[fe-(int) FirstFunc].str;
-      }
+      targets.fe=(&fe);
+      targets.funStr=(&funStr);
+      targets.chQual=(&chQual);
+      targets.expChLimit=(&expChLimit);
+      if (ApplyCoordQualifier (pfx, coordQual, &targets) == MagickFalse)
+        return MagickFalse;
     }
 
     if (IsUnqualifiedPixelFunction(chQual,fe) != MagickFalse)
@@ -2614,6 +2678,121 @@ static MagickBooleanType AddArtifactOperand (FxInfo * pfx, const char * artifact
   return MagickTrue;
 }
 
+static SymbolE FindSymbolToken (FxInfo * pfx)
+{
+  SymbolE se;
+  for (se = FirstSym; se < sNull; se=(SymbolE) (se+1)) {
+    const char * seStr = Symbols[se-(int) FirstSym].str;
+    if (LocaleCompare (seStr, pfx->token)==0) {
+      break;
+    }
+  }
+  return(se);
+}
+
+static MagickBooleanType NotASymbolOperand (FxInfo * pfx)
+{
+  SymbolE se;
+  se = FindSymbolToken (pfx);
+  if (se != sNull) {
+    fxFltType val = 0;
+    (void) AddElement (pfx, val, (int) se);
+    pfx->pex += pfx->lenToken;
+
+    if (IsHslSymbol(se) != MagickFalse) pfx->NeedHsl = MagickTrue;
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType NotAUserSymbolOperand (FxInfo * pfx,
+  MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol,
+  int * UserSymNdx)
+{
+  if (TokenMaybeUserSymbol (pfx)) {
+    *UserSymbol = MagickTrue;
+    *UserSymNdx = FindUserSymbol (pfx, pfx->token);
+    if (*UserSymNdx == NULL_ADDRESS) {
+      *UserSymNdx = AddUserSymbol (pfx, pfx->pex, pfx->lenToken);
+      *NewUserSymbol = MagickTrue;
+    } else {
+    }
+    pfx->pex += pfx->lenToken;
+
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+typedef struct _OperandSymbols
+{
+  MagickBooleanType
+    *UserSymbol,
+    *NewUserSymbol;
+
+  int
+    *UserSymNdx;
+
+  MagickBooleanType
+    *needPopAll;
+} OperandSymbols;
+
+static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
+  const OperandSymbols * symbols)
+{
+  MagickBooleanType
+    *const UserSymbol = symbols->UserSymbol,
+    *const NewUserSymbol = symbols->NewUserSymbol;
+
+  int
+    *const UserSymNdx = symbols->UserSymNdx;
+
+  MagickBooleanType
+    *const needPopAll = symbols->needPopAll;
+
+  MagickBooleanType operand_ok;
+  if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
+  pfx->pex++;
+  SkipSpaces (pfx);
+  if (!*pfx->pex) return MagickFalse;
+  if (pfx->teDepth >= MagickMaxRecursionDepth) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Expression too deeply nested", "(depth %i exceeds limit %i)",
+      pfx->teDepth, MagickMaxRecursionDepth);
+    return MagickFalse;
+  }
+  pfx->teDepth++;
+  operand_ok=GetOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx, needPopAll);
+  pfx->teDepth--;
+  if (!operand_ok) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "After unary, bad operand at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+
+  if (*NewUserSymbol) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "After unary, NewUserSymbol at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+
+  if (*UserSymbol) {
+    (void) AddAddressingElement (pfx, rCopyFrom, *UserSymNdx);
+    *UserSymNdx = NULL_ADDRESS;
+
+    *UserSymbol = MagickFalse;
+    *NewUserSymbol = MagickFalse;
+  }
+
+  (void) GetToken (pfx);
+  return MagickTrue;
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
   MagickBooleanType * needPopAll)
@@ -2634,47 +2813,14 @@ static MagickBooleanType GetOperand (
     if (op==oOpenParen) {
       return (GetParenthesisedOperand (pfx, op, needPopAll));
     } else if (OprIsUnaryPrefix (op)) {
-      MagickBooleanType operand_ok;
-      if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
-      pfx->pex++;
-      SkipSpaces (pfx);
-      if (!*pfx->pex) return MagickFalse;
-      if (pfx->teDepth >= MagickMaxRecursionDepth) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Expression too deeply nested", "(depth %i exceeds limit %i)",
-          pfx->teDepth, MagickMaxRecursionDepth);
-        return MagickFalse;
-      }
-      pfx->teDepth++;
-      operand_ok=GetOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx, needPopAll);
-      pfx->teDepth--;
-      if (!operand_ok) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "After unary, bad operand at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
+      OperandSymbols
+        symbols;
 
-      if (*NewUserSymbol) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "After unary, NewUserSymbol at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-
-      if (*UserSymbol) {
-        (void) AddAddressingElement (pfx, rCopyFrom, *UserSymNdx);
-        *UserSymNdx = NULL_ADDRESS;
-
-        *UserSymbol = MagickFalse;
-        *NewUserSymbol = MagickFalse;
-      }
-
-      (void) GetToken (pfx);
-      return MagickTrue;
+      symbols.UserSymbol=UserSymbol;
+      symbols.NewUserSymbol=NewUserSymbol;
+      symbols.UserSymNdx=UserSymNdx;
+      symbols.needPopAll=needPopAll;
+      return (GetUnaryPrefixOperand (pfx, op, &symbols));
     } else if (*pfx->pex == '#') {
       return (GetHexColourOperand (pfx));
     }
@@ -2769,23 +2915,8 @@ static MagickBooleanType GetOperand (
 
     /* Try symbol
     */
-    {
-      SymbolE se;
-      for (se = FirstSym; se < sNull; se=(SymbolE) (se+1)) {
-        const char * seStr = Symbols[se-(int) FirstSym].str;
-        if (LocaleCompare (seStr, pfx->token)==0) {
-          break;
-        }
-      }
-      if (se != sNull) {
-        fxFltType val = 0;
-        (void) AddElement (pfx, val, (int) se);
-        pfx->pex += pfx->lenToken;
-
-        if (IsHslSymbol(se) != MagickFalse) pfx->NeedHsl = MagickTrue;
-        return MagickTrue;
-      }
-    }
+    if (NotASymbolOperand (pfx) == MagickFalse)
+      return MagickTrue;
 
     /* Try constant colour.
     */
@@ -2812,18 +2943,9 @@ static MagickBooleanType GetOperand (
 
     /* Try user symbols. If it is, don't AddElement yet.
     */
-    if (TokenMaybeUserSymbol (pfx)) {
-      *UserSymbol = MagickTrue;
-      *UserSymNdx = FindUserSymbol (pfx, pfx->token);
-      if (*UserSymNdx == NULL_ADDRESS) {
-        *UserSymNdx = AddUserSymbol (pfx, pfx->pex, pfx->lenToken);
-        *NewUserSymbol = MagickTrue;
-      } else {
-      }
-      pfx->pex += pfx->lenToken;
-
+    if (NotAUserSymbolOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx) ==
+        MagickFalse)
       return MagickTrue;
-    }
   }
 
   (void) ThrowMagickException (

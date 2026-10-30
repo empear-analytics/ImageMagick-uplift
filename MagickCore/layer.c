@@ -304,6 +304,61 @@ static RectangleInfo ClipBoundsBottom(RectangleInfo bounds,
   return(bounds);
 }
 
+static void SetCoalescedDispose(const Image *previous,Image *coalesce_image,
+  RectangleInfo *bounds,ExceptionInfo *exception)
+{
+  if (IsBoundsCleared(previous,coalesce_image,bounds,exception) != MagickFalse)
+    coalesce_image->dispose=BackgroundDispose;
+  else
+    coalesce_image->dispose=NoneDispose;
+}
+
+static MagickBooleanType ReplaceDisposeImage(const Image *next,
+  const Image *coalesce_image,Image **dispose_image,ExceptionInfo *exception)
+{
+  if (GetPreviousImageInList(next)->dispose != PreviousDispose)
+    {
+      *dispose_image=DestroyImage(*dispose_image);
+      *dispose_image=CloneImage(coalesce_image,0,0,MagickTrue,exception);
+      if (*dispose_image == (Image *) NULL)
+        return(MagickFalse);
+      (*dispose_image)->background_color.alpha_trait=BlendPixelTrait;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireCoalesceCanvas(Image *next,
+  const RectangleInfo bounds,Image **coalesce_image,ExceptionInfo *exception)
+{
+  *coalesce_image=CloneImage(next,bounds.width,bounds.height,MagickTrue,
+    exception);
+  if (*coalesce_image == (Image *) NULL)
+    return(MagickFalse);
+  (*coalesce_image)->background_color.alpha_trait=BlendPixelTrait;
+  (*coalesce_image)->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(*coalesce_image,exception);
+  (*coalesce_image)->alpha_trait=next->alpha_trait;
+  (*coalesce_image)->page=bounds;
+  (*coalesce_image)->dispose=NoneDispose;
+  return(MagickTrue);
+}
+
+static RectangleInfo GetClippedFrameBounds(const Image *previous,
+  const Image *coalesce_image)
+{
+  RectangleInfo
+    bounds;
+
+  bounds=previous->page;
+  bounds.width=previous->columns;
+  bounds.height=previous->rows;
+  bounds=ClipBoundsLeft(bounds);
+  bounds=ClipBoundsRight(bounds,coalesce_image);
+  bounds=ClipBoundsTop(bounds);
+  bounds=ClipBoundsBottom(bounds,coalesce_image);
+  return(bounds);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -332,16 +387,9 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
   bounds.height=GetCanvasExtent(bounds.height,next->rows,bounds.y);
   bounds.x=0;
   bounds.y=0;
-  coalesce_image=CloneImage(next,bounds.width,bounds.height,MagickTrue,
-    exception);
-  if (coalesce_image == (Image *) NULL)
+  if (AcquireCoalesceCanvas(next,bounds,&coalesce_image,exception) ==
+      MagickFalse)
     return((Image *) NULL);
-  coalesce_image->background_color.alpha_trait=BlendPixelTrait;
-  coalesce_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(coalesce_image,exception);
-  coalesce_image->alpha_trait=next->alpha_trait;
-  coalesce_image->page=bounds;
-  coalesce_image->dispose=NoneDispose;
   /*
     Coalesce rest of the images.
   */
@@ -364,26 +412,15 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
       Determine the bounds that was overlaid in the previous image.
     */
     previous=GetPreviousImageInList(next);
-    bounds=previous->page;
-    bounds.width=previous->columns;
-    bounds.height=previous->rows;
-    bounds=ClipBoundsLeft(bounds);
-    bounds=ClipBoundsRight(bounds,coalesce_image);
-    bounds=ClipBoundsTop(bounds);
-    bounds=ClipBoundsBottom(bounds,coalesce_image);
+    bounds=GetClippedFrameBounds(previous,coalesce_image);
     /*
       Replace the dispose image with the new coalesced image.
     */
-    if (GetPreviousImageInList(next)->dispose != PreviousDispose)
+    if (ReplaceDisposeImage(next,coalesce_image,&dispose_image,exception) ==
+        MagickFalse)
       {
-        dispose_image=DestroyImage(dispose_image);
-        dispose_image=CloneImage(coalesce_image,0,0,MagickTrue,exception);
-        if (dispose_image == (Image *) NULL)
-          {
-            coalesce_image=DestroyImageList(coalesce_image);
-            return((Image *) NULL);
-          }
-        dispose_image->background_color.alpha_trait=BlendPixelTrait;
+        coalesce_image=DestroyImageList(coalesce_image);
+        return((Image *) NULL);
       }
     /*
       Clear the overlaid area of the coalesced bounds for background disposal
@@ -408,10 +445,7 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     /*
       If a pixel goes opaque to transparent, use background dispose.
     */
-    if (IsBoundsCleared(previous,coalesce_image,&bounds,exception) != MagickFalse)
-      coalesce_image->dispose=BackgroundDispose;
-    else
-      coalesce_image->dispose=NoneDispose;
+    SetCoalescedDispose(previous,coalesce_image,&bounds,exception);
     previous->dispose=coalesce_image->dispose;
   }
   dispose_image=DestroyImage(dispose_image);
@@ -444,6 +478,53 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *SelectDisposeImage(const Image *next,Image *dispose_image,
+  Image *current_image)
+{
+  if (next->dispose == PreviousDispose)
+    current_image=DestroyImage(current_image);
+  else
+    {
+      dispose_image=DestroyImage(dispose_image);
+      dispose_image=current_image;
+      current_image=(Image *) NULL;
+    }
+  return(dispose_image);
+}
+
+static MagickBooleanType CloneDisposeFrame(Image *dispose_image,
+  const Image *next,Image **dispose,ExceptionInfo *exception)
+{
+  *dispose=CloneImage(dispose_image,0,0,MagickTrue,exception);
+  if (*dispose == (Image *) NULL)
+    return(MagickFalse);
+  dispose_image->background_color.alpha_trait=BlendPixelTrait;
+  (void) CloneImageProfiles(*dispose,next);
+  (void) CloneImageProperties(*dispose,next);
+  (void) CloneImageArtifacts(*dispose,next);
+  (*dispose)->page.x=0;
+  (*dispose)->page.y=0;
+  (*dispose)->dispose=next->dispose;
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireDisposeCanvas(const Image *image,
+  Image **dispose_image,ExceptionInfo *exception)
+{
+  *dispose_image=CloneImage(image,image->page.width,image->page.height,
+    MagickTrue,exception);
+  if (*dispose_image == (Image *) NULL)
+    return(MagickFalse);
+  (*dispose_image)->page=image->page;
+  (*dispose_image)->page.x=0;
+  (*dispose_image)->page.y=0;
+  (*dispose_image)->dispose=NoneDispose;
+  (*dispose_image)->background_color.alpha_trait=BlendPixelTrait;
+  (*dispose_image)->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(*dispose_image,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
 {
   Image
@@ -467,17 +548,8 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   image=GetFirstImageInList(images);
-  dispose_image=CloneImage(image,image->page.width,image->page.height,
-    MagickTrue,exception);
-  if (dispose_image == (Image *) NULL)
+  if (AcquireDisposeCanvas(image,&dispose_image,exception) == MagickFalse)
     return((Image *) NULL);
-  dispose_image->page=image->page;
-  dispose_image->page.x=0;
-  dispose_image->page.y=0;
-  dispose_image->dispose=NoneDispose;
-  dispose_image->background_color.alpha_trait=BlendPixelTrait;
-  dispose_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(dispose_image,exception);
   dispose_images=NewImageList();
   for (next=image; image != (Image *) NULL; image=GetNextImageInList(image))
   {
@@ -515,14 +587,7 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
     /*
       Select the appropriate previous/disposed image.
     */
-    if (next->dispose == PreviousDispose)
-      current_image=DestroyImage(current_image);
-    else
-      {
-        dispose_image=DestroyImage(dispose_image);
-        dispose_image=current_image;
-        current_image=(Image *) NULL;
-      }
+    dispose_image=SelectDisposeImage(next,dispose_image,current_image);
     /*
       Save the dispose image just calculated for return.
     */
@@ -530,20 +595,13 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
       Image
         *dispose;
 
-      dispose=CloneImage(dispose_image,0,0,MagickTrue,exception);
-      if (dispose == (Image *) NULL)
+      if (CloneDisposeFrame(dispose_image,next,&dispose,exception) ==
+          MagickFalse)
         {
           dispose_images=DestroyImageList(dispose_images);
           dispose_image=DestroyImage(dispose_image);
           return((Image *) NULL);
         }
-      dispose_image->background_color.alpha_trait=BlendPixelTrait;
-      (void) CloneImageProfiles(dispose,next);
-      (void) CloneImageProperties(dispose,next);
-      (void) CloneImageArtifacts(dispose,next);
-      dispose->page.x=0;
-      dispose->page.y=0;
-      dispose->dispose=next->dispose;
       AppendImageToList(&dispose_images,dispose);
     }
   }
@@ -582,6 +640,15 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
 %
 */
 
+static MagickBooleanType IsOverlayPixelChanged(const double o2,
+  const PixelInfo *p,const PixelInfo *q)
+{
+  if (o2 < ((double) QuantumRange/2.0))
+    return MagickFalse;
+  return(IsFuzzyEquivalencePixelInfo(p,q) == MagickFalse ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType ComparePixels(const LayerMethod method,
   const PixelInfo *p,const PixelInfo *q)
 {
@@ -608,12 +675,7 @@ static MagickBooleanType ComparePixels(const LayerMethod method,
     Overlay would change first pixel by second.
   */
   if (method == CompareOverlayLayer)
-    {
-      if (o2 < ((double) QuantumRange/2.0))
-        return MagickFalse;
-      return(IsFuzzyEquivalencePixelInfo(p,q) == MagickFalse ? MagickTrue :
-        MagickFalse);
-    }
+    return(IsOverlayPixelChanged(o2,p,q));
   return(MagickFalse);
 }
 
@@ -1138,14 +1200,221 @@ static Image *OptimizeImageFrames(const Image *image,RectangleInfo *bounds,
   return(GetFirstImageInList(optimized_image));
 }
 
+static Image *DestroyImageIfSet(Image *image)
+{
+  if (image != (Image *) NULL)
+    image=DestroyImage(image);
+  return(image);
+}
+
+static MagickBooleanType ReferenceNoneDisposeImage(
+  const DisposeType *disposals,const ssize_t i,const Image *curr,
+  Image **prev_image)
+{
+  if ( disposals[i-1] == NoneDispose )
+    {
+      *prev_image=ReferenceImage(curr->previous);
+      if (*prev_image == (Image *) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _DuplicateFrameTrial
+{
+  MagickBooleanType
+    add_frames;
+
+  const Image
+    *curr;
+
+  RectangleInfo
+    *bounds;
+
+  DisposeType
+    *disposals;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} DuplicateFrameTrial;
+
+typedef struct _DuplicateFrameTargets
+{
+  Image
+    **dup_image;
+
+  RectangleInfo
+    *dup_bounds;
+
+  MagickBooleanType
+    *cleared;
+} DuplicateFrameTargets;
+
+static MagickBooleanType TryDuplicateFrame(const DuplicateFrameTrial *trial,
+  const DuplicateFrameTargets *targets)
+{
+  const MagickBooleanType
+    add_frames = trial->add_frames;
+
+  const Image
+    *const curr = trial->curr;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  const ssize_t
+    i = trial->i;
+
+  ExceptionInfo
+    *const exception = trial->exception;
+
+  Image
+    **const dup_image = targets->dup_image;
+
+  RectangleInfo
+    *const dup_bounds = targets->dup_bounds;
+
+  MagickBooleanType
+    *const cleared = targets->cleared;
+
+  RectangleInfo
+    try_bounds;
+
+if ( add_frames )
+  {
+    *dup_image=CloneImage(curr->previous,0,0,MagickTrue,exception);
+    if (*dup_image == (Image *) NULL)
+      return(MagickFalse);
+    (*dup_image)->background_color.alpha_trait=BlendPixelTrait;
+    *dup_bounds=CompareImagesBounds(*dup_image,curr,CompareClearLayer,exception);
+    ClearBounds(*dup_image,dup_bounds,exception);
+    try_bounds=CompareImagesBounds(*dup_image,curr,CompareAnyLayer,exception);
+    if ( *cleared ||
+           (*dup_bounds).width*(*dup_bounds).height
+              +try_bounds.width*try_bounds.height
+           < bounds[i].width * bounds[i].height )
+      {
+        *cleared=MagickFalse;
+        bounds[i]=try_bounds;
+        disposals[i-1]=DupDispose;
+        /* to be finalised later, if found to be optimal */
+      }
+    else
+      (*dup_bounds).width=(*dup_bounds).height=0;
+  }
+  return(MagickTrue);
+}
+
+static Image *DestroyDuplicateImage(const DisposeType *disposals,
+  const ssize_t i,Image *dup_image)
+{
+  if ( disposals[i-1] == DupDispose )
+    dup_image=DestroyImage(dup_image);
+  return(dup_image);
+}
+
+typedef struct _DisposeChoice
+{
+  const Image
+    *curr;
+
+  RectangleInfo
+    *bounds;
+
+  DisposeType
+    *disposals;
+
+  RectangleInfo
+    dup_bounds;
+} DisposeChoice;
+
+typedef struct _DisposeChoiceTargets
+{
+  Image
+    **bgnd_image,
+    **prev_image,
+    **dup_image;
+
+  ssize_t
+    *i;
+} DisposeChoiceTargets;
+
+static MagickBooleanType FinaliseDisposeChoice(const DisposeChoice *choice,
+  const DisposeChoiceTargets *targets)
+{
+  const Image
+    *const curr = choice->curr;
+
+  RectangleInfo
+    *const bounds = choice->bounds;
+
+  DisposeType
+    *const disposals = choice->disposals;
+
+  const RectangleInfo
+    dup_bounds = choice->dup_bounds;
+
+  Image
+    **const bgnd_image = targets->bgnd_image,
+    **const prev_image = targets->prev_image,
+    **const dup_image = targets->dup_image;
+
+  ssize_t
+    *const i = targets->i;
+
+  if ( disposals[*i-1] == DupDispose )
+    {
+       *bgnd_image=DestroyImageIfSet(*bgnd_image);
+       *prev_image=DestroyImage(*prev_image);
+       *prev_image=*dup_image, *dup_image=(Image *) NULL;
+       bounds[*i+1]=bounds[*i];
+       bounds[*i]=dup_bounds;
+       disposals[*i-1]=DupDispose;
+       disposals[*i]=BackgroundDispose;
+       (*i)++;
+    }
+  else
+    {
+      *dup_image=DestroyImageIfSet(*dup_image);
+      if ( disposals[*i-1] != PreviousDispose )
+        *prev_image=DestroyImage(*prev_image);
+      if ( disposals[*i-1] == BackgroundDispose )
+        *prev_image=*bgnd_image, *bgnd_image=(Image *) NULL;
+      *bgnd_image=DestroyImageIfSet(*bgnd_image);
+      if (ReferenceNoneDisposeImage(disposals,*i,curr,prev_image) ==
+          MagickFalse)
+        return(MagickFalse);
+
+    }
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
   const Image
     *curr;
 
+  DisposeChoice
+    choice;
+
+  DisposeChoiceTargets
+    choice_targets;
+
   DisposeType
     *disposals;
+
+  DuplicateFrameTargets
+    targets;
+
+  DuplicateFrameTrial
+    trial;
 
   Image
     *prev_image,
@@ -1316,32 +1585,21 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
           This method will always clear all the pixels that need to be cleared.
         */
         dup_bounds.width=dup_bounds.height=0; /* no dup, no pixel added */
-        if ( add_frames )
+        trial.add_frames=add_frames;
+        trial.curr=curr;
+        trial.bounds=bounds;
+        trial.disposals=disposals;
+        trial.i=i;
+        trial.exception=exception;
+        targets.dup_image=(&dup_image);
+        targets.dup_bounds=(&dup_bounds);
+        targets.cleared=(&cleared);
+        if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
           {
-            dup_image=CloneImage(curr->previous,0,0,MagickTrue,exception);
-            if (dup_image == (Image *) NULL)
-              {
-                bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-                disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-                prev_image=DestroyImage(prev_image);
-                return((Image *) NULL);
-              }
-            dup_image->background_color.alpha_trait=BlendPixelTrait;
-            dup_bounds=CompareImagesBounds(dup_image,curr,CompareClearLayer,exception);
-            ClearBounds(dup_image,&dup_bounds,exception);
-            try_bounds=CompareImagesBounds(dup_image,curr,CompareAnyLayer,exception);
-            if ( cleared ||
-                   dup_bounds.width*dup_bounds.height
-                      +try_bounds.width*try_bounds.height
-                   < bounds[i].width * bounds[i].height )
-              {
-                cleared=MagickFalse;
-                bounds[i]=try_bounds;
-                disposals[i-1]=DupDispose;
-                /* to be finalised later, if found to be optimal */
-              }
-            else
-              dup_bounds.width=dup_bounds.height=0;
+            bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+            disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+            prev_image=DestroyImage(prev_image);
+            return((Image *) NULL);
           }
         /*
           Now compare against a simple background disposal
@@ -1352,8 +1610,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
             bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
             disposals=(DisposeType *) RelinquishMagickMemory(disposals);
             prev_image=DestroyImage(prev_image);
-            if ( dup_image != (Image *) NULL)
-              dup_image=DestroyImage(dup_image);
+            dup_image=DestroyImageIfSet(dup_image);
             return((Image *) NULL);
           }
         bgnd_image->background_color.alpha_trait=BlendPixelTrait;
@@ -1424,8 +1681,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
             cleared=MagickFalse;
             bounds[i-1]=bgnd_bounds;
             bounds[i]=try_bounds;
-            if ( disposals[i-1] == DupDispose )
-              dup_image=DestroyImage(dup_image);
+            dup_image=DestroyDuplicateImage(disposals,i,dup_image);
             disposals[i-1]=BackgroundDispose;
 #if DEBUG_OPT_FRAME
     (void) FormatLocaleFile(stderr,"expand_bgnd: accepted\n");
@@ -1438,39 +1694,19 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
        Finalise choice of dispose, set new prev_image,
        and junk any extra images as appropriate,
     */
-    if ( disposals[i-1] == DupDispose )
+    choice.curr=curr;
+    choice.bounds=bounds;
+    choice.disposals=disposals;
+    choice.dup_bounds=dup_bounds;
+    choice_targets.bgnd_image=(&bgnd_image);
+    choice_targets.prev_image=(&prev_image);
+    choice_targets.dup_image=(&dup_image);
+    choice_targets.i=(&i);
+    if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
       {
-         if (bgnd_image != (Image *) NULL)
-           bgnd_image=DestroyImage(bgnd_image);
-         prev_image=DestroyImage(prev_image);
-         prev_image=dup_image, dup_image=(Image *) NULL;
-         bounds[i+1]=bounds[i];
-         bounds[i]=dup_bounds;
-         disposals[i-1]=DupDispose;
-         disposals[i]=BackgroundDispose;
-         i++;
-      }
-    else
-      {
-        if ( dup_image != (Image *) NULL)
-          dup_image=DestroyImage(dup_image);
-        if ( disposals[i-1] != PreviousDispose )
-          prev_image=DestroyImage(prev_image);
-        if ( disposals[i-1] == BackgroundDispose )
-          prev_image=bgnd_image, bgnd_image=(Image *) NULL;
-        if (bgnd_image != (Image *) NULL)
-          bgnd_image=DestroyImage(bgnd_image);
-        if ( disposals[i-1] == NoneDispose )
-          {
-            prev_image=ReferenceImage(curr->previous);
-            if (prev_image == (Image *) NULL)
-              {
-                bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-                disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-                return((Image *) NULL);
-              }
-          }
-
+        bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+        disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+        return((Image *) NULL);
       }
     assert(prev_image != (Image *) NULL);
     disposals[i]=disposals[i-1];
@@ -1593,6 +1829,19 @@ MagickExport Image *OptimizePlusImageLayers(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *KeepDisposedImage(const Image *next,Image *dispose_image,
+  Image *current_image)
+{
+  if (next->dispose != PreviousDispose)
+    {
+      dispose_image=DestroyImage(dispose_image);
+      dispose_image=current_image;
+    }
+  else
+    current_image=DestroyImage(current_image);
+  return(dispose_image);
+}
+
 MagickExport void OptimizeImageTransparency(const Image *image,
      ExceptionInfo *exception)
 {
@@ -1660,13 +1909,7 @@ MagickExport void OptimizeImageTransparency(const Image *image,
         bounds=ClipBoundsBottom(bounds,current_image);
         ClearBounds(current_image,&bounds,exception);
       }
-    if (next->dispose != PreviousDispose)
-      {
-        dispose_image=DestroyImage(dispose_image);
-        dispose_image=current_image;
-      }
-    else
-      current_image=DestroyImage(current_image);
+    dispose_image=KeepDisposedImage(next,dispose_image,current_image);
 
     /*
       Optimize Transparency of the next frame (if present)
@@ -1917,6 +2160,105 @@ static inline void CompositeCanvas(Image *destination,
     MagickFalse : MagickTrue,x_offset,y_offset,exception);
 }
 
+typedef struct _LayerCompositeInfo
+{
+  CompositeOperator
+    compose;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} LayerCompositeInfo;
+
+static void CompositeSourceListOverCanvas(Image *destination,Image *source,
+  const LayerCompositeInfo *composite)
+{
+  const CompositeOperator
+    compose = composite->compose;
+
+  const ssize_t
+    x_offset = composite->x_offset,
+    y_offset = composite->y_offset;
+
+  ExceptionInfo
+    *const exception = composite->exception;
+
+  Image *dest = CloneImage(destination,0,0,MagickTrue,exception);
+
+  if (dest != (Image *) NULL)
+    {
+      dest->background_color.alpha_trait=BlendPixelTrait;
+      CompositeCanvas(destination, compose, source, x_offset, y_offset,
+        exception);
+      /* copy source image attributes ? */
+      if ( source->next != (Image *) NULL )
+        {
+          destination->delay=source->delay;
+          destination->iterations=source->iterations;
+        }
+      source=GetNextImageInList(source);
+      while (source != (Image *) NULL)
+      {
+        AppendImageToList(&destination,
+          CloneImage(dest,0,0,MagickTrue,exception));
+        destination->background_color.alpha_trait=BlendPixelTrait;
+        destination=GetLastImageInList(destination);
+        CompositeCanvas(destination,compose,source,x_offset,y_offset,
+          exception);
+        destination->delay=source->delay;
+        destination->iterations=source->iterations;
+        source=GetNextImageInList(source);
+      }
+      dest=DestroyImage(dest);
+    }
+}
+
+static void CompositeSourceOverList(Image *destination,Image *source,
+  const LayerCompositeInfo *composite)
+{
+  const CompositeOperator
+    compose = composite->compose;
+
+  const ssize_t
+    x_offset = composite->x_offset,
+    y_offset = composite->y_offset;
+
+  ExceptionInfo
+    *const exception = composite->exception;
+
+  while ( destination != (Image *) NULL )
+  {
+    CompositeCanvas(destination, compose, source, x_offset, y_offset,
+      exception);
+    destination=GetNextImageInList(destination);
+  }
+}
+
+static void CompositeSourceListOverList(Image *destination,Image *source,
+  const LayerCompositeInfo *composite)
+{
+  const CompositeOperator
+    compose = composite->compose;
+
+  const ssize_t
+    x_offset = composite->x_offset,
+    y_offset = composite->y_offset;
+
+  ExceptionInfo
+    *const exception = composite->exception;
+
+  while ( source != (Image *) NULL && destination != (Image *) NULL )
+  {
+    CompositeCanvas(destination, compose, source, x_offset, y_offset,
+      exception);
+    source=GetNextImageInList(source);
+    destination=GetNextImageInList(destination);
+  }
+}
+
 MagickExport void CompositeLayers(Image *destination,
   const CompositeOperator compose, Image *source,const ssize_t x_offset,
   const ssize_t y_offset,ExceptionInfo *exception)
@@ -1934,12 +2276,16 @@ MagickExport void CompositeLayers(Image *destination,
     Overlay single source image over destination image/list
   */
   if ( source->next == (Image *) NULL )
-    while ( destination != (Image *) NULL )
-    {
-      CompositeCanvas(destination, compose, source, x_offset, y_offset,
-        exception);
-      destination=GetNextImageInList(destination);
-    }
+  {
+    LayerCompositeInfo
+      composite;
+
+    composite.compose=compose;
+    composite.x_offset=x_offset;
+    composite.y_offset=y_offset;
+    composite.exception=exception;
+    CompositeSourceOverList(destination,source,&composite);
+  }
 
   /*
     Overlay source image list over single destination.
@@ -1950,34 +2296,14 @@ MagickExport void CompositeLayers(Image *destination,
   */
   else if ( destination->next == (Image *) NULL )
   {
-    Image *dest = CloneImage(destination,0,0,MagickTrue,exception);
+    LayerCompositeInfo
+      composite;
 
-    if (dest != (Image *) NULL)
-      {
-        dest->background_color.alpha_trait=BlendPixelTrait;
-        CompositeCanvas(destination, compose, source, x_offset, y_offset,
-          exception);
-        /* copy source image attributes ? */
-        if ( source->next != (Image *) NULL )
-          {
-            destination->delay=source->delay;
-            destination->iterations=source->iterations;
-          }
-        source=GetNextImageInList(source);
-        while (source != (Image *) NULL)
-        {
-          AppendImageToList(&destination,
-            CloneImage(dest,0,0,MagickTrue,exception));
-          destination->background_color.alpha_trait=BlendPixelTrait;
-          destination=GetLastImageInList(destination);
-          CompositeCanvas(destination,compose,source,x_offset,y_offset,
-            exception);
-          destination->delay=source->delay;
-          destination->iterations=source->iterations;
-          source=GetNextImageInList(source);
-        }
-        dest=DestroyImage(dest);
-      }
+    composite.compose=compose;
+    composite.x_offset=x_offset;
+    composite.y_offset=y_offset;
+    composite.exception=exception;
+    CompositeSourceListOverCanvas(destination,source,&composite);
   }
 
   /*
@@ -1985,13 +2311,16 @@ MagickExport void CompositeLayers(Image *destination,
     until either list runs out of images. (Does not repeat)
   */
   else
-    while ( source != (Image *) NULL && destination != (Image *) NULL )
-    {
-      CompositeCanvas(destination, compose, source, x_offset, y_offset,
-        exception);
-      source=GetNextImageInList(source);
-      destination=GetNextImageInList(destination);
-    }
+  {
+    LayerCompositeInfo
+      composite;
+
+    composite.compose=compose;
+    composite.x_offset=x_offset;
+    composite.y_offset=y_offset;
+    composite.exception=exception;
+    CompositeSourceListOverList(destination,source,&composite);
+  }
 }
 
 

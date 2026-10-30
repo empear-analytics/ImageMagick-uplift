@@ -141,6 +141,216 @@ static inline MagickBooleanType IsComplexRowMissing(const Quantum *Ar,
     MagickTrue : MagickFalse);
 }
 
+typedef struct _ComplexUnaryOperands
+{
+  ComplexOperator
+    op;
+
+  double
+    ai,
+    ar;
+} ComplexUnaryOperands;
+
+static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
+  double *cr,double *ci)
+{
+  const ComplexOperator
+    op = unary->op;
+
+  const double
+    ai = unary->ai,
+    ar = unary->ar;
+
+  switch (op)
+  {
+    case ConjugateComplexOperator:
+    default:
+    {
+      (*cr)=ar;
+      (*ci)=(-ai);
+      break;
+    }
+    case MagnitudePhaseComplexOperator:
+    {
+      (*cr)=sqrt(ar*ar+ai*ai);
+      (*ci)=atan2((double) ai,(double) ar)/(2.0*MagickPI)+0.5;
+      break;
+    }
+    case RealImaginaryComplexOperator:
+    {
+      (*cr)=ar*cos(2.0*MagickPI*(ai-0.5));
+      (*ci)=ar*sin(2.0*MagickPI*(ai-0.5));
+      break;
+    }
+  }
+}
+
+typedef struct _ComplexPixelOperands
+{
+  ComplexOperator
+    op;
+
+  double
+    ai,
+    ar,
+    bi,
+    br,
+    snr;
+} ComplexPixelOperands;
+
+static void ApplyComplexOperator(const ComplexPixelOperands *operands,
+  double *cr,double *ci)
+{
+  const ComplexOperator
+    op = operands->op;
+
+  const double
+    ai = operands->ai,
+    ar = operands->ar,
+    bi = operands->bi,
+    br = operands->br,
+    snr = operands->snr;
+
+  switch (op)
+  {
+    case AddComplexOperator:
+    {
+      (*cr)=ar+br;
+      (*ci)=ai+bi;
+      break;
+    }
+    default:
+    {
+      ComplexUnaryOperands
+        unary;
+
+      unary.op=op;
+      unary.ai=ai;
+      unary.ar=ar;
+      ApplyUnaryComplexOperator(&unary,&(*cr),&(*ci));
+      break;
+    }
+    case DivideComplexOperator:
+    {
+      (*cr)=MagickSafeReciprocal(br*br+bi*bi+snr)*(ar*br+ai*bi);
+      (*ci)=MagickSafeReciprocal(br*br+bi*bi+snr)*(ai*br-ar*bi);
+      break;
+    }
+    case MultiplyComplexOperator:
+    {
+      (*cr)=(ar*br-ai*bi);
+      (*ci)=(ai*br+ar*bi);
+      break;
+    }
+    case SubtractComplexOperator:
+    {
+      (*cr)=ar-br;
+      (*ci)=ai-bi;
+      break;
+    }
+  }
+}
+
+typedef struct _ComplexChannelOperands
+{
+  const Quantum
+    *Ai,
+    *Ar,
+    *Bi,
+    *Br;
+
+  Quantum
+    *Ci,
+    *Cr;
+
+  size_t
+    number_channels;
+
+  ComplexOperator
+    op;
+
+  double
+    snr;
+} ComplexChannelOperands;
+
+static void ApplyComplexOperatorToChannels(
+  const ComplexChannelOperands *channels)
+{
+  const Quantum
+    *const Ai = channels->Ai,
+    *const Ar = channels->Ar,
+    *const Bi = channels->Bi,
+    *const Br = channels->Br;
+
+  Quantum
+    *const Ci = channels->Ci,
+    *const Cr = channels->Cr;
+
+  const size_t
+    number_channels = channels->number_channels;
+
+  const ComplexOperator
+    op = channels->op;
+
+  const double
+    snr = channels->snr;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) number_channels; i++)
+  {
+    double
+      ai = QuantumScale*(double) Ai[i],
+      ar = QuantumScale*(double) Ar[i],
+      bi = QuantumScale*(double) Bi[i],
+      br = QuantumScale*(double) Br[i],
+      ci,
+      cr;
+
+    ComplexPixelOperands
+      operands;
+
+    operands.op=op;
+    operands.ai=ai;
+    operands.ar=ar;
+    operands.bi=bi;
+    operands.br=br;
+    operands.snr=snr;
+    ApplyComplexOperator(&operands,&cr,&ci);
+    Cr[i]=ClampToQuantum((double) QuantumRange*cr);
+    Ci[i]=ClampToQuantum((double) QuantumRange*ci);
+  }
+}
+
+static void SelectComplexOperandImages(const Image *images,
+  const Image **Br_image,const Image **Bi_image)
+{
+  *Br_image=images;
+  *Bi_image=images->next;
+  if ((images->next->next != (Image *) NULL) &&
+      (images->next->next->next != (Image *) NULL))
+    {
+      *Br_image=images->next->next;
+      *Bi_image=images->next->next->next;
+    }
+}
+
+static double GetComplexSNR(const Image *images)
+{
+  const char
+    *artifact;
+
+  double
+    snr;
+
+  artifact=GetImageArtifact(images,"complex:snr");
+  snr=0.0;
+  if (artifact != (const char *) NULL)
+    snr=StringToDouble(artifact,(char **) NULL);
+  return(snr);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -153,9 +363,6 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     *Br_view,
     *Ci_view,
     *Cr_view;
-
-  const char
-    *artifact;
 
   const Image
     *Ai_image,
@@ -225,20 +432,10 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   /*
     Apply complex mathematics to image pixels.
   */
-  artifact=GetImageArtifact(images,"complex:snr");
-  snr=0.0;
-  if (artifact != (const char *) NULL)
-    snr=StringToDouble(artifact,(char **) NULL);
+  snr=GetComplexSNR(images);
   Ar_image=images;
   Ai_image=images->next;
-  Br_image=images;
-  Bi_image=images->next;
-  if ((images->next->next != (Image *) NULL) &&
-      (images->next->next->next != (Image *) NULL))
-    {
-      Br_image=images->next->next;
-      Bi_image=images->next->next->next;
-    }
+  SelectComplexOperandImages(images,&Br_image,&Bi_image);
   Cr_image=complex_images;
   Ci_image=complex_images->next;
   number_channels=MagickMin(MagickMin(MagickMin(
@@ -289,68 +486,19 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
-      ssize_t
-        i;
-      
-      for (i=0; i < (ssize_t) number_channels; i++)
-      {
-        double
-          ai = QuantumScale*(double) Ai[i],
-          ar = QuantumScale*(double) Ar[i],
-          bi = QuantumScale*(double) Bi[i],
-          br = QuantumScale*(double) Br[i],
-          ci,
-          cr;
+      ComplexChannelOperands
+        channels;
 
-        switch (op)
-        {
-          case AddComplexOperator:
-          {
-            cr=ar+br;
-            ci=ai+bi;
-            break;
-          }
-          case ConjugateComplexOperator:
-          default:
-          {
-            cr=ar;
-            ci=(-ai);
-            break;
-          }
-          case DivideComplexOperator:
-          {
-            cr=MagickSafeReciprocal(br*br+bi*bi+snr)*(ar*br+ai*bi);
-            ci=MagickSafeReciprocal(br*br+bi*bi+snr)*(ai*br-ar*bi);
-            break;
-          }
-          case MagnitudePhaseComplexOperator:
-          {
-            cr=sqrt(ar*ar+ai*ai);
-            ci=atan2((double) ai,(double) ar)/(2.0*MagickPI)+0.5;
-            break;
-          }
-          case MultiplyComplexOperator:
-          {
-            cr=(ar*br-ai*bi);
-            ci=(ai*br+ar*bi);
-            break;
-          }
-          case RealImaginaryComplexOperator:
-          {
-            cr=ar*cos(2.0*MagickPI*(ai-0.5));
-            ci=ar*sin(2.0*MagickPI*(ai-0.5));
-            break;
-          }
-          case SubtractComplexOperator:
-          {
-            cr=ar-br;
-            ci=ai-bi;
-            break;
-          }
-        }
-        Cr[i]=ClampToQuantum((double) QuantumRange*cr);
-        Ci[i]=ClampToQuantum((double) QuantumRange*ci);
-      }
+      channels.Ai=Ai;
+      channels.Ar=Ar;
+      channels.Bi=Bi;
+      channels.Br=Br;
+      channels.Ci=Ci;
+      channels.Cr=Cr;
+      channels.number_channels=number_channels;
+      channels.op=op;
+      channels.snr=snr;
+      ApplyComplexOperatorToChannels(&channels);
       Ar+=(ptrdiff_t) GetPixelChannels(Ar_image);
       Ai+=(ptrdiff_t) GetPixelChannels(Ai_image);
       Br+=(ptrdiff_t) GetPixelChannels(Br_image);
@@ -472,9 +620,44 @@ static MagickBooleanType RollFourier(const size_t width,const size_t height,
   return(MagickTrue);
 }
 
+typedef struct _ForwardQuadrant
+{
+  size_t
+    width,
+    height,
+    center;
+
+  double
+    *source_pixels;
+} ForwardQuadrant;
+
+static void SwapForwardQuadrantRows(const ForwardQuadrant *quadrant,
+  double *forward_pixels)
+{
+  const size_t
+    width = quadrant->width,
+    height = quadrant->height,
+    center = quadrant->center;
+
+  double
+    *const source_pixels = quadrant->source_pixels;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=1; y < (ssize_t) height; y++)
+    for (x=0L; x < (ssize_t) (width/2L); x++)
+      forward_pixels[((ssize_t) height-y)*(ssize_t) width+(ssize_t) width/2L-x-1L]=
+        source_pixels[y*(ssize_t) center+x+1L];
+}
+
 static MagickBooleanType ForwardQuadrantSwap(const size_t width,
   const size_t height,double *source_pixels,double *forward_pixels)
 {
+  ForwardQuadrant
+    quadrant;
+
   MagickBooleanType
     status;
 
@@ -496,10 +679,11 @@ static MagickBooleanType ForwardQuadrantSwap(const size_t width,
     for (x=0L; x < (ssize_t) (width/2L); x++)
       forward_pixels[y*(ssize_t) width+x+(ssize_t) width/2L]=
         source_pixels[y*(ssize_t) center+x];
-  for (y=1; y < (ssize_t) height; y++)
-    for (x=0L; x < (ssize_t) (width/2L); x++)
-      forward_pixels[((ssize_t) height-y)*(ssize_t) width+(ssize_t) width/2L-x-1L]=
-        source_pixels[y*(ssize_t) center+x+1L];
+  quadrant.width=width;
+  quadrant.height=height;
+  quadrant.center=center;
+  quadrant.source_pixels=source_pixels;
+  SwapForwardQuadrantRows(&quadrant,forward_pixels);
   for (x=0L; x < (ssize_t) (width/2L); x++)
     forward_pixels[(ssize_t) width/2L-x-1L]=source_pixels[x+1L];
   return(MagickTrue);
@@ -579,16 +763,131 @@ static inline MagickBooleanType IsFourierMemoryPairMissing(
     (phase_info == (MemoryInfo *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _ForwardFourierMagnitude
+{
+  const FourierInfo
+    *fourier_info;
+
+  Image
+    *magnitude_image;
+
+  double
+    *magnitude_pixels;
+
+  ExceptionInfo
+    *exception;
+} ForwardFourierMagnitude;
+
+static void SetForwardFourierMagnitude(const ForwardFourierMagnitude *pass,
+  MagickBooleanType *status)
+{
+  const FourierInfo
+    *const fourier_info = pass->fourier_info;
+
+  Image
+    *const magnitude_image = pass->magnitude_image;
+
+  double
+    *const magnitude_pixels = pass->magnitude_pixels;
+
+  ExceptionInfo
+    *const exception = pass->exception;
+
+  CacheView
+    *magnitude_view;
+
+  Quantum
+    *q;
+
+  ssize_t
+    i,
+    x,
+    y;
+
+  magnitude_view=AcquireAuthenticCacheView(magnitude_image,exception);
+  i=0L;
+  for (y=0L; y < (ssize_t) fourier_info->height; y++)
+  {
+    q=GetCacheViewAuthenticPixels(magnitude_view,0L,y,fourier_info->width,1UL,
+      exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0L; x < (ssize_t) fourier_info->width; x++)
+    {
+      SetFourierPixel(magnitude_image,fourier_info->channel,magnitude_pixels[i],q);
+      i++;
+      q+=(ptrdiff_t) GetPixelChannels(magnitude_image);
+    }
+    (*status)=SyncCacheViewAuthenticPixels(magnitude_view,exception);
+    if ((*status) == MagickFalse)
+      break;
+  }
+  magnitude_view=DestroyCacheView(magnitude_view);
+}
+
+typedef struct _ForwardFourierPhase
+{
+  const FourierInfo
+    *fourier_info;
+
+  Image
+    *phase_image;
+
+  double
+    *phase_pixels;
+
+  ExceptionInfo
+    *exception;
+} ForwardFourierPhase;
+
+static void SetForwardFourierPhase(const ForwardFourierPhase *pass,
+  MagickBooleanType *status)
+{
+  CacheView
+    *phase_view;
+
+  Quantum
+    *q;
+
+  ssize_t
+    i,
+    x,
+    y;
+
+  i=0L;
+  phase_view=AcquireAuthenticCacheView(pass->phase_image,pass->exception);
+  for (y=0L; y < (ssize_t) pass->fourier_info->height; y++)
+  {
+    q=GetCacheViewAuthenticPixels(phase_view,0L,y,pass->fourier_info->width,1UL,
+      pass->exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0L; x < (ssize_t) pass->fourier_info->width; x++)
+    {
+      SetFourierPixel(pass->phase_image,pass->fourier_info->channel,
+        pass->phase_pixels[i],q);
+      i++;
+      q+=(ptrdiff_t) GetPixelChannels(pass->phase_image);
+    }
+    (*status)=SyncCacheViewAuthenticPixels(phase_view,pass->exception);
+    if ((*status) == MagickFalse)
+      break;
+   }
+  phase_view=DestroyCacheView(phase_view);
+}
+
 static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   Image *image,double *magnitude,double *phase,ExceptionInfo *exception)
 {
-  CacheView
-    *magnitude_view,
-    *phase_view;
-
   double
     *magnitude_pixels,
     *phase_pixels;
+
+  ForwardFourierMagnitude
+    pass;
+
+  ForwardFourierPhase
+    phase_pass;
 
   Image
     *magnitude_image,
@@ -600,14 +899,6 @@ static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   MemoryInfo
     *magnitude_info,
     *phase_info;
-
-  Quantum
-    *q;
-
-  ssize_t
-    i,
-    x,
-    y;
 
   magnitude_image=GetFirstImageInList(image);
   phase_image=GetNextImageInList(image);
@@ -648,44 +939,16 @@ static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
       phase_pixels);
   CorrectPhaseLHS(fourier_info->width,fourier_info->height,phase_pixels);
   ScaleForwardFourierPhase(fourier_info,phase_pixels);
-  magnitude_view=AcquireAuthenticCacheView(magnitude_image,exception);
-  i=0L;
-  for (y=0L; y < (ssize_t) fourier_info->height; y++)
-  {
-    q=GetCacheViewAuthenticPixels(magnitude_view,0L,y,fourier_info->width,1UL,
-      exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0L; x < (ssize_t) fourier_info->width; x++)
-    {
-      SetFourierPixel(magnitude_image,fourier_info->channel,magnitude_pixels[i],q);
-      i++;
-      q+=(ptrdiff_t) GetPixelChannels(magnitude_image);
-    }
-    status=SyncCacheViewAuthenticPixels(magnitude_view,exception);
-    if (status == MagickFalse)
-      break;
-  }
-  magnitude_view=DestroyCacheView(magnitude_view);
-  i=0L;
-  phase_view=AcquireAuthenticCacheView(phase_image,exception);
-  for (y=0L; y < (ssize_t) fourier_info->height; y++)
-  {
-    q=GetCacheViewAuthenticPixels(phase_view,0L,y,fourier_info->width,1UL,
-      exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0L; x < (ssize_t) fourier_info->width; x++)
-    {
-      SetFourierPixel(phase_image,fourier_info->channel,phase_pixels[i],q);
-      i++;
-      q+=(ptrdiff_t) GetPixelChannels(phase_image);
-    }
-    status=SyncCacheViewAuthenticPixels(phase_view,exception);
-    if (status == MagickFalse)
-      break;
-   }
-  phase_view=DestroyCacheView(phase_view);
+  pass.fourier_info=fourier_info;
+  pass.magnitude_image=magnitude_image;
+  pass.magnitude_pixels=magnitude_pixels;
+  pass.exception=exception;
+  SetForwardFourierMagnitude(&pass,&status);
+  phase_pass.fourier_info=fourier_info;
+  phase_pass.phase_image=phase_image;
+  phase_pass.phase_pixels=phase_pixels;
+  phase_pass.exception=exception;
+  SetForwardFourierPhase(&phase_pass,&status);
   phase_info=RelinquishVirtualMemory(phase_info);
   magnitude_info=RelinquishVirtualMemory(magnitude_info);
   return(status);
@@ -958,8 +1221,7 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
 
     width=image->columns;
     height=image->rows;
-    if ((image->columns != image->rows) || ((image->columns % 2) != 0) ||
-        ((image->rows % 2) != 0))
+    if (IsFourierPaddingNeeded(image) != MagickFalse)
       {
         size_t extent=image->columns < image->rows ? image->rows :
           image->columns;
@@ -1285,12 +1547,81 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   return(status);
 }
 
-static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
-  fftw_complex *fourier_pixels,Image *image,ExceptionInfo *exception)
+typedef struct _InverseFourierRow
+{
+  FourierInfo
+    *fourier_info;
+
+  Image
+    *image;
+
+  double
+    *source_pixels;
+} InverseFourierRow;
+
+static void SetInverseFourierRow(const InverseFourierRow *row,ssize_t *i,
+  Quantum **q)
+{
+  FourierInfo
+    *const fourier_info = row->fourier_info;
+
+  Image
+    *const image = row->image;
+
+  double
+    *const source_pixels = row->source_pixels;
+
+  ssize_t
+    x;
+
+  for (x=0L; x < (ssize_t) fourier_info->width; x++)
+  {
+    if (x < (ssize_t) image->columns)
+      SetFourierPixel(image,fourier_info->channel,source_pixels[*i],*q);
+    (*i)++;
+    *q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void SetInverseFourierPixels(FourierInfo *fourier_info,
+  Image *image,double *source_pixels,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
+  Quantum
+    *q;
+
+  ssize_t
+    i,
+    y;
+
+  i=0L;
+  image_view=AcquireAuthenticCacheView(image,exception);
+  for (y=0L; y < (ssize_t) fourier_info->height; y++)
+  {
+    InverseFourierRow
+      row;
+
+    if (y >= (ssize_t) image->rows)
+      break;
+    q=GetCacheViewAuthenticPixels(image_view,0L,y,fourier_info->width >
+      image->columns ? image->columns : fourier_info->width,1UL,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.fourier_info=fourier_info;
+    row.image=image;
+    row.source_pixels=source_pixels;
+    SetInverseFourierRow(&row,&i,&q);
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      break;
+  }
+  image_view=DestroyCacheView(image_view);
+}
+
+static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
+  fftw_complex *fourier_pixels,Image *image,ExceptionInfo *exception)
+{
   const char
     *value;
 
@@ -1302,9 +1633,6 @@ static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
 
   MemoryInfo
     *source_info;
-
-  Quantum
-    *q;
 
   ssize_t
     i,
@@ -1360,27 +1688,7 @@ static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
     (int) fourier_info->height,fourier_pixels,source_pixels,FFTW_ESTIMATE);
   fftw_execute_dft_c2r(fftw_c2r_plan,fourier_pixels,source_pixels);
   fftw_destroy_plan(fftw_c2r_plan);
-  i=0L;
-  image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0L; y < (ssize_t) fourier_info->height; y++)
-  {
-    if (y >= (ssize_t) image->rows)
-      break;
-    q=GetCacheViewAuthenticPixels(image_view,0L,y,fourier_info->width >
-      image->columns ? image->columns : fourier_info->width,1UL,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0L; x < (ssize_t) fourier_info->width; x++)
-    {
-      if (x < (ssize_t) image->columns)
-        SetFourierPixel(image,fourier_info->channel,source_pixels[i],q);
-      i++;
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      break;
-  }
-  image_view=DestroyCacheView(image_view);
+  SetInverseFourierPixels(fourier_info,image,source_pixels,exception);
   source_info=RelinquishVirtualMemory(source_info);
   return(MagickTrue);
 }

@@ -171,6 +171,111 @@ static void RaiseColormapEntryDepth(const Image *image,size_t *current_depth,
   }
 }
 
+static size_t GetColormapDepth(const Image *image,size_t *current_depth,
+  const size_t number_threads)
+{
+  size_t
+    depth;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    RaiseColormapEntryDepth(image,current_depth,id,i);
+  }
+  depth=GetMaximumDepth(current_depth,number_threads);
+  current_depth=(size_t *) RelinquishMagickMemory(current_depth);
+  return(depth);
+}
+
+static void RaiseSampleDepth(const Quantum *p,const ssize_t j,
+  size_t *current_depth,const int id)
+{
+  while (current_depth[id] < MAGICKCORE_QUANTUM_DEPTH)
+  {
+    QuantumAny
+      range;
+
+    range=GetQuantumRange(current_depth[id]);
+    if (p[j] == ScaleAnyToQuantum(ScaleQuantumToAny(p[j],range),range))
+      break;
+    current_depth[id]++;
+  }
+}
+
+static void RaisePixelDepth(const Image *image,const Quantum *p,
+  size_t *current_depth,const int id)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel
+      channel;
+
+    PixelTrait
+      traits;
+
+    channel=GetPixelChannelChannel(image,j);
+    traits=GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    RaiseSampleDepth(p,j,current_depth,id);
+  }
+}
+
+typedef struct _DepthScan
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    *current_depth;
+
+  int
+    id;
+} DepthScan;
+
+static MagickBooleanType RaiseImageRowDepth(const DepthScan *scan)
+{
+  const Quantum
+    *magick_restrict p;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  p=GetCacheViewVirtualPixels(scan->image_view,0,scan->y,scan->image->columns,
+    1,scan->exception);
+  if (p == (const Quantum *) NULL)
+    return(status);
+  for (x=0; x < (ssize_t) scan->image->columns; x++)
+  {
+    RaisePixelDepth(scan->image,p,scan->current_depth,scan->id);
+    p+=(ptrdiff_t) GetPixelChannels(scan->image);
+  }
+  if (scan->current_depth[scan->id] == MAGICKCORE_QUANTUM_DEPTH)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -208,16 +313,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
   if ((image->storage_class == PseudoClass) &&
       ((image->alpha_trait & BlendPixelTrait) == 0))
     {
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        const int
-          id = GetOpenMPThreadId();
-
-        RaiseColormapEntryDepth(image,current_depth,id,i);
-      }
-      depth=GetMaximumDepth(current_depth,number_threads);
-      current_depth=(size_t *) RelinquishMagickMemory(current_depth);
-      return(depth);
+      return(GetColormapDepth(image,current_depth,number_threads));
     }
   image_view=AcquireVirtualCacheView(image,exception);
 #if !defined(MAGICKCORE_HDRI_SUPPORT)
@@ -312,48 +408,18 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
     const int
       id = GetOpenMPThreadId();
 
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
+    DepthScan
+      scan;
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits;
-
-        channel=GetPixelChannelChannel(image,j);
-        traits=GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        while (current_depth[id] < MAGICKCORE_QUANTUM_DEPTH)
-        {
-          QuantumAny
-            range;
-
-          range=GetQuantumRange(current_depth[id]);
-          if (p[j] == ScaleAnyToQuantum(ScaleQuantumToAny(p[j],range),range))
-            break;
-          current_depth[id]++;
-        }
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (current_depth[id] == MAGICKCORE_QUANTUM_DEPTH)
+    scan.image=image;
+    scan.image_view=image_view;
+    scan.y=y;
+    scan.exception=exception;
+    scan.current_depth=current_depth;
+    scan.id=id;
+    if (RaiseImageRowDepth(&scan) == MagickFalse)
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
@@ -392,6 +458,206 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 %
 */
 
+typedef struct _DitherErrorSpread
+{
+  Image
+    *image;
+
+  double
+    *distortion;
+
+  size_t
+    channels;
+
+  ssize_t
+    x,
+    y,
+    u,
+    v;
+
+  double
+    error;
+} DitherErrorSpread;
+
+static void DistributeDitherError(const DitherErrorSpread *spread)
+{
+  if ((spread->x+1) < (ssize_t) spread->image->columns)
+    spread->distortion[spread->u+(ssize_t) spread->channels]+=7.0*
+      spread->error/16.0;
+  if ((spread->y+1) < (ssize_t) spread->image->rows)
+    {
+      /*
+        Distribute distortion for bottom left, bottom, and bottom right.
+      */
+      if (spread->x > 0)
+        spread->distortion[spread->v-(ssize_t) spread->channels]+=3.0*
+          spread->error/16.0;
+      spread->distortion[spread->v]+=5.0*spread->error/16.0;
+      if ((spread->x+1) < (ssize_t) spread->image->columns)
+        spread->distortion[spread->v+(ssize_t) spread->channels]+=1.0*
+          spread->error/16.0;
+    }
+}
+
+typedef struct _DitherRow
+{
+  Image
+    *image;
+
+  double
+    *distortion;
+
+  QuantumAny
+    range;
+
+  size_t
+    channels;
+
+  ssize_t
+    y;
+} DitherRow;
+
+static void DitherImageRow(const DitherRow *row,Quantum *q)
+{
+  Image
+    *const image = row->image;
+
+  double
+    *const distortion = row->distortion;
+
+  const QuantumAny
+    range = row->range;
+
+  const size_t
+    channels = row->channels;
+
+  const ssize_t
+    y = row->y;
+
+  ssize_t
+    u,
+    v,
+    x;
+
+  /*
+    Reset pixel distortion for current row.
+  */
+  u=(y % 3)*(ssize_t) (image->columns*channels);
+  (void) memset(distortion+u,0,image->columns*channels*sizeof(*distortion));
+  v=((y+1) % 3)*(ssize_t) (image->columns*channels);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) channels; i++)
+    {
+      DitherErrorSpread
+        spread;
+
+      double
+        error,
+        pixel;
+
+      PixelChannel
+        channel;
+
+      PixelTrait
+        traits;
+
+      /*
+        Add distortion to current pixel then distribute new distortion.
+      */
+      channel=GetPixelChannelChannel(image,i);
+      traits=GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        {
+          u++;
+          v++;
+          continue;
+        }
+      pixel=(double) q[i]+distortion[u];
+      q[i]=ScaleAnyToQuantum(ScaleQuantumToAny(ClampPixel((MagickRealType)
+        pixel),range),range);
+      /*
+        Distribute distortion for right.
+      */
+      error=pixel-(double) q[i];
+      spread.image=image;
+      spread.distortion=distortion;
+      spread.channels=channels;
+      spread.x=x;
+      spread.y=y;
+      spread.u=u;
+      spread.v=v;
+      spread.error=error;
+      DistributeDitherError(&spread);
+      u++;
+      v++;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+typedef struct _DitherImageInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  double
+    *distortion;
+
+  QuantumAny
+    range;
+
+  size_t
+    channels;
+
+  ExceptionInfo
+    *exception;
+} DitherImageInfo;
+
+static void DitherImageRows(const DitherImageInfo *rows,
+  MagickBooleanType *status)
+{
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) rows->image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    DitherRow
+      row;
+
+    if (*status == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(rows->image_view,0,y,rows->image->columns,1,
+      rows->exception);
+    if (q == (Quantum *) NULL)
+      {
+        *status=MagickFalse;
+        continue;
+      }
+    row.image=rows->image;
+    row.distortion=rows->distortion;
+    row.range=rows->range;
+    row.channels=rows->channels;
+    row.y=y;
+    DitherImageRow(&row,q);
+    if (SyncCacheViewAuthenticPixels(rows->image_view,rows->exception) ==
+        MagickFalse)
+      {
+        *status=MagickFalse;
+        continue;
+      }
+  }
+}
+
 static MagickBooleanType FloydSteinbergImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -410,8 +676,8 @@ static MagickBooleanType FloydSteinbergImageDepth(Image *image,
   size_t
     channels;
 
-  ssize_t
-    y;
+  DitherImageInfo
+    rows;
 
   /*
     Dither pixels with Floyd Steinberg algorithm.
@@ -427,89 +693,13 @@ static MagickBooleanType FloydSteinbergImageDepth(Image *image,
   (void) memset(distortion,0,3*image->columns*channels*sizeof(*distortion));
   range=GetQuantumRange(depth);
   image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      u,
-      v,
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    /*
-      Reset pixel distortion for current row.
-    */
-    u=(y % 3)*(ssize_t) (image->columns*channels);
-    (void) memset(distortion+u,0,image->columns*channels*sizeof(*distortion));
-    v=((y+1) % 3)*(ssize_t) (image->columns*channels);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) channels; i++)
-      {
-        double
-          error,
-          pixel;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits;
-
-        /*
-          Add distortion to current pixel then distribute new distortion.
-        */
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          {
-            u++;
-            v++;
-            continue;
-          }
-        pixel=(double) q[i]+distortion[u];
-        q[i]=ScaleAnyToQuantum(ScaleQuantumToAny(ClampPixel((MagickRealType)
-          pixel),range),range);
-        /*
-          Distribute distortion for right.
-        */
-        error=pixel-(double) q[i];
-        if ((x+1) < (ssize_t) image->columns)
-          distortion[u+(ssize_t) channels]+=7.0*error/16.0;
-        if ((y+1) < (ssize_t) image->rows)
-          {
-            /*
-              Distribute distortion for bottom left, bottom, and bottom right.
-            */
-            if (x > 0)
-              distortion[v-(ssize_t) channels]+=3.0*error/16.0;
-            distortion[v]+=5.0*error/16.0;
-            if ((x+1) < (ssize_t) image->columns)
-              distortion[v+(ssize_t) channels]+=1.0*error/16.0;
-          }
-        u++;
-        v++;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
-  }
+  rows.image=image;
+  rows.image_view=image_view;
+  rows.distortion=distortion;
+  rows.range=range;
+  rows.channels=channels;
+  rows.exception=exception;
+  DitherImageRows(&rows,&status);
   image_view=DestroyCacheView(image_view);
   distortion=(double *) RelinquishMagickMemory(distortion);
   if (status != MagickFalse)
@@ -532,6 +722,87 @@ static void SetColormapEntryDepth(Image *image,const ssize_t i,
   if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
     image->colormap[i].alpha=(double) ScaleAnyToQuantum(ScaleQuantumToAny(
       ClampPixel(image->colormap[i].alpha),range),range);
+}
+
+static void ScalePixelRowToDepth(const Image *image,const QuantumAny range,
+  Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel
+        channel;
+
+      PixelTrait
+        traits;
+
+      channel=GetPixelChannelChannel(image,i);
+      traits=GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) == 0)
+        continue;
+      q[i]=ScaleAnyToQuantum(ScaleQuantumToAny(ClampPixel((MagickRealType)
+        q[i]),range),range);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+typedef struct _DepthRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  QuantumAny
+    range;
+
+  ExceptionInfo
+    *exception;
+} DepthRow;
+
+static MagickBooleanType SetImageRowDepth(const DepthRow *row)
+{
+  Quantum
+    *magick_restrict q;
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(row->image_view,0,row->y,row->image->columns,1,
+    row->exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  ScalePixelRowToDepth(row->image,row->range,q);
+  if (SyncCacheViewAuthenticPixels(row->image_view,row->exception) ==
+      MagickFalse)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  return(status);
+}
+
+static inline MagickBooleanType IsFloydSteinbergDither(const char *artifact)
+{
+  return(((artifact != (const char *) NULL) &&
+    (LocaleCompare(artifact,"FloydSteinberg") == 0)) ? MagickTrue :
+    MagickFalse);
 }
 
 MagickExport MagickBooleanType SetImageDepth(Image *image,
@@ -562,8 +833,7 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
       return(MagickTrue);
     }
   artifact=GetImageArtifact(image,"dither");
-  if ((artifact != (const char *) NULL) &&
-      (LocaleCompare(artifact,"FloydSteinberg") == 0))
+  if (IsFloydSteinbergDither(artifact) != MagickFalse)
     return(FloydSteinbergImageDepth(image,depth,exception));
   range=GetQuantumRange(depth);
   if (image->storage_class == PseudoClass)
@@ -666,47 +936,18 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
+    DepthRow
+      row;
 
     if (status == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        q[i]=ScaleAnyToQuantum(ScaleQuantumToAny(ClampPixel((MagickRealType)
-          q[i]),range),range);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
+    row.image=image;
+    row.image_view=image_view;
+    row.y=y;
+    row.range=range;
+    row.exception=exception;
+    if (SetImageRowDepth(&row) == MagickFalse)
+      status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
   if (status != MagickFalse)

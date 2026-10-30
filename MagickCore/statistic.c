@@ -256,6 +256,42 @@ static int IntensityCompare(const void *x,const void *y)
 }
 #endif
 
+static double EvaluatePow(const Quantum pixel,const double value,
+  double result)
+{
+  if (fabs(value) <= MagickEpsilon)
+    return(result);
+  if (((double) pixel < 0.0) && ((value-floor(value)) > MagickEpsilon))
+    result=(double) -((double) QuantumRange*pow(-(QuantumScale*(double)
+      pixel),value));
+  else
+    result=(double) QuantumRange*pow(QuantumScale*(double) pixel,value);
+  return(result);
+}
+
+static double EvaluateLog(const Quantum pixel,const double value,
+  double result)
+{
+  if ((QuantumScale*(double) pixel) >= MagickEpsilon)
+    result=(double) QuantumRange*log(QuantumScale*value*
+      (double) pixel+1.0)/log((double) (value+1.0));
+  return(result);
+}
+
+static double EvaluateLeftShift(const Quantum pixel,const double value)
+{
+  double
+    result;
+
+  ssize_t
+    i;
+
+  result=(double) pixel;
+  for (i=0; i < (ssize_t) value; i++)
+    result*=2.0;
+  return(result);
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
@@ -340,16 +376,12 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case LeftShiftEvaluateOperator:
     {
-      result=(double) pixel;
-      for (i=0; i < (ssize_t) value; i++)
-        result*=2.0;
+      result=EvaluateLeftShift(pixel,value);
       break;
     }
     case LogEvaluateOperator:
     {
-      if ((QuantumScale*(double) pixel) >= MagickEpsilon)
-        result=(double) QuantumRange*log(QuantumScale*value*
-          (double) pixel+1.0)/log((double) (value+1.0));
+      result=EvaluateLog(pixel,value,result);
       break;
     }
     case MaxEvaluateOperator:
@@ -396,13 +428,7 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case PowEvaluateOperator:
     {
-      if (fabs(value) <= MagickEpsilon)
-        break;
-      if (((double) pixel < 0.0) && ((value-floor(value)) > MagickEpsilon))
-        result=(double) -((double) QuantumRange*pow(-(QuantumScale*(double)
-          pixel),value));
-      else
-        result=(double) QuantumRange*pow(QuantumScale*(double) pixel,value);
+      result=EvaluatePow(pixel,value,result);
       break;
     }
     case RightShiftEvaluateOperator:
@@ -657,6 +683,147 @@ static void AccumulateEvaluateRow(const EvaluateRow *row,const Quantum **p,
   }
 }
 
+static void AccumulateEvaluateMedianPixel(const EvaluateRow *row,
+  const Quantum **p,PixelChannels *evaluate_pixel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < MaxPixelChannels; i++)
+    evaluate_pixel[row->j].channel[i]=0.0;
+  for (i=0; i < (ssize_t) GetPixelChannels(row->image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(row->image,i);
+    PixelTrait traits = GetPixelChannelTraits(row->next,channel);
+    PixelTrait evaluate_traits = GetPixelChannelTraits(row->image,channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((evaluate_traits & UpdatePixelTrait) == 0))
+      continue;
+    evaluate_pixel[row->j].channel[i]=ApplyEvaluateOperator(
+      row->random_info[row->id],GetPixelChannel(row->next,channel,p[row->j]),
+      row->op,evaluate_pixel[row->j].channel[i]);
+  }
+  p[row->j]+=(ptrdiff_t) GetPixelChannels(row->next);
+}
+
+typedef struct _EvaluateMedian
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  size_t
+    number_images;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  int
+    id;
+
+  MagickEvaluateOperator
+    op;
+} EvaluateMedian;
+
+static void EvaluateMedianRow(const EvaluateMedian *median,const Quantum **p,
+  PixelChannels *evaluate_pixel,Quantum *magick_restrict q)
+{
+  ssize_t
+    j,
+    x;
+
+  for (x=0; x < (ssize_t) median->image->columns; x++)
+  {
+    const Image
+      *next;
+
+    EvaluateRow
+      row;
+
+    next=median->images;
+    for (j=0; j < (ssize_t) median->number_images; j++)
+    {
+      row.image=median->image;
+      row.next=next;
+      row.random_info=median->random_info;
+      row.id=median->id;
+      row.op=median->op;
+      row.j=j;
+      AccumulateEvaluateMedianPixel(&row,p,evaluate_pixel);
+      next=GetNextImageInList(next);
+    }
+    qsort((void *) evaluate_pixel,median->number_images,sizeof(*evaluate_pixel),
+      IntensityCompare);
+    SetEvaluateMedianPixel(median->image,evaluate_pixel,median->number_images,
+      q);
+    q+=(ptrdiff_t) GetPixelChannels(median->image);
+  }
+}
+
+typedef struct _EvaluateFetch
+{
+  CacheView
+    **image_view;
+
+  Image
+    *image;
+
+  ssize_t
+    y;
+
+  size_t
+    number_images;
+} EvaluateFetch;
+
+static ssize_t GetEvaluateRows(const EvaluateFetch *fetch,const Quantum **p,
+  ExceptionInfo *exception)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) fetch->number_images; j++)
+  {
+    p[j]=GetCacheViewVirtualPixels(fetch->image_view[j],0,fetch->y,
+      fetch->image->columns,1,exception);
+    if (p[j] == (const Quantum *) NULL)
+      break;
+  }
+  return(j);
+}
+
+static void AcquireEvaluateViews(const Image *images,
+  const size_t number_images,CacheView **image_view,ExceptionInfo *exception)
+{
+  const Image
+    *view;
+
+  ssize_t
+    n;
+
+  view=images;
+  for (n=0; n < (ssize_t) number_images; n++)
+  {
+    image_view[n]=AcquireVirtualCacheView(view,exception);
+    view=GetNextImageInList(view);
+  }
+}
+
+static MagickBooleanType AcquireDirectImageCanvas(const Image *images,
+  Image **image,ExceptionInfo *exception)
+{
+  *image=AcquireImageCanvas(images,exception);
+  if (*image == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(*image,DirectClass,exception) == MagickFalse)
+    {
+      *image=DestroyImage(*image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -665,9 +832,6 @@ MagickExport Image *EvaluateImages(const Image *images,
   CacheView
     *evaluate_view,
     **image_view;
-
-  const Image
-    *view;
 
   Image
     *image;
@@ -702,14 +866,8 @@ MagickExport Image *EvaluateImages(const Image *images,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
-  image=AcquireImageCanvas(images,exception);
-  if (image == (Image *) NULL)
+  if (AcquireDirectImageCanvas(images,&image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    {
-      image=DestroyImage(image);
-      return((Image *) NULL);
-    }
   number_images=GetImageListLength(images);
   evaluate_pixels=AcquirePixelTLS(images);
   if (evaluate_pixels == (PixelChannels **) NULL)
@@ -729,12 +887,7 @@ MagickExport Image *EvaluateImages(const Image *images,
         ResourceLimitError,"MemoryAllocationFailed","`%s'",images->filename);
       return(image);
     }
-  view=images;
-  for (n=0; n < (ssize_t) number_images; n++)
-  {
-    image_view[n]=AcquireVirtualCacheView(view,exception);
-    view=GetNextImageInList(view);
-  }
+  AcquireEvaluateViews(images,number_images,image_view,exception);
   /*
     Evaluate image pixels.
   */
@@ -757,14 +910,17 @@ MagickExport Image *EvaluateImages(const Image *images,
         const Quantum
           **p;
 
+        EvaluateFetch
+          fetch;
+
+        EvaluateMedian
+          median;
+
         PixelChannels
           *evaluate_pixel;
 
         Quantum
           *magick_restrict q;
-
-        ssize_t
-          x;
 
         ssize_t
           j;
@@ -780,13 +936,11 @@ MagickExport Image *EvaluateImages(const Image *images,
               images->filename);
             continue;
           }
-        for (j=0; j < (ssize_t) number_images; j++)
-        {
-          p[j]=GetCacheViewVirtualPixels(image_view[j],0,y,image->columns,1,
-            exception);
-          if (p[j] == (const Quantum *) NULL)
-            break;
-        }
+        fetch.image_view=image_view;
+        fetch.image=image;
+        fetch.y=y;
+        fetch.number_images=number_images;
+        j=GetEvaluateRows(&fetch,p,exception);
         q=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
           exception);
         if ((j < (ssize_t) number_images) || (q == (Quantum *) NULL))
@@ -795,39 +949,13 @@ MagickExport Image *EvaluateImages(const Image *images,
             continue;
           }
         evaluate_pixel=evaluate_pixels[id];
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          const Image
-            *next;
-
-          ssize_t
-            i;
-
-          next=images;
-          for (j=0; j < (ssize_t) number_images; j++)
-          {
-            for (i=0; i < MaxPixelChannels; i++)
-              evaluate_pixel[j].channel[i]=0.0;
-            for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-            {
-              PixelChannel channel = GetPixelChannelChannel(image,i);
-              PixelTrait traits = GetPixelChannelTraits(next,channel);
-              PixelTrait evaluate_traits = GetPixelChannelTraits(image,channel);
-              if (((traits & UpdatePixelTrait) == 0) ||
-                  ((evaluate_traits & UpdatePixelTrait) == 0))
-                continue;
-              evaluate_pixel[j].channel[i]=ApplyEvaluateOperator(
-                random_info[id],GetPixelChannel(next,channel,p[j]),op,
-                evaluate_pixel[j].channel[i]);
-            }
-            p[j]+=(ptrdiff_t) GetPixelChannels(next);
-            next=GetNextImageInList(next);
-          }
-          qsort((void *) evaluate_pixel,number_images,sizeof(*evaluate_pixel),
-            IntensityCompare);
-          SetEvaluateMedianPixel(image,evaluate_pixel,number_images,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        median.image=image;
+        median.images=images;
+        median.number_images=number_images;
+        median.random_info=random_info;
+        median.id=id;
+        median.op=op;
+        EvaluateMedianRow(&median,p,evaluate_pixel,q);
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
         if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
           status=MagickFalse;
@@ -865,6 +993,9 @@ MagickExport Image *EvaluateImages(const Image *images,
         const Quantum
           **p;
 
+        EvaluateFetch
+          fetch;
+
         EvaluateRow
           row;
 
@@ -888,13 +1019,11 @@ MagickExport Image *EvaluateImages(const Image *images,
               images->filename);
             continue;
           }
-        for (j=0; j < (ssize_t) number_images; j++)
-        {
-          p[j]=GetCacheViewVirtualPixels(image_view[j],0,y,image->columns,1,
-            exception);
-          if (p[j] == (const Quantum *) NULL)
-            break;
-        }
+        fetch.image_view=image_view;
+        fetch.image=image;
+        fetch.y=y;
+        fetch.number_images=number_images;
+        j=GetEvaluateRows(&fetch,p,exception);
         q=QueueCacheViewAuthenticPixels(evaluate_view,0,y,image->columns,1,
           exception);
         if ((j < (ssize_t) number_images) || (q == (Quantum *) NULL))
@@ -1652,6 +1781,19 @@ static ssize_t SortMedianPair(Quantum *pixels,const ssize_t low,
   return(median);
 }
 
+static void PartitionMedianPixels(Quantum *pixels,const ssize_t low,
+  ssize_t *l,ssize_t *h)
+{
+  for ( ; ; )
+  {
+    do (*l)++; while (pixels[low] > pixels[*l]);
+    do (*h)--; while (pixels[*h] > pixels[low]);
+    if (*h < *l)
+      break;
+    SwapPixels(pixels[*l],pixels[*h]);
+  }
+}
+
 static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
 {
   ssize_t
@@ -1671,14 +1813,7 @@ static ssize_t GetMedianPixel(Quantum *pixels,const size_t n)
     if (high == (low+1))
       return(SortMedianPair(pixels,low,high,median));
     SetMedianPivot(pixels,low,mid,high);
-    for ( ; ; )
-    {
-      do l++; while (pixels[low] > pixels[l]);
-      do h--; while (pixels[h] > pixels[low]);
-      if (h < l)
-        break;
-      SwapPixels(pixels[l],pixels[h]);
-    }
+    PartitionMedianPixels(pixels,low,&l,&h);
     SwapPixels(pixels[low],pixels[h]);
     if (h <= median)
       low=l;
@@ -2029,6 +2164,195 @@ static size_t CollectMedianRow(const MedianRow *row,const Quantum *p,
   return(n);
 }
 
+typedef struct _MedianPass
+{
+  const Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  Quantum
+    *median;
+
+  ssize_t
+    i;
+} MedianPass;
+
+static void CollectMedianPass(const MedianPass *pass,ssize_t *y,size_t *n)
+{
+  for (*y=0; *y < (ssize_t) pass->image->rows; (*y)++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    MedianRow
+      row;
+
+    p=GetVirtualPixels(pass->image,0,*y,pass->image->columns,1,
+      pass->exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    row.image=pass->image;
+    row.i=pass->i;
+    *n=CollectMedianRow(&row,p,pass->median,*n);
+  }
+}
+
+static ChannelStatistics *RelinquishImageStatistics(const Image *image,
+  double *histogram,ChannelStatistics *channel_statistics,
+  ExceptionInfo *exception)
+{
+  if (histogram != (double *) NULL)
+    histogram=(double *) RelinquishMagickMemory(histogram);
+  if (channel_statistics != (ChannelStatistics *) NULL)
+    channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
+      channel_statistics);
+  (void) ThrowMagickException(exception,GetMagickModule(),
+    ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+  return(channel_statistics);
+}
+
+typedef struct _MedianStatistics
+{
+  const Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  ChannelStatistics
+    *channel_statistics;
+
+  MemoryInfo
+    *median_info;
+} MedianStatistics;
+
+static void ComputeChannelMedians(const MedianStatistics *medians,ssize_t *y)
+{
+  Quantum
+    *median;
+
+  ssize_t
+    i;
+
+  median=(Quantum *) GetVirtualMemoryBlob(medians->median_info);
+  for (i=0; i < (ssize_t) GetPixelChannels(medians->image); i++)
+  {
+    MedianPass
+      pass;
+
+    size_t
+      n = 0;
+
+    /*
+      Compute median statistics for each channel.
+    */
+    PixelChannel channel = GetPixelChannelChannel(medians->image,i);
+    PixelTrait traits = GetPixelChannelTraits(medians->image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    pass.image=medians->image;
+    pass.exception=medians->exception;
+    pass.median=median;
+    pass.i=i;
+    CollectMedianPass(&pass,y,&n);
+    medians->channel_statistics[channel].median=(double) median[
+      GetMedianPixel(median,n)];
+  }
+}
+
+static MagickBooleanType CheckChannelDepth(
+  ChannelStatistics *channel_statistics,ChannelStatistics *cs,
+  const Quantum *magick_restrict p,const ssize_t i)
+{
+  MagickStatusType
+    status;
+
+  QuantumAny
+    range;
+
+  size_t
+    depth;
+
+  if (cs->depth != MAGICKCORE_QUANTUM_DEPTH)
+    {
+      depth=cs->depth;
+      range=GetQuantumRange(depth);
+      status=p[i] != ScaleAnyToQuantum(ScaleQuantumToAny(p[i],range),
+        range) ? MagickTrue : MagickFalse;
+      if (status != MagickFalse)
+        {
+          IncreaseChannelDepth(channel_statistics,cs);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
+static void AccumulatePixelStatistics(const Image *image,
+  const Quantum *magick_restrict p,ChannelStatistics *channel_statistics,
+  double *histogram)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    ChannelStatistics
+      *cs;
+
+    ChannelSample
+      sample;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    cs=channel_statistics+channel;
+    if (CheckChannelDepth(channel_statistics,cs,p,i) == MagickFalse)
+      {
+        i--;
+        continue;
+      }
+    sample.image=image;
+    sample.p=p;
+    sample.i=i;
+    AccumulateChannelSample(&sample,cs,histogram);
+  }
+}
+
+static void AccumulateRowStatistics(const Image *image,
+  const Quantum *magick_restrict p,ChannelStatistics *channel_statistics,
+  double *histogram)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelReadMask(image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    AccumulatePixelStatistics(image,p,channel_statistics,histogram);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void FinalizeChannelStatistics(const Image *image,
+  const double *histogram,ChannelStatistics *channel_statistics)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    ComputeChannelStatisticsMoments(image,channel_statistics,i);
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    ComputeChannelEntropy(image,histogram,channel_statistics,i);
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2038,8 +2362,8 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   double
     *histogram;
 
-  MagickStatusType
-    status;
+  MedianStatistics
+    medians;
 
   MemoryInfo
     *median_info;
@@ -2047,14 +2371,7 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   Quantum
     *median;
 
-  QuantumAny
-    range;
-
-  size_t
-    depth;
-
   ssize_t
-    i,
     y;
 
   assert(image != (Image *) NULL);
@@ -2067,16 +2384,8 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     MaxPixelChannels+1,sizeof(*channel_statistics));
   if ((channel_statistics == (ChannelStatistics *) NULL) ||
       (histogram == (double *) NULL))
-    {
-      if (histogram != (double *) NULL)
-        histogram=(double *) RelinquishMagickMemory(histogram);
-      if (channel_statistics != (ChannelStatistics *) NULL)
-        channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
-          channel_statistics);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(channel_statistics);
-    }
+    return(RelinquishImageStatistics(image,histogram,channel_statistics,
+      exception));
   (void) memset(channel_statistics,0,(MaxPixelChannels+1)*
     sizeof(*channel_statistics));
   ResetChannelStatistics(channel_statistics);
@@ -2087,60 +2396,15 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     /*
       Compute pixel statistics.
     */
     p=GetVirtualPixels(image,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelReadMask(image,p) <= (QuantumRange/2))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          continue;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        ChannelStatistics
-          *cs;
-
-        ChannelSample
-          sample;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        cs=channel_statistics+channel;
-        if (cs->depth != MAGICKCORE_QUANTUM_DEPTH)
-          {
-            depth=cs->depth;
-            range=GetQuantumRange(depth);
-            status=p[i] != ScaleAnyToQuantum(ScaleQuantumToAny(p[i],range),
-              range) ? MagickTrue : MagickFalse;
-            if (status != MagickFalse)
-              {
-                IncreaseChannelDepth(channel_statistics,cs);
-                i--;
-                continue;
-              }
-          }
-        sample.image=image;
-        sample.p=p;
-        sample.i=i;
-        AccumulateChannelSample(&sample,cs,histogram);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateRowStatistics(image,p,channel_statistics,histogram);
   }
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    ComputeChannelStatisticsMoments(image,channel_statistics,i);
-  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    ComputeChannelEntropy(image,histogram,channel_statistics,i);
+  FinalizeChannelStatistics(image,histogram,channel_statistics);
   histogram=(double *) RelinquishMagickMemory(histogram);
   median_info=AcquireVirtualMemory(image->columns,image->rows*sizeof(*median));
   if (median_info == (MemoryInfo *) NULL)
@@ -2148,37 +2412,11 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
       ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
   else
     {
-      median=(Quantum *) GetVirtualMemoryBlob(median_info);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        size_t
-          n = 0;
-
-        /*
-          Compute median statistics for each channel.
-        */
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        for (y=0; y < (ssize_t) image->rows; y++)
-        {
-          const Quantum
-            *magick_restrict p;
-
-          MedianRow
-            row;
-
-          p=GetVirtualPixels(image,0,y,image->columns,1,exception);
-          if (p == (const Quantum *) NULL)
-            break;
-          row.image=image;
-          row.i=i;
-          n=CollectMedianRow(&row,p,median,n);
-        }
-        channel_statistics[channel].median=(double) median[
-          GetMedianPixel(median,n)];
-      }
+      medians.image=image;
+      medians.exception=exception;
+      medians.channel_statistics=channel_statistics;
+      medians.median_info=median_info;
+      ComputeChannelMedians(&medians,&y);
       median_info=RelinquishVirtualMemory(median_info);
     }
   ComputeCompositeStatistics(image,channel_statistics);
@@ -2301,6 +2539,66 @@ static void AccumulatePolynomialRow(const PolynomialTerm *term,
   }
 }
 
+typedef struct _PolynomialRows
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  size_t
+    number_images,
+    number_terms;
+
+  const double
+    *terms;
+
+  ssize_t
+    y;
+} PolynomialRows;
+
+static void AccumulatePolynomialImages(const PolynomialRows *rows,
+  PixelChannels *polynomial_pixel,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  const Image
+    *next;
+
+  PolynomialTerm
+    term;
+
+  ssize_t
+    j;
+
+  next=rows->images;
+  for (j=0; j < (ssize_t) rows->number_images; j++)
+  {
+    const Quantum
+      *p;
+
+    if (j >= (ssize_t) rows->number_terms)
+      continue;
+    image_view=AcquireVirtualCacheView(next,exception);
+    p=GetCacheViewVirtualPixels(image_view,0,rows->y,rows->image->columns,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      {
+        image_view=DestroyCacheView(image_view);
+        break;
+      }
+    term.image=rows->image;
+    term.next=next;
+    term.terms=rows->terms;
+    term.j=j;
+    AccumulatePolynomialRow(&term,p,polynomial_pixel);
+    image_view=DestroyCacheView(image_view);
+    next=GetNextImageInList(next);
+  }
+}
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
@@ -2333,14 +2631,8 @@ MagickExport Image *PolynomialImage(const Image *images,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
-  image=AcquireImageCanvas(images,exception);
-  if (image == (Image *) NULL)
+  if (AcquireDirectImageCanvas(images,&image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    {
-      image=DestroyImage(image);
-      return((Image *) NULL);
-    }
   number_images=GetImageListLength(images);
   polynomial_pixels=AcquirePixelTLS(images);
   if (polynomial_pixels == (PixelChannels **) NULL)
@@ -2362,26 +2654,17 @@ MagickExport Image *PolynomialImage(const Image *images,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    CacheView
-      *image_view;
-
-    const Image
-      *next;
-
     const int
       id = GetOpenMPThreadId();
 
     PixelChannels
       *polynomial_pixel;
 
-    PolynomialTerm
-      term;
+    PolynomialRows
+      rows;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      j;
 
     if (status == MagickFalse)
       continue;
@@ -2394,29 +2677,13 @@ MagickExport Image *PolynomialImage(const Image *images,
       }
     polynomial_pixel=polynomial_pixels[id];
     ClearPolynomialPixels(image,polynomial_pixel);
-    next=images;
-    for (j=0; j < (ssize_t) number_images; j++)
-    {
-      const Quantum
-        *p;
-
-      if (j >= (ssize_t) number_terms)
-        continue;
-      image_view=AcquireVirtualCacheView(next,exception);
-      p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          image_view=DestroyCacheView(image_view);
-          break;
-        }
-      term.image=image;
-      term.next=next;
-      term.terms=terms;
-      term.j=j;
-      AccumulatePolynomialRow(&term,p,polynomial_pixel);
-      image_view=DestroyCacheView(image_view);
-      next=GetNextImageInList(next);
-    }
+    rows.image=image;
+    rows.images=images;
+    rows.number_images=number_images;
+    rows.number_terms=number_terms;
+    rows.terms=terms;
+    rows.y=y;
+    AccumulatePolynomialImages(&rows,polynomial_pixel,exception);
     SetPolynomialPixels(image,polynomial_pixel,q);
     if (SyncCacheViewAuthenticPixels(polynomial_view,exception) == MagickFalse)
       status=MagickFalse;

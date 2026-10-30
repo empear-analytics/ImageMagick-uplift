@@ -263,6 +263,110 @@ static const char *SetOddSquareKernelSize(KernelInfo *kernel,
   return(p);
 }
 
+static void SetKernelArrayValue(KernelInfo *kernel,const ssize_t i,
+  const char *token,const double nan)
+{
+  if (    LocaleCompare("nan",token) == 0
+      || LocaleCompare("-",token) == 0 ) {
+    kernel->values[i] = nan; /* this value is not part of neighbourhood */
+  }
+  else {
+    kernel->values[i] = StringToDouble(token,(char **) NULL);
+    ( kernel->values[i] < 0)
+        ?  ( kernel->negative_range += kernel->values[i] )
+        :  ( kernel->positive_range += kernel->values[i] );
+    Minimize(kernel->minimum, kernel->values[i]);
+    Maximize(kernel->maximum, kernel->values[i]);
+  }
+}
+
+static const char *ReadKernelArrayToken(const char *p,char *token)
+{
+  (void) GetNextToken(p,&p,MagickPathExtent,token);
+  if (*token == ',')
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+  return(p);
+}
+
+static GeometryInfo SetKernelArraySize(KernelInfo *kernel,
+  const MagickStatusType flags,GeometryInfo args)
+{
+  if ( (flags & WidthValue) == 0 ) /* if no width then */
+    args.rho = args.sigma;         /* then  width = height */
+  if ( args.rho < 1.0 )            /* if width too small */
+     args.rho = 1.0;               /* then  width = 1 */
+  if ( args.sigma < 1.0 )          /* if height too small */
+    args.sigma = args.rho;         /* then  height = width */
+  kernel->width = CastDoubleToSizeT(args.rho);
+  kernel->height = CastDoubleToSizeT(args.sigma);
+  return(args);
+}
+
+static MagickBooleanType ParseKernelGeometry(const char *kernel_string,
+  const char *p,KernelInfo *kernel,MagickStatusType *flags)
+{
+  char
+    token[MagickPathExtent];
+
+  GeometryInfo
+    args;
+
+  size_t
+    length;
+
+  /* ParseGeometry() needs the geometry separated! -- Arrgghh */
+  length=MagickMin((size_t) (p-kernel_string),sizeof(token)-1);
+  (void) memcpy(token, kernel_string, length);
+  token[length] = '\0';
+  SetGeometryInfo(&args);
+  *flags = ParseGeometry(token, &args);
+
+  /* Size handling and checks of geometry settings */
+  args=SetKernelArraySize(kernel,*flags,args);
+
+  /* Offset Handling and Checks */
+  if ( args.xi  < 0.0 || args.psi < 0.0 )
+    return(MagickFalse);
+  kernel->x = ((*flags & XValue)!=0) ? (ssize_t)args.xi
+                                    : (ssize_t) (kernel->width-1)/2;
+  kernel->y = ((*flags & YValue)!=0) ? (ssize_t)args.psi
+                                    : (ssize_t) (kernel->height-1)/2;
+  if ( kernel->x >= (ssize_t) kernel->width ||
+       kernel->y >= (ssize_t) kernel->height )
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+typedef struct _KernelSpecificationTargets
+{
+  MagickStatusType
+    *flags;
+
+  const char
+    **p;
+} KernelSpecificationTargets;
+
+static MagickBooleanType ParseKernelSpecification(const char *kernel_string,
+  const char *end,KernelInfo *kernel,const KernelSpecificationTargets *targets)
+{
+  MagickStatusType
+    *const flags = targets->flags;
+
+  const char
+    **const p = targets->p;
+
+  if ( *p != (char *) NULL && *p < end)
+    {
+      if (ParseKernelGeometry(kernel_string,*p,kernel,flags) == MagickFalse)
+        return(MagickFalse);
+
+      (*p)++; /* advance beyond the ':' */
+    }
+  else
+    *p=SetOddSquareKernelSize(kernel,kernel_string,end);
+  return(MagickTrue);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -284,11 +388,8 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   MagickStatusType
     flags;
 
-  GeometryInfo
-    args;
-
-  size_t
-    length;
+  KernelSpecificationTargets
+    targets;
 
   kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
   if (kernel == (KernelInfo *) NULL)
@@ -314,40 +415,10 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
      FUTURE: this split on ':' could be done by StringToken()
    */
   p = strchr(kernel_string, ':');
-  if ( p != (char *) NULL && p < end)
-    {
-      /* ParseGeometry() needs the geometry separated! -- Arrgghh */
-      length=MagickMin((size_t) (p-kernel_string),sizeof(token)-1);
-      (void) memcpy(token, kernel_string, length);
-      token[length] = '\0';
-      SetGeometryInfo(&args);
-      flags = ParseGeometry(token, &args);
-
-      /* Size handling and checks of geometry settings */
-      if ( (flags & WidthValue) == 0 ) /* if no width then */
-        args.rho = args.sigma;         /* then  width = height */
-      if ( args.rho < 1.0 )            /* if width too small */
-         args.rho = 1.0;               /* then  width = 1 */
-      if ( args.sigma < 1.0 )          /* if height too small */
-        args.sigma = args.rho;         /* then  height = width */
-      kernel->width = CastDoubleToSizeT(args.rho);
-      kernel->height = CastDoubleToSizeT(args.sigma);
-
-      /* Offset Handling and Checks */
-      if ( args.xi  < 0.0 || args.psi < 0.0 )
-        return(DestroyKernelInfo(kernel));
-      kernel->x = ((flags & XValue)!=0) ? (ssize_t)args.xi
-                                        : (ssize_t) (kernel->width-1)/2;
-      kernel->y = ((flags & YValue)!=0) ? (ssize_t)args.psi
-                                        : (ssize_t) (kernel->height-1)/2;
-      if ( kernel->x >= (ssize_t) kernel->width ||
-           kernel->y >= (ssize_t) kernel->height )
-        return(DestroyKernelInfo(kernel));
-
-      p++; /* advance beyond the ':' */
-    }
-  else
-    p=SetOddSquareKernelSize(kernel,kernel_string,end);
+  targets.flags=(&flags);
+  targets.p=(&p);
+  if (ParseKernelSpecification(kernel_string,end,kernel,&targets) == MagickFalse)
+    return(DestroyKernelInfo(kernel));
 
   /* Read in the kernel values from rest of input string argument */
   if (AcquireKernelValues(kernel) == MagickFalse)
@@ -357,21 +428,8 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   kernel->negative_range = kernel->positive_range = 0.0;
   for (i=0; (i < (ssize_t) (kernel->width*kernel->height)) && (p < end); i++)
   {
-    (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (*token == ',')
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (    LocaleCompare("nan",token) == 0
-        || LocaleCompare("-",token) == 0 ) {
-      kernel->values[i] = nan; /* this value is not part of neighbourhood */
-    }
-    else {
-      kernel->values[i] = StringToDouble(token,(char **) NULL);
-      ( kernel->values[i] < 0)
-          ?  ( kernel->negative_range += kernel->values[i] )
-          :  ( kernel->positive_range += kernel->values[i] );
-      Minimize(kernel->minimum, kernel->values[i]);
-      Maximize(kernel->maximum, kernel->values[i]);
-    }
+    p=ReadKernelArrayToken(p,token);
+    SetKernelArrayValue(kernel,i,token,nan);
   }
 
   /* sanity check -- no more values in kernel definition */
@@ -531,12 +589,71 @@ static KernelInfo *ParseKernelName(const char *kernel_string,
   return(kernel);
 }
 
+static MagickBooleanType AppendKernelToken(const char *p,const char *token,
+  KernelInfo **kernel,ExceptionInfo *exception)
+{
+  KernelInfo
+    *new_kernel;
+
+  /* ignore extra or multiple ';' kernel separators */
+  if (*token != ';')
+    {
+      /* tokens starting with alpha is a Named kernel */
+      if (isalpha((int) ((unsigned char) *token)) != 0)
+        new_kernel=ParseKernelName(p,exception);
+      else /* otherwise a user defined kernel array */
+        new_kernel=ParseKernelArray(p);
+
+      /* Error handling -- this is not proper error handling! */
+      if (new_kernel == (KernelInfo *) NULL)
+        {
+          if (*kernel != (KernelInfo *) NULL)
+            *kernel=DestroyKernelInfo(*kernel);
+          return(MagickFalse);
+        }
+
+      /* initialise or append the kernel list */
+      if (*kernel == (KernelInfo *) NULL)
+        *kernel=new_kernel;
+      else
+        LastKernelInfo(*kernel)->next=new_kernel;
+    }
+  return(MagickTrue);
+}
+
+typedef struct _KernelStringTargets
+{
+  char
+    **kernel_cache;
+
+  const char
+    **p;
+} KernelStringTargets;
+
+static MagickBooleanType ReadKernelCache(const char *kernel_string,
+  ExceptionInfo *exception,const KernelStringTargets *targets)
+{
+  char
+    **const kernel_cache = targets->kernel_cache;
+
+  const char
+    **const p = targets->p;
+
+  if (*kernel_string == '@')
+    {
+      *kernel_cache=FileToString(kernel_string,~0UL,exception);
+      if (*kernel_cache == (char *) NULL)
+        return(MagickFalse);
+      *p=(const char *) *kernel_cache;
+    }
+  return(MagickTrue);
+}
+
 MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
   ExceptionInfo *exception)
 {
   KernelInfo
-    *kernel,
-    *new_kernel;
+    *kernel;
 
   char
     *kernel_cache,
@@ -545,43 +662,22 @@ MagickExport KernelInfo *AcquireKernelInfo(const char *kernel_string,
   const char
     *p;
 
+  KernelStringTargets
+    targets;
+
   if (kernel_string == (const char *) NULL)
     return(ParseKernelArray(kernel_string));
   p=kernel_string;
   kernel_cache=(char *) NULL;
-  if (*kernel_string == '@')
-    {
-      kernel_cache=FileToString(kernel_string,~0UL,exception);
-      if (kernel_cache == (char *) NULL)
-        return((KernelInfo *) NULL);
-      p=(const char *) kernel_cache;
-    }
+  targets.kernel_cache=(&kernel_cache);
+  targets.p=(&p);
+  if (ReadKernelCache(kernel_string,exception,&targets) == MagickFalse)
+    return((KernelInfo *) NULL);
   kernel=NULL;
   while (GetNextToken(p,(const char **) NULL,MagickPathExtent,token), *token != '\0')
   {
-    /* ignore extra or multiple ';' kernel separators */
-    if (*token != ';')
-      {
-        /* tokens starting with alpha is a Named kernel */
-        if (isalpha((int) ((unsigned char) *token)) != 0)
-          new_kernel=ParseKernelName(p,exception);
-        else /* otherwise a user defined kernel array */
-          new_kernel=ParseKernelArray(p);
-
-        /* Error handling -- this is not proper error handling! */
-        if (new_kernel == (KernelInfo *) NULL)
-          {
-            if (kernel != (KernelInfo *) NULL)
-              kernel=DestroyKernelInfo(kernel);
-            return((KernelInfo *) NULL);
-          }
-
-        /* initialise or append the kernel list */
-        if (kernel == (KernelInfo *) NULL)
-          kernel=new_kernel;
-        else
-          LastKernelInfo(kernel)->next=new_kernel;
-      }
+    if (AppendKernelToken(p,token,&kernel,exception) == MagickFalse)
+      return((KernelInfo *) NULL);
 
     /* look for the next kernel in list */
     p=strchr(p,';');
@@ -2798,6 +2894,81 @@ static double MaximizeChannelValue(const Quantum *magick_restrict pixels,
   return(maximum);
 }
 
+static double MinimizeKernelDistance(const MagickRealType *magick_restrict k,
+  const Quantum *magick_restrict pixels,const ssize_t i,double pixel)
+{
+  if (!IsNaN(*k))
+    {
+      if (((double) pixels[i]+(*k)) < pixel)
+        pixel=(double) pixels[i]+(*k);
+    }
+  return(pixel);
+}
+
+typedef struct _MorphologyKernelTap
+{
+  const MagickRealType
+    *k;
+
+  const Quantum
+    *pixels;
+
+  ssize_t
+    i;
+} MorphologyKernelTap;
+
+static void UpdateHitAndMissExtrema(const MorphologyKernelTap *tap,
+  double *minimum,double *maximum)
+{
+  if (*tap->k > 0.7)
+    (*minimum)=MinimizeChannelValue(tap->pixels,tap->i,(*minimum));
+  else
+    if (*tap->k < 0.3)
+      (*maximum)=MaximizeChannelValue(tap->pixels,tap->i,(*maximum));
+}
+
+typedef struct _MorphologyIntensityTap
+{
+  const Quantum
+    *pixels;
+
+  double
+    intensity;
+
+  ssize_t
+    i;
+} MorphologyIntensityTap;
+
+static void SelectMinimumIntensityPixel(const MorphologyIntensityTap *tap,
+  const Quantum *magick_restrict *quantum_pixels,double *pixel,double *minimum)
+{
+  if (tap->intensity < (*minimum))
+    {
+      (*quantum_pixels)=tap->pixels;
+      (*pixel)=(double) tap->pixels[tap->i];
+      (*minimum)=tap->intensity;
+    }
+}
+
+static void SelectMaximumIntensityPixel(const MorphologyIntensityTap *tap,
+  double *pixel,const Quantum *magick_restrict *quantum_pixels,double *maximum)
+{
+  if (tap->intensity > (*maximum))
+    {
+      (*pixel)=(double) tap->pixels[tap->i];
+      (*quantum_pixels)=tap->pixels;
+      (*maximum)=tap->intensity;
+    }
+}
+
+static double ConvolveChannelValue(const MagickRealType *magick_restrict k,
+  const Quantum *magick_restrict pixels,const ssize_t i,double pixel)
+{
+  if (!IsNaN(*k))
+    pixel+=(*k)*(double) pixels[i];
+  return(pixel);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3120,6 +3291,12 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
         ssize_t
           v;
 
+        MorphologyIntensityTap
+          intensity_tap;
+
+        MorphologyKernelTap
+          kernel_tap;
+
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
         morphology_traits=GetPixelChannelTraits(morphology_image,channel);
@@ -3189,8 +3366,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 {
                   for (u=0; u < (ssize_t) kernel->width; u++)
                   {
-                    if (!IsNaN(*k))
-                      pixel+=(*k)*(double) pixels[i];
+                    pixel=ConvolveChannelValue(k,pixels,i,pixel);
                     k--;
                     pixels+=(ptrdiff_t) GetPixelChannels(image);
                   }
@@ -3237,8 +3413,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
               {
                 if (!IsNaN(*k) && (*k >= 0.5))
                   {
-                    if ((double) pixels[i] < pixel)
-                      pixel=(double) pixels[i];
+                    pixel=MinimizeChannelValue(pixels,i,pixel);
                   }
                 k++;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
@@ -3267,8 +3442,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
               {
                 if (!IsNaN(*k) && (*k > 0.5))
                   {
-                    if ((double) pixels[i] > pixel)
-                      pixel=(double) pixels[i];
+                    pixel=MaximizeChannelValue(pixels,i,pixel);
                   }
                 k--;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
@@ -3300,11 +3474,10 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
               {
                 if (!IsNaN(*k))
                   {
-                    if (*k > 0.7)
-                      minimum=MinimizeChannelValue(pixels,i,minimum);
-                    else
-                      if (*k < 0.3)
-                        maximum=MaximizeChannelValue(pixels,i,maximum);
+                    kernel_tap.k=k;
+                    kernel_tap.pixels=pixels;
+                    kernel_tap.i=i;
+                    UpdateHitAndMissExtrema(&kernel_tap,&minimum,&maximum);
                   }
                 k++;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
@@ -3337,12 +3510,11 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 if (!IsNaN(*k) && (*k >= 0.5))
                   {
                     intensity=(double) GetPixelIntensity(image,pixels);
-                    if (intensity < minimum)
-                      {
-                        quantum_pixels=pixels;
-                        pixel=(double) pixels[i];
-                        minimum=intensity;
-                      }
+                    intensity_tap.pixels=pixels;
+                    intensity_tap.intensity=intensity;
+                    intensity_tap.i=i;
+                    SelectMinimumIntensityPixel(&intensity_tap,&quantum_pixels,
+                      &pixel,&minimum);
                   }
                 k++;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
@@ -3366,12 +3538,11 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 if (!IsNaN(*k) && (*k >= 0.5))
                   {
                     intensity=(double) GetPixelIntensity(image,pixels);
-                    if (intensity > maximum)
-                      {
-                        pixel=(double) pixels[i];
-                        quantum_pixels=pixels;
-                        maximum=intensity;
-                      }
+                    intensity_tap.pixels=pixels;
+                    intensity_tap.intensity=intensity;
+                    intensity_tap.i=i;
+                    SelectMaximumIntensityPixel(&intensity_tap,&pixel,
+                      &quantum_pixels,&maximum);
                   }
                 k--;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
@@ -3410,11 +3581,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
             {
               for (u=0; u < (ssize_t) kernel->width; u++)
               {
-                if (!IsNaN(*k))
-                  {
-                    if (((double) pixels[i]+(*k)) < pixel)
-                      pixel=(double) pixels[i]+(*k);
-                  }
+                pixel=MinimizeKernelDistance(k,pixels,i,pixel);
                 k--;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
               }
@@ -3476,17 +3643,6 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   Because of this 're-use of results' this function can not make use of multi-
   threaded, parallel processing.
 */
-static double MinimizeKernelDistance(const MagickRealType *magick_restrict k,
-  const Quantum *magick_restrict pixels,const ssize_t i,double pixel)
-{
-  if (!IsNaN(*k))
-    {
-      if (((double) pixels[i]+(*k)) < pixel)
-        pixel=(double) pixels[i]+(*k);
-    }
-  return(pixel);
-}
-
 typedef struct _MorphologyDirectPixel
 {
   Image

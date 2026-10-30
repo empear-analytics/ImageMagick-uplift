@@ -3,6 +3,14 @@
 
 New files must score a perfect 10.0. Existing files must not regress.
 
+Two exceptions, because both move code that was gated before rather than add any:
+
+- A split (Recipe S): a new file staged together with an existing file that shrinks
+  holds code moved out of it, so it must score at least what the shrinking file
+  scored before (the lowest, if several shrink), not 10.0.
+- A merge: a file whose staged content is exactly the merged branch's version came in
+  unchanged and was gated on that branch, so it is skipped.
+
     python3 tools/codescene_precommit.py        # checks what is staged
 
 Only library code is gated: .c and .cpp files in the subsystems that
@@ -18,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from cs_mcp_session import exchange
@@ -181,35 +190,89 @@ def check_revised_file(path: str, exe: str, previous: str, staged: str) -> str |
     return None
 
 
-def check_new_file(path: str, exe: str, staged: str) -> str | None:
+def check_new_file(path: str, exe: str, staged: str, bar: float | None) -> str | None:
     new_file = temp_file(staged, Path(path).suffix)
     try:
         new_score = score(new_file, exe)
     finally:
         cleanup_temp_files((new_file,))
 
-    if abs(new_score - 10.0) > 1e-9:
-        return f"{path}: new code must score 10.0, got {new_score:.2f}"
+    if bar is None:
+        if abs(new_score - 10.0) > 1e-9:
+            return f"{path}: new code must score 10.0, got {new_score:.2f}"
+    elif new_score < bar - 1e-9:
+        return f"{path}: code split off a file that scored {bar:.2f} must not score less, got {new_score:.2f}"
     return None
 
 
-def check(path: str, exe: str, previous_path: str | None = None) -> str | None:
+def merge_head() -> str | None:
+    result = git("rev-parse", "-q", "--verify", "MERGE_HEAD")
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+@dataclass(frozen=True)
+class GateContext:
+    """What every staged file is judged against: the merged branch, if any, and the
+    score a split-off file must reach (None: new code must score 10.0)."""
+    merged: str | None
+    bar: float | None
+
+
+def shrunk_previous(path: str, previous_path: str | None) -> str | None:
+    """The HEAD content of an existing staged file that loses lines, or None."""
+    previous_exists, previous = show("HEAD", previous_path or path)
+    if not previous_exists:
+        return None
+    staged_exists, staged = show_staged(path)
+    if not staged_exists:
+        return None
+    return previous if staged.count("\n") < previous.count("\n") else None
+
+
+def split_bar(paths: list[tuple[str, str | None]], exe: str) -> float | None:
+    """The lowest HEAD score among staged existing files that shrink, or None."""
+    bars: list[float] = []
+    for path, previous_path in paths:
+        previous = shrunk_previous(path, previous_path)
+        if previous is None:
+            continue
+        old_file = temp_file(previous, Path(path).suffix)
+        try:
+            bars.append(score(old_file, exe))
+        finally:
+            cleanup_temp_files((old_file,))
+    return min(bars) if bars else None
+
+
+def came_unchanged(path: str, staged: str, merged: str | None) -> bool:
+    """True when a merge brings the file in exactly as the merged branch has it."""
+    if merged is None:
+        return False
+    theirs_exists, theirs = show(merged, path)
+    return theirs_exists and theirs == staged
+
+
+def check(path: str, exe: str, previous_path: str | None,
+          context: GateContext) -> str | None:
     staged_exists, staged = show_staged(path)
     if not staged_exists:
         return f"{path}: could not read staged content"
+    if came_unchanged(path, staged, context.merged):
+        return None
 
     baseline_path = previous_path if previous_path is not None else path
     previous_exists, previous = show("HEAD", baseline_path)
     if not previous_exists:
-        return check_new_file(path, exe, staged)
+        return check_new_file(path, exe, staged, context.bar)
     return check_revised_file(path, exe, previous, staged)
 
 
 def collect_failures(paths: list[tuple[str, str | None]], exe: str) -> list[str]:
     failures: list[str] = []
+    context = GateContext(merge_head(), split_bar(paths, exe))
     for path, previous_path in paths:
         try:
-            reason = check(path, exe, previous_path)
+            reason = check(path, exe, previous_path, context)
         except Exception as exc:  # pragma: no cover
             reason = f"{path}: {exc}"
         if reason:
@@ -237,7 +300,8 @@ def main() -> int:
         report_failures(failures)
         return 1
 
-    print("CodeScene gate passed: staged code does not degrade and new code is perfect 10.0.")
+    print("CodeScene gate passed: staged code does not degrade, new code is perfect 10.0 "
+          "and split-off code no worse than its original.")
     return 0
 
 

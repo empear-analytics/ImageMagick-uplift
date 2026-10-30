@@ -1675,6 +1675,16 @@ MagickExport MagickBooleanType SetImageColorspace(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType SetGrayImageType(Image *image,const ImageType type,
+  ExceptionInfo *exception)
+{
+  image->colorspace=GRAYColorspace;
+  if (SyncImagePixelCache(image,exception) == MagickFalse)
+    return(MagickFalse);
+  image->type=type;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SetImageGray(Image *image,
   ExceptionInfo *exception)
 {
@@ -1698,11 +1708,7 @@ MagickExport MagickBooleanType SetImageGray(Image *image,
   type=IdentifyImageGray(image,exception);
   if (type == UndefinedType)
     return(MagickFalse);
-  image->colorspace=GRAYColorspace;
-  if (SyncImagePixelCache(image,exception) == MagickFalse)
-    return(MagickFalse);
-  image->type=type;
-  return(MagickTrue);
+  return(SetGrayImageType(image,type,exception));
 }
 
 /*
@@ -1749,11 +1755,7 @@ MagickExport MagickBooleanType SetImageMonochrome(Image *image,
   is_bilevel=IdentifyImageMonochrome(image,exception);
   if (is_bilevel == MagickFalse)
     return(MagickFalse);
-  image->colorspace=GRAYColorspace;
-  if (SyncImagePixelCache((Image *) image,exception) == MagickFalse)
-    return(MagickFalse);
-  image->type=BilevelType;
-  return(MagickTrue);
+  return(SetGrayImageType(image,BilevelType,exception));
 }
 
 /*

@@ -1292,6 +1292,38 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static double GetMeanShiftColorDistance(const PixelInfo mean_pixel,
+  const PixelInfo pixel)
+{
+  double
+    distance;
+
+  distance=(mean_pixel.red-pixel.red)*(mean_pixel.red-pixel.red)+
+    (mean_pixel.green-pixel.green)*(mean_pixel.green-pixel.green)+
+    (mean_pixel.blue-pixel.blue)*(mean_pixel.blue-pixel.blue);
+  return(distance);
+}
+
+static double GetMeanShiftDistance(const PointInfo mean_location,
+  const PointInfo previous_location,const PixelInfo mean_pixel,
+  const PixelInfo previous_pixel)
+{
+  double
+    distance;
+
+  distance=(mean_location.x-previous_location.x)*
+    (mean_location.x-previous_location.x)+
+    (mean_location.y-previous_location.y)*
+    (mean_location.y-previous_location.y)+
+    255.0*QuantumScale*(mean_pixel.red-previous_pixel.red)*
+    255.0*QuantumScale*(mean_pixel.red-previous_pixel.red)+
+    255.0*QuantumScale*(mean_pixel.green-previous_pixel.green)*
+    255.0*QuantumScale*(mean_pixel.green-previous_pixel.green)+
+    255.0*QuantumScale*(mean_pixel.blue-previous_pixel.blue)*
+    255.0*QuantumScale*(mean_pixel.blue-previous_pixel.blue);
+  return(distance);
+}
+
 static void SetMeanShiftPixel(const Image *mean_image,
   const PixelInfo mean_pixel,Quantum *magick_restrict q)
 {
@@ -1422,9 +1454,7 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
             status=GetOneCacheViewVirtualPixelInfo(pixel_view,(ssize_t)
               MagickRound(mean_location.x+u),(ssize_t) MagickRound(
               mean_location.y+v),&pixel,exception);
-            distance=(mean_pixel.red-pixel.red)*(mean_pixel.red-pixel.red)+
-              (mean_pixel.green-pixel.green)*(mean_pixel.green-pixel.green)+
-              (mean_pixel.blue-pixel.blue)*(mean_pixel.blue-pixel.blue);
+            distance=GetMeanShiftColorDistance(mean_pixel,pixel);
             if (!(distance <= (color_distance*color_distance)))
               continue;
             sum_location.x+=mean_location.x+u;
@@ -1444,16 +1474,8 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
         mean_pixel.green=gamma*sum_pixel.green;
         mean_pixel.blue=gamma*sum_pixel.blue;
         mean_pixel.alpha=gamma*sum_pixel.alpha;
-        distance=(mean_location.x-previous_location.x)*
-          (mean_location.x-previous_location.x)+
-          (mean_location.y-previous_location.y)*
-          (mean_location.y-previous_location.y)+
-          255.0*QuantumScale*(mean_pixel.red-previous_pixel.red)*
-          255.0*QuantumScale*(mean_pixel.red-previous_pixel.red)+
-          255.0*QuantumScale*(mean_pixel.green-previous_pixel.green)*
-          255.0*QuantumScale*(mean_pixel.green-previous_pixel.green)+
-          255.0*QuantumScale*(mean_pixel.blue-previous_pixel.blue)*
-          255.0*QuantumScale*(mean_pixel.blue-previous_pixel.blue);
+        distance=GetMeanShiftDistance(mean_location,previous_location,
+          mean_pixel,previous_pixel);
         if (distance <= 3.0)
           break;
       }

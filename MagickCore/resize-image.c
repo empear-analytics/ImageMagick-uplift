@@ -193,6 +193,21 @@ static void NormalizeContributions(ContributionInfo *contribution,
     contribution[i].weight*=density;
 }
 
+static inline MagickBooleanType IsResizeChannelCopied(
+  const Image *resize_image,const PixelTrait resize_traits,const Quantum *q)
+{
+  return((((resize_traits & CopyPixelTrait) != 0) ||
+    (GetPixelWriteMask(resize_image,q) <= (QuantumRange/2))) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsResizeChannelUndefined(
+  const PixelTrait traits,const PixelTrait resize_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    (resize_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 static void FilterHorizontalPixel(const Image *image,
   const Image *resize_image,const ContributionInfo *contribution,
   const ssize_t n,const ssize_t start,const ssize_t stop,const double bisect,
@@ -222,11 +237,9 @@ static void FilterHorizontalPixel(const Image *image,
     channel=GetPixelChannelChannel(image,i);
     traits=GetPixelChannelTraits(image,channel);
     resize_traits=GetPixelChannelTraits(resize_image,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (resize_traits == UndefinedPixelTrait))
+    if (IsResizeChannelUndefined(traits,resize_traits) != MagickFalse)
       continue;
-    if (((resize_traits & CopyPixelTrait) != 0) ||
-        (GetPixelWriteMask(resize_image,q) <= (QuantumRange/2)))
+    if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
       {
         j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
           stop-1.0)+0.5);
@@ -270,6 +283,56 @@ static void FilterHorizontalPixel(const Image *image,
   }
 }
 
+static MagickBooleanType AcquireFilterContributions(const Image *image,
+  const double support,ContributionInfo **magick_restrict *contributions,
+  ExceptionInfo *exception)
+{
+  *contributions=AcquireContributionTLS((size_t) (2.0*support+3.0));
+  if (*contributions == (ContributionInfo **) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SetFilterStorageClass(const Image *image,
+  Image *resize_image,const double support,ExceptionInfo *exception)
+{
+  ClassType
+    storage_class;
+
+  storage_class=support > 0.5 ? DirectClass : image->storage_class;
+  if (SetImageStorageClass(resize_image,storage_class,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static void ClampFilterSupport(double *support,double *scale)
+{
+  if (*support < 0.5)
+    {
+      /*
+        Support too small even for nearest neighbour: Reduce to point sampling.
+      */
+      *support=(double) 0.5;
+      *scale=1.0;
+    }
+}
+
+static void NormalizeContributionDensity(ContributionInfo *contribution,
+  const ssize_t n,const double density)
+{
+  if ((density != 0.0) && (density != 1.0))
+    {
+      /*
+        Normalize.
+      */
+      NormalizeContributions(contribution,n,density);
+    }
+}
+
 static MagickBooleanType HorizontalFilter(
   const ResizeFilter *magick_restrict resize_filter,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
@@ -281,9 +344,6 @@ static MagickBooleanType HorizontalFilter(
   CacheView
     *image_view,
     *resize_view;
-
-  ClassType
-    storage_class;
 
   ContributionInfo
     **magick_restrict contributions;
@@ -303,24 +363,12 @@ static MagickBooleanType HorizontalFilter(
   */
   scale=MagickMax(1.0/x_factor+MagickEpsilon,1.0);
   support=scale*GetResizeFilterSupport(resize_filter);
-  storage_class=support > 0.5 ? DirectClass : image->storage_class;
-  if (SetImageStorageClass(resize_image,storage_class,exception) == MagickFalse)
+  if (SetFilterStorageClass(image,resize_image,support,exception) == MagickFalse)
     return(MagickFalse);
-  if (support < 0.5)
-    {
-      /*
-        Support too small even for nearest neighbour: Reduce to point sampling.
-      */
-      support=(double) 0.5;
-      scale=1.0;
-    }
-  contributions=AcquireContributionTLS((size_t) (2.0*support+3.0));
-  if (contributions == (ContributionInfo **) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(MagickFalse);
-    }
+  ClampFilterSupport(&support,&scale);
+  if (AcquireFilterContributions(image,support,&contributions,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   status=MagickTrue;
   scale=MagickSafeReciprocal(scale);
   image_view=AcquireVirtualCacheView(image,exception);
@@ -369,13 +417,7 @@ static MagickBooleanType HorizontalFilter(
     }
     if (n == 0)
       continue;
-    if ((density != 0.0) && (density != 1.0))
-      {
-        /*
-          Normalize.
-        */
-        NormalizeContributions(contribution,n,density);
-      }
+    NormalizeContributionDensity(contribution,n,density);
     p=GetCacheViewVirtualPixels(image_view,contribution[0].pixel,0,(size_t)
       (contribution[n-1].pixel-contribution[0].pixel+1),image->rows,exception);
     q=QueueCacheViewAuthenticPixels(resize_view,x,0,1,resize_image->rows,
@@ -442,11 +484,9 @@ static void FilterVerticalPixel(const Image *image,
     channel=GetPixelChannelChannel(image,i);
     traits=GetPixelChannelTraits(image,channel);
     resize_traits=GetPixelChannelTraits(resize_image,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (resize_traits == UndefinedPixelTrait))
+    if (IsResizeChannelUndefined(traits,resize_traits) != MagickFalse)
       continue;
-    if (((resize_traits & CopyPixelTrait) != 0) ||
-        (GetPixelWriteMask(resize_image,q) <= (QuantumRange/2)))
+    if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
       {
         j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
           stop-1.0)+0.5);
@@ -497,9 +537,6 @@ static MagickBooleanType VerticalFilter(
     *image_view,
     *resize_view;
 
-  ClassType
-    storage_class;
-
   ContributionInfo
     **magick_restrict contributions;
 
@@ -518,24 +555,12 @@ static MagickBooleanType VerticalFilter(
   */
   scale=MagickMax(1.0/y_factor+MagickEpsilon,1.0);
   support=scale*GetResizeFilterSupport(resize_filter);
-  storage_class=support > 0.5 ? DirectClass : image->storage_class;
-  if (SetImageStorageClass(resize_image,storage_class,exception) == MagickFalse)
+  if (SetFilterStorageClass(image,resize_image,support,exception) == MagickFalse)
     return(MagickFalse);
-  if (support < 0.5)
-    {
-      /*
-        Support too small even for nearest neighbour: Reduce to point sampling.
-      */
-      support=(double) 0.5;
-      scale=1.0;
-    }
-  contributions=AcquireContributionTLS((size_t) (2.0*support+3.0));
-  if (contributions == (ContributionInfo **) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(MagickFalse);
-    }
+  ClampFilterSupport(&support,&scale);
+  if (AcquireFilterContributions(image,support,&contributions,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   status=MagickTrue;
   scale=MagickSafeReciprocal(scale);
   image_view=AcquireVirtualCacheView(image,exception);
@@ -584,13 +609,7 @@ static MagickBooleanType VerticalFilter(
     }
     if (n == 0)
       continue;
-    if ((density != 0.0) && (density != 1.0))
-      {
-        /*
-          Normalize.
-        */
-        NormalizeContributions(contribution,n,density);
-      }
+    NormalizeContributionDensity(contribution,n,density);
     p=GetCacheViewVirtualPixels(image_view,0,contribution[0].pixel,
       image->columns,(size_t) (contribution[n-1].pixel-contribution[0].pixel+1),
       exception);

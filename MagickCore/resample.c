@@ -290,11 +290,18 @@ static inline MagickBooleanType IsAreaOutsideImage(
     ) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsAreaBeyondTopLeftCorner(
+  const ResampleFilter *resample_filter,const double u0,const double v0,
+  const double edge)
+{
+  return(( u0 + resample_filter->Ulimit < edge
+    && v0 + resample_filter->Vlimit < edge ) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsAreaOutsideCorner(
   const ResampleFilter *resample_filter,const double u0,const double v0)
 {
-  return((    ( u0 + resample_filter->Ulimit < 0.0
-                && v0 + resample_filter->Vlimit < 0.0 )
+  return((    IsAreaBeyondTopLeftCorner(resample_filter,u0,v0,0.0)
            || ( u0 + resample_filter->Ulimit < 0.0
                 && v0 - resample_filter->Vlimit >
                    (double) resample_filter->image->rows-1.0 )
@@ -311,8 +318,7 @@ static inline MagickBooleanType IsAreaOutsideCorner(
 static inline MagickBooleanType IsAreaOutsideDitherCorner(
   const ResampleFilter *resample_filter,const double u0,const double v0)
 {
-  return((    ( u0 + resample_filter->Ulimit < -32.0
-                && v0 + resample_filter->Vlimit < -32.0 )
+  return((    IsAreaBeyondTopLeftCorner(resample_filter,u0,v0,-32.0)
            || ( u0 + resample_filter->Ulimit < -32.0
                 && v0 - resample_filter->Vlimit >
                    (double) resample_filter->image->rows+31.0 )
@@ -323,6 +329,24 @@ static inline MagickBooleanType IsAreaOutsideDitherCorner(
                 (double) resample_filter->image->columns+31.0
                 && v0 - resample_filter->Vlimit >
                    (double) resample_filter->image->rows+31.0 )
+           ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAreaOutsideRows(
+  const ResampleFilter *resample_filter,const double v0)
+{
+  return((    v0 + resample_filter->Vlimit < 0.0
+           || v0 - resample_filter->Vlimit >
+              (double) resample_filter->image->rows-1.0
+           ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAreaOutsideColumns(
+  const ResampleFilter *resample_filter,const double u0)
+{
+  return((    u0 + resample_filter->Ulimit < 0.0
+           || u0 - resample_filter->Ulimit >
+              (double) resample_filter->image->columns-1.0
            ) ? MagickTrue : MagickFalse);
 }
 
@@ -377,6 +401,163 @@ static void ResetPixelAccumulator(PixelInfo *pixel)
     pixel->black = 0.0;
   if (pixel->alpha_trait != UndefinedPixelTrait)
     pixel->alpha = 0.0;
+}
+
+static void SetWholeImageAveragePixel(ResampleFilter *resample_filter,
+  PixelInfo *pixel,ExceptionInfo *exception)
+{
+  const Quantum
+    *pixels;
+
+  if ( resample_filter->average_defined == MagickFalse ) {
+    Image
+      *average_image;
+
+    CacheView
+      *average_view;
+
+    GetPixelInfo(resample_filter->image,(PixelInfo *)
+      &resample_filter->average_pixel);
+    resample_filter->average_defined=MagickTrue;
+
+    /* Try to get an averaged pixel color of whole image */
+    average_image=ResizeImage(resample_filter->image,1,1,BoxFilter,
+      resample_filter->exception);
+    if (average_image == (Image *) NULL)
+      {
+        *pixel=resample_filter->average_pixel; /* FAILED */
+        return;
+      }
+    average_view=AcquireVirtualCacheView(average_image,exception);
+    pixels=GetCacheViewVirtualPixels(average_view,0,0,1,1,
+      resample_filter->exception);
+    if (pixels == (const Quantum *) NULL) {
+      average_view=DestroyCacheView(average_view);
+      average_image=DestroyImage(average_image);
+      *pixel=resample_filter->average_pixel; /* FAILED */
+      return;
+    }
+    GetPixelInfoPixel(resample_filter->image,pixels,
+      &(resample_filter->average_pixel));
+    average_view=DestroyCacheView(average_view);
+    average_image=DestroyImage(average_image);
+
+    if ( resample_filter->virtual_pixel == CheckerTileVirtualPixelMethod )
+      BlendCheckerTileAverage(resample_filter);
+  }
+  *pixel=resample_filter->average_pixel;
+}
+
+static void NormalizeResampledPixel(PixelInfo *pixel,double divisor_m,
+  double divisor_c)
+{
+  divisor_m = 1.0/divisor_m;
+  if (pixel->alpha_trait != UndefinedPixelTrait)
+    pixel->alpha = (double) ClampToQuantum(divisor_m*pixel->alpha);
+  divisor_c = 1.0/divisor_c;
+  pixel->red   = (double) ClampToQuantum(divisor_c*pixel->red);
+  pixel->green = (double) ClampToQuantum(divisor_c*pixel->green);
+  pixel->blue  = (double) ClampToQuantum(divisor_c*pixel->blue);
+  if (pixel->colorspace == CMYKColorspace)
+    pixel->black = (double) ClampToQuantum(divisor_c*pixel->black);
+}
+
+static void ResampleTiledLimitPixel(ResampleFilter *resample_filter,
+  PixelInfo *pixel,ExceptionInfo *exception,MagickBooleanType *status)
+{
+  switch ( resample_filter->virtual_pixel ) {
+    case HorizontalTileVirtualPixelMethod:
+    case VerticalTileVirtualPixelMethod:
+      /* just return the background pixel - Is there more direct way? */
+      *status=InterpolatePixelInfo(resample_filter->image,
+        resample_filter->view,IntegerInterpolatePixel,-1.0,-1.0,pixel,
+        resample_filter->exception);
+      break;
+    case TileVirtualPixelMethod:
+    case MirrorVirtualPixelMethod:
+    case RandomVirtualPixelMethod:
+    case CheckerTileVirtualPixelMethod:
+    default:
+      /* generate a average color of the WHOLE image */
+      SetWholeImageAveragePixel(resample_filter,pixel,exception);
+      break;
+  }
+}
+
+typedef struct _ResampleLimitPoint
+{
+  ResampleFilter
+    *resample_filter;
+
+  double
+    u0,
+    v0;
+
+  ExceptionInfo
+    *exception;
+} ResampleLimitPoint;
+
+static MagickBooleanType ResampleLimitedPixel(const ResampleLimitPoint *point,
+  PixelInfo *pixel,MagickBooleanType status)
+{
+  ResampleFilter
+    *const resample_filter = point->resample_filter;
+
+  const double
+    u0 = point->u0,
+    v0 = point->v0;
+
+  ExceptionInfo
+    *const exception = point->exception;
+
+  switch ( resample_filter->virtual_pixel ) {
+    /*  This is always handled by the above, so no need.
+      case BackgroundVirtualPixelMethod:
+      case ConstantVirtualPixelMethod:
+      case TransparentVirtualPixelMethod:
+      case GrayVirtualPixelMethod,
+      case WhiteVirtualPixelMethod
+      case MaskVirtualPixelMethod:
+    */
+    case UndefinedVirtualPixelMethod:
+    case EdgeVirtualPixelMethod:
+    case DitherVirtualPixelMethod:
+    case HorizontalTileEdgeVirtualPixelMethod:
+    case VerticalTileEdgeVirtualPixelMethod:
+      /* We need an average edge pixel, from the correct edge!
+         How should I calculate an average edge color?
+         Just returning an averaged neighbourhood,
+         works well in general, but falls down for TileEdge methods.
+         This needs to be done properly!!!!!!
+      */
+      status=InterpolatePixelInfo(resample_filter->image,
+        resample_filter->view,AverageInterpolatePixel,u0,v0,pixel,
+        resample_filter->exception);
+      break;
+    default:
+    {
+      ResampleTiledLimitPixel(resample_filter,pixel,exception,&status);
+      break;
+    }
+  }
+  return(status);
+}
+
+static double WeightByPixelAlpha(const ResampleFilter *resample_filter,
+  const Quantum *pixels,const PixelInfo *pixel,double weight)
+{
+  if (pixel->alpha_trait != UndefinedPixelTrait)
+    weight*=QuantumScale*((double)
+      GetPixelAlpha(resample_filter->image,pixels));
+  return(weight);
+}
+
+static void AccumulateBlackChannel(const ResampleFilter *resample_filter,
+  const Quantum *pixels,const double weight,PixelInfo *pixel)
+{
+  if (pixel->colorspace == CMYKColorspace)
+    pixel->black+=weight*(double)
+      GetPixelBlack(resample_filter->image,pixels);
 }
 
 /*
@@ -468,15 +649,11 @@ MagickExport MagickBooleanType ResamplePixelColor(
         hit++;
       break;
     case HorizontalTileVirtualPixelMethod:
-      if (    v0 + resample_filter->Vlimit < 0.0
-           || v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0
-           )
+      if (IsAreaOutsideRows(resample_filter,v0) != MagickFalse)
         hit++;  /* outside the horizontally tiled images. */
       break;
     case VerticalTileVirtualPixelMethod:
-      if (    u0 + resample_filter->Ulimit < 0.0
-           || u0 - resample_filter->Ulimit > (double) resample_filter->image->columns-1.0
-           )
+      if (IsAreaOutsideColumns(resample_filter,u0) != MagickFalse)
         hit++;  /* outside the vertically tiled images. */
       break;
     case DitherVirtualPixelMethod:
@@ -507,83 +684,14 @@ MagickExport MagickBooleanType ResamplePixelColor(
     When Scaling limits reached, return an 'averaged' result.
   */
   if ( resample_filter->limit_reached ) {
-    switch ( resample_filter->virtual_pixel ) {
-      /*  This is always handled by the above, so no need.
-        case BackgroundVirtualPixelMethod:
-        case ConstantVirtualPixelMethod:
-        case TransparentVirtualPixelMethod:
-        case GrayVirtualPixelMethod,
-        case WhiteVirtualPixelMethod
-        case MaskVirtualPixelMethod:
-      */
-      case UndefinedVirtualPixelMethod:
-      case EdgeVirtualPixelMethod:
-      case DitherVirtualPixelMethod:
-      case HorizontalTileEdgeVirtualPixelMethod:
-      case VerticalTileEdgeVirtualPixelMethod:
-        /* We need an average edge pixel, from the correct edge!
-           How should I calculate an average edge color?
-           Just returning an averaged neighbourhood,
-           works well in general, but falls down for TileEdge methods.
-           This needs to be done properly!!!!!!
-        */
-        status=InterpolatePixelInfo(resample_filter->image,
-          resample_filter->view,AverageInterpolatePixel,u0,v0,pixel,
-          resample_filter->exception);
-        break;
-      case HorizontalTileVirtualPixelMethod:
-      case VerticalTileVirtualPixelMethod:
-        /* just return the background pixel - Is there more direct way? */
-        status=InterpolatePixelInfo(resample_filter->image,
-          resample_filter->view,IntegerInterpolatePixel,-1.0,-1.0,pixel,
-          resample_filter->exception);
-        break;
-      case TileVirtualPixelMethod:
-      case MirrorVirtualPixelMethod:
-      case RandomVirtualPixelMethod:
-      case CheckerTileVirtualPixelMethod:
-      default:
-        /* generate a average color of the WHOLE image */
-        if ( resample_filter->average_defined == MagickFalse ) {
-          Image
-            *average_image;
+    ResampleLimitPoint
+      point;
 
-          CacheView
-            *average_view;
-
-          GetPixelInfo(resample_filter->image,(PixelInfo *)
-            &resample_filter->average_pixel);
-          resample_filter->average_defined=MagickTrue;
-
-          /* Try to get an averaged pixel color of whole image */
-          average_image=ResizeImage(resample_filter->image,1,1,BoxFilter,
-            resample_filter->exception);
-          if (average_image == (Image *) NULL)
-            {
-              *pixel=resample_filter->average_pixel; /* FAILED */
-              break;
-            }
-          average_view=AcquireVirtualCacheView(average_image,exception);
-          pixels=GetCacheViewVirtualPixels(average_view,0,0,1,1,
-            resample_filter->exception);
-          if (pixels == (const Quantum *) NULL) {
-            average_view=DestroyCacheView(average_view);
-            average_image=DestroyImage(average_image);
-            *pixel=resample_filter->average_pixel; /* FAILED */
-            break;
-          }
-          GetPixelInfoPixel(resample_filter->image,pixels,
-            &(resample_filter->average_pixel));
-          average_view=DestroyCacheView(average_view);
-          average_image=DestroyImage(average_image);
-
-          if ( resample_filter->virtual_pixel == CheckerTileVirtualPixelMethod )
-            BlendCheckerTileAverage(resample_filter);
-        }
-        *pixel=resample_filter->average_pixel;
-        break;
-    }
-    return(status);
+    point.resample_filter=resample_filter;
+    point.u0=u0;
+    point.v0=v0;
+    point.exception=exception;
+    return(ResampleLimitedPixel(&point,pixel,status));
   }
 
   /*
@@ -658,18 +766,14 @@ MagickExport MagickBooleanType ResamplePixelColor(
           GetPixelAlpha(resample_filter->image,pixels);
         divisor_m += weight;
 
-        if (pixel->alpha_trait != UndefinedPixelTrait)
-          weight*=QuantumScale*((double)
-            GetPixelAlpha(resample_filter->image,pixels));
+        weight=WeightByPixelAlpha(resample_filter,pixels,pixel,weight);
         pixel->red+=weight*(double)
           GetPixelRed(resample_filter->image,pixels);
         pixel->green+=weight*(double)
           GetPixelGreen(resample_filter->image,pixels);
         pixel->blue+=weight*(double)
           GetPixelBlue(resample_filter->image,pixels);
-        if (pixel->colorspace == CMYKColorspace)
-          pixel->black+=weight*(double)
-            GetPixelBlack(resample_filter->image,pixels);
+        AccumulateBlackChannel(resample_filter,pixels,weight,pixel);
         divisor_c += weight;
 
         hit++;
@@ -718,15 +822,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
   /*
     Finalize results of resampling
   */
-  divisor_m = 1.0/divisor_m;
-  if (pixel->alpha_trait != UndefinedPixelTrait)
-    pixel->alpha = (double) ClampToQuantum(divisor_m*pixel->alpha);
-  divisor_c = 1.0/divisor_c;
-  pixel->red   = (double) ClampToQuantum(divisor_c*pixel->red);
-  pixel->green = (double) ClampToQuantum(divisor_c*pixel->green);
-  pixel->blue  = (double) ClampToQuantum(divisor_c*pixel->blue);
-  if (pixel->colorspace == CMYKColorspace)
-    pixel->black = (double) ClampToQuantum(divisor_c*pixel->black);
+  NormalizeResampledPixel(pixel,divisor_m,divisor_c);
   return(MagickTrue);
 }
 
@@ -1265,6 +1361,47 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
   }
 }
 
+#if FILTER_LUT
+static void ReportResampleFilterLUT(
+  const ResampleFilter *resample_filter)
+{
+  if (IsStringTrue(GetImageArtifact(resample_filter->image,
+      "resample:verbose")) != MagickFalse)
+    {
+      int
+        Q;
+      double
+        r_scale;
+
+      /* Debug output of the filter weighting LUT
+        Gnuplot the LUT data, the x scale index has been adjusted
+          plot [0:2][-.2:1] "lut.dat" with lines
+        The filter values should be normalized for comparison
+      */
+      printf("#\n");
+      printf("# Resampling Filter LUT (%d values) for '%s' filter\n",
+                 WLUT_WIDTH, CommandOptionToMnemonic(MagickFilterOptions,
+                 resample_filter->filter) );
+      printf("#\n");
+      printf("# Note: values in table are using a squared radius lookup.\n");
+      printf("# As such its distribution is not uniform.\n");
+      printf("#\n");
+      printf("# The X value is the support distance for the Y weight\n");
+      printf("# so you can use gnuplot to plot this cylindrical filter\n");
+      printf("#    plot [0:2][-.2:1] \"lut.dat\" with lines\n");
+      printf("#\n");
+
+      /* Scale radius so the filter LUT covers the full support range */
+      r_scale = resample_filter->support*sqrt(1.0/(double)WLUT_WIDTH);
+      for(Q=0; Q<WLUT_WIDTH; Q++)
+        printf("%8.*g %.*g\n",
+            GetMagickPrecision(),sqrt((double)Q)*r_scale,
+            GetMagickPrecision(),resample_filter->filter_lut[Q] );
+      printf("\n\n"); /* generate a 'break' in gnuplot if multiple outputs */
+    }
+}
+#endif
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1387,40 +1524,7 @@ MagickExport void SetResampleFilter(ResampleFilter *resample_filter,
   #pragma omp single
 #endif
   {
-    if (IsStringTrue(GetImageArtifact(resample_filter->image,
-        "resample:verbose")) != MagickFalse)
-      {
-        int
-          Q;
-        double
-          r_scale;
-
-        /* Debug output of the filter weighting LUT
-          Gnuplot the LUT data, the x scale index has been adjusted
-            plot [0:2][-.2:1] "lut.dat" with lines
-          The filter values should be normalized for comparison
-        */
-        printf("#\n");
-        printf("# Resampling Filter LUT (%d values) for '%s' filter\n",
-                   WLUT_WIDTH, CommandOptionToMnemonic(MagickFilterOptions,
-                   resample_filter->filter) );
-        printf("#\n");
-        printf("# Note: values in table are using a squared radius lookup.\n");
-        printf("# As such its distribution is not uniform.\n");
-        printf("#\n");
-        printf("# The X value is the support distance for the Y weight\n");
-        printf("# so you can use gnuplot to plot this cylindrical filter\n");
-        printf("#    plot [0:2][-.2:1] \"lut.dat\" with lines\n");
-        printf("#\n");
-
-        /* Scale radius so the filter LUT covers the full support range */
-        r_scale = resample_filter->support*sqrt(1.0/(double)WLUT_WIDTH);
-        for(Q=0; Q<WLUT_WIDTH; Q++)
-          printf("%8.*g %.*g\n",
-              GetMagickPrecision(),sqrt((double)Q)*r_scale,
-              GetMagickPrecision(),resample_filter->filter_lut[Q] );
-        printf("\n\n"); /* generate a 'break' in gnuplot if multiple outputs */
-      }
+    ReportResampleFilterLUT(resample_filter);
     /* Output the above once only for each image, and each setting
     (void) DeleteImageArtifact(resample_filter->image,"resample:verbose");
     */
