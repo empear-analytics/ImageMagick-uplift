@@ -3553,6 +3553,92 @@ Opus 5.5) during task M115 (campaign B), under the mandate of 2026-10-24.
 
 ---
 
+## Recipe NS - Name a Constant Selection
+
+**Use when:** CodeScene reports *Complex Method* (or a helper Recipe SD, O or Z would add
+is refused as one), and much of the complexity is one conditional expression
+`(c ? k1 : k2)` that picks between two constants and recurs at many sites, as
+`AnnotateImage`'s gravity offsets do: `(geometry.width == 0 ? -1.0 : 1.0)` and three
+variants, eighteen sites in one `switch`, each counted as a decision.
+
+**Not covered by:** Recipe P, which moves a boolean condition and returns
+`MagickBooleanType`; this expression yields a value of another type (a `double` sign),
+and naming only its condition leaves the `?:` and its decision in place. Recipe D,
+which merges copies of statements, not of an expression inside them. Recipes E, O and
+SD, which move statements: the decision moves with them and the helper inherits it.
+
+**How:**
+
+1. The expression is `(c ? k1 : k2)` in its own parentheses: `k1` and `k2` are
+   literals of one arithmetic type (`-1.0` and `1.0`), and `c` reads only identifiers,
+   member accesses and literals, with no call, assignment, increment or decrement.
+2. Write a `static inline` function directly above the first function that uses it,
+   with one parameter per variable expression of `c` (`const size_t extent` for
+   `geometry.width`), of that expression's exact type, returning the type of `k1`:
+   `return(c' ? k1 : k2);`, `c'` being `c` with the parameters substituted, character
+   for character otherwise. A second variant (`k2 : k1`) is a second function.
+3. Replace each site, parentheses included, by the call with the site's expressions as
+   arguments. Check by script that every replaced site equals the function's body with
+   the arguments substituted, character for character, as Recipe P's *Several sites*
+   asks.
+4. All sites of the functions this step adds, in one function of the caller's, go in
+   one commit (one recipe, one function); a site in another function is its own
+   commit.
+5. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step.
+
+**Before:**
+
+```c
+      case (GravityType) NorthWestGravity:
+      {
+        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+i*
+          annotate_info->affine.ry*height+annotate_info->affine.ry*
+          (metrics.ascent+metrics.descent);
+```
+
+**After:**
+
+```c
+static inline double GravityOffsetSign(const size_t extent)
+{
+  return(extent == 0 ? -1.0 : 1.0);
+}
+...
+      case (GravityType) NorthWestGravity:
+      {
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
+          annotate_info->affine.ry*height+annotate_info->affine.ry*
+          (metrics.ascent+metrics.descent);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The argument is evaluated once, as `c` read it once;
+  it has no side effect (step 1), and passing it converts nothing (step 2: the
+  parameter has the expression's own type). The function returns `k1` or `k2` under
+  the same test, of the same type, so the product or sum the site stood in receives the
+  same value; the parentheses kept the site a single operand, so no operator regroups.
+- `static inline` and identical object code under the oracle build's flags (step 5)
+  prove it for this build on every input, reached or not.
+- The variant with the constants swapped is a different function, not a negated
+  argument: `!c` would be a new expression.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`; `refactor_guard.py` reports `WARN` (copies removed, every value still
+present), each literal of `c`, `k1` and `k2` dropping by its count per site times the
+sites replaced less one per function, which the step-3 script accounts for; `--calls`
+moves only the new functions, by one plus one per site each.
+
+**Provenance:** 2026-10-30, from `annotate.c`'s `AnnotateImage`, whose gravity `switch`
+carries eighteen `(geometry.width == 0 ? -1.0 : 1.0)`-shaped signs (cc 56 of the
+function; a probe: cc 56 to 38 with `IDENTICAL` object code), and which Recipe SD can
+split only once they are gone (a helper of three gravity cases would otherwise be a
+*Complex Method*). Added by Claude Code (Claude Opus 5.5) during task M115 (campaign B),
+under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -3697,3 +3783,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | OC | Extract Block Ending the Iteration with Out-Parameters: a block followed directly by `continue;` of its loop, which leaves early through that `continue;` and writes the loop's cursors, moves to a `static void` function: each `continue;` becomes `return;`, written variables go by pointer as in Recipe O, and the `continue;` after the block stays after the call | `delegate.c`'s `InterpretDelegateProperties` (campaign B, task M115): the backslash case's inner `switch` advances `p` and `q` and continues the scan loop from every case; O refuses its `continue`s, E step 7 its two written cursors and its position, LB would need a struct of out-pointers and a status that always leads to the same `continue;`. Probe: nesting 4 gone, 3.83 to 4.05 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | V | Step 7: `return(v);` after the shared cleanup `S` may be `return(e);` of a side-effect-free expression (no call, assignment, increment or decrement), the same text at every exit (checked by script), reading no variable the block writes; Recipe I step 8 follows. *Careful* gives the argument | `xml-tree.c`'s `NewXMLTree` (campaign B, task M115; the owner left the ruling to the session, 2026-10-30): about twelve exits end in `utf8=DestroyString(utf8); return(&root->root);`, which is neither a local, a constant nor a call | owner |
 | 2026-10-30 | AMEND | O | Step 2: a parameter of pointer type (declared `T *p`) whose own value the block assigns counts as a plain local, passed as `T **p` and written `(*p)`; writes through it stay writes through it. Recipes V, W, LB, I and OC read "plain local" the same way (V step 2 says so). *Careful* gives the argument | `xml-tree.c`'s `ParseEntities` and `ParseInternalDoctype` (campaign B, task M115; the owner left the ruling to the session, 2026-10-30): their blocks advance the `xml` parameter itself, which step 2 refused although the pointer object is the function's own (C11 6.9.1p9) | owner |
+| 2026-10-30 | NEW | NS | Name a Constant Selection: a recurring `(c ? k1 : k2)` that picks one of two literals of one type, with a side-effect-free `c`, becomes a call of a `static inline` function returning that type; all sites in one function per commit; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `annotate.c`'s `AnnotateImage` (campaign B, task M115): eighteen gravity signs such as `(geometry.width == 0 ? -1.0 : 1.0)` in one `switch`, cc 56 to 38 in a probe with identical object code; P names only boolean conditions, and SD's helpers would inherit the decisions (a three-case gravity helper would be a *Complex Method*) | mandate (2026-10-24) |
