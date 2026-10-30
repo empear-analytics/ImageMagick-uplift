@@ -378,6 +378,23 @@ static void BlackThresholdPixel(const Image *image,const PixelInfo *threshold,
   }
 }
 
+static void BlackThresholdRow(const Image *image,const PixelInfo *threshold,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      pixel;
+
+    pixel=GetPixelIntensity(image,q);
+    BlackThresholdPixel(image,threshold,pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType BlackThresholdImage(Image *image,
   const char *thresholds,ExceptionInfo *exception)
 {
@@ -421,9 +438,6 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -435,15 +449,7 @@ MagickExport MagickBooleanType BlackThresholdImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        pixel;
-
-      pixel=GetPixelIntensity(image,q);
-      BlackThresholdPixel(image,&threshold,pixel,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    BlackThresholdRow(image,&threshold,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
