@@ -136,7 +136,8 @@ helper (its definition and its call) before its `PASS` line. Any other count tha
 moves is the `WARN` that stops the commit.
 Recipes D and S fold code together or move it, the guard cannot follow them, and
 they need the oracle. The one exception is Recipe D's *Unreached functions* form,
-whose proof is an identical object file, not the guard.
+whose proof is an identical object file, not the guard. Recipe CN rests on the
+same proof, so it applies at either level.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -3336,6 +3337,74 @@ Claude Code (Claude Opus 5.5) during task M101, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe CN - Combine Nested Conditions
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*), and a
+bump is an `if` whose whole body is a second `if`, neither with an `else`: a nesting
+level that carries no statement of its own, as `GetDelegateInfo`'s three match tests
+(`if (decode matches) if (encode matches) break;`) and `IsExecutableToken`'s
+`if (length >= 3) { if (IsWindowsDrivePath(token) != MagickFalse) return(MagickTrue); }`.
+
+**Not covered by:** Recipe G, which inverts a condition into an early exit and keeps both
+tests as separate statements; Recipe P, which moves one expression into a predicate and
+leaves the statement structure as it is; Recipes E, O, LB and W, which move the block into
+a new function, where the nesting stays (a helper of nested `if`s is itself bumpy).
+
+**How:**
+
+1. Find `if (A) S` where `S` is `if (B) T`, or a compound statement `{ if (B) T }` holding
+   that one statement and no declaration; neither `if` has an `else`. `T` is any
+   statement.
+2. Replace the two by `if ((A) && (B)) T`: `A` and `B` copied character for character,
+   each in its own parentheses, in that order; `T` unchanged, re-indented one level
+   less. Wrap at 80 columns as ImageMagick does, the second operand under the first.
+3. Every such pair in one function may go in one commit (one recipe, one function).
+4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step (the compiler laid the code out differently, and the proof below does not
+   hold for it).
+
+**Before:**
+
+```c
+    if (LocaleCompare(decode,delegate_info->decode) == 0)
+      if (LocaleCompare(encode,delegate_info->encode) == 0)
+        break;
+```
+
+**After:**
+
+```c
+    if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
+        (LocaleCompare(encode,delegate_info->encode) == 0))
+      break;
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `&&` evaluates `A` first and `B` only when `A` is
+  non-zero, as the nested form does; `T` runs exactly when both are non-zero, in both
+  forms. With no `else` on either `if`, no path runs anything when `A` or `B` is zero.
+- An `else` changes this: on the inner `if` it runs when `A` holds and `B` does not,
+  which the combined form cannot express; on the outer one it would bind differently.
+  Step 1 refuses both.
+- A declaration in the braces, or a second statement there, means the level carries
+  something: step 1 refuses it.
+- The combined condition has two operands; a chain that would reach *Complex Conditional*
+  (three or more) is not this recipe's aim, and rule 2 judges it.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD` (byte-identical object code under the oracle build's pinned flags is the same
+compiled code, so the same behaviour on every input, reached or not), and
+`refactor_guard.py` literal and call counts unchanged.
+
+**Provenance:** 2026-10-30, from `delegate.c`'s `GetDelegateInfo`, whose three match
+tests are each an `if` holding one `if` and a `break`: a probe combining them gave
+bumps 6 to 3 and delegate.c 3.26 to 3.32, with `IDENTICAL` object code. The same shape
+holds in `IsExecutableToken` (twice) and `InvokeDelegate`. Added by Claude Code (Claude
+Opus 5.5) during task M115 (campaign B), under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -3475,3 +3544,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | V | Step 6: another copy of a step-6 block, in another function and identical under Recipe D's renaming (checked by script), may call the function the first copy became, with its own arguments and its own `c`, one commit per caller, as Recipe W step 7 allows for W; *Careful* gives the argument | `resize-image.c`'s `HorizontalFilter` and `VerticalFilter`: the contribution-buffer allocation, which throws and returns `MagickFalse` when it fails, is the same text in both. Recipe D moves copies whole and may not leave the caller, and a second helper of the same text would be a duplicate. A probe: 6.29 to 6.31 for the first copy, 6.32 with the second | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | LB | Step 6: a block whose step-3 text equals, under Recipe D's renaming (checked by script), the body of a function Recipe LB, Y or W already made in the file calls that function instead of a second copy, with its own struct local and its own `break;`, as Recipe W step 7 allows for W; *Careful* gives the argument | `histogram.c`'s `CheckImageColors`: its child-allocation block in the tree descent ends the level loop through `break;` where `ClassifyImageColors`' identical block returns `0`, which Recipe Y moved into `AcquireHNodeChild`; a second copy would be a *Code Duplication*. A probe: nesting 5 to 4, 6.41 to 6.42 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | I | Step 2: a written variable whose address the caller passes elsewhere only as an argument of calls that keep no copy of it (checked by reading the callee) still qualifies, as Recipe V step 2 and Recipe LB step 8 allow; in the block, `&v` becomes `v`, as step 8 already says for its form; *Careful* gives the argument | `histogram.c`'s `ClassifyImageColors`: its tree descent (the level loop at depth 3, its exit at depth 4) writes the node cursor and `pixel`, whose address the caller also passes to `GetPixelInfo` and `IsPixelInfoColorMatch`, neither of which keeps it, and leaves through `return(0);`. A probe: 6.43 to 6.47 | mandate (2026-10-24) |
+| 2026-10-30 | NEW | CN | Combine Nested Conditions: an `if` whose whole body is a second `if`, neither with an `else`, becomes one `if` whose condition is the two joined by `&&` in their order; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `delegate.c`'s `GetDelegateInfo` (campaign B, task M115): three such match tests, a probe gave bumps 6 to 3 and 3.26 to 3.32 with identical object code; the same shape in `IsExecutableToken` and `InvokeDelegate`. No recipe removes a nesting level that carries no statement: G and P keep both tests, E-family helpers inherit the nesting | mandate (2026-10-24) |
