@@ -872,6 +872,27 @@ MagickExport MagickBooleanType IsImageMonochrome(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType IsImageRowOpaque(const Image *image,const Quantum *p)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelAlpha(image,p) != OpaqueAlpha)
+      {
+        status=MagickFalse;
+        break;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType IsImageOpaque(const Image *image,
   ExceptionInfo *exception)
 {
@@ -903,9 +924,6 @@ MagickExport MagickBooleanType IsImageOpaque(const Image *image,
     const Quantum
       *p;
 
-    ssize_t
-      x;
-
     if (opaque == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -914,15 +932,8 @@ MagickExport MagickBooleanType IsImageOpaque(const Image *image,
         opaque=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelAlpha(image,p) != OpaqueAlpha)
-        {
-          opaque=MagickFalse;
-          break;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    if (IsImageRowOpaque(image,p) == MagickFalse)
+      opaque=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
   return(opaque);
