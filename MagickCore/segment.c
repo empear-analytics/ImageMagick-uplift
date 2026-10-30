@@ -449,6 +449,56 @@ static inline MagickBooleanType IsClusterAboveThreshold(const Cluster *cluster,
     MagickFalse);
 }
 
+typedef struct _ClusterTargets
+{
+  Cluster
+    **cluster,
+    **head;
+
+  ExtentPacket
+    *blue;
+} ClusterTargets;
+
+static MagickBooleanType FormBlueClusters(short **extrema,
+  const ExtentPacket red,const ExtentPacket green,
+  const ClusterTargets *targets)
+{
+  Cluster
+    **const cluster = targets->cluster,
+    **const head = targets->head;
+
+  ExtentPacket
+    *const blue = targets->blue;
+
+  while (DefineRegion(extrema[Blue],blue) != 0)
+  {
+    /*
+      Allocate a new class.
+    */
+    if (*head != (Cluster *) NULL)
+      {
+        (*cluster)->next=(Cluster *) AcquireQuantumMemory(1,
+          sizeof(*(*cluster)->next));
+        *cluster=(*cluster)->next;
+      }
+    else
+      {
+        *cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(**cluster));
+        *head=*cluster;
+      }
+    if (*cluster == (Cluster *) NULL)
+      return(MagickFalse);
+    /*
+      Initialize a new class.
+    */
+    (void) memset(*cluster,0,sizeof(**cluster));
+    (*cluster)->red=red;
+    (*cluster)->green=green;
+    (*cluster)->blue=*blue;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -526,34 +576,16 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     green.index=0;
     while (DefineRegion(extrema[Green],&green) != 0)
     {
+      ClusterTargets
+        targets;
+
       blue.index=0;
-      while (DefineRegion(extrema[Blue],&blue) != 0)
-      {
-        /*
-          Allocate a new class.
-        */
-        if (head != (Cluster *) NULL)
-          {
-            cluster->next=(Cluster *) AcquireQuantumMemory(1,
-              sizeof(*cluster->next));
-            cluster=cluster->next;
-          }
-        else
-          {
-            cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster));
-            head=cluster;
-          }
-        if (cluster == (Cluster *) NULL)
-          ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-            image->filename);
-        /*
-          Initialize a new class.
-        */
-        (void) memset(cluster,0,sizeof(*cluster));
-        cluster->red=red;
-        cluster->green=green;
-        cluster->blue=blue;
-      }
+      targets.cluster=(&cluster);
+      targets.head=(&head);
+      targets.blue=(&blue);
+      if (FormBlueClusters(extrema,red,green,&targets) == MagickFalse)
+        ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
+          image->filename);
     }
   }
   if (head == (Cluster *) NULL)
