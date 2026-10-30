@@ -56,7 +56,7 @@ Every refactoring commit states which level verified it.
 | Level | Applies to | Verification | Recipes allowed |
 | --- | --- | --- | --- |
 | **Oracle-verified** | functions that pass the readiness gate below | oracle `run --function`, guard, build | the whole playbook |
-| **Guard-verified** | functions that compile in some build but fail the gate: never called by a case, weakly checked, or X11 and OpenCL code | guard `OK` with `--calls`, the build that compiles the file (with `-Werror` on the changed file), and the machine-code comparison where it applies | only the recipes whose guard signature is exact: E, G, P |
+| **Guard-verified** | functions that compile in some build but fail the gate: never called by a case, weakly checked, or X11 and OpenCL code | guard `OK` with `--calls`, the build that compiles the file (with `-Werror` on the changed file), and the machine-code comparison where it applies | only the recipes whose guard signature is exact: E, G, P; and D's *Unreached functions* form, proven by an identical object file (`tools/obj_identical.sh`; owner, 2026-10-30) |
 | **Not verified** | code no build here compiles (`vms.c`) | none | untouched |
 
 Guard-verified is how 3SX refactored a decompiled game with no tests: the literal and call

@@ -94,7 +94,9 @@ python3 tools/oracle/casemap.py <Function>     # which cases execute it
   its cases are the protection.
 - **no case executes it**: guard-verified; only recipes E, G and P,
   with `refactor_guard.py --calls` reporting `OK`, and every argument of every call you
-  add checked against its parameter by reading.
+  add checked against its parameter by reading; and Recipe D's *Unreached functions*
+  form, whose proof is `tools/obj_identical.sh` printing `IDENTICAL` for the whole
+  object file (owner, 2026-10-30).
 
 The rules are in the playbook, *Two levels of evidence*; the reasoning and the measured
 results are in [`docs/refactoring/VERIFICATION.md`](docs/refactoring/VERIFICATION.md).
