@@ -2882,6 +2882,23 @@ static inline MagickBooleanType IsOperatorStackBarrier(const OperatorE top)
     OprInPlace ((int) top)) ? MagickTrue : MagickFalse);
 }
 
+static void MoveHigherPrecedenceOperators (FxInfo * pfx, OperatorE op)
+{
+  while (pfx->usedOprStack > 0) {
+    OperatorE top = pfx->OperatorStack[pfx->usedOprStack-1];
+    int precTop, precNew;
+    if (IsOperatorStackBarrier(top) != MagickFalse) break;
+    precTop = Operators[top].precedence;
+    precNew = Operators[op].precedence;
+    /* Assume left associativity.
+       If right assoc, this would be "<=".
+    */
+    if (precTop < precNew) break;
+    (void) AddElement (pfx, (fxFltType) 0, (int) top);
+    pfx->usedOprStack--;
+  }
+}
+
 static MagickBooleanType GetOperator (
   FxInfo * pfx,
   MagickBooleanType * Assign, MagickBooleanType * Update, MagickBooleanType * IncrDecr)
@@ -2923,19 +2940,7 @@ static MagickBooleanType GetOperator (
      then move top of OperatorStack to Element list.
   */
 
-  while (pfx->usedOprStack > 0) {
-    OperatorE top = pfx->OperatorStack[pfx->usedOprStack-1];
-    int precTop, precNew;
-    if (IsOperatorStackBarrier(top) != MagickFalse) break;
-    precTop = Operators[top].precedence;
-    precNew = Operators[op].precedence;
-    /* Assume left associativity.
-       If right assoc, this would be "<=".
-    */
-    if (precTop < precNew) break;
-    (void) AddElement (pfx, (fxFltType) 0, (int) top);
-    pfx->usedOprStack--;
-  }
+  MoveHigherPrecedenceOperators (pfx, op);
 
   /* If new op is close paren, and stack top is open paren,
      remove stack top.
