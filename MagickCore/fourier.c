@@ -1221,8 +1221,7 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
 
     width=image->columns;
     height=image->rows;
-    if ((image->columns != image->rows) || ((image->columns % 2) != 0) ||
-        ((image->rows % 2) != 0))
+    if (IsFourierPaddingNeeded(image) != MagickFalse)
       {
         size_t extent=image->columns < image->rows ? image->rows :
           image->columns;
