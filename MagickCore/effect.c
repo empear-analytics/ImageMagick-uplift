@@ -280,6 +280,105 @@ static void SumAdaptiveBlendedPixels(const AdaptiveSum *sum,
   }
 }
 
+typedef struct _AdaptiveChannel
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  double
+    **kernel;
+
+  const Quantum
+    *p;
+
+  size_t
+    width;
+
+  ssize_t
+    j,
+    center;
+} AdaptiveChannel;
+
+static void BlurAdaptiveChannel(const AdaptiveChannel *adaptive,
+  const ssize_t i,Quantum *magick_restrict q)
+{
+  const double
+    *magick_restrict k;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  double
+    gamma,
+    pixel;
+
+  AdaptiveSum
+    sum;
+
+  AdaptiveSumTargets
+    targets;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    blur_traits,
+    traits;
+
+  channel=GetPixelChannelChannel(adaptive->image,i);
+  traits=GetPixelChannelTraits(adaptive->image,channel);
+  blur_traits=GetPixelChannelTraits(adaptive->blur_image,channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (blur_traits == UndefinedPixelTrait))
+    return;
+  if ((blur_traits & CopyPixelTrait) != 0)
+    {
+      SetPixelChannel(adaptive->blur_image,channel,
+        adaptive->p[adaptive->center+i],q);
+      return;
+    }
+  k=adaptive->kernel[adaptive->j];
+  pixels=adaptive->p;
+  pixel=0.0;
+  gamma=0.0;
+  if ((blur_traits & BlendPixelTrait) == 0)
+    {
+      /*
+        No alpha blending.
+      */
+      sum.image=adaptive->image;
+      sum.width=adaptive->width;
+      sum.j=adaptive->j;
+      sum.i=i;
+      targets.pixel=(&pixel);
+      targets.gamma=(&gamma);
+      targets.k=(&k);
+      targets.pixels=(&pixels);
+      SumAdaptivePixels(&sum,&targets);
+      gamma=MagickSafeReciprocal(gamma);
+      SetPixelChannel(adaptive->blur_image,channel,ClampToQuantum(gamma*pixel),
+        q);
+      return;
+    }
+  /*
+    Alpha blending.
+  */
+  sum.image=adaptive->image;
+  sum.width=adaptive->width;
+  sum.j=adaptive->j;
+  sum.i=i;
+  targets.pixel=(&pixel);
+  targets.gamma=(&gamma);
+  targets.k=(&k);
+  targets.pixels=(&pixels);
+  SumAdaptiveBlendedPixels(&sum,&targets);
+  gamma=MagickSafeReciprocal(gamma);
+  SetPixelChannel(adaptive->blur_image,channel,ClampToQuantum(gamma*pixel),q);
+}
+
 MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -451,76 +550,17 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
         ((width-(size_t) j)/2L)+GetPixelChannels(image)*((width-(size_t) j)/2));
       for (i=0; i < (ssize_t) GetPixelChannels(blur_image); i++)
       {
-        const double
-          *magick_restrict k;
+        AdaptiveChannel
+          adaptive;
 
-        const Quantum
-          *magick_restrict pixels;
-
-        double
-          gamma,
-          pixel;
-
-        AdaptiveSum
-          sum;
-
-        AdaptiveSumTargets
-          targets;
-
-        PixelChannel
-          channel;
-
-        PixelTrait
-          blur_traits,
-          traits;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        blur_traits=GetPixelChannelTraits(blur_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (blur_traits == UndefinedPixelTrait))
-          continue;
-        if ((blur_traits & CopyPixelTrait) != 0)
-          {
-            SetPixelChannel(blur_image,channel,p[center+i],q);
-            continue;
-          }
-        k=kernel[j];
-        pixels=p;
-        pixel=0.0;
-        gamma=0.0;
-        if ((blur_traits & BlendPixelTrait) == 0)
-          {
-            /*
-              No alpha blending.
-            */
-            sum.image=image;
-            sum.width=width;
-            sum.j=j;
-            sum.i=i;
-            targets.pixel=(&pixel);
-            targets.gamma=(&gamma);
-            targets.k=(&k);
-            targets.pixels=(&pixels);
-            SumAdaptivePixels(&sum,&targets);
-            gamma=MagickSafeReciprocal(gamma);
-            SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
-            continue;
-          }
-        /*
-          Alpha blending.
-        */
-        sum.image=image;
-        sum.width=width;
-        sum.j=j;
-        sum.i=i;
-        targets.pixel=(&pixel);
-        targets.gamma=(&gamma);
-        targets.k=(&k);
-        targets.pixels=(&pixels);
-        SumAdaptiveBlendedPixels(&sum,&targets);
-        gamma=MagickSafeReciprocal(gamma);
-        SetPixelChannel(blur_image,channel,ClampToQuantum(gamma*pixel),q);
+        adaptive.image=image;
+        adaptive.blur_image=blur_image;
+        adaptive.kernel=kernel;
+        adaptive.p=p;
+        adaptive.width=width;
+        adaptive.j=j;
+        adaptive.center=center;
+        BlurAdaptiveChannel(&adaptive,i,q);
       }
       q+=(ptrdiff_t) GetPixelChannels(blur_image);
       r+=(ptrdiff_t) GetPixelChannels(edge_image);
