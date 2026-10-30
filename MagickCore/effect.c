@@ -385,12 +385,12 @@ static void RelinquishAdaptiveKernels(double **kernel,ssize_t w)
     kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
 }
 
-MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
-  const double sigma,ExceptionInfo *exception)
-{
 #define AdaptiveBlurImageTag  "Convolve/Image"
 #define MagickSigma  (fabs(sigma) < MagickEpsilon ? MagickEpsilon : sigma)
 
+MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
+  const double sigma,ExceptionInfo *exception)
+{
   CacheView
     *blur_view,
     *edge_view,
