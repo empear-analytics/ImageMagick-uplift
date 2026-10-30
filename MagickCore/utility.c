@@ -1010,6 +1010,22 @@ static ssize_t FindNonDirectory(char **filelist,const size_t number_files)
   return(j);
 }
 
+static MagickBooleanType ParseExpandableArgument(const char *option,
+  char *filename,char *magick)
+{
+  if ((*option == '"') || (*option == '\''))
+    return(MagickFalse);
+  GetPathComponent(option,TailPath,filename);
+  GetPathComponent(option,MagickPath,magick);
+  if (IsTextMagick(magick) != MagickFalse)
+    return(MagickFalse);
+  if ((IsGlob(filename) == MagickFalse) && (*option != '@'))
+    return(MagickFalse);
+  if (IsPathAccessible(option) != MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1081,15 +1097,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
         CopyArgumentParameters(&list,&i,&count);
         continue;
       }
-    if ((*option == '"') || (*option == '\''))
-      continue;
-    GetPathComponent(option,TailPath,filename);
-    GetPathComponent(option,MagickPath,magick);
-    if (IsTextMagick(magick) != MagickFalse)
-      continue;
-    if ((IsGlob(filename) == MagickFalse) && (*option != '@'))
-      continue;
-    if (IsPathAccessible(option) != MagickFalse)
+    if (ParseExpandableArgument(option,filename,magick) == MagickFalse)
       continue;
     if (*option != '@')
       {
