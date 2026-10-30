@@ -1932,6 +1932,67 @@ static ssize_t FindTauIndex(const ZeroCrossing *zero_crossing,
   return(k);
 }
 
+typedef struct _ActiveNodeInputs
+{
+  IntervalTree
+    **list;
+
+  ssize_t
+    number_nodes;
+
+  ZeroCrossing
+    *zero_crossing;
+
+  size_t
+    number_crossings;
+} ActiveNodeInputs;
+
+static void SetActiveNodeExtrema(const ActiveNodeInputs *inputs,
+  short *extrema)
+{
+  IntervalTree
+    **const list = inputs->list;
+
+  const ssize_t
+    number_nodes = inputs->number_nodes;
+
+  ZeroCrossing
+    *const zero_crossing = inputs->zero_crossing;
+
+  const size_t
+    number_crossings = inputs->number_crossings;
+
+  IntervalTree
+    *node;
+
+  MagickBooleanType
+    peak;
+
+  ssize_t
+    i,
+    index,
+    k;
+
+  for (i=0; i <= 255; i++)
+    extrema[i]=0;
+  for (i=0; i < number_nodes; i++)
+  {
+    /*
+      Find this tau in zero crossings list.
+    */
+    k=0;
+    node=list[i];
+    k=FindTauIndex(zero_crossing,number_crossings,node,k);
+    /*
+      Find the value of the peak.
+    */
+    peak=zero_crossing[k].crossings[node->right] == -1 ? MagickTrue :
+      MagickFalse;
+    index=FindPeakIndex(zero_crossing,k,node,peak);
+    SetNodeExtrema(extrema,node,index,peak);
+  }
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
@@ -1942,13 +2003,12 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     *second_derivative,
     tau;
 
+  ActiveNodeInputs
+    inputs;
+
   IntervalTree
     **list,
-    *node,
     *root;
-
-  MagickBooleanType
-    peak;
 
   ssize_t
     i;
@@ -1958,9 +2018,7 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     number_crossings;
 
   ssize_t
-    index,
     j,
-    k,
     number_nodes;
 
   ZeroCrossing
@@ -2043,24 +2101,11 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
   /*
     Initialize extrema.
   */
-  for (i=0; i <= 255; i++)
-    extrema[i]=0;
-  for (i=0; i < number_nodes; i++)
-  {
-    /*
-      Find this tau in zero crossings list.
-    */
-    k=0;
-    node=list[i];
-    k=FindTauIndex(zero_crossing,number_crossings,node,k);
-    /*
-      Find the value of the peak.
-    */
-    peak=zero_crossing[k].crossings[node->right] == -1 ? MagickTrue :
-      MagickFalse;
-    index=FindPeakIndex(zero_crossing,k,node,peak);
-    SetNodeExtrema(extrema,node,index,peak);
-  }
+  inputs.list=list;
+  inputs.number_nodes=number_nodes;
+  inputs.zero_crossing=zero_crossing;
+  inputs.number_crossings=number_crossings;
+  SetActiveNodeExtrema(&inputs,extrema);
   /*
     Determine the average tau.
   */
