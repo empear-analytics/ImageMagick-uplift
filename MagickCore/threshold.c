@@ -1527,6 +1527,17 @@ static const char *CopyThresholdMapName(const char *threshold_map,
   return(p);
 }
 
+static ThresholdMap *GetNamedThresholdMap(const char *threshold_map,
+  const char *p,ExceptionInfo *exception)
+{
+  char
+    token[MagickPathExtent];
+
+  p=CopyThresholdMapName(threshold_map,p,token);
+  token[p-threshold_map]='\0';
+  return(GetThresholdMap(token,exception));
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1534,9 +1545,6 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
 
   CacheView
     *image_view;
-
-  char
-    token[MagickPathExtent];
 
   const char
     *p;
@@ -1568,9 +1576,7 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   while (IsThresholdMapSeparator(p) != MagickFalse)
     p++;
   threshold_map=p;
-  p=CopyThresholdMapName(threshold_map,p,token);
-  token[p-threshold_map]='\0';
-  map=GetThresholdMap(token,exception);
+  map=GetNamedThresholdMap(threshold_map,p,exception);
   if (map == (ThresholdMap *) NULL)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
