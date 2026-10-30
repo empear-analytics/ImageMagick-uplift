@@ -265,6 +265,67 @@ static void FillBitCountTable(unsigned short *bits)
   }
 }
 
+typedef struct _RadonRow
+{
+  const Image
+    *image;
+
+  double
+    threshold;
+
+  ssize_t
+    y;
+} RadonRow;
+
+static void PackRadonRowReversed(const Quantum *magick_restrict p,
+  MatrixInfo *source_matrices,unsigned short *bits,const RadonRow *row)
+{
+  const Image
+    *const image = row->image;
+
+  const double
+    threshold = row->threshold;
+
+  const ssize_t
+    y = row->y;
+
+  size_t
+    bit,
+    byte;
+
+  ssize_t
+    i,
+    x;
+
+  unsigned short
+    value;
+
+  bit=0;
+  byte=0;
+  i=(ssize_t) (image->columns+7)/8;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    byte<<=1;
+    if (IsPixelBelowThreshold(image,p,threshold) != MagickFalse)
+      byte|=0x01;
+    bit++;
+    if (bit == 8)
+      {
+        value=bits[byte];
+        (void) SetMatrixElement(source_matrices,--i,y,&value);
+        bit=0;
+        byte=0;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (bit != 0)
+    {
+      byte<<=(8-bit);
+      value=bits[byte];
+      (void) SetMatrixElement(source_matrices,--i,y,&value);
+    }
+}
+
 static void DestroyRadonMatrices(MatrixInfo *source_matrices,
   MatrixInfo *destination_matrices)
 {
@@ -325,16 +386,8 @@ static MagickBooleanType RadonTransform(const Image *image,
     const Quantum
       *magick_restrict p;
 
-    size_t
-      bit,
-      byte;
-
-    ssize_t
-      i,
-      x;
-
-    unsigned short
-      value;
+    RadonRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -344,30 +397,10 @@ static MagickBooleanType RadonTransform(const Image *image,
         status=MagickFalse;
         continue;
       }
-    bit=0;
-    byte=0;
-    i=(ssize_t) (image->columns+7)/8;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      byte<<=1;
-      if (IsPixelBelowThreshold(image,p,threshold) != MagickFalse)
-        byte|=0x01;
-      bit++;
-      if (bit == 8)
-        {
-          value=bits[byte];
-          (void) SetMatrixElement(source_matrices,--i,y,&value);
-          bit=0;
-          byte=0;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (bit != 0)
-      {
-        byte<<=(8-bit);
-        value=bits[byte];
-        (void) SetMatrixElement(source_matrices,--i,y,&value);
-      }
+    row.image=image;
+    row.threshold=threshold;
+    row.y=y;
+    PackRadonRowReversed(p,source_matrices,bits,&row);
   }
   RadonProjection(source_matrices,destination_matrices,-1,projection);
   (void) NullMatrix(source_matrices);
