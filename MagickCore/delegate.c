@@ -988,6 +988,44 @@ static inline MagickBooleanType IsPropertyEnd(const char *p)
     MagickFalse);
 }
 
+static void DecodeDelegateEscape(const char **p,char **q)
+{
+  switch (*(*p+1))
+  {
+    case '\0':
+      return;
+    case 'r':  /* convert to RETURN */
+    {
+      *(*q)++='\r';
+      (*p)++;
+      return;
+    }
+    case 'n':  /* convert to NEWLINE */
+    {
+      *(*q)++='\n';
+      (*p)++;
+      return;
+    }
+    case '\n':  /* EOL removal UNIX,MacOSX */
+    {
+      (*p)++;
+      return;
+    }
+    case '\r':  /* EOL removal DOS,Windows */
+    {
+      (*p)++;
+      if (**p == '\n') /* return-newline EOL */
+        (*p)++;
+      return;
+    }
+    default:
+    {
+      (*p)++;
+      *(*q)++=(**p);
+    }
+  }
+}
+
 static void DecodeDelegateEntity(const char **p,char **q)
 {
   if (LocaleNCompare("&lt;",*p,4) == 0)
@@ -1107,40 +1145,7 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
     {
       case '\\':
       {
-        switch (*(p+1))
-        {
-          case '\0':
-            continue;
-          case 'r':  /* convert to RETURN */
-          {
-            *q++='\r';
-            p++;
-            continue;
-          }
-          case 'n':  /* convert to NEWLINE */
-          {
-            *q++='\n';
-            p++;
-            continue;
-          }
-          case '\n':  /* EOL removal UNIX,MacOSX */
-          {
-            p++;
-            continue;
-          }
-          case '\r':  /* EOL removal DOS,Windows */
-          {
-            p++;
-            if (*p == '\n') /* return-newline EOL */
-              p++;
-            continue;
-          }
-          default:
-          {
-            p++;
-            *q++=(*p);
-          }
-        }
+        DecodeDelegateEscape(&p,&q);
         continue;
       }
       case '&':
