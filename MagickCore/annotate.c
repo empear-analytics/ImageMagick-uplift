@@ -1875,6 +1875,18 @@ static void RelinquishFreetypeText(GraphemeInfo *grapheme,unsigned char *utf8)
     utf8=(unsigned char *) RelinquishMagickMemory(utf8);
 }
 
+static FT_Int32 GetFreetypeHintingFlags(Image *image,FT_Int32 flags,
+  ExceptionInfo *exception)
+{
+  const char
+    *value;
+
+  value=GetImageProperty(image,"type:hinting",exception);
+  if ((value != (const char *) NULL) && (LocaleCompare(value,"off") == 0))
+    flags|=FT_LOAD_NO_HINTING;
+  return(flags);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1916,9 +1928,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
   char
     *p;
-
-  const char
-    *value;
 
   DrawInfo
     *annotate_info;
@@ -2178,9 +2187,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
       flags|=FT_LOAD_TARGET_LCD;
 #endif
     }
-  value=GetImageProperty(image,"type:hinting",exception);
-  if ((value != (const char *) NULL) && (LocaleCompare(value,"off") == 0))
-    flags|=FT_LOAD_NO_HINTING;
+  flags=GetFreetypeHintingFlags(image,flags,exception);
   glyph.id=0;
   glyph.image=(FT_Glyph) NULL;
   last_glyph_id=0;
