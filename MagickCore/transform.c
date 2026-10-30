@@ -2344,6 +2344,41 @@ static RectangleInfo SetTrimShortfall(const RectangleInfo geometry,
   return(minSize);
 }
 
+static void OffsetTrimGeometry(const Image *image,const RectangleInfo minSize,
+  RectangleInfo *geometry)
+{
+  switch (image->gravity)
+  {
+    case NorthWestGravity:
+    {
+      (*geometry).x-=minSize.x;
+      (*geometry).y-=minSize.y;
+      break;
+    }
+    case NorthGravity:
+    {
+      (*geometry).x-=minSize.x/2;
+      (*geometry).y-=minSize.y;
+      break;
+    }
+    case NorthEastGravity:
+    {
+      (*geometry).y-=minSize.y;
+      break;
+    }
+    case WestGravity:
+    {
+      (*geometry).x-=minSize.x;
+      (*geometry).y-=minSize.y/2;
+      break;
+    }
+    case UndefinedGravity:
+    case SouthEastGravity:
+    default:
+      break;
+  }
+}
+
 MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
 {
   const char
@@ -2379,29 +2414,6 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
           minSize=SetTrimShortfall(geometry,minSize);
           switch (image->gravity)
           {
-            case NorthWestGravity:
-            {
-              geometry.x-=minSize.x;
-              geometry.y-=minSize.y;
-              break;
-            }
-            case NorthGravity:
-            {
-              geometry.x-=minSize.x/2;
-              geometry.y-=minSize.y;
-              break;
-            }
-            case NorthEastGravity:
-            {
-              geometry.y-=minSize.y;
-              break;
-            }
-            case WestGravity:
-            {
-              geometry.x-=minSize.x;
-              geometry.y-=minSize.y/2;
-              break;
-            }
             case EastGravity:
             {
               geometry.y-=minSize.y/2;
@@ -2423,10 +2435,11 @@ MagickExport Image *TrimImage(const Image *image,ExceptionInfo *exception)
               geometry.y-=minSize.y/2;
               break;
             }
-            case UndefinedGravity:
-            case SouthEastGravity:
             default:
+            {
+              OffsetTrimGeometry(image,minSize,&geometry);
               break;
+            }
           }
           geometry=ClampTrimExtent(image,minSize,geometry);
           geometry=ClampTrimOffset(image,geometry);
