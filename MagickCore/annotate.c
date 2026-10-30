@@ -1834,6 +1834,20 @@ static char *FindInvalidUTFCode(const DrawInfo *draw_info)
   return(p);
 }
 
+static void SelectFreetypeText(const DrawInfo *draw_info,
+  unsigned char **utf8,char **p)
+{
+  *utf8=(unsigned char *) NULL;
+  if (GetUTFCode(*p) == 0)
+    *p=draw_info->text;
+  else
+    {
+      *utf8=ConvertLatin1ToUTF8((unsigned char *) draw_info->text);
+      if (*utf8 != (unsigned char *) NULL)
+        *p=(char *) *utf8;
+    }
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2164,15 +2178,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   if (draw_info->render != MagickFalse)
     SetFreetypeCanvas(image,exception);
   p=FindInvalidUTFCode(draw_info);
-  utf8=(unsigned char *) NULL;
-  if (GetUTFCode(p) == 0)
-    p=draw_info->text;
-  else
-    {
-      utf8=ConvertLatin1ToUTF8((unsigned char *) draw_info->text);
-      if (utf8 != (unsigned char *) NULL)
-        p=(char *) utf8;
-    }
+  SelectFreetypeText(draw_info,&utf8,&p);
   grapheme=(GraphemeInfo *) NULL;
   length=strlen(p);
 #if defined(MAGICKCORE_RAQM_DELEGATE)
