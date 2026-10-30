@@ -1014,7 +1014,11 @@ accumulators.
    declared outside the loop body, `status` included.
 3. Variables the block declares and uses alone move with it; one initialised in its
    declaration moves with its initialiser only if it is declared in the innermost loop
-   that runs the block, so it is reset as often as before.
+   that runs the block, so it is reset as often as before. A variable of the caller that
+   the block writes before reading it, and that the caller does not read after the block
+   before writing it again (a loop counter the caller also uses elsewhere), is declared
+   in the new function instead, without an initialiser, and is not one of the four, as
+   Recipe J step 3 and Recipe Q step 2 do.
 4. Cut the block into a new `static void` function directly above the caller. Pass each
    variable it only reads by value; each array it writes as a pointer (its uses do not
    change); each scalar it writes as a pointer, written `*v` (or `(*v)++`) at every use,
@@ -1075,6 +1079,10 @@ static void AccumulateFUZZPixel(...,double *channel_similarity,
   the order of floating-point additions does not change.
 - Keep the written variables few; a block that writes more than four is not one
   accumulation, and is skipped.
+- A step-3 temporary moved into the new function is written there before it is read,
+  as it was in the block, so its value on entry was never read; and the caller writes it
+  again before it next reads it, so the value the block left was never read either. The
+  new function's own copy behaves the same for both.
 - Under step 6 there is no thread to share with: each pointer names the caller's own
   local, whose address is taken nowhere else, so no two pointers name one object, and
   `*v` reads and writes it at the same points and in the same order as `v` did (Recipe
@@ -3652,3 +3660,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | LB | Step 6: a block whose step-3 text equals, under Recipe D's renaming (checked by script), the body of a function Recipe LB, Y or W already made in the file calls that function instead of a second copy, with its own struct local and its own `break;`, as Recipe W step 7 allows for W; *Careful* gives the argument | `histogram.c`'s `CheckImageColors`: its child-allocation block in the tree descent ends the level loop through `break;` where `ClassifyImageColors`' identical block returns `0`, which Recipe Y moved into `AcquireHNodeChild`; a second copy would be a *Code Duplication*. A probe: nesting 5 to 4, 6.41 to 6.42 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | I | Step 2: a written variable whose address the caller passes elsewhere only as an argument of calls that keep no copy of it (checked by reading the callee) still qualifies, as Recipe V step 2 and Recipe LB step 8 allow; in the block, `&v` becomes `v`, as step 8 already says for its form; *Careful* gives the argument | `histogram.c`'s `ClassifyImageColors`: its tree descent (the level loop at depth 3, its exit at depth 4) writes the node cursor and `pixel`, whose address the caller also passes to `GetPixelInfo` and `IsPixelInfoColorMatch`, neither of which keeps it, and leaves through `return(0);`. A probe: 6.43 to 6.47 | mandate (2026-10-24) |
 | 2026-10-30 | NEW | TW | Extract Twin Blocks into One Function Taking an Input Struct: two functions' copies of one block, the same text once each copy's variables are renamed consistently and differing in at most one value (checked by script), move to one `static` function taking a `const` struct of the inputs (Recipe N), its members named for their roles and filled in each caller from that copy's variables; read-then-written inputs go by value, temporaries written before read are declared in the function; both copies in one commit (rule 1) | `shear.c`'s `XShearImage` and `YShearImage`: the left/up and right/down pixel-transfer cases of their direction `switch`es hold the depth-4 sites; Recipe N names members after one copy's variables, Recipe D needs a reported duplication and would take seven parameters. A probe: one function's cases alone 6.47 to 5.99, both 6.47 to 6.63 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | K | Step 3: a variable of the caller that the block writes before reading it, and that the caller does not read after the block before writing it again, is declared in the new function and is not one of the four written variables (Recipe J step 3, Recipe Q step 2); *Careful* gives the argument | `shear.c`'s `CropToFitImage`: its minimum/maximum scan over the four extent corners (a bump: four `if`s in a `for`) writes `min` and `max` and the loop counter `i`, which the caller also uses for the corner loop before it; step 6 would pass `i` by pointer as a third written local. A probe of the scan as a helper (step 6): 7.29 to 7.53 | mandate (2026-10-24) |
