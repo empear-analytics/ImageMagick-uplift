@@ -961,6 +961,73 @@ static void ReportResizeFilter(const Image *image,
   (void) DeleteImageArtifact((Image *) image,"filter:verbose");
 }
 
+/*
+  Table mapping the filter/window from the above table to an actual function.
+  The default support size for that filter as a weighting function, the range
+  to scale with to use that function as a sinc windowing function, (typ 1.0).
+
+  Note that the filter_type -> function is 1 to 1 except for Sinc(),
+  SincFast(), and CubicBC() functions, which may have multiple filter to
+  function associations.
+
+  See "filter:verbose" handling below for the function -> filter mapping.
+*/
+static struct
+{
+  double
+    (*function)(const double,const ResizeFilter*),
+    support, /* Default lobes/support size of the weighting filter. */
+    scale,   /* Support when function used as a windowing function
+               Typically equal to the location of the first zero crossing. */
+    B,C;     /* BC-spline coefficients, ignored if not a CubicBC filter. */
+  ResizeWeightingFunctionType weightingFunctionType;
+} const filters[SentinelFilter] =
+{
+  /*            .---  support window (if used as a Weighting Function)
+                |    .--- first crossing (if used as a Windowing Function)
+                |    |    .--- B value for Cubic Function
+                |    |    |    .---- C value for Cubic Function
+                |    |    |    |                                    */
+  { Box,       0.5, 0.5, 0.0, 0.0, BoxWeightingFunction },      /* Undefined (default to Box)  */
+  { Box,       0.0, 0.5, 0.0, 0.0, BoxWeightingFunction },      /* Point (special handling)    */
+  { Box,       0.5, 0.5, 0.0, 0.0, BoxWeightingFunction },      /* Box                         */
+  { Triangle,  1.0, 1.0, 0.0, 0.0, TriangleWeightingFunction }, /* Triangle                    */
+  { CubicBC,   1.0, 1.0, 0.0, 0.0, CubicBCWeightingFunction },  /* Hermite (cubic  B=C=0)      */
+  { Hann,      1.0, 1.0, 0.0, 0.0, HannWeightingFunction },     /* Hann, cosine window         */
+  { Hamming,   1.0, 1.0, 0.0, 0.0, HammingWeightingFunction },  /* Hamming, '' variation       */
+  { Blackman,  1.0, 1.0, 0.0, 0.0, BlackmanWeightingFunction }, /* Blackman, 2*cosine window   */
+  { Gaussian,  2.0, 1.5, 0.0, 0.0, GaussianWeightingFunction }, /* Gaussian                    */
+  { Quadratic, 1.5, 1.5, 0.0, 0.0, QuadraticWeightingFunction },/* Quadratic gaussian          */
+  { CubicBC,   2.0, 2.0, 1.0, 0.0, CubicBCWeightingFunction },  /* General Cubic Filter        */
+  { CubicBC,   2.0, 1.0, 0.0, 0.5, CubicBCWeightingFunction },  /* Catmull-Rom    (B=0,C=1/2)  */
+  { CubicBC,   2.0, 8.0/7.0, 1./3., 1./3., CubicBCWeightingFunction }, /* Mitchell   (B=C=1/3)    */
+  { Jinc,      3.0, 1.2196698912665045, 0.0, 0.0, JincWeightingFunction }, /* Raw 3-lobed Jinc */
+  { Sinc,      4.0, 1.0, 0.0, 0.0, SincWeightingFunction },     /* Raw 4-lobed Sinc            */
+  { SincFast,  4.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Raw fast sinc ("Pade"-type) */
+  { Kaiser,    1.0, 1.0, 0.0, 0.0, KaiserWeightingFunction },   /* Kaiser (square root window) */
+  { Welch,     1.0, 1.0, 0.0, 0.0, WelchWeightingFunction },    /* Welch (parabolic window)    */
+  { CubicBC,   2.0, 2.0, 1.0, 0.0, CubicBCWeightingFunction },  /* Parzen (B-Spline window)    */
+  { Bohman,    1.0, 1.0, 0.0, 0.0, BohmanWeightingFunction },   /* Bohman, 2*Cosine window     */
+  { Triangle,  1.0, 1.0, 0.0, 0.0, TriangleWeightingFunction }, /* Bartlett (triangle window)  */
+  { Lagrange,  2.0, 1.0, 0.0, 0.0, LagrangeWeightingFunction }, /* Lagrange sinc approximation */
+  { SincFast,  3.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos, 3-lobed Sinc-Sinc  */
+  { SincFast,  3.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos, Sharpened          */
+  { SincFast,  2.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos, 2-lobed            */
+  { SincFast,  2.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos2, sharpened         */
+  /* Robidoux: Keys cubic close to Lanczos2D sharpened */
+  { CubicBC,   2.0, 1.1685777620836932,
+                          0.37821575509399867, 0.31089212245300067, CubicBCWeightingFunction },
+  /* RobidouxSharp: Sharper version of Robidoux */
+  { CubicBC,   2.0, 1.105822933719019,
+                          0.2620145123990142,  0.3689927438004929, CubicBCWeightingFunction },
+  { Cosine,    1.0, 1.0, 0.0, 0.0, CosineWeightingFunction },   /* Low level cosine window     */
+  { CubicBC,   2.0, 2.0, 1.0, 0.0, CubicBCWeightingFunction },  /* Cubic B-Spline (B=1,C=0)    */
+  { SincFast,  3.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos, Integer Radius    */
+  { CubicSpline,2.0, 0.5, 0.0, 0.0, BoxWeightingFunction },  /* Spline Lobes 2-lobed */
+  { MagicKernelSharp2013, 2.5, 1.0, 0.0, 0.0, MagicKernelSharpWeightingFunction }, /* MagicKernelSharp2013 */
+  { MagicKernelSharp2021, 4.5, 1.0, 0.0, 0.0, MagicKernelSharpWeightingFunction }, /* MagicKernelSharp2021 */
+};
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1034,72 +1101,6 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
     { CubicSplineFilter,   BoxFilter      },  /* CubicSpline (2/3/4 lobes)    */
     { MagicKernelSharp2013Filter, BoxFilter }, /* Magic Kernal Sharp 2013     */
     { MagicKernelSharp2021Filter, BoxFilter }, /* Magic Kernal Sharp 2021     */
-  };
-  /*
-    Table mapping the filter/window from the above table to an actual function.
-    The default support size for that filter as a weighting function, the range
-    to scale with to use that function as a sinc windowing function, (typ 1.0).
-
-    Note that the filter_type -> function is 1 to 1 except for Sinc(),
-    SincFast(), and CubicBC() functions, which may have multiple filter to
-    function associations.
-
-    See "filter:verbose" handling below for the function -> filter mapping.
-  */
-  static struct
-  {
-    double
-      (*function)(const double,const ResizeFilter*),
-      support, /* Default lobes/support size of the weighting filter. */
-      scale,   /* Support when function used as a windowing function
-                 Typically equal to the location of the first zero crossing. */
-      B,C;     /* BC-spline coefficients, ignored if not a CubicBC filter. */
-    ResizeWeightingFunctionType weightingFunctionType;
-  } const filters[SentinelFilter] =
-  {
-    /*            .---  support window (if used as a Weighting Function)
-                  |    .--- first crossing (if used as a Windowing Function)
-                  |    |    .--- B value for Cubic Function
-                  |    |    |    .---- C value for Cubic Function
-                  |    |    |    |                                    */
-    { Box,       0.5, 0.5, 0.0, 0.0, BoxWeightingFunction },      /* Undefined (default to Box)  */
-    { Box,       0.0, 0.5, 0.0, 0.0, BoxWeightingFunction },      /* Point (special handling)    */
-    { Box,       0.5, 0.5, 0.0, 0.0, BoxWeightingFunction },      /* Box                         */
-    { Triangle,  1.0, 1.0, 0.0, 0.0, TriangleWeightingFunction }, /* Triangle                    */
-    { CubicBC,   1.0, 1.0, 0.0, 0.0, CubicBCWeightingFunction },  /* Hermite (cubic  B=C=0)      */
-    { Hann,      1.0, 1.0, 0.0, 0.0, HannWeightingFunction },     /* Hann, cosine window         */
-    { Hamming,   1.0, 1.0, 0.0, 0.0, HammingWeightingFunction },  /* Hamming, '' variation       */
-    { Blackman,  1.0, 1.0, 0.0, 0.0, BlackmanWeightingFunction }, /* Blackman, 2*cosine window   */
-    { Gaussian,  2.0, 1.5, 0.0, 0.0, GaussianWeightingFunction }, /* Gaussian                    */
-    { Quadratic, 1.5, 1.5, 0.0, 0.0, QuadraticWeightingFunction },/* Quadratic gaussian          */
-    { CubicBC,   2.0, 2.0, 1.0, 0.0, CubicBCWeightingFunction },  /* General Cubic Filter        */
-    { CubicBC,   2.0, 1.0, 0.0, 0.5, CubicBCWeightingFunction },  /* Catmull-Rom    (B=0,C=1/2)  */
-    { CubicBC,   2.0, 8.0/7.0, 1./3., 1./3., CubicBCWeightingFunction }, /* Mitchell   (B=C=1/3)    */
-    { Jinc,      3.0, 1.2196698912665045, 0.0, 0.0, JincWeightingFunction }, /* Raw 3-lobed Jinc */
-    { Sinc,      4.0, 1.0, 0.0, 0.0, SincWeightingFunction },     /* Raw 4-lobed Sinc            */
-    { SincFast,  4.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Raw fast sinc ("Pade"-type) */
-    { Kaiser,    1.0, 1.0, 0.0, 0.0, KaiserWeightingFunction },   /* Kaiser (square root window) */
-    { Welch,     1.0, 1.0, 0.0, 0.0, WelchWeightingFunction },    /* Welch (parabolic window)    */
-    { CubicBC,   2.0, 2.0, 1.0, 0.0, CubicBCWeightingFunction },  /* Parzen (B-Spline window)    */
-    { Bohman,    1.0, 1.0, 0.0, 0.0, BohmanWeightingFunction },   /* Bohman, 2*Cosine window     */
-    { Triangle,  1.0, 1.0, 0.0, 0.0, TriangleWeightingFunction }, /* Bartlett (triangle window)  */
-    { Lagrange,  2.0, 1.0, 0.0, 0.0, LagrangeWeightingFunction }, /* Lagrange sinc approximation */
-    { SincFast,  3.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos, 3-lobed Sinc-Sinc  */
-    { SincFast,  3.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos, Sharpened          */
-    { SincFast,  2.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos, 2-lobed            */
-    { SincFast,  2.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos2, sharpened         */
-    /* Robidoux: Keys cubic close to Lanczos2D sharpened */
-    { CubicBC,   2.0, 1.1685777620836932,
-                            0.37821575509399867, 0.31089212245300067, CubicBCWeightingFunction },
-    /* RobidouxSharp: Sharper version of Robidoux */
-    { CubicBC,   2.0, 1.105822933719019,
-                            0.2620145123990142,  0.3689927438004929, CubicBCWeightingFunction },
-    { Cosine,    1.0, 1.0, 0.0, 0.0, CosineWeightingFunction },   /* Low level cosine window     */
-    { CubicBC,   2.0, 2.0, 1.0, 0.0, CubicBCWeightingFunction },  /* Cubic B-Spline (B=1,C=0)    */
-    { SincFast,  3.0, 1.0, 0.0, 0.0, SincFastWeightingFunction }, /* Lanczos, Integer Radius    */
-    { CubicSpline,2.0, 0.5, 0.0, 0.0, BoxWeightingFunction },  /* Spline Lobes 2-lobed */
-    { MagicKernelSharp2013, 2.5, 1.0, 0.0, 0.0, MagicKernelSharpWeightingFunction }, /* MagicKernelSharp2013 */
-    { MagicKernelSharp2021, 4.5, 1.0, 0.0, 0.0, MagicKernelSharpWeightingFunction }, /* MagicKernelSharp2021 */
   };
   /*
     The known zero crossings of the Jinc() or more accurately the Jinc(x*PI)
