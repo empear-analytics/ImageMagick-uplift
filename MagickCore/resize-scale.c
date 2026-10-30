@@ -193,14 +193,69 @@ static void ImportScaleScanline(const Image *image,const Quantum *p,
   }
 }
 
-static void ExportScaleScanline(const Image *image,const Image *scale_image,
-  const double *scanline,double alpha,Quantum *q)
+typedef struct _ScaleExportPixel
 {
+  const Image
+    *image,
+    *scale_image;
+
+  const double
+    *scanline;
+
+  double
+    alpha;
+
+  ssize_t
+    x;
+} ScaleExportPixel;
+
+static void ExportScalePixel(const ScaleExportPixel *pixel,Quantum *q)
+{
+  const Image
+    *const image = pixel->image,
+    *const scale_image = pixel->scale_image;
+
+  const double
+    *const scanline = pixel->scanline;
+
+  const double
+    alpha = pixel->alpha;
+
+  const ssize_t
+    x = pixel->x;
+
   PixelTrait
     scale_traits;
 
   ssize_t
-    i,
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    scale_traits=GetPixelChannelTraits(scale_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (scale_traits == UndefinedPixelTrait))
+      continue;
+    if ((traits & BlendPixelTrait) == 0)
+      {
+        SetPixelChannel(scale_image,channel,ClampToQuantum(
+          scanline[x*(ssize_t) GetPixelChannels(image)+i]),q);
+        continue;
+      }
+    SetPixelChannel(scale_image,channel,ClampToQuantum(alpha*scanline[
+      x*(ssize_t) GetPixelChannels(image)+i]),q);
+  }
+}
+
+static void ExportScaleScanline(const Image *image,const Image *scale_image,
+  const double *scanline,double alpha,Quantum *q)
+{
+  ScaleExportPixel
+    pixel;
+
+  ssize_t
     x;
 
   for (x=0; x < (ssize_t) scale_image->columns; x++)
@@ -216,23 +271,12 @@ static void ExportScaleScanline(const Image *image,const Image *scale_image,
           GetPixelChannelOffset(image,AlphaPixelChannel)];
         alpha=MagickSafeReciprocal(alpha);
       }
-    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    {
-      PixelChannel channel = GetPixelChannelChannel(image,i);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      scale_traits=GetPixelChannelTraits(scale_image,channel);
-      if ((traits == UndefinedPixelTrait) ||
-          (scale_traits == UndefinedPixelTrait))
-        continue;
-      if ((traits & BlendPixelTrait) == 0)
-        {
-          SetPixelChannel(scale_image,channel,ClampToQuantum(
-            scanline[x*(ssize_t) GetPixelChannels(image)+i]),q);
-          continue;
-        }
-      SetPixelChannel(scale_image,channel,ClampToQuantum(alpha*scanline[
-        x*(ssize_t) GetPixelChannels(image)+i]),q);
-    }
+    pixel.image=image;
+    pixel.scale_image=scale_image;
+    pixel.scanline=scanline;
+    pixel.alpha=alpha;
+    pixel.x=x;
+    ExportScalePixel(&pixel,q);
     q+=(ptrdiff_t) GetPixelChannels(scale_image);
   }
 }
