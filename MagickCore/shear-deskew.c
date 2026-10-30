@@ -212,6 +212,24 @@ static void MergeRadonPair(MatrixInfo *q,const RadonCell *cell)
     return;
 }
 
+static void MergeRadonPairEdge(MatrixInfo *q,const RadonCell *cell)
+{
+  unsigned short
+    element,
+    neighbor;
+
+  if (GetMatrixElement(cell->p,cell->x+cell->i,cell->y,&element) == MagickFalse)
+    return;
+  if (GetMatrixElement(cell->p,cell->x+cell->i+(ssize_t) cell->step,
+      cell->y+cell->i,&neighbor) == MagickFalse)
+    return;
+  neighbor+=element;
+  if (SetMatrixElement(q,cell->x+2*cell->i,cell->y,&neighbor) == MagickFalse)
+    return;
+  if (SetMatrixElement(q,cell->x+2*cell->i+1,cell->y,&element) == MagickFalse)
+    return;
+}
+
 typedef struct _RadonEdgeCell
 {
   MatrixInfo
@@ -260,10 +278,6 @@ static void RadonProjection(MatrixInfo *source_matrices,
         i,
         y;
 
-      unsigned short
-        element,
-        neighbor;
-
       for (i=0; i < (ssize_t) step; i++)
       {
         for (y=0; y < ((ssize_t) GetMatrixRows(p)-i-1); y++)
@@ -280,15 +294,15 @@ static void RadonProjection(MatrixInfo *source_matrices,
         }
         for ( ; y < ((ssize_t) GetMatrixRows(p)-i); y++)
         {
-          if (GetMatrixElement(p,x+i,y,&element) == MagickFalse)
-            continue;
-          if (GetMatrixElement(p,x+i+(ssize_t) step,y+i,&neighbor) == MagickFalse)
-            continue;
-          neighbor+=element;
-          if (SetMatrixElement(q,x+2*i,y,&neighbor) == MagickFalse)
-            continue;
-          if (SetMatrixElement(q,x+2*i+1,y,&element) == MagickFalse)
-            continue;
+          RadonCell
+            cell;
+
+          cell.p=p;
+          cell.x=x;
+          cell.i=i;
+          cell.step=step;
+          cell.y=y;
+          MergeRadonPairEdge(q,&cell);
         }
         for ( ; y < (ssize_t) GetMatrixRows(p); y++)
         {
