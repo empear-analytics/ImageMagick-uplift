@@ -848,14 +848,13 @@ static double GetHoughMaxima(const MatrixInfo *accumulator,
 
     for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
     {
-      if ((u != 0) || (v !=0))
+      if ((u == 0) && (v == 0))
+        continue;
+      (void) GetMatrixElement(accumulator,x+u,y+v,&count);
+      if (count > maxima)
         {
-          (void) GetMatrixElement(accumulator,x+u,y+v,&count);
-          if (count > maxima)
-            {
-              maxima=count;
-              break;
-            }
+          maxima=count;
+          break;
         }
     }
     if (u < (ssize_t) (width/2))
