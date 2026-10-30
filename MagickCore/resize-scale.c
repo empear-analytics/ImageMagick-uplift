@@ -501,6 +501,40 @@ static void AccumulateScaleColumnTail(const ScaleColumnTail *tail,
     }
 }
 
+typedef struct _ScaleColumnLast
+{
+  const Image
+    *image,
+    *scale_image;
+
+  MagickBooleanType
+    next_column;
+
+  ssize_t
+    t;
+} ScaleColumnLast;
+
+static void StoreLastScaleColumn(const ScaleColumnLast *last,
+  const double *pixel,double *scale_scanline)
+{
+  const Image
+    *const image = last->image,
+    *const scale_image = last->scale_image;
+
+  const MagickBooleanType
+    next_column = last->next_column;
+
+  const ssize_t
+    t = last->t;
+
+  ssize_t
+    i;
+
+  if ((next_column == MagickFalse) && (t < (ssize_t) scale_image->columns))
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
+}
+
 static void ScaleScanlineX(const Image *image,const Image *scale_image,
   const double *scanline,double *scale_scanline)
 {
@@ -514,11 +548,13 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
     scale,
     span;
 
+  ScaleColumnLast
+    last;
+
   ScaleColumnTail
     tail;
 
   ssize_t
-    i,
     t,
     x;
 
@@ -560,9 +596,11 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
   tail.scanline=scanline;
   tail.x=x;
   AccumulateScaleColumnTail(&tail,pixel);
-  if ((next_column == MagickFalse) && (t < (ssize_t) scale_image->columns))
-    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      scale_scanline[t*(ssize_t) GetPixelChannels(image)+i]=pixel[i];
+  last.image=image;
+  last.scale_image=scale_image;
+  last.next_column=next_column;
+  last.t=t;
+  StoreLastScaleColumn(&last,pixel,scale_scanline);
 }
 
 static void AccumulateScaleScanline(const Image *image,const PointInfo scale,
