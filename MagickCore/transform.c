@@ -938,9 +938,6 @@ MagickExport Image *ExcerptImage(const Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,geometry->x,geometry->y+y,
@@ -952,24 +949,7 @@ MagickExport Image *ExcerptImage(const Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) excerpt_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait excerpt_traits=GetPixelChannelTraits(excerpt_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (excerpt_traits == UndefinedPixelTrait))
-          continue;
-        SetPixelChannel(excerpt_image,channel,p[i],q);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(excerpt_image);
-    }
+    CopyPixelRow(image,excerpt_image,p,q);
     if (SyncCacheViewAuthenticPixels(excerpt_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
