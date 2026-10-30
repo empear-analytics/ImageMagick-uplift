@@ -1292,7 +1292,11 @@ as parameters. K then B is two commits, of which the first adds a finding.
    write `name->member` for every use of a member, as Recipe N step 4 also allows.
 5. In the block's text, write each written scalar `v` as `*v` (`(*v)++` for `v++`) at
    every use, reads included, as Recipe K step 4 does, and its address `&v` (passed on to
-   a helper) as `v`, the same address; nothing else in the text changes.
+   a helper) as `v`, the same address; nothing else in the text changes. A written
+   variable may be a plain struct value the block assigns whole (`error=f(...,error);`,
+   a `DoublePixelPacket`), as Recipe Z's `start` and `stop` are: it goes by pointer like
+   a scalar, `*v` at every use, parenthesised where a postfix operator follows
+   (`(*node_info)->child[id]`, `(*v).m`; Recipe Z step 4).
 6. In the caller, declare the `Name` local at the top of the block holding the call (in
    the parallel loop body, so each thread fills its own), and directly before the call
    assign every member from the variable of its name, in declaration order, with nothing
@@ -1420,6 +1424,12 @@ static void SumBilateralPixels(const BilateralSum *sum,double *pixel,
 - Two blocks that differ only by a line or two (a plain and an alpha-blended sum) become
   two helpers that CodeScene may report as *Code Duplication*; measure, and keep the step
   only when no duplication appears.
+- A written struct value (step 5) is the caller's own object behind the pointer, as
+  Recipe Z's `start` and `stop` are: `*error=f(...,*error);` reads every member of the
+  caller's variable and assigns every member back, where `error=f(...,error);` did, and a
+  member the block leaves alone keeps the caller's value (Recipe O's argument). Nothing
+  is copied into the helper or back out of it. The parentheses of `(*v)->m` and `(*v).m`
+  are what `*v` means there: `*v->m` would apply `->` to the pointer to `v`.
 - Step 8 is step 7 with the pointers carried in one struct, and Recipe I's argument
   holds: the written variables stay the caller's own locals, under their own names,
   read and written directly everywhere else; only their addresses travel, set directly
@@ -1461,7 +1471,9 @@ Code (Claude Opus 5.5) during task W07, under the mandate of 2026-10-24. Step 8
 (2026-10-30, task W09): `effect.c`'s `AdaptiveBlurImage` and `AdaptiveSharpenImage`,
 whose plain and alpha-blended kernel sums (nesting 6) write `pixel`, `gamma` and the
 cursors `k` and `pixels`, and `SelectiveBlurImage`'s, which also advance
-`luminance_pixels`: with a pointer each, five or six parameters.
+`luminance_pixels`: with a pointer each, five or six parameters. Step 5's struct values
+(2026-10-30, task W09): `quantize.c`'s `ClassifyImageColors`, whose tree descents write
+the struct `error` and the cursor `node_info`.
 
 ---
 
@@ -2897,3 +2909,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | D | *Unreached functions*: in a function no oracle case executes (casemap 0 for it and its callers in the catalogue), a block identical to an existing `static` helper's body (checked by script) may become a call of that helper when `tools/obj_identical.sh` prints `IDENTICAL` for the whole object file against `HEAD`; nested replacements in one function (an inner block onto one helper, the loop around it onto another) may share the commit; the commit carries `Verified: guard` and quotes that line. *Careful* gives the argument (byte-identical object code under the oracle build's pinned flags is the same compiled code, so the same behaviour on every input) and says a step whose object file differs is not this form: fall back to the oracle or skip. *Two levels of evidence* names it as the one exception for D | `transform.c`'s `ExcerptImage` (0 cases, no in-tree caller): its pixel loop is `CopyPixelRow`'s body with `CopyPixelChannelsTo`'s written out; a probe calling `CopyPixelRow` compared `IDENTICAL` and measured 4.40 to 4.69, the file's last Deep, Nested Complexity. Under the founding evidence level neither D (oracle only) nor E (a new helper would duplicate an existing one) applied | owner |
 | 2026-10-30 | AMEND | Q | Step 8: an array the block updates element by element counts as one written variable; its member is a pointer to the array's type, `targets.v=(&v);`, and `v[i]` becomes `(*v)[i]` | `compare.c`'s `GetSSIMSimularity` and `GetPHASESimilarity`: five accumulators per pixel, some of them per-channel arrays; step 8 said "written scalar" while step 1 (through Recipe K step 2) already counts such arrays among the written variables. The address of an array points to the same elements, so every update reaches the caller's array in the same order | mandate (2026-10-24) |
 | 2026-10-30 | NEW | SD | Split a Selection at its Default: a `switch` whose groups all end in `break;` moves some of its groups, the `default` group among them, into a new `static void` function with the same `switch (e)` (built as Recipe O or Z builds one); the caller's `switch` keeps the other groups and a `default:` that calls it | `ComplexImages`' operator `switch` (eight labels, depth 4 in the parallel loop): Recipe Z on the whole `switch` gives a cc-9 helper the gate refuses (5.09); the unary group as its own function, then Z on the binary rest, leaves no helper finding, 4.83 to 5.21 in a probe | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | Q | Step 5: a written variable may be a plain struct value the block assigns whole (`error=f(...,error);`); it goes by pointer like a scalar, `*v` at every use, parenthesised before `->` or `.` (`(*node_info)->child[id]`), as Recipe Z does for `start` and `stop`. *Careful* gives the argument: the pointer names the caller's own object, so every member is read and assigned where it was, and nothing is copied in or out | `quantize.c`'s `ClassifyImageColors`: each row loop's tree descent (the level loop with its node creation, nesting 5, a `continue` of the level loop inside) writes the cursor `node_info` and the struct `error` (`DoublePixelPacket`) and reads six inputs; step 5 named only scalars, as the N row of 2026-10-30 noted for `MeanShiftImage`. A probe of both descents: the function leaves Deep, Nested Complexity, cc 26 to 16, 4.05 to 4.24 | mandate (2026-10-24) |
