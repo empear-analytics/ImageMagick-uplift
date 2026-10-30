@@ -605,9 +605,44 @@ static MagickBooleanType RollFourier(const size_t width,const size_t height,
   return(MagickTrue);
 }
 
+typedef struct _ForwardQuadrant
+{
+  size_t
+    width,
+    height,
+    center;
+
+  double
+    *source_pixels;
+} ForwardQuadrant;
+
+static void SwapForwardQuadrantRows(const ForwardQuadrant *quadrant,
+  double *forward_pixels)
+{
+  const size_t
+    width = quadrant->width,
+    height = quadrant->height,
+    center = quadrant->center;
+
+  double
+    *const source_pixels = quadrant->source_pixels;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=1; y < (ssize_t) height; y++)
+    for (x=0L; x < (ssize_t) (width/2L); x++)
+      forward_pixels[((ssize_t) height-y)*(ssize_t) width+(ssize_t) width/2L-x-1L]=
+        source_pixels[y*(ssize_t) center+x+1L];
+}
+
 static MagickBooleanType ForwardQuadrantSwap(const size_t width,
   const size_t height,double *source_pixels,double *forward_pixels)
 {
+  ForwardQuadrant
+    quadrant;
+
   MagickBooleanType
     status;
 
@@ -629,10 +664,11 @@ static MagickBooleanType ForwardQuadrantSwap(const size_t width,
     for (x=0L; x < (ssize_t) (width/2L); x++)
       forward_pixels[y*(ssize_t) width+x+(ssize_t) width/2L]=
         source_pixels[y*(ssize_t) center+x];
-  for (y=1; y < (ssize_t) height; y++)
-    for (x=0L; x < (ssize_t) (width/2L); x++)
-      forward_pixels[((ssize_t) height-y)*(ssize_t) width+(ssize_t) width/2L-x-1L]=
-        source_pixels[y*(ssize_t) center+x+1L];
+  quadrant.width=width;
+  quadrant.height=height;
+  quadrant.center=center;
+  quadrant.source_pixels=source_pixels;
+  SwapForwardQuadrantRows(&quadrant,forward_pixels);
   for (x=0L; x < (ssize_t) (width/2L); x++)
     forward_pixels[(ssize_t) width/2L-x-1L]=source_pixels[x+1L];
   return(MagickTrue);
