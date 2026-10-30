@@ -2818,6 +2818,30 @@ static MagickBooleanType SeedKmeansFromQuantization(Image *image,
   return(status);
 }
 
+static void AssignKmeansRow(Image *image,KmeansInfo **kmeans_pixels,
+  const int id,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      min_distance;
+
+    ssize_t
+      k;
+
+    /*
+      Assign each pixel whose mean has the least squared color distance.
+    */
+    FindNearestKmeansColor(image,q,&k,&min_distance);
+    AccumulateKmeansPixel(image,q,min_distance,kmeans_pixels[id]+k);
+    SetPixelIndex(image,(Quantum) k,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void ListKmeansColors(const Image *image)
 {
   char
@@ -2926,9 +2950,6 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
       Quantum
         *magick_restrict q;
 
-      ssize_t
-        x;
-
       if (status == MagickFalse)
         continue;
       q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2937,22 +2958,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
           status=MagickFalse;
           continue;
         }
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        double
-          min_distance;
-
-        ssize_t
-          k;
-
-        /*
-          Assign each pixel whose mean has the least squared color distance.
-        */
-        FindNearestKmeansColor(image,q,&k,&min_distance);
-        AccumulateKmeansPixel(image,q,min_distance,kmeans_pixels[id]+k);
-        SetPixelIndex(image,(Quantum) k,q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      AssignKmeansRow(image,kmeans_pixels,id,q);
       if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
         status=MagickFalse;
     }
