@@ -1596,12 +1596,25 @@ typedef struct _CCAdjacentCensus
     *exception;
 } CCAdjacentCensus;
 
+static const Quantum *GetAdjacentObjectPixel(const CCAdjacentCensus *census,
+  const ssize_t k)
+{
+  ssize_t
+    dx,
+    dy;
+
+  dx=census->connectivity > 4 ? census->connect8[k][1] :
+    census->connect4[k][1];
+  dy=census->connectivity > 4 ? census->connect8[k][0] :
+    census->connect4[k][0];
+  return(GetCacheViewVirtualPixels(census->object_view,census->bounding_box.x+
+    census->x+dx,census->bounding_box.y+census->y+dy,1,1,census->exception));
+}
+
 static void CountAdjacentObjects(const CCAdjacentCensus *census,
   MagickBooleanType *status,size_t *count)
 {
   ssize_t
-    dx,
-    dy,
     j,
     k;
 
@@ -1615,12 +1628,7 @@ static void CountAdjacentObjects(const CCAdjacentCensus *census,
     */
     if (*status == MagickFalse)
       continue;
-    dx=census->connectivity > 4 ? census->connect8[k][1] :
-      census->connect4[k][1];
-    dy=census->connectivity > 4 ? census->connect8[k][0] :
-      census->connect4[k][0];
-    q=GetCacheViewVirtualPixels(census->object_view,census->bounding_box.x+
-      census->x+dx,census->bounding_box.y+census->y+dy,1,1,census->exception);
+    q=GetAdjacentObjectPixel(census,k);
     if (q == (const Quantum *) NULL)
       {
         *status=MagickFalse;
