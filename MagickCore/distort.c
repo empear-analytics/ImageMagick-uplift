@@ -3633,6 +3633,24 @@ static void AccumulateInverseSparseColor(const SparseColorWeights *weights,
   }
 }
 
+static PixelInfo ClearSparseColor(const Image *image,
+  const Image *sparse_image,PixelInfo pixel)
+{
+  if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red=0.0;
+  if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green=0.0;
+  if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue=0.0;
+  if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (image->colorspace == CMYKColorspace))
+    pixel.black=0.0;
+  if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
+      (sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha=0.0;
+  return(pixel);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3789,18 +3807,7 @@ MagickExport Image *SparseColorImage(const Image *image,
             SparseColorWeights
               weights;
 
-            if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.red=0.0;
-            if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.green=0.0;
-            if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-              pixel.blue=0.0;
-            if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (image->colorspace == CMYKColorspace))
-              pixel.black=0.0;
-            if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                (sparse_image->alpha_trait != UndefinedPixelTrait))
-              pixel.alpha=0.0;
+            pixel=ClearSparseColor(image,sparse_image,pixel);
             denominator = 0.0;
             weights.image=image;
             weights.sparse_image=sparse_image;
