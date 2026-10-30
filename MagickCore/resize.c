@@ -962,6 +962,62 @@ static void ReportResizeFilter(const Image *image,
 }
 
 /*
+  Table Mapping given Filter, into Weighting and Windowing functions.
+  A 'Box' windowing function means its a simple non-windowed filter.
+  An 'SincFast' filter function could be upgraded to a 'Jinc' filter if a
+  "cylindrical" is requested, unless a 'Sinc' or 'SincFast' filter was
+  specifically requested by the user.
+
+  WARNING: The order of this table must match the order of the FilterType
+  enumeration specified in "resample.h", or the filter names will not match
+  the filter being setup.
+
+  You can check filter setups with the "filter:verbose" expert setting.
+*/
+static struct
+{
+  FilterType
+    filter,
+    window;
+} const mapping[SentinelFilter] =
+{
+  { UndefinedFilter,     BoxFilter      },  /* Undefined (default to Box)   */
+  { PointFilter,         BoxFilter      },  /* SPECIAL: Nearest neighbour   */
+  { BoxFilter,           BoxFilter      },  /* Box averaging filter         */
+  { TriangleFilter,      BoxFilter      },  /* Linear interpolation filter  */
+  { HermiteFilter,       BoxFilter      },  /* Hermite interpolation filter */
+  { SincFastFilter,      HannFilter     },  /* Hann -- cosine-sinc          */
+  { SincFastFilter,      HammingFilter  },  /* Hamming --   '' variation    */
+  { SincFastFilter,      BlackmanFilter },  /* Blackman -- 2*cosine-sinc    */
+  { GaussianFilter,      BoxFilter      },  /* Gaussian blur filter         */
+  { QuadraticFilter,     BoxFilter      },  /* Quadratic Gaussian approx    */
+  { CubicFilter,         BoxFilter      },  /* General Cubic Filter, Spline */
+  { CatromFilter,        BoxFilter      },  /* Cubic-Keys interpolator      */
+  { MitchellFilter,      BoxFilter      },  /* 'Ideal' Cubic-Keys filter    */
+  { JincFilter,          BoxFilter      },  /* Raw 3-lobed Jinc function    */
+  { SincFilter,          BoxFilter      },  /* Raw 4-lobed Sinc function    */
+  { SincFastFilter,      BoxFilter      },  /* Raw fast sinc ("Pade"-type)  */
+  { SincFastFilter,      KaiserFilter   },  /* Kaiser -- square root-sinc   */
+  { LanczosFilter,       WelchFilter    },  /* Welch -- parabolic (3 lobe)  */
+  { SincFastFilter,      CubicFilter    },  /* Parzen -- cubic-sinc         */
+  { SincFastFilter,      BohmanFilter   },  /* Bohman -- 2*cosine-sinc      */
+  { SincFastFilter,      TriangleFilter },  /* Bartlett -- triangle-sinc    */
+  { LagrangeFilter,      BoxFilter      },  /* Lagrange self-windowing      */
+  { LanczosFilter,       LanczosFilter  },  /* Lanczos Sinc-Sinc filters    */
+  { LanczosSharpFilter,  LanczosSharpFilter }, /* | these require */
+  { Lanczos2Filter,      Lanczos2Filter },     /* | special handling */
+  { Lanczos2SharpFilter, Lanczos2SharpFilter },
+  { RobidouxFilter,      BoxFilter      },  /* Cubic Keys tuned for EWA     */
+  { RobidouxSharpFilter, BoxFilter      },  /* Sharper Cubic Keys for EWA   */
+  { LanczosFilter,       CosineFilter   },  /* Cosine window (3 lobes)      */
+  { SplineFilter,        BoxFilter      },  /* Spline Cubic Filter          */
+  { LanczosRadiusFilter, LanczosFilter  },  /* Lanczos with integer radius  */
+  { CubicSplineFilter,   BoxFilter      },  /* CubicSpline (2/3/4 lobes)    */
+  { MagicKernelSharp2013Filter, BoxFilter }, /* Magic Kernal Sharp 2013     */
+  { MagicKernelSharp2021Filter, BoxFilter }, /* Magic Kernal Sharp 2021     */
+};
+
+/*
   Table mapping the filter/window from the above table to an actual function.
   The default support size for that filter as a weighting function, the range
   to scale with to use that function as a sinc windowing function, (typ 1.0).
@@ -1047,61 +1103,6 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   ResizeFilter
     *resize_filter;
 
-  /*
-    Table Mapping given Filter, into Weighting and Windowing functions.
-    A 'Box' windowing function means its a simple non-windowed filter.
-    An 'SincFast' filter function could be upgraded to a 'Jinc' filter if a
-    "cylindrical" is requested, unless a 'Sinc' or 'SincFast' filter was
-    specifically requested by the user.
-
-    WARNING: The order of this table must match the order of the FilterType
-    enumeration specified in "resample.h", or the filter names will not match
-    the filter being setup.
-
-    You can check filter setups with the "filter:verbose" expert setting.
-  */
-  static struct
-  {
-    FilterType
-      filter,
-      window;
-  } const mapping[SentinelFilter] =
-  {
-    { UndefinedFilter,     BoxFilter      },  /* Undefined (default to Box)   */
-    { PointFilter,         BoxFilter      },  /* SPECIAL: Nearest neighbour   */
-    { BoxFilter,           BoxFilter      },  /* Box averaging filter         */
-    { TriangleFilter,      BoxFilter      },  /* Linear interpolation filter  */
-    { HermiteFilter,       BoxFilter      },  /* Hermite interpolation filter */
-    { SincFastFilter,      HannFilter     },  /* Hann -- cosine-sinc          */
-    { SincFastFilter,      HammingFilter  },  /* Hamming --   '' variation    */
-    { SincFastFilter,      BlackmanFilter },  /* Blackman -- 2*cosine-sinc    */
-    { GaussianFilter,      BoxFilter      },  /* Gaussian blur filter         */
-    { QuadraticFilter,     BoxFilter      },  /* Quadratic Gaussian approx    */
-    { CubicFilter,         BoxFilter      },  /* General Cubic Filter, Spline */
-    { CatromFilter,        BoxFilter      },  /* Cubic-Keys interpolator      */
-    { MitchellFilter,      BoxFilter      },  /* 'Ideal' Cubic-Keys filter    */
-    { JincFilter,          BoxFilter      },  /* Raw 3-lobed Jinc function    */
-    { SincFilter,          BoxFilter      },  /* Raw 4-lobed Sinc function    */
-    { SincFastFilter,      BoxFilter      },  /* Raw fast sinc ("Pade"-type)  */
-    { SincFastFilter,      KaiserFilter   },  /* Kaiser -- square root-sinc   */
-    { LanczosFilter,       WelchFilter    },  /* Welch -- parabolic (3 lobe)  */
-    { SincFastFilter,      CubicFilter    },  /* Parzen -- cubic-sinc         */
-    { SincFastFilter,      BohmanFilter   },  /* Bohman -- 2*cosine-sinc      */
-    { SincFastFilter,      TriangleFilter },  /* Bartlett -- triangle-sinc    */
-    { LagrangeFilter,      BoxFilter      },  /* Lagrange self-windowing      */
-    { LanczosFilter,       LanczosFilter  },  /* Lanczos Sinc-Sinc filters    */
-    { LanczosSharpFilter,  LanczosSharpFilter }, /* | these require */
-    { Lanczos2Filter,      Lanczos2Filter },     /* | special handling */
-    { Lanczos2SharpFilter, Lanczos2SharpFilter },
-    { RobidouxFilter,      BoxFilter      },  /* Cubic Keys tuned for EWA     */
-    { RobidouxSharpFilter, BoxFilter      },  /* Sharper Cubic Keys for EWA   */
-    { LanczosFilter,       CosineFilter   },  /* Cosine window (3 lobes)      */
-    { SplineFilter,        BoxFilter      },  /* Spline Cubic Filter          */
-    { LanczosRadiusFilter, LanczosFilter  },  /* Lanczos with integer radius  */
-    { CubicSplineFilter,   BoxFilter      },  /* CubicSpline (2/3/4 lobes)    */
-    { MagicKernelSharp2013Filter, BoxFilter }, /* Magic Kernal Sharp 2013     */
-    { MagicKernelSharp2021Filter, BoxFilter }, /* Magic Kernal Sharp 2021     */
-  };
   /*
     The known zero crossings of the Jinc() or more accurately the Jinc(x*PI)
     function being used as a filter. It is used by the "filter:lobes" expert
