@@ -3265,6 +3265,21 @@ static void ListKmeansColors(const Image *image)
 
 #define KmeansImageTag  "Kmeans/Image"
 
+static void ReportKmeansProgress(Image *image,const ssize_t n,
+  const size_t max_iterations,MagickBooleanType *status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,KmeansImageTag,(MagickOffsetType) n,
+        max_iterations);
+      if (proceed == MagickFalse)
+        *status=MagickFalse;
+    }
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -3382,16 +3397,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     if (fabs(distortion-previous_tolerance) <= tolerance)
       break;
     previous_tolerance=distortion;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,KmeansImageTag,(MagickOffsetType) n,
-          max_iterations);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    ReportKmeansProgress(image,n,max_iterations,&status);
   }
   image_view=DestroyCacheView(image_view);
   if (verbose != MagickFalse)
