@@ -165,6 +165,16 @@ static char
 %
 */
 
+static void InsertIntoTagList(XMLTreeInfo *node,XMLTreeInfo *child,
+  const size_t offset)
+{
+  while ((node->next != (XMLTreeInfo *) NULL) &&
+         (node->next->offset <= offset))
+    node=node->next;
+  child->next=node->next;
+  node->next=child;
+}
+
 static XMLTreeInfo *InsertTagIntoXMLTree(XMLTreeInfo *xml_info,
   XMLTreeInfo *child,const size_t offset)
 {
@@ -207,11 +217,7 @@ static XMLTreeInfo *InsertTagIntoXMLTree(XMLTreeInfo *xml_info,
   }
   if ((node != (XMLTreeInfo *) NULL) && (node->offset <= offset))
     {
-      while ((node->next != (XMLTreeInfo *) NULL) &&
-             (node->next->offset <= offset))
-        node=node->next;
-      child->next=node->next;
-      node->next=child;
+      InsertIntoTagList(node,child,offset);
     }
   else
     {
