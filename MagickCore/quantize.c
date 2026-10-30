@@ -2818,6 +2818,22 @@ static MagickBooleanType SeedKmeansFromQuantization(Image *image,
   return(status);
 }
 
+static void ListKmeansColors(const Image *image)
+{
+  char
+    tuple[MagickPathExtent];
+
+  ssize_t
+    n;
+
+  for (n=0; n < (ssize_t) image->colors; n++)
+  {
+    GetColorTuple(image->colormap+n,MagickTrue,tuple);
+    (void) FormatLocaleFile(stderr,"%s %.17g\n",tuple,(double)
+      image->colormap[n].count);
+  }
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -2826,9 +2842,6 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
 
   CacheView
     *image_view;
-
-  char
-    tuple[MagickPathExtent];
 
   const char
     *colors;
@@ -2973,12 +2986,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
   }
   image_view=DestroyCacheView(image_view);
   if (verbose != MagickFalse)
-    for (n=0; n < (ssize_t) image->colors; n++)
-    {
-      GetColorTuple(image->colormap+n,MagickTrue,tuple);
-      (void) FormatLocaleFile(stderr,"%s %.17g\n",tuple,(double)
-        image->colormap[n].count);
-    }
+    ListKmeansColors(image);
   SetKmeansDominantColor(image,exception);
   kmeans_pixels=DestroyKmeansTLS(kmeans_pixels);
   if (image->progress_monitor != (MagickProgressMonitor) NULL)
