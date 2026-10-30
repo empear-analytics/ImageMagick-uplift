@@ -1656,6 +1656,14 @@ static void SetFreetypeMetrics(const FT_Face face,TypeMetric *metrics)
     (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
 }
 
+static void SetFreetypeCanvas(Image *image,ExceptionInfo *exception)
+{
+  if (image->storage_class != DirectClass)
+    (void) SetImageStorageClass(image,DirectClass,exception);
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1984,12 +1992,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   (void) CloneString(&annotate_info->primitive,"path '");
   status=MagickTrue;
   if (draw_info->render != MagickFalse)
-    {
-      if (image->storage_class != DirectClass)
-        (void) SetImageStorageClass(image,DirectClass,exception);
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
-    }
+    SetFreetypeCanvas(image,exception);
   for (p=draw_info->text; GetUTFCode(p) != 0; p+=(ptrdiff_t) GetUTFOctets(p))
     if (GetUTFCode(p) < 0)
       break;
