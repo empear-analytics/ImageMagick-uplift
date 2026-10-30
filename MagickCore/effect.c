@@ -4928,6 +4928,27 @@ static void BlurSelectiveChannel(const SelectiveChannel *selective,
   BlurSelectiveChannelSum(&blur,i,q);
 }
 
+static void BuildSelectiveKernel(MagickRealType *kernel,const size_t width,
+  const double sigma)
+{
+  ssize_t
+    i,
+    j,
+    v;
+
+  j=(ssize_t) (width-1)/2;
+  i=0;
+  for (v=(-j); v <= j; v++)
+  {
+    ssize_t
+      u;
+
+    for (u=(-j); u <= j; u++)
+      kernel[i++]=(MagickRealType) (exp(-((double) u*u+v*v)/(2.0*MagickSigma*
+        MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
+  }
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -4972,24 +4993,7 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
     width,width*sizeof(*kernel)));
   if (kernel == (MagickRealType *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  {
-    ssize_t
-      i,
-      j,
-      v;
-
-    j=(ssize_t) (width-1)/2;
-    i=0;
-    for (v=(-j); v <= j; v++)
-    {
-      ssize_t
-        u;
-
-      for (u=(-j); u <= j; u++)
-        kernel[i++]=(MagickRealType) (exp(-((double) u*u+v*v)/(2.0*MagickSigma*
-          MagickSigma))/(2.0*MagickPI*MagickSigma*MagickSigma));
-    }
-  }
+  BuildSelectiveKernel(kernel,width,sigma);
   if (image->debug != MagickFalse)
     {
       char
