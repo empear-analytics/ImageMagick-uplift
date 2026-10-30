@@ -2631,14 +2631,8 @@ MagickExport Image *PolynomialImage(const Image *images,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
-  image=AcquireImageCanvas(images,exception);
-  if (image == (Image *) NULL)
+  if (AcquireDirectImageCanvas(images,&image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    {
-      image=DestroyImage(image);
-      return((Image *) NULL);
-    }
   number_images=GetImageListLength(images);
   polynomial_pixels=AcquirePixelTLS(images);
   if (polynomial_pixels == (PixelChannels **) NULL)
