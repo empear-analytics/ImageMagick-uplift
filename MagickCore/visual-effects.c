@@ -2737,14 +2737,14 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
-  ExceptionInfo *exception)
-{
 #define GetBit(alpha,i) ((((size_t) (alpha) >> (size_t) (i)) & 0x01) != 0)
 #define SetBit(alpha,i,set) (Quantum) ((set) != 0 ? (size_t) (alpha) \
   | (one << (size_t) (i)) : (size_t) (alpha) & ~(one << (size_t) (i)))
 #define SteganoImageTag  "Stegano/Image"
 
+MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
+  ExceptionInfo *exception)
+{
   CacheView
     *stegano_view,
     *watermark_view;
