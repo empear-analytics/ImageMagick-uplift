@@ -379,6 +379,51 @@ static void ResetPixelAccumulator(PixelInfo *pixel)
     pixel->alpha = 0.0;
 }
 
+static void SetWholeImageAveragePixel(ResampleFilter *resample_filter,
+  PixelInfo *pixel,ExceptionInfo *exception)
+{
+  const Quantum
+    *pixels;
+
+  if ( resample_filter->average_defined == MagickFalse ) {
+    Image
+      *average_image;
+
+    CacheView
+      *average_view;
+
+    GetPixelInfo(resample_filter->image,(PixelInfo *)
+      &resample_filter->average_pixel);
+    resample_filter->average_defined=MagickTrue;
+
+    /* Try to get an averaged pixel color of whole image */
+    average_image=ResizeImage(resample_filter->image,1,1,BoxFilter,
+      resample_filter->exception);
+    if (average_image == (Image *) NULL)
+      {
+        *pixel=resample_filter->average_pixel; /* FAILED */
+        return;
+      }
+    average_view=AcquireVirtualCacheView(average_image,exception);
+    pixels=GetCacheViewVirtualPixels(average_view,0,0,1,1,
+      resample_filter->exception);
+    if (pixels == (const Quantum *) NULL) {
+      average_view=DestroyCacheView(average_view);
+      average_image=DestroyImage(average_image);
+      *pixel=resample_filter->average_pixel; /* FAILED */
+      return;
+    }
+    GetPixelInfoPixel(resample_filter->image,pixels,
+      &(resample_filter->average_pixel));
+    average_view=DestroyCacheView(average_view);
+    average_image=DestroyImage(average_image);
+
+    if ( resample_filter->virtual_pixel == CheckerTileVirtualPixelMethod )
+      BlendCheckerTileAverage(resample_filter);
+  }
+  *pixel=resample_filter->average_pixel;
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -544,43 +589,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
       case CheckerTileVirtualPixelMethod:
       default:
         /* generate a average color of the WHOLE image */
-        if ( resample_filter->average_defined == MagickFalse ) {
-          Image
-            *average_image;
-
-          CacheView
-            *average_view;
-
-          GetPixelInfo(resample_filter->image,(PixelInfo *)
-            &resample_filter->average_pixel);
-          resample_filter->average_defined=MagickTrue;
-
-          /* Try to get an averaged pixel color of whole image */
-          average_image=ResizeImage(resample_filter->image,1,1,BoxFilter,
-            resample_filter->exception);
-          if (average_image == (Image *) NULL)
-            {
-              *pixel=resample_filter->average_pixel; /* FAILED */
-              break;
-            }
-          average_view=AcquireVirtualCacheView(average_image,exception);
-          pixels=GetCacheViewVirtualPixels(average_view,0,0,1,1,
-            resample_filter->exception);
-          if (pixels == (const Quantum *) NULL) {
-            average_view=DestroyCacheView(average_view);
-            average_image=DestroyImage(average_image);
-            *pixel=resample_filter->average_pixel; /* FAILED */
-            break;
-          }
-          GetPixelInfoPixel(resample_filter->image,pixels,
-            &(resample_filter->average_pixel));
-          average_view=DestroyCacheView(average_view);
-          average_image=DestroyImage(average_image);
-
-          if ( resample_filter->virtual_pixel == CheckerTileVirtualPixelMethod )
-            BlendCheckerTileAverage(resample_filter);
-        }
-        *pixel=resample_filter->average_pixel;
+        SetWholeImageAveragePixel(resample_filter,pixel,exception);
         break;
     }
     return(status);
