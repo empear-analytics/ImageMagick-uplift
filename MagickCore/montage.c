@@ -927,11 +927,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
             montage->directory);
         ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
       }
-    x_offset=0;
-    y_offset=0;
-    if (montage_info->tile != (char *) NULL)
-      GetMontageGeometry(montage_info->tile,number_images,&x_offset,&y_offset,
-        &sans,&sans);
+    GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
     y_offset+=(ssize_t) title_offset;
     (void) FormatLocaleString(montage->montage,MagickPathExtent,
       "%.17gx%.17g%+.20g%+.20g",(double) ((ssize_t) extract_info.width+
@@ -965,11 +961,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     /*
       Copy tile to the composite.
     */
-    x_offset=0;
-    y_offset=0;
-    if (montage_info->tile != (char *) NULL)
-      GetMontageGeometry(montage_info->tile,number_images,&x_offset,&y_offset,
-        &sans,&sans);
+    GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
     x_offset+=extract_info.x;
     y_offset+=(ssize_t) title_offset+extract_info.y;
     max_height=0;
