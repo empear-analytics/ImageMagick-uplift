@@ -1917,6 +1917,14 @@ static inline MagickBooleanType IsNonOutlineGlyph(const FT_Glyph glyph_image,
     (IsEmptyOutline(outline) == MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
+static void ExtendGlyphMinBounds(const FT_BBox bounds,TypeMetric *metrics)
+{
+  if ((bounds.xMin < metrics->bounds.x1) && (bounds.xMin != 0))
+    metrics->bounds.x1=(double) bounds.xMin;
+  if ((bounds.yMin < metrics->bounds.y1) && (bounds.yMin != 0))
+    metrics->bounds.y1=(double) bounds.yMin;
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2278,10 +2286,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     ft_status=FT_Outline_Get_BBox(&outline,&bounds);
     if (ft_status != 0)
       continue;
-    if ((bounds.xMin < metrics->bounds.x1) && (bounds.xMin != 0))
-      metrics->bounds.x1=(double) bounds.xMin;
-    if ((bounds.yMin < metrics->bounds.y1) && (bounds.yMin != 0))
-      metrics->bounds.y1=(double) bounds.yMin;
+    ExtendGlyphMinBounds(bounds,metrics);
     if ((bounds.xMax > metrics->bounds.x2) && (bounds.xMax != 0))
       metrics->bounds.x2=(double) bounds.xMax;
     if ((bounds.yMax > metrics->bounds.y2) && (bounds.yMax != 0))
