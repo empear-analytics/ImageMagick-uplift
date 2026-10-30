@@ -271,11 +271,77 @@ static inline void Eagle2X(const Image *source,const Quantum *pixels,
     break; \
   }
 
+static void Hq2XApplyRulesFrom17(const unsigned int rule,
+  const MagnifyPixels *magnify,const ssize_t destination_offset,
+  const Hq2XNeighbours *neighbours)
+{
+  const ssize_t e = neighbours->e, a = neighbours->a, b = neighbours->b,
+    d = neighbours->d, f = neighbours->f, h = neighbours->h;
+
+  switch (rule)
+  {
+    case 17:
+    {
+      if (PixelsEqual(magnify->source,b,d,magnify->channels))
+        {
+          const ssize_t
+            offsets[8] = { e, e, d, d, d, b, b, b };
+
+          MixPixels(magnify,offsets,8,destination_offset);
+        }
+      else
+        {
+          const ssize_t
+            offsets[4] = { e, e, e, a };
+
+          MixPixels(magnify,offsets,4,destination_offset);
+        }
+      break;
+    }
+    case 18:
+    {
+      if (PixelsEqual(magnify->source,b,f,magnify->channels))
+        {
+          const ssize_t
+            offsets[8] = { e, e, e, e, e, b, b, d };
+
+          MixPixels(magnify,offsets,8,destination_offset);
+        }
+      else
+        {
+          const ssize_t
+            offsets[4] = { e, e, e, d };
+
+          MixPixels(magnify,offsets,4,destination_offset);
+        }
+      break;
+    }
+    default:
+    {
+      if (PixelsEqual(magnify->source,d,h,magnify->channels))
+        {
+          const ssize_t
+            offsets[8] = { e, e, e, e, e, d, d, b };
+
+          MixPixels(magnify,offsets,8,destination_offset);
+        }
+      else
+        {
+          const ssize_t
+            offsets[4] = { e, e, e, b };
+
+          MixPixels(magnify,offsets,4,destination_offset);
+        }
+      break;
+    }
+  }
+}
+
 static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
   const ssize_t destination_offset,const Hq2XNeighbours *neighbours)
 {
   const ssize_t e = neighbours->e, a = neighbours->a, b = neighbours->b,
-    d = neighbours->d, f = neighbours->f, h = neighbours->h;
+    d = neighbours->d;
 
   switch (rule)
   {
@@ -377,58 +443,9 @@ static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
         }
       break;
     }
-    case 17:
-    {
-      if (PixelsEqual(magnify->source,b,d,magnify->channels))
-        {
-          const ssize_t
-            offsets[8] = { e, e, d, d, d, b, b, b };
-
-          MixPixels(magnify,offsets,8,destination_offset);
-        }
-      else
-        {
-          const ssize_t
-            offsets[4] = { e, e, e, a };
-
-          MixPixels(magnify,offsets,4,destination_offset);
-        }
-      break;
-    }
-    case 18:
-    {
-      if (PixelsEqual(magnify->source,b,f,magnify->channels))
-        {
-          const ssize_t
-            offsets[8] = { e, e, e, e, e, b, b, d };
-
-          MixPixels(magnify,offsets,8,destination_offset);
-        }
-      else
-        {
-          const ssize_t
-            offsets[4] = { e, e, e, d };
-
-          MixPixels(magnify,offsets,4,destination_offset);
-        }
-      break;
-    }
     default:
     {
-      if (PixelsEqual(magnify->source,d,h,magnify->channels))
-        {
-          const ssize_t
-            offsets[8] = { e, e, e, e, e, d, d, b };
-
-          MixPixels(magnify,offsets,8,destination_offset);
-        }
-      else
-        {
-          const ssize_t
-            offsets[4] = { e, e, e, b };
-
-          MixPixels(magnify,offsets,4,destination_offset);
-        }
+      Hq2XApplyRulesFrom17(rule,magnify,destination_offset,neighbours);
       break;
     }
   }
