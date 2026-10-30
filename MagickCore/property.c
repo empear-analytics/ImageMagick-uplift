@@ -4613,6 +4613,36 @@ static inline MagickBooleanType IsReadOnlySProperty(const char *property)
     MagickFalse);
 }
 
+static MagickBooleanType SetImageDelayProperty(Image *image,
+  const char *value)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    flags;
+
+  flags=ParseGeometry(value,&geometry_info);
+  if ((flags & GreaterValue) != 0)
+    {
+      if (image->delay > (size_t) floor(geometry_info.rho+0.5))
+        image->delay=(size_t) floor(geometry_info.rho+0.5);
+    }
+  else
+    if ((flags & LessValue) != 0)
+      {
+        if ((double) image->delay < floor(geometry_info.rho+0.5))
+          image->delay=(size_t) CastDoubleToSsizeT(floor(
+            geometry_info.sigma+0.5));
+      }
+    else
+      image->delay=(size_t) floor(geometry_info.rho+0.5);
+  if ((flags & SigmaValue) != 0)
+    image->ticks_per_second=CastDoubleToSsizeT(floor(
+      geometry_info.sigma+0.5));
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SetImageProperty(Image *image,
   const char *property,const char *value,ExceptionInfo *exception)
 {
@@ -4733,28 +4763,7 @@ MagickExport MagickBooleanType SetImageProperty(Image *image,
     {
       if (LocaleCompare("delay",property) == 0)
         {
-          GeometryInfo
-            geometry_info;
-
-          flags=ParseGeometry(value,&geometry_info);
-          if ((flags & GreaterValue) != 0)
-            {
-              if (image->delay > (size_t) floor(geometry_info.rho+0.5))
-                image->delay=(size_t) floor(geometry_info.rho+0.5);
-            }
-          else
-            if ((flags & LessValue) != 0)
-              {
-                if ((double) image->delay < floor(geometry_info.rho+0.5))
-                  image->delay=(size_t) CastDoubleToSsizeT(floor(
-                    geometry_info.sigma+0.5));
-              }
-            else
-              image->delay=(size_t) floor(geometry_info.rho+0.5);
-          if ((flags & SigmaValue) != 0)
-            image->ticks_per_second=CastDoubleToSsizeT(floor(
-              geometry_info.sigma+0.5));
-          return(MagickTrue);
+          return(SetImageDelayProperty(image,value));
         }
       if (LocaleCompare("delay_units",property) == 0)
         {
