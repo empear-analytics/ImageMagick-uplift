@@ -1031,14 +1031,13 @@ static XMLTreeInfo *FindThresholdMap(XMLTreeInfo *thresholds,
   return(threshold);
 }
 
-static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
-  const char *map_id,ExceptionInfo *exception)
+static MagickBooleanType ReadThresholdLevels(ThresholdMap *map,
+  XMLTreeInfo *levels,const char *map_id,ExceptionInfo *exception)
 {
   char
     *p;
 
   const char
-    *attribute,
     *content;
 
   double
@@ -1046,6 +1045,52 @@ static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
 
   ssize_t
     i;
+
+  content=GetXMLTreeContent(levels);
+  if (content == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlMissingContent", "<levels>, map \"%s\"",map_id);
+      return(MagickFalse);
+    }
+  map->levels=(ssize_t *) AcquireQuantumMemory((size_t) map->width,map->height*
+    sizeof(*map->levels));
+  if (map->levels == (ssize_t *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"UnableToAcquireThresholdMap");
+  for (i=0; i < (ssize_t) (map->width*map->height); i++)
+  {
+    map->levels[i]=(ssize_t) strtol(content,&p,10);
+    if (p == content)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "XmlInvalidContent", "<level> too few values, map \"%s\"",map_id);
+        return(MagickFalse);
+      }
+    if ((map->levels[i] < 0) || (map->levels[i] > map->divisor))
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "XmlInvalidContent", "<level> %.17g out of range, map \"%s\"",
+          (double) map->levels[i],map_id);
+        return(MagickFalse);
+      }
+    content=p;
+  }
+  value=(double) strtol(content,&p,10);
+  (void) value;
+  if (p != content)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "XmlInvalidContent", "<level> too many values, map \"%s\"",map_id);
+     return(MagickFalse);
+   }
+  return(MagickTrue);
+}
+
+static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
+  const char *map_id,ExceptionInfo *exception)
+{
+  const char
+    *attribute;
 
   ThresholdMap
     *map;
@@ -1139,51 +1184,12 @@ static ThresholdMap *GetThresholdMapFile(const char *xml,const char *filename,
       map=DestroyThresholdMap(map);
       return(map);
     }
-  content=GetXMLTreeContent(levels);
-  if (content == (char *) NULL)
+  if (ReadThresholdLevels(map,levels,map_id,exception) == MagickFalse)
     {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlMissingContent", "<levels>, map \"%s\"",map_id);
       thresholds=DestroyXMLTree(thresholds);
       map=DestroyThresholdMap(map);
       return(map);
     }
-  map->levels=(ssize_t *) AcquireQuantumMemory((size_t) map->width,map->height*
-    sizeof(*map->levels));
-  if (map->levels == (ssize_t *) NULL)
-    ThrowFatalException(ResourceLimitFatalError,"UnableToAcquireThresholdMap");
-  for (i=0; i < (ssize_t) (map->width*map->height); i++)
-  {
-    map->levels[i]=(ssize_t) strtol(content,&p,10);
-    if (p == content)
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "XmlInvalidContent", "<level> too few values, map \"%s\"",map_id);
-        thresholds=DestroyXMLTree(thresholds);
-        map=DestroyThresholdMap(map);
-        return(map);
-      }
-    if ((map->levels[i] < 0) || (map->levels[i] > map->divisor))
-      {
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "XmlInvalidContent", "<level> %.17g out of range, map \"%s\"",
-          (double) map->levels[i],map_id);
-        thresholds=DestroyXMLTree(thresholds);
-        map=DestroyThresholdMap(map);
-        return(map);
-      }
-    content=p;
-  }
-  value=(double) strtol(content,&p,10);
-  (void) value;
-  if (p != content)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "XmlInvalidContent", "<level> too many values, map \"%s\"",map_id);
-     thresholds=DestroyXMLTree(thresholds);
-     map=DestroyThresholdMap(map);
-     return(map);
-   }
   thresholds=DestroyXMLTree(thresholds);
   return(map);
 }
