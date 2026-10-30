@@ -1629,6 +1629,19 @@ MagickExport Image *OptimizePlusImageLayers(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *KeepDisposedImage(const Image *next,Image *dispose_image,
+  Image *current_image)
+{
+  if (next->dispose != PreviousDispose)
+    {
+      dispose_image=DestroyImage(dispose_image);
+      dispose_image=current_image;
+    }
+  else
+    current_image=DestroyImage(current_image);
+  return(dispose_image);
+}
+
 MagickExport void OptimizeImageTransparency(const Image *image,
      ExceptionInfo *exception)
 {
@@ -1696,13 +1709,7 @@ MagickExport void OptimizeImageTransparency(const Image *image,
         bounds=ClipBoundsBottom(bounds,current_image);
         ClearBounds(current_image,&bounds,exception);
       }
-    if (next->dispose != PreviousDispose)
-      {
-        dispose_image=DestroyImage(dispose_image);
-        dispose_image=current_image;
-      }
-    else
-      current_image=DestroyImage(current_image);
+    dispose_image=KeepDisposedImage(next,dispose_image,current_image);
 
     /*
       Optimize Transparency of the next frame (if present)
