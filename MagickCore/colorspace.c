@@ -733,6 +733,19 @@ static inline MagickBooleanType IsTransformMapMissing(
     (z_map == (TransformPacket *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType SyncImageToDirectClass(Image *image,
+  ExceptionInfo *exception)
+{
+  if (image->storage_class == PseudoClass)
+    {
+      if (SyncImage(image,exception) == MagickFalse)
+        return(MagickFalse);
+      if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType sRGBTransformImage(Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -797,13 +810,8 @@ static MagickBooleanType sRGBTransformImage(Image *image,
       /*
         Convert RGB to CMYK colorspace.
       */
-      if (image->storage_class == PseudoClass)
-        {
-          if (SyncImage(image,exception) == MagickFalse)
-            return(MagickFalse);
-          if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-            return(MagickFalse);
-        }
+      if (SyncImageToDirectClass(image,exception) == MagickFalse)
+        return(MagickFalse);
       if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
         return(MagickFalse);
       GetPixelInfo(image,&zero);
