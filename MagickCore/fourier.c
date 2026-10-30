@@ -185,6 +185,72 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   }
 }
 
+typedef struct _ComplexPixelOperands
+{
+  ComplexOperator
+    op;
+
+  double
+    ai,
+    ar,
+    bi,
+    br,
+    snr;
+} ComplexPixelOperands;
+
+static void ApplyComplexOperator(const ComplexPixelOperands *operands,
+  double *cr,double *ci)
+{
+  const ComplexOperator
+    op = operands->op;
+
+  const double
+    ai = operands->ai,
+    ar = operands->ar,
+    bi = operands->bi,
+    br = operands->br,
+    snr = operands->snr;
+
+  switch (op)
+  {
+    case AddComplexOperator:
+    {
+      (*cr)=ar+br;
+      (*ci)=ai+bi;
+      break;
+    }
+    default:
+    {
+      ComplexUnaryOperands
+        unary;
+
+      unary.op=op;
+      unary.ai=ai;
+      unary.ar=ar;
+      ApplyUnaryComplexOperator(&unary,&(*cr),&(*ci));
+      break;
+    }
+    case DivideComplexOperator:
+    {
+      (*cr)=MagickSafeReciprocal(br*br+bi*bi+snr)*(ar*br+ai*bi);
+      (*ci)=MagickSafeReciprocal(br*br+bi*bi+snr)*(ai*br-ar*bi);
+      break;
+    }
+    case MultiplyComplexOperator:
+    {
+      (*cr)=(ar*br-ai*bi);
+      (*ci)=(ai*br+ar*bi);
+      break;
+    }
+    case SubtractComplexOperator:
+    {
+      (*cr)=ar-br;
+      (*ci)=ai-bi;
+      break;
+    }
+  }
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -346,44 +412,16 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
           ci,
           cr;
 
-        switch (op)
-        {
-          case AddComplexOperator:
-          {
-            cr=ar+br;
-            ci=ai+bi;
-            break;
-          }
-          default:
-          {
-            ComplexUnaryOperands
-              unary;
+        ComplexPixelOperands
+          operands;
 
-            unary.op=op;
-            unary.ai=ai;
-            unary.ar=ar;
-            ApplyUnaryComplexOperator(&unary,&cr,&ci);
-            break;
-          }
-          case DivideComplexOperator:
-          {
-            cr=MagickSafeReciprocal(br*br+bi*bi+snr)*(ar*br+ai*bi);
-            ci=MagickSafeReciprocal(br*br+bi*bi+snr)*(ai*br-ar*bi);
-            break;
-          }
-          case MultiplyComplexOperator:
-          {
-            cr=(ar*br-ai*bi);
-            ci=(ai*br+ar*bi);
-            break;
-          }
-          case SubtractComplexOperator:
-          {
-            cr=ar-br;
-            ci=ai-bi;
-            break;
-          }
-        }
+        operands.op=op;
+        operands.ai=ai;
+        operands.ar=ar;
+        operands.bi=bi;
+        operands.br=br;
+        operands.snr=snr;
+        ApplyComplexOperator(&operands,&cr,&ci);
         Cr[i]=ClampToQuantum((double) QuantumRange*cr);
         Ci[i]=ClampToQuantum((double) QuantumRange*ci);
       }
