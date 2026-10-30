@@ -327,6 +327,22 @@ static MagickBooleanType ReplaceDisposeImage(const Image *next,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireCoalesceCanvas(Image *next,
+  const RectangleInfo bounds,Image **coalesce_image,ExceptionInfo *exception)
+{
+  *coalesce_image=CloneImage(next,bounds.width,bounds.height,MagickTrue,
+    exception);
+  if (*coalesce_image == (Image *) NULL)
+    return(MagickFalse);
+  (*coalesce_image)->background_color.alpha_trait=BlendPixelTrait;
+  (*coalesce_image)->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(*coalesce_image,exception);
+  (*coalesce_image)->alpha_trait=next->alpha_trait;
+  (*coalesce_image)->page=bounds;
+  (*coalesce_image)->dispose=NoneDispose;
+  return(MagickTrue);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -355,16 +371,9 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
   bounds.height=GetCanvasExtent(bounds.height,next->rows,bounds.y);
   bounds.x=0;
   bounds.y=0;
-  coalesce_image=CloneImage(next,bounds.width,bounds.height,MagickTrue,
-    exception);
-  if (coalesce_image == (Image *) NULL)
+  if (AcquireCoalesceCanvas(next,bounds,&coalesce_image,exception) ==
+      MagickFalse)
     return((Image *) NULL);
-  coalesce_image->background_color.alpha_trait=BlendPixelTrait;
-  coalesce_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(coalesce_image,exception);
-  coalesce_image->alpha_trait=next->alpha_trait;
-  coalesce_image->page=bounds;
-  coalesce_image->dispose=NoneDispose;
   /*
     Coalesce rest of the images.
   */
