@@ -828,6 +828,22 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
   return(shear_image);
 }
 
+static Image *CropShearedImage(Image *shear_image,const Image *image,
+  CropToFitRegion crop_region,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=CropToFitImage(&shear_image,&crop_region,exception);
+  shear_image->alpha_trait=image->alpha_trait;
+  shear_image->compose=image->compose;
+  shear_image->page.width=0;
+  shear_image->page.height=0;
+  if (status == MagickFalse)
+    shear_image=DestroyImage(shear_image);
+  return(shear_image);
+}
+
 MagickExport Image *ShearImage(const Image *image,const double x_shear,
   const double y_shear,ExceptionInfo *exception)
 {
@@ -837,9 +853,6 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   Image
     *integral_image,
     *shear_image;
-
-  MagickBooleanType
-    status;
 
   PointInfo
     shear;
@@ -879,14 +892,7 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   crop_region.width=(MagickRealType) image->columns;
   crop_region.height=(MagickRealType) image->rows;
   crop_region.rotate=MagickFalse;
-  status=CropToFitImage(&shear_image,&crop_region,exception);
-  shear_image->alpha_trait=image->alpha_trait;
-  shear_image->compose=image->compose;
-  shear_image->page.width=0;
-  shear_image->page.height=0;
-  if (status == MagickFalse)
-    shear_image=DestroyImage(shear_image);
-  return(shear_image);
+  return(CropShearedImage(shear_image,image,crop_region,exception));
 }
 
 /*
