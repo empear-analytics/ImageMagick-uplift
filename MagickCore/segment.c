@@ -1445,23 +1445,80 @@ static IntervalTree *AcquireRootInterval(void)
   return(root);
 }
 
-static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
-  const size_t number_crossings)
+static MagickBooleanType SplitIntervalList(const ZeroCrossing *zero_crossing,
+  const ssize_t i,IntervalTree *root,IntervalTree ***list)
 {
   IntervalTree
     *head,
-    **list,
-    *node,
-    *root;
-
-  ssize_t
-    i;
+    *node;
 
   ssize_t
     j,
     k,
     left,
     number_nodes;
+
+  /*
+    Initialize list with all nodes with no children.
+  */
+  number_nodes=0;
+  InitializeList(*list,&number_nodes,root);
+  /*
+    Split list.
+  */
+  for (j=0; j < number_nodes; j++)
+  {
+    head=(*list)[j];
+    left=head->left;
+    node=head;
+    for (k=head->left+1; k < head->right; k++)
+    {
+      if (zero_crossing[i+1].crossings[k] == 0)
+        continue;
+      node=AppendIntervalNode(head,node);
+      if (node == (IntervalTree *) NULL)
+        {
+          *list=(IntervalTree **) RelinquishMagickMemory(*list);
+          FreeNodes(root);
+          return(MagickFalse);
+        }
+      node->tau=zero_crossing[i+1].tau;
+      node->child=(IntervalTree *) NULL;
+      node->sibling=(IntervalTree *) NULL;
+      node->left=left;
+      node->right=k;
+      left=k;
+    }
+    if (left != head->left)
+      {
+        node->sibling=(IntervalTree *) AcquireQuantumMemory(1,
+          sizeof(*node->sibling));
+        node=node->sibling;
+        if (node == (IntervalTree *) NULL)
+          {
+            *list=(IntervalTree **) RelinquishMagickMemory(*list);
+            FreeNodes(root);
+            return(MagickFalse);
+          }
+        node->tau=zero_crossing[i+1].tau;
+        node->child=(IntervalTree *) NULL;
+        node->sibling=(IntervalTree *) NULL;
+        node->left=left;
+        node->right=head->right;
+      }
+  }
+  return(MagickTrue);
+}
+
+static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
+  const size_t number_crossings)
+{
+  IntervalTree
+    **list,
+    *root;
+
+  ssize_t
+    i;
 
   /*
     Allocate interval tree.
@@ -1477,55 +1534,8 @@ static IntervalTree *InitializeIntervalTree(const ZeroCrossing *zero_crossing,
   (void) memset(list,0,(size_t) TreeLength*sizeof(*list));
   for (i=(-1); i < (ssize_t) number_crossings; i++)
   {
-    /*
-      Initialize list with all nodes with no children.
-    */
-    number_nodes=0;
-    InitializeList(list,&number_nodes,root);
-    /*
-      Split list.
-    */
-    for (j=0; j < number_nodes; j++)
-    {
-      head=list[j];
-      left=head->left;
-      node=head;
-      for (k=head->left+1; k < head->right; k++)
-      {
-        if (zero_crossing[i+1].crossings[k] == 0)
-          continue;
-        node=AppendIntervalNode(head,node);
-        if (node == (IntervalTree *) NULL)
-          {
-            list=(IntervalTree **) RelinquishMagickMemory(list);
-            FreeNodes(root);
-            return((IntervalTree *) NULL);
-          }
-        node->tau=zero_crossing[i+1].tau;
-        node->child=(IntervalTree *) NULL;
-        node->sibling=(IntervalTree *) NULL;
-        node->left=left;
-        node->right=k;
-        left=k;
-      }
-      if (left != head->left)
-        {
-          node->sibling=(IntervalTree *) AcquireQuantumMemory(1,
-            sizeof(*node->sibling));
-          node=node->sibling;
-          if (node == (IntervalTree *) NULL)
-            {
-              list=(IntervalTree **) RelinquishMagickMemory(list);
-              FreeNodes(root);
-              return((IntervalTree *) NULL);
-            }
-          node->tau=zero_crossing[i+1].tau;
-          node->child=(IntervalTree *) NULL;
-          node->sibling=(IntervalTree *) NULL;
-          node->left=left;
-          node->right=head->right;
-        }
-    }
+    if (SplitIntervalList(zero_crossing,i,root,&list) == MagickFalse)
+      return((IntervalTree *) NULL);
   }
   /*
     Determine the stability: difference between a nodes tau and its child.
