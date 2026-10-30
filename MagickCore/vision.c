@@ -675,9 +675,6 @@ static void EccentricityThreshold(const Image *component_image,
       *magick_restrict p;
 
     ssize_t
-      x;
-
-    ssize_t
       y;
 
     /*
@@ -694,6 +691,12 @@ static void EccentricityThreshold(const Image *component_image,
     centroid.y=M01*MagickSafeReciprocal(M00);
     for (y=0; y < (ssize_t) bounding_box.height; y++)
     {
+      CCMomentRow
+        moment_row;
+
+      const CCMomentSums
+        moment_sums = { &M11, &M20, &M02, &p };
+
       if (status == MagickFalse)
         continue;
       p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
@@ -703,16 +706,12 @@ static void EccentricityThreshold(const Image *component_image,
           status=MagickFalse;
           break;
         }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        if ((ssize_t) GetPixelIndex(component_image,p) == i)
-          {
-            M11+=(x-centroid.x)*(y-centroid.y);
-            M20+=(x-centroid.x)*(x-centroid.x);
-            M02+=(y-centroid.y)*(y-centroid.y);
-          }
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
+      moment_row.component_image=component_image;
+      moment_row.bounding_box=bounding_box;
+      moment_row.i=i;
+      moment_row.centroid=centroid;
+      moment_row.y=y;
+      AccumulateSecondMoments(&moment_row,&moment_sums);
     }
     component_view=DestroyCacheView(component_view);
     ellipse_axis.x=sqrt((2.0*MagickSafeReciprocal(M00))*((M20+M02)+
