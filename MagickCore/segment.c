@@ -2188,6 +2188,30 @@ static void ScaleSpace(const ssize_t *histogram,const double tau,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType AcquireSegmentHistograms(const Image *image,
+  ssize_t **histogram,short **extrema,ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < MaxDimension; i++)
+  {
+    histogram[i]=(ssize_t *) AcquireQuantumMemory(256,sizeof(**histogram));
+    extrema[i]=(short *) AcquireQuantumMemory(256,sizeof(**extrema));
+    if ((histogram[i] == (ssize_t *) NULL) || (extrema[i] == (short *) NULL))
+      {
+        for (i-- ; i >= 0; i--)
+        {
+          extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
+          histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
+        }
+        ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+          image->filename)
+      }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SegmentImage(Image *image,
   const ColorspaceType colorspace,const MagickBooleanType verbose,
   const double cluster_threshold,const double smooth_threshold,
@@ -2218,21 +2242,9 @@ MagickExport MagickBooleanType SegmentImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  for (i=0; i < MaxDimension; i++)
-  {
-    histogram[i]=(ssize_t *) AcquireQuantumMemory(256,sizeof(**histogram));
-    extrema[i]=(short *) AcquireQuantumMemory(256,sizeof(**extrema));
-    if ((histogram[i] == (ssize_t *) NULL) || (extrema[i] == (short *) NULL))
-      {
-        for (i-- ; i >= 0; i--)
-        {
-          extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
-          histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
-        }
-        ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-          image->filename)
-      }
-  }
+  if (AcquireSegmentHistograms(image,histogram,extrema,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   /*
     Initialize histogram.
   */
