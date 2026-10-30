@@ -647,6 +647,19 @@ static Image *CompositeMontageTile(Image *image,
   return(image);
 }
 
+static void GetMontageOffsets(const MontageInfo *montage_info,
+  const size_t number_images,ssize_t *x_offset,ssize_t *y_offset)
+{
+  size_t
+    sans;
+
+  *x_offset=0;
+  *y_offset=0;
+  if (montage_info->tile != (char *) NULL)
+    GetMontageGeometry(montage_info->tile,number_images,x_offset,y_offset,
+      &sans,&sans);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -852,11 +865,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
       Determine bounding box.
     */
     tiles_per_page=tiles_per_row*tiles_per_column;
-    x_offset=0;
-    y_offset=0;
-    if (montage_info->tile != (char *) NULL)
-      GetMontageGeometry(montage_info->tile,number_images,&x_offset,&y_offset,
-        &sans,&sans);
+    GetMontageOffsets(montage_info,number_images,&x_offset,&y_offset);
     tiles_per_page=tiles_per_row*tiles_per_column;
     y_offset+=(ssize_t) title_offset;
     max_height=0;
