@@ -302,6 +302,41 @@ static GeometryInfo SetKernelArraySize(KernelInfo *kernel,
   return(args);
 }
 
+static MagickBooleanType ParseKernelGeometry(const char *kernel_string,
+  const char *p,KernelInfo *kernel,MagickStatusType *flags)
+{
+  char
+    token[MagickPathExtent];
+
+  GeometryInfo
+    args;
+
+  size_t
+    length;
+
+  /* ParseGeometry() needs the geometry separated! -- Arrgghh */
+  length=MagickMin((size_t) (p-kernel_string),sizeof(token)-1);
+  (void) memcpy(token, kernel_string, length);
+  token[length] = '\0';
+  SetGeometryInfo(&args);
+  *flags = ParseGeometry(token, &args);
+
+  /* Size handling and checks of geometry settings */
+  args=SetKernelArraySize(kernel,*flags,args);
+
+  /* Offset Handling and Checks */
+  if ( args.xi  < 0.0 || args.psi < 0.0 )
+    return(MagickFalse);
+  kernel->x = ((*flags & XValue)!=0) ? (ssize_t)args.xi
+                                    : (ssize_t) (kernel->width-1)/2;
+  kernel->y = ((*flags & YValue)!=0) ? (ssize_t)args.psi
+                                    : (ssize_t) (kernel->height-1)/2;
+  if ( kernel->x >= (ssize_t) kernel->width ||
+       kernel->y >= (ssize_t) kernel->height )
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -322,12 +357,6 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
 
   MagickStatusType
     flags;
-
-  GeometryInfo
-    args;
-
-  size_t
-    length;
 
   kernel=(KernelInfo *) AcquireMagickMemory(sizeof(*kernel));
   if (kernel == (KernelInfo *) NULL)
@@ -355,25 +384,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
   p = strchr(kernel_string, ':');
   if ( p != (char *) NULL && p < end)
     {
-      /* ParseGeometry() needs the geometry separated! -- Arrgghh */
-      length=MagickMin((size_t) (p-kernel_string),sizeof(token)-1);
-      (void) memcpy(token, kernel_string, length);
-      token[length] = '\0';
-      SetGeometryInfo(&args);
-      flags = ParseGeometry(token, &args);
-
-      /* Size handling and checks of geometry settings */
-      args=SetKernelArraySize(kernel,flags,args);
-
-      /* Offset Handling and Checks */
-      if ( args.xi  < 0.0 || args.psi < 0.0 )
-        return(DestroyKernelInfo(kernel));
-      kernel->x = ((flags & XValue)!=0) ? (ssize_t)args.xi
-                                        : (ssize_t) (kernel->width-1)/2;
-      kernel->y = ((flags & YValue)!=0) ? (ssize_t)args.psi
-                                        : (ssize_t) (kernel->height-1)/2;
-      if ( kernel->x >= (ssize_t) kernel->width ||
-           kernel->y >= (ssize_t) kernel->height )
+      if (ParseKernelGeometry(kernel_string,p,kernel,&flags) == MagickFalse)
         return(DestroyKernelInfo(kernel));
 
       p++; /* advance beyond the ':' */
