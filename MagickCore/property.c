@@ -2004,6 +2004,22 @@ static void AddXMPDescriptionValues(const Image *image,
   }
 }
 
+static void AddXMPRDFValues(const Image *image,XMLTreeInfo *rdf)
+{
+  XMLTreeInfo
+    *description;
+
+  if (image->properties == (void *) NULL)
+    ((Image *) image)->properties=NewSplayTree(CompareSplayTreeString,
+      RelinquishMagickMemory,RelinquishMagickMemory);
+  description=GetXMLTreeChild(rdf,"rdf:Description");
+  while (description != (XMLTreeInfo *) NULL)
+  {
+    AddXMPDescriptionValues(image,description);
+    description=GetNextXMLTreeTag(description);
+  }
+}
+
 static void GetXMPProperty(const Image *image,const char *property)
 {
   char
@@ -2019,7 +2035,6 @@ static void GetXMPProperty(const Image *image,const char *property)
     *p;
 
   XMLTreeInfo
-    *description,
     *rdf,
     *xmp;
 
@@ -2044,17 +2059,7 @@ static void GetXMPProperty(const Image *image,const char *property)
     return;
   rdf=GetXMLTreeChild(xmp,"rdf:RDF");
   if (rdf != (XMLTreeInfo *) NULL)
-    {
-      if (image->properties == (void *) NULL)
-        ((Image *) image)->properties=NewSplayTree(CompareSplayTreeString,
-          RelinquishMagickMemory,RelinquishMagickMemory);
-      description=GetXMLTreeChild(rdf,"rdf:Description");
-      while (description != (XMLTreeInfo *) NULL)
-      {
-        AddXMPDescriptionValues(image,description);
-        description=GetNextXMLTreeTag(description);
-      }
-    }
+    AddXMPRDFValues(image,rdf);
   xmp=DestroyXMLTree(xmp);
 }
 
