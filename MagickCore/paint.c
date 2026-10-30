@@ -158,6 +158,19 @@ static ssize_t FillFloodplaneSpan(const FloodfillScan *scan,
   return(x);
 }
 
+static MagickBooleanType PrepareFloodfillImage(Image *image,
+  const DrawInfo *draw_info,ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+  if (((image->alpha_trait & BlendPixelTrait) == 0) &&
+      (draw_info->fill.alpha_trait != UndefinedPixelTrait))
+    (void) SetImageAlpha(image,OpaqueAlpha,exception);
+  return(MagickTrue);
+}
+
 typedef struct _FloodfillTile
 {
   Image
@@ -267,13 +280,8 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     return(MagickFalse);
   if ((y_offset < 0) || (y_offset >= (ssize_t) image->rows))
     return(MagickFalse);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (PrepareFloodfillImage(image,draw_info,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) SetImageColorspace(image,sRGBColorspace,exception);
-  if (((image->alpha_trait & BlendPixelTrait) == 0) &&
-      (draw_info->fill.alpha_trait != UndefinedPixelTrait))
-    (void) SetImageAlpha(image,OpaqueAlpha,exception);
   /*
     Set floodfill state.
   */
