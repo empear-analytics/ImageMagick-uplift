@@ -1425,6 +1425,19 @@ static void OrderedDitherPixel(const Image *image,const double *levels,
   }
 }
 
+static const char *CopyThresholdMapName(const char *threshold_map,
+  const char *p,char *token)
+{
+  while (IsThresholdMapNameCharacter(p) != MagickFalse)
+  {
+    if ((p-threshold_map) >= (MagickPathExtent-1))
+      break;
+    token[p-threshold_map]=(*p);
+    p++;
+  }
+  return(p);
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1466,13 +1479,7 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   while (IsThresholdMapSeparator(p) != MagickFalse)
     p++;
   threshold_map=p;
-  while (IsThresholdMapNameCharacter(p) != MagickFalse)
-  {
-    if ((p-threshold_map) >= (MagickPathExtent-1))
-      break;
-    token[p-threshold_map]=(*p);
-    p++;
-  }
+  p=CopyThresholdMapName(threshold_map,p,token);
   token[p-threshold_map]='\0';
   map=GetThresholdMap(token,exception);
   if (map == (ThresholdMap *) NULL)
