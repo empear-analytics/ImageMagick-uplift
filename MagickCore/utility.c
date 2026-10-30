@@ -416,6 +416,41 @@ static const char *SkipBase64Whitespace(const char *p)
   return(p);
 }
 
+static MagickBooleanType VerifyBase64Padding(const char *p,const int state,
+  unsigned char *decode,const size_t i)
+{
+  p++;
+  switch (state)
+  {
+    case 0:
+    case 1:
+    {
+      /*
+        Unrecognized '=' character.
+      */
+      decode=(unsigned char *) RelinquishMagickMemory(decode);
+      return(MagickFalse);
+    }
+    case 2:
+    {
+      p=SkipBase64Whitespace(p);
+      if (*p != '=')
+        {
+          decode=(unsigned char *) RelinquishMagickMemory(decode);
+          return(MagickFalse);
+        }
+      p++;
+    }
+    case 3:
+    {
+      if (VerifyBase64Tail(p,decode,i) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
 {
   int
@@ -469,35 +504,8 @@ MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
     }
   else
     {
-      p++;
-      switch (state)
-      {
-        case 0:
-        case 1:
-        {
-          /*
-            Unrecognized '=' character.
-          */
-          decode=(unsigned char *) RelinquishMagickMemory(decode);
-          return((unsigned char *) NULL);
-        }
-        case 2:
-        {
-          p=SkipBase64Whitespace(p);
-          if (*p != '=')
-            {
-              decode=(unsigned char *) RelinquishMagickMemory(decode);
-              return((unsigned char *) NULL);
-            }
-          p++;
-        }
-        case 3:
-        {
-          if (VerifyBase64Tail(p,decode,i) == MagickFalse)
-            return((unsigned char *) NULL);
-          break;
-        }
-      }
+      if (VerifyBase64Padding(p,state,decode,i) == MagickFalse)
+        return((unsigned char *) NULL);
     }
   *length=i;
   return(decode);
