@@ -1030,6 +1030,38 @@ static MagickBooleanType WriteHoughLines(const HoughSegments *segments,
   return(status);
 }
 
+typedef struct _HoughVotes
+{
+  const Image
+    *image;
+
+  MatrixInfo
+    *accumulator;
+
+  double
+    hough_height;
+
+  ssize_t
+    y;
+} HoughVotes;
+
+static void VoteHoughRow(const HoughVotes *votes,
+  const Quantum *magick_restrict p,PointInfo center)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) votes->image->columns; x++)
+  {
+    const HoughCell
+      cell = { x, votes->y };
+
+    if (GetPixelIntensity(votes->image,p) > ((double) QuantumRange/2.0))
+      VoteHoughLines(votes->accumulator,&center,&cell,votes->hough_height);
+    p+=(ptrdiff_t) GetPixelChannels(votes->image);
+  }
+}
+
 MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const size_t height,const size_t threshold,ExceptionInfo *exception)
 {
@@ -1117,8 +1149,8 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
+    HoughVotes
+      votes;
 
     if (status == MagickFalse)
       continue;
@@ -1128,15 +1160,11 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      const HoughCell
-        cell = { x, y };
-
-      if (GetPixelIntensity(image,p) > ((double) QuantumRange/2.0))
-        VoteHoughLines(accumulator,&center,&cell,hough_height);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    votes.image=image;
+    votes.accumulator=accumulator;
+    votes.hough_height=hough_height;
+    votes.y=y;
+    VoteHoughRow(&votes,p,center);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
