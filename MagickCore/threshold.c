@@ -1972,6 +1972,16 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType SetDirectRGBImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+  return(MagickTrue);
+}
+
 static inline Quantum RangeThresholdValue(const double pixel,
   const double low_black,const double low_white,const double high_white,
   const double high_black)
@@ -2043,10 +2053,8 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (SetDirectRGBImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
   /*
     Range threshold image.
   */
@@ -2156,16 +2164,6 @@ static void WhiteThresholdIntensity(const Image *image,
 
   pixel=GetPixelIntensity(image,q);
   WhiteThresholdPixel(image,threshold,pixel,q);
-}
-
-static MagickBooleanType SetDirectRGBImage(Image *image,
-  ExceptionInfo *exception)
-{
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
-    return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
-  return(MagickTrue);
 }
 
 MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
