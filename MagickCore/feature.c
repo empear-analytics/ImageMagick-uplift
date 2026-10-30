@@ -1064,35 +1064,32 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
 
     for (x=0; x < (ssize_t) accumulator_width; x++)
     {
+      const HoughCell
+        cell = { x, y };
+
       double
-        count;
+        count,
+        maxima;
+
+      SegmentInfo
+        line;
 
       (void) GetMatrixElement(accumulator,x,y,&count);
-      if (count >= (double) line_count)
-        {
-          const HoughCell
-            cell = { x, y };
-
-          double
-            maxima;
-
-          SegmentInfo
-            line;
-
-          /*
-            Is point a local maxima?
-          */
-          maxima=GetHoughMaxima(accumulator,&cell,&window,count);
-          (void) GetMatrixElement(accumulator,x,y,&count);
-          if (maxima > count)
-            continue;
-          line=GetHoughLine(image,x,y,accumulator_height);
-          (void) FormatLocaleString(message,MagickPathExtent,
-            "line %g,%g %g,%g  # %g %g %g\n",line.x1,line.y1,line.x2,line.y2,
-            maxima,(double) x,(double) y);
-          if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
-            status=MagickFalse;
-        }
+      if (!(count >= (double) line_count))
+        continue;
+      /*
+        Is point a local maxima?
+      */
+      maxima=GetHoughMaxima(accumulator,&cell,&window,count);
+      (void) GetMatrixElement(accumulator,x,y,&count);
+      if (maxima > count)
+        continue;
+      line=GetHoughLine(image,x,y,accumulator_height);
+      (void) FormatLocaleString(message,MagickPathExtent,
+        "line %g,%g %g,%g  # %g %g %g\n",line.x1,line.y1,line.x2,line.y2,
+        maxima,(double) x,(double) y);
+      if (write(file,message,strlen(message)) != (ssize_t) strlen(message))
+        status=MagickFalse;
     }
   }
   (void) close_utf8(file);
