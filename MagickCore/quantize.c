@@ -1228,6 +1228,69 @@ static DoublePixelPacket GetQCubeMidpoint(void)
 
 #define ClassifyImageTag  "Classify/Image"
 
+typedef struct _QCubeRows
+{
+  QCubeInfo
+    *cube_info;
+
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  DoublePixelPacket
+    midpoint;
+
+  ExceptionInfo
+    *exception;
+} QCubeRows;
+
+static void ClassifyPrunedImageRows(const QCubeRows *rows,ssize_t *y,
+  DoublePixelPacket *error)
+{
+  QCubeInfo
+    *const cube_info = rows->cube_info;
+
+  const Image
+    *const image = rows->image;
+
+  CacheView
+    *const image_view = rows->image_view;
+
+  const DoublePixelPacket
+    midpoint = rows->midpoint;
+
+  ExceptionInfo
+    *const exception = rows->exception;
+
+  MagickBooleanType
+    proceed;
+
+  for ((*y)++; *y < (ssize_t) image->rows; (*y)++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    QCubeRow
+      row;
+
+    p=GetCacheViewVirtualPixels(image_view,0,*y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    PruneOversizedColorTree(cube_info);
+    row.cube_info=cube_info;
+    row.image=image;
+    row.midpoint=midpoint;
+    row.exception=exception;
+    ClassifyPrunedImageRow(&row,&p,error);
+    proceed=SetImageProgress(image,ClassifyImageTag,(MagickOffsetType) *y,
+      image->rows);
+    if (proceed == MagickFalse)
+      break;
+  }
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -1240,6 +1303,9 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
 
   MagickBooleanType
     proceed;
+
+  QCubeRows
+    rows;
 
   ssize_t
     y;
@@ -1280,28 +1346,12 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
     if (proceed == MagickFalse)
       break;
   }
-  for (y++; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    QCubeRow
-      row;
-
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    PruneOversizedColorTree(cube_info);
-    row.cube_info=cube_info;
-    row.image=image;
-    row.midpoint=midpoint;
-    row.exception=exception;
-    ClassifyPrunedImageRow(&row,&p,&error);
-    proceed=SetImageProgress(image,ClassifyImageTag,(MagickOffsetType) y,
-      image->rows);
-    if (proceed == MagickFalse)
-      break;
-  }
+  rows.cube_info=cube_info;
+  rows.image=image;
+  rows.image_view=image_view;
+  rows.midpoint=midpoint;
+  rows.exception=exception;
+  ClassifyPrunedImageRows(&rows,&y,&error);
   image_view=DestroyCacheView(image_view);
   RestoreClassifyColorspace(cube_info,image,exception);
   return(y < (ssize_t) image->rows ? MagickFalse : MagickTrue);
