@@ -116,6 +116,37 @@ typedef struct _CopyRegion
 %    o exception: Return any errors or warnings in this structure.
 %
 */
+static void OrientTopBottomImage(const Image *image,
+  const OrientationType orientation,ExceptionInfo *exception,
+  Image **orient_image)
+{
+  switch (orientation)
+  {
+    case UndefinedOrientation:
+    case TopLeftOrientation:
+    default:
+    {
+      (*orient_image)=CloneImage(image,0,0,MagickTrue,exception);
+      break;
+    }
+    case TopRightOrientation:
+    {
+      (*orient_image)=FlopImage(image,exception);
+      break;
+    }
+    case BottomRightOrientation:
+    {
+      (*orient_image)=RotateImage(image,180.0,exception);
+      break;
+    }
+    case BottomLeftOrientation:
+    {
+      (*orient_image)=FlipImage(image,exception);
+      break;
+    }
+  }
+}
+
 MagickExport Image *AutoOrientImage(const Image *image,
   const OrientationType orientation,ExceptionInfo *exception)
 {
@@ -129,26 +160,9 @@ MagickExport Image *AutoOrientImage(const Image *image,
   orient_image=(Image *) NULL;
   switch (orientation)
   {
-    case UndefinedOrientation:
-    case TopLeftOrientation:
     default:
     {
-      orient_image=CloneImage(image,0,0,MagickTrue,exception);
-      break;
-    }
-    case TopRightOrientation:
-    {
-      orient_image=FlopImage(image,exception);
-      break;
-    }
-    case BottomRightOrientation:
-    {
-      orient_image=RotateImage(image,180.0,exception);
-      break;
-    }
-    case BottomLeftOrientation:
-    {
-      orient_image=FlipImage(image,exception);
+      OrientTopBottomImage(image,orientation,exception,&orient_image);
       break;
     }
     case LeftTopOrientation:
