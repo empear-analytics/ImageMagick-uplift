@@ -1931,13 +1931,39 @@ static void AddXMPPropertyValue(const Image *image,XMLTreeInfo *node,
   xmp_namespace=DestroyString(xmp_namespace);
 }
 
+static void AddXMPDescriptionValues(const Image *image,
+  XMLTreeInfo *description)
+{
+  const char
+    *content;
+
+  XMLTreeInfo
+    *child,
+    *node;
+
+  node=GetXMLTreeChild(description,(const char *) NULL);
+  while (node != (XMLTreeInfo *) NULL)
+  {
+    child=GetXMLTreeChild(node,(const char *) NULL);
+    content=GetXMLTreeContent(node);
+    if ((child == (XMLTreeInfo *) NULL) &&
+        (SkipXMPValue(content) == MagickFalse))
+      AddXMPPropertyValue(image,node,content);
+    while (child != (XMLTreeInfo *) NULL)
+    {
+      content=GetXMLTreeContent(child);
+      if (SkipXMPValue(content) == MagickFalse)
+        AddXMPPropertyValue(image,node,content);
+      child=GetXMLTreeSibling(child);
+    }
+    node=GetXMLTreeSibling(node);
+  }
+}
+
 static void GetXMPProperty(const Image *image,const char *property)
 {
   char
     *xmp_profile;
-
-  const char
-    *content;
 
   const StringInfo
     *profile;
@@ -1949,9 +1975,7 @@ static void GetXMPProperty(const Image *image,const char *property)
     *p;
 
   XMLTreeInfo
-    *child,
     *description,
-    *node,
     *rdf,
     *xmp;
 
@@ -1983,23 +2007,7 @@ static void GetXMPProperty(const Image *image,const char *property)
       description=GetXMLTreeChild(rdf,"rdf:Description");
       while (description != (XMLTreeInfo *) NULL)
       {
-        node=GetXMLTreeChild(description,(const char *) NULL);
-        while (node != (XMLTreeInfo *) NULL)
-        {
-          child=GetXMLTreeChild(node,(const char *) NULL);
-          content=GetXMLTreeContent(node);
-          if ((child == (XMLTreeInfo *) NULL) &&
-              (SkipXMPValue(content) == MagickFalse))
-            AddXMPPropertyValue(image,node,content);
-          while (child != (XMLTreeInfo *) NULL)
-          {
-            content=GetXMLTreeContent(child);
-            if (SkipXMPValue(content) == MagickFalse)
-              AddXMPPropertyValue(image,node,content);
-            child=GetXMLTreeSibling(child);
-          }
-          node=GetXMLTreeSibling(node);
-        }
+        AddXMPDescriptionValues(image,description);
         description=GetNextXMLTreeTag(description);
       }
     }
