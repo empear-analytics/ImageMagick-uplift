@@ -801,6 +801,18 @@ static ssize_t FindCrossingBelow(const ZeroCrossing *zero_crossing,
   return(k);
 }
 
+static ssize_t FindCrossingAbove(const ZeroCrossing *zero_crossing,
+  const ssize_t i,const ssize_t j)
+{
+  ssize_t
+    k;
+
+  for (k=j+1; k < 255; k++)
+    if (zero_crossing[i+1].crossings[k] != 0)
+      break;
+  return(k);
+}
+
 static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -832,9 +844,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       k=FindCrossingBelow(zero_crossing,i+1,j);
       left=MagickMax(k,0);
       center=j;
-      for (k=j+1; k < 255; k++)
-        if (zero_crossing[i+1].crossings[k] != 0)
-          break;
+      k=FindCrossingAbove(zero_crossing,i,j);
       right=MagickMin(k,255);
       /*
         K is the zero crossing just left of j.
