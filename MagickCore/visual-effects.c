@@ -1302,6 +1302,22 @@ static void MorphPixelChannels(const Image *morph_image,
 
 #define MorphImageTag  "Morph/Image"
 
+static MagickBooleanType ReportMorphProgress(const Image *image,
+  const MagickOffsetType scene,MagickBooleanType status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,MorphImageTag,scene,
+        GetImageListLength(image));
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   ExceptionInfo *exception)
 {
@@ -1464,16 +1480,7 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
       }
     AppendImageToList(&morph_images,morph_image);
     morph_images=GetLastImageInList(morph_images);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,MorphImageTag,scene,
-          GetImageListLength(image));
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    status=ReportMorphProgress(image,scene,status);
     scene++;
   }
   if (GetNextImageInList(next) != (Image *) NULL)
