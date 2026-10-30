@@ -1903,6 +1903,13 @@ static inline MagickBooleanType IsColumnOutside(const Image *image,
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsRowOutside(const Image *image,
+  const ssize_t y_offset)
+{
+  return(((y_offset < 0) || (y_offset >= (ssize_t) image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2343,7 +2350,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
             continue;
           x_offset=CastDoubleToSsizeT(ceil(point.x-0.5));
           y_offset=CastDoubleToSsizeT(ceil(point.y+y-0.5));
-          if ((y_offset < 0) || (y_offset >= (ssize_t) image->rows))
+          if (IsRowOutside(image,y_offset) != MagickFalse)
             continue;
           q=(Quantum *) NULL;
           if (IsColumnOutside(image,x_offset) != MagickFalse)
