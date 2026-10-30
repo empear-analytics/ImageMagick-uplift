@@ -175,6 +175,28 @@ static void InsertIntoTagList(XMLTreeInfo *node,XMLTreeInfo *child,
   node->next=child;
 }
 
+static void InsertIntoOrderedList(XMLTreeInfo *xml_info,XMLTreeInfo *head,
+  XMLTreeInfo *child,const size_t offset)
+{
+  XMLTreeInfo
+    *node;
+
+  if (head->offset > offset)
+    {
+      child->ordered=head;
+      xml_info->child=child;
+    }
+  else
+    {
+      node=head;
+      while ((node->ordered != (XMLTreeInfo *) NULL) &&
+             (node->ordered->offset <= offset))
+        node=node->ordered;
+      child->ordered=node->ordered;
+      node->ordered=child;
+    }
+}
+
 static XMLTreeInfo *InsertTagIntoXMLTree(XMLTreeInfo *xml_info,
   XMLTreeInfo *child,const size_t offset)
 {
@@ -194,20 +216,7 @@ static XMLTreeInfo *InsertTagIntoXMLTree(XMLTreeInfo *xml_info,
       return(child);
     }
   head=xml_info->child;
-  if (head->offset > offset)
-    {
-      child->ordered=head;
-      xml_info->child=child;
-    }
-  else
-    {
-      node=head;
-      while ((node->ordered != (XMLTreeInfo *) NULL) &&
-             (node->ordered->offset <= offset))
-        node=node->ordered;
-      child->ordered=node->ordered;
-      node->ordered=child;
-    }
+  InsertIntoOrderedList(xml_info,head,child,offset);
   previous=(XMLTreeInfo *) NULL;
   node=head;
   while ((node != (XMLTreeInfo *) NULL) && (strcmp(node->tag,child->tag) != 0))
