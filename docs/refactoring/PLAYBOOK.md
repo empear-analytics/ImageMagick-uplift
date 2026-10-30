@@ -1622,6 +1622,12 @@ Q and U, whose first step refuses a block containing `goto`.
    does nothing after the block but its own statements. Temporaries it writes before
    reading, and the caller does not read after it, are declared in the new function
    (Recipe Y). Steps 1 and 4 hold as written, with `S return(v);` in place of `goto L;`.
+   `return(c);` of one constant `c` (step 6) may end every exit in place of
+   `return(v);` (`OptimizeLayerFrames`' `bounds=(RectangleInfo *)
+   RelinquishMagickMemory(bounds); disposals=(DisposeType *)
+   RelinquishMagickMemory(disposals); return((Image *) NULL);`): the caller writes
+   `{ S return(c); }`, and step 2 then holds as well, its one written variable being
+   one that `S` neither reads nor writes.
 
 **Before:**
 
@@ -1695,6 +1701,18 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   keeping `S` in the caller needs neither. The helper's pointer copy is dead once it
   returns, before `S` frees the memory. `refactor_guard.py --calls` shows each call in
   `S` fall by one per copy that merged into the caller's single `S`.
+- Under step 7 with `return(c);` the argument is the same with `c` for `v`. The writes
+  in `S` (`bounds` and `disposals` relinquished, an image destroyed) are dead on that
+  path, since the caller returns `c` at once and reads none of them, but the recipe does
+  not rest on that: `S` stays the caller's own text, run on the caller's own variables
+  at the same point, so the helper neither takes them nor writes them. The block's one
+  written variable (`prev_image`, from `ReferenceImage`) has landed through the pointer
+  before `return(MagickFalse);`, and `S` does not read it, so `S` sees the values it saw
+  before. On the success path `S` runs in neither version. The other way to admit
+  these blocks, moving `S` into the helper with the variables it writes passed by value
+  so that its writes land in dead copies, is not this recipe: it would pass every
+  variable `S` reads (seven parameters at `OptimizeLayerFrames`' background clone) and
+  would rest on reading that the caller reads none of them afterwards.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved; under step 7 also `-(k-1)` for each call in `S`, where `k` is the
@@ -1712,6 +1730,10 @@ probe of the work-image clone: nesting 6 to 5, 2.46 to 2.51. Cleanup labels reac
 (2026-10-30, task W09): `threshold.c`'s `GetThresholdMapFile` (cc 18, 150 lines), whose
 ten validation exits each throw a warning and end in the same destroy of the XML tree
 and the map, then `return(map);`.
+Step 7's `return(c);` (2026-10-30, task W09): `layer.c`'s `OptimizeLayerFrames`, whose
+`NoneDispose` reference ends in releasing `bounds` and `disposals`, then
+`return((Image *) NULL);` (nesting 4), and `CoalesceImages`' dispose-image clone, which
+destroys the coalesced list first.
 
 ---
 
@@ -2348,3 +2370,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | F | Step 2: a non-`const` array whose every use is an element read or an argument to a `const`-qualified pointer parameter counts as never written, and moves unchanged | `resize.c`'s `AcquireResizeFilter`: its `static double jinc_zeros[16]` (18 lines of Bessel zeros) is only indexed, and passed to `SetJincSupport`'s `const double *`; it is the last data in the function. A probe: with it and four extractions the function leaves Large Method, 5.83 to 6.18. Machine code and data unchanged (objdump on Linux) | mandate (2026-10-24) |
 | 2026-10-30 | NEW | Z | Extract Selection with Out-Parameters Taking an Input Struct: a Recipe O selection whose inputs would give the new function five or more parameters moves to a `static void` function taking a `const` struct of the inputs it only reads (Recipe N's struct) and one pointer per local it sets (Recipe O) | `threshold.c`'s `ColorThresholdImage`: the colorspace `switch` sets `start` and `stop` and reads four inputs (six arguments under O); a probe 4.46 to 4.58 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | V | Step 7: a block whose every exit is the same cleanup run `S` followed by `return(v);` moves with `S` left in the caller: each exit becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) { S return(v); }`; the block may not write what `S` reads or writes. *Careful* gives the argument: the caller runs the same cleanup on the same values and returns the same variable, so nothing rests on the destroy function returning NULL | `threshold.c`'s `GetThresholdMapFile`: its level-parsing tail has four exits of `thresholds=DestroyXMLTree(thresholds); map=DestroyThresholdMap(map); return(map);`, which step 6 refuses (a variable, not a constant). A probe: cc 18 to 12, 150 to 104 lines, 4.60 to 4.71 | owner |
+| 2026-10-30 | AMEND | V | Step 7: `return(c);` of one constant `c` (step 6) may end every exit in place of `return(v);`; the caller writes `{ S return(c); }` and step 2 holds (one written variable, which `S` neither reads nor writes). *Careful*: the cleanup's writes are dead on the failure path, but the recipe does not rest on that, since `S` stays in the caller; moving `S` into the helper instead is not admitted | Owner's request of 2026-10-30 after the W08 report (V allowing dead cleanup writes on the failure path). `layer.c`'s `OptimizeLayerFrames`: the `NoneDispose` reference's failure path releases `bounds` and `disposals`, then `return((Image *) NULL);`, which step 6 refused (three written variables) and step 7 did not name (a constant, not a variable). A probe: bumps 9 to 8, 4.99 to 5.00; with `CoalesceImages`' dispose-image clone, 5.01 | owner |
