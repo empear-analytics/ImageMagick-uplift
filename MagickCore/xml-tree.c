@@ -1124,6 +1124,29 @@ static char *ResizeEntityBuffer(char *p,const char *q,const size_t extent)
   return(p);
 }
 
+static char *WriteUTF8Sequence(char *xml,const int c)
+{
+  int
+    byte;
+
+  ssize_t
+    i;
+
+  byte=c;
+  for (i=0; byte != 0; byte/=2)
+    i++;
+  i=(i-2)/5;
+  *xml=(char) ((0xFF << (7-i)) | (c >> (6*i)));
+  xml++;
+  while (i != 0)
+  {
+    i--;
+    *xml=(char) (0x80 | ((c >> (6*i)) & 0x3F));
+    xml++;
+  }
+  return(xml);
+}
+
 static char *ParseEntities(char *xml,char **entities,int state)
 {
   char
@@ -1132,7 +1155,6 @@ static char *ParseEntities(char *xml,char **entities,int state)
     *q;
 
   int
-    byte,
     c;
 
   size_t
@@ -1193,18 +1215,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
             /*
               Multi-byte UTF-8 sequence.
             */
-            byte=c;
-            for (i=0; byte != 0; byte/=2)
-              i++;
-            i=(i-2)/5;
-            *xml=(char) ((0xFF << (7-i)) | (c >> (6*i)));
-            xml++;
-            while (i != 0)
-            {
-              i--;
-              *xml=(char) (0x80 | ((c >> (6*i)) & 0x3F));
-              xml++;
-            }
+            xml=WriteUTF8Sequence(xml,c);
           }
         (void) memmove(xml,strchr(xml,';')+1,strlen(strchr(xml,';')));
       }
