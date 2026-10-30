@@ -650,6 +650,22 @@ static MagickBooleanType ReportImageRowProgress(Image *image,
   return(status);
 }
 
+static inline MagickBooleanType IsMonochromeQuantize(
+  const QCubeInfo *cube_info)
+{
+  return(((cube_info->quantize_info->number_colors == 2) &&
+      (IsGrayColorspace(cube_info->quantize_info->colorspace))) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsColorspaceRestoreNeeded(
+  const QCubeInfo *cube_info,const ColorspaceType colorspace)
+{
+  return(((cube_info->quantize_info->colorspace != UndefinedColorspace) &&
+      (IssRGBCompatibleColorspace(colorspace) == MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -713,12 +729,10 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
     }
   if (cube_info->quantize_info->measure_error != MagickFalse)
     (void) GetImageQuantizeError(image,exception);
-  if ((cube_info->quantize_info->number_colors == 2) &&
-      (IsGrayColorspace(cube_info->quantize_info->colorspace)))
+  if (IsMonochromeQuantize(cube_info) != MagickFalse)
     SetMonochromeColormap(image);
   (void) SyncImage(image,exception);
-  if ((cube_info->quantize_info->colorspace != UndefinedColorspace) &&
-      (IssRGBCompatibleColorspace(colorspace) == MagickFalse))
+  if (IsColorspaceRestoreNeeded(cube_info,colorspace) != MagickFalse)
     (void) TransformImageColorspace(image,colorspace,exception);
   return(MagickTrue);
 }
