@@ -171,6 +171,20 @@ static MagickBooleanType PrepareFloodfillImage(Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireFloodplaneImage(Image *image,
+  Image **floodplane_image,ExceptionInfo *exception)
+{
+  *floodplane_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*floodplane_image == (Image *) NULL)
+    return(MagickFalse);
+  (*floodplane_image)->alpha_trait=UndefinedPixelTrait;
+  (*floodplane_image)->colorspace=GRAYColorspace;
+  (void) QueryColorCompliance("#000",AllCompliance,
+    &(*floodplane_image)->background_color,exception);
+  (void) SetImageBackgroundColor(*floodplane_image,exception);
+  return(MagickTrue);
+}
+
 typedef struct _FloodfillTile
 {
   Image
@@ -285,14 +299,8 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   /*
     Set floodfill state.
   */
-  floodplane_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (floodplane_image == (Image *) NULL)
+  if (AcquireFloodplaneImage(image,&floodplane_image,exception) == MagickFalse)
     return(MagickFalse);
-  floodplane_image->alpha_trait=UndefinedPixelTrait;
-  floodplane_image->colorspace=GRAYColorspace;
-  (void) QueryColorCompliance("#000",AllCompliance,
-    &floodplane_image->background_color,exception);
-  (void) SetImageBackgroundColor(floodplane_image,exception);
   segment_info=AcquireVirtualMemory(MaxStacksize,sizeof(*segment_stack));
   if (segment_info == (MemoryInfo *) NULL)
     {
