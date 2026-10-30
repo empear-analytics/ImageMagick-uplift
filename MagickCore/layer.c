@@ -507,11 +507,9 @@ MagickExport Image *DisposeImages(const Image *images,ExceptionInfo *exception)
         bounds.width=next->columns;
         bounds.height=next->rows;
         bounds=ClipBoundsLeft(bounds);
-        if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) current_image->columns)
-          bounds.width=(size_t) ((ssize_t) current_image->columns-bounds.x);
+        bounds=ClipBoundsRight(bounds,current_image);
         bounds=ClipBoundsTop(bounds);
-        if ((bounds.y+(ssize_t) bounds.height) > (ssize_t) current_image->rows)
-          bounds.height=(size_t) ((ssize_t) current_image->rows-bounds.y);
+        bounds=ClipBoundsBottom(bounds,current_image);
         ClearBounds(current_image,&bounds,exception);
       }
     /*
