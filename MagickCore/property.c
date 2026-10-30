@@ -3882,6 +3882,31 @@ static inline MagickBooleanType IsEscapeEnd(const char *p)
     MagickFalse);
 }
 
+static void ScanBracedPattern(char *pattern,ssize_t *offset,ssize_t *depth,
+  const char **p)
+{
+  for ((*offset)=0; (*offset) < (MagickPathExtent-1L) && (*(*p) != '\0'); )
+  {
+    if ((*(*p) == '\\') && (*((*p)+1) != '\0'))
+      {
+        /*
+          Skip escaped braces within braced pattern.
+        */
+        pattern[(*offset)++]=(*(*p)++);
+        pattern[(*offset)++]=(*(*p)++);
+        continue;
+      }
+    if (*(*p) == '[')
+      (*depth)++;
+    if (*(*p) == ']')
+      (*depth)--;
+    if ((*depth) <= 0)
+      break;
+    pattern[(*offset)++]=(*(*p)++);
+  }
+  pattern[(*offset)]='\0';
+}
+
 static MagickStatusType EvaluatePixelExpression(FxInfo *fx_info,
   const Image *image,PixelInfo *pixel,ExceptionInfo *exception)
 {
@@ -4189,26 +4214,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
           status=MagickFalse;
           goto cleanup;
         }
-      for (offset=0; offset < (MagickPathExtent-1L) && (*p != '\0'); )
-      {
-        if ((*p == '\\') && (*(p+1) != '\0'))
-          {
-            /*
-              Skip escaped braces within braced pattern.
-            */
-            pattern[offset++]=(*p++);
-            pattern[offset++]=(*p++);
-            continue;
-          }
-        if (*p == '[')
-          depth++;
-        if (*p == ']')
-          depth--;
-        if (depth <= 0)
-          break;
-        pattern[offset++]=(*p++);
-      }
-      pattern[offset]='\0';
+      ScanBracedPattern(pattern,&offset,&depth,&p);
       if (depth != 0)
         {
           /*
