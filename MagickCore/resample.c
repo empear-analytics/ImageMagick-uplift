@@ -484,6 +484,65 @@ static void ResampleTiledLimitPixel(ResampleFilter *resample_filter,
   }
 }
 
+typedef struct _ResampleLimitPoint
+{
+  ResampleFilter
+    *resample_filter;
+
+  double
+    u0,
+    v0;
+
+  ExceptionInfo
+    *exception;
+} ResampleLimitPoint;
+
+static MagickBooleanType ResampleLimitedPixel(const ResampleLimitPoint *point,
+  PixelInfo *pixel,MagickBooleanType status)
+{
+  ResampleFilter
+    *const resample_filter = point->resample_filter;
+
+  const double
+    u0 = point->u0,
+    v0 = point->v0;
+
+  ExceptionInfo
+    *const exception = point->exception;
+
+  switch ( resample_filter->virtual_pixel ) {
+    /*  This is always handled by the above, so no need.
+      case BackgroundVirtualPixelMethod:
+      case ConstantVirtualPixelMethod:
+      case TransparentVirtualPixelMethod:
+      case GrayVirtualPixelMethod,
+      case WhiteVirtualPixelMethod
+      case MaskVirtualPixelMethod:
+    */
+    case UndefinedVirtualPixelMethod:
+    case EdgeVirtualPixelMethod:
+    case DitherVirtualPixelMethod:
+    case HorizontalTileEdgeVirtualPixelMethod:
+    case VerticalTileEdgeVirtualPixelMethod:
+      /* We need an average edge pixel, from the correct edge!
+         How should I calculate an average edge color?
+         Just returning an averaged neighbourhood,
+         works well in general, but falls down for TileEdge methods.
+         This needs to be done properly!!!!!!
+      */
+      status=InterpolatePixelInfo(resample_filter->image,
+        resample_filter->view,AverageInterpolatePixel,u0,v0,pixel,
+        resample_filter->exception);
+      break;
+    default:
+    {
+      ResampleTiledLimitPixel(resample_filter,pixel,exception,&status);
+      break;
+    }
+  }
+  return(status);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -608,37 +667,14 @@ MagickExport MagickBooleanType ResamplePixelColor(
     When Scaling limits reached, return an 'averaged' result.
   */
   if ( resample_filter->limit_reached ) {
-    switch ( resample_filter->virtual_pixel ) {
-      /*  This is always handled by the above, so no need.
-        case BackgroundVirtualPixelMethod:
-        case ConstantVirtualPixelMethod:
-        case TransparentVirtualPixelMethod:
-        case GrayVirtualPixelMethod,
-        case WhiteVirtualPixelMethod
-        case MaskVirtualPixelMethod:
-      */
-      case UndefinedVirtualPixelMethod:
-      case EdgeVirtualPixelMethod:
-      case DitherVirtualPixelMethod:
-      case HorizontalTileEdgeVirtualPixelMethod:
-      case VerticalTileEdgeVirtualPixelMethod:
-        /* We need an average edge pixel, from the correct edge!
-           How should I calculate an average edge color?
-           Just returning an averaged neighbourhood,
-           works well in general, but falls down for TileEdge methods.
-           This needs to be done properly!!!!!!
-        */
-        status=InterpolatePixelInfo(resample_filter->image,
-          resample_filter->view,AverageInterpolatePixel,u0,v0,pixel,
-          resample_filter->exception);
-        break;
-      default:
-      {
-        ResampleTiledLimitPixel(resample_filter,pixel,exception,&status);
-        break;
-      }
-    }
-    return(status);
+    ResampleLimitPoint
+      point;
+
+    point.resample_filter=resample_filter;
+    point.u0=u0;
+    point.v0=v0;
+    point.exception=exception;
+    return(ResampleLimitedPixel(&point,pixel,status));
   }
 
   /*
