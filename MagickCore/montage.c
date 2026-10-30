@@ -660,6 +660,23 @@ static void GetMontageOffsets(const MontageInfo *montage_info,
       &sans,&sans);
 }
 
+static ssize_t GetMontageRowOffset(const MontageInfo *montage_info,
+  const size_t number_images)
+{
+  size_t
+    sans;
+
+  ssize_t
+    x_offset,
+    y;
+
+  x_offset=0;
+  if (montage_info->tile != (char *) NULL)
+    GetMontageGeometry(montage_info->tile,number_images,&x_offset,&y,
+      &sans,&sans);
+  return(x_offset);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -718,7 +735,6 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
     max_height,
     number_images,
     number_lines,
-    sans,
     tiles_per_column,
     tiles_per_page,
     tiles_per_row,
@@ -887,10 +903,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
       if (((tile+1) == (ssize_t) tiles_per_page) ||
           (((tile+1) % (ssize_t) tiles_per_row) == 0))
         {
-          x_offset=0;
-          if (montage_info->tile != (char *) NULL)
-            GetMontageGeometry(montage_info->tile,number_images,&x_offset,&y,
-              &sans,&sans);
+          x_offset=GetMontageRowOffset(montage_info,number_images);
           height=concatenate != MagickFalse ? max_height : extract_info.height;
           y_offset+=(ssize_t) ((ssize_t) height+(extract_info.y+
             (ssize_t) border_width)*2+(metrics.ascent-metrics.descent+4)*
