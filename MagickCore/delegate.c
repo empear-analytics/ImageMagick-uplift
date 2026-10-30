@@ -2441,6 +2441,34 @@ static void SetDelegateModeAttribute(DelegateInfo *delegate_info,
   }
 }
 
+static void SetDelegateSpawnAttribute(DelegateInfo *delegate_info,
+  const char *keyword,const char *token)
+{
+  switch (*keyword)
+  {
+    case 'S':
+    case 's':
+    {
+      if (LocaleCompare((char *) keyword,"spawn") == 0)
+        {
+          delegate_info->spawn=IsStringTrue(token);
+          break;
+        }
+      if (LocaleCompare((char *) keyword,"stealth") == 0)
+        {
+          delegate_info->stealth=IsStringTrue(token);
+          break;
+        }
+      break;
+    }
+    default:
+    {
+      SetDelegateModeAttribute(delegate_info,keyword,token);
+      break;
+    }
+  }
+}
+
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2627,24 +2655,9 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
           }
         break;
       }
-      case 'S':
-      case 's':
-      {
-        if (LocaleCompare((char *) keyword,"spawn") == 0)
-          {
-            delegate_info->spawn=IsStringTrue(token);
-            break;
-          }
-        if (LocaleCompare((char *) keyword,"stealth") == 0)
-          {
-            delegate_info->stealth=IsStringTrue(token);
-            break;
-          }
-        break;
-      }
       default:
       {
-        SetDelegateModeAttribute(delegate_info,keyword,token);
+        SetDelegateSpawnAttribute(delegate_info,keyword,token);
         break;
       }
     }
