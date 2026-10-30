@@ -688,6 +688,19 @@ static size_t GetTallestTileHeight(Image **image_list,const ssize_t tile,
 #define MontageImageTag  "Montage/Image"
 #define TileImageTag  "Tile/Image"
 
+static MagickBooleanType SetMontageTileProgress(Image *image,
+  const MagickOffsetType tiles,const size_t total_tiles,
+  MagickBooleanType status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,MontageImageTag,tiles,total_tiles);
+  if (proceed == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -1055,11 +1068,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
           max_height=0;
         }
       if (images->progress_monitor != (MagickProgressMonitor) NULL)
-        {
-          proceed=SetImageProgress(image,MontageImageTag,tiles,total_tiles);
-          if (proceed == MagickFalse)
-            status=MagickFalse;
-        }
+        status=SetMontageTileProgress(image,tiles,total_tiles,status);
       image_list[tile]=DestroyImage(image_list[tile]);
       image=DestroyImage(image);
       tiles++;
