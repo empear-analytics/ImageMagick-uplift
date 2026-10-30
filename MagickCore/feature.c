@@ -389,6 +389,34 @@ static void GetCannyGradient(const Image *edge_image,
   }
 }
 
+static void SetCannyGradientRow(const Image *edge_image,
+  MatrixInfo *canny_cache,const Quantum *magick_restrict p,const ssize_t y)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) edge_image->columns; x++)
+  {
+    CannyInfo
+      pixel;
+
+    double
+      dx,
+      dy;
+
+    (void) memset(&pixel,0,sizeof(pixel));
+    dx=0.0;
+    dy=0.0;
+    GetCannyGradient(edge_image,p,&dx,&dy);
+    pixel.magnitude=hypot(dx,dy);
+    pixel.orientation=0;
+    pixel=SetCannyOrientation(pixel,dx,dy);
+    if (SetMatrixElement(canny_cache,x,y,&pixel) == MagickFalse)
+      continue;
+    p+=(ptrdiff_t) GetPixelChannels(edge_image);
+  }
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -475,9 +503,6 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns+1,2,
@@ -487,26 +512,7 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) edge_image->columns; x++)
-    {
-      CannyInfo
-        pixel;
-
-      double
-        dx,
-        dy;
-
-      (void) memset(&pixel,0,sizeof(pixel));
-      dx=0.0;
-      dy=0.0;
-      GetCannyGradient(edge_image,p,&dx,&dy);
-      pixel.magnitude=hypot(dx,dy);
-      pixel.orientation=0;
-      pixel=SetCannyOrientation(pixel,dx,dy);
-      if (SetMatrixElement(canny_cache,x,y,&pixel) == MagickFalse)
-        continue;
-      p+=(ptrdiff_t) GetPixelChannels(edge_image);
-    }
+    SetCannyGradientRow(edge_image,canny_cache,p,y);
   }
   edge_view=DestroyCacheView(edge_view);
   /*
