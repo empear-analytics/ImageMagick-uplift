@@ -1336,11 +1336,28 @@ static inline MagickBooleanType IsThresholdMapNameCharacter(const char *p)
     (*p != '\0')) ? MagickTrue : MagickFalse);
 }
 
-static void GetDitherLevels(const char *threshold_map,double *levels)
+static void ParseDitherLevels(const char *p,double *levels)
 {
   char
     token[MagickPathExtent];
 
+  ssize_t
+    i;
+
+  (void) GetNextToken(p,&p,MagickPathExtent,token);
+  for (i=0; (i < MaxPixelChannels); i++)
+    levels[i]=StringToDouble(token,(char **) NULL);
+  for (i=0; (*p != '\0') && (i < MaxPixelChannels); i++)
+  {
+    (void) GetNextToken(p,&p,MagickPathExtent,token);
+    if (*token == ',')
+      (void) GetNextToken(p,&p,MagickPathExtent,token);
+    levels[i]=StringToDouble(token,(char **) NULL);
+  }
+}
+
+static void GetDitherLevels(const char *threshold_map,double *levels)
+{
   const char
     *p;
 
@@ -1351,18 +1368,7 @@ static void GetDitherLevels(const char *threshold_map,double *levels)
     levels[i]=2.0;
   p=strchr((char *) threshold_map,',');
   if ((p != (char *) NULL) && (isdigit((int) ((unsigned char) *(++p))) != 0))
-    {
-      (void) GetNextToken(p,&p,MagickPathExtent,token);
-      for (i=0; (i < MaxPixelChannels); i++)
-        levels[i]=StringToDouble(token,(char **) NULL);
-      for (i=0; (*p != '\0') && (i < MaxPixelChannels); i++)
-      {
-        (void) GetNextToken(p,&p,MagickPathExtent,token);
-        if (*token == ',')
-          (void) GetNextToken(p,&p,MagickPathExtent,token);
-        levels[i]=StringToDouble(token,(char **) NULL);
-      }
-    }
+    ParseDitherLevels(p,levels);
   for (i=0; i < MaxPixelChannels; i++)
     if (fabs(levels[i]) >= 1)
       levels[i]-=1.0;
