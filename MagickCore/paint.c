@@ -849,6 +849,15 @@ static inline void SetOilPaintChannels(const Image *linear_image,
   }
 }
 
+static Image *DestroyOilPaintClones(Image *linear_image,Image *paint_image)
+{
+  if (linear_image != (Image *) NULL)
+    linear_image=DestroyImage(linear_image);
+  if (paint_image != (Image *) NULL)
+    linear_image=DestroyImage(paint_image);
+  return((Image *) NULL);
+}
+
 MagickExport Image *OilPaintImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -887,13 +896,7 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
   linear_image=CloneImage(image,0,0,MagickTrue,exception);
   paint_image=CloneImage(image,0,0,MagickTrue,exception);
   if ((linear_image == (Image *) NULL) || (paint_image == (Image *) NULL))
-    {
-      if (linear_image != (Image *) NULL)
-        linear_image=DestroyImage(linear_image);
-      if (paint_image != (Image *) NULL)
-        linear_image=DestroyImage(paint_image);
-      return((Image *) NULL);
-    }
+    return(DestroyOilPaintClones(linear_image,paint_image));
   if (SetImageStorageClass(paint_image,DirectClass,exception) == MagickFalse)
     {
       linear_image=DestroyImage(linear_image);
