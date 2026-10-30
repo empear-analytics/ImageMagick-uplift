@@ -253,6 +253,52 @@ static void CopyRadonElement(MatrixInfo *q,const ssize_t y,
     return;
 }
 
+static void MergeRadonColumnPairs(MatrixInfo *p,MatrixInfo *q,
+  const ssize_t x,const size_t step)
+{
+  ssize_t
+    i,
+    y;
+
+  for (i=0; i < (ssize_t) step; i++)
+  {
+    for (y=0; y < ((ssize_t) GetMatrixRows(p)-i-1); y++)
+    {
+      RadonCell
+        cell;
+
+      cell.p=p;
+      cell.x=x;
+      cell.i=i;
+      cell.step=step;
+      cell.y=y;
+      MergeRadonPair(q,&cell);
+    }
+    for ( ; y < ((ssize_t) GetMatrixRows(p)-i); y++)
+    {
+      RadonCell
+        cell;
+
+      cell.p=p;
+      cell.x=x;
+      cell.i=i;
+      cell.step=step;
+      cell.y=y;
+      MergeRadonPairEdge(q,&cell);
+    }
+    for ( ; y < (ssize_t) GetMatrixRows(p); y++)
+    {
+      RadonEdgeCell
+        edge;
+
+      edge.p=p;
+      edge.x=x;
+      edge.i=i;
+      CopyRadonElement(q,y,&edge);
+    }
+  }
+}
+
 static void RadonProjection(MatrixInfo *source_matrices,
   MatrixInfo *destination_matrices,const ssize_t sign,size_t *projection)
 {
@@ -273,47 +319,7 @@ static void RadonProjection(MatrixInfo *source_matrices,
   {
     for (x=0; x < (ssize_t) GetMatrixColumns(p); x+=2*(ssize_t) step)
     {
-      ssize_t
-        i,
-        y;
-
-      for (i=0; i < (ssize_t) step; i++)
-      {
-        for (y=0; y < ((ssize_t) GetMatrixRows(p)-i-1); y++)
-        {
-          RadonCell
-            cell;
-
-          cell.p=p;
-          cell.x=x;
-          cell.i=i;
-          cell.step=step;
-          cell.y=y;
-          MergeRadonPair(q,&cell);
-        }
-        for ( ; y < ((ssize_t) GetMatrixRows(p)-i); y++)
-        {
-          RadonCell
-            cell;
-
-          cell.p=p;
-          cell.x=x;
-          cell.i=i;
-          cell.step=step;
-          cell.y=y;
-          MergeRadonPairEdge(q,&cell);
-        }
-        for ( ; y < (ssize_t) GetMatrixRows(p); y++)
-        {
-          RadonEdgeCell
-            edge;
-
-          edge.p=p;
-          edge.x=x;
-          edge.i=i;
-          CopyRadonElement(q,y,&edge);
-        }
-      }
+      MergeRadonColumnPairs(p,q,x,step);
     }
     swap=p;
     p=q;
