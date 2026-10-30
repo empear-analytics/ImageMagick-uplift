@@ -3410,10 +3410,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           {
             if (compose_sync == MagickFalse)
               {
-                if (fabs(Sc) < MagickEpsilon)
-                  pixel=(double) QuantumRange;
-                else
-                  pixel=(double) QuantumRange*(Dc/Sc);
+                pixel=GetChannelQuotient(Dc,Sc);
                 break;
               }
             if (fabs(Dca) < MagickEpsilon)
