@@ -994,6 +994,28 @@ static MagickBooleanType SetImageDirectClass(Image *image,
   return(status);
 }
 
+static MagickBooleanType SetImageTypeBilevel(Image *image,
+  const ImageInfo *image_info,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  QuantizeInfo
+    *quantize_info;
+
+  if (IsGrayImageType(image->type) == MagickFalse)
+    status=TransformImageColorspace(image,GRAYColorspace,exception);
+  (void) NormalizeImage(image,exception);
+  (void) BilevelImage(image,(double) QuantumRange/2.0,exception);
+  quantize_info=AcquireQuantizeInfo(image_info);
+  quantize_info->number_colors=2;
+  quantize_info->colorspace=GRAYColorspace;
+  status=QuantizeImage(quantize_info,image,exception);
+  quantize_info=DestroyQuantizeInfo(quantize_info);
+  image->alpha_trait=UndefinedPixelTrait;
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -1023,16 +1045,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   {
     case BilevelType:
     {
-      if (IsGrayImageType(image->type) == MagickFalse)
-        status=TransformImageColorspace(image,GRAYColorspace,exception);
-      (void) NormalizeImage(image,exception);
-      (void) BilevelImage(image,(double) QuantumRange/2.0,exception);
-      quantize_info=AcquireQuantizeInfo(image_info);
-      quantize_info->number_colors=2;
-      quantize_info->colorspace=GRAYColorspace;
-      status=QuantizeImage(quantize_info,image,exception);
-      quantize_info=DestroyQuantizeInfo(quantize_info);
-      image->alpha_trait=UndefinedPixelTrait;
+      status=SetImageTypeBilevel(image,image_info,exception);
       break;
     }
     case GrayscaleType:
