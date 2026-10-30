@@ -743,6 +743,13 @@ static inline MagickBooleanType IsTransformMapMissing(
     (z_map == (TransformPacket *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static TransformPacket *RelinquishTransformMap(TransformPacket *map)
+{
+  if (map != (TransformPacket *) NULL)
+    map=(TransformPacket *) RelinquishMagickMemory(map);
+  return(map);
+}
+
 static void GetIlluminantArtifact(const Image *image,const char **artifact,
   IlluminantType *illuminant)
 {
@@ -1255,8 +1262,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
     sizeof(*z_map));
   if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
     {
-      if (x_map != (TransformPacket *) NULL)
-        x_map=(TransformPacket *) RelinquishMagickMemory(x_map);
+      x_map=RelinquishTransformMap(x_map);
       if (y_map != (TransformPacket *) NULL)
         y_map=(TransformPacket *) RelinquishMagickMemory(y_map);
       if (z_map != (TransformPacket *) NULL)
