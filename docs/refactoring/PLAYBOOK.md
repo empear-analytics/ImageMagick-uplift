@@ -2300,7 +2300,8 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
 1. The block meets Recipe V steps 1, 3 and 6: it lies outside every OpenMP region and has
    no `#pragma` line; it leaves the function only through `goto L;` to one label, or only
    through `return(c);` of one constant `c` (written `return c;` in some files); no
-   `continue` or `break` leaves it. Recipe V step 7's cleanup form is not this recipe.
+   `continue` or `break` leaves it. Recipe V step 7's cleanup form is not this recipe,
+   except as step 8 admits it.
 2. List the variables of the caller the block writes: two to four, each a plain local of
    the caller or a by-value parameter of it (`FunctionE fe`), none a global, a `static`
    or an array, and none whose address `&v` the caller takes anywhere (check by
@@ -2339,6 +2340,12 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    the caller passes only as an argument of calls that keep no copy of it (`memset`, a
    `static` function of the file that does not store its pointer parameter, checked by
    reading) still meets step 2; in the block, `&v` becomes `v`.
+   The same holds when every exit is the same run of cleanup statements `S` followed by
+   `return(c);` of one constant `c`, Recipe V step 7's `S return(c);`: each becomes
+   `return(MagickFalse);`, and the caller writes `if (Helper(...,&targets) ==
+   MagickFalse) { S return(c); }`, `S` copied unchanged (checked by script to be
+   identical in every copy). Here, as in V step 7, `S` neither reads nor writes a
+   written variable (step 2).
 
 **Before:**
 
@@ -2476,6 +2483,13 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   callee that keeps no copy has no second name when the helper runs, so its member
   aliases nothing; `&v` in the block and `v` (the member's value) are the same address,
   so the callee receives the same argument.
+- Step 8's plain run `S return(c);` is Recipe V step 7's argument with Recipe I's
+  members: `S` stays the caller's own text, run on the caller's own variables at the
+  same point (the helper returns at once, and the caller runs nothing between the call
+  and `S`); `S` reads none of the written variables, so it sees the values it saw
+  before whatever the helper wrote through the members, and the helper takes none of
+  the variables `S` writes (`bounds`, `disposals`, `prev_image` in
+  `OptimizeLayerFrames`). On the success path `S` runs in neither version.
 - More than four written variables, two labels, two different constants, or a written
   variable whose address the caller takes elsewhere: skip the block.
 
@@ -2489,7 +2503,11 @@ nothing else moved), and steps 1, 2, 6 and 7 checked by reading.
 variable, O, Z and Q no `return`, and E step 4 refuses it; a conditional return left in
 the caller stays at depth 4, so the whole `if (coordQual)` moves. A probe: the function
 leaves Deep, Nested Complexity, fx.c 3.08 to 3.23. Added by Claude Code (Claude Opus 5.5)
-during task W09, at the owner's request of 2026-10-30.
+during task W09, at the owner's request of 2026-10-30. Step 8's plain cleanup run
+(2026-10-30, task W09): `layer.c`'s `OptimizeLayerFrames`, whose duplicate-frame trial
+(nesting 4) writes `dup_image`, `dup_bounds` and `cleared` and, when the clone fails,
+releases `bounds` and `disposals`, destroys `prev_image` and returns
+`(Image *) NULL`.
 
 ---
 
@@ -3210,3 +3228,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | LB | Step 8: a block writing two to four variables of the caller that the caller reads after it passes their addresses in one `const` struct, Recipe I's form (steps 3, 5, 6), after the input struct; the caller fills it before the call or declares it `const` with the addresses (Recipe Q step 8). A variable whose address the caller passes elsewhere only to calls that keep no copy of it still qualifies (Recipe I step 8). *Careful* gives the argument | `vision.c`'s `ConnectedComponentsImage`: the label pass's per-pixel body (the function's last depth-4 site but one) writes `status`, `n`, `p` and `q` and leaves the column loop through `break;` when `n` reaches `MaxColormapSize`; step 2 allows one variable, Q and I refuse the `break`, and `n`'s address goes to `SetMatrixElement` in the initialisation loop. Moving the column loop whole (Recipe Q step 8) leaves its helper a Bumpy Road (2 bumps). A probe of the body in this form: 4.73 to 4.76; with the census column loop (Recipe Q step 8), 5.07 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | O | Step 2: a written variable whose address the caller passes elsewhere, outside the block, only to calls that keep no copy of it (checked by reading the callee) still qualifies, as in Recipe I step 8; Recipes Z and SD, which rest on O steps 1 to 3, take the same reading. *Careful* gives the argument | `transform.c`'s `TrimImage`: its gravity `switch` (cc 19 in the caller, 11 labels) writes only `geometry`, whose address the caller later passes to `CropImage`, which reads `*geometry` through `GetCropPage` and `ClampCropExtent` and stores no pointer. Recipe SD on the `switch`, then E on the min-size block: 4.76 to 4.83 to 5.00 in a probe, TrimImage leaving Complex and Large Method, neither helper with a finding | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | O | Step 2: a parameter the caller receives by value, of struct or arithmetic type (not a pointer or array), counts as a plain local, under the same rule on its address; Recipes Z and SD read step 2 the same way. *Careful* gives the argument | `transform.c`'s `ApplySpliceGravity` (cc 12): its whole body is the gravity `switch` (eleven labels), which writes only `splice_geometry`, a `RectangleInfo` received by value and returned. Recipe SD (the default group and North, NorthEast and West to a helper taking `&splice_geometry`): 5.15 to 5.31 in a probe, ApplySpliceGravity leaving Complex Method, the helper with no finding | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | I | Step 8: a block whose every exit is the same run of cleanup statements `S` followed by `return(c);` of one constant (Recipe V step 7's `S return(c);`) moves with `S return(c);` left in the caller, as the macro form leaves its call; `S` neither reads nor writes a written variable. Step 1 points to it. *Careful* gives the argument (V step 7's, with the members) | `layer.c`'s `OptimizeLayerFrames`: the duplicate-frame trial (`if ( add_frames )`, nesting 4, one of the function's two depth-4 sites) writes three variables read later (`dup_image`, `dup_bounds`, `cleared`), so V step 7 (one written variable) refuses it, and its failure exit is three plain cleanup statements and `return((Image *) NULL);`, which I step 1 refused and step 8 named only as a macro. A probe with the other depth-4 site (Recipe E): Deep, Nested Complexity leaves, 5.47 to 5.82 | mandate (2026-10-24) |
