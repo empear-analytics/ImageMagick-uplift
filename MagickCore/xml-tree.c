@@ -672,6 +672,44 @@ static inline MagickBooleanType IsUnseekableXMLFile(const int file,
     MagickFalse);
 }
 
+static MagickBooleanType ReadXMLFileContent(int file,char *xml,
+  const size_t length)
+{
+  size_t
+    i;
+
+  ssize_t
+    count;
+
+  void
+    *map;
+
+  map=MapBlob(file,ReadMode,0,length);
+  if (map != (char *) NULL)
+    {
+      (void) memcpy(xml,map,length);
+      (void) UnmapBlob(map,length);
+    }
+  else
+    {
+      (void) lseek(file,0,SEEK_SET);
+      for (i=0; i < length; i+=(size_t) count)
+      {
+        count=MagickRead(file,xml+i,(size_t) MagickMin(length-i,(size_t)
+          MagickMaxBufferExtent));
+        if (count <= 0)
+          break;
+      }
+      if (i < length)
+        {
+          file=close_utf8(file)-1;
+          xml=(char *) RelinquishMagickMemory(xml);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate char *FileToXML(const char *filename,const size_t extent)
 {
   char
@@ -689,9 +727,6 @@ MagickPrivate char *FileToXML(const char *filename,const size_t extent)
 
   ssize_t
     count;
-
-  void
-    *map;
 
   assert(filename != (const char *) NULL);
   length=0;
@@ -754,29 +789,8 @@ MagickPrivate char *FileToXML(const char *filename,const size_t extent)
       file=close_utf8(file);
       return((char *) NULL);
     }
-  map=MapBlob(file,ReadMode,0,length);
-  if (map != (char *) NULL)
-    {
-      (void) memcpy(xml,map,length);
-      (void) UnmapBlob(map,length);
-    }
-  else
-    {
-      (void) lseek(file,0,SEEK_SET);
-      for (i=0; i < length; i+=(size_t) count)
-      {
-        count=MagickRead(file,xml+i,(size_t) MagickMin(length-i,(size_t)
-          MagickMaxBufferExtent));
-        if (count <= 0)
-          break;
-      }
-      if (i < length)
-        {
-          file=close_utf8(file)-1;
-          xml=(char *) RelinquishMagickMemory(xml);
-          return((char *) NULL);
-        }
-    }
+  if (ReadXMLFileContent(file,xml,length) == MagickFalse)
+    return((char *) NULL);
   xml[length]='\0';
   if (LocaleCompare(filename,"-") != 0)
     file=close_utf8(file);
