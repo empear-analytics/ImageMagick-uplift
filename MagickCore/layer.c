@@ -1578,8 +1578,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     */
     if ( disposals[i-1] == DupDispose )
       {
-         if (bgnd_image != (Image *) NULL)
-           bgnd_image=DestroyImage(bgnd_image);
+         bgnd_image=DestroyImageIfSet(bgnd_image);
          prev_image=DestroyImage(prev_image);
          prev_image=dup_image, dup_image=(Image *) NULL;
          bounds[i+1]=bounds[i];
@@ -1590,14 +1589,12 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
       }
     else
       {
-        if ( dup_image != (Image *) NULL)
-          dup_image=DestroyImage(dup_image);
+        dup_image=DestroyImageIfSet(dup_image);
         if ( disposals[i-1] != PreviousDispose )
           prev_image=DestroyImage(prev_image);
         if ( disposals[i-1] == BackgroundDispose )
           prev_image=bgnd_image, bgnd_image=(Image *) NULL;
-        if (bgnd_image != (Image *) NULL)
-          bgnd_image=DestroyImage(bgnd_image);
+        bgnd_image=DestroyImageIfSet(bgnd_image);
         if (ReferenceNoneDisposeImage(disposals,i,curr,&prev_image) ==
             MagickFalse)
           {
