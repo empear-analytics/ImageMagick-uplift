@@ -2438,6 +2438,75 @@ static void SumSSIMWindow(const SSIMWindow *window,
   }
 }
 
+typedef struct _SSIMChannelInputs
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  double
+    *x_pixel_mu,
+    *x_pixel_sigma_squared,
+    *xy_sigma,
+    *y_pixel_mu,
+    *y_pixel_sigma_squared,
+    c1,
+    c2;
+} SSIMChannelInputs;
+
+static void AccumulateSSIMChannels(const SSIMChannelInputs *inputs,
+  double *channel_similarity)
+{
+  const Image
+    *const image = inputs->image,
+    *const reconstruct_image = inputs->reconstruct_image;
+
+  double
+    *const x_pixel_mu = inputs->x_pixel_mu,
+    *const x_pixel_sigma_squared = inputs->x_pixel_sigma_squared,
+    *const xy_sigma = inputs->xy_sigma,
+    *const y_pixel_mu = inputs->y_pixel_mu,
+    *const y_pixel_sigma_squared = inputs->y_pixel_sigma_squared;
+
+  const double
+    c1 = inputs->c1,
+    c2 = inputs->c2;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      ssim,
+      x_pixel_mu_squared,
+      x_pixel_sigmas_squared,
+      xy_mu,
+      xy_sigmas,
+      y_pixel_mu_squared,
+      y_pixel_sigmas_squared;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(
+      reconstruct_image,channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    x_pixel_mu_squared=x_pixel_mu[i]*x_pixel_mu[i];
+    y_pixel_mu_squared=y_pixel_mu[i]*y_pixel_mu[i];
+    xy_mu=x_pixel_mu[i]*y_pixel_mu[i];
+    xy_sigmas=xy_sigma[i]-xy_mu;
+    x_pixel_sigmas_squared=x_pixel_sigma_squared[i]-x_pixel_mu_squared;
+    y_pixel_sigmas_squared=y_pixel_sigma_squared[i]-y_pixel_mu_squared;
+    ssim=((2.0*xy_mu+c1)*(2.0*xy_sigmas+c2))*
+      MagickSafeReciprocal((x_pixel_mu_squared+y_pixel_mu_squared+c1)*
+       (x_pixel_sigmas_squared+y_pixel_sigmas_squared+c2));
+    channel_similarity[i]+=ssim;
+    channel_similarity[CompositePixelChannel]+=ssim;
+  }
+}
+
 static MagickBooleanType GetSSIMSimularity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -2520,7 +2589,6 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
       channel_similarity[MaxPixelChannels+1] = { 0.0 };
 
     ssize_t
-      i,
       x;
 
     if (status == MagickFalse)
@@ -2544,6 +2612,9 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
         xy_sigma[MaxPixelChannels+1] = { 0.0 },
         y_pixel_mu[MaxPixelChannels+1] = { 0.0 },
         y_pixel_sigma_squared[MaxPixelChannels+1] = { 0.0 };
+
+      SSIMChannelInputs
+        channel_inputs;
 
       SSIMTapTargets
         sums;
@@ -2570,36 +2641,16 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
       sums.y_pixel_sigma_squared=(&y_pixel_sigma_squared);
       sums.xy_sigma=(&xy_sigma);
       SumSSIMWindow(&window,&sums);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          ssim,
-          x_pixel_mu_squared,
-          x_pixel_sigmas_squared,
-          xy_mu,
-          xy_sigmas,
-          y_pixel_mu_squared,
-          y_pixel_sigmas_squared;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(
-          reconstruct_image,channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        x_pixel_mu_squared=x_pixel_mu[i]*x_pixel_mu[i];
-        y_pixel_mu_squared=y_pixel_mu[i]*y_pixel_mu[i];
-        xy_mu=x_pixel_mu[i]*y_pixel_mu[i];
-        xy_sigmas=xy_sigma[i]-xy_mu;
-        x_pixel_sigmas_squared=x_pixel_sigma_squared[i]-x_pixel_mu_squared;
-        y_pixel_sigmas_squared=y_pixel_sigma_squared[i]-y_pixel_mu_squared;
-        ssim=((2.0*xy_mu+c1)*(2.0*xy_sigmas+c2))*
-          MagickSafeReciprocal((x_pixel_mu_squared+y_pixel_mu_squared+c1)*
-           (x_pixel_sigmas_squared+y_pixel_sigmas_squared+c2));
-        channel_similarity[i]+=ssim;
-        channel_similarity[CompositePixelChannel]+=ssim;
-      }
+      channel_inputs.image=image;
+      channel_inputs.reconstruct_image=reconstruct_image;
+      channel_inputs.x_pixel_mu=x_pixel_mu;
+      channel_inputs.x_pixel_sigma_squared=x_pixel_sigma_squared;
+      channel_inputs.xy_sigma=xy_sigma;
+      channel_inputs.y_pixel_mu=y_pixel_mu;
+      channel_inputs.y_pixel_sigma_squared=y_pixel_sigma_squared;
+      channel_inputs.c1=c1;
+      channel_inputs.c2=c2;
+      AccumulateSSIMChannels(&channel_inputs,channel_similarity);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
       channel_area++;
