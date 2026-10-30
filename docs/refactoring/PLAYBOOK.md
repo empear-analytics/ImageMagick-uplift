@@ -1847,7 +1847,11 @@ Q and U, whose first step refuses a block containing `goto`.
    through pointers the block already uses stay as they are; variables it declares move
    with it. A temporary it writes before reading, and that the caller does not read
    after the block before writing it again, is declared in the new function and is not
-   `v` (Recipe Y step 2).
+   `v` (Recipe Y step 2). A `v` whose address the caller passes elsewhere, outside the
+   block, only as an argument of calls that keep no copy of it (`GetProperty`'s `text`,
+   whose address goes to `GetPropertySeconds`, which reads and replaces `*text` and
+   stores no pointer; checked by reading the callee) still qualifies, as in Recipe O
+   step 2.
 3. Cut the block into a new `static MagickBooleanType` function directly above the
    caller. Each `goto L;` becomes `return(MagickFalse);`, one for one, and the function
    ends with `return(MagickTrue);`. Nothing else in the text changes.
@@ -1940,6 +1944,12 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   against its `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2`.
 - A block that jumps to two labels, or writes two of the caller's variables, is not this
   recipe: skip it.
+- Under step 2's exception the other call receives `&v` at a point outside the block,
+  before or after the new function runs, and keeps no copy of it once it returns; so
+  while the new function runs, its pointer parameter is the only pointer to `v` in use,
+  and every read and write through it reaches `v` in the block's order (Recipe O's
+  argument). A callee that stores the address (in a struct, a global, a cache) gives `v`
+  a second name: the variable does not qualify.
 - A temporary (step 2) holds nothing the caller uses: every path through the block
   writes it before reading it, so its value on entry is never read, and the caller
   writes it again before any later read, so the value the block leaves is never read
@@ -2007,6 +2017,9 @@ Step 7's `return(c);` (2026-10-30, task W09): `layer.c`'s `OptimizeLayerFrames`,
 destroys the coalesced list first.
 Step 2's temporary (2026-10-30, task W09): `morphology.c`'s `AcquireKernelInfo`, whose
 token step writes `kernel` and, as a temporary, the parse result `new_kernel`.
+Step 2's address passed to calls that keep no copy (2026-10-30, task W09): `fx.c`'s
+`GetProperty`, whose "not a number" branch writes `text`, whose address the other
+branch passes to `GetPropertySeconds`.
 
 ---
 
@@ -3243,3 +3256,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | I | Step 8: a block whose every exit is the same run of cleanup statements `S` followed by `return(c);` of one constant (Recipe V step 7's `S return(c);`) moves with `S return(c);` left in the caller, as the macro form leaves its call; `S` neither reads nor writes a written variable. Step 1 points to it. *Careful* gives the argument (V step 7's, with the members) | `layer.c`'s `OptimizeLayerFrames`: the duplicate-frame trial (`if ( add_frames )`, nesting 4, one of the function's two depth-4 sites) writes three variables read later (`dup_image`, `dup_bounds`, `cleared`), so V step 7 (one written variable) refuses it, and its failure exit is three plain cleanup statements and `return((Image *) NULL);`, which I step 1 refused and step 8 named only as a macro. A probe with the other depth-4 site (Recipe E): Deep, Nested Complexity leaves, 5.47 to 5.82 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | I | Step 2: a written variable whose address the caller takes only to fill a member of another helper's targets struct under this recipe (filled directly before that call, read by nothing else) still qualifies, as Recipe LB step 2 allows for its own helpers. *Careful* gives the argument | `layer.c`'s `OptimizeLayerFrames`: the finalisation of the dispose choice writes `bgnd_image`, `prev_image`, `dup_image` and `i`, and leaves through the release of `bounds` and `disposals` and `return((Image *) NULL);`; `&dup_image` is already taken for `TryDuplicateFrame`'s targets. A probe: bumps 5 to 3, cc 39 to 33, 5.96 to 5.98 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 4: a variable the block reads on entry and then writes, and that nothing after the block reads, goes by value as an input, its text unchanged; its writes land in the new function's copy | `effect.c`'s `AdaptiveBlurImage`: its release of the kernels allocated so far (`for (w-=2; w >= 0; w-=2)`, a bump inside the failure branch) counts `w` down just before `ThrowImageException` returns; step 4 counts no output, but says only that a written temporary is declared in the new function. A probe with the kernel-building loop (Recipe LB): bumps 6 to 4, 3.12 to 3.19 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | V | Step 2: a written variable whose address the caller passes elsewhere, outside the block, only to calls that keep no copy of it (checked by reading the callee) still qualifies, as Recipe O step 2 and Recipe I step 8 already allow. *Careful* gives the argument | `fx.c`'s `GetProperty`: the "not a number" branch (`*val = strtold (text, &tailptr);`, then destroy `text`, throw and `return -1;`) writes only `text`, whose address the caller passes to `GetPropertySeconds` in the other branch; that callee reads and replaces `*text` and keeps no pointer. With the bracket scan moved (Recipes LB and K), a probe: GetProperty leaves Bumpy Road Ahead, 3.23 to 3.25 | mandate (2026-10-24) |
