@@ -1200,6 +1200,18 @@ static void RestoreClassifyColorspace(const QCubeInfo *cube_info,
       (void) TransformImageColorspace((Image *) image,sRGBColorspace,exception);
 }
 
+static DoublePixelPacket GetQCubeMidpoint(void)
+{
+  DoublePixelPacket
+    midpoint;
+
+  midpoint.red=(double) QuantumRange/2.0;
+  midpoint.green=(double) QuantumRange/2.0;
+  midpoint.blue=(double) QuantumRange/2.0;
+  midpoint.alpha=(double) QuantumRange/2.0;
+  return(midpoint);
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -1224,10 +1236,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   SetAssociatedAlpha(image,cube_info);
   if (cube_info->quantize_info->colorspace != image->colorspace)
     TransformClassifyColorspace(cube_info,image,exception);
-  midpoint.red=(double) QuantumRange/2.0;
-  midpoint.green=(double) QuantumRange/2.0;
-  midpoint.blue=(double) QuantumRange/2.0;
-  midpoint.alpha=(double) QuantumRange/2.0;
+  midpoint=GetQCubeMidpoint();
   error.alpha=0.0;
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
