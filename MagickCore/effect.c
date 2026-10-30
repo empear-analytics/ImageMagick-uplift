@@ -754,8 +754,7 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   }
   if (w < (ssize_t) width)
     {
-      for (w-=2; w >= 0; w-=2)
-        kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+      RelinquishAdaptiveKernels(kernel,w);
       kernel=(double **) RelinquishAlignedMemory(kernel);
       edge_image=DestroyImage(edge_image);
       sharp_image=DestroyImage(sharp_image);
