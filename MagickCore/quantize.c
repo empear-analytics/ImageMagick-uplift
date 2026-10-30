@@ -2919,6 +2919,17 @@ static void AssignKmeansRow(Image *image,KmeansInfo **kmeans_pixels,
   }
 }
 
+static void SeedKmeansFromColors(Image *image,const char *colors,
+  ExceptionInfo *exception)
+{
+  ssize_t
+    n;
+
+  n=ParseKmeansSeedColors(image,colors,exception);
+  if (n < (ssize_t) image->colors)
+    SeedKmeansRandomColors(image,n,exception);
+}
+
 static void ListKmeansColors(const Image *image)
 {
   char
@@ -2989,9 +3000,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
       status=AcquireImageColormap(image,number_colors,exception);
       if (status == MagickFalse)
         return(status);
-      n=ParseKmeansSeedColors(image,colors,exception);
-      if (n < (ssize_t) image->colors)
-        SeedKmeansRandomColors(image,n,exception);
+      SeedKmeansFromColors(image,colors,exception);
     }
   /*
     Iterative refinement.
