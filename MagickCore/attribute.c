@@ -1085,8 +1085,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     case TrueColorAlphaType:
     {
       status=TransformImageTosRGB(image,status,exception);
-      if (image->storage_class != DirectClass)
-        status=SetImageStorageClass(image,DirectClass,exception);
+      status=SetImageDirectClass(image,status,exception);
       SetOpaqueAlphaIfMissing(image,exception);
       break;
     }
@@ -1094,8 +1093,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     {
       if (image->colorspace != CMYKColorspace)
         status=TransformImageColorspace(image,CMYKColorspace,exception);
-      if (image->storage_class != DirectClass)
-        status=SetImageStorageClass(image,DirectClass,exception);
+      status=SetImageDirectClass(image,status,exception);
       image->alpha_trait=UndefinedPixelTrait;
       break;
     }
@@ -1103,8 +1101,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     {
       if (image->colorspace != CMYKColorspace)
         status=TransformImageColorspace(image,CMYKColorspace,exception);
-      if (image->storage_class != DirectClass)
-        status=SetImageStorageClass(image,DirectClass,exception);
+      status=SetImageDirectClass(image,status,exception);
       if ((image->alpha_trait & BlendPixelTrait) == 0)
         status=SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
       break;
