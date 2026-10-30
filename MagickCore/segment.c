@@ -1084,6 +1084,22 @@ static inline MagickBooleanType HasObjectAndBackgroundClusters(
     (head->next != (Cluster *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static Cluster *FindObjectCluster(Cluster *head)
+{
+  Cluster
+    *object,
+    *cluster;
+
+  object=head->next;
+  for (cluster=object; cluster->next != (Cluster *) NULL; )
+  {
+    if (cluster->count < object->count)
+      object=cluster;
+    cluster=cluster->next;
+  }
+  return(object);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1301,13 +1317,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   background=head;
   if (HasObjectAndBackgroundClusters(count,head) != MagickFalse)
     {
-      object=head->next;
-      for (cluster=object; cluster->next != (Cluster *) NULL; )
-      {
-        if (cluster->count < object->count)
-          object=cluster;
-        cluster=cluster->next;
-      }
+      object=FindObjectCluster(head);
       background=head->next;
       for (cluster=background; cluster->next != (Cluster *) NULL; )
       {
