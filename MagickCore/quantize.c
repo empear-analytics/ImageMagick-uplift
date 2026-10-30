@@ -1141,6 +1141,56 @@ static void ClassifyPrunedImageRow(const QCubeRow *row,
   }
 }
 
+static void ClassifyImageRow(const QCubeRow *row,
+  const Quantum *magick_restrict *p,DoublePixelPacket *error)
+{
+  QCubeInfo
+    *const cube_info = row->cube_info;
+
+  const Image
+    *const image = row->image;
+
+  const DoublePixelPacket
+    midpoint = row->midpoint;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  DoublePixelPacket
+    pixel;
+
+  QNodeDescent
+    descent;
+
+  QNodeInfo
+    *node_info;
+
+  ssize_t
+    count,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) count)
+  {
+    /*
+      Start at the root and descend the color cube tree.
+    */
+    count=GetPixelRunLength(image,*p,x);
+    AssociateAlphaPixel(image,cube_info,*p,&pixel);
+    descent.cube_info=cube_info;
+    descent.image=image;
+    descent.pixel=pixel;
+    descent.midpoint=midpoint;
+    descent.count=count;
+    descent.exception=exception;
+    DescendClassifyTree(&descent,&node_info,error);
+    /*
+      Sum RGB for this leaf for later derivation of the mean cube color.
+    */
+    SumQNodeLeafColor(cube_info,node_info,count,pixel);
+    *p+=(ptrdiff_t) count*(ssize_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -1151,20 +1201,12 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
 
   DoublePixelPacket
     error,
-    midpoint,
-    pixel;
+    midpoint;
 
   MagickBooleanType
     proceed;
 
-  QNodeDescent
-    descent;
-
-  QNodeInfo
-    *node_info;
-
   ssize_t
-    count,
     y;
 
   /*
@@ -1184,33 +1226,18 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
+    QCubeRow
+      row;
 
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
     PruneOversizedColorTree(cube_info);
-    for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) count)
-    {
-      /*
-        Start at the root and descend the color cube tree.
-      */
-      count=GetPixelRunLength(image,p,x);
-      AssociateAlphaPixel(image,cube_info,p,&pixel);
-      descent.cube_info=cube_info;
-      descent.image=image;
-      descent.pixel=pixel;
-      descent.midpoint=midpoint;
-      descent.count=count;
-      descent.exception=exception;
-      DescendClassifyTree(&descent,&node_info,&error);
-      /*
-        Sum RGB for this leaf for later derivation of the mean cube color.
-      */
-      SumQNodeLeafColor(cube_info,node_info,count,pixel);
-      p+=(ptrdiff_t) count*(ssize_t) GetPixelChannels(image);
-    }
+    row.cube_info=cube_info;
+    row.image=image;
+    row.midpoint=midpoint;
+    row.exception=exception;
+    ClassifyImageRow(&row,&p,&error);
     if (cube_info->colors > cube_info->maximum_colors)
       {
         PruneToCubeDepth(cube_info,cube_info->root);
