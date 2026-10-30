@@ -270,6 +270,20 @@ static void FilterHorizontalPixel(const Image *image,
   }
 }
 
+static MagickBooleanType AcquireFilterContributions(const Image *image,
+  const double support,ContributionInfo **magick_restrict *contributions,
+  ExceptionInfo *exception)
+{
+  *contributions=AcquireContributionTLS((size_t) (2.0*support+3.0));
+  if (*contributions == (ContributionInfo **) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType HorizontalFilter(
   const ResizeFilter *magick_restrict resize_filter,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
@@ -314,13 +328,9 @@ static MagickBooleanType HorizontalFilter(
       support=(double) 0.5;
       scale=1.0;
     }
-  contributions=AcquireContributionTLS((size_t) (2.0*support+3.0));
-  if (contributions == (ContributionInfo **) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(MagickFalse);
-    }
+  if (AcquireFilterContributions(image,support,&contributions,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   status=MagickTrue;
   scale=MagickSafeReciprocal(scale);
   image_view=AcquireVirtualCacheView(image,exception);
