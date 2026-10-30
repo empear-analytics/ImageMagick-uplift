@@ -605,6 +605,56 @@ static void AccumulateCorrelationPixel(const ComparePixels *pixels,
   }
 }
 
+typedef struct _CorrelationRow
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  size_t
+    columns;
+
+  ChannelStatistics
+    *image_statistics,
+    *reconstruct_statistics;
+} CorrelationRow;
+
+static void AccumulateCorrelationRow(const CorrelationRow *row,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q,
+  const CorrelationSums sums)
+{
+  const Image
+    *const image = row->image,
+    *const reconstruct_image = row->reconstruct_image;
+
+  const size_t
+    columns = row->columns;
+
+  ChannelStatistics
+    *const image_statistics = row->image_statistics,
+    *const reconstruct_statistics = row->reconstruct_statistics;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    const ComparePixels pixels = { image, reconstruct_image, p, q };
+
+    if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
+        (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
+        continue;
+      }
+    AccumulateCorrelationPixel(&pixels,image_statistics,
+      reconstruct_statistics,&sums);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
+  }
+}
+
 static MagickBooleanType GetDPCSimilarity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -675,8 +725,8 @@ static MagickBooleanType GetDPCSimilarity(const Image *image,
       sums = { channel_similarity, channel_norm,
         channel_reconstruct_norm };
 
-    ssize_t
-      x;
+    CorrelationRow
+      row;
 
     p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
     q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
@@ -685,22 +735,12 @@ static MagickBooleanType GetDPCSimilarity(const Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      const ComparePixels pixels = { image, reconstruct_image, p, q };
-
-      if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-          continue;
-        }
-      AccumulateCorrelationPixel(&pixels,image_statistics,
-        reconstruct_statistics,&sums);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-    }
+    row.image=image;
+    row.reconstruct_image=reconstruct_image;
+    row.columns=columns;
+    row.image_statistics=image_statistics;
+    row.reconstruct_statistics=reconstruct_statistics;
+    AccumulateCorrelationRow(&row,p,q,sums);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetDPCSimilarity)
 #endif
@@ -1477,8 +1517,8 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
       sums = { channel_similarity, channel_variance,
         channel_reconstruct_variance };
 
-    ssize_t
-      x;
+    CorrelationRow
+      row;
 
     p=GetCacheViewVirtualPixels(image_view,0,y,columns,1,exception);
     q=GetCacheViewVirtualPixels(reconstruct_view,0,y,columns,1,exception);
@@ -1487,22 +1527,12 @@ static MagickBooleanType GetNCCSimilarity(const Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      const ComparePixels pixels = { image, reconstruct_image, p, q };
-
-      if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
-          (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-          continue;
-        }
-      AccumulateCorrelationPixel(&pixels,image_statistics,
-        reconstruct_statistics,&sums);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-    }
+    row.image=image;
+    row.reconstruct_image=reconstruct_image;
+    row.columns=columns;
+    row.image_statistics=image_statistics;
+    row.reconstruct_statistics=reconstruct_statistics;
+    AccumulateCorrelationRow(&row,p,q,sums);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp critical (MagickCore_GetNCCSimilarity)
 #endif
