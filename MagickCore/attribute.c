@@ -523,6 +523,13 @@ static ImageType GetColorSeparationType(const Image *image)
   return(ColorSeparationAlphaType);
 }
 
+static ImageType GetPaletteType(const Image *image)
+{
+  if (image->alpha_trait != UndefinedPixelTrait)
+    return(PaletteAlphaType);
+  return(PaletteType);
+}
+
 MagickExport ImageType GetImageType(const Image *image)
 {
   assert(image != (Image *) NULL);
@@ -538,11 +545,7 @@ MagickExport ImageType GetImageType(const Image *image)
       return(GrayscaleType);
     }
   if (IsPaletteImage(image) != MagickFalse)
-    {
-      if (image->alpha_trait != UndefinedPixelTrait)
-        return(PaletteAlphaType);
-      return(PaletteType);
-    }
+    return(GetPaletteType(image));
   if (image->alpha_trait != UndefinedPixelTrait)
     return(TrueColorAlphaType);
   return(TrueColorType);
