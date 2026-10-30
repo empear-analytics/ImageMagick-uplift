@@ -2297,6 +2297,65 @@ static void GetIncludePath(const char *filename,const char *token,
     (void) ConcatenateMagickString(path,token,MagickPathExtent);
 }
 
+typedef struct _DelegateInclude
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *filename;
+
+  char
+    *token;
+
+  size_t
+    depth;
+} DelegateInclude;
+
+static void LoadDelegateInclude(const DelegateInclude *include,
+  MagickStatusType *status)
+{
+  LinkedListInfo
+    *const cache = include->cache;
+
+  ExceptionInfo
+    *const exception = include->exception;
+
+  const char
+    *const filename = include->filename;
+
+  char
+    *const token = include->token;
+
+  const size_t
+    depth = include->depth;
+
+  if (depth >= MagickMaxRecursionDepth)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+  else
+    {
+      const DelegateLoadTarget include_target = { cache,
+        exception };
+
+      char
+        path[MagickPathExtent],
+        *file_xml;
+
+      GetIncludePath(filename,token,path);
+      file_xml=FileToXML(path,~0UL);
+      if (file_xml != (char *) NULL)
+        {
+          *status&=(MagickStatusType) LoadDelegateCache(
+            &include_target,file_xml,path,depth+1);
+          file_xml=DestroyString(file_xml);
+        }
+    }
+}
+
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2404,27 +2463,15 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
           (void) GetNextToken(q,&q,extent,token);
           if (LocaleCompare(keyword,"file") == 0)
             {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-              else
-                {
-                  const DelegateLoadTarget include_target = { cache,
-                    exception };
+              DelegateInclude
+                include;
 
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  GetIncludePath(filename,token,path);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadDelegateCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
+              include.cache=cache;
+              include.exception=exception;
+              include.filename=filename;
+              include.token=token;
+              include.depth=depth;
+              LoadDelegateInclude(&include,&status);
             }
         }
         continue;
