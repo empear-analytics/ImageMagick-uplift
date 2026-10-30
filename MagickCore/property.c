@@ -3773,23 +3773,7 @@ MagickExport const char *GetMagickProperty(ImageInfo *image_info,
   }
   if (string != (char *) NULL)
     return(string);
-  if (*value != '\0')
-    {
-      /*
-        Create a cloned copy of result, that will get cleaned up, eventually.
-      */
-      if (image != (Image *) NULL)
-        {
-          (void) SetImageArtifact(image,"magick-property",value);
-          return(GetImageArtifact(image,"magick-property"));
-        }
-      else
-        {
-          (void) SetImageOption(image_info,"magick-property",value);
-          return(GetImageOption(image_info,"magick-property"));
-        }
-    }
-  return((char *) NULL);
+  return(CloneMagickPropertyValue(image_info,image,value));
 }
 #undef WarnNoImageReturn
 
