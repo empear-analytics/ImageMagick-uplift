@@ -2854,6 +2854,17 @@ static void SelectMinimumIntensityPixel(const MorphologyIntensityTap *tap,
     }
 }
 
+static void SelectMaximumIntensityPixel(const MorphologyIntensityTap *tap,
+  double *pixel,const Quantum *magick_restrict *quantum_pixels,double *maximum)
+{
+  if (tap->intensity > (*maximum))
+    {
+      (*pixel)=(double) tap->pixels[tap->i];
+      (*quantum_pixels)=tap->pixels;
+      (*maximum)=tap->intensity;
+    }
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3424,12 +3435,11 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 if (!IsNaN(*k) && (*k >= 0.5))
                   {
                     intensity=(double) GetPixelIntensity(image,pixels);
-                    if (intensity > maximum)
-                      {
-                        pixel=(double) pixels[i];
-                        quantum_pixels=pixels;
-                        maximum=intensity;
-                      }
+                    intensity_tap.pixels=pixels;
+                    intensity_tap.intensity=intensity;
+                    intensity_tap.i=i;
+                    SelectMaximumIntensityPixel(&intensity_tap,&pixel,
+                      &quantum_pixels,&maximum);
                   }
                 k--;
                 pixels+=(ptrdiff_t) GetPixelChannels(image);
