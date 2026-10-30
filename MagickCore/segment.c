@@ -469,6 +469,16 @@ static inline MagickBooleanType IsClusterAboveThreshold(const Cluster *cluster,
     MagickFalse);
 }
 
+static Cluster *UnlinkCluster(Cluster *head,Cluster *last_cluster,
+  const Cluster *cluster,Cluster *next_cluster)
+{
+  if (cluster == head)
+    head=next_cluster;
+  else
+    last_cluster->next=next_cluster;
+  return(head);
+}
+
 typedef struct _ClusterTargets
 {
   Cluster
@@ -682,10 +692,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
     /*
       Delete cluster.
     */
-    if (cluster == head)
-      head=next_cluster;
-    else
-      last_cluster->next=next_cluster;
+    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
     cluster=(Cluster *) RelinquishMagickMemory(cluster);
   }
   number_clusters=(size_t) count;
