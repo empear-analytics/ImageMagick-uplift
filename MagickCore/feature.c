@@ -1072,6 +1072,22 @@ static void VoteHoughRow(const HoughVotes *votes,
   }
 }
 
+static Image *AppendHoughAccumulator(Image *lines_image,
+  MatrixInfo *accumulator,const char *artifact,ExceptionInfo *exception)
+{
+  if ((lines_image != (Image *) NULL) &&
+      (IsStringTrue(artifact) != MagickFalse))
+    {
+      Image
+        *accumulator_image;
+
+      accumulator_image=MatrixToImage(accumulator,exception);
+      if (accumulator_image != (Image *) NULL)
+        AppendImageToList(&lines_image,accumulator_image);
+    }
+  return(lines_image);
+}
+
 MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const size_t height,const size_t threshold,ExceptionInfo *exception)
 {
@@ -1225,16 +1241,8 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   SetHoughDrawOptions(image,image_info);
   lines_image=RenderHoughLines(image_info,image->columns,image->rows,exception);
   artifact=GetImageArtifact(image,"hough-lines:accumulator");
-  if ((lines_image != (Image *) NULL) &&
-      (IsStringTrue(artifact) != MagickFalse))
-    {
-      Image
-        *accumulator_image;
-
-      accumulator_image=MatrixToImage(accumulator,exception);
-      if (accumulator_image != (Image *) NULL)
-        AppendImageToList(&lines_image,accumulator_image);
-    }
+  lines_image=AppendHoughAccumulator(lines_image,accumulator,artifact,
+    exception);
   /*
     Free resources.
   */
