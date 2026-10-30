@@ -959,6 +959,13 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
 %      of a particular peak or valley of a color component.
 %
 */
+static void SkipToRegionMinimum(const short *extrema,ExtentPacket *extents)
+{
+  for ( ; extents->index <= 255; extents->index++)
+    if (extrema[extents->index] < 0)
+      break;
+}
+
 static ssize_t DefineRegion(const short *extrema,ExtentPacket *extents)
 {
   /*
@@ -979,9 +986,7 @@ static ssize_t DefineRegion(const short *extrema,ExtentPacket *extents)
   /*
     Find the right side (minima).
   */
-  for ( ; extents->index <= 255; extents->index++)
-    if (extrema[extents->index] < 0)
-      break;
+  SkipToRegionMinimum(extrema,extents);
   extents->right=extents->index-1;
   return(MagickTrue);
 }
