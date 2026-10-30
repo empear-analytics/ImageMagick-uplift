@@ -323,6 +323,19 @@ static void ApplyComplexOperatorToChannels(
   }
 }
 
+static void SelectComplexOperandImages(const Image *images,
+  const Image **Br_image,const Image **Bi_image)
+{
+  *Br_image=images;
+  *Bi_image=images->next;
+  if ((images->next->next != (Image *) NULL) &&
+      (images->next->next->next != (Image *) NULL))
+    {
+      *Br_image=images->next->next;
+      *Bi_image=images->next->next->next;
+    }
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -413,14 +426,7 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     snr=StringToDouble(artifact,(char **) NULL);
   Ar_image=images;
   Ai_image=images->next;
-  Br_image=images;
-  Bi_image=images->next;
-  if ((images->next->next != (Image *) NULL) &&
-      (images->next->next->next != (Image *) NULL))
-    {
-      Br_image=images->next->next;
-      Bi_image=images->next->next->next;
-    }
+  SelectComplexOperandImages(images,&Br_image,&Bi_image);
   Cr_image=complex_images;
   Ci_image=complex_images->next;
   number_channels=MagickMin(MagickMin(MagickMin(
