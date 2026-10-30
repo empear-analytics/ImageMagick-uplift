@@ -2667,7 +2667,10 @@ the block's depth.
    the block stood, inside the same loops and `switch`es, so its `break` ends `Lp`.
 6. Two blocks of one caller whose groups of read variables are the same take the same
    struct type; the caller fills its one local directly before each call (Recipe Y step
-   5). Check every member and argument by reading.
+   5). Check every member and argument by reading. A block whose step-3 text would equal,
+   under Recipe D's renaming (checked by script), the body of a function Recipe LB, Y or
+   W already made in the file calls that function instead of a second copy, with its own
+   struct local and its own `break;`, as Recipe W step 7 allows.
 7. A block whose every exit is the same run of statements `S` followed by `continue;`
    of `Lp` (`i--; continue;`, which retries the iteration) moves the same way, with `S`
    left in the caller as Recipe V step 7 leaves its cleanup: each `S continue;` becomes
@@ -2755,6 +2758,9 @@ static MagickBooleanType FillFloodplaneRun(const FloodfillRow *row,ssize_t *x)
   the helper returns `MagickTrue` and the caller goes on with the next statement, as
   the block fell through. This is Recipe V step 6 with `break;` in place of
   `return(c);`.
+- Under step 6's reuse the existing function's body is the text step 3 would cut from
+  this block, `return(MagickFalse);` in place of each `break;`, so calling it is calling
+  the function step 3 would have made; the caller's `break;` after it is step 5's.
 - Step 1 matters: a block inside a `switch` inside the loop has its `break` end the
   `switch`, not the loop, and a `break` of a loop nested inside the block ends that
   loop, which moves with the block unchanged. Read each `break` against its loop.
@@ -3460,3 +3466,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | T | Step 2: the loop's status may have another name or type, a variable `v` declared outside the loop body that the parallel loop writes only as `v=c;` of one constant and the body reads only in its leading `if (v == c) continue;`; the helper is step 5's and the caller writes `if (Helper(...) == MagickFalse) v=c;`; *Careful* gives the argument and refuses a flag written another value | `attribute.c`'s `IsImageOpaque` (`opaque=MagickFalse;`) and `IdentifyImageMonochrome` (`type=UndefinedType;`), row loops of T's shape whose flag is not called `status`. A probe on `IsImageOpaque`: bumps 2 to 1, cc 10 to 9, Code Duplication leaves the file, 6.08 to 6.52 | mandate (2026-10-24) |
 | 2026-10-30 | WORDING | Wa | Campaign A's Recipe W (Extract Accumulating Block Returning the Loop Status Taking an Input Struct, 2026-10-29) is renamed Wa: campaign B's M112 added a different Recipe W (Extract Block Returning Success for an Early Return) the same day on its own branch, and both reached `main`. B's reached `main` first and keeps W. Campaign A commits made before this rename whose trailer reads `Recipe: W` (W08's `effect.c` steps and the steps that cite Recipe W step 3's member form) mean Wa | Both headings stood in `main` after #75 and #78, which `playbook_lint` refuses as a duplicate code | owner |
 | 2026-10-30 | AMEND | V | Step 6: another copy of a step-6 block, in another function and identical under Recipe D's renaming (checked by script), may call the function the first copy became, with its own arguments and its own `c`, one commit per caller, as Recipe W step 7 allows for W; *Careful* gives the argument | `resize-image.c`'s `HorizontalFilter` and `VerticalFilter`: the contribution-buffer allocation, which throws and returns `MagickFalse` when it fails, is the same text in both. Recipe D moves copies whole and may not leave the caller, and a second helper of the same text would be a duplicate. A probe: 6.29 to 6.31 for the first copy, 6.32 with the second | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | LB | Step 6: a block whose step-3 text equals, under Recipe D's renaming (checked by script), the body of a function Recipe LB, Y or W already made in the file calls that function instead of a second copy, with its own struct local and its own `break;`, as Recipe W step 7 allows for W; *Careful* gives the argument | `histogram.c`'s `CheckImageColors`: its child-allocation block in the tree descent ends the level loop through `break;` where `ClassifyImageColors`' identical block returns `0`, which Recipe Y moved into `AcquireHNodeChild`; a second copy would be a *Code Duplication*. A probe: nesting 5 to 4, 6.41 to 6.42 | mandate (2026-10-24) |
