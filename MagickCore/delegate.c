@@ -1813,6 +1813,77 @@ static void WaitForDelegateInput(const Image *image)
     (void) MagickDelay(100);  /* sleep 0.1 seconds */
 }
 
+typedef struct _DelegateInvocation
+{
+  ImageInfo
+    *image_info;
+
+  Image
+    *image;
+
+  const char
+    *decode,
+    *encode;
+
+  ExceptionInfo
+    *exception;
+
+  const DelegateInfo
+    *delegate_info;
+
+  MagickBooleanType
+    temporary;
+} DelegateInvocation;
+
+static MagickBooleanType WriteDelegateImages(
+  const DelegateInvocation *invocation,ImageInfo **clone_info)
+{
+  ImageInfo
+    *const image_info = invocation->image_info;
+
+  Image
+    *const image = invocation->image;
+
+  const char
+    *const decode = invocation->decode,
+    *const encode = invocation->encode;
+
+  ExceptionInfo
+    *const exception = invocation->exception;
+
+  const DelegateInfo
+    *const delegate_info = invocation->delegate_info;
+
+  const MagickBooleanType
+    temporary = invocation->temporary;
+
+  Image
+    *p;
+
+  MagickBooleanType
+    status;
+
+  for (p=image; p != (Image *) NULL; p=GetNextImageInList(p))
+  {
+    (void) FormatLocaleString(p->filename,MagickPathExtent,"%s:%s",
+      delegate_info->decode,(*clone_info)->filename);
+    status=WriteImage(*clone_info,p,exception);
+    if (status == MagickFalse)
+      {
+        (void) RelinquishUniqueFileResource(image_info->unique);
+        if (temporary != MagickFalse)
+          (void) RelinquishUniqueFileResource(image->filename);
+        *clone_info=DestroyImageInfo(*clone_info);
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
+        return(MagickFalse);
+      }
+    if ((*clone_info)->adjoin != MagickFalse)
+      break;
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -1885,11 +1956,11 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
       char
         *magick;
 
+      DelegateInvocation
+        invocation;
+
       ImageInfo
         *clone_info;
-
-      Image
-        *p;
 
       /*
         Delegate requires a particular image format.
@@ -1926,24 +1997,15 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
         MagickPathExtent);
       (void) CopyMagickString(image_info->filename,image->filename,
         MagickPathExtent);
-      for (p=image; p != (Image *) NULL; p=GetNextImageInList(p))
-      {
-        (void) FormatLocaleString(p->filename,MagickPathExtent,"%s:%s",
-          delegate_info->decode,clone_info->filename);
-        status=WriteImage(clone_info,p,exception);
-        if (status == MagickFalse)
-          {
-            (void) RelinquishUniqueFileResource(image_info->unique);
-            if (temporary != MagickFalse)
-              (void) RelinquishUniqueFileResource(image->filename);
-            clone_info=DestroyImageInfo(clone_info);
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
-            return(MagickFalse);
-          }
-        if (clone_info->adjoin != MagickFalse)
-          break;
-      }
+      invocation.image_info=image_info;
+      invocation.image=image;
+      invocation.decode=decode;
+      invocation.encode=encode;
+      invocation.exception=exception;
+      invocation.delegate_info=delegate_info;
+      invocation.temporary=temporary;
+      if (WriteDelegateImages(&invocation,&clone_info) == MagickFalse)
+        return(MagickFalse);
       (void) RelinquishUniqueFileResource(image_info->unique);
       clone_info=DestroyImageInfo(clone_info);
     }
