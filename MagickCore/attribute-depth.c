@@ -207,6 +207,28 @@ static void RaiseSampleDepth(const Quantum *p,const ssize_t j,
   }
 }
 
+static void RaisePixelDepth(const Image *image,const Quantum *p,
+  size_t *current_depth,const int id)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    PixelChannel
+      channel;
+
+    PixelTrait
+      traits;
+
+    channel=GetPixelChannelChannel(image,j);
+    traits=GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    RaiseSampleDepth(p,j,current_depth,id);
+  }
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -352,23 +374,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
       continue;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        j;
-
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        PixelChannel
-          channel;
-
-        PixelTrait
-          traits;
-
-        channel=GetPixelChannelChannel(image,j);
-        traits=GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        RaiseSampleDepth(p,j,current_depth,id);
-      }
+      RaisePixelDepth(image,p,current_depth,id);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (current_depth[id] == MAGICKCORE_QUANTUM_DEPTH)
