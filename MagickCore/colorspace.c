@@ -1827,6 +1827,21 @@ static inline ssize_t RoundToYCC(const double value)
   return((ssize_t) (value+0.5));
 }
 
+static MagickBooleanType SyncLogImageToDirectClass(Image *image,
+  Quantum **logmap,ExceptionInfo *exception)
+{
+  if (image->storage_class == PseudoClass)
+    {
+      if ((SyncImage(image,exception) == MagickFalse) ||
+          (SetImageStorageClass(image,DirectClass,exception) == MagickFalse))
+        {
+          *logmap=(Quantum *) RelinquishMagickMemory(*logmap);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2432,15 +2447,8 @@ static MagickBooleanType TransformsRGBImage(Image *image,
           (gamma/density)*0.002*MagickSafeReciprocal(film_gamma))-black));
       for ( ; i <= (ssize_t) MaxMap; i++)
         logmap[i]=QuantumRange;
-      if (image->storage_class == PseudoClass)
-        {
-          if ((SyncImage(image,exception) == MagickFalse) ||
-              (SetImageStorageClass(image,DirectClass,exception) == MagickFalse))
-            {
-              logmap=(Quantum *) RelinquishMagickMemory(logmap);
-              return(MagickFalse);
-            }
-        }
+      if (SyncLogImageToDirectClass(image,&logmap,exception) == MagickFalse)
+        return(MagickFalse);
       image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
       #pragma omp parallel for schedule(static) shared(status) \
