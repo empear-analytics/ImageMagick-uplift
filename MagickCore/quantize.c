@@ -1191,6 +1191,15 @@ static void ClassifyImageRow(const QCubeRow *row,
   }
 }
 
+static void RestoreClassifyColorspace(const QCubeInfo *cube_info,
+  const Image *image,ExceptionInfo *exception)
+{
+  if (cube_info->quantize_info->colorspace != image->colorspace)
+    if ((cube_info->quantize_info->colorspace != UndefinedColorspace) &&
+        (cube_info->quantize_info->colorspace != CMYKColorspace))
+      (void) TransformImageColorspace((Image *) image,sRGBColorspace,exception);
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -1271,10 +1280,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
       break;
   }
   image_view=DestroyCacheView(image_view);
-  if (cube_info->quantize_info->colorspace != image->colorspace)
-    if ((cube_info->quantize_info->colorspace != UndefinedColorspace) &&
-        (cube_info->quantize_info->colorspace != CMYKColorspace))
-      (void) TransformImageColorspace((Image *) image,sRGBColorspace,exception);
+  RestoreClassifyColorspace(cube_info,image,exception);
   return(y < (ssize_t) image->rows ? MagickFalse : MagickTrue);
 }
 
