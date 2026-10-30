@@ -1146,6 +1146,43 @@ static Cluster *FindObjectCluster(Cluster *head)
   return(object);
 }
 
+static ssize_t CountRowPixelsByRGB(const Image *image,Cluster *head,
+  const Quantum *p,ssize_t count)
+{
+  Cluster
+    *cluster;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      b,
+      g,
+      r;
+
+    r=(double) ScaleQuantumToChar(GetPixelRed(image,p));
+    g=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
+    b=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
+    for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
+      if (IsPixelInCluster(cluster,r,g,b) != MagickFalse)
+        {
+          /*
+            Count this pixel.
+          */
+          count++;
+          cluster->red.center+=r;
+          cluster->green.center+=g;
+          cluster->blue.center+=b;
+          cluster->count++;
+          break;
+        }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(count);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1173,8 +1210,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     *p;
 
   ssize_t
-    i,
-    x;
+    i;
 
   short
     *extrema[MaxDimension];
@@ -1297,31 +1333,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     p=GetVirtualPixels(image,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        b,
-        g,
-        r;
-
-      r=(double) ScaleQuantumToChar(GetPixelRed(image,p));
-      g=(double) ScaleQuantumToChar(GetPixelGreen(image,p));
-      b=(double) ScaleQuantumToChar(GetPixelBlue(image,p));
-      for (cluster=head; cluster != (Cluster *) NULL; cluster=cluster->next)
-        if (IsPixelInCluster(cluster,r,g,b) != MagickFalse)
-          {
-            /*
-              Count this pixel.
-            */
-            count++;
-            cluster->red.center+=r;
-            cluster->green.center+=g;
-            cluster->blue.center+=b;
-            cluster->count++;
-            break;
-          }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    count=CountRowPixelsByRGB(image,head,p,count);
     proceed=SetImageProgress(image,SegmentImageTag,(MagickOffsetType) y,
       2*image->rows);
     if (proceed == MagickFalse)
