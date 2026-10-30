@@ -763,6 +763,25 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *SurroundImageWithBorder(const Image *image,Image *integral_image,
+  const RectangleInfo bounds,ExceptionInfo *exception)
+{
+  Image
+    *rotate_image;
+
+  RectangleInfo
+    border_info;
+
+  integral_image->border_color=integral_image->background_color;
+  integral_image->compose=CopyCompositeOp;
+  border_info.width=(size_t) bounds.x;
+  border_info.height=(size_t) bounds.y;
+  rotate_image=BorderImage(integral_image,&border_info,image->compose,
+    exception);
+  integral_image=DestroyImage(integral_image);
+  return(rotate_image);
+}
+
 static Image *ShearIntegralImage(const Image *image,Image *integral_image,
   const PointInfo shear,ExceptionInfo *exception)
 {
@@ -773,7 +792,6 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
     status;
 
   RectangleInfo
-    border_info,
     bounds;
 
   ShearRegion
@@ -792,12 +810,7 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
   /*
     Surround image with border.
   */
-  integral_image->border_color=integral_image->background_color;
-  integral_image->compose=CopyCompositeOp;
-  border_info.width=(size_t) bounds.x;
-  border_info.height=(size_t) bounds.y;
-  shear_image=BorderImage(integral_image,&border_info,image->compose,exception);
-  integral_image=DestroyImage(integral_image);
+  shear_image=SurroundImageWithBorder(image,integral_image,bounds,exception);
   if (shear_image == (Image *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   /*
@@ -934,25 +947,6 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static Image *SurroundImageWithBorder(const Image *image,Image *integral_image,
-  const RectangleInfo bounds,ExceptionInfo *exception)
-{
-  Image
-    *rotate_image;
-
-  RectangleInfo
-    border_info;
-
-  integral_image->border_color=integral_image->background_color;
-  integral_image->compose=CopyCompositeOp;
-  border_info.width=(size_t) bounds.x;
-  border_info.height=(size_t) bounds.y;
-  rotate_image=BorderImage(integral_image,&border_info,image->compose,
-    exception);
-  integral_image=DestroyImage(integral_image);
-  return(rotate_image);
-}
-
 MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   ExceptionInfo *exception)
 {
