@@ -583,6 +583,10 @@ needs two copies of the block.
    no copy of it (`TrimImage`'s `CropImage(image,&geometry,exception)`, which reads
    `*geometry` and stores no pointer; checked by reading the callee) still qualifies,
    as in Recipe I step 8: while the new function runs, no other pointer to it exists.
+   So does one whose address the caller takes only to fill a member of another
+   helper's targets struct, under Recipe I step 2's exception (a struct of Recipe I, LB
+   step 8 or Q step 8, its `const` form included, read by nothing but that helper's
+   call).
    A parameter the caller receives by value, of a struct or arithmetic type (not a
    pointer, and not an array parameter, which is one), counts as a plain local
    (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
@@ -656,6 +660,11 @@ static void SelectMagnifyMethod(const char *option,
   when the new function runs, its out-parameter is the only pointer to `v`, and no two
   of its pointers name one object. A callee that stores the address (in a struct, a
   global, a cache) gives `v` a second name: the variable does not qualify.
+- Under step 2's targets-struct exception the struct does keep `&v`, but it is the
+  caller's local, never passed to the new function, and read by nothing but the call of
+  its own helper, which runs before or after the new function, never during it. While
+  the new function runs nothing reads that member, so its out-parameter is the only
+  pointer to `v` in use (Recipe I's *Careful*).
 - A parameter received by value is an object of the function's own, initialised from
   the argument when the call starts and gone when it returns (C11 6.9.1p9); a write to
   it, directly or through `&v`, reaches no object of its caller. A parameter of
@@ -2431,8 +2440,10 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    the caller or a by-value parameter of it (`FunctionE fe`), none a global, a `static`
    or an array, and none whose address `&v` the caller takes anywhere (check by
    `grep`), except to fill a member of another helper's targets struct under this
-   recipe, filled directly before that helper's call and read by nothing else (Recipe
-   LB step 2's "helpers of this recipe"), or as an argument of calls that keep no copy
+   recipe, Recipe LB step 8 or Recipe Q step 8, filled directly before that helper's
+   call or declared `const` with the addresses as its initialiser (Recipe Q step 8's
+   `const` form), and read by nothing but that call (Recipe LB step 2's "helpers of
+   this recipe"), or as an argument of calls that keep no copy
    of it (checked by reading the callee: `GetPixelInfo(image,&pixel)` fills `pixel` and
    returns), as Recipe V step 2 and Recipe LB step 8 allow; in the block, `&v` becomes
    `v`. Writes through pointers the block already uses stay as they are; variables
@@ -2628,9 +2639,12 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   the variables `S` writes (`bounds`, `disposals`, `prev_image` in
   `OptimizeLayerFrames`). On the success path `S` runs in neither version.
 - Step 2's exception for another helper's targets struct: that struct is the caller's
-  local, filled directly before its own call and read by nothing else, so its copy of
-  `&v` is used only while that helper runs, which is never while this one runs (C calls
-  do not overlap here: no OpenMP region, step 1). While this helper runs, its member is
+  local, filled directly before its own call (or declared `const` with the addresses as
+  its initialiser: an address does not change while its variable lives) and read by nothing but
+  that call, so its copy of `&v` is used only while that helper runs, which is never
+  while this one runs (C calls do not overlap here: no OpenMP region, step 1). The
+  struct may be of Recipe I, LB step 8 or Q step 8: all three hold addresses only and
+  hand them to their own helper alone. While this helper runs, its member is
   the only pointer to `v` in use, and no two of its own members name one object.
 - More than four written variables, two labels, two different constants, or a written
   variable whose address the caller takes elsewhere: skip the block.
@@ -3722,3 +3736,5 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | H | Step 1: a run that follows only declarations at the top of the body, none naming its macros, may be hoisted the same way, the declarations staying; *Careful*: the reach widens over those declarations too, which `pp_identical.sh` covers | `magnify.c`'s `Xbr2X` (W10): its `WeightVar` macro (a `?:`) follows the declaration of `magnify`; the hoist preprocessed identically, cc 10 to 9, 8.13 to 8.15 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | O | Step 2: a variable the block does not read before writing it, and that nothing after the block reads, is declared in the new function (Recipe E step 4) and is no out-parameter. Step 5: `&v` of a written variable, passed on to a callee, is written `v` (Recipe Q step 5) | `MontageImageList`'s three copies of `x_offset=0; y_offset=0; if (montage_info->tile != (char *) NULL) GetMontageGeometry(...,&x_offset,&y_offset,&sans,&sans);`: `sans` is a discarded out-argument that nothing reads, and as a third pointer it would give five parameters. A probe of the first copy: 6.63 to 6.65; all three, 6.68 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 3: a single output that is one member of a caller's struct local, whose other members are not all set, goes by passing the struct as a pointer (`(*v).m` at each use, Recipe Q step 5's form) to a `void` function; the struct is a plain local whose address is not taken elsewhere (Recipe O step 2) | `MontageImageList`'s row end in the bounding-box pass, `if (y_offset > (ssize_t) bounds.height) bounds.height=(size_t) y_offset;`, its last depth-4 site: `bounds.x` and `bounds.y` are never set, so returning `bounds.height` through a by-value copy of `bounds` would read indeterminate members. A probe: Deep, Nested Complexity leaves, 6.87 to 7.30 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | I | Step 2: the exception for another helper's targets struct covers a struct of Recipe I, LB step 8 or Q step 8, filled directly before its own call or declared `const` with the addresses (Q step 8's `const` form), read by nothing but that call; LB step 8, which rests on step 2, takes the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleImage` (W10): Recipe Q moved the Y direction's row loop to `AccumulateScaleRows`, whose `const` targets struct holds `&n`, `&status`, `&number_rows` and `&next_row` among six; the pending read after the loop (nesting 4, the function's last depth-4 site) writes those four and ends the row loop through `break;`. Recipe LB step 8: Deep, Nested Complexity leaves `ScaleImage`, 7.40 to 7.88 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | O | Step 2: a written variable whose address the caller takes only to fill a member of another helper's targets struct (Recipe I step 2's exception: I, LB step 8 or Q step 8, the `const` form included) still qualifies; Recipes K, Q, Z and SD, which rest on O step 2, take the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleImage` (W10): the row-span restart `if (scale.y <= 0) { ... }` writes `scale` and `next_row`, whose addresses only the `const` targets structs of `AccumulateScaleRows` (Q) and `ReadPendingScaleRow` (LB) hold. Recipe O: cc 27 to 26, 7.88 to 7.90 | mandate (2026-10-24) |
