@@ -540,14 +540,7 @@ static MagickBooleanType VerticalFilter(
   support=scale*GetResizeFilterSupport(resize_filter);
   if (SetFilterStorageClass(image,resize_image,support,exception) == MagickFalse)
     return(MagickFalse);
-  if (support < 0.5)
-    {
-      /*
-        Support too small even for nearest neighbour: Reduce to point sampling.
-      */
-      support=(double) 0.5;
-      scale=1.0;
-    }
+  ClampFilterSupport(&support,&scale);
   if (AcquireFilterContributions(image,support,&contributions,exception) ==
       MagickFalse)
     return(MagickFalse);
