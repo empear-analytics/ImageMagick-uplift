@@ -763,11 +763,7 @@ MagickExport ImageType IdentifyImageType(const Image *image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (image->colorspace == CMYKColorspace)
-    {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        return(ColorSeparationType);
-      return(ColorSeparationAlphaType);
-    }
+    return(GetColorSeparationType(image));
   type=IdentifyImageGray(image,exception);
   if (IsGrayImageType(type))
     return(type);
