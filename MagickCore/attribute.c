@@ -132,6 +132,77 @@ static double LexicographicalOrder(PointInfo *a,PointInfo *b,PointInfo *c)
   return((b->x-a->x)*(c->y-a->y)-(b->y-a->y)*(c->x-a->x));
 }
 
+typedef struct _ImageEdge
+{
+  const Image
+    *image;
+
+  const CacheView
+    *image_view;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} ImageEdge;
+
+static void SelectImageEdge(const ImageEdge *edge,const Quantum **p,
+  GravityType *gravity,RectangleInfo *edge_geometry)
+{
+  const Image
+    *image = edge->image;
+
+  const CacheView
+    *image_view = edge->image_view;
+
+  const ssize_t
+    i = edge->i;
+
+  ExceptionInfo
+    *exception = edge->exception;
+
+  switch (i)
+  {
+    case 0:
+    default:
+    {
+      (*p)=GetCacheViewVirtualPixels(image_view,0,(ssize_t) image->rows-1,1,1,
+        exception);
+      (*gravity)=WestGravity;
+      (*edge_geometry).width=1;
+      (*edge_geometry).height=0;
+      break;
+    }
+    case 1:
+    {
+      (*p)=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,
+        1,exception);
+      (*gravity)=EastGravity;
+      (*edge_geometry).width=1;
+      (*edge_geometry).height=0;
+      break;
+    }
+    case 2:
+    {
+      (*p)=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
+      (*gravity)=NorthGravity;
+      (*edge_geometry).width=0;
+      (*edge_geometry).height=1;
+      break;
+    }
+    case 3:
+    {
+      (*p)=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,
+        (ssize_t) image->rows-1,1,1,exception);
+      (*gravity)=SouthGravity;
+      (*edge_geometry).width=0;
+      (*edge_geometry).height=1;
+      break;
+    }
+  }
+}
+
 static PixelInfo GetEdgeBackgroundColor(const Image *image,
   const CacheView *image_view,ExceptionInfo *exception)
 {
@@ -170,6 +241,9 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
     Image
       *edge_image;
 
+    ImageEdge
+      edge;
+
     PixelInfo
       pixel;
 
@@ -184,45 +258,11 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
 
     census[i]=0.0;
     (void) memset(&edge_geometry,0,sizeof(edge_geometry));
-    switch (i)
-    {
-      case 0:
-      default:
-      {
-        p=GetCacheViewVirtualPixels(image_view,0,(ssize_t) image->rows-1,1,1,
-          exception);
-        gravity=WestGravity;
-        edge_geometry.width=1;
-        edge_geometry.height=0;
-        break;
-      }
-      case 1:
-      {
-        p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,0,1,1,
-          exception);
-        gravity=EastGravity;
-        edge_geometry.width=1;
-        edge_geometry.height=0;
-        break;
-      }
-      case 2:
-      {
-        p=GetCacheViewVirtualPixels(image_view,0,0,1,1,exception);
-        gravity=NorthGravity;
-        edge_geometry.width=0;
-        edge_geometry.height=1;
-        break;
-      }
-      case 3:
-      {
-        p=GetCacheViewVirtualPixels(image_view,(ssize_t) image->columns-1,
-          (ssize_t) image->rows-1,1,1,exception);
-        gravity=SouthGravity;
-        edge_geometry.width=0;
-        edge_geometry.height=1;
-        break;
-      }
-    }
+    edge.image=image;
+    edge.image_view=image_view;
+    edge.i=i;
+    edge.exception=exception;
+    SelectImageEdge(&edge,&p,&gravity,&edge_geometry);
     GetPixelInfoPixel(image,p,background+i);
     if (artifact != (const char *) NULL)
       (void) QueryColorCompliance(artifact,AllCompliance,background+i,
