@@ -2308,6 +2308,25 @@ static void AccumulatePixelStatistics(const Image *image,
   }
 }
 
+static void AccumulateRowStatistics(const Image *image,
+  const Quantum *magick_restrict p,ChannelStatistics *channel_statistics,
+  double *histogram)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelReadMask(image,p) <= (QuantumRange/2))
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    AccumulatePixelStatistics(image,p,channel_statistics,histogram);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2352,25 +2371,13 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     /*
       Compute pixel statistics.
     */
     p=GetVirtualPixels(image,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelReadMask(image,p) <= (QuantumRange/2))
-        {
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          continue;
-        }
-      AccumulatePixelStatistics(image,p,channel_statistics,histogram);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateRowStatistics(image,p,channel_statistics,histogram);
   }
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
     ComputeChannelStatisticsMoments(image,channel_statistics,i);
