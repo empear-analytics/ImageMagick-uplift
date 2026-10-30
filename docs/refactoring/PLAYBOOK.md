@@ -2058,6 +2058,200 @@ illuminant: six arguments under Recipe O. A probe: cc 20 to 13, 146 to 92 lines,
 
 ---
 
+## Recipe I - Extract Block Returning Success Through a Struct of Out-Pointers
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it meets Recipe V (steps 1 to 6)
+in every respect but one: it writes two, three or four variables of the caller that the
+caller reads after it, and with each as a pointer (Recipe O) the new function would take
+five or more arguments (*Excess Number of Function Arguments*, which the pre-commit gate
+refuses on a new function). The typical case is a parser step that, on success, rewrites
+several of the caller's parse-state variables together (a function code, its name string,
+a qualifier, an expected delimiter) and on an internal error throws and returns
+`MagickFalse`.
+
+**Not covered by:** Recipe E, whose step 4 skips a block writing more than one outer
+variable and says not to invent an out-parameter struct (*Careful* says how this recipe
+differs, deliberately); Recipes V and Y, whose block writes at most one variable of the
+caller (V step 2, Y step 1); Recipes O and Z, which take up to four written variables by
+pointer but refuse a block containing `return` or `goto` (O step 3, Z step 1); Recipe Q,
+which also refuses `return` and `goto` (K step 1). V or Y with every written variable as
+its own pointer is Recipe O's form plus an exit, but gives five or more parameters here.
+
+**How:**
+
+1. The block meets Recipe V steps 1, 3 and 6: it lies outside every OpenMP region and has
+   no `#pragma` line; it leaves the function only through `goto L;` to one label, or only
+   through `return(c);` of one constant `c` (written `return c;` in some files); no
+   `continue` or `break` leaves it. Recipe V step 7's cleanup form is not this recipe.
+2. List the variables of the caller the block writes: two to four, each a plain local of
+   the caller or a by-value parameter of it (`FunctionE fe`), none a global, a `static`
+   or an array, and none whose address `&v` the caller takes anywhere (check by
+   `grep`). Writes through pointers the block already uses stay as they are; variables
+   the block declares move with it; a temporary it writes before reading, and the caller
+   does not read after it, is declared in the new function (Recipe Y step 2).
+3. Directly above the new function declare a `typedef struct` with one member per
+   written variable: a pointer to the variable's exact type, with the variable's name
+   (`const char *funStr` gives `const char **funStr`). It holds addresses only: no value,
+   no input, nothing else.
+4. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. It takes the variables the block only reads as parameters (Recipe V step 4),
+   or in one `const` input struct (Recipe Y steps 3 to 5) when they would not fit, then
+   `const Name *targets` last: at most four parameters in all, otherwise skip the block.
+5. At the top of its body declare, per member and in member order,
+   `T *const v = targets->v;`. In the block's text write each written variable `v` as
+   `*v` at every use, reads included (`(*v)++` for `v++`), as Recipe O step 5 does; each
+   `goto L;` or `return(c);` becomes `return(MagickFalse);`, one for one; the function
+   ends with `return(MagickTrue);`. Nothing else in the text changes.
+6. In the caller, declare the `Name` local among the declarations at the top of the
+   block that holds the call. Directly before the call assign every member its
+   variable's address, `targets.v=(&v);`, in member order, with nothing between the
+   assignments and the call.
+7. Where the block stood, write `if (Helper(...,&targets) == MagickFalse) goto L;` (or
+   `return(c);`), and check every argument, member and address by reading.
+
+**Before:**
+
+```c
+    if (IsCoordFunction(fe) != MagickFalse) {
+
+      coordQual = (GetCoordQualifier (pfx, (int) fe) == 1) ? MagickTrue : MagickFalse;
+
+      if (coordQual) {
+
+        /* Remove last element, which should be fP */
+        ElementT * pel = &pfx->Elements[pfx->usedElements-1];
+        if (pel->operator_index != fP) {
+          (void) ThrowMagickException (
+            pfx->exception, GetMagickModule(), OptionError,
+            "Bug: For function", "'%s' last element not 'p' at '%s'",
+            funStr, SetShortExp(pfx));
+          return MagickFalse;
+        }
+        chQual = pel->channel_qual;
+        expChLimit = (pel->is_relative) ? ']' : '}';
+        pfx->usedElements--;
+        if (fe == fU) fe = fUP;
+        else if (fe == fV) fe = fVP;
+        else if (fe == fS) fe = fSP;
+        funStr = Functions[fe-(int) FirstFunc].str;
+      }
+    }
+```
+
+**After:**
+
+```c
+typedef struct _CoordQualifierTargets
+{
+  FunctionE
+    *fe;
+
+  const char
+    **funStr;
+
+  PixelChannel
+    *chQual;
+
+  char
+    *expChLimit;
+} CoordQualifierTargets;
+
+static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
+  const MagickBooleanType coordQual,const CoordQualifierTargets *targets)
+{
+  FunctionE
+    *const fe = targets->fe;
+
+  const char
+    **const funStr = targets->funStr;
+
+  PixelChannel
+    *const chQual = targets->chQual;
+
+  char
+    *const expChLimit = targets->expChLimit;
+
+  if (coordQual) {
+    ...
+    if (pel->operator_index != fP) {
+      (void) ThrowMagickException (
+        ...
+        *funStr, SetShortExp(pfx));
+      return(MagickFalse);
+    }
+    *chQual = pel->channel_qual;
+    *expChLimit = (pel->is_relative) ? ']' : '}';
+    pfx->usedElements--;
+    if (*fe == fU) *fe = fUP;
+    else if (*fe == fV) *fe = fVP;
+    else if (*fe == fS) *fe = fSP;
+    *funStr = Functions[*fe-(int) FirstFunc].str;
+  }
+  return(MagickTrue);
+}
+...
+    if (IsCoordFunction(fe) != MagickFalse) {
+      CoordQualifierTargets targets;
+
+      coordQual = (GetCoordQualifier (pfx, (int) fe) == 1) ? MagickTrue : MagickFalse;
+
+      targets.fe=(&fe);
+      targets.funStr=(&funStr);
+      targets.chQual=(&chQual);
+      targets.expChLimit=(&expChLimit);
+      if (ApplyCoordQualifier (pfx, coordQual, &targets) == MagickFalse)
+        return MagickFalse;
+    }
+```
+
+**Careful:**
+
+- This is Recipe O's argument with the pointers carried in one struct, plus Recipe V's
+  exit. Each `*v` in the helper is the caller's own object `v`, so every read sees the
+  caller's current value and every write lands in the caller's variable, the same
+  operations in the same order; a variable a path leaves alone keeps the caller's value.
+  On a failure path every write made before the exit has landed, the helper returns at
+  once, and the caller jumps or returns `c` from the same point, running nothing in
+  between (Recipe V); on the success path the caller goes on with the next statement.
+- How this differs from the out-parameter struct that Recipe E step 4 forbids, and why
+  it is safe: the caller's variables are not moved into a struct; they stay its own
+  locals, under their own names, read and written directly everywhere else. The struct
+  holds only their addresses, set directly before the call and dead after it; the helper
+  receives it as `const` and binds each member once to a `*const` local, so no pointer
+  is ever reseated. Nothing is copied in or back. The alternative, a struct of values
+  that the caller copies back, would need the copy-back on every exit, a statement
+  each, and a reader would have to check that none is missing and that a value the block
+  left alone comes back unchanged; with addresses there is nothing to miss.
+- The pointers name different objects and cannot alias each other or a parameter's
+  pointee: each is the address of a distinct local whose address the caller takes
+  nowhere else (step 2). A by-value parameter is such a local: C passes it by copy, so
+  `&fe` is the caller's own object and the caller's caller sees no change.
+- `return MagickFalse;` with `c` itself `MagickFalse` becomes `return(MagickFalse);` like
+  any other constant: the helper's result says whether the block fell through, and the
+  caller returns `c` when it did not. A warning thrown with `GetMagickModule()` now names
+  the helper as its location, which the oracle normalises.
+- The failure paths are mostly internal checks no case reaches: the oracle checks the
+  fall-through path, with a case that takes the block's writes where one exists; each
+  exit is checked by reading against its `return(MagickFalse);`, and
+  `refactor_guard.py --calls` moves only `+2`.
+- More than four written variables, two labels, two different constants, or a written
+  variable whose address the caller takes elsewhere: skip the block.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2, 6 and 7 checked by reading.
+
+**Provenance:** 2026-10-30, from `fx.c`'s `GetFunction`, whose coordinate-qualifier block
+(`u.p[...]`, `v.p{...}`) is the file's last *Deep, Nested Complexity* (depth 4): it writes
+`fe` (a by-value parameter), `funStr`, `chQual` and `expChLimit`, and returns
+`MagickFalse` when the last element is not `p`. Recipes V and Y allow one written
+variable, O, Z and Q no `return`, and E step 4 refuses it; a conditional return left in
+the caller stays at depth 4, so the whole `if (coordQual)` moves. A probe: the function
+leaves Deep, Nested Complexity, fx.c 3.08 to 3.23. Added by Claude Code (Claude Opus 5.5)
+during task W09, at the owner's request of 2026-10-30.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -2424,3 +2618,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | V | Step 7: `return(c);` of one constant `c` (step 6) may end every exit in place of `return(v);`; the caller writes `{ S return(c); }` and step 2 holds (one written variable, which `S` neither reads nor writes). *Careful*: the cleanup's writes are dead on the failure path, but the recipe does not rest on that, since `S` stays in the caller; moving `S` into the helper instead is not admitted | Owner's request of 2026-10-30 after the W08 report (V allowing dead cleanup writes on the failure path). `layer.c`'s `OptimizeLayerFrames`: the `NoneDispose` reference's failure path releases `bounds` and `disposals`, then `return((Image *) NULL);`, which step 6 refused (three written variables) and step 7 did not name (a constant, not a variable). A probe: bumps 9 to 8, 4.99 to 5.00; with `CoalesceImages`' dispose-image clone, 5.01 | owner |
 | 2026-10-30 | AMEND | N, Q, U, W, Y, Z | N step 2: a plain struct value the block only reads (`PixelInfo`, `PointInfo`, `RectangleInfo`) may be a member, copied by `name.v=v;` directly before the call, when every member is set before the call, the block assigns neither it nor a member, takes `&v` only for a callee's pointer-to-`const` parameter that only reads through it (stores and compares no address), no pointer to it is held where the block can write, and the block writes through none of its pointer members; arrays stay out. *Careful* gives the argument (a copy holds the same values while nothing writes the original; a `const` callee sees the copy's address). Q step 3, U step 2, W step 2, Y step 3 and Z step 2 name struct values as N step 2 does | Owner's request of 2026-10-30 after the W08 report (struct-valued read-only members in N and Q). `feature.c`'s `MeanShiftImage`: its convergence block reads `sum_location`, `sum_pixel`, `previous_location`, `previous_pixel` (`PointInfo`/`PixelInfo`) and `count`; `layer.c`'s `CompareImagesBounds` and `OptimizeLayerFrames` (`RectangleInfo try_bounds`, a `PixelInfo` read through `&alpha_pixel`). MeanShiftImage's block also writes the struct values `mean_location` and `mean_pixel`, which Q passes only as scalars, so this amendment alone does not admit it: a probe that also passed them by pointer measured 5.20 to 5.23 | owner |
 | 2026-10-30 | AMEND | Q | Step 1: in a function with no OpenMP region, `status` is a plain local of the caller and may be one of the four written variables, passed by pointer, its reads in the block included; a pointer the block writes through but never assigns is a read-only member, not a written variable. *Careful* gives the argument: K, J and T refuse `status` only because a parallel loop shares it; through `*status` every read and write reaches the caller's variable in the same order, so no guard on its entry value is needed | Owner's request of 2026-10-30 after the W08 report (a sequential form of J and W). `vision.c`'s `ConnectedComponentsImage`: the merge census's neighbour loop (nesting 6, no OpenMP region in the function) writes `status=MagickFalse` and `count` and tests `status`, which J, T and U refuse; in the pointer form its helper takes the struct, `&status` and `&count`. A probe: nesting 6 to 4, 4.18 to 4.21; with the neighbour fetch then moved out of the helper (Recipe E), 4.30 | owner |
+| 2026-10-30 | NEW | I | Extract Block Returning Success Through a Struct of Out-Pointers: a Recipe V block (a `goto L;` or `return(c);` exit) that writes two to four of the caller's locals or by-value parameters, which as separate pointers would give five or more parameters, moves to a `static MagickBooleanType` function taking its read-only inputs (as V, or in Y's input struct) and last a `const` struct holding only the written variables' addresses, bound to `*const` locals and used as `*v` (Recipe O). *Careful* states how it differs from the out-parameter struct Recipe E step 4 forbids: the variables stay the caller's own, only their addresses travel, and nothing is copied back | Owner's request of 2026-10-30 after the W08 report (V with an out-parameter struct). `fx.c`'s `GetFunction`: the coordinate-qualifier block (depth 4, the file's last Deep Nesting) writes `fe`, `funStr`, `chQual` and `expChLimit` and returns `MagickFalse` on one path, refused by V, Y, O, Q and E step 4. A probe: 3.08 to 3.23 | owner |
