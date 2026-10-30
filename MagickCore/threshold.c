@@ -2158,6 +2158,16 @@ static void WhiteThresholdIntensity(const Image *image,
   WhiteThresholdPixel(image,threshold,pixel,q);
 }
 
+static MagickBooleanType SetDirectRGBImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (IsGrayColorspace(image->colorspace) != MagickFalse)
+    (void) TransformImageColorspace(image,sRGBColorspace,exception);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
   const char *thresholds,ExceptionInfo *exception)
 {
@@ -2184,10 +2194,8 @@ MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (thresholds == (const char *) NULL)
     return(MagickTrue);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (SetDirectRGBImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) != MagickFalse)
-    (void) TransformImageColorspace(image,sRGBColorspace,exception);
   threshold=GetThresholdLevels(image,thresholds);
   /*
     White threshold image.
