@@ -174,7 +174,12 @@ blocks of nested logic). Each bump is a missing function.
    element (an accumulator, `mean[i]+=...`), pass the array as a pointer parameter
    whose uses do not change, as Recipe K does; the OpenMP rule below still applies.
 4. If the block writes to more than one outer variable, **skip it** and move to the next
-   bump. Do not invent an out-parameter struct.
+   bump. Do not invent an out-parameter struct. A variable declared outside the block
+   that the block writes before it reads it there, and that the caller does not read
+   after the block before writing it again (a loop counter, a fetched pixel pointer), is
+   not an outer variable: its declaration moves into the new function, as Recipe J
+   step 3 and Recipe Q step 2 have it, and the caller's declaration goes when nothing
+   else uses it.
 5. If the block is inside an OpenMP loop, check the rule above before you cut.
 6. If the block can throw - `ThrowBinaryException`, `ThrowImageException` and friends
    expand to a `return` - the new function must return a status the caller checks, and
@@ -2166,3 +2171,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | Q | Step 4: the member form of Recipe N step 4 | `SparseColorImage`'s inverse-distance accumulation (`pixel`, `denominator` written, eight inputs): with `const` locals its helper would repeat `ManhattanSparseColor`'s seven locals and loop header; in the member form no duplication | mandate (2026-10-24) |
 | 2026-10-30 | NEW | Y | Extract Block Returning Success Taking an Input Struct: a Recipe V block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and its one written variable by pointer (Recipe V); temporaries it writes before reading, and the caller does not read after it, are declared in the new function (Recipe J step 3) | `visual-effects.c`'s `PlasmaImageProxy`: its middle pixel (`return(MagickTrue)` on a failed fetch; `status` written; five inputs) needs six parameters under Recipe V. A probe: bumps 5 to 4, 3.12 to 3.19 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | Step 2: a variable of the caller that the block writes before reading it, and that the caller does not read after the block before writing it again, is declared in the new function and is not one of the four written variables (Recipe J step 3). Step 5: `&v` of a written scalar becomes `v` | `visual-effects.c`'s `SteganoImage`: its column loop (sequential) advances the cursors `c`, `k` and `j` and writes the temporaries `x`, `pixel` and `q`, declared at the top of the function and used nowhere else; step 1 counted six written locals. A probe of the loop as a helper (nine inputs): the function leaves Deep, Nested Complexity, 3.19 to 3.27 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | E | Step 4: a variable declared outside the block that the block writes before reading it, and that the caller does not read after the block before writing it again, is not an outer variable; its declaration moves into the new function (as Recipes J step 3 and Q step 2) | The campaign A subagent brief (W07, W08) stated this reading of step 4 and steps relied on it (for example `colorspace.c`'s `InitializeYCCTransformMaps` and `FillLogTransformMap`, whose counter `i` nothing reads afterwards) before the playbook said so; written down here so the text and the practice agree. The argument is J's: the variable's value on leaving the block is never read, so where it is declared does not change what the caller computes | mandate (2026-10-24); for the owner's review |
