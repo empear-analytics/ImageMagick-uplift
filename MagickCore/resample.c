@@ -332,6 +332,24 @@ static inline MagickBooleanType IsAreaOutsideDitherCorner(
            ) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsAreaOutsideRows(
+  const ResampleFilter *resample_filter,const double v0)
+{
+  return((    v0 + resample_filter->Vlimit < 0.0
+           || v0 - resample_filter->Vlimit >
+              (double) resample_filter->image->rows-1.0
+           ) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsAreaOutsideColumns(
+  const ResampleFilter *resample_filter,const double u0)
+{
+  return((    u0 + resample_filter->Ulimit < 0.0
+           || u0 - resample_filter->Ulimit >
+              (double) resample_filter->image->columns-1.0
+           ) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsResampleUnweighted(const ssize_t hit,
   const double divisor_m,const double divisor_c)
 {
@@ -533,15 +551,11 @@ MagickExport MagickBooleanType ResamplePixelColor(
         hit++;
       break;
     case HorizontalTileVirtualPixelMethod:
-      if (    v0 + resample_filter->Vlimit < 0.0
-           || v0 - resample_filter->Vlimit > (double) resample_filter->image->rows-1.0
-           )
+      if (IsAreaOutsideRows(resample_filter,v0) != MagickFalse)
         hit++;  /* outside the horizontally tiled images. */
       break;
     case VerticalTileVirtualPixelMethod:
-      if (    u0 + resample_filter->Ulimit < 0.0
-           || u0 - resample_filter->Ulimit > (double) resample_filter->image->columns-1.0
-           )
+      if (IsAreaOutsideColumns(resample_filter,u0) != MagickFalse)
         hit++;  /* outside the vertically tiled images. */
       break;
     case DitherVirtualPixelMethod:
