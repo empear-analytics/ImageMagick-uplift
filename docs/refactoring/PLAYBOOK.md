@@ -2412,7 +2412,10 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    or an array, and none whose address `&v` the caller takes anywhere (check by
    `grep`), except to fill a member of another helper's targets struct under this
    recipe, filled directly before that helper's call and read by nothing else (Recipe
-   LB step 2's "helpers of this recipe"). Writes through pointers the block already uses stay as they are; variables
+   LB step 2's "helpers of this recipe"), or as an argument of calls that keep no copy
+   of it (checked by reading the callee: `GetPixelInfo(image,&pixel)` fills `pixel` and
+   returns), as Recipe V step 2 and Recipe LB step 8 allow; in the block, `&v` becomes
+   `v`. Writes through pointers the block already uses stay as they are; variables
    the block declares move with it; a temporary it writes before reading, and the caller
    does not read after it, is declared in the new function (Recipe Y step 2).
 3. Directly above the new function declare a `typedef struct` with one member per
@@ -2554,6 +2557,10 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
 
 **Careful:**
 
+- A call outside the block that only reads or fills through `&v` while it runs and
+  keeps no copy of the address gives `v` no second name, so no two pointers the helper
+  holds name one object (step 2); inside the block, `v` is the address `&v` was, the
+  same argument of the same type.
 - This is Recipe O's argument with the pointers carried in one struct, plus Recipe V's
   exit. Each `*v` in the helper is the caller's own object `v`, so every read sees the
   caller's current value and every write lands in the caller's variable, the same
@@ -3467,3 +3474,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | WORDING | Wa | Campaign A's Recipe W (Extract Accumulating Block Returning the Loop Status Taking an Input Struct, 2026-10-29) is renamed Wa: campaign B's M112 added a different Recipe W (Extract Block Returning Success for an Early Return) the same day on its own branch, and both reached `main`. B's reached `main` first and keeps W. Campaign A commits made before this rename whose trailer reads `Recipe: W` (W08's `effect.c` steps and the steps that cite Recipe W step 3's member form) mean Wa | Both headings stood in `main` after #75 and #78, which `playbook_lint` refuses as a duplicate code | owner |
 | 2026-10-30 | AMEND | V | Step 6: another copy of a step-6 block, in another function and identical under Recipe D's renaming (checked by script), may call the function the first copy became, with its own arguments and its own `c`, one commit per caller, as Recipe W step 7 allows for W; *Careful* gives the argument | `resize-image.c`'s `HorizontalFilter` and `VerticalFilter`: the contribution-buffer allocation, which throws and returns `MagickFalse` when it fails, is the same text in both. Recipe D moves copies whole and may not leave the caller, and a second helper of the same text would be a duplicate. A probe: 6.29 to 6.31 for the first copy, 6.32 with the second | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | LB | Step 6: a block whose step-3 text equals, under Recipe D's renaming (checked by script), the body of a function Recipe LB, Y or W already made in the file calls that function instead of a second copy, with its own struct local and its own `break;`, as Recipe W step 7 allows for W; *Careful* gives the argument | `histogram.c`'s `CheckImageColors`: its child-allocation block in the tree descent ends the level loop through `break;` where `ClassifyImageColors`' identical block returns `0`, which Recipe Y moved into `AcquireHNodeChild`; a second copy would be a *Code Duplication*. A probe: nesting 5 to 4, 6.41 to 6.42 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | I | Step 2: a written variable whose address the caller passes elsewhere only as an argument of calls that keep no copy of it (checked by reading the callee) still qualifies, as Recipe V step 2 and Recipe LB step 8 allow; in the block, `&v` becomes `v`, as step 8 already says for its form; *Careful* gives the argument | `histogram.c`'s `ClassifyImageColors`: its tree descent (the level loop at depth 3, its exit at depth 4) writes the node cursor and `pixel`, whose address the caller also passes to `GetPixelInfo` and `IsPixelInfoColorMatch`, neither of which keeps it, and leaves through `return(0);`. A probe: 6.43 to 6.47 | mandate (2026-10-24) |
