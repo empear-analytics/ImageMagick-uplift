@@ -441,6 +441,14 @@ static Cluster *ClassifyPixelByCluster(const Image *image,Cluster *head,
   return(c);
 }
 
+static inline MagickBooleanType IsClusterAboveThreshold(const Cluster *cluster,
+  const ssize_t count,const double cluster_threshold)
+{
+  return(((cluster->count > 0) &&
+    (cluster->count >= (count*cluster_threshold/100.0))) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -619,8 +627,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
   {
     next_cluster=cluster->next;
-    if ((cluster->count > 0) &&
-        (cluster->count >= (count*cluster_threshold/100.0)))
+    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
       {
         /*
           Initialize cluster.
@@ -1290,8 +1297,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
   {
     next_cluster=cluster->next;
-    if ((cluster->count > 0) &&
-        (cluster->count >= (count*cluster_threshold/100.0)))
+    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
       {
         /*
           Initialize cluster.
