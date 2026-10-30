@@ -1032,6 +1032,18 @@ static MagickBooleanType ParseExpandableArgument(const char *option,
   return(MagickTrue);
 }
 
+static void ComposeListedFilename(char *filename,const char *path,
+  char **filelist,const ssize_t j)
+{
+  (void) CopyMagickString(filename,path,MagickPathExtent);
+  if (*path != '\0')
+    (void) ConcatenateMagickString(filename,DirectorySeparator,
+      MagickPathExtent);
+  if (filelist[j] != (char *) NULL)
+    (void) ConcatenateMagickString(filename,filelist[j],MagickPathExtent);
+  filelist[j]=DestroyString(filelist[j]);
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1169,13 +1181,7 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
           CopyFileListParameters(&list,&j,&count);
           continue;
         }
-      (void) CopyMagickString(filename,path,MagickPathExtent);
-      if (*path != '\0')
-        (void) ConcatenateMagickString(filename,DirectorySeparator,
-          MagickPathExtent);
-      if (filelist[j] != (char *) NULL)
-        (void) ConcatenateMagickString(filename,filelist[j],MagickPathExtent);
-      filelist[j]=DestroyString(filelist[j]);
+      ComposeListedFilename(filename,path,filelist,j);
       CheckFilenameLength(filename);
       if (IsPathDirectory(filename) <= 0)
         {
