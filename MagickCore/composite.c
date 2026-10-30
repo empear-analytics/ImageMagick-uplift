@@ -4249,6 +4249,46 @@ static MagickBooleanType ReportTextureProgress(Image *image,const ssize_t y)
   return(status);
 }
 
+typedef struct _TextureTiles
+{
+  Image
+    *image,
+    *texture_image;
+
+  ssize_t
+    y;
+} TextureTiles;
+
+static MagickBooleanType CompositeTextureRow(const TextureTiles *tiles,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  Image
+    *const image = tiles->image,
+    *const texture_image = tiles->texture_image;
+
+  const ssize_t
+    y = tiles->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) texture_image->columns)
+  {
+    MagickBooleanType
+      thread_status;
+
+    thread_status=CompositeImage(image,texture_image,image->compose,
+      MagickTrue,x+texture_image->tile_offset.x,y+
+      texture_image->tile_offset.y,exception);
+    if (thread_status == MagickFalse)
+      {
+        status=thread_status;
+        break;
+      }
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
@@ -4287,25 +4327,15 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
       */
       for (y=0; y < (ssize_t) image->rows; y+=(ssize_t) texture_image->rows)
       {
-        ssize_t
-          x;
+        TextureTiles
+          tiles;
 
         if (status == MagickFalse)
           continue;
-        for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) texture_image->columns)
-        {
-          MagickBooleanType
-            thread_status;
-
-          thread_status=CompositeImage(image,texture_image,image->compose,
-            MagickTrue,x+texture_image->tile_offset.x,y+
-            texture_image->tile_offset.y,exception);
-          if (thread_status == MagickFalse)
-            {
-              status=thread_status;
-              break;
-            }
-        }
+        tiles.image=image;
+        tiles.texture_image=texture_image;
+        tiles.y=y;
+        status=CompositeTextureRow(&tiles,status,exception);
         if (ReportTextureProgress(image,y) == MagickFalse)
           status=MagickFalse;
       }
