@@ -1590,6 +1590,48 @@ static void SetPlasmaPixelChannels(const Image *image,
   }
 }
 
+static MagickBooleanType PlasmaImageProxy(const PlasmaContext *,
+  const SegmentInfo *magick_restrict,size_t,size_t);
+
+static MagickBooleanType DividePlasmaSegment(const PlasmaContext *context,
+  const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
+{
+  MagickStatusType
+    status;
+
+  SegmentInfo
+    local_info;
+
+  ssize_t
+    x_mid,
+    y_mid;
+
+  /*
+    Divide the area into quadrants and recurse.
+  */
+  depth--;
+  attenuate++;
+  x_mid=CastDoubleToSsizeT(ceil((segment->x1+segment->x2)/2-0.5));
+  y_mid=CastDoubleToSsizeT(ceil((segment->y1+segment->y2)/2-0.5));
+  local_info=(*segment);
+  local_info.x2=(double) x_mid;
+  local_info.y2=(double) y_mid;
+  status=PlasmaImageProxy(context,&local_info,attenuate,depth);
+  local_info=(*segment);
+  local_info.y1=(double) y_mid;
+  local_info.x2=(double) x_mid;
+  status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
+  local_info=(*segment);
+  local_info.x1=(double) x_mid;
+  local_info.y2=(double) y_mid;
+  status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
+  local_info=(*segment);
+  local_info.x1=(double) x_mid;
+  local_info.y1=(double) y_mid;
+  status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
+  return(status == 0 ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
   const SegmentInfo *magick_restrict segment,size_t attenuate,size_t depth)
 {
@@ -1616,35 +1658,7 @@ static MagickBooleanType PlasmaImageProxy(const PlasmaContext *context,
       (fabs(segment->y2-segment->y1) < MagickEpsilon))
     return(MagickTrue);
   if (depth != 0)
-    {
-      SegmentInfo
-        local_info;
-
-      /*
-        Divide the area into quadrants and recurse.
-      */
-      depth--;
-      attenuate++;
-      x_mid=CastDoubleToSsizeT(ceil((segment->x1+segment->x2)/2-0.5));
-      y_mid=CastDoubleToSsizeT(ceil((segment->y1+segment->y2)/2-0.5));
-      local_info=(*segment);
-      local_info.x2=(double) x_mid;
-      local_info.y2=(double) y_mid;
-      status=PlasmaImageProxy(context,&local_info,attenuate,depth);
-      local_info=(*segment);
-      local_info.y1=(double) y_mid;
-      local_info.x2=(double) x_mid;
-      status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
-      local_info=(*segment);
-      local_info.x1=(double) x_mid;
-      local_info.y2=(double) y_mid;
-      status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
-      local_info=(*segment);
-      local_info.x1=(double) x_mid;
-      local_info.y1=(double) y_mid;
-      status&=(MagickStatusType) PlasmaImageProxy(context,&local_info,attenuate,depth);
-      return(status == 0 ? MagickFalse : MagickTrue);
-    }
+    return(DividePlasmaSegment(context,segment,attenuate,depth));
   x_mid=CastDoubleToSsizeT(ceil((segment->x1+segment->x2)/2-0.5));
   y_mid=CastDoubleToSsizeT(ceil((segment->y1+segment->y2)/2-0.5));
   if (IsPlasmaSegmentAtMidpoint(segment,x_mid,y_mid) != MagickFalse)
