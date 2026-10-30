@@ -1978,6 +1978,23 @@ static void RestoreDelegateInput(const Image *image,
     }
 }
 
+static MagickBooleanType LinkDelegateInput(Image *image,
+  const char *input_filename,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (IsPathAccessible(input_filename) != MagickFalse)
+    {
+      *status=AcquireUniqueSymbolicLink(input_filename,image->filename);
+      if (*status == MagickFalse)
+        {
+          ThrowFileException(exception,FileOpenError,
+            "UnableToCreateTemporaryFile",input_filename);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -2087,16 +2104,9 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
           "UnableToCreateTemporaryFile",image_info->unique);
         break;
       }
-    if (IsPathAccessible(input_filename) != MagickFalse)
-      {
-        status=AcquireUniqueSymbolicLink(input_filename,image->filename);
-        if (status == MagickFalse)
-          {
-            ThrowFileException(exception,FileOpenError,
-              "UnableToCreateTemporaryFile",input_filename);
-            break;
-          }
-      }
+    if (LinkDelegateInput(image,input_filename,exception,&status) ==
+        MagickFalse)
+      break;
     status=MagickTrue;
     command=InterpretDelegateProperties(image_info,image,commands[i],exception);
     if (command != (char *) NULL)
