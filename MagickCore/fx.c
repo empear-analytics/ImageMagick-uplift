@@ -1283,6 +1283,18 @@ static size_t ScanPlainTokenLength (char * p, size_t len)
   return(len);
 }
 
+static size_t ScanNonIccTokenLength (char * p, size_t len)
+{
+  if (LocaleNCompare (p, "device-", 7) == 0) {
+    len = 7;
+    p += 7;
+    while (isalpha ((int)*p)) { len++; p++; }
+  } else {
+    len = ScanPlainTokenLength (p, len);
+  }
+  return(len);
+}
+
 static size_t GetToken (FxInfo * pfx)
 /* Returns length of token that starts with an alpha,
      or 0 if it isn't a token that starts with an alpha.
@@ -1309,12 +1321,8 @@ static size_t GetToken (FxInfo * pfx)
     len = 4;
     p += 4;
     while (isalpha ((int)*p)) { len++; p++; }
-  } else if (LocaleNCompare (p, "device-", 7) == 0) {
-    len = 7;
-    p += 7;
-    while (isalpha ((int)*p)) { len++; p++; }
   } else {
-    len = ScanPlainTokenLength (p, len);
+    len = ScanNonIccTokenLength (p, len);
   }
   if (len >= MaxTokenLen) {
     (void) ThrowMagickException (
