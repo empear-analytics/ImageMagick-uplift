@@ -3298,6 +3298,10 @@ functions between files. No other recipe changes where a preprocessor line sits.
 1. Take the run of `#define` lines (with their `\` continuations and the blank lines
    between them) that starts on the first line after the function's opening `{` and ends
    before its first declaration. Nothing else may sit in that run.
+   A run that follows only declarations at the top of the body, none of which names one
+   of its macros (`Xbr2X`'s `const MagnifyPixels magnify = { pixels, result, channels };`
+   before `WeightVar`), may be taken the same way: the run, from its first `#define` to
+   its last line, moves; the declarations stay. Step 4's proof covers them too.
 2. Move the run, unchanged, to directly above the function's signature: below its
    comment banner and below any helper already placed there.
 3. Leave every `#undef` and any `#define` further down the body where it is.
@@ -3339,7 +3343,8 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
 
 - A `#define` inside a function is already in force from its line to the end of the file
   (or to its `#undef`), so the step widens the macro's reach only over the function's
-  signature. `pp_identical.sh` proves that no token there changed meaning.
+  signature, and under step 1's second form over the declarations before the run.
+  `pp_identical.sh` proves that no token there changed meaning.
 - Do not hoist a macro that is `#define`d differently in an earlier function of the same
   file: the run would then redefine it above code that used the other definition. The
   compiler warns about a redefinition, and the build must stay free of warnings.
@@ -3702,3 +3707,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | K | Step 3: a variable of the caller that the block writes before reading it, and that the caller does not read after the block before writing it again, is declared in the new function and is not one of the four written variables (Recipe J step 3, Recipe Q step 2); *Careful* gives the argument | `shear.c`'s `CropToFitImage`: its minimum/maximum scan over the four extent corners (a bump: four `if`s in a `for`) writes `min` and `max` and the loop counter `i`, which the caller also uses for the corner loop before it; step 6 would pass `i` by pointer as a third written local. A probe of the scan as a helper (step 6): 7.29 to 7.53 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | H | *Use when*: also a function whose leading `#define` run holds helper macros with branches or many lines, which CodeScene counts in that function's cyclomatic complexity and length; the step is then kept for its own measured effect under rule 2. *Careful* says when the step is flat and when it is measured | `magnify.c` (W10): `Fish2XBottomRightPixel`'s `Corner` (one `if`, 16 lines), `Epbx2X`'s `HelperCond` (a conjunction and three disjunctions) and `Hq2XHelper`'s `caseA`/`caseB`; each hoist preprocessed identically. Probes from 6.90: `Fish2XBottomRightPixel` 7.19 (leaves *Large Method*), `Epbx2X` 7.11, `Hq2XHelper` 6.97 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | SD | Step 6: when the moved groups read `const` locals the caller initialises from its parameters only, the new function may take the caller's parameters and repeat the declarations of the locals it reads, initialisers unchanged; a local the caller no longer reads leaves its declaration; moved groups need not be adjacent, and the step may repeat on the same `switch`. *Careful* gives the argument, the chain, and the duplication to avoid | `magnify.c`'s `Hq2XHelper` (W10): the six neighbour offsets come from its `Hq2XNeighbours` parameter; Recipe Z's struct for nine inputs took the file over *Lines of Code in a Single File* (6.39 in a probe), step 6 twice gives 7.48 to 8.13 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | H | Step 1: a run that follows only declarations at the top of the body, none naming its macros, may be hoisted the same way, the declarations staying; *Careful*: the reach widens over those declarations too, which `pp_identical.sh` covers | `magnify.c`'s `Xbr2X` (W10): its `WeightVar` macro (a `?:`) follows the declaration of `magnify`; the hoist preprocessed identically, cc 10 to 9, 8.13 to 8.15 | mandate (2026-10-24) |
