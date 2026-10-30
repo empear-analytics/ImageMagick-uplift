@@ -1892,6 +1892,41 @@ static PixelInfo ScaleTransformedPixel(const Image *image,
   return(pixel);
 }
 
+typedef struct _LogTransformMap
+{
+  double
+    black,
+    density,
+    film_gamma,
+    gamma,
+    reference_black,
+    reference_white;
+} LogTransformMap;
+
+static void FillLogTransformMap(const LogTransformMap *log_map,
+  Quantum *logmap)
+{
+  const double
+    black = log_map->black,
+    density = log_map->density,
+    film_gamma = log_map->film_gamma,
+    gamma = log_map->gamma,
+    reference_black = log_map->reference_black,
+    reference_white = log_map->reference_white;
+
+  ssize_t
+    i;
+
+  for (i=0; i <= (ssize_t) (reference_black*MaxMap/MaximumLogarithmicColorspace); i++)
+    logmap[i]=(Quantum) 0;
+  for ( ; i < (ssize_t) (reference_white*MaxMap/MaximumLogarithmicColorspace); i++)
+    logmap[i]=ClampToQuantum((double) QuantumRange/(1.0-black)*
+      (pow(10.0,(MaximumLogarithmicColorspace*i/MaxMap-reference_white)*
+      (gamma/density)*0.002*MagickSafeReciprocal(film_gamma))-black));
+  for ( ; i <= (ssize_t) MaxMap; i++)
+    logmap[i]=QuantumRange;
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2441,6 +2476,9 @@ static MagickBooleanType TransformsRGBImage(Image *image,
         reference_black,
         reference_white;
 
+      LogTransformMap
+        log_map;
+
       Quantum
         *logmap;
 
@@ -2477,14 +2515,13 @@ static MagickBooleanType TransformsRGBImage(Image *image,
           image->filename);
       black=pow(10.0,(reference_black-reference_white)*(gamma/density)*0.002*
         MagickSafeReciprocal(film_gamma));
-      for (i=0; i <= (ssize_t) (reference_black*MaxMap/MaximumLogarithmicColorspace); i++)
-        logmap[i]=(Quantum) 0;
-      for ( ; i < (ssize_t) (reference_white*MaxMap/MaximumLogarithmicColorspace); i++)
-        logmap[i]=ClampToQuantum((double) QuantumRange/(1.0-black)*
-          (pow(10.0,(MaximumLogarithmicColorspace*i/MaxMap-reference_white)*
-          (gamma/density)*0.002*MagickSafeReciprocal(film_gamma))-black));
-      for ( ; i <= (ssize_t) MaxMap; i++)
-        logmap[i]=QuantumRange;
+      log_map.black=black;
+      log_map.density=density;
+      log_map.film_gamma=film_gamma;
+      log_map.gamma=gamma;
+      log_map.reference_black=reference_black;
+      log_map.reference_white=reference_white;
+      FillLogTransformMap(&log_map,logmap);
       if (SyncLogImageToDirectClass(image,&logmap,exception) == MagickFalse)
         return(MagickFalse);
       image_view=AcquireAuthenticCacheView(image,exception);
