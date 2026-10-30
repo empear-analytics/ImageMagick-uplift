@@ -1679,6 +1679,40 @@ static void DrawFreetypeStroke(Image *image,DrawInfo *annotate_info,
   (void) CloneString(&annotate_info->primitive,"path '");
 }
 
+typedef struct _GlyphRasterInfo
+{
+  FT_BitmapGlyph
+    bitmap;
+
+  unsigned char
+    *r;
+} GlyphRasterInfo;
+
+static double GetGlyphFillOpacity(const GlyphRasterInfo *raster,
+  const ssize_t n,const ssize_t x,const ssize_t y)
+{
+  const FT_BitmapGlyph
+    bitmap = raster->bitmap;
+
+  unsigned char
+    *const r = raster->r;
+
+  double
+    fill_opacity;
+
+  fill_opacity=1.0;
+  if (bitmap->bitmap.buffer != (unsigned char *) NULL)
+    {
+      if (bitmap->bitmap.pixel_mode == ft_pixel_mode_grays)
+        fill_opacity=(double) (r[n])/(bitmap->bitmap.num_grays-1);
+      else
+        if (bitmap->bitmap.pixel_mode == ft_pixel_mode_mono)
+          fill_opacity=((r[(x >> 3)+y*bitmap->bitmap.pitch] &
+            (1 << (~x & 0x07)))) == 0 ? 0.0 : 1.0;
+    }
+  return(fill_opacity);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2162,6 +2196,9 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
           n=y*bitmap->bitmap.pitch;
           for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
           {
+            GlyphRasterInfo
+              raster;
+
             x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
             if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
               {
@@ -2169,16 +2206,9 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
                   q+=(ptrdiff_t) GetPixelChannels(image);
                 continue;
               }
-            fill_opacity=1.0;
-            if (bitmap->bitmap.buffer != (unsigned char *) NULL)
-              {
-                if (bitmap->bitmap.pixel_mode == ft_pixel_mode_grays)
-                  fill_opacity=(double) (r[n])/(bitmap->bitmap.num_grays-1);
-                else
-                  if (bitmap->bitmap.pixel_mode == ft_pixel_mode_mono)
-                    fill_opacity=((r[(x >> 3)+y*bitmap->bitmap.pitch] &
-                      (1 << (~x & 0x07)))) == 0 ? 0.0 : 1.0;
-              }
+            raster.bitmap=bitmap;
+            raster.r=r;
+            fill_opacity=GetGlyphFillOpacity(&raster,n,x,y);
             if (draw_info->text_antialias == MagickFalse)
               fill_opacity=fill_opacity >= 0.5 ? 1.0 : 0.0;
             if (active == MagickFalse)
