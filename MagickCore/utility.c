@@ -151,13 +151,9 @@ MagickExport MagickBooleanType AcquireUniqueFilename(char *path)
 %
 */
 
-MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
-  char *destination)
+static MagickBooleanType CopyFileDescriptor(const int source_file,
+  const int destination_file,const char *destination)
 {
-  int
-    destination_file,
-    source_file;
-
   MagickBooleanType
     status;
 
@@ -168,14 +164,56 @@ MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
   ssize_t
     count;
 
-  static ssize_t
-    passes = -1;
-
   struct stat
     attributes;
 
   unsigned char
     *buffer;
+
+  quantum=(size_t) MagickMaxBufferExtent;
+  if ((fstat(source_file,&attributes) == 0) && (attributes.st_size > 0))
+    quantum=(size_t) MagickMin(attributes.st_size,MagickMaxBufferExtent);
+  buffer=(unsigned char *) AcquireQuantumMemory(quantum,sizeof(*buffer));
+  if (buffer == (unsigned char *) NULL)
+    {
+      (void) close_utf8(source_file);
+      (void) close_utf8(destination_file);
+      (void) RelinquishUniqueFileResource(destination);
+      return(MagickFalse);
+    }
+  status=MagickTrue;
+  for (length=0; ; )
+  {
+    count=(ssize_t) read(source_file,buffer,quantum);
+    if (count <= 0)
+      break;
+    length=(size_t) count;
+    count=(ssize_t) write(destination_file,buffer,length);
+    if ((size_t) count != length)
+      {
+        (void) RelinquishUniqueFileResource(destination);
+        status=MagickFalse;
+        break;
+      }
+  }
+  (void) close_utf8(destination_file);
+  (void) close_utf8(source_file);
+  buffer=(unsigned char *) RelinquishMagickMemory(buffer);
+  return(status);
+}
+
+MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
+  char *destination)
+{
+  int
+    destination_file,
+    source_file;
+
+  MagickBooleanType
+    status;
+
+  static ssize_t
+    passes = -1;
 
   assert(source != (const char *) NULL);
   assert(destination != (char *) NULL);
@@ -227,36 +265,7 @@ MagickExport MagickBooleanType AcquireUniqueSymbolicLink(const char *source,
       (void) RelinquishUniqueFileResource(destination);
       return(MagickFalse);
     }
-  quantum=(size_t) MagickMaxBufferExtent;
-  if ((fstat(source_file,&attributes) == 0) && (attributes.st_size > 0))
-    quantum=(size_t) MagickMin(attributes.st_size,MagickMaxBufferExtent);
-  buffer=(unsigned char *) AcquireQuantumMemory(quantum,sizeof(*buffer));
-  if (buffer == (unsigned char *) NULL)
-    {
-      (void) close_utf8(source_file);
-      (void) close_utf8(destination_file);
-      (void) RelinquishUniqueFileResource(destination);
-      return(MagickFalse);
-    }
-  status=MagickTrue;
-  for (length=0; ; )
-  {
-    count=(ssize_t) read(source_file,buffer,quantum);
-    if (count <= 0)
-      break;
-    length=(size_t) count;
-    count=(ssize_t) write(destination_file,buffer,length);
-    if ((size_t) count != length)
-      {
-        (void) RelinquishUniqueFileResource(destination);
-        status=MagickFalse;
-        break;
-      }
-  }
-  (void) close_utf8(destination_file);
-  (void) close_utf8(source_file);
-  buffer=(unsigned char *) RelinquishMagickMemory(buffer);
-  return(status);
+  return(CopyFileDescriptor(source_file,destination_file,destination));
 }
 
 /*
