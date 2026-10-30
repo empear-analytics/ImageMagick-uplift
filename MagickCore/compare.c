@@ -2357,6 +2357,87 @@ static void AccumulateSSIMTap(const SSIMTap *tap,
   }
 }
 
+typedef struct _SSIMWindow
+{
+  KernelInfo
+    *kernel_info;
+
+  const Image
+    *image,
+    *reconstruct_image;
+
+  const Quantum
+    *p,
+    *q;
+
+  size_t
+    columns;
+} SSIMWindow;
+
+static void SumSSIMWindow(const SSIMWindow *window,
+  const SSIMTapTargets *sums)
+{
+  KernelInfo
+    *const kernel_info = window->kernel_info;
+
+  const Image
+    *const image = window->image,
+    *const reconstruct_image = window->reconstruct_image;
+
+  const Quantum
+    *const p = window->p,
+    *const q = window->q;
+
+  const size_t
+    columns = window->columns;
+
+  const Quantum
+    *magick_restrict reconstruct,
+    *magick_restrict test;
+
+  MagickRealType
+    *k;
+
+  ssize_t
+    v;
+
+  k=kernel_info->values;
+  test=p;
+  reconstruct=q;
+  for (v=0; v < (ssize_t) kernel_info->height; v++)
+  {
+    ssize_t
+      u;
+
+    for (u=0; u < (ssize_t) kernel_info->width; u++)
+    {
+      SSIMTap
+        tap;
+
+      SSIMTapTargets
+        targets;
+
+      tap.image=image;
+      tap.reconstruct_image=reconstruct_image;
+      tap.k=k;
+      tap.test=test;
+      tap.reconstruct=reconstruct;
+      targets.x_pixel_mu=(sums->x_pixel_mu);
+      targets.x_pixel_sigma_squared=(sums->x_pixel_sigma_squared);
+      targets.y_pixel_mu=(sums->y_pixel_mu);
+      targets.y_pixel_sigma_squared=(sums->y_pixel_sigma_squared);
+      targets.xy_sigma=(sums->xy_sigma);
+      AccumulateSSIMTap(&tap,&targets);
+      k++;
+      test+=(ptrdiff_t) GetPixelChannels(image);
+      reconstruct+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
+    }
+    test+=(ptrdiff_t) ((double) GetPixelChannels(image)*(double) columns);
+    reconstruct+=(ptrdiff_t) ((double) GetPixelChannels(reconstruct_image)*
+      (double) columns);
+  }
+}
+
 static MagickBooleanType GetSSIMSimularity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -2457,10 +2538,6 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
       }
     for (x=0; x < (ssize_t) columns; x++)
     {
-      const Quantum
-        *magick_restrict reconstruct,
-        *magick_restrict test;
-
       double
         x_pixel_mu[MaxPixelChannels+1] = { 0.0 },
         x_pixel_sigma_squared[MaxPixelChannels+1] = { 0.0 },
@@ -2468,11 +2545,11 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
         y_pixel_mu[MaxPixelChannels+1] = { 0.0 },
         y_pixel_sigma_squared[MaxPixelChannels+1] = { 0.0 };
 
-      MagickRealType
-        *k;
+      SSIMTapTargets
+        sums;
 
-      ssize_t
-        v;
+      SSIMWindow
+        window;
 
       if ((GetPixelReadMask(image,p) <= (QuantumRange/2)) ||
           (GetPixelReadMask(reconstruct_image,q) <= (QuantumRange/2)))
@@ -2481,41 +2558,18 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
           q+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
           continue;
         }
-      k=kernel_info->values;
-      test=p;
-      reconstruct=q;
-      for (v=0; v < (ssize_t) kernel_info->height; v++)
-      {
-        ssize_t
-          u;
-
-        for (u=0; u < (ssize_t) kernel_info->width; u++)
-        {
-          SSIMTap
-            tap;
-
-          SSIMTapTargets
-            targets;
-
-          tap.image=image;
-          tap.reconstruct_image=reconstruct_image;
-          tap.k=k;
-          tap.test=test;
-          tap.reconstruct=reconstruct;
-          targets.x_pixel_mu=(&x_pixel_mu);
-          targets.x_pixel_sigma_squared=(&x_pixel_sigma_squared);
-          targets.y_pixel_mu=(&y_pixel_mu);
-          targets.y_pixel_sigma_squared=(&y_pixel_sigma_squared);
-          targets.xy_sigma=(&xy_sigma);
-          AccumulateSSIMTap(&tap,&targets);
-          k++;
-          test+=(ptrdiff_t) GetPixelChannels(image);
-          reconstruct+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
-        }
-        test+=(ptrdiff_t) ((double) GetPixelChannels(image)*(double) columns);
-        reconstruct+=(ptrdiff_t) ((double) GetPixelChannels(reconstruct_image)*
-          (double) columns);
-      }
+      window.kernel_info=kernel_info;
+      window.image=image;
+      window.reconstruct_image=reconstruct_image;
+      window.p=p;
+      window.q=q;
+      window.columns=columns;
+      sums.x_pixel_mu=(&x_pixel_mu);
+      sums.x_pixel_sigma_squared=(&x_pixel_sigma_squared);
+      sums.y_pixel_mu=(&y_pixel_mu);
+      sums.y_pixel_sigma_squared=(&y_pixel_sigma_squared);
+      sums.xy_sigma=(&xy_sigma);
+      SumSSIMWindow(&window,&sums);
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
         double
