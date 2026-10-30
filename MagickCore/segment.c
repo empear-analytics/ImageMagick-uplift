@@ -2188,6 +2188,15 @@ static void MergeSmallDerivatives(double *second_derivative,
 %      of a particular color component.
 %
 */
+static ssize_t MarkFallingCrossing(short *crossings,const ssize_t i,
+  ssize_t parity)
+{
+  if (parity > 0)
+    crossings[i]=(-1);
+  parity=1;
+  return(parity);
+}
+
 static void ZeroCrossHistogram(double *second_derivative,
   const double smooth_threshold,short *crossings)
 {
@@ -2209,11 +2218,7 @@ static void ZeroCrossHistogram(double *second_derivative,
   {
     crossings[i]=0;
     if (second_derivative[i] < 0.0)
-      {
-        if (parity > 0)
-          crossings[i]=(-1);
-        parity=1;
-      }
+      parity=MarkFallingCrossing(crossings,i,parity);
     else
       if (second_derivative[i] > 0.0)
         {
