@@ -424,6 +424,20 @@ static void SetWholeImageAveragePixel(ResampleFilter *resample_filter,
   *pixel=resample_filter->average_pixel;
 }
 
+static void NormalizeResampledPixel(PixelInfo *pixel,double divisor_m,
+  double divisor_c)
+{
+  divisor_m = 1.0/divisor_m;
+  if (pixel->alpha_trait != UndefinedPixelTrait)
+    pixel->alpha = (double) ClampToQuantum(divisor_m*pixel->alpha);
+  divisor_c = 1.0/divisor_c;
+  pixel->red   = (double) ClampToQuantum(divisor_c*pixel->red);
+  pixel->green = (double) ClampToQuantum(divisor_c*pixel->green);
+  pixel->blue  = (double) ClampToQuantum(divisor_c*pixel->blue);
+  if (pixel->colorspace == CMYKColorspace)
+    pixel->black = (double) ClampToQuantum(divisor_c*pixel->black);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -727,15 +741,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
   /*
     Finalize results of resampling
   */
-  divisor_m = 1.0/divisor_m;
-  if (pixel->alpha_trait != UndefinedPixelTrait)
-    pixel->alpha = (double) ClampToQuantum(divisor_m*pixel->alpha);
-  divisor_c = 1.0/divisor_c;
-  pixel->red   = (double) ClampToQuantum(divisor_c*pixel->red);
-  pixel->green = (double) ClampToQuantum(divisor_c*pixel->green);
-  pixel->blue  = (double) ClampToQuantum(divisor_c*pixel->blue);
-  if (pixel->colorspace == CMYKColorspace)
-    pixel->black = (double) ClampToQuantum(divisor_c*pixel->black);
+  NormalizeResampledPixel(pixel,divisor_m,divisor_c);
   return(MagickTrue);
 }
 
