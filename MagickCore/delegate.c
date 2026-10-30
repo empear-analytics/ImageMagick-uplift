@@ -2097,6 +2097,49 @@ static MagickBooleanType LinkDelegateInput(Image *image,
   return(MagickTrue);
 }
 
+typedef struct _DelegateExecution
+{
+  const DelegateInfo
+    *delegate_info;
+
+  ImageInfo
+    *image_info;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} DelegateExecution;
+
+static void ExecuteDelegateCommand(const DelegateExecution *execution,
+  MagickBooleanType *status,char **command)
+{
+  const DelegateInfo
+    *const delegate_info = execution->delegate_info;
+
+  ImageInfo
+    *const image_info = execution->image_info;
+
+  Image
+    *const image = execution->image;
+
+  ExceptionInfo
+    *const exception = execution->exception;
+
+  if (*command != (char *) NULL)
+    {
+      /*
+        Execute delegate.
+      */
+      if (ExternalDelegateCommand(delegate_info->spawn,image_info->verbose,*command,(char *) NULL,exception) != 0)
+        *status=MagickFalse;
+      if (delegate_info->spawn != MagickFalse)
+        WaitForDelegateInput(image);
+      *command=DestroyString(*command);
+    }
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -2199,6 +2242,9 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   (void) CopyMagickString(input_filename,image->filename,MagickPathExtent);
   for (i=0; commands[i] != (char *) NULL; i++)
   {
+    DelegateExecution
+      execution;
+
     (void) AcquireUniqueSymbolicLink(output_filename,image_info->filename);
     if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
       {
@@ -2211,17 +2257,11 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
       break;
     status=MagickTrue;
     command=InterpretDelegateProperties(image_info,image,commands[i],exception);
-    if (command != (char *) NULL)
-      {
-        /*
-          Execute delegate.
-        */
-        if (ExternalDelegateCommand(delegate_info->spawn,image_info->verbose,command,(char *) NULL,exception) != 0)
-          status=MagickFalse;
-        if (delegate_info->spawn != MagickFalse)
-          WaitForDelegateInput(image);
-        command=DestroyString(command);
-      }
+    execution.delegate_info=delegate_info;
+    execution.image_info=image_info;
+    execution.image=image;
+    execution.exception=exception;
+    ExecuteDelegateCommand(&execution,&status,&command);
     RestoreDelegateInput(image,input_filename,exception,&status);
     if ((strcmp(input_filename,output_filename) != 0) &&
         (CopyDelegateFile(image_info->filename,output_filename,MagickTrue,exception) == MagickFalse))
