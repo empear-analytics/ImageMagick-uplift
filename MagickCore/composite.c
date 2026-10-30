@@ -2034,6 +2034,31 @@ static MagickRealType GetChangeMaskAlpha(const ChangeMaskImages *images,
   return(pixel);
 }
 
+typedef struct _IntensityAlphaInputs
+{
+  MagickBooleanType
+    compose_sync;
+
+  MagickRealType
+    Sa,
+    Da,
+    Si,
+    Di;
+} IntensityAlphaInputs;
+
+static MagickRealType GetDarkenIntensityAlpha(
+  const IntensityAlphaInputs *intensity,MagickRealType pixel)
+{
+  if (intensity->compose_sync == MagickFalse)
+    {
+      pixel=intensity->Si < intensity->Di ? intensity->Sa : intensity->Da;
+      return(pixel);
+    }
+  pixel=intensity->Sa*intensity->Si < intensity->Da*intensity->Di ?
+    intensity->Sa : intensity->Da;
+  return(pixel);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3117,12 +3142,15 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
               }
               case DarkenIntensityCompositeOp:
               {
-                if (compose_sync == MagickFalse)
-                  {
-                    pixel=Si < Di ? Sa : Da;
-                    break;
-                  }
-                pixel=Sa*Si < Da*Di ? Sa : Da;
+                IntensityAlphaInputs
+                  intensity;
+
+                intensity.compose_sync=compose_sync;
+                intensity.Sa=Sa;
+                intensity.Da=Da;
+                intensity.Si=Si;
+                intensity.Di=Di;
+                pixel=GetDarkenIntensityAlpha(&intensity,pixel);
                 break;
               }
               case DifferenceCompositeOp:
