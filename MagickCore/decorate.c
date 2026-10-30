@@ -696,6 +696,64 @@ static void SetFrameImageAttributes(Image *frame_image,const Image *image,
     }
 }
 
+typedef struct _FrameSide
+{
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    highlight,
+    matte,
+    shadow;
+
+  size_t
+    bevel_width;
+} FrameSide;
+
+static Quantum *DrawFrameSideRow(const FrameSide *frame_side,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = frame_side->frame_image;
+
+  const Image
+    *const image = frame_side->image;
+
+  const FrameInfo
+    *const frame_info = frame_side->frame_info;
+
+  const PixelInfo
+    highlight = frame_side->highlight,
+    matte = frame_side->matte,
+    shadow = frame_side->shadow;
+
+  const size_t
+    bevel_width = frame_side->bevel_width;
+
+  size_t
+    width;
+
+  q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+  q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
+  q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->inner_bevel,q);
+  /*
+    Set frame interior pixels.
+  */
+  q=SetFramePixels(frame_image,&frame_image->border_color,(ssize_t)
+    image->columns,q);
+  q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->inner_bevel,q);
+  width=frame_info->width-(size_t) frame_info->x-image->columns-bevel_width;
+  q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+  q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+  return(q);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -801,11 +859,11 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    FrameSide
+      frame_side;
+
     Quantum
       *magick_restrict q;
-
-    size_t
-      width;
 
     /*
       Initialize scanline with matte color.
@@ -819,18 +877,14 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
         status=MagickFalse;
         continue;
       }
-    q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-    q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
-    q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->inner_bevel,q);
-    /*
-      Set frame interior pixels.
-    */
-    q=SetFramePixels(frame_image,&frame_image->border_color,(ssize_t)
-      image->columns,q);
-    q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->inner_bevel,q);
-    width=frame_info->width-(size_t) frame_info->x-image->columns-bevel_width;
-    q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-    q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+    frame_side.frame_image=frame_image;
+    frame_side.image=image;
+    frame_side.frame_info=frame_info;
+    frame_side.highlight=highlight;
+    frame_side.matte=matte;
+    frame_side.shadow=shadow;
+    frame_side.bevel_width=bevel_width;
+    q=DrawFrameSideRow(&frame_side,q);
     if (SyncCacheViewAuthenticPixels(frame_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
