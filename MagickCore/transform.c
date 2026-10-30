@@ -704,6 +704,20 @@ static void SetCropPage(const Image *image,
   crop_image->page.y=bounding_box.y;
 }
 
+static RectangleInfo GetCropBoundingBox(const Image *image)
+{
+  RectangleInfo
+    bounding_box;
+
+  bounding_box=image->page;
+  if ((bounding_box.width == 0) || (bounding_box.height == 0))
+    {
+      bounding_box.width=image->columns;
+      bounding_box.height=image->rows;
+    }
+  return(bounding_box);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -739,12 +753,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  bounding_box=image->page;
-  if ((bounding_box.width == 0) || (bounding_box.height == 0))
-    {
-      bounding_box.width=image->columns;
-      bounding_box.height=image->rows;
-    }
+  bounding_box=GetCropBoundingBox(image);
   page=(*geometry);
   if (page.width == 0)
     page.width=bounding_box.width;
