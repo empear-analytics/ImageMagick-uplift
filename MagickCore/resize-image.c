@@ -201,6 +201,13 @@ static inline MagickBooleanType IsResizeChannelCopied(
     MagickFalse);
 }
 
+static inline MagickBooleanType IsResizeChannelUndefined(
+  const PixelTrait traits,const PixelTrait resize_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    (resize_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 static void FilterHorizontalPixel(const Image *image,
   const Image *resize_image,const ContributionInfo *contribution,
   const ssize_t n,const ssize_t start,const ssize_t stop,const double bisect,
@@ -230,8 +237,7 @@ static void FilterHorizontalPixel(const Image *image,
     channel=GetPixelChannelChannel(image,i);
     traits=GetPixelChannelTraits(image,channel);
     resize_traits=GetPixelChannelTraits(resize_image,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (resize_traits == UndefinedPixelTrait))
+    if (IsResizeChannelUndefined(traits,resize_traits) != MagickFalse)
       continue;
     if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
       {
