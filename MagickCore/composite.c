@@ -2103,6 +2103,18 @@ static MagickRealType GetMultiplyAlpha(const MultiplyAlphaInputs *multiply,
   return(pixel);
 }
 
+static double GetHardMixBurn(const MagickRealType S,const MagickRealType D)
+{
+  double
+    vivid;
+
+  if (S <= MagickEpsilon)
+    vivid=0.0;
+  else
+    vivid=1.0-(1.0-D)/(2.0*S);
+  return(vivid);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3579,12 +3591,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
             S=(Sa > 0.0) ? RoundToUnity(Sca/Sa) : 0.0;
             D=(Da > 0.0) ? RoundToUnity(Dca/Da) : 0.0;
             if (S <= 0.5)
-              {
-                if (S <= MagickEpsilon)
-                  vivid=0.0;
-                else
-                  vivid=1.0-(1.0-D)/(2.0*S);
-              }
+              vivid=GetHardMixBurn(S,D);
             else
               {
                 if ((1.0-(2.0*S-1.0)) <= MagickEpsilon)
