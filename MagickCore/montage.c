@@ -677,6 +677,14 @@ static ssize_t GetMontageRowOffset(const MontageInfo *montage_info,
   return(x_offset);
 }
 
+static size_t GetTallestTileHeight(Image **image_list,const ssize_t tile,
+  size_t max_height)
+{
+  if (image_list[tile]->rows > max_height)
+    max_height=image_list[tile]->rows;
+  return(max_height);
+}
+
 MagickExport Image *MontageImageList(const ImageInfo *image_info,
   const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
 {
@@ -894,8 +902,7 @@ MagickExport Image *MontageImageList(const ImageInfo *image_info,
         {
           width=concatenate != MagickFalse ? image_list[tile]->columns :
             extract_info.width;
-          if (image_list[tile]->rows > max_height)
-            max_height=image_list[tile]->rows;
+          max_height=GetTallestTileHeight(image_list,tile,max_height);
         }
       x_offset+=((ssize_t) width+2*(extract_info.x+(ssize_t) border_width));
       if (x_offset > (ssize_t) bounds.width)
