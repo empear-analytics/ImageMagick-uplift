@@ -343,6 +343,22 @@ static MagickBooleanType AcquireCoalesceCanvas(Image *next,
   return(MagickTrue);
 }
 
+static RectangleInfo GetClippedFrameBounds(const Image *previous,
+  const Image *coalesce_image)
+{
+  RectangleInfo
+    bounds;
+
+  bounds=previous->page;
+  bounds.width=previous->columns;
+  bounds.height=previous->rows;
+  bounds=ClipBoundsLeft(bounds);
+  bounds=ClipBoundsRight(bounds,coalesce_image);
+  bounds=ClipBoundsTop(bounds);
+  bounds=ClipBoundsBottom(bounds,coalesce_image);
+  return(bounds);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -396,13 +412,7 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
       Determine the bounds that was overlaid in the previous image.
     */
     previous=GetPreviousImageInList(next);
-    bounds=previous->page;
-    bounds.width=previous->columns;
-    bounds.height=previous->rows;
-    bounds=ClipBoundsLeft(bounds);
-    bounds=ClipBoundsRight(bounds,coalesce_image);
-    bounds=ClipBoundsTop(bounds);
-    bounds=ClipBoundsBottom(bounds,coalesce_image);
+    bounds=GetClippedFrameBounds(previous,coalesce_image);
     /*
       Replace the dispose image with the new coalesced image.
     */
