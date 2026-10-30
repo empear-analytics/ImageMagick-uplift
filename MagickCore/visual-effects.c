@@ -2742,6 +2742,61 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
   | (one << (size_t) (i)) : (size_t) (alpha) & ~(one << (size_t) (i)))
 #define SteganoImageTag  "Stegano/Image"
 
+typedef struct _SteganoBit
+{
+  Image
+    *stegano_image;
+
+  int
+    c;
+
+  size_t
+    one;
+
+  ssize_t
+    i,
+    j;
+} SteganoBit;
+
+static void SetSteganoBit(const SteganoBit *stegano_bit,const PixelInfo pixel,
+  Quantum *q)
+{
+  Image
+    *const stegano_image = stegano_bit->stegano_image;
+
+  const int
+    c = stegano_bit->c;
+
+  const size_t
+    one = stegano_bit->one;
+
+  const ssize_t
+    i = stegano_bit->i,
+    j = stegano_bit->j;
+
+  switch (c)
+  {
+    case 0:
+    {
+      SetPixelRed(stegano_image,SetBit(GetPixelRed(stegano_image,q),j,
+        GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
+      break;
+    }
+    case 1:
+    {
+      SetPixelGreen(stegano_image,SetBit(GetPixelGreen(stegano_image,q),j,
+        GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
+      break;
+    }
+    case 2:
+    {
+      SetPixelBlue(stegano_image,SetBit(GetPixelBlue(stegano_image,q),j,
+        GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
+      break;
+    }
+  }
+}
+
 MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   ExceptionInfo *exception)
 {
@@ -2818,6 +2873,9 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
         ssize_t
           offset;
 
+        SteganoBit
+          stegano_bit;
+
         (void) GetOneCacheViewVirtualPixelInfo(watermark_view,x,y,&pixel,
           exception);
         offset=k/(ssize_t) stegano_image->columns;
@@ -2828,27 +2886,12 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
           exception);
         if (q == (Quantum *) NULL)
           break;
-        switch (c)
-        {
-          case 0:
-          {
-            SetPixelRed(stegano_image,SetBit(GetPixelRed(stegano_image,q),j,
-              GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
-            break;
-          }
-          case 1:
-          {
-            SetPixelGreen(stegano_image,SetBit(GetPixelGreen(stegano_image,q),j,
-              GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
-            break;
-          }
-          case 2:
-          {
-            SetPixelBlue(stegano_image,SetBit(GetPixelBlue(stegano_image,q),j,
-              GetBit(GetPixelInfoIntensity(stegano_image,&pixel),i)),q);
-            break;
-          }
-        }
+        stegano_bit.stegano_image=stegano_image;
+        stegano_bit.c=c;
+        stegano_bit.one=one;
+        stegano_bit.i=i;
+        stegano_bit.j=j;
+        SetSteganoBit(&stegano_bit,pixel,q);
         if (SyncCacheViewAuthenticPixels(stegano_view,exception) == MagickFalse)
           break;
         c++;
