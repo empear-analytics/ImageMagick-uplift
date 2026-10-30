@@ -248,6 +248,145 @@ static MagickBooleanType CropToFitImage(Image **image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _ShearSpan
+{
+  Image
+    *image;
+
+  PixelInfo
+    background;
+
+  double
+    area;
+
+  size_t
+    length,
+    extent;
+
+  ssize_t
+    offset,
+    step;
+} ShearSpan;
+
+static void TransferPixelsForward(Quantum *magick_restrict p,PixelInfo pixel,
+  PixelInfo destination,const ShearSpan *span)
+{
+  Image
+    *image = span->image;
+
+  const PixelInfo
+    background = span->background;
+
+  const double
+    area = span->area;
+
+  const size_t
+    length = span->length;
+
+  const ssize_t
+    offset = span->offset,
+    step = span->step;
+
+  PixelInfo
+    source;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    i;
+
+  /*
+    Transfer pixels forward: left-to-right or top-to-bottom.
+  */
+  if (step > offset)
+    return;
+  q=p-step*(ssize_t) GetPixelChannels(image);
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    if ((offset+i) < step)
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        GetPixelInfoPixel(image,p,&pixel);
+        q+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    GetPixelInfoPixel(image,p,&source);
+    CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
+      &source,(double) GetPixelAlpha(image,p),area,&destination);
+    SetPixelViaPixelInfo(image,&destination,q);
+    GetPixelInfoPixel(image,p,&pixel);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
+    &background,(double) background.alpha,area,&destination);
+  SetPixelViaPixelInfo(image,&destination,q);
+  q+=(ptrdiff_t) GetPixelChannels(image);
+  for (i=0; i < (step-1); i++)
+  {
+    SetPixelViaPixelInfo(image,&background,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void TransferPixelsBackward(Quantum *magick_restrict p,PixelInfo pixel,
+  PixelInfo destination,const ShearSpan *span)
+{
+  Image
+    *image = span->image;
+
+  const PixelInfo
+    background = span->background;
+
+  const double
+    area = span->area;
+
+  const size_t
+    length = span->length,
+    extent = span->extent;
+
+  const ssize_t
+    offset = span->offset,
+    step = span->step;
+
+  PixelInfo
+    source;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    i;
+
+  /*
+    Transfer pixels backward: right-to-left or bottom-to-top.
+  */
+  p+=(ptrdiff_t) length*GetPixelChannels(image);
+  q=p+step*(ssize_t) GetPixelChannels(image);
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    p-=(ptrdiff_t)GetPixelChannels(image);
+    q-=GetPixelChannels(image);
+    if ((size_t) (offset+(ssize_t) length+step-i) > extent)
+      continue;
+    GetPixelInfoPixel(image,p,&source);
+    CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
+      &source,(double) GetPixelAlpha(image,p),area,&destination);
+    SetPixelViaPixelInfo(image,&destination,q);
+    GetPixelInfoPixel(image,p,&pixel);
+  }
+  CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
+    &background,(double) background.alpha,area,&destination);
+  q-=GetPixelChannels(image);
+  SetPixelViaPixelInfo(image,&destination,q);
+  for (i=0; i < (step-1); i++)
+  {
+    q-=GetPixelChannels(image);
+    SetPixelViaPixelInfo(image,&background,q);
+  }
+}
+
 static MagickBooleanType XShearImage(Image *image,const double degrees,
   const ShearRegion *region,ExceptionInfo *exception)
 {
@@ -309,14 +448,15 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
       destination;
 
     Quantum
-      *magick_restrict p,
-      *magick_restrict q;
+      *magick_restrict p;
 
     ShearDirection
       direction;
 
+    ShearSpan
+      span;
+
     ssize_t
-      i,
       step;
 
     if (status == MagickFalse)
@@ -352,35 +492,14 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
         /*
           Transfer pixels left-to-right.
         */
-        if (step > x_offset)
-          break;
-        q=p-step*(ssize_t) GetPixelChannels(image);
-        for (i=0; i < (ssize_t) width; i++)
-        {
-          if ((x_offset+i) < step)
-            {
-              p+=(ptrdiff_t) GetPixelChannels(image);
-              GetPixelInfoPixel(image,p,&pixel);
-              q+=(ptrdiff_t) GetPixelChannels(image);
-              continue;
-            }
-          GetPixelInfoPixel(image,p,&source);
-          CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-            &source,(double) GetPixelAlpha(image,p),area,&destination);
-          SetPixelViaPixelInfo(image,&destination,q);
-          GetPixelInfoPixel(image,p,&pixel);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-          &background,(double) background.alpha,area,&destination);
-        SetPixelViaPixelInfo(image,&destination,q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        for (i=0; i < (step-1); i++)
-        {
-          SetPixelViaPixelInfo(image,&background,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        span.image=image;
+        span.background=background;
+        span.area=area;
+        span.length=width;
+        span.extent=image->columns;
+        span.offset=x_offset;
+        span.step=step;
+        TransferPixelsForward(p,pixel,destination,&span);
         break;
       }
       case RIGHT:
@@ -388,29 +507,14 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
         /*
           Transfer pixels right-to-left.
         */
-        p+=(ptrdiff_t) width*GetPixelChannels(image);
-        q=p+step*(ssize_t) GetPixelChannels(image);
-        for (i=0; i < (ssize_t) width; i++)
-        {
-          p-=(ptrdiff_t)GetPixelChannels(image);
-          q-=GetPixelChannels(image);
-          if ((size_t) (x_offset+(ssize_t) width+step-i) > image->columns)
-            continue;
-          GetPixelInfoPixel(image,p,&source);
-          CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-            &source,(double) GetPixelAlpha(image,p),area,&destination);
-          SetPixelViaPixelInfo(image,&destination,q);
-          GetPixelInfoPixel(image,p,&pixel);
-        }
-        CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-          &background,(double) background.alpha,area,&destination);
-        q-=GetPixelChannels(image);
-        SetPixelViaPixelInfo(image,&destination,q);
-        for (i=0; i < (step-1); i++)
-        {
-          q-=GetPixelChannels(image);
-          SetPixelViaPixelInfo(image,&background,q);
-        }
+        span.image=image;
+        span.background=background;
+        span.area=area;
+        span.length=width;
+        span.extent=image->columns;
+        span.offset=x_offset;
+        span.step=step;
+        TransferPixelsBackward(p,pixel,destination,&span);
         break;
       }
     }
@@ -530,14 +634,15 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
       destination;
 
     Quantum
-      *magick_restrict p,
-      *magick_restrict q;
+      *magick_restrict p;
 
     ShearDirection
       direction;
 
+    ShearSpan
+      span;
+
     ssize_t
-      i,
       step;
 
     if (status == MagickFalse)
@@ -573,36 +678,14 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
         /*
           Transfer pixels top-to-bottom.
         */
-        if (step > y_offset)
-          break;
-        q=p-step*(ssize_t) GetPixelChannels(image);
-        for (i=0; i < (ssize_t) height; i++)
-        {
-          if ((y_offset+i) < step)
-            {
-              p+=(ptrdiff_t) GetPixelChannels(image);
-              GetPixelInfoPixel(image,p,&pixel);
-              q+=(ptrdiff_t) GetPixelChannels(image);
-              continue;
-            }
-          GetPixelInfoPixel(image,p,&source);
-          CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-            &source,(double) GetPixelAlpha(image,p),area,
-            &destination);
-          SetPixelViaPixelInfo(image,&destination,q);
-          GetPixelInfoPixel(image,p,&pixel);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-          &background,(double) background.alpha,area,&destination);
-        SetPixelViaPixelInfo(image,&destination,q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        for (i=0; i < (step-1); i++)
-        {
-          SetPixelViaPixelInfo(image,&background,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        span.image=image;
+        span.background=background;
+        span.area=area;
+        span.length=height;
+        span.extent=image->rows;
+        span.offset=y_offset;
+        span.step=step;
+        TransferPixelsForward(p,pixel,destination,&span);
         break;
       }
       case DOWN:
@@ -610,30 +693,14 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
         /*
           Transfer pixels bottom-to-top.
         */
-        p+=(ptrdiff_t) height*GetPixelChannels(image);
-        q=p+step*(ssize_t) GetPixelChannels(image);
-        for (i=0; i < (ssize_t) height; i++)
-        {
-          p-=(ptrdiff_t)GetPixelChannels(image);
-          q-=GetPixelChannels(image);
-          if ((size_t) (y_offset+(ssize_t) height+step-i) > image->rows)
-            continue;
-          GetPixelInfoPixel(image,p,&source);
-          CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-            &source,(double) GetPixelAlpha(image,p),area,
-            &destination);
-          SetPixelViaPixelInfo(image,&destination,q);
-          GetPixelInfoPixel(image,p,&pixel);
-        }
-        CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-          &background,(double) background.alpha,area,&destination);
-        q-=GetPixelChannels(image);
-        SetPixelViaPixelInfo(image,&destination,q);
-        for (i=0; i < (step-1); i++)
-        {
-          q-=GetPixelChannels(image);
-          SetPixelViaPixelInfo(image,&background,q);
-        }
+        span.image=image;
+        span.background=background;
+        span.area=area;
+        span.length=height;
+        span.extent=image->rows;
+        span.offset=y_offset;
+        span.step=step;
+        TransferPixelsBackward(p,pixel,destination,&span);
         break;
       }
     }
