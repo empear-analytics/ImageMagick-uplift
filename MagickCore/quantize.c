@@ -3919,6 +3919,20 @@ static void SortGrayscaleColormap(Image *image)
     IntensityCompare);
 }
 
+static void RemapGrayscaleRow(Image *image,const ssize_t *colormap_index,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    SetPixelIndex(image,(Quantum) colormap_index[ScaleQuantumToMap(
+      GetPixelIndex(image,q))],q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType SetGrayscaleImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -4037,9 +4051,6 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -4048,12 +4059,7 @@ static MagickBooleanType SetGrayscaleImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SetPixelIndex(image,(Quantum) colormap_index[ScaleQuantumToMap(
-        GetPixelIndex(image,q))],q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    RemapGrayscaleRow(image,colormap_index,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
