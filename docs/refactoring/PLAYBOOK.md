@@ -3347,6 +3347,119 @@ Complexity*. Added by Claude Code (Claude Opus 5.5) during task W10, under the m
 
 ---
 
+## Recipe SV - Extract Sibling Blocks Differing in One Value
+
+**Use when:** CodeScene reports *Complex Method*, *Bumpy Road Ahead* or *Large Method* on
+a function that holds two or more copies of one small block, typically sibling `switch`
+cases, that are the same text except for one constant (`SetImageAlphaChannel`'s
+`DeactivateAlphaChannel`, `DiscreteAlphaChannel` and `OnAlphaChannel` cases, which
+differ only in the trait they assign). CodeScene does not report the copies as *Code
+Duplication*, but moving each with Recipe E would write helpers that differ only in that
+constant.
+
+**Not covered by:** Recipe E, which passes the block's variables as parameters but no
+constant, so each copy would become its own near-identical helper; Recipe D, whose *Use
+when* is a reported *Code Duplication* (these copies, a few lines each, are not
+reported); Recipe TW, whose copies stand in two functions and whose inputs, five or more,
+go in a struct; Recipe SD, which moves a group of different cases, not copies of one.
+
+**How:**
+
+1. Each copy lies in the same function and meets Recipe E steps 1 and 3 to 7 and the
+   OpenMP rule above, with no `#pragma` line.
+2. The copies are the same token sequence once one value is replaced by a name, checked
+   by script (whitespace and line breaks ignored; no variable renamed). The value is a
+   literal or an enumeration constant, the same at each of its positions in one copy
+   (Recipe D's *One value at several positions*), and differs between at least two
+   copies.
+3. The new function's parameters are the variables a copy reads (Recipe E step 3) and
+   the value, at most four in all. The value's parameter is `const` and has the type of
+   every object it is assigned to or parameter it is passed to in the block (an
+   enumeration's type for an enumeration constant assigned to a member of that type);
+   used in an expression or comparison, it has the constant's own type, as in Recipe D.
+4. Write one `static` function directly above the caller: the text of one copy, the
+   value replaced at each of its positions by the parameter's name, nothing else
+   changed. Recipe E step 7's forms apply as for one block (in a `switch` case, a single
+   output `v` taken by value and returned, the copy becoming `v=Helper(...);`).
+5. Replace every copy with the call, passing that copy's value where the parameter
+   stands and each variable in the position of its parameter. All copies move in one
+   commit; the message gives the score of the first copy moved alone under Recipe E.
+6. Check by script that each copy equals the helper's body with that copy's arguments
+   substituted, and by reading that every argument fills its parameter.
+
+**Before:**
+
+```c
+    case DeactivateAlphaChannel:
+    {
+      if ((image->alpha_trait & BlendPixelTrait) == 0)
+        status=SetImageAlpha(image,OpaqueAlpha,exception);
+      image->alpha_trait=CopyPixelTrait;
+      break;
+    }
+    case DiscreteAlphaChannel:
+    {
+      if ((image->alpha_trait & BlendPixelTrait) == 0)
+        status=SetImageAlpha(image,OpaqueAlpha,exception);
+      image->alpha_trait=UpdatePixelTrait;
+      break;
+    }
+```
+
+**After:**
+
+```c
+static MagickBooleanType SetOpaqueAlphaTrait(Image *image,
+  const PixelTrait alpha_trait,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    status=SetImageAlpha(image,OpaqueAlpha,exception);
+  image->alpha_trait=alpha_trait;
+  return(status);
+}
+...
+    case DeactivateAlphaChannel:
+    {
+      status=SetOpaqueAlphaTrait(image,CopyPixelTrait,status,exception);
+      break;
+    }
+    case DiscreteAlphaChannel:
+    {
+      status=SetOpaqueAlphaTrait(image,UpdatePixelTrait,status,exception);
+      break;
+    }
+```
+
+**Careful:**
+
+- A constant has no side effect, so evaluating it as an argument before the block runs
+  instead of where the block used it changes nothing; the statements of the block run
+  in the same order on the same variables.
+- The type rule of step 3 is what keeps the value: converting a constant to the type of
+  the object it is assigned to at the call, instead of at the assignment, gives the same
+  value, and an enumeration constant is a valid value of its enumeration. A parameter of
+  another type (an `int` for a `double` literal, a `float` for a `double`) would round
+  or truncate: then the parameter takes the constant's own type.
+- Only one value may differ. Two differing values, or a variable that differs, is not
+  this recipe: leave the copies, or move one with Recipe E and report the rest.
+- `refactor_guard.py` reports the removed copies as deduplication (`WARN`, every value
+  still present) and `--calls` moves only the callees of the copies (down by the copies
+  removed) and the helper (its definition and one call per copy); anything else stops
+  the step.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` and steps 2 and 6 checked
+by script; each copy reached by a case (the case list names the option or path that
+reaches it).
+
+**Provenance:** 2026-10-30, from `channel-alpha.c`'s `SetImageAlphaChannel`, whose
+`DeactivateAlphaChannel`, `DiscreteAlphaChannel` and `OnAlphaChannel` cases differ only
+in the trait assigned. Recipe E on the first alone: 7.56 to 7.58; as three Recipe E
+helpers: 7.62, with three functions that differ in one constant; as one helper: 7.62.
+Added by Claude Code (Claude Opus 5.5) during task W10, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -3787,3 +3900,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | I | Step 1: in a `void` function a plain `return;` at every exit stands for `return(c);`, each becoming `return(MagickFalse);` with `return;` in the caller (step 7). Step 7: a block of another function whose step-5 text equals, under Recipe D's renaming (checked by script), the body of a function this recipe made calls that function, one commit per caller, as W step 7 and LB step 6 allow. *Careful* gives both arguments | `shear-deskew.c`'s `RadonProjection` (W10): its pair-merge row loops (nesting 5) share a head (two reads, a sum, a write) that leaves through `continue;`; once the first loop's body moved to the `void` `MergeRadonPair` (Recipe N with E step 7) the head leaves through `return;` and writes `element` and `neighbor`, which the tail reads, so W step 3 and LB step 1 refuse it. Moving the second loop's body as it is gives *Code Duplication* with `MergeRadonPair` (7.39 in a probe); with the head moved first and the second body calling it, `RadonProjection` leaves Complex Method and Bumpy Road Ahead, 7.78 to 7.86 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | T | Step 2: the other name's one read may be a leading guard that tests the loop's `status` and `v` together and `continue`s on either; *Careful* gives the argument | `channel-alpha.c`'s `SetImageAlphaChannel` (W10): the `OffIfOpaqueAlphaChannel` row loop guards on `status` and `opaque` together and writes `opaque=MagickFalse;` in its column scan (nesting 4). Probe of the scan as `IsAlphaRowOpaque`: *Deep, Nested Complexity* leaves, bumps 8 to 7, but as the file's seventh function it switches on *Overall Code Complexity*: 6.96 to 6.77 alone, 7.00 with Recipe E on the `AssociateAlphaChannel` column loop | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | rule 1 | The blocks of one function in a set may take different recipes when what lowers each alone is a finding of the whole file that the first new function switches on (*Overall Code Complexity*, from a file's seventh function); the message names each block with its recipe and its score alone, and the `Recipe:` trailer names the recipe of the block that leaves a finding category | `channel-alpha.c`'s `SetImageAlphaChannel` (W10), six functions: Recipe T on the `OffIfOpaqueAlphaChannel` column scan alone 6.96 to 6.77 (*Deep, Nested Complexity* leaves, *Overall Code Complexity* arrives), Recipe E on the `AssociateAlphaChannel` column loop alone 6.38, both 7.00. No one recipe reaches both blocks: E refuses the scan's write of the shared `opaque`, and T has nothing to return for a loop that writes no status | mandate (2026-10-24) |
+| 2026-10-30 | NEW | SV | Extract Sibling Blocks Differing in One Value: copies of one block in one function, the same text except for one literal or enumeration constant and not reported as *Code Duplication*, move to one `static` function taking the value as a `const` parameter of the type it is assigned to; each copy becomes the call with its own value | `channel-alpha.c`'s `SetImageAlphaChannel` (W10): the `DeactivateAlphaChannel`, `DiscreteAlphaChannel` and `OnAlphaChannel` cases differ only in the trait assigned. Recipe E on one: 7.56 to 7.58; one helper for the three: 7.62 (cc 66 to 63) | mandate (2026-10-24) |
