@@ -2029,6 +2029,38 @@ static int FileCompare(const void *x,const void *y)
 }
 #endif
 
+typedef struct _FileListTargets
+{
+  size_t
+    *max_entries;
+
+  char
+    ***filelist;
+} FileListTargets;
+
+static MagickBooleanType ExtendFileList(const size_t *number_entries,
+  const FileListTargets *targets)
+{
+  size_t
+    *const max_entries = targets->max_entries;
+
+  char
+    ***const filelist = targets->filelist;
+
+  if (*number_entries >= (*max_entries))
+    {
+      /*
+        Extend the file list.
+      */
+      (*max_entries)<<=1;
+      (*filelist)=(char **) ResizeQuantumMemory((*filelist),(size_t)
+        (*max_entries),sizeof(*(*filelist)));
+      if ((*filelist) == (char **) NULL)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickPrivate char **ListFiles(const char *directory,const char *pattern,
   size_t *number_entries)
 {
@@ -2091,17 +2123,13 @@ MagickPrivate char **ListFiles(const char *directory,const char *pattern,
         (GlobExpression(entry->d_name,pattern,MagickFalse) != MagickFalse))
 #endif
       {
-        if (*number_entries >= max_entries)
-          {
-            /*
-              Extend the file list.
-            */
-            max_entries<<=1;
-            filelist=(char **) ResizeQuantumMemory(filelist,(size_t)
-              max_entries,sizeof(*filelist));
-            if (filelist == (char **) NULL)
-              break;
-          }
+        FileListTargets
+          targets;
+
+        targets.max_entries=(&max_entries);
+        targets.filelist=(&filelist);
+        if (ExtendFileList(number_entries,&targets) == MagickFalse)
+          break;
 #if defined(vms)
         {
           char
