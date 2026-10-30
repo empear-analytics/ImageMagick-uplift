@@ -2368,6 +2368,161 @@ during task W09, at the owner's request of 2026-10-30.
 
 ---
 
+## Recipe SD - Split a Selection at its Default
+
+**Use when:** CodeScene reports *Complex Method*, *Bumpy Road Ahead* or *Deep, Nested
+Complexity*, and the block that would fix it is a `switch` that Recipe O or Z could move
+whole, except that the new function would itself be a *Complex Method* (cc 9 or more: one
+per case label, `default` included), which the pre-commit gate refuses on a new function.
+The typical case is an operator `switch` of seven or eight labels whose cases fall into
+two families, such as the unary and the binary complex operators.
+
+**Not covered by:** Recipes O and Z, which move a selection whole, so the new function
+keeps every label's branch; Recipe E step 7's `switch` form, which moves part of one case,
+not a group of cases; Recipe D, which needs two copies of a block. Moving one case at a
+time (E, O or Z on its body) leaves every label in the caller, and the cc with it.
+
+**How:**
+
+1. The `switch` has a `default:` label, and its controlling expression `e` is a
+   variable, or an expression of variables with no call, assignment or increment, that
+   no statement inside the `switch` writes. Every *group* (a run of labels and the body
+   after them) ends with a `break;` of this `switch` and contains no other `break` of
+   it, no `continue`, `return` or `goto`: no group falls through into another.
+2. Choose the groups that move: the group carrying `default:`, and others beside it.
+   Together their bodies meet Recipe O steps 1 to 3 (OpenMP, written variables, exits),
+   as one selection does.
+3. Cut the moved groups, labels and bodies, in their order, into a new `static void`
+   function directly above the caller, whose body is `switch (e) { ... }` with the same
+   text of `e`. Its parameters and the text of the bodies are those Recipe O steps 4 and
+   5 give, or Recipe Z steps 2 to 4 when O's would number five or more.
+4. Where the `default` group stood, write the group `default:` alone, whose body is a
+   compound block holding the call: Recipe O step 6's call, or Recipe Z's struct local
+   declared at the top of that block, its members assigned and the call (Z steps 5 and
+   6), followed by `break;`.
+5. The kept groups stay where they were, unchanged. Check by reading that every label
+   of the original `switch` is in exactly one of the two, `default` in the new one, and
+   check every member and argument as Recipe O step 6 or Z step 6 says.
+
+**Before:**
+
+```c
+        switch (op)
+        {
+          case AddComplexOperator:
+          {
+            cr=ar+br;
+            ci=ai+bi;
+            break;
+          }
+          case ConjugateComplexOperator:
+          default:
+          {
+            cr=ar;
+            ci=(-ai);
+            break;
+          }
+          case DivideComplexOperator:
+          ...
+          case MagnitudePhaseComplexOperator:
+          {
+            cr=sqrt(ar*ar+ai*ai);
+            ci=atan2((double) ai,(double) ar)/(2.0*MagickPI)+0.5;
+            break;
+          }
+          ...
+        }
+```
+
+**After:**
+
+```c
+static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
+  double *cr,double *ci)
+{
+  const ComplexOperator
+    op = unary->op;
+
+  const double
+    ai = unary->ai,
+    ar = unary->ar;
+
+  switch (op)
+  {
+    case ConjugateComplexOperator:
+    default:
+    {
+      (*cr)=ar;
+      (*ci)=(-ai);
+      break;
+    }
+    case MagnitudePhaseComplexOperator:
+    ...
+  }
+}
+...
+        switch (op)
+        {
+          case AddComplexOperator:
+          {
+            cr=ar+br;
+            ci=ai+bi;
+            break;
+          }
+          default:
+          {
+            ComplexUnaryOperands
+              unary;
+
+            unary.op=op;
+            unary.ai=ai;
+            unary.ar=ar;
+            ApplyUnaryComplexOperator(&unary,&cr,&ci);
+            break;
+          }
+          case DivideComplexOperator:
+          ...
+        }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, value by value. A value of `e` that matches a kept
+  label selects the same group as before, unchanged. One that matches a moved label no
+  longer matches any label of the outer `switch`, so it selects `default`, whose first
+  act is the call; nothing between the two evaluations writes what `e` reads (the
+  member assignments only read), so the inner `switch` sees the same value and selects
+  the same group, whose body writes the caller's variables through the pointers (Recipe
+  O); its `break` ends the inner `switch`, the function returns, and the outer `break`
+  ends the outer one, where the original `break` ended the original. A value that
+  matches no label went to `default`'s body before; now it goes to the outer `default`
+  and then to the inner one, which is the same body.
+- `default` must move: left in the caller with its body, the values of the moved labels
+  would reach it instead of their own groups. A shared run of labels
+  (`case ConjugateComplexOperator: default:`) moves whole.
+- Fall-through would break the argument: a group that runs into the next one would,
+  after the split, run into a different group or into none. Step 1 refuses it.
+- Both `switch` statements have a `default`, so `-Wswitch` warns about neither; the
+  controlling expression's type and promotions are those of the same text.
+- The order of groups within each `switch` is the original order; C selects by label,
+  not by position, once no group falls through.
+- Choose the split along what the groups read when you can (the unary operators read
+  `ar` and `ai` only): the new function then takes fewer inputs.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), a case for each moved label where one exists, and steps 1 and 5
+checked by reading.
+
+**Provenance:** 2026-10-30, from `fourier.c`'s `ComplexImages`, whose operator `switch`
+(seven operators and `default`) sits at depth 4 inside the parallel row loop. Recipe Z on
+the whole `switch` gives a helper of cc 9, a *Complex Method* the gate refuses (5.09 in a
+probe); the unary group (conjugate with `default`, magnitude-phase, real-imaginary) as its
+own function, then Z on the binary rest, leaves neither helper with a finding: 4.83 to
+4.85 to 5.21 in a probe. Added by Claude Code (Claude Opus 5.5) during task W09, under the
+mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -2741,3 +2896,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | E | Step 7: a block that ends a loop's body, after statements that stay, may contain `continue;` of that loop; each becomes `return;` of a new `void` function whose call is the body's last statement (the whole-body form's conditions; step 7's first form, for a loop body instead of a `void` function) | `effect.c`'s `SelectiveBlurImage`: its channel-loop body moved whole (Recipe N) gives a helper of 79 lines (*Large Method*), refused by the gate; its tail after the trait checks (the two kernel sums and their stores, three `continue`s) moved first, then the body: the function leaves Brain Method and Deep, Nested Complexity, 2.84 to 3.12 in a probe | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | D | *Unreached functions*: in a function no oracle case executes (casemap 0 for it and its callers in the catalogue), a block identical to an existing `static` helper's body (checked by script) may become a call of that helper when `tools/obj_identical.sh` prints `IDENTICAL` for the whole object file against `HEAD`; nested replacements in one function (an inner block onto one helper, the loop around it onto another) may share the commit; the commit carries `Verified: guard` and quotes that line. *Careful* gives the argument (byte-identical object code under the oracle build's pinned flags is the same compiled code, so the same behaviour on every input) and says a step whose object file differs is not this form: fall back to the oracle or skip. *Two levels of evidence* names it as the one exception for D | `transform.c`'s `ExcerptImage` (0 cases, no in-tree caller): its pixel loop is `CopyPixelRow`'s body with `CopyPixelChannelsTo`'s written out; a probe calling `CopyPixelRow` compared `IDENTICAL` and measured 4.40 to 4.69, the file's last Deep, Nested Complexity. Under the founding evidence level neither D (oracle only) nor E (a new helper would duplicate an existing one) applied | owner |
 | 2026-10-30 | AMEND | Q | Step 8: an array the block updates element by element counts as one written variable; its member is a pointer to the array's type, `targets.v=(&v);`, and `v[i]` becomes `(*v)[i]` | `compare.c`'s `GetSSIMSimularity` and `GetPHASESimilarity`: five accumulators per pixel, some of them per-channel arrays; step 8 said "written scalar" while step 1 (through Recipe K step 2) already counts such arrays among the written variables. The address of an array points to the same elements, so every update reaches the caller's array in the same order | mandate (2026-10-24) |
+| 2026-10-30 | NEW | SD | Split a Selection at its Default: a `switch` whose groups all end in `break;` moves some of its groups, the `default` group among them, into a new `static void` function with the same `switch (e)` (built as Recipe O or Z builds one); the caller's `switch` keeps the other groups and a `default:` that calls it | `ComplexImages`' operator `switch` (eight labels, depth 4 in the parallel loop): Recipe Z on the whole `switch` gives a cc-9 helper the gate refuses (5.09); the unary group as its own function, then Z on the binary rest, leaves no helper finding, 4.83 to 5.21 in a probe | mandate (2026-10-24) |
