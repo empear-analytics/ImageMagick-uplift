@@ -1158,6 +1158,80 @@ static inline MagickBooleanType IsOutsideSourceColumn(const Quantum *pixels,
     MagickFalse);
 }
 
+typedef struct _OverChannelInputs
+{
+  const Image
+    *source_image;
+
+  const Quantum
+    *p;
+
+  PixelChannel
+    channel;
+
+  PixelTrait
+    traits;
+
+  MagickRealType
+    alpha,
+    Da,
+    Sa;
+
+  MagickBooleanType
+    clamp;
+} OverChannelInputs;
+
+static void CompositeOverChannel(const OverChannelInputs *over,
+  Quantum *magick_restrict q,const ssize_t i)
+{
+  double
+    gamma;
+
+  MagickRealType
+    Dc,
+    Dca,
+    pixel,
+    Sc,
+    Sca;
+
+  if (over->channel == AlphaPixelChannel)
+    {
+      /*
+        Set alpha channel.
+      */
+      pixel=(double) QuantumRange*over->alpha;
+      q[i]=over->clamp != MagickFalse ? ClampPixel(pixel) :
+        ClampToQuantum(pixel);
+      return;
+    }
+  /*
+    Sc: source color.
+    Dc: canvas color.
+  */
+  Sc=(MagickRealType) GetPixelChannel(over->source_image,over->channel,
+    over->p);
+  Dc=(MagickRealType) q[i];
+  if ((over->traits & CopyPixelTrait) != 0)
+    {
+      /*
+        Copy channel.
+      */
+      q[i]=ClampToQuantum(Sc);
+      return;
+    }
+  /*
+    Porter-Duff compositions:
+      Sca: source normalized color multiplied by alpha.
+      Dca: normalized canvas color multiplied by alpha.
+  */
+  Sca=QuantumScale*over->Sa*Sc;
+  Dca=QuantumScale*over->Da*Dc;
+  gamma=MagickSafeReciprocal(over->alpha);
+  pixel=(double) QuantumRange*gamma*(Sca+Dca*(1.0-over->Sa));
+  q[i]=over->clamp != MagickFalse ? ClampPixel(pixel) :
+    ClampToQuantum(pixel);
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1262,17 +1336,10 @@ static MagickBooleanType CompositeOverImage(Image *image,
     GetPixelInfo(source_image,&source_pixel);
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      double
-        gamma;
-
       MagickRealType
         alpha,
         Da,
-        Dc,
-        Dca,
-        Sa,
-        Sc,
-        Sca;
+        Sa;
 
       ssize_t
         i;
@@ -1335,8 +1402,8 @@ static MagickBooleanType CompositeOverImage(Image *image,
       alpha=Sa+Da-Sa*Da;
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
-        MagickRealType
-          pixel;
+        OverChannelInputs
+          over;
 
         PixelChannel channel = GetPixelChannelChannel(image,i);
         PixelTrait traits = GetPixelChannelTraits(image,channel);
@@ -1346,40 +1413,15 @@ static MagickBooleanType CompositeOverImage(Image *image,
         if ((source_traits == UndefinedPixelTrait) &&
             (channel != AlphaPixelChannel))
             continue;
-        if (channel == AlphaPixelChannel)
-          {
-            /*
-              Set alpha channel.
-            */
-            pixel=(double) QuantumRange*alpha;
-            q[i]=clamp != MagickFalse ? ClampPixel(pixel) :
-              ClampToQuantum(pixel);
-            continue;
-          }
-        /*
-          Sc: source color.
-          Dc: canvas color.
-        */
-        Sc=(MagickRealType) GetPixelChannel(source_image,channel,p);
-        Dc=(MagickRealType) q[i];
-        if ((traits & CopyPixelTrait) != 0)
-          {
-            /*
-              Copy channel.
-            */
-            q[i]=ClampToQuantum(Sc);
-            continue;
-          }
-        /*
-          Porter-Duff compositions:
-            Sca: source normalized color multiplied by alpha.
-            Dca: normalized canvas color multiplied by alpha.
-        */
-        Sca=QuantumScale*Sa*Sc;
-        Dca=QuantumScale*Da*Dc;
-        gamma=MagickSafeReciprocal(alpha);
-        pixel=(double) QuantumRange*gamma*(Sca+Dca*(1.0-Sa));
-        q[i]=clamp != MagickFalse ? ClampPixel(pixel) : ClampToQuantum(pixel);
+        over.source_image=source_image;
+        over.p=p;
+        over.channel=channel;
+        over.traits=traits;
+        over.alpha=alpha;
+        over.Da=Da;
+        over.Sa=Sa;
+        over.clamp=clamp;
+        CompositeOverChannel(&over,q,i);
       }
       p+=(ptrdiff_t) GetPixelChannels(source_image);
       channels=GetPixelChannels(source_image);
