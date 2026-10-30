@@ -263,6 +263,23 @@ static const char *SetOddSquareKernelSize(KernelInfo *kernel,
   return(p);
 }
 
+static void SetKernelArrayValue(KernelInfo *kernel,const ssize_t i,
+  const char *token,const double nan)
+{
+  if (    LocaleCompare("nan",token) == 0
+      || LocaleCompare("-",token) == 0 ) {
+    kernel->values[i] = nan; /* this value is not part of neighbourhood */
+  }
+  else {
+    kernel->values[i] = StringToDouble(token,(char **) NULL);
+    ( kernel->values[i] < 0)
+        ?  ( kernel->negative_range += kernel->values[i] )
+        :  ( kernel->positive_range += kernel->values[i] );
+    Minimize(kernel->minimum, kernel->values[i]);
+    Maximize(kernel->maximum, kernel->values[i]);
+  }
+}
+
 static KernelInfo *ParseKernelArray(const char *kernel_string)
 {
   KernelInfo
@@ -360,18 +377,7 @@ static KernelInfo *ParseKernelArray(const char *kernel_string)
     (void) GetNextToken(p,&p,MagickPathExtent,token);
     if (*token == ',')
       (void) GetNextToken(p,&p,MagickPathExtent,token);
-    if (    LocaleCompare("nan",token) == 0
-        || LocaleCompare("-",token) == 0 ) {
-      kernel->values[i] = nan; /* this value is not part of neighbourhood */
-    }
-    else {
-      kernel->values[i] = StringToDouble(token,(char **) NULL);
-      ( kernel->values[i] < 0)
-          ?  ( kernel->negative_range += kernel->values[i] )
-          :  ( kernel->positive_range += kernel->values[i] );
-      Minimize(kernel->minimum, kernel->values[i]);
-      Maximize(kernel->maximum, kernel->values[i]);
-    }
+    SetKernelArrayValue(kernel,i,token,nan);
   }
 
   /* sanity check -- no more values in kernel definition */
