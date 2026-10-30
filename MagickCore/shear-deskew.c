@@ -265,6 +265,15 @@ static void FillBitCountTable(unsigned short *bits)
   }
 }
 
+static void DestroyRadonMatrices(MatrixInfo *source_matrices,
+  MatrixInfo *destination_matrices)
+{
+  if (destination_matrices != (MatrixInfo *) NULL)
+    destination_matrices=DestroyMatrixInfo(destination_matrices);
+  if (source_matrices != (MatrixInfo *) NULL)
+    source_matrices=DestroyMatrixInfo(source_matrices);
+}
+
 static MagickBooleanType RadonTransform(const Image *image,
   const double threshold,size_t *projection,ExceptionInfo *exception)
 {
@@ -295,10 +304,7 @@ static MagickBooleanType RadonTransform(const Image *image,
   if ((source_matrices == (MatrixInfo *) NULL) ||
       (destination_matrices == (MatrixInfo *) NULL))
     {
-      if (destination_matrices != (MatrixInfo *) NULL)
-        destination_matrices=DestroyMatrixInfo(destination_matrices);
-      if (source_matrices != (MatrixInfo *) NULL)
-        source_matrices=DestroyMatrixInfo(source_matrices);
+      DestroyRadonMatrices(source_matrices,destination_matrices);
       return(MagickFalse);
     }
   if (NullMatrix(source_matrices) == MagickFalse)
