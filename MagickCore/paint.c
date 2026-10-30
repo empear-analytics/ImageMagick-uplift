@@ -222,6 +222,94 @@ static void TileFloodplaneRow(const FloodfillTile *tile,
   }
 }
 
+typedef struct _FloodfillRow
+{
+  Image
+    *image,
+    *floodplane_image;
+
+  CacheView
+    *image_view,
+    *floodplane_view;
+
+  const PixelInfo
+    *target;
+
+  MagickBooleanType
+    invert;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} FloodfillRow;
+
+static MagickBooleanType FillFloodplaneRun(const FloodfillRow *row,ssize_t *x)
+{
+  const Quantum
+    *magick_restrict p;
+
+  FloodfillScan
+    scan;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  if (*x < (ssize_t) row->image->columns)
+    {
+      p=GetCacheViewVirtualPixels(row->image_view,*x,row->y,(size_t)
+        ((ssize_t) row->image->columns-*x),1,row->exception);
+      q=GetCacheViewAuthenticPixels(row->floodplane_view,*x,row->y,(size_t)
+        ((ssize_t) row->image->columns-*x),1,row->exception);
+      if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+        return(MagickFalse);
+      scan.image=row->image;
+      scan.floodplane_image=row->floodplane_image;
+      scan.target=row->target;
+      scan.invert=row->invert;
+      *x=FillFloodplaneSpan(&scan,p,q,*x);
+      status=SyncCacheViewAuthenticPixels(row->floodplane_view,row->exception);
+      if (status == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType SkipFloodplaneRun(const FloodfillRow *row,
+  const ssize_t x2,ssize_t *x)
+{
+  const Quantum
+    *magick_restrict p;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    *magick_restrict q;
+
+  p=GetCacheViewVirtualPixels(row->image_view,*x,row->y,(size_t) (x2-*x+1),1,
+    row->exception);
+  q=GetCacheViewAuthenticPixels(row->floodplane_view,*x,row->y,(size_t)
+    (x2-*x+1),1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    return(MagickFalse);
+  for ( ; *x <= x2; (*x)++)
+  {
+    if (GetPixelGray(row->floodplane_image,q) != 0)
+      break;
+    GetPixelInfoPixel(row->image,p,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,row->target) != row->invert)
+      break;
+    p+=(ptrdiff_t) GetPixelChannels(row->image);
+    q+=(ptrdiff_t) GetPixelChannels(row->floodplane_image);
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -325,8 +413,8 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     const Quantum
       *magick_restrict p;
 
-    FloodfillScan
-      scan;
+    FloodfillRow
+      row;
 
     Quantum
       *magick_restrict q;
@@ -377,23 +465,16 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     {
       if (skip == MagickFalse)
         {
-          if (x < (ssize_t) image->columns)
-            {
-              p=GetCacheViewVirtualPixels(image_view,x,y,(size_t)
-                ((ssize_t) image->columns-x),1,exception);
-              q=GetCacheViewAuthenticPixels(floodplane_view,x,y,(size_t)
-                ((ssize_t) image->columns-x),1,exception);
-              if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-                break;
-              scan.image=image;
-              scan.floodplane_image=floodplane_image;
-              scan.target=target;
-              scan.invert=invert;
-              x=FillFloodplaneSpan(&scan,p,q,x);
-              status=SyncCacheViewAuthenticPixels(floodplane_view,exception);
-              if (status == MagickFalse)
-                break;
-            }
+          row.image=image;
+          row.floodplane_image=floodplane_image;
+          row.image_view=image_view;
+          row.floodplane_view=floodplane_view;
+          row.target=target;
+          row.invert=invert;
+          row.y=y;
+          row.exception=exception;
+          if (FillFloodplaneRun(&row,&x) == MagickFalse)
+            break;
           PushSegmentStack(y,start,x-1,offset);
           if (x > (x2+1))
             PushSegmentStack(y,x2+1,x-1,-offset);
@@ -402,22 +483,16 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
       x++;
       if (x <= x2)
         {
-          p=GetCacheViewVirtualPixels(image_view,x,y,(size_t) (x2-x+1),1,
-            exception);
-          q=GetCacheViewAuthenticPixels(floodplane_view,x,y,(size_t) (x2-x+1),1,
-            exception);
-          if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+          row.image=image;
+          row.floodplane_image=floodplane_image;
+          row.image_view=image_view;
+          row.floodplane_view=floodplane_view;
+          row.target=target;
+          row.invert=invert;
+          row.y=y;
+          row.exception=exception;
+          if (SkipFloodplaneRun(&row,x2,&x) == MagickFalse)
             break;
-          for ( ; x <= x2; x++)
-          {
-            if (GetPixelGray(floodplane_image,q) != 0)
-              break;
-            GetPixelInfoPixel(image,p,&pixel);
-            if (IsFuzzyEquivalencePixelInfo(&pixel,target) != invert)
-              break;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-            q+=(ptrdiff_t) GetPixelChannels(floodplane_image);
-          }
         }
       start=x;
     } while (x <= x2);
