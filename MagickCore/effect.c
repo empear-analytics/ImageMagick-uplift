@@ -2405,6 +2405,54 @@ static double GetKuwaharaVariance(const Image *gaussian_image,
   return(variance);
 }
 
+typedef struct _KuwaharaCorner
+{
+  ssize_t
+    x,
+    y;
+
+  size_t
+    width,
+    i;
+} KuwaharaCorner;
+
+static void OffsetKuwaharaQuadrant(const KuwaharaCorner *corner,
+  RectangleInfo *quadrant)
+{
+  const ssize_t
+    x = corner->x,
+    y = corner->y;
+
+  const size_t
+    width = corner->width,
+    i = corner->i;
+
+  (*quadrant).x=x;
+  (*quadrant).y=y;
+  switch (i)
+  {
+    case 0:
+    {
+      (*quadrant).x=x-(ssize_t) (width-1);
+      (*quadrant).y=y-(ssize_t) (width-1);
+      break;
+    }
+    case 1:
+    {
+      (*quadrant).y=y-(ssize_t) (width-1);
+      break;
+    }
+    case 2:
+    {
+      (*quadrant).x=x-(ssize_t) (width-1);
+      break;
+    }
+    case 3:
+    default:
+      break;
+  }
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -2508,30 +2556,14 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
           mean[MaxPixelChannels],
           variance;
 
-        quadrant.x=x;
-        quadrant.y=y;
-        switch (i)
-        {
-          case 0:
-          {
-            quadrant.x=x-(ssize_t) (width-1);
-            quadrant.y=y-(ssize_t) (width-1);
-            break;
-          }
-          case 1:
-          {
-            quadrant.y=y-(ssize_t) (width-1);
-            break;
-          }
-          case 2:
-          {
-            quadrant.x=x-(ssize_t) (width-1);
-            break;
-          }
-          case 3:
-          default:
-            break;
-        }
+        KuwaharaCorner
+          corner;
+
+        corner.x=x;
+        corner.y=y;
+        corner.width=width;
+        corner.i=i;
+        OffsetKuwaharaQuadrant(&corner,&quadrant);
         p=GetCacheViewVirtualPixels(image_view,quadrant.x,quadrant.y,
           quadrant.width,quadrant.height,exception);
         if (p == (const Quantum *) NULL)
