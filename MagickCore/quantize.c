@@ -3263,12 +3263,12 @@ static void ListKmeansColors(const Image *image)
   }
 }
 
+#define KmeansImageTag  "Kmeans/Image"
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
 {
-#define KmeansImageTag  "Kmeans/Image"
-
   CacheView
     *image_view;
 
