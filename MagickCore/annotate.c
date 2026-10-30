@@ -1925,6 +1925,14 @@ static void ExtendGlyphMinBounds(const FT_BBox bounds,TypeMetric *metrics)
     metrics->bounds.y1=(double) bounds.yMin;
 }
 
+static void ExtendGlyphMaxBounds(const FT_BBox bounds,TypeMetric *metrics)
+{
+  if ((bounds.xMax > metrics->bounds.x2) && (bounds.xMax != 0))
+    metrics->bounds.x2=(double) bounds.xMax;
+  if ((bounds.yMax > metrics->bounds.y2) && (bounds.yMax != 0))
+    metrics->bounds.y2=(double) bounds.yMax;
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2287,10 +2295,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     if (ft_status != 0)
       continue;
     ExtendGlyphMinBounds(bounds,metrics);
-    if ((bounds.xMax > metrics->bounds.x2) && (bounds.xMax != 0))
-      metrics->bounds.x2=(double) bounds.xMax;
-    if ((bounds.yMax > metrics->bounds.y2) && (bounds.yMax != 0))
-      metrics->bounds.y2=(double) bounds.yMax;
+    ExtendGlyphMaxBounds(bounds,metrics);
     if (IsRenderedStroke(draw_info,status) != MagickFalse)
       {
         /*
