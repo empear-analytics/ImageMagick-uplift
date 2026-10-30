@@ -2075,6 +2075,21 @@ static void FormatPSClippathKnot(char *message,PointInfo *last,
     last[i]=point[i];
 }
 
+static void StartPSClippathSubpath(char *message,PointInfo *first,
+  PointInfo *last,const PointInfo *point)
+{
+  ssize_t
+    i;
+
+  (void) FormatLocaleString(message,MagickPathExtent,"  %g %g m\n",
+    point[1].x,point[1].y);
+  for (i=0; i < 3; i++)
+  {
+    first[i]=point[i];
+    last[i]=point[i];
+  }
+}
+
 static char *TracePSClippath(const unsigned char *blob,size_t length)
 {
   char
@@ -2182,15 +2197,7 @@ static char *TracePSClippath(const unsigned char *blob,size_t length)
           point[i].y=1.0-(double) y/4096.0/4096.0;
         }
         if (in_subpath == MagickFalse)
-          {
-            (void) FormatLocaleString(message,MagickPathExtent,"  %g %g m\n",
-              point[1].x,point[1].y);
-            for (i=0; i < 3; i++)
-            {
-              first[i]=point[i];
-              last[i]=point[i];
-            }
-          }
+          StartPSClippathSubpath(message,first,last,point);
         else
           FormatPSClippathKnot(message,last,point);
         (void) ConcatenateString(&path,message);
