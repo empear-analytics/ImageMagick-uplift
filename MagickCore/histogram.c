@@ -867,19 +867,19 @@ static MagickBooleanType CheckImageColors(const Image *image,
       index=MaxTreeDepth-1;
       for (level=1; level < MaxTreeDepth; level++)
       {
+        HNodeChild
+          child;
+
         GetPixelInfoPixel(image,p,&pixel);
         id=ColorToNodeId(&pixel,index);
-        if (node_info->child[id] == (HNodeInfo *) NULL)
-          {
-            node_info->child[id]=GetHNodeInfo(cube_info,level);
-            if (node_info->child[id] == (HNodeInfo *) NULL)
-              {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ResourceLimitError,"MemoryAllocationFailed","`%s'",
-                  image->filename);
-                break;
-              }
-          }
+        child.image=image;
+        child.cube_info=cube_info;
+        child.node_info=node_info;
+        child.id=id;
+        child.level=level;
+        child.exception=exception;
+        if (AcquireHNodeChild(&child) == MagickFalse)
+          break;
         node_info=node_info->child[id];
         index--;
       }
