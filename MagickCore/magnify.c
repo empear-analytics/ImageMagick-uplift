@@ -252,9 +252,6 @@ static inline void Eagle2X(const Image *source,const Quantum *pixels,
     CopyPixels(&magnify,8,3);
 }
 
-static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
-  const ssize_t destination_offset,const Hq2XNeighbours *neighbours)
-{
 #define caseA(N,A,B,C,D) \
   case N: \
   { \
@@ -274,6 +271,9 @@ static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
     break; \
   }
 
+static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
+  const ssize_t destination_offset,const Hq2XNeighbours *neighbours)
+{
   const ssize_t e = neighbours->e, a = neighbours->a, b = neighbours->b,
     d = neighbours->d, f = neighbours->f, h = neighbours->h;
 
