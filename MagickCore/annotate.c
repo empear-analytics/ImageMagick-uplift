@@ -1720,6 +1720,23 @@ static Quantum *SkipGlyphPixel(const Image *image,Quantum *q)
   return(q);
 }
 
+static MagickBooleanType SyncGlyphPixel(const MagickBooleanType active,
+  CacheView *image_view,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status,
+    sync;
+
+  status=MagickTrue;
+  if (active == MagickFalse)
+    {
+      sync=SyncCacheViewAuthenticPixels(image_view,exception);
+      if (sync == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2242,12 +2259,8 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
                   QuantumRange;
                 SetPixelAlpha(image,(const Quantum) fill_opacity,q);
               }
-            if (active == MagickFalse)
-              {
-                sync=SyncCacheViewAuthenticPixels(image_view,exception);
-                if (sync == MagickFalse)
-                  status=MagickFalse;
-              }
+            if (SyncGlyphPixel(active,image_view,exception) == MagickFalse)
+              status=MagickFalse;
             q+=(ptrdiff_t) GetPixelChannels(image);
           }
           sync=SyncCacheViewAuthenticPixels(image_view,exception);
