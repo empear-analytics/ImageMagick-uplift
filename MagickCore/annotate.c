@@ -1624,6 +1624,38 @@ static PointInfo GetFreetypeResolution(const DrawInfo *draw_info,
   return(resolution);
 }
 
+static void SetFreetypeMetrics(const FT_Face face,TypeMetric *metrics)
+{
+  metrics->pixels_per_em.x=face->size->metrics.x_ppem;
+  metrics->pixels_per_em.y=face->size->metrics.y_ppem;
+  metrics->ascent=(double) face->size->metrics.ascender/64.0;
+  metrics->descent=(double) face->size->metrics.descender/64.0;
+  if (face->size->metrics.ascender == 0)
+    {
+      /*
+        Sanitize buggy ascender and descender values.
+      */
+      metrics->ascent=face->size->metrics.y_ppem;
+      if (face->size->metrics.descender == 0)
+        metrics->descent=face->size->metrics.y_ppem/-3.5;
+    }
+  metrics->width=0;
+  metrics->origin.x=0;
+  metrics->origin.y=0;
+  metrics->height=(double) face->size->metrics.height/64.0;
+  metrics->max_advance=0.0;
+  if (face->size->metrics.max_advance > MagickEpsilon)
+    metrics->max_advance=(double) face->size->metrics.max_advance/64.0;
+  metrics->bounds.x1=0.0;
+  metrics->bounds.y1=metrics->descent;
+  metrics->bounds.x2=metrics->ascent+metrics->descent;
+  metrics->bounds.y2=metrics->ascent+metrics->descent;
+  metrics->underline_position=face->underline_position*
+    (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
+  metrics->underline_thickness=face->underline_thickness*
+    (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1895,34 +1927,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
         draw_info->font);
       return(MagickFalse);
     }
-  metrics->pixels_per_em.x=face->size->metrics.x_ppem;
-  metrics->pixels_per_em.y=face->size->metrics.y_ppem;
-  metrics->ascent=(double) face->size->metrics.ascender/64.0;
-  metrics->descent=(double) face->size->metrics.descender/64.0;
-  if (face->size->metrics.ascender == 0)
-    {
-      /*
-        Sanitize buggy ascender and descender values.
-      */
-      metrics->ascent=face->size->metrics.y_ppem;
-      if (face->size->metrics.descender == 0)
-        metrics->descent=face->size->metrics.y_ppem/-3.5;
-    }
-  metrics->width=0;
-  metrics->origin.x=0;
-  metrics->origin.y=0;
-  metrics->height=(double) face->size->metrics.height/64.0;
-  metrics->max_advance=0.0;
-  if (face->size->metrics.max_advance > MagickEpsilon)
-    metrics->max_advance=(double) face->size->metrics.max_advance/64.0;
-  metrics->bounds.x1=0.0;
-  metrics->bounds.y1=metrics->descent;
-  metrics->bounds.x2=metrics->ascent+metrics->descent;
-  metrics->bounds.y2=metrics->ascent+metrics->descent;
-  metrics->underline_position=face->underline_position*
-    (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
-  metrics->underline_thickness=face->underline_thickness*
-    (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
+  SetFreetypeMetrics(face,metrics);
   first_glyph_id=0;
   FT_Get_First_Char(face,&first_glyph_id);
   if (IsTextWithoutGlyphs(draw_info,first_glyph_id) != MagickFalse)
