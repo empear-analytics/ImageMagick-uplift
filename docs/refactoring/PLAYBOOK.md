@@ -1440,6 +1440,11 @@ that meets Recipe K in every respect but one: with its inputs as parameters, the
 function would take five or more arguments (*Excess Number of Function Arguments*, which
 the pre-commit gate refuses on a new function). The typical case is a filter's per-channel weighted sum (`pixel`, `gamma`
 and a cursor), reading the window pointer, the window size, the weights and the channel.
+In a sequential function (step 1) the block may also be a running selection over an
+array: a loop that, element by element, compares a candidate with the best so far and
+updates the best value and its index together (an argmax: `TriangleThreshold`'s
+`threshold` and `max_distance` over the histogram's bins). It folds the array into its
+written locals as a sum does, under the same steps.
 
 **Not covered by:** Recipe K, which passes every input as a parameter; Recipe N, whose
 block may write only one value or through a pixel pointer, and which keeps written
@@ -1672,7 +1677,9 @@ whose plain and alpha-blended kernel sums (nesting 6) write `pixel`, `gamma` and
 cursors `k` and `pixels`, and `SelectiveBlurImage`'s, which also advance
 `luminance_pixels`: with a pointer each, five or six parameters. Step 5's struct values
 (2026-10-30, task W09): `quantize.c`'s `ClassifyImageColors`, whose tree descents write
-the struct `error` and the cursor `node_info`.
+the struct `error` and the cursor `node_info`. The running selection of *Use when*
+(2026-10-30, task W10): `threshold-auto.c`'s `TriangleThreshold`, whose split-point
+search reads seven variables and writes `threshold` and `max_distance`.
 
 ---
 
@@ -3921,3 +3928,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | rule 1 | The blocks of one function in a set may take different recipes when what lowers each alone is a finding of the whole file that the first new function switches on (*Overall Code Complexity*, from a file's seventh function); the message names each block with its recipe and its score alone, and the `Recipe:` trailer names the recipe of the block that leaves a finding category | `channel-alpha.c`'s `SetImageAlphaChannel` (W10), six functions: Recipe T on the `OffIfOpaqueAlphaChannel` column scan alone 6.96 to 6.77 (*Deep, Nested Complexity* leaves, *Overall Code Complexity* arrives), Recipe E on the `AssociateAlphaChannel` column loop alone 6.38, both 7.00. No one recipe reaches both blocks: E refuses the scan's write of the shared `opaque`, and T has nothing to return for a loop that writes no status | mandate (2026-10-24) |
 | 2026-10-30 | NEW | SV | Extract Sibling Blocks Differing in One Value: copies of one block in one function, the same text except for one literal or enumeration constant and not reported as *Code Duplication*, move to one `static` function taking the value as a `const` parameter of the type it is assigned to; each copy becomes the call with its own value | `channel-alpha.c`'s `SetImageAlphaChannel` (W10): the `DeactivateAlphaChannel`, `DiscreteAlphaChannel` and `OnAlphaChannel` cases differ only in the trait assigned. Recipe E on one: 7.56 to 7.58; one helper for the three: 7.62 (cc 66 to 63) | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | SV | Step 2: the copies may read different variables, the same token sequence under Recipe D's consistent renaming, each copy passing its own; the value may then also be a member access of a variable the block does not write (`image->columns`, `image->rows`), of one type in every copy, as in Recipe TW step 2. Step 3: its parameter has the member's declared type. *Careful* gives the argument | `shear-rotate.c`'s `IntegralRotateImage` (W10): its 90- and 270-degree tile loops clip the width (`width=tile_width;` and an `if` on `tile_x` and `image->columns`) and the height (`tile_height`, `tile_y`, `image->rows`) with the same text, four copies in one function, not reported as *Code Duplication*. SV refuses the renaming, TW wants two functions and five inputs, Recipe E on the first copy alone gives 7.55 to 7.56 and would need a second helper for the height. All four as one helper: 7.55 to 7.60 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | Q | *Use when*: in a sequential function the block may also be a running selection over an array (an argmax loop updating the best value and its index together), which folds the array into its written locals as a sum does; the steps are unchanged | `threshold-auto.c`'s `TriangleThreshold` (W10): its split-point search below the peak reads `a`, `b`, `c`, `inverse_ratio`, `histogram`, `max` and `start` and writes `threshold` and `max_distance`, refused by Recipe E step 4 (two written variables, `threshold` read after) and outside Recipe O's and Z's selection (a `switch` or `if` chain) and Q's per-pixel sum. A probe in Q's form: TriangleThreshold leaves Complex Method (cc 11), bumps 3 to 2, 8.11 to 8.36 | mandate (2026-10-24) |
