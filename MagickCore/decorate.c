@@ -564,6 +564,121 @@ static void DrawFrameTopBorder(const FrameTopBorder *top_border)
     }
 }
 
+typedef struct _FrameBottomBorder
+{
+  CacheView
+    *frame_view;
+
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    accentuate,
+    highlight,
+    matte,
+    shadow,
+    trough;
+
+  size_t
+    bevel_width;
+
+  ExceptionInfo
+    *exception;
+} FrameBottomBorder;
+
+static void DrawFrameBottomBorder(const FrameBottomBorder *bottom_border,
+  size_t height)
+{
+  CacheView
+    *const frame_view = bottom_border->frame_view;
+
+  Image
+    *const frame_image = bottom_border->frame_image;
+
+  const Image
+    *const image = bottom_border->image;
+
+  const FrameInfo
+    *const frame_info = bottom_border->frame_info;
+
+  const PixelInfo
+    accentuate = bottom_border->accentuate,
+    highlight = bottom_border->highlight,
+    matte = bottom_border->matte,
+    shadow = bottom_border->shadow,
+    trough = bottom_border->trough;
+
+  const size_t
+    bevel_width = bottom_border->bevel_width;
+
+  ExceptionInfo
+    *const exception = bottom_border->exception;
+
+  ssize_t
+    y;
+
+  size_t
+    width;
+
+  Quantum
+    *magick_restrict q;
+
+  /*
+    Draw bottom of ornamental border.
+  */
+  q=QueueCacheViewAuthenticPixels(frame_view,0,(ssize_t) (frame_image->rows-
+    height),frame_image->columns,height,exception);
+  if (q != (Quantum *) NULL)
+    {
+      /*
+        Draw bottom of ornamental border.
+      */
+      for (y=frame_info->inner_bevel-1; y >= 0; y--)
+      {
+        FrameBottomInnerBevel
+          bottom_inner;
+
+        bottom_inner.frame_image=frame_image;
+        bottom_inner.image=image;
+        bottom_inner.frame_info=frame_info;
+        bottom_inner.accentuate=accentuate;
+        bottom_inner.highlight=highlight;
+        bottom_inner.matte=matte;
+        bottom_inner.shadow=shadow;
+        bottom_inner.bevel_width=bevel_width;
+        q=DrawFrameBottomInnerRow(&bottom_inner,y,q);
+      }
+      height=(size_t) ((ssize_t) frame_info->height-frame_info->y-(ssize_t)
+        image->rows-(ssize_t) bevel_width);
+      for (y=0; y < (ssize_t) height; y++)
+      {
+        q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+        width=(size_t) ((ssize_t) frame_image->columns-2*(ssize_t)
+          frame_info->outer_bevel);
+        q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+        q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+      }
+      for (y=frame_info->outer_bevel-1; y >= 0; y--)
+      {
+        FrameBottomOuterBevel
+          bottom_outer;
+
+        bottom_outer.frame_image=frame_image;
+        bottom_outer.highlight=highlight;
+        bottom_outer.shadow=shadow;
+        bottom_outer.trough=trough;
+        q=DrawFrameBottomOuterRow(&bottom_outer,y,q);
+      }
+      (void) SyncCacheViewAuthenticPixels(frame_view,exception);
+    }
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -731,60 +846,21 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     frame_info->outer_bevel);
   if (height != 0)
     {
-      size_t
-        width;
+      FrameBottomBorder
+        bottom_border;
 
-      Quantum
-        *magick_restrict q;
-
-      /*
-        Draw bottom of ornamental border.
-      */
-      q=QueueCacheViewAuthenticPixels(frame_view,0,(ssize_t) (frame_image->rows-
-        height),frame_image->columns,height,exception);
-      if (q != (Quantum *) NULL)
-        {
-          /*
-            Draw bottom of ornamental border.
-          */
-          for (y=frame_info->inner_bevel-1; y >= 0; y--)
-          {
-            FrameBottomInnerBevel
-              bottom_inner;
-
-            bottom_inner.frame_image=frame_image;
-            bottom_inner.image=image;
-            bottom_inner.frame_info=frame_info;
-            bottom_inner.accentuate=accentuate;
-            bottom_inner.highlight=highlight;
-            bottom_inner.matte=matte;
-            bottom_inner.shadow=shadow;
-            bottom_inner.bevel_width=bevel_width;
-            q=DrawFrameBottomInnerRow(&bottom_inner,y,q);
-          }
-          height=(size_t) ((ssize_t) frame_info->height-frame_info->y-(ssize_t)
-            image->rows-(ssize_t) bevel_width);
-          for (y=0; y < (ssize_t) height; y++)
-          {
-            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-            width=(size_t) ((ssize_t) frame_image->columns-2*(ssize_t)
-              frame_info->outer_bevel);
-            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
-          }
-          for (y=frame_info->outer_bevel-1; y >= 0; y--)
-          {
-            FrameBottomOuterBevel
-              bottom_outer;
-
-            bottom_outer.frame_image=frame_image;
-            bottom_outer.highlight=highlight;
-            bottom_outer.shadow=shadow;
-            bottom_outer.trough=trough;
-            q=DrawFrameBottomOuterRow(&bottom_outer,y,q);
-          }
-          (void) SyncCacheViewAuthenticPixels(frame_view,exception);
-        }
+      bottom_border.frame_view=frame_view;
+      bottom_border.frame_image=frame_image;
+      bottom_border.image=image;
+      bottom_border.frame_info=frame_info;
+      bottom_border.accentuate=accentuate;
+      bottom_border.highlight=highlight;
+      bottom_border.matte=matte;
+      bottom_border.shadow=shadow;
+      bottom_border.trough=trough;
+      bottom_border.bevel_width=bevel_width;
+      bottom_border.exception=exception;
+      DrawFrameBottomBorder(&bottom_border,height);
     }
   frame_view=DestroyCacheView(frame_view);
   image_view=DestroyCacheView(image_view);
