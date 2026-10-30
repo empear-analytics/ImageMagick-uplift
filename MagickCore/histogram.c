@@ -412,6 +412,17 @@ static MagickBooleanType DescendHCube(const HCubeDescent *descent,
   return(MagickTrue);
 }
 
+static ssize_t MatchHNodeColor(HNodeInfo *node_info,const PixelInfo pixel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) node_info->number_unique; i++)
+    if (IsPixelInfoColorMatch(&pixel,node_info->list+i) != MagickFalse)
+      break;
+  return(i);
+}
+
 static HCubeInfo *ClassifyImageColors(const Image *image,
   ExceptionInfo *exception)
 {
@@ -485,9 +496,7 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
       targets.pixel=(&pixel);
       if (DescendHCube(&descent,&targets) == MagickFalse)
         return(0);
-      for (i=0; i < (ssize_t) node_info->number_unique; i++)
-        if (IsPixelInfoColorMatch(&pixel,node_info->list+i) != MagickFalse)
-          break;
+      i=MatchHNodeColor(node_info,pixel);
       if (i < (ssize_t) node_info->number_unique)
         node_info->list[i].count++;
       else
