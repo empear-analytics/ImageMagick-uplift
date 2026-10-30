@@ -2854,21 +2854,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
         pixel.red=x_map[red].x+y_map[green].x+z_map[blue].x;
         pixel.green=x_map[red].y+y_map[green].y+z_map[blue].y;
         pixel.blue=x_map[red].z+y_map[green].z+z_map[blue].z;
-        if (image->colorspace == YCCColorspace)
-          {
-            pixel.red=(double) QuantumRange*(double) YCCMap[RoundToYCC(
-              MaximumLogarithmicColorspace*pixel.red/(double) MaxMap)];
-            pixel.green=(double) QuantumRange*(double) YCCMap[RoundToYCC(
-              MaximumLogarithmicColorspace*pixel.green/(double) MaxMap)];
-            pixel.blue=(double) QuantumRange*(double) YCCMap[RoundToYCC(
-              MaximumLogarithmicColorspace*pixel.blue/(double) MaxMap)];
-          }
-        else
-          {
-            pixel.red=(MagickRealType) ScaleMapToQuantum(pixel.red);
-            pixel.green=(MagickRealType) ScaleMapToQuantum(pixel.green);
-            pixel.blue=(MagickRealType) ScaleMapToQuantum(pixel.blue);
-          }
+        pixel=ScaleTransformedPixel(image,YCCMap,pixel);
         image->colormap[i].red=(double) ClampToQuantum(pixel.red);
         image->colormap[i].green=(double) ClampToQuantum(pixel.green);
         image->colormap[i].blue=(double) ClampToQuantum(pixel.blue);
