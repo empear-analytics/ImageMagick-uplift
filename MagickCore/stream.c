@@ -1199,6 +1199,34 @@ MagickExport void SetStreamInfoStorageType(StreamInfo *stream_info,
 extern "C" {
 #endif
 
+static MagickBooleanType PrepareStreamForWriting(StreamInfo *stream_info,
+  const Image *image,const size_t length)
+{
+  if (image != stream_info->image)
+    {
+      ImageInfo
+        *write_info;
+
+      /*
+        Prepare stream for writing.
+      */
+      (void) RelinquishAlignedMemory(stream_info->pixels);
+      stream_info->pixels=(unsigned char *) AcquireAlignedMemory(1,length);
+      if (stream_info->pixels == (unsigned char *) NULL)
+        return(MagickFalse);
+      (void) memset(stream_info->pixels,0,length);
+      stream_info->image=image;
+      write_info=CloneImageInfo(stream_info->image_info);
+      (void) SetImageInfo(write_info,1,stream_info->exception);
+      if (write_info->extract != (char *) NULL)
+        (void) ParseAbsoluteGeometry(write_info->extract,
+          &stream_info->extract_info);
+      stream_info->y=0;
+      write_info=DestroyImageInfo(write_info);
+    }
+  return(MagickTrue);
+}
+
 static size_t WriteStreamImage(const Image *image,const void *pixels,
   const size_t columns)
 {
@@ -1235,28 +1263,8 @@ static size_t WriteStreamImage(const Image *image,const void *pixels,
   assert(cache_info->signature == MagickCoreSignature);
   packet_size*=strlen(stream_info->map);
   length=packet_size*cache_info->columns*cache_info->rows;
-  if (image != stream_info->image)
-    {
-      ImageInfo
-        *write_info;
-
-      /*
-        Prepare stream for writing.
-      */
-      (void) RelinquishAlignedMemory(stream_info->pixels);
-      stream_info->pixels=(unsigned char *) AcquireAlignedMemory(1,length);
-      if (stream_info->pixels == (unsigned char *) NULL)
-        return(0);
-      (void) memset(stream_info->pixels,0,length);
-      stream_info->image=image;
-      write_info=CloneImageInfo(stream_info->image_info);
-      (void) SetImageInfo(write_info,1,stream_info->exception);
-      if (write_info->extract != (char *) NULL)
-        (void) ParseAbsoluteGeometry(write_info->extract,
-          &stream_info->extract_info);
-      stream_info->y=0;
-      write_info=DestroyImageInfo(write_info);
-    }
+  if (PrepareStreamForWriting(stream_info,image,length) == MagickFalse)
+    return(0);
   extract_info=stream_info->extract_info;
   if ((extract_info.width == 0) || (extract_info.height == 0))
     {
