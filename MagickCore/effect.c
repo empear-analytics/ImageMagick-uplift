@@ -767,7 +767,6 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
           *magick_restrict pixels;
 
         double
-          alpha,
           gamma,
           pixel;
 
@@ -783,10 +782,6 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
         PixelTrait
           sharp_traits,
           traits;
-
-        ssize_t
-          u,
-          v;
 
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
@@ -824,17 +819,15 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
         /*
           Alpha blending.
         */
-        for (v=0; v < ((ssize_t) width-j); v++)
-        {
-          for (u=0; u < ((ssize_t) width-j); u++)
-          {
-            alpha=(double) (QuantumScale*(double) GetPixelAlpha(image,pixels));
-            pixel+=(*k)*alpha*(double) pixels[i];
-            gamma+=(*k)*alpha;
-            k++;
-            pixels+=(ptrdiff_t) GetPixelChannels(image);
-          }
-        }
+        sum.image=image;
+        sum.width=width;
+        sum.j=j;
+        sum.i=i;
+        targets.pixel=(&pixel);
+        targets.gamma=(&gamma);
+        targets.k=(&k);
+        targets.pixels=(&pixels);
+        SumAdaptiveBlendedPixels(&sum,&targets);
         gamma=MagickSafeReciprocal(gamma);
         SetPixelChannel(sharp_image,channel,ClampToQuantum(gamma*pixel),q);
       }
