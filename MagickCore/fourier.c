@@ -774,18 +774,69 @@ static void SetForwardFourierMagnitude(const ForwardFourierMagnitude *pass,
   magnitude_view=DestroyCacheView(magnitude_view);
 }
 
-static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
-  Image *image,double *magnitude,double *phase,ExceptionInfo *exception)
+typedef struct _ForwardFourierPhase
+{
+  const FourierInfo
+    *fourier_info;
+
+  Image
+    *phase_image;
+
+  double
+    *phase_pixels;
+
+  ExceptionInfo
+    *exception;
+} ForwardFourierPhase;
+
+static void SetForwardFourierPhase(const ForwardFourierPhase *pass,
+  MagickBooleanType *status)
 {
   CacheView
     *phase_view;
 
+  Quantum
+    *q;
+
+  ssize_t
+    i,
+    x,
+    y;
+
+  i=0L;
+  phase_view=AcquireAuthenticCacheView(pass->phase_image,pass->exception);
+  for (y=0L; y < (ssize_t) pass->fourier_info->height; y++)
+  {
+    q=GetCacheViewAuthenticPixels(phase_view,0L,y,pass->fourier_info->width,1UL,
+      pass->exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0L; x < (ssize_t) pass->fourier_info->width; x++)
+    {
+      SetFourierPixel(pass->phase_image,pass->fourier_info->channel,
+        pass->phase_pixels[i],q);
+      i++;
+      q+=(ptrdiff_t) GetPixelChannels(pass->phase_image);
+    }
+    (*status)=SyncCacheViewAuthenticPixels(phase_view,pass->exception);
+    if ((*status) == MagickFalse)
+      break;
+   }
+  phase_view=DestroyCacheView(phase_view);
+}
+
+static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
+  Image *image,double *magnitude,double *phase,ExceptionInfo *exception)
+{
   double
     *magnitude_pixels,
     *phase_pixels;
 
   ForwardFourierMagnitude
     pass;
+
+  ForwardFourierPhase
+    phase_pass;
 
   Image
     *magnitude_image,
@@ -797,14 +848,6 @@ static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   MemoryInfo
     *magnitude_info,
     *phase_info;
-
-  Quantum
-    *q;
-
-  ssize_t
-    i,
-    x,
-    y;
 
   magnitude_image=GetFirstImageInList(image);
   phase_image=GetNextImageInList(image);
@@ -850,25 +893,11 @@ static MagickBooleanType ForwardFourier(const FourierInfo *fourier_info,
   pass.magnitude_pixels=magnitude_pixels;
   pass.exception=exception;
   SetForwardFourierMagnitude(&pass,&status);
-  i=0L;
-  phase_view=AcquireAuthenticCacheView(phase_image,exception);
-  for (y=0L; y < (ssize_t) fourier_info->height; y++)
-  {
-    q=GetCacheViewAuthenticPixels(phase_view,0L,y,fourier_info->width,1UL,
-      exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0L; x < (ssize_t) fourier_info->width; x++)
-    {
-      SetFourierPixel(phase_image,fourier_info->channel,phase_pixels[i],q);
-      i++;
-      q+=(ptrdiff_t) GetPixelChannels(phase_image);
-    }
-    status=SyncCacheViewAuthenticPixels(phase_view,exception);
-    if (status == MagickFalse)
-      break;
-   }
-  phase_view=DestroyCacheView(phase_view);
+  phase_pass.fourier_info=fourier_info;
+  phase_pass.phase_image=phase_image;
+  phase_pass.phase_pixels=phase_pixels;
+  phase_pass.exception=exception;
+  SetForwardFourierPhase(&phase_pass,&status);
   phase_info=RelinquishVirtualMemory(phase_info);
   magnitude_info=RelinquishVirtualMemory(magnitude_info);
   return(status);
