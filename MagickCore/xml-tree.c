@@ -1054,13 +1054,32 @@ MagickExport const char *GetXMLTreeTag(XMLTreeInfo *xml_info)
 %
 */
 
+static ssize_t WriteUTF8Bytes(char *utf8,ssize_t j,const int c)
+{
+  int
+    bits,
+    byte;
+
+  byte=c;
+  for (bits=0; byte != 0; byte/=2)
+    bits++;
+  bits=(bits-2)/5;
+  utf8[j++]=(char) ((0xFF << (7-bits)) | (c >> (6*bits)));
+  while (bits != 0)
+  {
+    bits--;
+    utf8[j]=(char) (0x80 | ((c >> (6*bits)) & 0x3f));
+    j++;
+  }
+  return(j);
+}
+
 static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
 {
   char
     *utf8;
 
   int
-    bits,
     byte,
     c,
     encoding;
@@ -1114,17 +1133,7 @@ static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
     /*
       Multi-byte UTF-8 sequence.
     */
-    byte=c;
-    for (bits=0; byte != 0; byte/=2)
-      bits++;
-    bits=(bits-2)/5;
-    utf8[j++]=(char) ((0xFF << (7-bits)) | (c >> (6*bits)));
-    while (bits != 0)
-    {
-      bits--;
-      utf8[j]=(char) (0x80 | ((c >> (6*bits)) & 0x3f));
-      j++;
-    }
+    j=WriteUTF8Bytes(utf8,j,c);
   }
   *length=(size_t) j;
   utf8=(char *) ResizeQuantumMemory(utf8,(*length+1),sizeof(*utf8));
