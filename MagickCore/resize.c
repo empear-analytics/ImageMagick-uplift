@@ -1335,6 +1335,19 @@ static void SetGaussianKaiserCoefficients(const Image *image,
   }
 }
 
+static void ApplySupportOverride(const Image *image,
+  ResizeFilter *resize_filter,const FilterType filter_type)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"filter:lobes");
+  if (artifact != (const char *) NULL)
+    SetResizeFilterLobes(resize_filter,artifact);
+  if (resize_filter->filter == Jinc)
+    SetJincSupport(resize_filter,filter_type,jinc_zeros);
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1406,11 +1419,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   SetGaussianKaiserCoefficients(image,resize_filter);
 
   /* Support Overrides */
-  artifact=GetImageArtifact(image,"filter:lobes");
-  if (artifact != (const char *) NULL)
-    SetResizeFilterLobes(resize_filter,artifact);
-  if (resize_filter->filter == Jinc)
-    SetJincSupport(resize_filter,filter_type,jinc_zeros);
+  ApplySupportOverride(image,resize_filter,filter_type);
   ApplyBlurAndSupportOverrides(image,resize_filter);
   /*
     Adjust window function scaling to match windowing support for weighting
