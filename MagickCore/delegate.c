@@ -1337,15 +1337,15 @@ MagickExport const DelegateInfo *GetDelegateInfo(const char *decode,
         p=p->next;
         continue;
       }
-    if (LocaleCompare(decode,delegate_info->decode) == 0)
-      if (LocaleCompare(encode,delegate_info->encode) == 0)
-        break;
-    if (LocaleCompare(decode,"*") == 0)
-      if (LocaleCompare(encode,delegate_info->encode) == 0)
-        break;
-    if (LocaleCompare(decode,delegate_info->decode) == 0)
-      if (LocaleCompare(encode,"*") == 0)
-        break;
+    if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
+        (LocaleCompare(encode,delegate_info->encode) == 0))
+      break;
+    if ((LocaleCompare(decode,"*") == 0) &&
+        (LocaleCompare(encode,delegate_info->encode) == 0))
+      break;
+    if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
+        (LocaleCompare(encode,"*") == 0))
+      break;
     p=p->next;
   }
   if (p == (ElementInfo *) NULL)
