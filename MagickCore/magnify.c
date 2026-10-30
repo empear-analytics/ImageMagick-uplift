@@ -752,13 +752,13 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
   Fish2XBottomRightPixel(&magnify,pixels,channels,intensities);
 }
 
+#define WeightVar(M,N) const int w_##M##_##N = \
+  PixelsEqual(pixels,M,N,channels) ? 0 : 1;
+
 static void Xbr2X(const Image *magick_unused(source),const Quantum *pixels,
   Quantum *result,const size_t channels)
 {
   const MagnifyPixels magnify = { pixels, result, channels };
-
-#define WeightVar(M,N) const int w_##M##_##N = \
-  PixelsEqual(pixels,M,N,channels) ? 0 : 1;
 
   WeightVar(12,11)
   WeightVar(12,7)
