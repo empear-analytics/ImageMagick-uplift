@@ -1263,10 +1263,8 @@ static MagickBooleanType sRGBTransformImage(Image *image,
   if (IsTransformMapMissing(x_map,y_map,z_map) != MagickFalse)
     {
       x_map=RelinquishTransformMap(x_map);
-      if (y_map != (TransformPacket *) NULL)
-        y_map=(TransformPacket *) RelinquishMagickMemory(y_map);
-      if (z_map != (TransformPacket *) NULL)
-        z_map=(TransformPacket *) RelinquishMagickMemory(z_map);
+      y_map=RelinquishTransformMap(y_map);
+      z_map=RelinquishTransformMap(z_map);
       ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
         image->filename);
     }
