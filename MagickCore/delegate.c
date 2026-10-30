@@ -1751,6 +1751,20 @@ static inline MagickBooleanType IsKeptDestination(
     MagickFalse);
 }
 
+static size_t GetDelegateCopyQuantum(const int source_file)
+{
+  size_t
+    quantum;
+
+  struct stat
+    attributes = { 0 };
+
+  quantum=(size_t) MagickMaxBufferExtent;
+  if ((fstat(source_file,&attributes) == 0) && (attributes.st_size > 0))
+    quantum=MagickMin((size_t) attributes.st_size,MagickMaxBufferExtent);
+  return(quantum);
+}
+
 typedef struct _DelegateFileCopy
 {
   int
@@ -1838,9 +1852,7 @@ static MagickBooleanType CopyDelegateFile(const char *source,
       (void) close_utf8(destination_file);
       return(MagickFalse);
     }
-  quantum=(size_t) MagickMaxBufferExtent;
-  if ((fstat(source_file,&attributes) == 0) && (attributes.st_size > 0))
-    quantum=MagickMin((size_t) attributes.st_size,MagickMaxBufferExtent);
+  quantum=GetDelegateCopyQuantum(source_file);
   buffer=(unsigned char *) AcquireQuantumMemory(quantum,sizeof(*buffer));
   if (buffer == (unsigned char *) NULL)
     {
