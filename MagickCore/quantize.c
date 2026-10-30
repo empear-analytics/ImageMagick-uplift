@@ -2774,6 +2774,50 @@ static void SetKmeansDominantColor(Image *image,ExceptionInfo *exception)
     }
 }
 
+static MagickBooleanType SeedKmeansFromQuantization(Image *image,
+  const size_t number_colors,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  QCubeInfo
+    *cube_info;
+
+  QuantizeInfo
+    *quantize_info;
+
+  size_t
+    depth;
+
+  ssize_t
+    n;
+
+  quantize_info=AcquireQuantizeInfo((ImageInfo *) NULL);
+  quantize_info->colorspace=image->colorspace;
+  quantize_info->number_colors=number_colors;
+  quantize_info->dither_method=NoDitherMethod;
+  n=(ssize_t) number_colors;
+  for (depth=1; n != 0; depth++)
+    n>>=2;
+  cube_info=GetQCubeInfo(quantize_info,depth,number_colors);
+  if (cube_info == (QCubeInfo *) NULL)
+    {
+      quantize_info=DestroyQuantizeInfo(quantize_info);
+      ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
+    }
+  status=ClassifyImageColors(cube_info,image,exception);
+  if (status != MagickFalse)
+    {
+      if (cube_info->colors > cube_info->maximum_colors)
+        ReduceImageColors(image,cube_info);
+      status=SetImageColormap(image,cube_info,exception);
+    }
+  DestroyQCubeInfo(cube_info);
+  quantize_info=DestroyQuantizeInfo(quantize_info);
+  return(status);
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -2816,41 +2860,10 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
   colors=GetImageArtifact(image,"kmeans:seed-colors");
   if (colors == (const char *) NULL)
     {
-      QCubeInfo
-        *cube_info;
-
-      QuantizeInfo
-        *quantize_info;
-
-      size_t
-        depth;
-
       /*
         Seed clusters from color quantization.
       */
-      quantize_info=AcquireQuantizeInfo((ImageInfo *) NULL);
-      quantize_info->colorspace=image->colorspace;
-      quantize_info->number_colors=number_colors;
-      quantize_info->dither_method=NoDitherMethod;
-      n=(ssize_t) number_colors;
-      for (depth=1; n != 0; depth++)
-        n>>=2;
-      cube_info=GetQCubeInfo(quantize_info,depth,number_colors);
-      if (cube_info == (QCubeInfo *) NULL)
-        {
-          quantize_info=DestroyQuantizeInfo(quantize_info);
-          ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-            image->filename);
-        }
-      status=ClassifyImageColors(cube_info,image,exception);
-      if (status != MagickFalse)
-        {
-          if (cube_info->colors > cube_info->maximum_colors)
-            ReduceImageColors(image,cube_info);
-          status=SetImageColormap(image,cube_info,exception);
-        }
-      DestroyQCubeInfo(cube_info);
-      quantize_info=DestroyQuantizeInfo(quantize_info);
+      status=SeedKmeansFromQuantization(image,number_colors,exception);
       if (status == MagickFalse)
         return(status);
     }
