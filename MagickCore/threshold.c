@@ -2148,6 +2148,16 @@ static void WhiteThresholdPixel(const Image *image,const PixelInfo *threshold,
   }
 }
 
+static void WhiteThresholdIntensity(const Image *image,
+  const PixelInfo *threshold,Quantum *magick_restrict q)
+{
+  double
+    pixel;
+
+  pixel=GetPixelIntensity(image,q);
+  WhiteThresholdPixel(image,threshold,pixel,q);
+}
+
 MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
   const char *thresholds,ExceptionInfo *exception)
 {
@@ -2207,11 +2217,7 @@ MagickExport MagickBooleanType WhiteThresholdImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      double
-        pixel;
-
-      pixel=GetPixelIntensity(image,q);
-      WhiteThresholdPixel(image,&threshold,pixel,q);
+      WhiteThresholdIntensity(image,&threshold,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
