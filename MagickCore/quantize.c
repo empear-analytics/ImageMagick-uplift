@@ -3265,6 +3265,16 @@ static void ListKmeansColors(const Image *image)
 
 #define KmeansImageTag  "Kmeans/Image"
 
+static void ClearKmeansPixels(const Image *image,KmeansInfo **kmeans_pixels,
+  const size_t number_threads)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) number_threads; j++)
+    (void) memset(kmeans_pixels[j],0,image->colors*sizeof(*kmeans_pixels[j]));
+}
+
 static void ReportKmeansProgress(Image *image,const ssize_t n,
   const size_t max_iterations,MagickBooleanType *status)
 {
@@ -3351,11 +3361,9 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
       distortion;
 
     ssize_t
-      j,
       y;
 
-    for (j=0; j < (ssize_t) number_threads; j++)
-      (void) memset(kmeans_pixels[j],0,image->colors*sizeof(*kmeans_pixels[j]));
+    ClearKmeansPixels(image,kmeans_pixels,number_threads);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
     #pragma omp parallel for schedule(dynamic) shared(status) \
       magick_number_threads(image,image,image->rows,1)
