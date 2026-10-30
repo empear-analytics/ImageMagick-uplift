@@ -337,50 +337,15 @@ static void Hq2XApplyRulesFrom17(const unsigned int rule,
   }
 }
 
-static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
-  const ssize_t destination_offset,const Hq2XNeighbours *neighbours)
+static void Hq2XApplyRulesFrom13(const unsigned int rule,
+  const MagnifyPixels *magnify,const ssize_t destination_offset,
+  const Hq2XNeighbours *neighbours)
 {
   const ssize_t e = neighbours->e, a = neighbours->a, b = neighbours->b,
     d = neighbours->d;
 
   switch (rule)
   {
-    case 0:
-    {
-      CopyPixels(magnify,e,destination_offset);
-      break;
-    }
-    caseA(1,e,e,e,a)
-    caseA(2,e,e,e,d)
-    caseA(3,e,e,e,b)
-    caseA(4,e,e,d,b)
-    caseA(5,e,e,a,b)
-    caseA(6,e,e,a,d)
-    caseB(7,e,e,e,e,e,b,b,d)
-    caseB(8,e,e,e,e,e,d,d,b)
-    caseB(9,e,e,e,e,e,e,d,b)
-    caseB(10,e,e,d,d,d,b,b,b)
-    case 11:
-    {
-      const ssize_t
-        offsets[16] = { e, e, e, e, e, e, e, e, e, e, e, e, e, e, d, b };
-
-      MixPixels(magnify,offsets,16,destination_offset);
-      break;
-    }
-    case 12:
-    {
-      if (PixelsEqual(magnify->source,b,d,magnify->channels))
-        {
-          const ssize_t
-            offsets[4] = { e, e, d, b };
-
-          MixPixels(magnify,offsets,4,destination_offset);
-        }
-      else
-        CopyPixels(magnify,e,destination_offset);
-      break;
-    }
     case 13:
     {
       if (PixelsEqual(magnify->source,b,d,magnify->channels))
@@ -425,6 +390,58 @@ static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
         }
       break;
     }
+    default:
+    {
+      Hq2XApplyRulesFrom17(rule,magnify,destination_offset,neighbours);
+      break;
+    }
+  }
+}
+
+static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
+  const ssize_t destination_offset,const Hq2XNeighbours *neighbours)
+{
+  const ssize_t e = neighbours->e, a = neighbours->a, b = neighbours->b,
+    d = neighbours->d;
+
+  switch (rule)
+  {
+    case 0:
+    {
+      CopyPixels(magnify,e,destination_offset);
+      break;
+    }
+    caseA(1,e,e,e,a)
+    caseA(2,e,e,e,d)
+    caseA(3,e,e,e,b)
+    caseA(4,e,e,d,b)
+    caseA(5,e,e,a,b)
+    caseA(6,e,e,a,d)
+    caseB(7,e,e,e,e,e,b,b,d)
+    caseB(8,e,e,e,e,e,d,d,b)
+    caseB(9,e,e,e,e,e,e,d,b)
+    caseB(10,e,e,d,d,d,b,b,b)
+    case 11:
+    {
+      const ssize_t
+        offsets[16] = { e, e, e, e, e, e, e, e, e, e, e, e, e, e, d, b };
+
+      MixPixels(magnify,offsets,16,destination_offset);
+      break;
+    }
+    case 12:
+    {
+      if (PixelsEqual(magnify->source,b,d,magnify->channels))
+        {
+          const ssize_t
+            offsets[4] = { e, e, d, b };
+
+          MixPixels(magnify,offsets,4,destination_offset);
+        }
+      else
+        CopyPixels(magnify,e,destination_offset);
+      break;
+    }
     case 16:
     {
       if (PixelsEqual(magnify->source,b,d,magnify->channels))
@@ -445,7 +462,7 @@ static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
     }
     default:
     {
-      Hq2XApplyRulesFrom17(rule,magnify,destination_offset,neighbours);
+      Hq2XApplyRulesFrom13(rule,magnify,destination_offset,neighbours);
       break;
     }
   }
