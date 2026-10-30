@@ -3254,6 +3254,12 @@ Complexity*. Added by Claude Code (Claude Opus 5.5) during task W10, under the m
 the blocks Recipe E or P would move use them. A helper outside the function cannot sit
 above those lines, so every such block is pinned: `HuffmanDecodeImage`, `LZWEncodeImage`,
 `TransformSignature`, `GenerateDifferentialNoise`, `SyncExifProfile`, `GetEXIFProperty`.
+Also when CodeScene reports *Complex Method* or *Large Method* on a function whose
+leading `#define` run holds helper macros with branches (`if`, `&&`, `||`, `?:`, a `case`
+label) or many lines: CodeScene counts a macro's body in the function whose braces hold
+the `#define`, not where the macro is used, so the run alone carries part of the finding
+(`magnify.c`'s `Corner`, `HelperCond`, `caseA`/`caseB`). The step is then kept for what
+it measures on its own, under rule 2, with no extraction after it.
 
 **Not covered by:** Recipe E, whose step 7 moves a macro only together with a block that is
 its sole user; here the macros serve the whole function. Recipe S, which moves whole
@@ -3309,9 +3315,14 @@ MagickExport MagickBooleanType HuffmanDecodeImage(Image *image,
 - Do not hoist a macro that is `#define`d differently in an earlier function of the same
   file: the run would then redefine it above code that used the other definition. The
   compiler warns about a redefinition, and the build must stay free of warnings.
-- The step changes no code Code Health measures and leaves the score flat. It is kept
-  under rule 2 only when the same task follows it with the extractions it unblocks, and
-  its commit names them.
+- For a run of constants the step changes no code Code Health measures and leaves the
+  score flat. It is kept under rule 2 only when the same task follows it with the
+  extractions it unblocks, and its commit names them. A run of helper macros with
+  branches is measured: the function loses the macros' decisions from its cyclomatic
+  complexity and their lines from its length, while the compiled code, which the
+  preprocessed translation unit fixes, is the same. Keep that step only when the file
+  score rises, and say in the commit that the code did not change, only where the
+  lines stand.
 
 **Evidence level:** guard, with `tools/pp_identical.sh` printing `IDENTICAL`. That is a
 proof of identity for the build, stronger than the oracle, so no readiness verdict is
@@ -3661,3 +3672,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | I | Step 2: a written variable whose address the caller passes elsewhere only as an argument of calls that keep no copy of it (checked by reading the callee) still qualifies, as Recipe V step 2 and Recipe LB step 8 allow; in the block, `&v` becomes `v`, as step 8 already says for its form; *Careful* gives the argument | `histogram.c`'s `ClassifyImageColors`: its tree descent (the level loop at depth 3, its exit at depth 4) writes the node cursor and `pixel`, whose address the caller also passes to `GetPixelInfo` and `IsPixelInfoColorMatch`, neither of which keeps it, and leaves through `return(0);`. A probe: 6.43 to 6.47 | mandate (2026-10-24) |
 | 2026-10-30 | NEW | TW | Extract Twin Blocks into One Function Taking an Input Struct: two functions' copies of one block, the same text once each copy's variables are renamed consistently and differing in at most one value (checked by script), move to one `static` function taking a `const` struct of the inputs (Recipe N), its members named for their roles and filled in each caller from that copy's variables; read-then-written inputs go by value, temporaries written before read are declared in the function; both copies in one commit (rule 1) | `shear.c`'s `XShearImage` and `YShearImage`: the left/up and right/down pixel-transfer cases of their direction `switch`es hold the depth-4 sites; Recipe N names members after one copy's variables, Recipe D needs a reported duplication and would take seven parameters. A probe: one function's cases alone 6.47 to 5.99, both 6.47 to 6.63 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | K | Step 3: a variable of the caller that the block writes before reading it, and that the caller does not read after the block before writing it again, is declared in the new function and is not one of the four written variables (Recipe J step 3, Recipe Q step 2); *Careful* gives the argument | `shear.c`'s `CropToFitImage`: its minimum/maximum scan over the four extent corners (a bump: four `if`s in a `for`) writes `min` and `max` and the loop counter `i`, which the caller also uses for the corner loop before it; step 6 would pass `i` by pointer as a third written local. A probe of the scan as a helper (step 6): 7.29 to 7.53 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | H | *Use when*: also a function whose leading `#define` run holds helper macros with branches or many lines, which CodeScene counts in that function's cyclomatic complexity and length; the step is then kept for its own measured effect under rule 2. *Careful* says when the step is flat and when it is measured | `magnify.c` (W10): `Fish2XBottomRightPixel`'s `Corner` (one `if`, 16 lines), `Epbx2X`'s `HelperCond` (a conjunction and three disjunctions) and `Hq2XHelper`'s `caseA`/`caseB`; each hoist preprocessed identically. Probes from 6.90: `Fish2XBottomRightPixel` 7.19 (leaves *Large Method*), `Epbx2X` 7.11, `Hq2XHelper` 6.97 | mandate (2026-10-24) |
