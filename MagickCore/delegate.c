@@ -387,11 +387,8 @@ static inline MagickBooleanType IsDotRelativePath(const char *token)
     MagickTrue : MagickFalse);
 }
 
-static inline MagickBooleanType IsExecutableToken(const char *token)
+static inline MagickBooleanType HasExecutableLead(const char *token)
 {
-  size_t
-    length = 0;
-
   if ((token == (const char *) NULL) || (*token == '\0'))
     return(MagickFalse);
   if (*token == '-')
@@ -399,6 +396,16 @@ static inline MagickBooleanType IsExecutableToken(const char *token)
   if (*token == '%')
     return(MagickFalse);
   if ((*token == '\'') || (*token == '"'))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType IsExecutableToken(const char *token)
+{
+  size_t
+    length = 0;
+
+  if (HasExecutableLead(token) == MagickFalse)
     return(MagickFalse);
   length=strlen(token);
   if ((length >= 3) && (IsWindowsDrivePath(token) != MagickFalse))
