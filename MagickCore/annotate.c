@@ -1887,6 +1887,15 @@ static FT_Int32 GetFreetypeHintingFlags(Image *image,FT_Int32 flags,
   return(flags);
 }
 
+static inline MagickBooleanType IsTransparentFill(const DrawInfo *draw_info)
+{
+  return(((draw_info->fill.alpha == (MagickRealType) TransparentAlpha) &&
+    (draw_info->fill_pattern == (Image *) NULL) &&
+    (draw_info->stroke.alpha == (MagickRealType) TransparentAlpha) &&
+    (draw_info->stroke_pattern == (Image *) NULL)) ? MagickTrue :
+    MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2293,11 +2302,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
         /*
           Rasterize the glyph.
         */
-        transparent_fill=((draw_info->fill.alpha == (MagickRealType) TransparentAlpha) &&
-          (draw_info->fill_pattern == (Image *) NULL) &&
-          (draw_info->stroke.alpha == (MagickRealType) TransparentAlpha) &&
-          (draw_info->stroke_pattern == (Image *) NULL)) ? MagickTrue :
-          MagickFalse;
+        transparent_fill=IsTransparentFill(draw_info);
         r=bitmap->bitmap.buffer;
         image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
