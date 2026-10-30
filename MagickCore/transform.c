@@ -2146,6 +2146,21 @@ MagickExport Image *TransposeImage(const Image *image,ExceptionInfo *exception)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetTransversePage(Image *transverse_image)
+{
+  RectangleInfo
+    page;
+
+  page=transverse_image->page;
+  Swap(page.width,page.height);
+  Swap(page.x,page.y);
+  if (page.width != 0)
+    page.x=(ssize_t) page.width-(ssize_t) transverse_image->columns-page.x;
+  if (page.height != 0)
+    page.y=(ssize_t) page.height-(ssize_t) transverse_image->rows-page.y;
+  transverse_image->page=page;
+}
+
 MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 {
 #define TransverseImageTag  "Transverse/Image"
@@ -2162,9 +2177,6 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 
   MagickOffsetType
     progress;
-
-  RectangleInfo
-    page;
 
   ssize_t
     y;
@@ -2241,14 +2253,7 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
   transverse_view=DestroyCacheView(transverse_view);
   image_view=DestroyCacheView(image_view);
   transverse_image->type=image->type;
-  page=transverse_image->page;
-  Swap(page.width,page.height);
-  Swap(page.x,page.y);
-  if (page.width != 0)
-    page.x=(ssize_t) page.width-(ssize_t) transverse_image->columns-page.x;
-  if (page.height != 0)
-    page.y=(ssize_t) page.height-(ssize_t) transverse_image->rows-page.y;
-  transverse_image->page=page;
+  SetTransversePage(transverse_image);
   if (status != MagickFalse)
     AppendTransformProperty(image,transverse_image,"transverse %.17gx%.17g",
       exception);
