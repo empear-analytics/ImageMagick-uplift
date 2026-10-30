@@ -2151,6 +2151,58 @@ static MagickBooleanType CheckAttrChannelQualifier (FxInfo * pfx,
   return MagickTrue;
 }
 
+typedef struct _CoordQualifierTargets
+{
+  FunctionE
+    *fe;
+
+  const char
+    **funStr;
+
+  PixelChannel
+    *chQual;
+
+  char
+    *expChLimit;
+} CoordQualifierTargets;
+
+static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
+  const MagickBooleanType coordQual,const CoordQualifierTargets *targets)
+{
+  FunctionE
+    *const fe = targets->fe;
+
+  const char
+    **const funStr = targets->funStr;
+
+  PixelChannel
+    *const chQual = targets->chQual;
+
+  char
+    *const expChLimit = targets->expChLimit;
+
+  if (coordQual) {
+
+    /* Remove last element, which should be fP */
+    ElementT * pel = &pfx->Elements[pfx->usedElements-1];
+    if (pel->operator_index != fP) {
+      (void) ThrowMagickException (
+        pfx->exception, GetMagickModule(), OptionError,
+        "Bug: For function", "'%s' last element not 'p' at '%s'",
+        *funStr, SetShortExp(pfx));
+      return(MagickFalse);
+    }
+    *chQual = pel->channel_qual;
+    *expChLimit = (pel->is_relative) ? ']' : '}';
+    pfx->usedElements--;
+    if (*fe == fU) *fe = fUP;
+    else if (*fe == fV) *fe = fVP;
+    else if (*fe == fS) *fe = fSP;
+    *funStr = Functions[*fe-(int) FirstFunc].str;
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 {
   /* A function, so get open-parens, n args, close-parens
@@ -2366,27 +2418,16 @@ static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe)
 
     if (IsCoordFunction(fe) != MagickFalse) {
 
+      CoordQualifierTargets targets;
+
       coordQual = (GetCoordQualifier (pfx, (int) fe) == 1) ? MagickTrue : MagickFalse;
 
-      if (coordQual) {
-
-        /* Remove last element, which should be fP */
-        ElementT * pel = &pfx->Elements[pfx->usedElements-1];
-        if (pel->operator_index != fP) {
-          (void) ThrowMagickException (
-            pfx->exception, GetMagickModule(), OptionError,
-            "Bug: For function", "'%s' last element not 'p' at '%s'",
-            funStr, SetShortExp(pfx));
-          return MagickFalse;
-        }
-        chQual = pel->channel_qual;
-        expChLimit = (pel->is_relative) ? ']' : '}';
-        pfx->usedElements--;
-        if (fe == fU) fe = fUP;
-        else if (fe == fV) fe = fVP;
-        else if (fe == fS) fe = fSP;
-        funStr = Functions[fe-(int) FirstFunc].str;
-      }
+      targets.fe=(&fe);
+      targets.funStr=(&funStr);
+      targets.chQual=(&chQual);
+      targets.expChLimit=(&expChLimit);
+      if (ApplyCoordQualifier (pfx, coordQual, &targets) == MagickFalse)
+        return MagickFalse;
     }
 
     if (IsUnqualifiedPixelFunction(chQual,fe) != MagickFalse)
