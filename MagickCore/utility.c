@@ -902,6 +902,12 @@ static void CopyFileListParameters(const FileListParameters *list,ssize_t *j,
   }
 }
 
+static void CheckFilenameLength(const char *filename)
+{
+  if (strlen(filename) >= (MagickPathExtent-1))
+    ThrowFatalException(OptionFatalError,"FilenameTruncated");
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1071,16 +1077,14 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       if (filelist[j] != (char *) NULL)
         (void) ConcatenateMagickString(filename,filelist[j],MagickPathExtent);
       filelist[j]=DestroyString(filelist[j]);
-      if (strlen(filename) >= (MagickPathExtent-1))
-        ThrowFatalException(OptionFatalError,"FilenameTruncated");
+      CheckFilenameLength(filename);
       if (IsPathDirectory(filename) <= 0)
         {
           char
             file_path[MagickPathExtent];
 
           FormatExpandedPath(file_path,magick,filename,subimage);
-          if (strlen(file_path) >= (MagickPathExtent-1))
-            ThrowFatalException(OptionFatalError,"FilenameTruncated");
+          CheckFilenameLength(file_path);
           DestroyOriginalArgument(vector,&count,&destroy);
           vector[count++]=ConstantString(file_path);
         }
