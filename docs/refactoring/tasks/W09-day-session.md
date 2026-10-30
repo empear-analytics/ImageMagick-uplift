@@ -1,9 +1,10 @@
-# W09 - campaign A, day session (2026-10-30)
+# W09 - campaign A, day and evening session (2026-10-30)
 
 Not a generated task file. Campaign A (Windows desktop, WSL2), branch `campaign/W09`,
-stacked on W08 (#75); the oracle's baseline is `origin/main` at 727f2598d. Measured with
-`cs-mcp` 1.5.16. The owner asked in the morning for the recipes W08's subagents had
-described but not added; the day added them, then used the grown catalogue on 16 files.
+stacked on W08 (#75), with `main` merged in at c1e813d23; the oracle's baseline is
+`origin/main` (b0445b519 at the end). Measured with `cs-mcp` 1.5.16. The owner asked in
+the morning for the recipes W08's subagents had described but not added; the day added
+them, then used the grown catalogue on 22 files.
 Each file was worked by a subagent under one brief, one at a time; the session read every
 new recipe and amendment, and every step that read a recipe closely, before pushing.
 
@@ -11,7 +12,12 @@ new recipe and amendment, and every step that read a recipe closely, before push
 
 | File | Code Health |
 | --- | --- |
+| `histogram.c` | 6.39 → **7.47** |
+| `resample.c` | 5.13 → **7.30** |
+| `attribute-depth.c` | 6.37 → **7.03** |
+| `attribute.c` | 5.64 → **6.58** |
 | `layer.c` | 4.99 → **6.51** |
+| `resize-image.c` | 6.29 → **6.46** |
 | `paint.c` | 5.10 → **6.10** |
 | `fourier.c` | 4.83 → **5.94** |
 | `transform.c` | 4.22 → **5.45** |
@@ -29,12 +35,37 @@ new recipe and amendment, and every step that read a recipe closely, before push
 | `compare.c` | 2.18 → 2.43 |
 | `distort.c` | 3.01 (no legal step raises it) |
 | `visual-effects.c` | 3.27 (no legal step raises it) |
+| `feature-texture.c` | 5.18 (one step, 5.31, reverted: see below) |
 
-219 commits: 183 refactor steps, 32 playbook commits, a contract update and three report commits.
-Ten files are now above 5. Every refactor commit ran the oracle on its function's cases (0 diverged)
-and passed the pre-commit gate, except those on functions no case reaches, which say so
-and rest on the guard or, for Recipe D, on an identical object file. The whole catalogue
-ran after each file: 15,900 cases, 0 diverged. CodeScene's PR gate passed on #79's pushes.
+287 commits of its own plus two merges of `main`: 236 refactor steps, 41 playbook
+commits, 2 tool commits, 1 revert and 7 docs commits (the contract updates and this
+report). Fifteen files are now above 5, three of them above 7. Every
+refactor commit ran the oracle on its function's cases (0 diverged) and passed the
+pre-commit gate, except those on functions no case reaches, which say so and rest on
+the guard or, for Recipe D, on an identical object file. The whole catalogue ran after
+each file, and on the merged tree: 15,900 cases, 0 diverged.
+
+### Evening: merge, a shared recipe code, the gate
+
+- **Recipe W was taken twice.** Campaign B's M112 added a Recipe W (Extract Block
+  Returning Success for an Early Return) on its own branch the same day campaign A's W08
+  added one; both reached `main`, which then failed `playbook_lint`. As the owner decided,
+  B's keeps W and A's is now **Wa** (c1e813d23, with a WORDING row). Before taking a
+  code, the brief now checks `main` and every open campaign branch.
+- **Pull before push.** `main` is merged into the branch before each push (owner); the
+  conflicts are both-sides-appended playbook text, kept whole. The merge rebuilt the
+  region where git had interleaved B's W section with A's I, LB and SD.
+- **The pre-commit gate held moved code to 10.0** (from the 3SX setup): it refused the
+  merge, because campaign B's `string-argv.c` (9.06) and `string-si.c` (8.50), split off
+  `string.c`, came in as "new" files. It now holds a split-off file to its original's
+  score and skips, in a merge, files identical to the merged branch's (81ce5e39d,
+  3b8e39352; AGENTS.md 3ab114a27). The first version gave the hook findings of its own,
+  which CodeScene's PR gate caught; the second scores 10.0.
+- **CodeScene's PR gate on #79** also failed on `feature-texture.c` (Recipe B grew
+  `GetImageFeatures`, a Complex Method, by member assignments) and `paint.c` (Lines of
+  Code in a Single File at 1,105 lines). The owner chose to revert the first (ac770d71e,
+  committed with `--no-verify` on that approval, since the revert lowers the file) and
+  to suppress the second.
 
 ### The recipes the owner asked for
 
@@ -63,6 +94,12 @@ ran after each file: 15,900 cases, 0 diverged. CodeScene's PR gate passed on #79
   blocks of one function may share a commit when only together they raise the score);
   E step 4 (a variable read on entry, written, and read by nothing after goes by value);
   V step 2 (an address passed elsewhere only to calls that keep no copy, as O step 2).
+  Evening: E step 7's `void` switch form; D for one value at several positions and for
+  operands of `||`/`&&`; the OpenMP section for blocks inside `omp single` and for a
+  thread's own slot `a[id]` of a per-thread array; T step 2 (a flag set only to one
+  constant plays `status`'s part); V step 6 (a second copy calls the same function);
+  rule 1 (a flat set falls under rule 2); LB (reuse an identical helper); I (an address
+  passed to calls that keep no copy).
 - **Owner-approved:** Recipe D for functions no case reaches, proven by
   `tools/obj_identical.sh` printing IDENTICAL for the whole object file (91ed57bbc,
   43f2b75c6); AGENTS.md and VERIFICATION.md say so.
@@ -80,6 +117,10 @@ ran after each file: 15,900 cases, 0 diverged. CodeScene's PR gate passed on #79
   one is written in the member form and the other with `const` locals, and CodeScene then
   reports no duplication. Behaviour is identical, but the duplication is only hidden. Later
   briefs forbid it; the pair is left for your ruling (revert, or accept).
+- **A shared array written at the parallel loop's own index** (`census[i]`, `i` the
+  loop counter, in `attribute.c`'s `GetEdgeBackgroundColor`): each iteration writes only
+  its own element; a probe measured 6.52 → 7.18. The OpenMP rule forbids writing
+  anything shared, so it was not taken. (A thread's own slot `a[id]` was admitted.)
 - **`&status` inside a parallel loop** would open `ImplodeImage`, `SwirlImage` and
   `resize.c`'s `InterpolativeResizeImage` (a block that assigns the shared `status` and
   tests it). The same memory operations in the same order, but the playbook refuses it
@@ -128,4 +169,11 @@ ran after each file: 15,900 cases, 0 diverged. CodeScene's PR gate passed on #79
   writes of the shared `status` in parallel loops.
 - `compare.c` `ThrowMSESimilarityException` destroys `alpha_image` twice (harmless);
   `segment.c` `GetImageDynamicThreshold` sizes `extrema[i]` by `ssize_t`, not `short`.
+- `feature-texture.c` `GetImageFeatures`: the green channel's guard and divisor in the
+  Q loop use `density_y[x].direction[i].red`; `density_xy` is not cleared between the
+  sum-average and difference passes; a failed co-occurrence pass leaks `Q`, `sum` and
+  the densities and reports a memory error.
+- `attribute-depth.c` `RaiseColormapEntryDepth` tests red, green and blue but not alpha,
+  which `SetColormapEntryDepth` scales; `attribute.c` `SetImageType`'s Bilevel case
+  overwrites a failed transform's `status`.
 - W07 and W08's lists stand.
