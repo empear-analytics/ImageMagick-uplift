@@ -793,6 +793,23 @@ static ssize_t GetEvaluateRows(const EvaluateFetch *fetch,const Quantum **p,
   return(j);
 }
 
+static void AcquireEvaluateViews(const Image *images,
+  const size_t number_images,CacheView **image_view,ExceptionInfo *exception)
+{
+  const Image
+    *view;
+
+  ssize_t
+    n;
+
+  view=images;
+  for (n=0; n < (ssize_t) number_images; n++)
+  {
+    image_view[n]=AcquireVirtualCacheView(view,exception);
+    view=GetNextImageInList(view);
+  }
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -801,9 +818,6 @@ MagickExport Image *EvaluateImages(const Image *images,
   CacheView
     *evaluate_view,
     **image_view;
-
-  const Image
-    *view;
 
   Image
     *image;
@@ -865,12 +879,7 @@ MagickExport Image *EvaluateImages(const Image *images,
         ResourceLimitError,"MemoryAllocationFailed","`%s'",images->filename);
       return(image);
     }
-  view=images;
-  for (n=0; n < (ssize_t) number_images; n++)
-  {
-    image_view[n]=AcquireVirtualCacheView(view,exception);
-    view=GetNextImageInList(view);
-  }
+  AcquireEvaluateViews(images,number_images,image_view,exception);
   /*
     Evaluate image pixels.
   */
