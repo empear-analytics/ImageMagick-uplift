@@ -908,6 +908,46 @@ static void CheckFilenameLength(const char *filename)
     ThrowFatalException(OptionFatalError,"FilenameTruncated");
 }
 
+typedef struct _ArgumentParameters
+{
+  int
+    *number_arguments;
+
+  char
+    ***arguments,
+    **vector;
+
+  ssize_t
+    parameters;
+} ArgumentParameters;
+
+static void CopyArgumentParameters(const ArgumentParameters *list,ssize_t *i,
+  ssize_t *count)
+{
+  int
+    *const number_arguments = list->number_arguments;
+
+  char
+    ***const arguments = list->arguments,
+    **const vector = list->vector,
+    *option;
+
+  const ssize_t
+    parameters = list->parameters;
+
+  ssize_t
+    j;
+
+  for (j=0; j < parameters; j++)
+  {
+    (*i)++;
+    if ((*i) == (ssize_t) *number_arguments)
+      break;
+    option=(*arguments)[(*i)];
+    vector[(*count)++]=ConstantString(option);
+  }
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -966,17 +1006,17 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
     parameters=ParseCommandOption(MagickCommandOptions,MagickFalse,option);
     if (parameters > 0)
       {
+        ArgumentParameters
+          list;
+
         /*
           Do not expand command option parameters.
         */
-        for (j=0; j < parameters; j++)
-        {
-          i++;
-          if (i == (ssize_t) *number_arguments)
-            break;
-          option=(*arguments)[i];
-          vector[count++]=ConstantString(option);
-        }
+        list.number_arguments=number_arguments;
+        list.arguments=arguments;
+        list.vector=vector;
+        list.parameters=parameters;
+        CopyArgumentParameters(&list,&i,&count);
         continue;
       }
     if ((*option == '"') || (*option == '\''))
