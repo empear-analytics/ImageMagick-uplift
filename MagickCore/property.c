@@ -528,6 +528,23 @@ static inline int ReadPropertyByte(const unsigned char **p,size_t *length)
   return(c);
 }
 
+static inline void ReadPropertyBuffer(const unsigned char **p,size_t *length,
+  unsigned char *buffer,const ssize_t count)
+{
+  int
+    c;
+
+  ssize_t
+    i;
+
+  for (i=0; i < count; i++)
+  {
+    c=(int) (*(*p)++);
+    (*length)--;
+    buffer[i]=(unsigned char) c;
+  }
+}
+
 static inline signed int ReadPropertyMSBLong(const unsigned char **p,
   size_t *length)
 {
@@ -540,12 +557,6 @@ static inline signed int ReadPropertyMSBLong(const unsigned char **p,
       signed_value;
   } quantum;
 
-  int
-    c;
-
-  ssize_t
-    i;
-
   unsigned char
     buffer[4];
 
@@ -554,12 +565,7 @@ static inline signed int ReadPropertyMSBLong(const unsigned char **p,
 
   if (*length < 4)
     return(-1);
-  for (i=0; i < 4; i++)
-  {
-    c=(int) (*(*p)++);
-    (*length)--;
-    buffer[i]=(unsigned char) c;
-  }
+  ReadPropertyBuffer(p,length,buffer,4);
   value=(unsigned int) buffer[0] << 24;
   value|=(unsigned int) buffer[1] << 16;
   value|=(unsigned int) buffer[2] << 8;
@@ -580,12 +586,6 @@ static inline signed short ReadPropertyMSBShort(const unsigned char **p,
       signed_value;
   } quantum;
 
-  int
-    c;
-
-  ssize_t
-    i;
-
   unsigned char
     buffer[2];
 
@@ -594,12 +594,7 @@ static inline signed short ReadPropertyMSBShort(const unsigned char **p,
 
   if (*length < 2)
     return(-1);
-  for (i=0; i < 2; i++)
-  {
-    c=(int) (*(*p)++);
-    (*length)--;
-    buffer[i]=(unsigned char) c;
-  }
+  ReadPropertyBuffer(p,length,buffer,2);
   value=(unsigned short) buffer[0] << 8;
   value|=(unsigned short) buffer[1];
   quantum.unsigned_value=value & 0xffff;
