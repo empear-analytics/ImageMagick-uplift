@@ -136,6 +136,27 @@ typedef struct _CropToFitRegion
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void GetExtentLimits(const PointInfo *extent,PointInfo *min,
+  PointInfo *max)
+{
+  ssize_t
+    i;
+
+  *min=extent[0];
+  *max=extent[0];
+  for (i=1; i < 4; i++)
+  {
+    if ((*min).x > extent[i].x)
+      (*min).x=extent[i].x;
+    if ((*min).y > extent[i].y)
+      (*min).y=extent[i].y;
+    if ((*max).x < extent[i].x)
+      (*max).x=extent[i].x;
+    if ((*max).y < extent[i].y)
+      (*max).y=extent[i].y;
+  }
+}
+
 static MagickBooleanType CropToFitImage(Image **image,
   const CropToFitRegion *region,ExceptionInfo *exception)
 {
@@ -183,19 +204,7 @@ static MagickBooleanType CropToFitImage(Image **image,
     extent[i].x+=(double) (*image)->columns/2.0;
     extent[i].y+=(double) (*image)->rows/2.0;
   }
-  min=extent[0];
-  max=extent[0];
-  for (i=1; i < 4; i++)
-  {
-    if (min.x > extent[i].x)
-      min.x=extent[i].x;
-    if (min.y > extent[i].y)
-      min.y=extent[i].y;
-    if (max.x < extent[i].x)
-      max.x=extent[i].x;
-    if (max.y < extent[i].y)
-      max.y=extent[i].y;
-  }
+  GetExtentLimits(extent,&min,&max);
   geometry.x=CastDoubleToSsizeT(ceil(min.x-0.5));
   geometry.y=CastDoubleToSsizeT(ceil(min.y-0.5));
   geometry.width=(size_t) CastDoubleToSsizeT(floor(max.x-min.x+0.5));
