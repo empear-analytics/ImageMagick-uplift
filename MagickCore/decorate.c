@@ -231,6 +231,82 @@ static Quantum *DrawFrameTopOuterBevel(const FrameTopBevel *top_bevel,
   return(q);
 }
 
+typedef struct _FrameTopInnerBevel
+{
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    highlight,
+    matte,
+    shadow,
+    trough;
+
+  size_t
+    bevel_width;
+} FrameTopInnerBevel;
+
+static Quantum *DrawFrameTopInnerBevel(const FrameTopInnerBevel *top_inner,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = top_inner->frame_image;
+
+  const Image
+    *const image = top_inner->image;
+
+  const FrameInfo
+    *const frame_info = top_inner->frame_info;
+
+  const PixelInfo
+    highlight = top_inner->highlight,
+    matte = top_inner->matte,
+    shadow = top_inner->shadow,
+    trough = top_inner->trough;
+
+  const size_t
+    bevel_width = top_inner->bevel_width;
+
+  size_t
+    width;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) frame_info->inner_bevel; y++)
+  {
+    q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+    q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
+    width=image->columns+((size_t) frame_info->inner_bevel << 1)-
+      (size_t) y;
+    for (x=0; x < (ssize_t) width; x++)
+    {
+      if (x < y)
+        SetPixelViaPixelInfo(frame_image,&shadow,q);
+      else
+        SetPixelViaPixelInfo(frame_image,&trough,q);
+      q+=(ptrdiff_t) GetPixelChannels(frame_image);
+    }
+    for ( ; x < ((ssize_t) image->columns+2*frame_info->inner_bevel); x++)
+    {
+      SetPixelViaPixelInfo(frame_image,&highlight,q);
+      q+=(ptrdiff_t) GetPixelChannels(frame_image);
+    }
+    width=frame_info->width-(size_t) frame_info->x-
+      image->columns-bevel_width;
+    q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+    q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+  }
+  return(q);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -360,11 +436,11 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
       FrameTopBevel
         top_bevel;
 
+      FrameTopInnerBevel
+        top_inner;
+
       Quantum
         *magick_restrict q;
-
-      ssize_t
-        x;
 
       size_t
         width;
@@ -392,30 +468,15 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
             q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
             q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
           }
-          for (y=0; y < (ssize_t) frame_info->inner_bevel; y++)
-          {
-            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-            q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
-            width=image->columns+((size_t) frame_info->inner_bevel << 1)-
-              (size_t) y;
-            for (x=0; x < (ssize_t) width; x++)
-            {
-              if (x < y)
-                SetPixelViaPixelInfo(frame_image,&shadow,q);
-              else
-                SetPixelViaPixelInfo(frame_image,&trough,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for ( ; x < ((ssize_t) image->columns+2*frame_info->inner_bevel); x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&highlight,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            width=frame_info->width-(size_t) frame_info->x-
-              image->columns-bevel_width;
-            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
-          }
+          top_inner.frame_image=frame_image;
+          top_inner.image=image;
+          top_inner.frame_info=frame_info;
+          top_inner.highlight=highlight;
+          top_inner.matte=matte;
+          top_inner.shadow=shadow;
+          top_inner.trough=trough;
+          top_inner.bevel_width=bevel_width;
+          q=DrawFrameTopInnerBevel(&top_inner,q);
           (void) SyncCacheViewAuthenticPixels(frame_view,exception);
         }
     }
