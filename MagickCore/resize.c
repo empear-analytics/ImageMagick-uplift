@@ -1194,6 +1194,24 @@ static void SetResizeFilterLobes(ResizeFilter *resize_filter,
   resize_filter->support=(double) lobes;
 }
 
+static void SetJincSupport(ResizeFilter *resize_filter,
+  const FilterType filter_type,const double *jinc_zeros)
+{
+  /*
+    Convert a Jinc function lobes value to a real support value.
+  */
+  if (resize_filter->support > 16)
+    resize_filter->support=jinc_zeros[15];  /* largest entry in table */
+  else
+    resize_filter->support=jinc_zeros[((long) resize_filter->support)-1];
+  /*
+    Blur this filter so support is a integer value (lobes dependant).
+  */
+  if (filter_type == LanczosRadiusFilter)
+    resize_filter->blur*=floor(resize_filter->support)/
+      resize_filter->support;
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1309,21 +1327,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   if (artifact != (const char *) NULL)
     SetResizeFilterLobes(resize_filter,artifact);
   if (resize_filter->filter == Jinc)
-    {
-      /*
-        Convert a Jinc function lobes value to a real support value.
-      */
-      if (resize_filter->support > 16)
-        resize_filter->support=jinc_zeros[15];  /* largest entry in table */
-      else
-        resize_filter->support=jinc_zeros[((long) resize_filter->support)-1];
-      /*
-        Blur this filter so support is a integer value (lobes dependant).
-      */
-      if (filter_type == LanczosRadiusFilter)
-        resize_filter->blur*=floor(resize_filter->support)/
-          resize_filter->support;
-    }
+    SetJincSupport(resize_filter,filter_type,jinc_zeros);
   /*
     Expert blur override.
   */
