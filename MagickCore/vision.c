@@ -1693,6 +1693,85 @@ static void CountAdjacentObjects(const CCAdjacentCensus *census,
   }
 }
 
+typedef struct _CCLabelPixel
+{
+  const Image
+    *image;
+
+  MatrixInfo
+    *equivalences;
+
+  CCObjectInfo
+    *object;
+
+  Image
+    *component_image;
+
+  ssize_t
+    x,
+    y;
+} CCLabelPixel;
+
+typedef struct _CCLabelTargets
+{
+  MagickBooleanType
+    *status;
+
+  ssize_t
+    *n;
+
+  const Quantum
+    *magick_restrict *p;
+
+  Quantum
+    *magick_restrict *q;
+} CCLabelTargets;
+
+static MagickBooleanType LabelObjectPixel(const CCLabelPixel *label_pixel,
+  const CCLabelTargets *label_targets)
+{
+  MagickBooleanType
+    *const status = label_targets->status;
+
+  ssize_t
+    *const n = label_targets->n;
+
+  const Quantum
+    *magick_restrict *const p = label_targets->p;
+
+  Quantum
+    *magick_restrict *const q = label_targets->q;
+
+  CCObjectPixel
+    object_pixel;
+
+  ssize_t
+    id,
+    offset;
+
+  offset=label_pixel->y*(ssize_t) label_pixel->image->columns+label_pixel->x;
+  *status=GetMatrixElement(label_pixel->equivalences,offset,0,&id);
+  if (id != offset)
+    *status=GetMatrixElement(label_pixel->equivalences,id,0,&id);
+  else
+    {
+      id=(*n)++;
+      if (id >= (ssize_t) MaxColormapSize)
+        return(MagickFalse);
+    }
+  *status=SetMatrixElement(label_pixel->equivalences,offset,0,&id);
+  object_pixel.image=label_pixel->image;
+  object_pixel.p=(*p);
+  object_pixel.x=label_pixel->x;
+  object_pixel.y=label_pixel->y;
+  object_pixel.id=id;
+  AddLabeledObjectPixel(label_pixel->object,&object_pixel);
+  SetPixelIndex(label_pixel->component_image,(Quantum) id,*q);
+  *p+=(ptrdiff_t) GetPixelChannels(label_pixel->image);
+  *q+=(ptrdiff_t) GetPixelChannels(label_pixel->component_image);
+  return(MagickTrue);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -1841,6 +1920,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     Quantum
       *magick_restrict q;
 
+    const CCLabelTargets
+      label_targets = { &status, &n, &p, &q };
+
     ssize_t
       x;
 
@@ -1856,33 +1938,17 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       }
     for (x=0; x < (ssize_t) component_image->columns; x++)
     {
-      CCObjectPixel
-        object_pixel;
+      CCLabelPixel
+        label_pixel;
 
-      ssize_t
-        id,
-        offset;
-
-      offset=y*(ssize_t) image->columns+x;
-      status=GetMatrixElement(equivalences,offset,0,&id);
-      if (id != offset)
-        status=GetMatrixElement(equivalences,id,0,&id);
-      else
-        {
-          id=n++;
-          if (id >= (ssize_t) MaxColormapSize)
-            break;
-        }
-      status=SetMatrixElement(equivalences,offset,0,&id);
-      object_pixel.image=image;
-      object_pixel.p=p;
-      object_pixel.x=x;
-      object_pixel.y=y;
-      object_pixel.id=id;
-      AddLabeledObjectPixel(object,&object_pixel);
-      SetPixelIndex(component_image,(Quantum) id,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(component_image);
+      label_pixel.image=image;
+      label_pixel.equivalences=equivalences;
+      label_pixel.object=object;
+      label_pixel.component_image=component_image;
+      label_pixel.x=x;
+      label_pixel.y=y;
+      if (LabelObjectPixel(&label_pixel,&label_targets) == MagickFalse)
+        break;
     }
     if (n > (ssize_t) MaxColormapSize)
       break;
