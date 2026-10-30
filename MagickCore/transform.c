@@ -1603,8 +1603,8 @@ MagickExport Image *ShaveImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-static RectangleInfo ApplySpliceGravity(const Image *image,
-  RectangleInfo splice_geometry)
+static void OffsetSpliceGeometry(const Image *image,
+  RectangleInfo *splice_geometry)
 {
   switch (image->gravity)
   {
@@ -1614,17 +1614,30 @@ static RectangleInfo ApplySpliceGravity(const Image *image,
       break;
     case NorthGravity:
     {
-      splice_geometry.x+=(ssize_t) splice_geometry.width/2;
+      (*splice_geometry).x+=(ssize_t) (*splice_geometry).width/2;
       break;
     }
     case NorthEastGravity:
     {
-      splice_geometry.x+=(ssize_t) splice_geometry.width;
+      (*splice_geometry).x+=(ssize_t) (*splice_geometry).width;
       break;
     }
     case WestGravity:
     {
-      splice_geometry.y+=(ssize_t) splice_geometry.width/2;
+      (*splice_geometry).y+=(ssize_t) (*splice_geometry).width/2;
+      break;
+    }
+  }
+}
+
+static RectangleInfo ApplySpliceGravity(const Image *image,
+  RectangleInfo splice_geometry)
+{
+  switch (image->gravity)
+  {
+    default:
+    {
+      OffsetSpliceGeometry(image,&splice_geometry);
       break;
     }
     case CenterGravity:
