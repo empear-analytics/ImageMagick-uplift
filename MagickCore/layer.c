@@ -1283,11 +1283,93 @@ static Image *DestroyDuplicateImage(const DisposeType *disposals,
   return(dup_image);
 }
 
+typedef struct _DisposeChoice
+{
+  const Image
+    *curr;
+
+  RectangleInfo
+    *bounds;
+
+  DisposeType
+    *disposals;
+
+  RectangleInfo
+    dup_bounds;
+} DisposeChoice;
+
+typedef struct _DisposeChoiceTargets
+{
+  Image
+    **bgnd_image,
+    **prev_image,
+    **dup_image;
+
+  ssize_t
+    *i;
+} DisposeChoiceTargets;
+
+static MagickBooleanType FinaliseDisposeChoice(const DisposeChoice *choice,
+  const DisposeChoiceTargets *targets)
+{
+  const Image
+    *const curr = choice->curr;
+
+  RectangleInfo
+    *const bounds = choice->bounds;
+
+  DisposeType
+    *const disposals = choice->disposals;
+
+  const RectangleInfo
+    dup_bounds = choice->dup_bounds;
+
+  Image
+    **const bgnd_image = targets->bgnd_image,
+    **const prev_image = targets->prev_image,
+    **const dup_image = targets->dup_image;
+
+  ssize_t
+    *const i = targets->i;
+
+  if ( disposals[*i-1] == DupDispose )
+    {
+       *bgnd_image=DestroyImageIfSet(*bgnd_image);
+       *prev_image=DestroyImage(*prev_image);
+       *prev_image=*dup_image, *dup_image=(Image *) NULL;
+       bounds[*i+1]=bounds[*i];
+       bounds[*i]=dup_bounds;
+       disposals[*i-1]=DupDispose;
+       disposals[*i]=BackgroundDispose;
+       (*i)++;
+    }
+  else
+    {
+      *dup_image=DestroyImageIfSet(*dup_image);
+      if ( disposals[*i-1] != PreviousDispose )
+        *prev_image=DestroyImage(*prev_image);
+      if ( disposals[*i-1] == BackgroundDispose )
+        *prev_image=*bgnd_image, *bgnd_image=(Image *) NULL;
+      *bgnd_image=DestroyImageIfSet(*bgnd_image);
+      if (ReferenceNoneDisposeImage(disposals,*i,curr,prev_image) ==
+          MagickFalse)
+        return(MagickFalse);
+
+    }
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
   const Image
     *curr;
+
+  DisposeChoice
+    choice;
+
+  DisposeChoiceTargets
+    choice_targets;
 
   DisposeType
     *disposals;
@@ -1576,33 +1658,19 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
        Finalise choice of dispose, set new prev_image,
        and junk any extra images as appropriate,
     */
-    if ( disposals[i-1] == DupDispose )
+    choice.curr=curr;
+    choice.bounds=bounds;
+    choice.disposals=disposals;
+    choice.dup_bounds=dup_bounds;
+    choice_targets.bgnd_image=(&bgnd_image);
+    choice_targets.prev_image=(&prev_image);
+    choice_targets.dup_image=(&dup_image);
+    choice_targets.i=(&i);
+    if (FinaliseDisposeChoice(&choice,&choice_targets) == MagickFalse)
       {
-         bgnd_image=DestroyImageIfSet(bgnd_image);
-         prev_image=DestroyImage(prev_image);
-         prev_image=dup_image, dup_image=(Image *) NULL;
-         bounds[i+1]=bounds[i];
-         bounds[i]=dup_bounds;
-         disposals[i-1]=DupDispose;
-         disposals[i]=BackgroundDispose;
-         i++;
-      }
-    else
-      {
-        dup_image=DestroyImageIfSet(dup_image);
-        if ( disposals[i-1] != PreviousDispose )
-          prev_image=DestroyImage(prev_image);
-        if ( disposals[i-1] == BackgroundDispose )
-          prev_image=bgnd_image, bgnd_image=(Image *) NULL;
-        bgnd_image=DestroyImageIfSet(bgnd_image);
-        if (ReferenceNoneDisposeImage(disposals,i,curr,&prev_image) ==
-            MagickFalse)
-          {
-            bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-            disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-            return((Image *) NULL);
-          }
-
+        bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+        disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+        return((Image *) NULL);
       }
     assert(prev_image != (Image *) NULL);
     disposals[i]=disposals[i-1];
