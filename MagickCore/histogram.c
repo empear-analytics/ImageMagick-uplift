@@ -1487,11 +1487,29 @@ static void SetUniqueColorPixels(const HUniqueColors *unique)
   }
 }
 
-static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
-  HCubeInfo *cube_info,const HNodeInfo *node_info,ExceptionInfo *exception)
+static void UpdateUniqueColorsProgress(Image *unique_image,
+  HCubeInfo *cube_info,MagickBooleanType status)
 {
 #define UniqueColorsImageTag  "UniqueColors/Image"
 
+  if (unique_image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(unique_image,UniqueColorsImageTag,
+        cube_info->progress,cube_info->colors);
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  cube_info->progress++;
+  if (status == MagickFalse)
+    return;
+}
+
+static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
+  HCubeInfo *cube_info,const HNodeInfo *node_info,ExceptionInfo *exception)
+{
   MagickBooleanType
     status;
 
@@ -1521,19 +1539,7 @@ static void UniqueColorsToImage(Image *unique_image,CacheView *unique_view,
       unique.node_info=node_info;
       unique.exception=exception;
       SetUniqueColorPixels(&unique);
-      if (unique_image->progress_monitor != (MagickProgressMonitor) NULL)
-        {
-          MagickBooleanType
-            proceed;
-
-          proceed=SetImageProgress(unique_image,UniqueColorsImageTag,
-            cube_info->progress,cube_info->colors);
-          if (proceed == MagickFalse)
-            status=MagickFalse;
-        }
-      cube_info->progress++;
-      if (status == MagickFalse)
-        return;
+      UpdateUniqueColorsProgress(unique_image,cube_info,status);
     }
 }
 
