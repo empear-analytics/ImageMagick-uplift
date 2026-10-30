@@ -2268,6 +2268,63 @@ MagickExport size_t MultilineCensus(const char *label)
 %    o path:  Specifies a path to a file.
 %
 */
+typedef struct _ShredPass
+{
+  int
+    file;
+
+  MagickSizeType
+    length;
+
+  RandomInfo
+    *random_info;
+
+  size_t
+    quantum;
+
+  StringInfo
+    *key;
+} ShredPass;
+
+static MagickBooleanType ShredFilePass(const ShredPass *pass,const ssize_t i)
+{
+  const int
+    file = pass->file;
+
+  const MagickSizeType
+    length = pass->length;
+
+  RandomInfo
+    *const random_info = pass->random_info;
+
+  const size_t
+    quantum = pass->quantum;
+
+  StringInfo
+    *const key = pass->key;
+
+  MagickOffsetType
+    j;
+
+  ssize_t
+    count;
+
+  if (lseek(file,0,SEEK_SET) < 0)
+    return(MagickFalse);
+  for (j=0; j < (MagickOffsetType) length; j+=count)
+  {
+    if (i != 0)
+      SetRandomKey(random_info,quantum,GetStringInfoDatum(key));
+    count=MagickWrite(file,GetStringInfoDatum(key),(size_t)
+      MagickMin((MagickOffsetType) quantum,(MagickOffsetType) length-j));
+    if (count <= 0)
+      break;
+  }
+  if (j < (MagickOffsetType) length)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickPrivate MagickBooleanType ShredFile(const char *path)
 {
   int
@@ -2315,24 +2372,15 @@ MagickPrivate MagickBooleanType ShredFile(const char *path)
   key=GetRandomKey(random_info,quantum);
   for (i=0; i < passes; i++)
   {
-    MagickOffsetType
-      j;
+    ShredPass
+      pass;
 
-    ssize_t
-      count;
-
-    if (lseek(file,0,SEEK_SET) < 0)
-      break;
-    for (j=0; j < (MagickOffsetType) length; j+=count)
-    {
-      if (i != 0)
-        SetRandomKey(random_info,quantum,GetStringInfoDatum(key));
-      count=MagickWrite(file,GetStringInfoDatum(key),(size_t)
-        MagickMin((MagickOffsetType) quantum,(MagickOffsetType) length-j));
-      if (count <= 0)
-        break;
-    }
-    if (j < (MagickOffsetType) length)
+    pass.file=file;
+    pass.length=length;
+    pass.random_info=random_info;
+    pass.quantum=quantum;
+    pass.key=key;
+    if (ShredFilePass(&pass,i) == MagickFalse)
       break;
   }
   key=DestroyStringInfo(key);
