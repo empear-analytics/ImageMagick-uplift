@@ -158,6 +158,43 @@ static ssize_t FillFloodplaneSpan(const FloodfillScan *scan,
   return(x);
 }
 
+typedef struct _FloodfillTile
+{
+  Image
+    *image,
+    *floodplane_image;
+
+  const DrawInfo
+    *draw_info;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} FloodfillTile;
+
+static void TileFloodplaneRow(const FloodfillTile *tile,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) tile->image->columns; x++)
+  {
+    if (GetPixelGray(tile->floodplane_image,p) != 0)
+      {
+        PixelInfo
+          fill_color;
+
+        GetFillColor(tile->draw_info,x,tile->y,&fill_color,tile->exception);
+        SetMaskedFillChannels(tile->image,&fill_color,q);
+      }
+    p+=(ptrdiff_t) GetPixelChannels(tile->floodplane_image);
+    q+=(ptrdiff_t) GetPixelChannels(tile->image);
+  }
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -379,11 +416,11 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     const Quantum
       *magick_restrict p;
 
+    FloodfillTile
+      tile;
+
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     /*
       Tile fill color onto floodplane.
@@ -397,19 +434,12 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if (GetPixelGray(floodplane_image,p) != 0)
-        {
-          PixelInfo
-            fill_color;
-
-          GetFillColor(draw_info,x,y,&fill_color,exception);
-          SetMaskedFillChannels(image,&fill_color,q);
-        }
-      p+=(ptrdiff_t) GetPixelChannels(floodplane_image);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    tile.image=image;
+    tile.floodplane_image=floodplane_image;
+    tile.draw_info=draw_info;
+    tile.y=y;
+    tile.exception=exception;
+    TileFloodplaneRow(&tile,p,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
   }
