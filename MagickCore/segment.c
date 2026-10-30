@@ -575,6 +575,32 @@ static MagickBooleanType FormBlueClusters(short **extrema,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireDefaultCluster(const ExtentPacket red,
+  const ExtentPacket green,const ExtentPacket blue,Cluster **head)
+{
+  Cluster
+    *cluster;
+
+  if (*head == (Cluster *) NULL)
+    {
+      /*
+        No classes were identified-- create one.
+      */
+      cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster));
+      if (cluster == (Cluster *) NULL)
+        return(MagickFalse);
+      /*
+        Initialize a new class.
+      */
+      (void) memset(cluster,0,sizeof(*cluster));
+      cluster->red=red;
+      cluster->green=green;
+      cluster->blue=blue;
+      *head=cluster;
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -664,24 +690,9 @@ static MagickBooleanType Classify(Image *image,short **extrema,
           image->filename);
     }
   }
-  if (head == (Cluster *) NULL)
-    {
-      /*
-        No classes were identified-- create one.
-      */
-      cluster=(Cluster *) AcquireQuantumMemory(1,sizeof(*cluster));
-      if (cluster == (Cluster *) NULL)
-        ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-          image->filename);
-      /*
-        Initialize a new class.
-      */
-      (void) memset(cluster,0,sizeof(*cluster));
-      cluster->red=red;
-      cluster->green=green;
-      cluster->blue=blue;
-      head=cluster;
-    }
+  if (AcquireDefaultCluster(red,green,blue,&head) == MagickFalse)
+    ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
   /*
     Count the pixels for each cluster.
   */
