@@ -2197,6 +2197,15 @@ static ssize_t MarkFallingCrossing(short *crossings,const ssize_t i,
   return(parity);
 }
 
+static ssize_t MarkRisingCrossing(short *crossings,const ssize_t i,
+  ssize_t parity)
+{
+  if (parity < 0)
+    crossings[i]=1;
+  parity=(-1);
+  return(parity);
+}
+
 static void ZeroCrossHistogram(double *second_derivative,
   const double smooth_threshold,short *crossings)
 {
@@ -2221,10 +2230,6 @@ static void ZeroCrossHistogram(double *second_derivative,
       parity=MarkFallingCrossing(crossings,i,parity);
     else
       if (second_derivative[i] > 0.0)
-        {
-          if (parity < 0)
-            crossings[i]=1;
-          parity=(-1);
-        }
+        parity=MarkRisingCrossing(crossings,i,parity);
   }
 }
