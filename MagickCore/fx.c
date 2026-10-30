@@ -4045,6 +4045,49 @@ static fxFltType GetImageZeroValueU0 (const RpnFirstImageInputs * in,
   return(regA);
 }
 
+static fxFltType GetQualifiedValueU0 (const RpnFirstImageInputs * in,
+  const fxImgXYT xy, fxFltType regA)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const Quantum
+    *const p = in->p;
+
+  Image
+    *const pimg = in->pimg;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    imgx = in->imgx,
+    imgy = in->imgy;
+
+  if (pel->channel_qual == NO_CHAN_QUAL || pel->channel_qual == THIS_CHANNEL) {
+    RpnFirstImageInputs
+      first_in;
+
+    first_in.pfx=pfx;
+    first_in.pel=pel;
+    first_in.p=p;
+    first_in.pimg=pimg;
+    first_in.channel=channel;
+    first_in.imgx=imgx;
+    first_in.imgy=imgy;
+    regA = GetImageZeroValueU0 (&first_in, regA);
+  } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
+    regA = GetHslInt (pfx, 0, &xy, pel->channel_qual);
+    return(regA);
+  } else if (pel->channel_qual == INTENSITY_CHANNEL) {
+    regA = GetIntensity (pfx, 0, (fxFltType) imgx, (fxFltType) imgy);
+  }
+  return(regA);
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -4495,24 +4538,17 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           */
           Image * pimg = pfx->Images[0];
           if ((int) pel->channel_qual < 0) {
-            if (pel->channel_qual == NO_CHAN_QUAL || pel->channel_qual == THIS_CHANNEL) {
-              RpnFirstImageInputs
-                first_in;
+            RpnFirstImageInputs
+              zero_in;
 
-              first_in.pfx=pfx;
-              first_in.pel=pel;
-              first_in.p=p;
-              first_in.pimg=pimg;
-              first_in.channel=channel;
-              first_in.imgx=imgx;
-              first_in.imgy=imgy;
-              regA = GetImageZeroValueU0 (&first_in, regA);
-            } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
-              regA = GetHslInt (pfx, 0, &xy, pel->channel_qual);
-              break;
-            } else if (pel->channel_qual == INTENSITY_CHANNEL) {
-              regA = GetIntensity (pfx, 0, (fxFltType) imgx, (fxFltType) imgy);
-            }
+            zero_in.pfx=pfx;
+            zero_in.pel=pel;
+            zero_in.p=p;
+            zero_in.pimg=pimg;
+            zero_in.channel=channel;
+            zero_in.imgx=imgx;
+            zero_in.imgy=imgy;
+            regA = GetQualifiedValueU0 (&zero_in, xy, regA);
           } else {
             RpnFirstImageInputs
               first_in;
