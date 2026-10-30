@@ -456,6 +456,114 @@ static Quantum *DrawFrameBottomOuterRow(
   return(q);
 }
 
+typedef struct _FrameTopBorder
+{
+  CacheView
+    *frame_view;
+
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    accentuate,
+    highlight,
+    matte,
+    shadow,
+    trough;
+
+  size_t
+    bevel_width,
+    height;
+
+  ExceptionInfo
+    *exception;
+} FrameTopBorder;
+
+static void DrawFrameTopBorder(const FrameTopBorder *top_border)
+{
+  CacheView
+    *const frame_view = top_border->frame_view;
+
+  Image
+    *const frame_image = top_border->frame_image;
+
+  const Image
+    *const image = top_border->image;
+
+  const FrameInfo
+    *const frame_info = top_border->frame_info;
+
+  const PixelInfo
+    accentuate = top_border->accentuate,
+    highlight = top_border->highlight,
+    matte = top_border->matte,
+    shadow = top_border->shadow,
+    trough = top_border->trough;
+
+  const size_t
+    bevel_width = top_border->bevel_width,
+    height = top_border->height;
+
+  ExceptionInfo
+    *const exception = top_border->exception;
+
+  ssize_t
+    y;
+
+  FrameTopBevel
+    top_bevel;
+
+  FrameTopInnerBevel
+    top_inner;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    width;
+
+  /*
+    Draw top of ornamental border.
+  */
+  q=QueueCacheViewAuthenticPixels(frame_view,0,0,frame_image->columns,
+    height,exception);
+  if (q != (Quantum *) NULL)
+    {
+      /*
+        Draw top of ornamental border.
+      */
+      top_bevel.frame_image=frame_image;
+      top_bevel.frame_info=frame_info;
+      top_bevel.accentuate=accentuate;
+      top_bevel.highlight=highlight;
+      top_bevel.shadow=shadow;
+      q=DrawFrameTopOuterBevel(&top_bevel,q);
+      for (y=0; y < (frame_info->y-(ssize_t) bevel_width); y++)
+      {
+        q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+        width=frame_image->columns-2*(size_t) frame_info->outer_bevel;
+        q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+        q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+      }
+      top_inner.frame_image=frame_image;
+      top_inner.image=image;
+      top_inner.frame_info=frame_info;
+      top_inner.highlight=highlight;
+      top_inner.matte=matte;
+      top_inner.shadow=shadow;
+      top_inner.trough=trough;
+      top_inner.bevel_width=bevel_width;
+      q=DrawFrameTopInnerBevel(&top_inner,q);
+      (void) SyncCacheViewAuthenticPixels(frame_view,exception);
+    }
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -546,52 +654,22 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     bevel_width)+frame_info->inner_bevel);
   if (height != 0)
     {
-      FrameTopBevel
-        top_bevel;
+      FrameTopBorder
+        top_border;
 
-      FrameTopInnerBevel
-        top_inner;
-
-      Quantum
-        *magick_restrict q;
-
-      size_t
-        width;
-
-      /*
-        Draw top of ornamental border.
-      */
-      q=QueueCacheViewAuthenticPixels(frame_view,0,0,frame_image->columns,
-        height,exception);
-      if (q != (Quantum *) NULL)
-        {
-          /*
-            Draw top of ornamental border.
-          */
-          top_bevel.frame_image=frame_image;
-          top_bevel.frame_info=frame_info;
-          top_bevel.accentuate=accentuate;
-          top_bevel.highlight=highlight;
-          top_bevel.shadow=shadow;
-          q=DrawFrameTopOuterBevel(&top_bevel,q);
-          for (y=0; y < (frame_info->y-(ssize_t) bevel_width); y++)
-          {
-            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-            width=frame_image->columns-2*(size_t) frame_info->outer_bevel;
-            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
-          }
-          top_inner.frame_image=frame_image;
-          top_inner.image=image;
-          top_inner.frame_info=frame_info;
-          top_inner.highlight=highlight;
-          top_inner.matte=matte;
-          top_inner.shadow=shadow;
-          top_inner.trough=trough;
-          top_inner.bevel_width=bevel_width;
-          q=DrawFrameTopInnerBevel(&top_inner,q);
-          (void) SyncCacheViewAuthenticPixels(frame_view,exception);
-        }
+      top_border.frame_view=frame_view;
+      top_border.frame_image=frame_image;
+      top_border.image=image;
+      top_border.frame_info=frame_info;
+      top_border.accentuate=accentuate;
+      top_border.highlight=highlight;
+      top_border.matte=matte;
+      top_border.shadow=shadow;
+      top_border.trough=trough;
+      top_border.bevel_width=bevel_width;
+      top_border.height=height;
+      top_border.exception=exception;
+      DrawFrameTopBorder(&top_border);
     }
   /*
     Draw sides of ornamental border.
