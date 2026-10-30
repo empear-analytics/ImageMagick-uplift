@@ -630,6 +630,24 @@ static void SetGradientExtent(GradientInfo *gradient,const Image *image,
     }
 }
 
+static void SetGradientRadii(GradientInfo *gradient,const Image *image)
+{
+  const char
+    *artifact;
+
+  gradient->radii.x=(double) MagickMax((image->columns-1.0),(image->rows-1.0))/
+    2.0;
+  gradient->radii.y=gradient->radii.x;
+  artifact=GetImageArtifact(image,"gradient:extent");
+  if (artifact != (const char *) NULL)
+    SetGradientExtent(gradient,image,artifact);
+  artifact=GetImageArtifact(image,"gradient:radii");
+  if (artifact != (const char *) NULL)
+    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->radii.x,
+      &gradient->radii.y);
+  gradient->radius=MagickMax(gradient->radii.x,gradient->radii.y);
+}
+
 MagickExport MagickBooleanType GradientImage(Image *image,
   const GradientType type,const SpreadMethod method,const StopInfo *stops,
   const size_t number_stops,ExceptionInfo *exception)
@@ -688,17 +706,7 @@ MagickExport MagickBooleanType GradientImage(Image *image,
   artifact=GetImageArtifact(image,"gradient:angle");
   if ((type == LinearGradient) && (artifact != (const char *) NULL))
     SetGradientAngleVector(gradient,image);
-  gradient->radii.x=(double) MagickMax((image->columns-1.0),(image->rows-1.0))/
-    2.0;
-  gradient->radii.y=gradient->radii.x;
-  artifact=GetImageArtifact(image,"gradient:extent");
-  if (artifact != (const char *) NULL)
-    SetGradientExtent(gradient,image,artifact);
-  artifact=GetImageArtifact(image,"gradient:radii");
-  if (artifact != (const char *) NULL)
-    (void) MagickSscanf(artifact,"%lf%*[ ,]%lf",&gradient->radii.x,
-      &gradient->radii.y);
-  gradient->radius=MagickMax(gradient->radii.x,gradient->radii.y);
+  SetGradientRadii(gradient,image);
   gradient->spread=method;
   /*
     Define the gradient to fill between the stops.
