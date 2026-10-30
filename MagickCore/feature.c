@@ -1387,28 +1387,26 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
 
           for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
           {
-            if ((v*v+u*u) <= (ssize_t) ((width/2)*(height/2)))
-              {
-                PixelInfo
-                  pixel;
+            PixelInfo
+              pixel;
 
-                status=GetOneCacheViewVirtualPixelInfo(pixel_view,(ssize_t)
-                  MagickRound(mean_location.x+u),(ssize_t) MagickRound(
-                  mean_location.y+v),&pixel,exception);
-                distance=(mean_pixel.red-pixel.red)*(mean_pixel.red-pixel.red)+
-                  (mean_pixel.green-pixel.green)*(mean_pixel.green-pixel.green)+
-                  (mean_pixel.blue-pixel.blue)*(mean_pixel.blue-pixel.blue);
-                if (distance <= (color_distance*color_distance))
-                  {
-                    sum_location.x+=mean_location.x+u;
-                    sum_location.y+=mean_location.y+v;
-                    sum_pixel.red+=pixel.red;
-                    sum_pixel.green+=pixel.green;
-                    sum_pixel.blue+=pixel.blue;
-                    sum_pixel.alpha+=pixel.alpha;
-                    count++;
-                  }
-              }
+            if ((v*v+u*u) > (ssize_t) ((width/2)*(height/2)))
+              continue;
+            status=GetOneCacheViewVirtualPixelInfo(pixel_view,(ssize_t)
+              MagickRound(mean_location.x+u),(ssize_t) MagickRound(
+              mean_location.y+v),&pixel,exception);
+            distance=(mean_pixel.red-pixel.red)*(mean_pixel.red-pixel.red)+
+              (mean_pixel.green-pixel.green)*(mean_pixel.green-pixel.green)+
+              (mean_pixel.blue-pixel.blue)*(mean_pixel.blue-pixel.blue);
+            if (!(distance <= (color_distance*color_distance)))
+              continue;
+            sum_location.x+=mean_location.x+u;
+            sum_location.y+=mean_location.y+v;
+            sum_pixel.red+=pixel.red;
+            sum_pixel.green+=pixel.green;
+            sum_pixel.blue+=pixel.blue;
+            sum_pixel.alpha+=pixel.alpha;
+            count++;
           }
         }
         if (count != 0)
