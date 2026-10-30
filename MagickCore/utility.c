@@ -1786,6 +1786,17 @@ static MagickBooleanType CheckPathComponent(char **components,
   return(MagickTrue);
 }
 
+static void CountPathComponents(const char *path,size_t *number_components)
+{
+  const char
+    *p;
+
+  *number_components=1;
+  for (p=path; *p != '\0'; p++)
+    if (IsBasenameSeparator(*p))
+      (*number_components)++;
+}
+
 MagickPrivate char **GetPathComponents(const char *path,
   size_t *number_components)
 {
@@ -1801,10 +1812,7 @@ MagickPrivate char **GetPathComponents(const char *path,
 
   if (path == (char *) NULL)
     return((char **) NULL);
-  *number_components=1;
-  for (p=path; *p != '\0'; p++)
-    if (IsBasenameSeparator(*p))
-      (*number_components)++;
+  CountPathComponents(path,number_components);
   components=(char **) AcquireQuantumMemory((size_t) *number_components+1UL,
     sizeof(*components));
   if (components == (char **) NULL)
