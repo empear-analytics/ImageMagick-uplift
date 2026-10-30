@@ -620,6 +620,20 @@ static inline MagickBooleanType IsUnrequestedResource(const char *resource,
     (LocaleCompare(name,macroman_resource) != 0))) ? MagickTrue : MagickFalse);
 }
 
+static char *Trace8BIMClippath(const Image *image,const char *format,
+  char *attribute,const ssize_t count)
+{
+  char
+    *path;
+
+  if (LocaleCompare(format,"svg") == 0)
+    path=TraceSVGClippath((unsigned char *) attribute,(size_t) count,
+      image->columns,image->rows);
+  else
+    path=TracePSClippath((unsigned char *) attribute,(size_t) count);
+  return(path);
+}
+
 static void Get8BIMProperty(const Image *image,const char *key,
   ExceptionInfo *exception)
 {
@@ -757,11 +771,7 @@ static void Get8BIMProperty(const Image *image,const char *key,
             char
               *path;
 
-            if (LocaleCompare(format,"svg") == 0)
-              path=TraceSVGClippath((unsigned char *) attribute,(size_t) count,
-                image->columns,image->rows);
-            else
-              path=TracePSClippath((unsigned char *) attribute,(size_t) count);
+            path=Trace8BIMClippath(image,format,attribute,count);
             (void) SetImageProperty((Image *) image,key,(const char *) path,
               exception);
             path=DestroyString(path);
