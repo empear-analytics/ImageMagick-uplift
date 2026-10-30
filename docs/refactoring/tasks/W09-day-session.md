@@ -15,23 +15,23 @@ new recipe and amendment, and every step that read a recipe closely, before push
 | `paint.c` | 5.10 → **6.10** |
 | `fourier.c` | 4.83 → **5.94** |
 | `transform.c` | 4.22 → **5.45** |
+| `quantize.c` | 4.05 → **5.51** |
 | `segment.c` | 4.93 → **5.27** |
 | `statistic.c` | 4.20 → **5.24** |
 | `feature.c` | 5.20 → **5.23** |
 | `threshold.c` | 4.60 → **5.20** |
 | `vision.c` | 4.18 → **5.16** |
-| `quantize.c` | 4.05 → 4.94 |
-| `fx.c` | 3.08 → 3.23 |
+| `effect.c` | 2.54 → 3.52 |
+| `fx.c` | 3.08 → 3.31 |
 | `colorspace.c` | 3.01 → 3.15 |
-| `effect.c` | 2.54 → 3.12 |
 | `composite.c` | 2.68 → 3.01 |
 | `morphology.c` | 2.62 → 2.70 |
 | `compare.c` | 2.18 → 2.43 |
 | `distort.c` | 3.01 (no legal step raises it) |
 | `visual-effects.c` | 3.27 (no legal step raises it) |
 
-185 commits: 155 refactor steps, 29 playbook commits, 1 contract update. Nine files are
-now above 5. Every refactor commit ran the oracle on its function's cases (0 diverged)
+211 commits: 178 refactor steps, 31 playbook commits, a contract update and this report.
+Ten files are now above 5. Every refactor commit ran the oracle on its function's cases (0 diverged)
 and passed the pre-commit gate, except those on functions no case reaches, which say so
 and rest on the guard or, for Recipe D, on an identical object file. The whole catalogue
 ran after each file: 15,900 cases, 0 diverged. CodeScene's PR gate passed on #79's pushes.
@@ -60,7 +60,9 @@ ran after each file: 15,900 cases, 0 diverged. CodeScene's PR gate passed on #79
   keep no copy; by-value parameters count as locals); I steps 2 and 8 and V step 7 (a
   function-local cleanup-and-throw macro stays in the caller); V step 2 (temporaries);
   D (casts of a variable to its own type are not a differing value); rule 1 (several
-  blocks of one function may share a commit when only together they raise the score).
+  blocks of one function may share a commit when only together they raise the score);
+  E step 4 (a variable read on entry, written, and read by nothing after goes by value);
+  V step 2 (an address passed elsewhere only to calls that keep no copy, as O step 2).
 - **Owner-approved:** Recipe D for functions no case reaches, proven by
   `tools/obj_identical.sh` printing IDENTICAL for the whole object file (91ed57bbc,
   43f2b75c6); AGENTS.md and VERIFICATION.md say so.
@@ -105,6 +107,9 @@ ran after each file: 15,900 cases, 0 diverged. CodeScene's PR gate passed on #79
 - `feature.c` 5.23: the 1,000-line threshold.
 - `compare.c` 2.43, `morphology.c` 2.70: near-copy kernels and SIM shells that become
   duplicates when extracted; status/`continue` paths in parallel loops.
+- `fx.c` 3.31: `GetOperand`'s remaining "try" blocks return several different values or
+  fall through; a recipe "return whether it returned, with the value through `T *result`"
+  would cover them (about +0.02, not added). `ExecuteRPN` (cc 229) keeps its bumps.
 - The rest stopped at their commit budget or at the parallel loops' `status`/progress
   skeletons, which no recipe moves.
 
