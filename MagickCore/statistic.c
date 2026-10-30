@@ -680,6 +680,62 @@ static void AccumulateEvaluateMedianPixel(const EvaluateRow *row,
   p[row->j]+=(ptrdiff_t) GetPixelChannels(row->next);
 }
 
+typedef struct _EvaluateMedian
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  size_t
+    number_images;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  int
+    id;
+
+  MagickEvaluateOperator
+    op;
+} EvaluateMedian;
+
+static void EvaluateMedianRow(const EvaluateMedian *median,const Quantum **p,
+  PixelChannels *evaluate_pixel,Quantum *magick_restrict q)
+{
+  ssize_t
+    j,
+    x;
+
+  for (x=0; x < (ssize_t) median->image->columns; x++)
+  {
+    const Image
+      *next;
+
+    EvaluateRow
+      row;
+
+    next=median->images;
+    for (j=0; j < (ssize_t) median->number_images; j++)
+    {
+      row.image=median->image;
+      row.next=next;
+      row.random_info=median->random_info;
+      row.id=median->id;
+      row.op=median->op;
+      row.j=j;
+      AccumulateEvaluateMedianPixel(&row,p,evaluate_pixel);
+      next=GetNextImageInList(next);
+    }
+    qsort((void *) evaluate_pixel,median->number_images,sizeof(*evaluate_pixel),
+      IntensityCompare);
+    SetEvaluateMedianPixel(median->image,evaluate_pixel,median->number_images,
+      q);
+    q+=(ptrdiff_t) GetPixelChannels(median->image);
+  }
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -780,14 +836,14 @@ MagickExport Image *EvaluateImages(const Image *images,
         const Quantum
           **p;
 
+        EvaluateMedian
+          median;
+
         PixelChannels
           *evaluate_pixel;
 
         Quantum
           *magick_restrict q;
-
-        ssize_t
-          x;
 
         ssize_t
           j;
@@ -818,31 +874,13 @@ MagickExport Image *EvaluateImages(const Image *images,
             continue;
           }
         evaluate_pixel=evaluate_pixels[id];
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          const Image
-            *next;
-
-          EvaluateRow
-            row;
-
-          next=images;
-          for (j=0; j < (ssize_t) number_images; j++)
-          {
-            row.image=image;
-            row.next=next;
-            row.random_info=random_info;
-            row.id=id;
-            row.op=op;
-            row.j=j;
-            AccumulateEvaluateMedianPixel(&row,p,evaluate_pixel);
-            next=GetNextImageInList(next);
-          }
-          qsort((void *) evaluate_pixel,number_images,sizeof(*evaluate_pixel),
-            IntensityCompare);
-          SetEvaluateMedianPixel(image,evaluate_pixel,number_images,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        median.image=image;
+        median.images=images;
+        median.number_images=number_images;
+        median.random_info=random_info;
+        median.id=id;
+        median.op=op;
+        EvaluateMedianRow(&median,p,evaluate_pixel,q);
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
         if (SyncCacheViewAuthenticPixels(evaluate_view,exception) == MagickFalse)
           status=MagickFalse;
