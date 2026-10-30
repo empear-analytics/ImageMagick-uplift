@@ -657,6 +657,29 @@ static void AccumulateEvaluateRow(const EvaluateRow *row,const Quantum **p,
   }
 }
 
+static void AccumulateEvaluateMedianPixel(const EvaluateRow *row,
+  const Quantum **p,PixelChannels *evaluate_pixel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < MaxPixelChannels; i++)
+    evaluate_pixel[row->j].channel[i]=0.0;
+  for (i=0; i < (ssize_t) GetPixelChannels(row->image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(row->image,i);
+    PixelTrait traits = GetPixelChannelTraits(row->next,channel);
+    PixelTrait evaluate_traits = GetPixelChannelTraits(row->image,channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((evaluate_traits & UpdatePixelTrait) == 0))
+      continue;
+    evaluate_pixel[row->j].channel[i]=ApplyEvaluateOperator(
+      row->random_info[row->id],GetPixelChannel(row->next,channel,p[row->j]),
+      row->op,evaluate_pixel[row->j].channel[i]);
+  }
+  p[row->j]+=(ptrdiff_t) GetPixelChannels(row->next);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -800,27 +823,19 @@ MagickExport Image *EvaluateImages(const Image *images,
           const Image
             *next;
 
-          ssize_t
-            i;
+          EvaluateRow
+            row;
 
           next=images;
           for (j=0; j < (ssize_t) number_images; j++)
           {
-            for (i=0; i < MaxPixelChannels; i++)
-              evaluate_pixel[j].channel[i]=0.0;
-            for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-            {
-              PixelChannel channel = GetPixelChannelChannel(image,i);
-              PixelTrait traits = GetPixelChannelTraits(next,channel);
-              PixelTrait evaluate_traits = GetPixelChannelTraits(image,channel);
-              if (((traits & UpdatePixelTrait) == 0) ||
-                  ((evaluate_traits & UpdatePixelTrait) == 0))
-                continue;
-              evaluate_pixel[j].channel[i]=ApplyEvaluateOperator(
-                random_info[id],GetPixelChannel(next,channel,p[j]),op,
-                evaluate_pixel[j].channel[i]);
-            }
-            p[j]+=(ptrdiff_t) GetPixelChannels(next);
+            row.image=image;
+            row.next=next;
+            row.random_info=random_info;
+            row.id=id;
+            row.op=op;
+            row.j=j;
+            AccumulateEvaluateMedianPixel(&row,p,evaluate_pixel);
             next=GetNextImageInList(next);
           }
           qsort((void *) evaluate_pixel,number_images,sizeof(*evaluate_pixel),
