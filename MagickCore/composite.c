@@ -1284,6 +1284,61 @@ static void CompositeOverPixelChannels(const OverPixelInputs *authentic,
   }
 }
 
+typedef struct _VirtualOverInputs
+{
+  Image
+    *image;
+
+  const Image
+    *source_image;
+
+  ssize_t
+    x,
+    x_offset,
+    y,
+    y_offset;
+
+  MagickBooleanType
+    clamp;
+
+  ExceptionInfo
+    *exception;
+} VirtualOverInputs;
+
+static void CompositeVirtualOverPixel(const VirtualOverInputs *virtual_pixel,
+  Quantum *magick_restrict q)
+{
+  Quantum
+    source[MaxPixelChannels];
+
+  ssize_t
+    i;
+
+  (void) GetOneVirtualPixel(virtual_pixel->source_image,
+    CastDoubleToSsizeT((double) virtual_pixel->x-virtual_pixel->x_offset),
+    CastDoubleToSsizeT((double) virtual_pixel->y-virtual_pixel->y_offset),
+    source,virtual_pixel->exception);
+  for (i=0; i < (ssize_t) GetPixelChannels(virtual_pixel->image); i++)
+  {
+    MagickRealType
+      pixel;
+
+    PixelChannel channel = GetPixelChannelChannel(virtual_pixel->image,i);
+    PixelTrait traits = GetPixelChannelTraits(virtual_pixel->image,channel);
+    PixelTrait source_traits=GetPixelChannelTraits(virtual_pixel->source_image,
+      channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (source_traits == UndefinedPixelTrait))
+      continue;
+    if (channel == AlphaPixelChannel)
+      pixel=(MagickRealType) TransparentAlpha;
+    else
+      pixel=(MagickRealType) q[i];
+    q[i]=virtual_pixel->clamp != MagickFalse ? ClampPixel(pixel) :
+      ClampToQuantum(pixel);
+  }
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1396,9 +1451,6 @@ static MagickBooleanType CompositeOverImage(Image *image,
       OverPixelInputs
         authentic;
 
-      ssize_t
-        i;
-
       size_t
         channels;
 
@@ -1414,36 +1466,23 @@ static MagickBooleanType CompositeOverImage(Image *image,
         }
       if (IsOutsideSourceColumn(pixels,x,x_offset,source_image) != MagickFalse)
         {
-          Quantum
-            source[MaxPixelChannels];
+          VirtualOverInputs
+            virtual_pixel;
 
           /*
             Virtual composite:
               Sc: source color.
               Dc: canvas color.
           */
-          (void) GetOneVirtualPixel(source_image,
-            CastDoubleToSsizeT((double) x-x_offset),
-            CastDoubleToSsizeT((double) y-y_offset),source,exception);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            MagickRealType
-              pixel;
-
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            PixelTrait source_traits=GetPixelChannelTraits(source_image,
-              channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (source_traits == UndefinedPixelTrait))
-              continue;
-            if (channel == AlphaPixelChannel)
-              pixel=(MagickRealType) TransparentAlpha;
-            else
-              pixel=(MagickRealType) q[i];
-            q[i]=clamp != MagickFalse ? ClampPixel(pixel) :
-              ClampToQuantum(pixel);
-          }
+          virtual_pixel.image=image;
+          virtual_pixel.source_image=source_image;
+          virtual_pixel.x=x;
+          virtual_pixel.x_offset=x_offset;
+          virtual_pixel.y=y;
+          virtual_pixel.y_offset=y_offset;
+          virtual_pixel.clamp=clamp;
+          virtual_pixel.exception=exception;
+          CompositeVirtualOverPixel(&virtual_pixel,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
           continue;
         }
