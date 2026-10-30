@@ -2149,6 +2149,59 @@ static void DitherFloydSteinbergPixel(const FloydSteinbergPixel *fs,
 
 #define DitherImageTag  "Dither/Image"
 
+typedef struct _FloydSteinbergRow
+{
+  Image
+    *image;
+
+  QCubeInfo
+    *cube_info;
+
+  CacheView
+    *image_view;
+
+  DoublePixelPacket
+    *current,
+    *previous;
+
+  Quantum
+    *q;
+
+  ssize_t
+    v,
+    y;
+
+  ExceptionInfo
+    *exception;
+} FloydSteinbergRow;
+
+static void DitherFloydSteinbergRow(const FloydSteinbergRow *row,
+  QCubeInfo *cube,MagickBooleanType *status)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->image->columns; x++)
+  {
+    FloydSteinbergPixel
+      fs;
+
+    fs.image=row->image;
+    fs.cube_info=row->cube_info;
+    fs.image_view=row->image_view;
+    fs.current=row->current;
+    fs.previous=row->previous;
+    fs.q=row->q;
+    fs.v=row->v;
+    fs.x=x;
+    fs.y=row->y;
+    fs.exception=row->exception;
+    DitherFloydSteinbergPixel(&fs,cube,status);
+    if (ReportImageRowProgress(row->image,DitherImageTag,row->y) == MagickFalse)
+      *status=MagickFalse;
+  }
+}
+
 static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -2181,6 +2234,9 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
       *current,
       *previous;
 
+    FloydSteinbergRow
+      row;
+
     QCubeInfo
       cube;
 
@@ -2188,7 +2244,6 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
       *magick_restrict q;
 
     ssize_t
-      x,
       v;
 
     if (status == MagickFalse)
@@ -2203,25 +2258,16 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
     current=pixels[id]+(y & 0x01)*image->columns;
     previous=pixels[id]+((y+1) & 0x01)*image->columns;
     v=(ssize_t) ((y & 0x01) != 0 ? -1 : 1);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      FloydSteinbergPixel
-        fs;
-
-      fs.image=image;
-      fs.cube_info=cube_info;
-      fs.image_view=image_view;
-      fs.current=current;
-      fs.previous=previous;
-      fs.q=q;
-      fs.v=v;
-      fs.x=x;
-      fs.y=y;
-      fs.exception=exception;
-      DitherFloydSteinbergPixel(&fs,&cube,&status);
-      if (ReportImageRowProgress(image,DitherImageTag,y) == MagickFalse)
-        status=MagickFalse;
-    }
+    row.image=image;
+    row.cube_info=cube_info;
+    row.image_view=image_view;
+    row.current=current;
+    row.previous=previous;
+    row.q=q;
+    row.v=v;
+    row.y=y;
+    row.exception=exception;
+    DitherFloydSteinbergRow(&row,&cube,&status);
   }
   image_view=DestroyCacheView(image_view);
   pixels=DestroyPixelTLS(pixels);
