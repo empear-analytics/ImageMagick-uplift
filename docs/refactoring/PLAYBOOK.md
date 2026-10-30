@@ -3064,6 +3064,182 @@ the mandate of 2026-10-24.
 
 ---
 
+## Recipe TW - Extract Twin Blocks into One Function Taking an Input Struct
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method* on two functions of one file that hold the same block: the same
+text once each copy's variables are renamed consistently, differing in at most one value
+(`shear.c`'s `XShearImage` and `YShearImage`, whose pixel-transfer cases differ in
+`x_offset`/`y_offset`, `width`/`height` and `image->columns`/`image->rows`), with five or
+more inputs. Moving one copy alone lowers the score (one more function raises the file's
+mean complexity while the twin keeps its findings), and a second helper of the same text
+would be *Code Duplication*.
+
+**Not covered by:** Recipe N, which moves one block, names each member after the variable
+it holds and fills it only from the variable of that name; Recipe D, whose *Use when* is
+a reported *Code Duplication* (these twins, whole `switch` cases of two functions, are not
+reported) and which passes the inputs as parameters (seven here); Recipe W step 7 and
+Recipe LB step 6, which reuse a helper of their own forms, one caller per commit; Recipe E
+step 4, which declares a moved temporary in the new function only when nothing between
+its declaration and the block writes it.
+
+**How:**
+
+1. Each copy meets Recipe N step 1: Recipe E steps 1 and 3 to 7 and the OpenMP rule, no
+   `#pragma` line. Check by script that the copies are the same token sequence once each
+   copy's variables are renamed to one common name per role and the differing value is
+   replaced by a name (`extent`). Literals and operators are not renamed; whitespace and
+   line breaks are ignored.
+2. Inputs. The variables each copy only reads go into one struct, as in Recipe N steps 2
+   and 3, each member of the variable's exact type and named for its role (`offset` for
+   `x_offset` and `y_offset`); the two variables of a role have the same type. The
+   differing value, a side-effect-free expression of one type in both copies
+   (`image->columns`, `image->rows`) that nothing in the block can change, is one more
+   member of that type. A variable the block reads on entry and then writes, and that
+   nothing after the block reads, goes by value as a parameter (Recipe E step 4). With
+   the struct and the pointers the block writes through, at most four parameters.
+3. Temporaries. A variable of the caller that the block writes before it reads it, on
+   every path, and that nothing after the block reads, is declared in the new function
+   without an initialiser, even when the caller writes it before the block (a
+   `GetPixelInfo(image,&source)` that stays): its value on entry is never read (Recipe J
+   step 3, Recipe Q step 2). Its declaration leaves the caller only when nothing else
+   there uses it.
+4. Write one `static` function directly above the first caller: a `const` local per
+   member it reads, as in Recipe N step 4 (or the member form), then the block's text
+   with the common names, nothing else changed. Recipe E step 7's forms apply as for one
+   block (a `break;` of the `switch` becomes `return;`).
+5. In each caller, declare the struct local among the declarations at the top of the
+   block that holds the call (inside a parallel loop's body, as Recipe N step 7 says).
+   Directly before the call assign every member, in declaration order, from the variable
+   that plays its role in that copy (`span.offset=y_offset;`) or from that copy's
+   differing value (`span.extent=image->rows;`). The call stands where the block stood.
+6. Both copies move in one commit (rule 1, several functions); the message gives the
+   score of the first copy moved alone. Several twin pairs of the same two functions
+   (two `switch` cases each, say) may share the commit, one function per pair, and may
+   share one struct type.
+7. Check by reading that every call assigns every member, each from the variable or
+   expression it replaced in that copy, and that every other argument fills its
+   parameter.
+
+**Before:**
+
+```c
+/* XShearImage, inside the parallel row loop */
+      case LEFT:
+      {
+        if (step > x_offset)
+          break;
+        q=p-step*(ssize_t) GetPixelChannels(image);
+        for (i=0; i < (ssize_t) width; i++)
+        {
+          if ((x_offset+i) < step)
+            { ... continue; }
+          GetPixelInfoPixel(image,p,&source);
+          ...
+        }
+        ...
+        break;
+      }
+/* YShearImage, inside the parallel column loop: the same with y_offset and height */
+      case UP:
+      {
+        if (step > y_offset)
+          break;
+        ...
+      }
+```
+
+**After:**
+
+```c
+typedef struct _ShearSpan
+{
+  Image
+    *image;
+
+  PixelInfo
+    background;
+
+  double
+    area;
+
+  size_t
+    length,
+    extent;
+
+  ssize_t
+    offset,
+    step;
+} ShearSpan;
+
+static void TransferPixelsForward(Quantum *magick_restrict p,PixelInfo pixel,
+  PixelInfo destination,const ShearSpan *span)
+{
+  Image
+    *image = span->image;
+  ...
+  const ssize_t
+    offset = span->offset,
+    step = span->step;
+
+  PixelInfo
+    source;
+  ...
+  if (step > offset)
+    return;
+  q=p-step*(ssize_t) GetPixelChannels(image);
+  for (i=0; i < (ssize_t) length; i++)
+  ...
+}
+...
+      case UP:
+      {
+        span.image=image;
+        span.background=background;
+        span.area=area;
+        span.length=height;
+        span.extent=image->rows;
+        span.offset=y_offset;
+        span.step=step;
+        TransferPixelsForward(p,pixel,destination,&span);
+        break;
+      }
+```
+
+**Careful:**
+
+- The function's text is each copy's text with that copy's variables substituted, so each
+  call runs the operations its copy ran on the values its copy read. The token comparison
+  of step 1 is the check; a literal or operator that differs stops the step.
+- The differing value is read once, at the fill, where the copy read it at each use: the
+  same value only while nothing in the block can change what it reads. In `shear.c` the
+  block writes pixels through `q` and its own temporaries, never the image's size.
+- A by-value input (`p`, `pixel`, `destination`) is copied at the call, and the block's
+  writes land in the copy, which nothing reads once the function returns. A struct value
+  passed this way is read whole by the copy, so it must be set on every path to the call
+  (`pixel=background;`, `GetPixelInfo(image,&destination)`), as Recipe N step 2 (a) asks
+  of a member.
+- A member that one of the functions does not read (`extent`, in a call of the forward
+  transfer) is still assigned, from a side-effect-free expression: one struct type serves
+  both functions, and step 7's count stays simple.
+- Inside a parallel loop every variable the call writes is the loop body's own: the struct
+  local, the by-value copies and the new function's temporaries. The OpenMP rule holds as
+  for Recipe N.
+- `refactor_guard.py --calls` shows each new function and the callees of the removed
+  copies, down by the calls the second copy made: a deduplication, as Recipe D's.
+
+**Evidence level:** oracle (the cases of both functions), with `refactor_guard.py --calls`,
+and steps 1 (by script), 2, 3 and 7 checked by reading.
+
+**Provenance:** 2026-10-30, from `shear.c`'s `XShearImage` and `YShearImage`: their
+depth-4 sites and three of their five bumps are the two pixel-transfer cases of each
+function's direction `switch`, twins under the renaming. A probe: `XShearImage`'s two cases
+alone, 6.47 to 5.99; both functions' four cases, 6.47 to 6.63, both leaving *Deep, Nested
+Complexity*. Added by Claude Code (Claude Opus 5.5) during task W10, under the mandate of
+2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -3475,3 +3651,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | V | Step 6: another copy of a step-6 block, in another function and identical under Recipe D's renaming (checked by script), may call the function the first copy became, with its own arguments and its own `c`, one commit per caller, as Recipe W step 7 allows for W; *Careful* gives the argument | `resize-image.c`'s `HorizontalFilter` and `VerticalFilter`: the contribution-buffer allocation, which throws and returns `MagickFalse` when it fails, is the same text in both. Recipe D moves copies whole and may not leave the caller, and a second helper of the same text would be a duplicate. A probe: 6.29 to 6.31 for the first copy, 6.32 with the second | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | LB | Step 6: a block whose step-3 text equals, under Recipe D's renaming (checked by script), the body of a function Recipe LB, Y or W already made in the file calls that function instead of a second copy, with its own struct local and its own `break;`, as Recipe W step 7 allows for W; *Careful* gives the argument | `histogram.c`'s `CheckImageColors`: its child-allocation block in the tree descent ends the level loop through `break;` where `ClassifyImageColors`' identical block returns `0`, which Recipe Y moved into `AcquireHNodeChild`; a second copy would be a *Code Duplication*. A probe: nesting 5 to 4, 6.41 to 6.42 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | I | Step 2: a written variable whose address the caller passes elsewhere only as an argument of calls that keep no copy of it (checked by reading the callee) still qualifies, as Recipe V step 2 and Recipe LB step 8 allow; in the block, `&v` becomes `v`, as step 8 already says for its form; *Careful* gives the argument | `histogram.c`'s `ClassifyImageColors`: its tree descent (the level loop at depth 3, its exit at depth 4) writes the node cursor and `pixel`, whose address the caller also passes to `GetPixelInfo` and `IsPixelInfoColorMatch`, neither of which keeps it, and leaves through `return(0);`. A probe: 6.43 to 6.47 | mandate (2026-10-24) |
+| 2026-10-30 | NEW | TW | Extract Twin Blocks into One Function Taking an Input Struct: two functions' copies of one block, the same text once each copy's variables are renamed consistently and differing in at most one value (checked by script), move to one `static` function taking a `const` struct of the inputs (Recipe N), its members named for their roles and filled in each caller from that copy's variables; read-then-written inputs go by value, temporaries written before read are declared in the function; both copies in one commit (rule 1) | `shear.c`'s `XShearImage` and `YShearImage`: the left/up and right/down pixel-transfer cases of their direction `switch`es hold the depth-4 sites; Recipe N names members after one copy's variables, Recipe D needs a reported duplication and would take seven parameters. A probe: one function's cases alone 6.47 to 5.99, both 6.47 to 6.63 | mandate (2026-10-24) |
