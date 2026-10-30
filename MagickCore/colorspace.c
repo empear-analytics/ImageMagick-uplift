@@ -309,6 +309,19 @@ MagickPrivate void ConvertGenericToRGB(const ColorspaceType colorspace,
 %    o red, green, blue: A pointer to a pixel component of type Quantum.
 %
 */
+static double ComputeHSLChroma(const double saturation,
+  const double lightness)
+{
+  double
+    c;
+
+  if (lightness <= 0.5)
+    c=2.0*lightness*saturation;
+  else
+    c=(2.0-2.0*lightness)*saturation;
+  return(c);
+}
+
 MagickExport void ConvertHSLToRGB(const double hue,const double saturation,
   const double lightness,double *red,double *green,double *blue)
 {
@@ -325,10 +338,7 @@ MagickExport void ConvertHSLToRGB(const double hue,const double saturation,
   assert(green != (double *) NULL);
   assert(blue != (double *) NULL);
   h=hue*360.0;
-  if (lightness <= 0.5)
-    c=2.0*lightness*saturation;
-  else
-    c=(2.0-2.0*lightness)*saturation;
+  c=ComputeHSLChroma(saturation,lightness);
   min=lightness-0.5*c;
   h-=360.0*floor(h/360.0);
   h/=60.0;
