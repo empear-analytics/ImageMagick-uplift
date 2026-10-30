@@ -1407,6 +1407,29 @@ static MagickBooleanType ValidateEntities(char *tag,char *xml,
   }
 }
 
+static void AddProcessingInstructionTarget(XMLTreeRoot *root,const ssize_t i,
+  const char *target)
+{
+  if (root->processing_instructions[i] == (char **) NULL)
+    {
+      root->processing_instructions=(char ***) ResizeQuantumMemory(
+        root->processing_instructions,(size_t) (i+2),
+        sizeof(*root->processing_instructions));
+      if (root->processing_instructions == (char ***) NULL)
+        ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+      root->processing_instructions[i]=(char **) AcquireQuantumMemory(3,
+        sizeof(**root->processing_instructions));
+      if (root->processing_instructions[i] == (char **) NULL)
+        ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+      root->processing_instructions[i+1]=(char **) NULL;
+      root->processing_instructions[i][0]=ConstantString(target);
+      root->processing_instructions[i][1]=(char *)
+        root->processing_instructions[i+1];
+      root->processing_instructions[i+1]=(char **) NULL;
+      root->processing_instructions[i][2]=ConstantString("");
+    }
+}
+
 static void ParseProcessingInstructions(XMLTreeRoot *root,char *xml,
   size_t length)
 {
@@ -1443,24 +1466,7 @@ static void ParseProcessingInstructions(XMLTreeRoot *root,char *xml,
   while ((root->processing_instructions[i] != (char **) NULL) &&
          (strcmp(target,root->processing_instructions[i][0]) != 0))
     i++;
-  if (root->processing_instructions[i] == (char **) NULL)
-    {
-      root->processing_instructions=(char ***) ResizeQuantumMemory(
-        root->processing_instructions,(size_t) (i+2),
-        sizeof(*root->processing_instructions));
-      if (root->processing_instructions == (char ***) NULL)
-        ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-      root->processing_instructions[i]=(char **) AcquireQuantumMemory(3,
-        sizeof(**root->processing_instructions));
-      if (root->processing_instructions[i] == (char **) NULL)
-        ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-      root->processing_instructions[i+1]=(char **) NULL;
-      root->processing_instructions[i][0]=ConstantString(target);
-      root->processing_instructions[i][1]=(char *)
-        root->processing_instructions[i+1];
-      root->processing_instructions[i+1]=(char **) NULL;
-      root->processing_instructions[i][2]=ConstantString("");
-    }
+  AddProcessingInstructionTarget(root,i,target);
   j=1;
   while (root->processing_instructions[i][j] != (char *) NULL)
     j++;
