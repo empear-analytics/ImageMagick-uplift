@@ -2387,6 +2387,66 @@ static void AccumulatePolynomialRow(const PolynomialTerm *term,
   }
 }
 
+typedef struct _PolynomialRows
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  size_t
+    number_images,
+    number_terms;
+
+  const double
+    *terms;
+
+  ssize_t
+    y;
+} PolynomialRows;
+
+static void AccumulatePolynomialImages(const PolynomialRows *rows,
+  PixelChannels *polynomial_pixel,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  const Image
+    *next;
+
+  PolynomialTerm
+    term;
+
+  ssize_t
+    j;
+
+  next=rows->images;
+  for (j=0; j < (ssize_t) rows->number_images; j++)
+  {
+    const Quantum
+      *p;
+
+    if (j >= (ssize_t) rows->number_terms)
+      continue;
+    image_view=AcquireVirtualCacheView(next,exception);
+    p=GetCacheViewVirtualPixels(image_view,0,rows->y,rows->image->columns,1,
+      exception);
+    if (p == (const Quantum *) NULL)
+      {
+        image_view=DestroyCacheView(image_view);
+        break;
+      }
+    term.image=rows->image;
+    term.next=next;
+    term.terms=rows->terms;
+    term.j=j;
+    AccumulatePolynomialRow(&term,p,polynomial_pixel);
+    image_view=DestroyCacheView(image_view);
+    next=GetNextImageInList(next);
+  }
+}
+
 MagickExport Image *PolynomialImage(const Image *images,
   const size_t number_terms,const double *terms,ExceptionInfo *exception)
 {
@@ -2448,26 +2508,17 @@ MagickExport Image *PolynomialImage(const Image *images,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    CacheView
-      *image_view;
-
-    const Image
-      *next;
-
     const int
       id = GetOpenMPThreadId();
 
     PixelChannels
       *polynomial_pixel;
 
-    PolynomialTerm
-      term;
+    PolynomialRows
+      rows;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      j;
 
     if (status == MagickFalse)
       continue;
@@ -2480,29 +2531,13 @@ MagickExport Image *PolynomialImage(const Image *images,
       }
     polynomial_pixel=polynomial_pixels[id];
     ClearPolynomialPixels(image,polynomial_pixel);
-    next=images;
-    for (j=0; j < (ssize_t) number_images; j++)
-    {
-      const Quantum
-        *p;
-
-      if (j >= (ssize_t) number_terms)
-        continue;
-      image_view=AcquireVirtualCacheView(next,exception);
-      p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          image_view=DestroyCacheView(image_view);
-          break;
-        }
-      term.image=image;
-      term.next=next;
-      term.terms=terms;
-      term.j=j;
-      AccumulatePolynomialRow(&term,p,polynomial_pixel);
-      image_view=DestroyCacheView(image_view);
-      next=GetNextImageInList(next);
-    }
+    rows.image=image;
+    rows.images=images;
+    rows.number_images=number_images;
+    rows.number_terms=number_terms;
+    rows.terms=terms;
+    rows.y=y;
+    AccumulatePolynomialImages(&rows,polynomial_pixel,exception);
     SetPolynomialPixels(image,polynomial_pixel,q);
     if (SyncCacheViewAuthenticPixels(polynomial_view,exception) == MagickFalse)
       status=MagickFalse;
