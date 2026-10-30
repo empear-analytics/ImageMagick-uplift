@@ -192,6 +192,21 @@ static size_t GetColormapDepth(const Image *image,size_t *current_depth,
   return(depth);
 }
 
+static void RaiseSampleDepth(const Quantum *p,const ssize_t j,
+  size_t *current_depth,const int id)
+{
+  while (current_depth[id] < MAGICKCORE_QUANTUM_DEPTH)
+  {
+    QuantumAny
+      range;
+
+    range=GetQuantumRange(current_depth[id]);
+    if (p[j] == ScaleAnyToQuantum(ScaleQuantumToAny(p[j],range),range))
+      break;
+    current_depth[id]++;
+  }
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -352,16 +367,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
         traits=GetPixelChannelTraits(image,channel);
         if ((traits & UpdatePixelTrait) == 0)
           continue;
-        while (current_depth[id] < MAGICKCORE_QUANTUM_DEPTH)
-        {
-          QuantumAny
-            range;
-
-          range=GetQuantumRange(current_depth[id]);
-          if (p[j] == ScaleAnyToQuantum(ScaleQuantumToAny(p[j],range),range))
-            break;
-          current_depth[id]++;
-        }
+        RaiseSampleDepth(p,j,current_depth,id);
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
