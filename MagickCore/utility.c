@@ -357,6 +357,40 @@ MagickExport void AppendImageFormat(const char *format,char *filename)
 %    o length: the number of bytes decoded.
 %
 */
+static void DecodeBase64Character(unsigned char *decode,const char *q,
+  size_t *i,int *state)
+{
+  switch (*state)
+  {
+    case 0:
+    {
+      decode[(*i)]=(unsigned char)((q-Base64) << 2);
+      (*state)++;
+      break;
+    }
+    case 1:
+    {
+      decode[(*i)++]|=(unsigned char)((q-Base64) >> 4);
+      decode[(*i)]=(unsigned char)(((q-Base64) & 0x0f) << 4);
+      (*state)++;
+      break;
+    }
+    case 2:
+    {
+      decode[(*i)++]|=(unsigned char)((q-Base64) >> 2);
+      decode[(*i)]=(unsigned char)(((q-Base64) & 0x03) << 6);
+      (*state)++;
+      break;
+    }
+    case 3:
+    {
+      decode[(*i)++]|=(unsigned char)(q-Base64);
+      (*state)=0;
+      break;
+    }
+  }
+}
+
 MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
 {
   int
@@ -395,35 +429,7 @@ MagickExport unsigned char *Base64Decode(const char *source,size_t *length)
         decode=(unsigned char *) RelinquishMagickMemory(decode);
         return((unsigned char *) NULL);  /* non-Base64 character */
       }
-    switch (state)
-    {
-      case 0:
-      {
-        decode[i]=(unsigned char)((q-Base64) << 2);
-        state++;
-        break;
-      }
-      case 1:
-      {
-        decode[i++]|=(unsigned char)((q-Base64) >> 4);
-        decode[i]=(unsigned char)(((q-Base64) & 0x0f) << 4);
-        state++;
-        break;
-      }
-      case 2:
-      {
-        decode[i++]|=(unsigned char)((q-Base64) >> 2);
-        decode[i]=(unsigned char)(((q-Base64) & 0x03) << 6);
-        state++;
-        break;
-      }
-      case 3:
-      {
-        decode[i++]|=(unsigned char)(q-Base64);
-        state=0;
-        break;
-      }
-    }
+    DecodeBase64Character(decode,q,&i,&state);
   }
   /*
     Verify Base-64 string has proper terminal characters.
