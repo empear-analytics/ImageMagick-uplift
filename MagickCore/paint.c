@@ -125,6 +125,39 @@ static inline void SetMaskedFillChannels(const Image *image,
     SetPixelAlpha(image,(Quantum) fill_color->alpha,q);
 }
 
+typedef struct _FloodfillScan
+{
+  Image
+    *image,
+    *floodplane_image;
+
+  const PixelInfo
+    *target;
+
+  MagickBooleanType
+    invert;
+} FloodfillScan;
+
+static ssize_t FillFloodplaneSpan(const FloodfillScan *scan,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,ssize_t x)
+{
+  PixelInfo
+    pixel;
+
+  for ( ; x < (ssize_t) scan->image->columns; x++)
+  {
+    if (GetPixelGray(scan->floodplane_image,q) != 0)
+      break;
+    GetPixelInfoPixel(scan->image,p,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,scan->target) == scan->invert)
+      break;
+    SetPixelGray(scan->floodplane_image,QuantumRange,q);
+    p+=(ptrdiff_t) GetPixelChannels(scan->image);
+    q+=(ptrdiff_t) GetPixelChannels(scan->floodplane_image);
+  }
+  return(x);
+}
+
 MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
   const DrawInfo *draw_info,const PixelInfo *target,const ssize_t x_offset,
   const ssize_t y_offset,const MagickBooleanType invert,
@@ -239,6 +272,9 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     const Quantum
       *magick_restrict p;
 
+    FloodfillScan
+      scan;
+
     Quantum
       *magick_restrict q;
 
@@ -296,17 +332,11 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
                 ((ssize_t) image->columns-x),1,exception);
               if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
                 break;
-              for ( ; x < (ssize_t) image->columns; x++)
-              {
-                if (GetPixelGray(floodplane_image,q) != 0)
-                  break;
-                GetPixelInfoPixel(image,p,&pixel);
-                if (IsFuzzyEquivalencePixelInfo(&pixel,target) == invert)
-                  break;
-                SetPixelGray(floodplane_image,QuantumRange,q);
-                p+=(ptrdiff_t) GetPixelChannels(image);
-                q+=(ptrdiff_t) GetPixelChannels(floodplane_image);
-              }
+              scan.image=image;
+              scan.floodplane_image=floodplane_image;
+              scan.target=target;
+              scan.invert=invert;
+              x=FillFloodplaneSpan(&scan,p,q,x);
               status=SyncCacheViewAuthenticPixels(floodplane_view,exception);
               if (status == MagickFalse)
                 break;
