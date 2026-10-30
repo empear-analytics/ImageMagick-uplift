@@ -170,7 +170,10 @@ harness has one, or through `tools/ch.py`, which talks to the same server. Do no
 - Never squash several functions into one commit. The campaign relies on being able to
   revert a single step.
 - The CodeScene gate, `tools/codescene_precommit.py`, checks what is staged: no library
-  file may lose Code Health, and a new one must score 10.0. `.githooks/pre-commit` runs
+  file may lose Code Health, and a genuinely new one must score 10.0. Code that only
+  moves is held to what it scored before: a file split off another (Recipe S) must
+  score at least what its original scored, and in a merge a file identical to the
+  merged branch's version is skipped (owner, 2026-10-30). `.githooks/pre-commit` runs
   it on every commit once the clone is set up with `git config core.hooksPath .githooks`.
   It needs `cs-mcp` on the `PATH` (or `CS_MCP_BINARY_PATH`) and `CS_ACCESS_TOKEN`. Do not
   bypass it with `--no-verify`; when it refuses, stop and report, as the playbook says.
