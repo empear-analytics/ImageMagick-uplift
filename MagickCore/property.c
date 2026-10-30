@@ -1912,6 +1912,25 @@ static inline MagickBooleanType IsNotNamespaceWildcard(
     MagickFalse);
 }
 
+static void AddXMPPropertyValue(const Image *image,XMLTreeInfo *node,
+  const char *content)
+{
+  char
+    *xmp_namespace;
+
+  size_t
+    xmp_namespace_length;
+
+  xmp_namespace=ConstantString(GetXMLTreeTag(node));
+  (void) SubstituteString(&xmp_namespace,"exif:","xmp:");
+  xmp_namespace_length=strlen(xmp_namespace);
+  if (IsNotNamespaceWildcard(xmp_namespace,xmp_namespace_length) !=
+      MagickFalse)
+    (void) AddValueToSplayTree((SplayTreeInfo *) image->properties,
+     ConstantString(xmp_namespace),ConstantString(content));
+  xmp_namespace=DestroyString(xmp_namespace);
+}
+
 static void GetXMPProperty(const Image *image,const char *property)
 {
   char
@@ -1977,16 +1996,7 @@ static void GetXMPProperty(const Image *image,const char *property)
           content=GetXMLTreeContent(node);
           if ((child == (XMLTreeInfo *) NULL) &&
               (SkipXMPValue(content) == MagickFalse))
-            {
-              xmp_namespace=ConstantString(GetXMLTreeTag(node));
-              (void) SubstituteString(&xmp_namespace,"exif:","xmp:");
-              xmp_namespace_length=strlen(xmp_namespace);
-              if (IsNotNamespaceWildcard(xmp_namespace,xmp_namespace_length) !=
-                  MagickFalse)
-                (void) AddValueToSplayTree((SplayTreeInfo *) image->properties,
-                 ConstantString(xmp_namespace),ConstantString(content));
-              xmp_namespace=DestroyString(xmp_namespace);
-            }
+            AddXMPPropertyValue(image,node,content);
           while (child != (XMLTreeInfo *) NULL)
           {
             content=GetXMLTreeContent(child);
