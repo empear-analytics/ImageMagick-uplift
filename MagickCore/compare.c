@@ -2283,6 +2283,80 @@ static MagickBooleanType GetRMSESimilarity(const Image *image,
   return(status);
 }
 
+typedef struct _SSIMTap
+{
+  const Image
+    *image,
+    *reconstruct_image;
+
+  MagickRealType
+    *k;
+
+  const Quantum
+    *test,
+    *reconstruct;
+} SSIMTap;
+
+typedef struct _SSIMTapTargets
+{
+  double
+    (*x_pixel_mu)[MaxPixelChannels+1],
+    (*x_pixel_sigma_squared)[MaxPixelChannels+1],
+    (*y_pixel_mu)[MaxPixelChannels+1],
+    (*y_pixel_sigma_squared)[MaxPixelChannels+1],
+    (*xy_sigma)[MaxPixelChannels+1];
+} SSIMTapTargets;
+
+static void AccumulateSSIMTap(const SSIMTap *tap,
+  const SSIMTapTargets *targets)
+{
+  const Image
+    *const image = tap->image,
+    *const reconstruct_image = tap->reconstruct_image;
+
+  MagickRealType
+    *const k = tap->k;
+
+  const Quantum
+    *const test = tap->test,
+    *const reconstruct = tap->reconstruct;
+
+  double
+    (*const x_pixel_mu)[MaxPixelChannels+1] = targets->x_pixel_mu,
+    (*const x_pixel_sigma_squared)[MaxPixelChannels+1] =
+      targets->x_pixel_sigma_squared,
+    (*const y_pixel_mu)[MaxPixelChannels+1] = targets->y_pixel_mu,
+    (*const y_pixel_sigma_squared)[MaxPixelChannels+1] =
+      targets->y_pixel_sigma_squared,
+    (*const xy_sigma)[MaxPixelChannels+1] = targets->xy_sigma;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      x_pixel,
+      y_pixel;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(
+      reconstruct_image,channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    x_pixel=QuantumScale*(double) test[i];
+    (*x_pixel_mu)[i]+=(*k)*x_pixel;
+    (*x_pixel_sigma_squared)[i]+=(*k)*x_pixel*x_pixel;
+    y_pixel=QuantumScale*(double)
+      GetPixelChannel(reconstruct_image,channel,reconstruct);
+    (*y_pixel_mu)[i]+=(*k)*y_pixel;
+    (*y_pixel_sigma_squared)[i]+=(*k)*y_pixel*y_pixel;
+    (*xy_sigma)[i]+=(*k)*x_pixel*y_pixel;
+  }
+}
+
 static MagickBooleanType GetSSIMSimularity(const Image *image,
   const Image *reconstruct_image,double *similarity,ExceptionInfo *exception)
 {
@@ -2417,28 +2491,23 @@ static MagickBooleanType GetSSIMSimularity(const Image *image,
 
         for (u=0; u < (ssize_t) kernel_info->width; u++)
         {
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            double
-              x_pixel,
-              y_pixel;
+          SSIMTap
+            tap;
 
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            PixelTrait reconstruct_traits = GetPixelChannelTraits(
-              reconstruct_image,channel);
-            if (((traits & UpdatePixelTrait) == 0) ||
-                ((reconstruct_traits & UpdatePixelTrait) == 0))
-              continue;
-            x_pixel=QuantumScale*(double) test[i];
-            x_pixel_mu[i]+=(*k)*x_pixel;
-            x_pixel_sigma_squared[i]+=(*k)*x_pixel*x_pixel;
-            y_pixel=QuantumScale*(double)
-              GetPixelChannel(reconstruct_image,channel,reconstruct);
-            y_pixel_mu[i]+=(*k)*y_pixel;
-            y_pixel_sigma_squared[i]+=(*k)*y_pixel*y_pixel;
-            xy_sigma[i]+=(*k)*x_pixel*y_pixel;
-          }
+          SSIMTapTargets
+            targets;
+
+          tap.image=image;
+          tap.reconstruct_image=reconstruct_image;
+          tap.k=k;
+          tap.test=test;
+          tap.reconstruct=reconstruct;
+          targets.x_pixel_mu=(&x_pixel_mu);
+          targets.x_pixel_sigma_squared=(&x_pixel_sigma_squared);
+          targets.y_pixel_mu=(&y_pixel_mu);
+          targets.y_pixel_sigma_squared=(&y_pixel_sigma_squared);
+          targets.xy_sigma=(&xy_sigma);
+          AccumulateSSIMTap(&tap,&targets);
           k++;
           test+=(ptrdiff_t) GetPixelChannels(image);
           reconstruct+=(ptrdiff_t) GetPixelChannels(reconstruct_image);
