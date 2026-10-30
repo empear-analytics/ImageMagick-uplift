@@ -3697,6 +3697,65 @@ MagickExport MagickBooleanType QuantizeImage(const QuantizeInfo *quantize_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _QuantizeSequence
+{
+  Image
+    *images;
+
+  QCubeInfo
+    *cube_info;
+
+  size_t
+    number_images;
+
+  ExceptionInfo
+    *exception;
+} QuantizeSequence;
+
+static void ClassifyImageSequence(const QuantizeSequence *sequence,
+  MagickBooleanType *status)
+{
+  Image
+    *const images = sequence->images;
+
+  QCubeInfo
+    *const cube_info = sequence->cube_info;
+
+  const size_t
+    number_images = sequence->number_images;
+
+  ExceptionInfo
+    *const exception = sequence->exception;
+
+  Image
+    *image;
+
+  MagickBooleanType
+    proceed;
+
+  MagickProgressMonitor
+    progress_monitor;
+
+  ssize_t
+    i;
+
+  image=images;
+  for (i=0; image != (Image *) NULL; i++)
+  {
+    progress_monitor=SetImageProgressMonitor(image,(MagickProgressMonitor) NULL,
+      image->client_data);
+    *status=ClassifyImageColors(cube_info,image,exception);
+    if (*status == MagickFalse)
+      break;
+    (void) SetImageProgressMonitor(image,progress_monitor,image->client_data);
+    proceed=SetImageProgress(image,AssignImageTag,(MagickOffsetType) i,
+      number_images);
+    if (proceed == MagickFalse)
+      break;
+    image=GetNextImageInList(image);
+  }
+}
+
 MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
   Image *images,ExceptionInfo *exception)
 {
@@ -3712,6 +3771,9 @@ MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
 
   QCubeInfo
     *cube_info;
+
+  QuantizeSequence
+    sequence;
 
   size_t
     depth,
@@ -3757,21 +3819,11 @@ MagickExport MagickBooleanType QuantizeImages(const QuantizeInfo *quantize_info,
       return(MagickFalse);
     }
   number_images=GetImageListLength(images);
-  image=images;
-  for (i=0; image != (Image *) NULL; i++)
-  {
-    progress_monitor=SetImageProgressMonitor(image,(MagickProgressMonitor) NULL,
-      image->client_data);
-    status=ClassifyImageColors(cube_info,image,exception);
-    if (status == MagickFalse)
-      break;
-    (void) SetImageProgressMonitor(image,progress_monitor,image->client_data);
-    proceed=SetImageProgress(image,AssignImageTag,(MagickOffsetType) i,
-      number_images);
-    if (proceed == MagickFalse)
-      break;
-    image=GetNextImageInList(image);
-  }
+  sequence.images=images;
+  sequence.cube_info=cube_info;
+  sequence.number_images=number_images;
+  sequence.exception=exception;
+  ClassifyImageSequence(&sequence,&status);
   if (status != MagickFalse)
     {
       /*
