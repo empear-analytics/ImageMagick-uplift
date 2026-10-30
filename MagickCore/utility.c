@@ -1381,12 +1381,47 @@ static void GetSceneSpecification(const SubimageBrackets *brackets,
     }
 }
 
+static void GetSubimageSpecification(const char *path,char *component,
+  size_t *subimage_length,size_t *subimage_offset)
+{
+  char
+    *p,
+    *q;
+
+  p=component+strlen(component)-1;
+  if ((strlen(component) > 2) && (*p == ']'))
+    {
+      q=strrchr(component,'[');
+      if (q != (char *) NULL)
+        {
+          ExceptionInfo *exception = AcquireExceptionInfo();
+          char *literal = (char *) GetImageRegistry(StringRegistryType,
+            "filename:literal",exception);
+          exception=DestroyExceptionInfo(exception);
+          if ((IsStringTrue(literal) == MagickFalse) ||
+              (IsPathAccessible(path) == MagickFalse))
+            {
+              SubimageBrackets
+                brackets;
+
+              /*
+                Look for scene specification (e.g. img0001.pcd[4]).
+              */
+              brackets.component=component;
+              brackets.p=p;
+              brackets.q=q;
+              GetSceneSpecification(&brackets,&(*subimage_length),
+                &(*subimage_offset));
+            }
+          if (literal != (char *) NULL)
+            literal=DestroyString(literal);
+        }
+    }
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
-  char
-    *q;
-
   char
     *p;
 
@@ -1408,37 +1443,8 @@ MagickExport void GetPathComponent(const char *path,PathType type,
   subimage_length=0;
   subimage_offset=0;
   if (type != SubcanonicalPath)
-    {
-      p=component+strlen(component)-1;
-      if ((strlen(component) > 2) && (*p == ']'))
-        {
-          q=strrchr(component,'[');
-          if (q != (char *) NULL)
-            {
-              ExceptionInfo *exception = AcquireExceptionInfo();
-              char *literal = (char *) GetImageRegistry(StringRegistryType,
-                "filename:literal",exception);
-              exception=DestroyExceptionInfo(exception);
-              if ((IsStringTrue(literal) == MagickFalse) ||
-                  (IsPathAccessible(path) == MagickFalse))
-                {
-                  SubimageBrackets
-                    brackets;
-
-                  /*
-                    Look for scene specification (e.g. img0001.pcd[4]).
-                  */
-                  brackets.component=component;
-                  brackets.p=p;
-                  brackets.q=q;
-                  GetSceneSpecification(&brackets,&subimage_length,
-                    &subimage_offset);
-                }
-              if (literal != (char *) NULL)
-                literal=DestroyString(literal);
-            }
-        }
-    }
+    GetSubimageSpecification(path,component,&subimage_length,
+      &subimage_offset);
   magick_length=0;
 #if defined(__OS2__)
   if (path[1] != ":")
