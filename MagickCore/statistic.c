@@ -2115,6 +2115,41 @@ static size_t CollectMedianRow(const MedianRow *row,const Quantum *p,
   return(n);
 }
 
+typedef struct _MedianPass
+{
+  const Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  Quantum
+    *median;
+
+  ssize_t
+    i;
+} MedianPass;
+
+static void CollectMedianPass(const MedianPass *pass,ssize_t *y,size_t *n)
+{
+  for (*y=0; *y < (ssize_t) pass->image->rows; (*y)++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    MedianRow
+      row;
+
+    p=GetVirtualPixels(pass->image,0,*y,pass->image->columns,1,
+      pass->exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    row.image=pass->image;
+    row.i=pass->i;
+    *n=CollectMedianRow(&row,p,pass->median,*n);
+  }
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2237,6 +2272,9 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
       median=(Quantum *) GetVirtualMemoryBlob(median_info);
       for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
       {
+        MedianPass
+          pass;
+
         size_t
           n = 0;
 
@@ -2247,21 +2285,11 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
         PixelTrait traits = GetPixelChannelTraits(image,channel);
         if ((traits & UpdatePixelTrait) == 0)
           continue;
-        for (y=0; y < (ssize_t) image->rows; y++)
-        {
-          const Quantum
-            *magick_restrict p;
-
-          MedianRow
-            row;
-
-          p=GetVirtualPixels(image,0,y,image->columns,1,exception);
-          if (p == (const Quantum *) NULL)
-            break;
-          row.image=image;
-          row.i=i;
-          n=CollectMedianRow(&row,p,median,n);
-        }
+        pass.image=image;
+        pass.exception=exception;
+        pass.median=median;
+        pass.i=i;
+        CollectMedianPass(&pass,&y,&n);
         channel_statistics[channel].median=(double) median[
           GetMedianPixel(median,n)];
       }
