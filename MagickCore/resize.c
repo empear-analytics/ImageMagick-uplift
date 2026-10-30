@@ -1276,6 +1276,38 @@ static void ApplyBlurAndSupportOverrides(const Image *image,
     resize_filter->window_support=fabs(StringToDouble(artifact,(char **) NULL));
 }
 
+/*
+  The known zero crossings of the Jinc() or more accurately the Jinc(x*PI)
+  function being used as a filter. It is used by the "filter:lobes" expert
+  setting and for 'lobes' for Jinc functions in the previous table. This way
+  users do not have to deal with the highly irrational lobe sizes of the Jinc
+  filter.
+
+  Values taken from
+  http://cose.math.bas.bg/webMathematica/webComputing/BesselZeros.jsp
+  using Jv-function with v=1, then dividing by PI.
+*/
+static double
+  jinc_zeros[16] =
+  {
+    1.2196698912665045,
+    2.2331305943815286,
+    3.2383154841662362,
+    4.2410628637960699,
+    5.2427643768701817,
+    6.2439216898644877,
+    7.2447598687199570,
+    8.2453949139520427,
+    9.2458926849494673,
+    10.246293348754916,
+    11.246622794877883,
+    12.246898461138105,
+    13.247132522181061,
+    14.247333735806849,
+    15.247508563037300,
+    16.247661874700962
+ };
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1294,37 +1326,6 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   ResizeFilter
     *resize_filter;
 
-  /*
-    The known zero crossings of the Jinc() or more accurately the Jinc(x*PI)
-    function being used as a filter. It is used by the "filter:lobes" expert
-    setting and for 'lobes' for Jinc functions in the previous table. This way
-    users do not have to deal with the highly irrational lobe sizes of the Jinc
-    filter.
-
-    Values taken from
-    http://cose.math.bas.bg/webMathematica/webComputing/BesselZeros.jsp
-    using Jv-function with v=1, then dividing by PI.
-  */
-  static double
-    jinc_zeros[16] =
-    {
-      1.2196698912665045,
-      2.2331305943815286,
-      3.2383154841662362,
-      4.2410628637960699,
-      5.2427643768701817,
-      6.2439216898644877,
-      7.2447598687199570,
-      8.2453949139520427,
-      9.2458926849494673,
-      10.246293348754916,
-      11.246622794877883,
-      12.246898461138105,
-      13.247132522181061,
-      14.247333735806849,
-      15.247508563037300,
-      16.247661874700962
-   };
 
   /*
     Allocate resize filter.
