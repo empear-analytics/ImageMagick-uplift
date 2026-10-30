@@ -516,16 +516,19 @@ MagickExport size_t GetImageQuantumDepth(const Image *image,
 %    o image: the image.
 %
 */
+static ImageType GetColorSeparationType(const Image *image)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    return(ColorSeparationType);
+  return(ColorSeparationAlphaType);
+}
+
 MagickExport ImageType GetImageType(const Image *image)
 {
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   if (image->colorspace == CMYKColorspace)
-    {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        return(ColorSeparationType);
-      return(ColorSeparationAlphaType);
-    }
+    return(GetColorSeparationType(image));
   if (IsImageMonochrome(image) != MagickFalse)
     return(BilevelType);
   if (IsImageGray(image) != MagickFalse)
