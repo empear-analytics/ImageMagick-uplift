@@ -552,6 +552,14 @@ static double WeightByPixelAlpha(const ResampleFilter *resample_filter,
   return(weight);
 }
 
+static void AccumulateBlackChannel(const ResampleFilter *resample_filter,
+  const Quantum *pixels,const double weight,PixelInfo *pixel)
+{
+  if (pixel->colorspace == CMYKColorspace)
+    pixel->black+=weight*(double)
+      GetPixelBlack(resample_filter->image,pixels);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -765,9 +773,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
           GetPixelGreen(resample_filter->image,pixels);
         pixel->blue+=weight*(double)
           GetPixelBlue(resample_filter->image,pixels);
-        if (pixel->colorspace == CMYKColorspace)
-          pixel->black+=weight*(double)
-            GetPixelBlack(resample_filter->image,pixels);
+        AccumulateBlackChannel(resample_filter,pixels,weight,pixel);
         divisor_c += weight;
 
         hit++;
