@@ -1447,6 +1447,19 @@ static size_t GetImageFormatPrefix(char *component,size_t magick_length)
   return(magick_length);
 }
 
+static char *LocateBasenameSeparator(char *component)
+{
+  char
+    *p;
+
+  p=component;
+  if (*p != '\0')
+    for (p=component+strlen(component)-1; p > component; p--)
+      if (IsBasenameSeparator(*p) != MagickFalse)
+        break;
+  return(p);
+}
+
 MagickExport void GetPathComponent(const char *path,PathType type,
   char *component)
 {
@@ -1478,11 +1491,7 @@ MagickExport void GetPathComponent(const char *path,PathType type,
   if (path[1] != ":")
 #endif
   magick_length=GetImageFormatPrefix(component,magick_length);
-  p=component;
-  if (*p != '\0')
-    for (p=component+strlen(component)-1; p > component; p--)
-      if (IsBasenameSeparator(*p) != MagickFalse)
-        break;
+  p=LocateBasenameSeparator(component);
   switch (type)
   {
     case MagickPath:
