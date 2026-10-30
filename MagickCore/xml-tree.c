@@ -1857,6 +1857,22 @@ static char **FindDefaultAttributes(XMLTreeRoot *root,const char *tag)
   return(root->attributes[i]);
 }
 
+static void DecodeAttributeValue(XMLTreeRoot *root,char **attribute,
+  char **attributes,const ssize_t l)
+{
+  ssize_t
+    j;
+
+  j=1;
+  while (IsOtherDefaultAttribute(attribute,j,attributes,
+      l) != MagickFalse)
+    j+=3;
+  attributes[l+1]=ParseEntities(attributes[l+1],
+    root->entities,(attribute != (char **) NULL) &&
+    (attribute[j] != (char *) NULL) ? *attribute[j+2] :
+    ' ');
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -1878,7 +1894,6 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
     length;
 
   ssize_t
-    j,
     l;
 
   XMLTreeRoot
@@ -1999,14 +2014,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                           utf8=DestroyString(utf8);
                           return(&root->root);
                         }
-                      j=1;
-                      while (IsOtherDefaultAttribute(attribute,j,attributes,
-                          l) != MagickFalse)
-                        j+=3;
-                      attributes[l+1]=ParseEntities(attributes[l+1],
-                        root->entities,(attribute != (char **) NULL) &&
-                        (attribute[j] != (char *) NULL) ? *attribute[j+2] :
-                        ' ');
+                      DecodeAttributeValue(root,attribute,attributes,l);
                     }
                   attributes[l]=ConstantString(attributes[l]);
                 }
