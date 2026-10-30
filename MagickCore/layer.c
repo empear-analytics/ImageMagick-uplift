@@ -984,6 +984,25 @@ static RectangleInfo ExpandBoundsWidth(RectangleInfo bgnd_bounds,
   return(bgnd_bounds);
 }
 
+static RectangleInfo ExpandBoundsHeight(RectangleInfo bgnd_bounds,
+  RectangleInfo try_bounds)
+{
+  if ( try_bounds.y < bgnd_bounds.y )
+    {
+      bgnd_bounds.height=(size_t) ((ssize_t) bgnd_bounds.height+
+        bgnd_bounds.y-try_bounds.y);
+      bgnd_bounds.height=GrowExtent(bgnd_bounds.height,try_bounds.height);
+      bgnd_bounds.y=try_bounds.y;
+    }
+  else
+    {
+      try_bounds.height=(size_t) ((ssize_t) try_bounds.height+
+        try_bounds.y-bgnd_bounds.y);
+      bgnd_bounds.height=GrowExtent(bgnd_bounds.height,try_bounds.height);
+    }
+  return(bgnd_bounds);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1240,21 +1259,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
                     (double) bgnd_bounds.x,(double) bgnd_bounds.y );
 #endif
                 bgnd_bounds=ExpandBoundsWidth(bgnd_bounds,try_bounds);
-                if ( try_bounds.y < bgnd_bounds.y )
-                  {
-                    bgnd_bounds.height=(size_t) ((ssize_t) bgnd_bounds.height+
-                      bgnd_bounds.y-try_bounds.y);
-                    if (bgnd_bounds.height < try_bounds.height)
-                      bgnd_bounds.height=try_bounds.height;
-                    bgnd_bounds.y=try_bounds.y;
-                  }
-                else
-                  {
-                    try_bounds.height=(size_t) ((ssize_t) try_bounds.height+
-                      try_bounds.y-bgnd_bounds.y);
-                    if ( bgnd_bounds.height < try_bounds.height )
-                      bgnd_bounds.height = try_bounds.height;
-                  }
+                bgnd_bounds=ExpandBoundsHeight(bgnd_bounds,try_bounds);
 #if DEBUG_OPT_FRAME
                 (void) FormatLocaleFile(stderr, "        to : %.17gx%.17g%+.20g%+.20g\n",
                     (double) bgnd_bounds.width,(double) bgnd_bounds.height,
