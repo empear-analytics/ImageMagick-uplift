@@ -1347,6 +1347,69 @@ MagickExport Image *FlopImage(const Image *image,ExceptionInfo *exception)
 %
 */
 
+typedef struct _CopyRegionRow
+{
+  CacheView
+    *source_view,
+    *destination_view;
+
+  const Image
+    *source;
+
+  Image
+    *destination;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    columns;
+
+  ssize_t
+    sx,
+    sy,
+    dx,
+    dy,
+    y;
+} CopyRegionRow;
+
+static MagickBooleanType CopyRegionScanline(const CopyRegionRow *row)
+{
+  MagickBooleanType
+    status,
+    sync;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  p=GetCacheViewVirtualPixels(row->source_view,row->sx,row->sy+row->y,
+    row->columns,1,row->exception);
+  q=GetCacheViewAuthenticPixels(row->destination_view,row->dx,row->dy+row->y,
+    row->columns,1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (x=0; x < (ssize_t) row->columns; x++)
+  {
+    CopyPixelChannelsTo(row->source,row->destination,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(row->source);
+    q+=(ptrdiff_t) GetPixelChannels(row->destination);
+  }
+  sync=SyncCacheViewAuthenticPixels(row->destination_view,row->exception);
+  if (sync == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 static MagickBooleanType CopyImageRegion(Image *destination,const Image *source,
   const CopyRegion *region,ExceptionInfo *exception)
 {
@@ -1381,38 +1444,26 @@ static MagickBooleanType CopyImageRegion(Image *destination,const Image *source,
 #endif
   for (y=0; y < (ssize_t) rows; y++)
   {
-    MagickBooleanType
-      sync;
-
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
+    CopyRegionRow
+      row;
 
     /*
       Transfer scanline.
     */
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(source_view,sx,sy+y,columns,1,exception);
-    q=GetCacheViewAuthenticPixels(destination_view,dx,dy+y,columns,1,exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) columns; x++)
-    {
-      CopyPixelChannelsTo(source,destination,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(source);
-      q+=(ptrdiff_t) GetPixelChannels(destination);
-    }
-    sync=SyncCacheViewAuthenticPixels(destination_view,exception);
-    if (sync == MagickFalse)
+    row.source_view=source_view;
+    row.destination_view=destination_view;
+    row.source=source;
+    row.destination=destination;
+    row.exception=exception;
+    row.columns=columns;
+    row.sx=sx;
+    row.sy=sy;
+    row.dx=dx;
+    row.dy=dy;
+    row.y=y;
+    if (CopyRegionScanline(&row) == MagickFalse)
       status=MagickFalse;
   }
   destination_view=DestroyCacheView(destination_view);
