@@ -2356,6 +2356,28 @@ static void LoadDelegateInclude(const DelegateInclude *include,
     }
 }
 
+static void SetDelegateThreadSupport(DelegateInfo *delegate_info,
+  const char *keyword,const char *token)
+{
+  switch (*keyword)
+  {
+    case 'T':
+    case 't':
+    {
+      if (LocaleCompare((char *) keyword,"thread-support") == 0)
+        {
+          delegate_info->thread_support=IsStringTrue(token);
+          if (delegate_info->thread_support == MagickFalse)
+            delegate_info->semaphore=AcquireSemaphoreInfo();
+          break;
+        }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
   const char *xml,const char *filename,const size_t depth)
 {
@@ -2594,20 +2616,11 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
           }
         break;
       }
-      case 'T':
-      case 't':
+      default:
       {
-        if (LocaleCompare((char *) keyword,"thread-support") == 0)
-          {
-            delegate_info->thread_support=IsStringTrue(token);
-            if (delegate_info->thread_support == MagickFalse)
-              delegate_info->semaphore=AcquireSemaphoreInfo();
-            break;
-          }
+        SetDelegateThreadSupport(delegate_info,keyword,token);
         break;
       }
-      default:
-        break;
     }
   }
   token=(char *) RelinquishMagickMemory(token);
