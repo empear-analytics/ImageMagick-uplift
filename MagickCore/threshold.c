@@ -1361,6 +1361,57 @@ static void GetDitherLevels(const char *threshold_map,double *levels)
       levels[i]-=1.0;
 }
 
+typedef struct _OrderedDither
+{
+  ThresholdMap
+    *map;
+
+  ssize_t
+    x,
+    y;
+} OrderedDither;
+
+static void OrderedDitherPixel(const Image *image,const double *levels,
+  const OrderedDither *ordered_dither,Quantum *magick_restrict q)
+{
+  ThresholdMap
+    *const map = ordered_dither->map;
+
+  const ssize_t
+    x = ordered_dither->x,
+    y = ordered_dither->y;
+
+  ssize_t
+    j,
+    n;
+
+  n=0;
+  for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
+  {
+    ssize_t
+      level,
+      threshold;
+
+    PixelChannel channel = GetPixelChannelChannel(image,j);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    if (fabs(levels[n]) < MagickEpsilon)
+      {
+        n++;
+        continue;
+      }
+    threshold=(ssize_t) (QuantumScale*(double) q[j]*(levels[n]*
+      (map->divisor-1)+1));
+    level=threshold/(map->divisor-1);
+    threshold-=level*(map->divisor-1);
+    q[j]=ClampToQuantum((double) (level+(threshold >=
+      map->levels[(x % (ssize_t) map->width)+(ssize_t) map->width*
+      (y % (ssize_t) map->height)]))*(double) QuantumRange/levels[n]);
+    n++;
+  }
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1429,6 +1480,9 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    OrderedDither
+      ordered_dither;
+
     ssize_t
       x;
 
@@ -1445,35 +1499,10 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
       }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        j,
-        n;
-
-      n=0;
-      for (j=0; j < (ssize_t) GetPixelChannels(image); j++)
-      {
-        ssize_t
-          level,
-          threshold;
-
-        PixelChannel channel = GetPixelChannelChannel(image,j);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        if (fabs(levels[n]) < MagickEpsilon)
-          {
-            n++;
-            continue;
-          }
-        threshold=(ssize_t) (QuantumScale*(double) q[j]*(levels[n]*
-          (map->divisor-1)+1));
-        level=threshold/(map->divisor-1);
-        threshold-=level*(map->divisor-1);
-        q[j]=ClampToQuantum((double) (level+(threshold >=
-          map->levels[(x % (ssize_t) map->width)+(ssize_t) map->width*
-          (y % (ssize_t) map->height)]))*(double) QuantumRange/levels[n]);
-        n++;
-      }
+      ordered_dither.map=map;
+      ordered_dither.x=x;
+      ordered_dither.y=y;
+      OrderedDitherPixel(image,levels,&ordered_dither,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
