@@ -712,6 +712,50 @@ static void ScalePixelRowToDepth(const Image *image,const QuantumAny range,
   }
 }
 
+typedef struct _DepthRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  QuantumAny
+    range;
+
+  ExceptionInfo
+    *exception;
+} DepthRow;
+
+static MagickBooleanType SetImageRowDepth(const DepthRow *row)
+{
+  Quantum
+    *magick_restrict q;
+
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(row->image_view,0,row->y,row->image->columns,1,
+    row->exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  ScalePixelRowToDepth(row->image,row->range,q);
+  if (SyncCacheViewAuthenticPixels(row->image_view,row->exception) ==
+      MagickFalse)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -844,23 +888,18 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    DepthRow
+      row;
 
     if (status == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    ScalePixelRowToDepth(image,range,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
+    row.image=image;
+    row.image_view=image_view;
+    row.y=y;
+    row.range=range;
+    row.exception=exception;
+    if (SetImageRowDepth(&row) == MagickFalse)
+      status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
   if (status != MagickFalse)
