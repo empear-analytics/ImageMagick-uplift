@@ -445,6 +445,64 @@ static inline MagickBooleanType IsPixelListStatistic(const StatisticType type)
     (type == NonpeakStatistic)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _StatisticOperands
+{
+  StatisticType
+    type;
+
+  double
+    area,
+    minimum,
+    maximum,
+    sum,
+    sum_squared;
+} StatisticOperands;
+
+static void ComputeStatisticPixel(const StatisticOperands *operands,
+  Quantum *pixel)
+{
+  const StatisticType
+    type = operands->type;
+
+  const double
+    area = operands->area,
+    minimum = operands->minimum,
+    maximum = operands->maximum,
+    sum = operands->sum,
+    sum_squared = operands->sum_squared;
+
+  switch (type)
+  {
+    case ContrastStatistic:
+    {
+      (*pixel)=ClampToQuantum(MagickAbsoluteValue((maximum-minimum)*
+        MagickSafeReciprocal(maximum+minimum)));
+      break;
+    }
+    case GradientStatistic:
+    {
+      (*pixel)=ClampToQuantum(MagickAbsoluteValue(maximum-minimum));
+      break;
+    }
+    case MeanStatistic:
+    default:
+    {
+      (*pixel)=ClampToQuantum(sum/area);
+      break;
+    }
+    case RootMeanSquareStatistic:
+    {
+      (*pixel)=ClampToQuantum(sqrt(sum_squared/area));
+      break;
+    }
+    case StandardDeviationStatistic:
+    {
+      (*pixel)=ClampToQuantum(sqrt(sum_squared/area-(sum/area*sum/area)));
+      break;
+    }
+  }
+}
+
 static Quantum GetStatisticPixel(const StatisticType type,
   PixelList **magick_restrict pixel_list,const int id,const double area,
   const double minimum,const double maximum,const double sum,
@@ -455,26 +513,23 @@ static Quantum GetStatisticPixel(const StatisticType type,
 
   switch (type)
   {
-    case ContrastStatistic:
-    {
-      pixel=ClampToQuantum(MagickAbsoluteValue((maximum-minimum)*
-        MagickSafeReciprocal(maximum+minimum)));
-      break;
-    }
-    case GradientStatistic:
-    {
-      pixel=ClampToQuantum(MagickAbsoluteValue(maximum-minimum));
-      break;
-    }
     case MaximumStatistic:
     {
       pixel=ClampToQuantum(maximum);
       break;
     }
-    case MeanStatistic:
     default:
     {
-      pixel=ClampToQuantum(sum/area);
+      StatisticOperands
+        operands;
+
+      operands.type=type;
+      operands.area=area;
+      operands.minimum=minimum;
+      operands.maximum=maximum;
+      operands.sum=sum;
+      operands.sum_squared=sum_squared;
+      ComputeStatisticPixel(&operands,&pixel);
       break;
     }
     case MedianStatistic:
@@ -495,16 +550,6 @@ static Quantum GetStatisticPixel(const StatisticType type,
     case NonpeakStatistic:
     {
       GetNonpeakPixelList(pixel_list[id],&pixel);
-      break;
-    }
-    case RootMeanSquareStatistic:
-    {
-      pixel=ClampToQuantum(sqrt(sum_squared/area));
-      break;
-    }
-    case StandardDeviationStatistic:
-    {
-      pixel=ClampToQuantum(sqrt(sum_squared/area-(sum/area*sum/area)));
       break;
     }
   }
