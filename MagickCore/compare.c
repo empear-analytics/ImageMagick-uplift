@@ -3008,6 +3008,33 @@ MagickExport double *GetImageDistortions(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ssize_t FindUnequalPixelChannel(const Image *image,
+  const Image *reconstruct_image,const Quantum *magick_restrict p,
+  const Quantum *magick_restrict q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      distance;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
+      channel);
+    if (((traits & UpdatePixelTrait) == 0) ||
+        ((reconstruct_traits & UpdatePixelTrait) == 0))
+      continue;
+    distance=fabs((double) p[i]-(double) GetPixelChannel(reconstruct_image,
+      channel,q));
+    if (distance >= MagickEpsilon)
+      break;
+  }
+  return(i);
+}
+
 MagickExport MagickBooleanType IsImagesEqual(const Image *image,
   const Image *reconstruct_image,ExceptionInfo *exception)
 {
@@ -3047,23 +3074,7 @@ MagickExport MagickBooleanType IsImagesEqual(const Image *image,
       ssize_t
         i;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          distance;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        PixelTrait reconstruct_traits = GetPixelChannelTraits(reconstruct_image,
-          channel);
-        if (((traits & UpdatePixelTrait) == 0) ||
-            ((reconstruct_traits & UpdatePixelTrait) == 0))
-          continue;
-        distance=fabs((double) p[i]-(double) GetPixelChannel(reconstruct_image,
-          channel,q));
-        if (distance >= MagickEpsilon)
-          break;
-      }
+      i=FindUnequalPixelChannel(image,reconstruct_image,p,q);
       if (i < (ssize_t) GetPixelChannels(image))
         break;
       p+=(ptrdiff_t) GetPixelChannels(image);
