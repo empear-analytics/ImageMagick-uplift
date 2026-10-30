@@ -914,8 +914,9 @@ same day. Added by Claude Code (Claude Opus 5.5) during task M01, on `magnify.c`
 
 **Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
 Method* or *Large Method*, and the block that would fix it is a per-pixel accumulation
-inside a parallel loop body that adds into two to four of the iteration's own
-accumulators (`channel_similarity` and `channel_area`, or three sums).
+inside a parallel loop body (or in a sequential function, step 6) that adds into two to
+four of the iteration's own accumulators (`channel_similarity` and `channel_area`, or
+three sums).
 
 **Not covered by:** Recipe E, whose step 4 refuses a block that writes more than one
 variable; Recipe O, which takes a selection (a `switch` or `if` chain) and only outside
@@ -939,6 +940,12 @@ accumulators.
    reads included.
 5. Call it where the block stood, passing `&v` for each written scalar and the array
    for each written array, in parameter order; check every argument by reading.
+6. A block in a function with no OpenMP region at all (a sequential pass, as Recipe Q
+   step 1 admits) moves the same way: it writes at most four plain locals of the caller,
+   none a parameter, a global or a `static`, and none whose address is taken elsewhere
+   (Recipe O step 2); steps 1, 3, 4 and 5 hold as written. The written locals may be
+   cursors the block advances and the caller reads afterwards (a partition's `l` and
+   `h`), not only sums.
 
 **Before:**
 
@@ -987,6 +994,12 @@ static void AccumulateFUZZPixel(...,double *channel_similarity,
   the order of floating-point additions does not change.
 - Keep the written variables few; a block that writes more than four is not one
   accumulation, and is skipped.
+- Under step 6 there is no thread to share with: each pointer names the caller's own
+  local, whose address is taken nowhere else, so no two pointers name one object, and
+  `*v` reads and writes it at the same points and in the same order as `v` did (Recipe
+  O step 5's argument); the value the caller reads after the call is the one the block
+  left. A macro argument written `pixels[*l]` for `pixels[l]` expands to the same
+  access.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 checked by
 reading.
@@ -996,7 +1009,9 @@ and `channel_area`), `GetMEPPSimilarity` (mean and maximum error), `GetDPCSimila
 and `GetNCCSimilarity` (three sums each), whose per-pixel blocks Recipe E's step 4
 refused after the single-accumulator siblings (`GetAESimilarity`, `GetMAESimilarity`,
 `GetMSESimilarity`, `GetPASimilarity`, `GetPDCSimilarity`) had taken Recipe E. Added by
-Claude Code (Claude Opus 5.5) during task M02, under the mandate of 2026-10-24.
+Claude Code (Claude Opus 5.5) during task M02, under the mandate of 2026-10-24. Step 6
+(2026-10-30, task W09): `statistic.c`'s `GetMedianPixel`, whose quickselect partition
+loop advances the two cursors `l` and `h` that the caller then reads.
 
 ---
 
@@ -3130,3 +3145,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | LB | Extract Block Returning Success for a Loop Break: a block that leaves its enclosing loop through `break;` moves to a `static MagickBooleanType` function, each such `break;` becoming `return(MagickFalse);`, and the caller writes `if (Helper(...) == MagickFalse) break;`; inputs by value or in a `const` struct (Recipe Y), one written variable by pointer, temporaries declared in the helper | `paint.c`'s `FloodfillPaintImage`: its two depth-4 sites end the `do`-loop through `break;` when a fetch or a sync fails, which V, Y and I refuse (V step 1) and E step 7 admits only for a `switch`; a probe of both, 5.10 to 5.77 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | T, U | T step 4 (U step 1): a block that ends the parallel loop body may contain `continue;` of the parallel loop; each becomes `return(status);` and the call `if (Helper(...) == MagickFalse) status=MagickFalse;` is the body's last statement (Recipe E step 7's loop-tail form); *Careful* gives the argument and excludes a block followed by a progress block | `paint.c`'s `FloodfillPaintImage`: its tiling loop body after the status test is a fetch that `continue`s on failure, a fill and a sync; a probe with Recipe U, 6.06 to 6.10 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | LB | Step 7: a block whose every exit is the same run `S` followed by `continue;` of `Lp` moves with `S continue;` left in the caller, `if (Helper(...) == MagickFalse) { S continue; }`, as Recipe V step 7 leaves its cleanup; the block writes nothing `S` reads or writes. *Careful* gives the argument, including `S` writing the loop counter | `statistic.c`'s `GetImageStatistics`: the depth check inside the channel loop (nesting 5) ends in `IncreaseChannelDepth(...); i--; continue;`, which E step 7 refuses (its counter goes by value; the block is not the body's tail) and LB step 1 refuses (a `continue`); its temporaries `depth`, `range` and `status` move with it. A probe: nesting 5 to 4, bumps 4 to 3, 4.73 to 4.76 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | K | Step 6: a block in a function with no OpenMP region (a sequential pass, as Recipe Q step 1 admits) moves the same way, writing at most four plain locals of the caller, none whose address is taken elsewhere (Recipe O step 2); the written locals may be cursors the caller reads afterwards. *Careful* gives the argument | `statistic.c`'s `GetMedianPixel` (cc 10, two bumps): its partition loop writes the cursors `l` and `h`, which E step 4 refuses (two written variables), O refuses (a loop, not a selection) and Q refuses (two inputs, so K's form has four parameters). A probe: the function leaves Complex Method and Bumpy Road Ahead, 4.91 to 5.07 | mandate (2026-10-24) |
