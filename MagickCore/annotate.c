@@ -248,6 +248,36 @@ MagickPrivate void AnnotateComponentTerminus(void)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SplitTextLines(char *text,char **textlist,
+  const size_t number_lines)
+{
+  char
+    *p;
+
+  ssize_t
+    i;
+
+  p=text;
+  for (i=0; i < (ssize_t) number_lines; i++)
+  {
+    char
+      *q;
+
+    textlist[i]=p;
+    for (q=p; *q != '\0'; q++)
+      if ((*q == '\r') || (*q == '\n'))
+        break;
+    if (*q == '\r')
+      {
+        *q='\0';
+        q++;
+      }
+    *q='\0';
+    p=q+1;
+  }
+  textlist[i]=(char *) NULL;
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -313,25 +343,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       text=DestroyString(text);
       return(MagickFalse);
     }
-  p=text;
-  for (i=0; i < (ssize_t) number_lines; i++)
-  {
-    char
-      *q;
-
-    textlist[i]=p;
-    for (q=p; *q != '\0'; q++)
-      if ((*q == '\r') || (*q == '\n'))
-        break;
-    if (*q == '\r')
-      {
-        *q='\0';
-        q++;
-      }
-    *q='\0';
-    p=q+1;
-  }
-  textlist[i]=(char *) NULL;
+  SplitTextLines(text,textlist,number_lines);
   SetGeometry(image,&geometry);
   SetGeometryInfo(&geometry_info);
   if (annotate_info->geometry != (char *) NULL)
