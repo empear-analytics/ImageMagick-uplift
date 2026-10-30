@@ -555,6 +555,70 @@ static inline MagickBooleanType IsFish2XAntiDiagonal(const int bd,
     MagickFalse);
 }
 
+typedef struct _Fish2XLadder
+{
+  const MagnifyPixels
+    *magnify;
+
+  const MagickFloatType
+    *intensities;
+
+  int
+    ab,
+    ad,
+    ae,
+    bd,
+    be,
+    de;
+} Fish2XLadder;
+
+static void Fish2XBottomRightBlend(const Fish2XLadder *ladder,
+  const ssize_t *pixels_offsets)
+{
+#define Line(A,B,C,D) \
+  { \
+    if (ladder->intensities[C] > ladder->intensities[A]) \
+      Mix2Pixels(ladder->magnify,C,D,3); \
+    else \
+      Mix2Pixels(ladder->magnify,A,B,3); \
+  }
+
+  if (IsFish2XMainDiagonal(ladder->ae,ladder->bd,ladder->intensities) !=
+      MagickFalse)
+    {
+      Mix2Pixels(ladder->magnify,0,4,3);
+      return;
+    }
+  if (IsFish2XAntiDiagonal(ladder->bd,ladder->ae,ladder->intensities) !=
+      MagickFalse)
+    {
+      Mix2Pixels(ladder->magnify,1,3,3);
+      return;
+    }
+  if (ladder->ab)
+    {
+      Line(0,1,3,4)
+      return;
+    }
+  if (ladder->de)
+    {
+      Line(3,4,0,1)
+      return;
+    }
+  if (ladder->ad)
+    {
+      Line(0,3,1,4)
+      return;
+    }
+  if (ladder->be)
+    {
+      Line(1,4,0,3)
+      return;
+    }
+  MixPixels(ladder->magnify,pixels_offsets,4,3);
+#undef Line
+}
+
 static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
   const Quantum *pixels,const size_t channels,
   const MagickFloatType *intensities)
@@ -577,16 +641,11 @@ static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
       } \
   }
 
-#define Line(A,B,C,D) \
-  { \
-    if (intensities[C] > intensities[A]) \
-      Mix2Pixels(magnify,C,D,3); \
-    else \
-      Mix2Pixels(magnify,A,B,3); \
-  }
-
   const ssize_t
     pixels_offsets[4] = { 0, 1, 3, 4 };
+
+  Fish2XLadder
+    ladder;
 
   int
     ab,
@@ -627,39 +686,16 @@ static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
       Corner(3,0,4,1)
       return;
     }
-  if (IsFish2XMainDiagonal(ae,bd,intensities) != MagickFalse)
-    {
-      Mix2Pixels(magnify,0,4,3);
-      return;
-    }
-  if (IsFish2XAntiDiagonal(bd,ae,intensities) != MagickFalse)
-    {
-      Mix2Pixels(magnify,1,3,3);
-      return;
-    }
-  if (ab)
-    {
-      Line(0,1,3,4)
-      return;
-    }
-  if (de)
-    {
-      Line(3,4,0,1)
-      return;
-    }
-  if (ad)
-    {
-      Line(0,3,1,4)
-      return;
-    }
-  if (be)
-    {
-      Line(1,4,0,3)
-      return;
-    }
-  MixPixels(magnify,pixels_offsets,4,3);
+  ladder.magnify=magnify;
+  ladder.intensities=intensities;
+  ladder.ab=ab;
+  ladder.ad=ad;
+  ladder.ae=ae;
+  ladder.bd=bd;
+  ladder.be=be;
+  ladder.de=de;
+  Fish2XBottomRightBlend(&ladder,pixels_offsets);
 #undef Corner
-#undef Line
 }
 
 static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
