@@ -788,6 +788,10 @@ static MagickBooleanType TranslateExpression
 
 static MagickBooleanType GetFunction (FxInfo * pfx, FunctionE fe);
 
+static MagickBooleanType GetOperand (
+  FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
+  MagickBooleanType * needPopAll);
+
 static inline MagickBooleanType IsHslOrIntensityChannel(const PixelChannel pc)
 {
   return((pc==HUE_CHANNEL || pc==SAT_CHANNEL || pc==LIGHT_CHANNEL ||
@@ -2720,6 +2724,75 @@ static MagickBooleanType NotAUserSymbolOperand (FxInfo * pfx,
   return(MagickTrue);
 }
 
+typedef struct _OperandSymbols
+{
+  MagickBooleanType
+    *UserSymbol,
+    *NewUserSymbol;
+
+  int
+    *UserSymNdx;
+
+  MagickBooleanType
+    *needPopAll;
+} OperandSymbols;
+
+static MagickBooleanType GetUnaryPrefixOperand (FxInfo * pfx, OperatorE op,
+  const OperandSymbols * symbols)
+{
+  MagickBooleanType
+    *const UserSymbol = symbols->UserSymbol,
+    *const NewUserSymbol = symbols->NewUserSymbol;
+
+  int
+    *const UserSymNdx = symbols->UserSymNdx;
+
+  MagickBooleanType
+    *const needPopAll = symbols->needPopAll;
+
+  MagickBooleanType operand_ok;
+  if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
+  pfx->pex++;
+  SkipSpaces (pfx);
+  if (!*pfx->pex) return MagickFalse;
+  if (pfx->teDepth >= MagickMaxRecursionDepth) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "Expression too deeply nested", "(depth %i exceeds limit %i)",
+      pfx->teDepth, MagickMaxRecursionDepth);
+    return MagickFalse;
+  }
+  pfx->teDepth++;
+  operand_ok=GetOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx, needPopAll);
+  pfx->teDepth--;
+  if (!operand_ok) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "After unary, bad operand at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+
+  if (*NewUserSymbol) {
+    (void) ThrowMagickException (
+      pfx->exception, GetMagickModule(), OptionError,
+      "After unary, NewUserSymbol at", "'%s'",
+      SetShortExp(pfx));
+    return MagickFalse;
+  }
+
+  if (*UserSymbol) {
+    (void) AddAddressingElement (pfx, rCopyFrom, *UserSymNdx);
+    *UserSymNdx = NULL_ADDRESS;
+
+    *UserSymbol = MagickFalse;
+    *NewUserSymbol = MagickFalse;
+  }
+
+  (void) GetToken (pfx);
+  return MagickTrue;
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
   MagickBooleanType * needPopAll)
@@ -2740,47 +2813,14 @@ static MagickBooleanType GetOperand (
     if (op==oOpenParen) {
       return (GetParenthesisedOperand (pfx, op, needPopAll));
     } else if (OprIsUnaryPrefix (op)) {
-      MagickBooleanType operand_ok;
-      if (!PushOperatorStack (pfx, (int) op)) return MagickFalse;
-      pfx->pex++;
-      SkipSpaces (pfx);
-      if (!*pfx->pex) return MagickFalse;
-      if (pfx->teDepth >= MagickMaxRecursionDepth) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "Expression too deeply nested", "(depth %i exceeds limit %i)",
-          pfx->teDepth, MagickMaxRecursionDepth);
-        return MagickFalse;
-      }
-      pfx->teDepth++;
-      operand_ok=GetOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx, needPopAll);
-      pfx->teDepth--;
-      if (!operand_ok) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "After unary, bad operand at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
+      OperandSymbols
+        symbols;
 
-      if (*NewUserSymbol) {
-        (void) ThrowMagickException (
-          pfx->exception, GetMagickModule(), OptionError,
-          "After unary, NewUserSymbol at", "'%s'",
-          SetShortExp(pfx));
-        return MagickFalse;
-      }
-
-      if (*UserSymbol) {
-        (void) AddAddressingElement (pfx, rCopyFrom, *UserSymNdx);
-        *UserSymNdx = NULL_ADDRESS;
-
-        *UserSymbol = MagickFalse;
-        *NewUserSymbol = MagickFalse;
-      }
-
-      (void) GetToken (pfx);
-      return MagickTrue;
+      symbols.UserSymbol=UserSymbol;
+      symbols.NewUserSymbol=NewUserSymbol;
+      symbols.UserSymNdx=UserSymNdx;
+      symbols.needPopAll=needPopAll;
+      return (GetUnaryPrefixOperand (pfx, op, &symbols));
     } else if (*pfx->pex == '#') {
       return (GetHexColourOperand (pfx));
     }
