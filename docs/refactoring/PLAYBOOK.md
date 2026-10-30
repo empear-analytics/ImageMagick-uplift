@@ -399,6 +399,17 @@ same text once the variables each reads or writes are renamed consistently (bloc
 takes those variables as arguments. Check it by script: rename, then compare the text.
 Literals and operators are not renamed; one that differs is a differing value.
 
+**Casts to the variable's own type.** A cast of a variable to the exact type it is
+declared with (`(Image *) image`, where `image` is an `Image *` parameter) converts
+nothing: C converts a value to its own type unchanged, so the cast expression and the
+variable alone give the same value of the same type. Such a cast is not a differing
+value: check each declared type by reading, have the script remove these casts before
+it compares, and write the helper without them. A cast to any other type (one that adds
+or drops a qualifier, or changes signedness, width or the pointed-to type), or a cast of
+anything but a plain variable, is a differing value. A block whose every path ends in
+`return(<expr>);` becomes `return(<call>);` in each copy, the helper having the
+callers' return type, as Recipe E step 7 says.
+
 **Unreached functions.** When no oracle case executes the function, D may still replace
 a block with a call to an existing `static` helper of the same file, under three
 conditions, all checked before the commit:
@@ -444,7 +455,9 @@ other movement stops the step.
 **Evidence level:** oracle; or, for a function no case reaches, the identical object
 file of *Unreached functions*.
 
-**Provenance:** founding recipe (2026-09-29).
+**Provenance:** founding recipe (2026-09-29). *Casts to the variable's own type:* 2026-10-30, from
+`colorspace.c`'s `SetImageGray` and `SetImageMonochrome`, whose closing blocks differ in
+the image type set and in a `(Image *)` cast of the `Image *` parameter.
 
 ---
 
@@ -2945,3 +2958,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | Q | Step 5: a written variable may be a plain struct value the block assigns whole (`error=f(...,error);`); it goes by pointer like a scalar, `*v` at every use, parenthesised before `->` or `.` (`(*node_info)->child[id]`), as Recipe Z does for `start` and `stop`. *Careful* gives the argument: the pointer names the caller's own object, so every member is read and assigned where it was, and nothing is copied in or out | `quantize.c`'s `ClassifyImageColors`: each row loop's tree descent (the level loop with its node creation, nesting 5, a `continue` of the level loop inside) writes the cursor `node_info` and the struct `error` (`DoublePixelPacket`) and reads six inputs; step 5 named only scalars, as the N row of 2026-10-30 noted for `MeanShiftImage`. A probe of both descents: the function leaves Deep, Nested Complexity, cc 26 to 16, 4.05 to 4.24 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | I | Step 8: a block whose every exit is the same call of a function-local cleanup-and-throw macro (cleanup statements, then `return(c);`) moves with the call left in the caller, as V step 7 leaves `S`; the macro may read and write the written variables, whose writes have landed through the members. In this form a written variable whose address the caller passes only to calls that keep no copy (`memset`, a `static` callee that does not store it) meets step 2, `&v` becoming `v` in the block. *Careful* gives the argument | `segment.c`'s `Classify`: the cluster allocation inside its triple `while` (the file's last depth-4 site in an oracle-reached function) writes `cluster`, `head` and, through `DefineRegion(extrema[Blue],&blue)`, `blue`, and leaves through `ThrowClassifyException`, which frees the list from `head`; step 1 refused V step 7's form and step 2 the address of `blue` (passed to `memset` and `DefineRegion`). A probe of the innermost `while`: `Classify` leaves Deep, Nested Complexity, cc 35 to 33, 4.93 to 4.96 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | V | Step 7: `S return(c);` may be one call of a function-local cleanup-and-throw macro (Recipe I step 8), left unchanged in the caller; in that form `S` may read and write the block's one written variable, passed by pointer, whose writes have landed before the helper returns. *Careful* gives the argument | `segment.c`'s `Classify`: the default cluster (`if (head == NULL)`, allocate, initialise, `head=cluster`) writes `head` and the temporary `cluster` and leaves through `ThrowClassifyException`, which walks the list from `head`; step 7 refused a cleanup that reads the written variable, and Recipe I needs two written variables. A probe: bumps 7 to 6, 5.09 to 5.11 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | D | Casts to the variable's own type: a cast of a plain variable to the exact type it is declared with (`(Image *) image` of an `Image *` parameter) is not a differing value; the script removes such casts, each type checked by reading, before comparing, and the helper is written without them. A block whose every path ends in `return(<expr>);` becomes `return(<call>);` (Recipe E step 7) | `colorspace.c`'s `SetImageGray` and `SetImageMonochrome` (*Code Duplication*): their closing blocks differ in the type set (`type`, `BilevelType`: one value) and in `SyncImagePixelCache((Image *) image,...)`, a no-op cast; a probe of the shared helper, 3.01 to 3.15, the file leaving *Code Duplication* | mandate (2026-10-24) |
