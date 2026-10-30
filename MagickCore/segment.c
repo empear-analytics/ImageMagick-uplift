@@ -469,6 +469,52 @@ static inline MagickBooleanType IsClusterAboveThreshold(const Cluster *cluster,
     MagickFalse);
 }
 
+typedef struct _ClassifyRowInputs
+{
+  Cluster
+    *head;
+
+  double
+    *squares;
+
+  double
+    weighting_exponent;
+} ClassifyRowInputs;
+
+static void ClassifyRowPixels(Image *image,const ClassifyRowInputs *inputs,
+  Quantum *magick_restrict q)
+{
+  Cluster
+    *const head = inputs->head;
+
+  double
+    *const squares = inputs->squares;
+
+  const double
+    weighting_exponent = inputs->weighting_exponent;
+
+  Cluster
+    *c;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PixelInfo
+      pixel;
+
+    SetPixelIndex(image,(Quantum) 0,q);
+    pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,q));
+    pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,q));
+    pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,q));
+    c=ClassifyPixelByCluster(image,head,pixel,q);
+    if (c == (Cluster *) NULL)
+      ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static Cluster *UnlinkCluster(Cluster *head,Cluster *last_cluster,
   const Cluster *cluster,Cluster *next_cluster)
 {
@@ -728,11 +774,8 @@ static MagickBooleanType Classify(Image *image,short **extrema,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Cluster
-      *c;
-
-    ssize_t
-      x;
+    ClassifyRowInputs
+      inputs;
 
     Quantum
       *magick_restrict q;
@@ -745,20 +788,10 @@ static MagickBooleanType Classify(Image *image,short **extrema,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PixelInfo
-        pixel;
-
-      SetPixelIndex(image,(Quantum) 0,q);
-      pixel.red=(double) ScaleQuantumToChar(GetPixelRed(image,q));
-      pixel.green=(double) ScaleQuantumToChar(GetPixelGreen(image,q));
-      pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,q));
-      c=ClassifyPixelByCluster(image,head,pixel,q);
-      if (c == (Cluster *) NULL)
-        ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    inputs.head=head;
+    inputs.squares=squares;
+    inputs.weighting_exponent=weighting_exponent;
+    ClassifyRowPixels(image,&inputs,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
