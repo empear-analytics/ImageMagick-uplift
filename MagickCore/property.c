@@ -1115,6 +1115,19 @@ static char *AcquireEXIFStringValue(const unsigned char *p,
   return(value);
 }
 
+static void FormatEXIFTagIdKey(char *key,const size_t tag_value)
+{
+  if (tag_value < 0x10000)
+    (void) FormatLocaleString(key,MagickPathExtent,"#%04lx",
+      (unsigned long) tag_value);
+  else
+    if (tag_value < 0x20000)
+      (void) FormatLocaleString(key,MagickPathExtent,"@%04lx",
+        (unsigned long) (tag_value & 0xffff));
+    else
+      (void) FormatLocaleString(key,MagickPathExtent,"unknown");
+}
+
 static void GetEXIFProperty(const Image *image,const char *property,
   ExceptionInfo *exception)
 {
@@ -1770,15 +1783,7 @@ static void GetEXIFProperty(const Image *image,const char *property,
                 }
                 case 2:
                 {
-                  if (tag_value < 0x10000)
-                    (void) FormatLocaleString(key,MagickPathExtent,"#%04lx",
-                      (unsigned long) tag_value);
-                  else
-                    if (tag_value < 0x20000)
-                      (void) FormatLocaleString(key,MagickPathExtent,"@%04lx",
-                        (unsigned long) (tag_value & 0xffff));
-                    else
-                      (void) FormatLocaleString(key,MagickPathExtent,"unknown");
+                  FormatEXIFTagIdKey(key,tag_value);
                   break;
                 }
                 default:
