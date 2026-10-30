@@ -1772,6 +1772,92 @@ static MagickBooleanType LabelObjectPixel(const CCLabelPixel *label_pixel,
   return(MagickTrue);
 }
 
+typedef struct _CCAdjacentRow
+{
+  Image
+    *component_image;
+
+  CacheView
+    *object_view;
+
+  CCObjectInfo
+    *object;
+
+  size_t
+    *neighbors;
+
+  RectangleInfo
+    bounding_box;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    y,
+    i;
+
+  ExceptionInfo
+    *exception;
+} CCAdjacentRow;
+
+typedef struct _CCAdjacentTargets
+{
+  MagickBooleanType
+    *status;
+
+  size_t
+    *count;
+
+  const Quantum
+    *magick_restrict *p;
+} CCAdjacentTargets;
+
+static void CountAdjacentObjectsInRow(const CCAdjacentRow *adjacent_row,
+  const CCAdjacentTargets *adjacent_targets)
+{
+  MagickBooleanType
+    *const status = adjacent_targets->status;
+
+  size_t
+    *const count = adjacent_targets->count;
+
+  const Quantum
+    *magick_restrict *const p = adjacent_targets->p;
+
+  ssize_t
+    j,
+    x;
+
+  for (x=0; x < (ssize_t) adjacent_row->bounding_box.width; x++)
+  {
+    CCAdjacentCensus
+      census;
+
+    if (*status == MagickFalse)
+      continue;
+    j=(ssize_t) GetPixelIndex(adjacent_row->component_image,*p);
+    if (j == adjacent_row->i)
+      {
+        census.component_image=adjacent_row->component_image;
+        census.object_view=adjacent_row->object_view;
+        census.object=adjacent_row->object;
+        census.neighbors=adjacent_row->neighbors;
+        census.bounding_box=adjacent_row->bounding_box;
+        census.connectivity=adjacent_row->connectivity;
+        census.connect4=adjacent_row->connect4;
+        census.connect8=adjacent_row->connect8;
+        census.x=x;
+        census.y=adjacent_row->y;
+        census.i=adjacent_row->i;
+        census.exception=adjacent_row->exception;
+        CountAdjacentObjects(&census,status,count);
+      }
+    *p+=(ptrdiff_t) GetPixelChannels(adjacent_row->component_image);
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2225,9 +2311,6 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       count,
       id;
 
-    ssize_t
-      j;
-
     if (status == MagickFalse)
       continue;
     if ((object[i].merge == MagickFalse) || (i == background_id))
@@ -2239,11 +2322,14 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     bounding_box=object[i].bounding_box;
     for (y=0; y < (ssize_t) bounding_box.height; y++)
     {
+      CCAdjacentRow
+        adjacent_row;
+
       const Quantum
         *magick_restrict p;
 
-      ssize_t
-        x;
+      const CCAdjacentTargets
+        adjacent_targets = { &status, &count, &p };
 
       if (status == MagickFalse)
         continue;
@@ -2254,32 +2340,18 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
           status=MagickFalse;
           continue;
         }
-      for (x=0; x < (ssize_t) bounding_box.width; x++)
-      {
-        CCAdjacentCensus
-          census;
-
-        if (status == MagickFalse)
-          continue;
-        j=(ssize_t) GetPixelIndex(component_image,p);
-        if (j == i)
-          {
-            census.component_image=component_image;
-            census.object_view=object_view;
-            census.object=object;
-            census.neighbors=neighbors;
-            census.bounding_box=bounding_box;
-            census.connectivity=connectivity;
-            census.connect4=connect4;
-            census.connect8=connect8;
-            census.x=x;
-            census.y=y;
-            census.i=i;
-            census.exception=exception;
-            CountAdjacentObjects(&census,&status,&count);
-          }
-        p+=(ptrdiff_t) GetPixelChannels(component_image);
-      }
+      adjacent_row.component_image=component_image;
+      adjacent_row.object_view=object_view;
+      adjacent_row.object=object;
+      adjacent_row.neighbors=neighbors;
+      adjacent_row.bounding_box=bounding_box;
+      adjacent_row.connectivity=connectivity;
+      adjacent_row.connect4=connect4;
+      adjacent_row.connect8=connect8;
+      adjacent_row.y=y;
+      adjacent_row.i=i;
+      adjacent_row.exception=exception;
+      CountAdjacentObjectsInRow(&adjacent_row,&adjacent_targets);
     }
     /*
       Merge with object of greatest adjacent area.
