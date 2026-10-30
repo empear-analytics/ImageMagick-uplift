@@ -343,21 +343,8 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
         q+=(ptrdiff_t) GetPixelChannels(rotate_image)*image->columns;
         for (x=0; x < (ssize_t) image->columns; x++)
         {
-          ssize_t
-            i;
-
           q-=GetPixelChannels(rotate_image);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            PixelTrait rotate_traits = GetPixelChannelTraits(rotate_image,
-              channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (rotate_traits == UndefinedPixelTrait))
-              continue;
-            SetPixelChannel(rotate_image,channel,p[i],q);
-          }
+          CopyRotatedPixelChannels(image,rotate_image,p,q);
           p+=(ptrdiff_t) GetPixelChannels(image);
         }
         sync=SyncCacheViewAuthenticPixels(rotate_view,exception);
@@ -462,20 +449,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
               GetPixelChannels(image);
             for (x=0; x < (ssize_t) height; x++)
             {
-              ssize_t
-                i;
-
-              for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-              {
-                PixelChannel channel = GetPixelChannelChannel(image,i);
-                PixelTrait traits = GetPixelChannelTraits(image,channel);
-                PixelTrait rotate_traits = GetPixelChannelTraits(rotate_image,
-                  channel);
-                if ((traits == UndefinedPixelTrait) ||
-                    (rotate_traits == UndefinedPixelTrait))
-                  continue;
-                SetPixelChannel(rotate_image,channel,tile_pixels[i],q);
-              }
+              CopyRotatedPixelChannels(image,rotate_image,tile_pixels,q);
               tile_pixels+=width*GetPixelChannels(image);
               q+=(ptrdiff_t) GetPixelChannels(rotate_image);
             }
