@@ -1044,6 +1044,62 @@ static void MergeDeletedFrameDelays(const DisposeType *disposals,
   }
 }
 
+static Image *OptimizeImageFrames(const Image *image,RectangleInfo *bounds,
+  DisposeType *disposals,ExceptionInfo *exception)
+{
+  const Image
+    *curr;
+
+  ExceptionInfo
+    *sans_exception;
+
+  Image
+    *prev_image,
+    *bgnd_image,
+    *optimized_image;
+
+  ssize_t
+    i;
+
+  /*
+    Optimize all images in sequence.
+  */
+  sans_exception=AcquireExceptionInfo();
+  i=0;
+  curr=GetFirstImageInList(image);
+  optimized_image=NewImageList();
+  while ( curr != (const Image *) NULL )
+  {
+    prev_image=CloneImage(curr,0,0,MagickTrue,exception);
+    if (prev_image == (Image *) NULL)
+      break;
+    prev_image->background_color.alpha_trait=BlendPixelTrait;
+    MergeDeletedFrameDelays(disposals,prev_image,&curr,&i);
+    bgnd_image=CropImage(prev_image,&bounds[i],sans_exception);
+    prev_image=DestroyImage(prev_image);
+    if (bgnd_image == (Image *) NULL)
+      break;
+    bgnd_image->dispose=disposals[i];
+    if ( disposals[i] == DupDispose ) {
+      bgnd_image->delay=0;
+      bgnd_image->dispose=NoneDispose;
+    }
+    else
+      curr=GetNextImageInList(curr);
+    AppendImageToList(&optimized_image,bgnd_image);
+    i++;
+  }
+  sans_exception=DestroyExceptionInfo(sans_exception);
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+  if (curr != (Image *) NULL)
+    {
+      optimized_image=DestroyImageList(optimized_image);
+      return((Image *) NULL);
+    }
+  return(GetFirstImageInList(optimized_image));
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1053,14 +1109,10 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   DisposeType
     *disposals;
 
-  ExceptionInfo
-    *sans_exception;
-
   Image
     *prev_image,
     *dup_image,
-    *bgnd_image,
-    *optimized_image;
+    *bgnd_image;
 
   RectangleInfo
     try_bounds,
@@ -1402,43 +1454,7 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
     i++;
   }
   prev_image=DestroyImage(prev_image);
-  /*
-    Optimize all images in sequence.
-  */
-  sans_exception=AcquireExceptionInfo();
-  i=0;
-  curr=GetFirstImageInList(image);
-  optimized_image=NewImageList();
-  while ( curr != (const Image *) NULL )
-  {
-    prev_image=CloneImage(curr,0,0,MagickTrue,exception);
-    if (prev_image == (Image *) NULL)
-      break;
-    prev_image->background_color.alpha_trait=BlendPixelTrait;
-    MergeDeletedFrameDelays(disposals,prev_image,&curr,&i);
-    bgnd_image=CropImage(prev_image,&bounds[i],sans_exception);
-    prev_image=DestroyImage(prev_image);
-    if (bgnd_image == (Image *) NULL)
-      break;
-    bgnd_image->dispose=disposals[i];
-    if ( disposals[i] == DupDispose ) {
-      bgnd_image->delay=0;
-      bgnd_image->dispose=NoneDispose;
-    }
-    else
-      curr=GetNextImageInList(curr);
-    AppendImageToList(&optimized_image,bgnd_image);
-    i++;
-  }
-  sans_exception=DestroyExceptionInfo(sans_exception);
-  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-  disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-  if (curr != (Image *) NULL)
-    {
-      optimized_image=DestroyImageList(optimized_image);
-      return((Image *) NULL);
-    }
-  return(GetFirstImageInList(optimized_image));
+  return(OptimizeImageFrames(image,bounds,disposals,exception));
 }
 
 /*
