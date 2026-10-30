@@ -685,12 +685,12 @@ static size_t GetTallestTileHeight(Image **image_list,const ssize_t tile,
   return(max_height);
 }
 
-MagickExport Image *MontageImageList(const ImageInfo *image_info,
-  const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
-{
 #define MontageImageTag  "Montage/Image"
 #define TileImageTag  "Tile/Image"
 
+MagickExport Image *MontageImageList(const ImageInfo *image_info,
+  const MontageInfo *montage_info,const Image *images,ExceptionInfo *exception)
+{
   char
     tile_geometry[MagickPathExtent],
     *title;
