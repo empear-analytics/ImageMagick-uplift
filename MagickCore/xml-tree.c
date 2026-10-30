@@ -1822,6 +1822,18 @@ static inline MagickBooleanType IsUnterminatedSection(const char *p,
     (terminal != '>'))) ? MagickTrue : MagickFalse);
 }
 
+static char *SkipProcessingInstruction(char *p)
+{
+  do
+  {
+    p=strchr(p,'?');
+    if (p == (char *) NULL)
+      break;
+    p++;
+  } while ((*p != '\0') && (*p != '>'));
+  return(p);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2147,13 +2159,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                   /*
                     Processing instructions.
                   */
-                  do
-                  {
-                    p=strchr(p,'?');
-                    if (p == (char *) NULL)
-                      break;
-                    p++;
-                  } while ((*p != '\0') && (*p != '>'));
+                  p=SkipProcessingInstruction(p);
                   if (IsUnterminatedSection(p,terminal) != MagickFalse)
                     {
                       (void) ThrowMagickException(exception,GetMagickModule(),
