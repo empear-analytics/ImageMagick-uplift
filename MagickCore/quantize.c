@@ -630,6 +630,26 @@ static void AssignImageRowColors(Image *image,const QCubeInfo *cube_info,
 
 #define AssignImageTag  "Assign/Image"
 
+static MagickBooleanType ReportAssignImageProgress(Image *image,
+  const ssize_t y)
+{
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,AssignImageTag,(MagickOffsetType) y,
+        image->rows);
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -686,16 +706,8 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
         AssignImageRowColors(image,cube_info,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            MagickBooleanType
-              proceed;
-
-            proceed=SetImageProgress(image,AssignImageTag,(MagickOffsetType) y,
-              image->rows);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
-          }
+        if (ReportAssignImageProgress(image,y) == MagickFalse)
+          status=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);
     }
