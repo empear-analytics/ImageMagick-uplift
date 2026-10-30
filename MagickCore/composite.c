@@ -1999,6 +1999,19 @@ static void SetBlendFactors(const GeometryInfo geometry_info,
     *canvas_dissolve=geometry_info.sigma/100.0;
 }
 
+static MagickRealType GetChannelQuotient(const MagickRealType dividend,
+  const MagickRealType divisor)
+{
+  MagickRealType
+    pixel;
+
+  if (fabs(divisor) < MagickEpsilon)
+    pixel=(double) QuantumRange;
+  else
+    pixel=(double) QuantumRange*(dividend/divisor);
+  return(pixel);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3384,10 +3397,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           {
             if (compose_sync == MagickFalse)
               {
-                if (fabs(Dc) < MagickEpsilon)
-                  pixel=(double) QuantumRange;
-                else
-                  pixel=(double) QuantumRange*(Sc/Dc);
+                pixel=GetChannelQuotient(Sc,Dc);
                 break;
               }
             if (fabs(Dca) < MagickEpsilon)
