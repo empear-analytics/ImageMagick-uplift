@@ -2164,6 +2164,55 @@ static ChannelStatistics *RelinquishImageStatistics(const Image *image,
   return(channel_statistics);
 }
 
+typedef struct _MedianStatistics
+{
+  const Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+
+  ChannelStatistics
+    *channel_statistics;
+
+  MemoryInfo
+    *median_info;
+} MedianStatistics;
+
+static void ComputeChannelMedians(const MedianStatistics *medians,ssize_t *y)
+{
+  Quantum
+    *median;
+
+  ssize_t
+    i;
+
+  median=(Quantum *) GetVirtualMemoryBlob(medians->median_info);
+  for (i=0; i < (ssize_t) GetPixelChannels(medians->image); i++)
+  {
+    MedianPass
+      pass;
+
+    size_t
+      n = 0;
+
+    /*
+      Compute median statistics for each channel.
+    */
+    PixelChannel channel = GetPixelChannelChannel(medians->image,i);
+    PixelTrait traits = GetPixelChannelTraits(medians->image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    pass.image=medians->image;
+    pass.exception=medians->exception;
+    pass.median=median;
+    pass.i=i;
+    CollectMedianPass(&pass,y,&n);
+    medians->channel_statistics[channel].median=(double) median[
+      GetMedianPixel(median,n)];
+  }
+}
+
 MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
   ExceptionInfo *exception)
 {
@@ -2175,6 +2224,9 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
 
   MagickStatusType
     status;
+
+  MedianStatistics
+    medians;
 
   MemoryInfo
     *median_info;
@@ -2275,30 +2327,11 @@ MagickExport ChannelStatistics *GetImageStatistics(const Image *image,
       ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
   else
     {
-      median=(Quantum *) GetVirtualMemoryBlob(median_info);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        MedianPass
-          pass;
-
-        size_t
-          n = 0;
-
-        /*
-          Compute median statistics for each channel.
-        */
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        pass.image=image;
-        pass.exception=exception;
-        pass.median=median;
-        pass.i=i;
-        CollectMedianPass(&pass,&y,&n);
-        channel_statistics[channel].median=(double) median[
-          GetMedianPixel(median,n)];
-      }
+      medians.image=image;
+      medians.exception=exception;
+      medians.channel_statistics=channel_statistics;
+      medians.median_info=median_info;
+      ComputeChannelMedians(&medians,&y);
       median_info=RelinquishVirtualMemory(median_info);
     }
   ComputeCompositeStatistics(image,channel_statistics);
