@@ -2701,6 +2701,25 @@ static MagickBooleanType NotASymbolOperand (FxInfo * pfx)
   return(MagickTrue);
 }
 
+static MagickBooleanType NotAUserSymbolOperand (FxInfo * pfx,
+  MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol,
+  int * UserSymNdx)
+{
+  if (TokenMaybeUserSymbol (pfx)) {
+    *UserSymbol = MagickTrue;
+    *UserSymNdx = FindUserSymbol (pfx, pfx->token);
+    if (*UserSymNdx == NULL_ADDRESS) {
+      *UserSymNdx = AddUserSymbol (pfx, pfx->pex, pfx->lenToken);
+      *NewUserSymbol = MagickTrue;
+    } else {
+    }
+    pfx->pex += pfx->lenToken;
+
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType GetOperand (
   FxInfo * pfx, MagickBooleanType * UserSymbol, MagickBooleanType * NewUserSymbol, int * UserSymNdx,
   MagickBooleanType * needPopAll)
@@ -2884,18 +2903,9 @@ static MagickBooleanType GetOperand (
 
     /* Try user symbols. If it is, don't AddElement yet.
     */
-    if (TokenMaybeUserSymbol (pfx)) {
-      *UserSymbol = MagickTrue;
-      *UserSymNdx = FindUserSymbol (pfx, pfx->token);
-      if (*UserSymNdx == NULL_ADDRESS) {
-        *UserSymNdx = AddUserSymbol (pfx, pfx->pex, pfx->lenToken);
-        *NewUserSymbol = MagickTrue;
-      } else {
-      }
-      pfx->pex += pfx->lenToken;
-
+    if (NotAUserSymbolOperand (pfx, UserSymbol, NewUserSymbol, UserSymNdx) ==
+        MagickFalse)
       return MagickTrue;
-    }
   }
 
   (void) ThrowMagickException (
