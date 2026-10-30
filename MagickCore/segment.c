@@ -813,14 +813,25 @@ static ssize_t FindCrossingAbove(const ZeroCrossing *zero_crossing,
   return(k);
 }
 
+static void MoveCrossing(ZeroCrossing *zero_crossing,const ssize_t i,
+  const ssize_t j,const ssize_t correct)
+{
+  ssize_t
+    l;
+
+  l=(ssize_t) zero_crossing[i].crossings[j];
+  zero_crossing[i].crossings[j]=0;
+  if (correct != -1)
+    zero_crossing[i].crossings[correct]=(short) l;
+}
+
 static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
   ssize_t
     i,
     j,
-    k,
-    l;
+    k;
 
   ssize_t
     center,
@@ -871,10 +882,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       if (correct == -1)
         if (IsEvenCrossing(zero_crossing,i,k,right) != MagickFalse)
           correct=right;
-      l=(ssize_t) zero_crossing[i].crossings[j];
-      zero_crossing[i].crossings[j]=0;
-      if (correct != -1)
-        zero_crossing[i].crossings[correct]=(short) l;
+      MoveCrossing(zero_crossing,i,j,correct);
     }
 }
 
