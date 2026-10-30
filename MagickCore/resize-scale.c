@@ -385,6 +385,81 @@ static void AccumulateScaleColumn(const ScaleColumn *column,
   *next_column=MagickTrue;
 }
 
+typedef struct _ScalePartialColumn
+{
+  const Image
+    *image;
+
+  const PointInfo
+    *scale;
+
+  const double
+    *scanline;
+
+  ssize_t
+    x;
+} ScalePartialColumn;
+
+typedef struct _ScalePartialTargets
+{
+  double
+    (*pixel)[CompositePixelChannel];
+
+  MagickBooleanType
+    *next_column;
+
+  ssize_t
+    *t;
+
+  PointInfo
+    *span;
+} ScalePartialTargets;
+
+static void AccumulatePartialScaleColumn(const ScalePartialColumn *partial,
+  const ScalePartialTargets *targets)
+{
+  const Image
+    *const image = partial->image;
+
+  const PointInfo
+    *const scale = partial->scale;
+
+  const double
+    *const scanline = partial->scanline;
+
+  const ssize_t
+    x = partial->x;
+
+  double
+    (*const pixel)[CompositePixelChannel] = targets->pixel;
+
+  MagickBooleanType
+    *const next_column = targets->next_column;
+
+  ssize_t
+    *const t = targets->t;
+
+  PointInfo
+    *const span = targets->span;
+
+  ssize_t
+    i;
+
+  if ((*scale).x > 0)
+    {
+      if (*next_column != MagickFalse)
+        {
+          ResetScalePixel(image,*pixel);
+          *next_column=MagickFalse;
+          (*t)++;
+        }
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+        (*pixel)[i]+=(*scale).x*scanline[x*(ssize_t)
+          GetPixelChannels(image)+i];
+      (*span).x-=(*scale).x;
+    }
+}
+
 static void ScaleScanlineX(const Image *image,const Image *scale_image,
   const double *scanline,double *scale_scanline)
 {
@@ -409,6 +484,12 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
   t=0;
   for (x=0; x < (ssize_t) image->columns; x++)
   {
+    const ScalePartialTargets
+      partial_targets = { &pixel, &next_column, &t, &span };
+
+    ScalePartialColumn
+      partial;
+
     scale.x=(double) scale_image->columns/(double) image->columns;
     while (scale.x >= span.x)
     {
@@ -424,19 +505,11 @@ static void ScaleScanlineX(const Image *image,const Image *scale_image,
       column.x=x;
       AccumulateScaleColumn(&column,&targets);
     }
-    if (scale.x > 0)
-      {
-        if (next_column != MagickFalse)
-          {
-            ResetScalePixel(image,pixel);
-            next_column=MagickFalse;
-            t++;
-          }
-        for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          pixel[i]+=scale.x*scanline[x*(ssize_t)
-            GetPixelChannels(image)+i];
-        span.x-=scale.x;
-      }
+    partial.image=image;
+    partial.scale=(&scale);
+    partial.scanline=scanline;
+    partial.x=x;
+    AccumulatePartialScaleColumn(&partial,&partial_targets);
   }
   if (span.x > 0)
     {
