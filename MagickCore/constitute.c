@@ -734,6 +734,50 @@ static void SetInterpretedProperty(ImageInfo *read_info,Image *next,
     }
 }
 
+static MagickBooleanType OpenSeekableReadStream(const ImageInfo *image_info,
+  ImageInfo *read_info,const MagickInfo *magick_info,ExceptionInfo *exception)
+{
+  Image
+    *image;
+
+  MagickBooleanType
+    status;
+
+  if ((magick_info != (const MagickInfo *) NULL) &&
+      (GetMagickDecoderSeekableStream(magick_info) != MagickFalse))
+    {
+      image=AcquireImage(read_info,exception);
+      (void) CopyMagickString(image->filename,read_info->filename,
+        MagickPathExtent);
+      status=OpenBlob(image_info,image,ReadBinaryBlobMode,exception);
+      if (status == MagickFalse)
+        {
+          read_info=DestroyImageInfo(read_info);
+          image=DestroyImage(image);
+          return(MagickFalse);
+        }
+      if (IsBlobSeekable(image) == MagickFalse)
+        {
+          /*
+            Coder requires a seekable stream.
+          */
+          *read_info->filename='\0';
+          status=ImageToFile(image,read_info->filename,exception);
+          if (status == MagickFalse)
+            {
+              (void) CloseBlob(image);
+              read_info=DestroyImageInfo(read_info);
+              image=DestroyImage(image);
+              return(MagickFalse);
+            }
+          read_info->temporary=MagickTrue;
+        }
+      (void) CloseBlob(image);
+      image=DestroyImage(image);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ReadImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -799,38 +843,9 @@ MagickExport Image *ReadImage(const ImageInfo *image_info,
             (GetMagickRawSupport(magick_info) != MagickFalse))
           read_info->endian=GetHostEndian();
     }
-  if ((magick_info != (const MagickInfo *) NULL) &&
-      (GetMagickDecoderSeekableStream(magick_info) != MagickFalse))
-    {
-      image=AcquireImage(read_info,exception);
-      (void) CopyMagickString(image->filename,read_info->filename,
-        MagickPathExtent);
-      status=OpenBlob(image_info,image,ReadBinaryBlobMode,exception);
-      if (status == MagickFalse)
-        {
-          read_info=DestroyImageInfo(read_info);
-          image=DestroyImage(image);
-          return((Image *) NULL);
-        }
-      if (IsBlobSeekable(image) == MagickFalse)
-        {
-          /*
-            Coder requires a seekable stream.
-          */
-          *read_info->filename='\0';
-          status=ImageToFile(image,read_info->filename,exception);
-          if (status == MagickFalse)
-            {
-              (void) CloseBlob(image);
-              read_info=DestroyImageInfo(read_info);
-              image=DestroyImage(image);
-              return((Image *) NULL);
-            }
-          read_info->temporary=MagickTrue;
-        }
-      (void) CloseBlob(image);
-      image=DestroyImage(image);
-    }
+  if (OpenSeekableReadStream(image_info,read_info,magick_info,exception) ==
+      MagickFalse)
+    return((Image *) NULL);
   image=NewImageList();
   decoder=GetImageDecoder(magick_info);
   if (decoder == (DecodeImageHandler *) NULL)
