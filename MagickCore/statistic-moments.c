@@ -520,6 +520,26 @@ static void ComputeCentroids(PointInfo *centroid,const double *M00,
   }
 }
 
+static void AccumulateCentralMomentRow(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t y,const MomentArrays *moments)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MomentPixel
+      moment_pixel;
+
+    moment_pixel.image=image;
+    moment_pixel.p=p;
+    moment_pixel.x=x;
+    moment_pixel.y=y;
+    AccumulateCentralMoments(&moment_pixel,moments);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport ChannelMoments *GetImageMoments(const Image *image,
   ExceptionInfo *exception)
 {
@@ -578,27 +598,13 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     /*
       Compute the image moments.
     */
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MomentPixel
-        moment_pixel;
-
-      moment_pixel.image=image;
-      moment_pixel.p=p;
-      moment_pixel.x=x;
-      moment_pixel.y=y;
-      AccumulateCentralMoments(&moment_pixel,&moments);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateCentralMomentRow(image,p,y,&moments);
   }
   AverageCompositeMoments(image,&moments);
   ComputeEllipseMoments(channel_moments,&moments);
