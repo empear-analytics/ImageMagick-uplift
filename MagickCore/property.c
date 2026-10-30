@@ -2666,6 +2666,28 @@ MagickExport const char *GetImageProperty(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static const char *CloneMagickPropertyValue(ImageInfo *image_info,
+  Image *image,const char *value)
+{
+  if (*value != '\0')
+    {
+      /*
+        Create a cloned copy of result.
+      */
+      if (image != (Image *) NULL)
+        {
+          (void) SetImageArtifact(image,"magick-property",value);
+          return(GetImageArtifact(image,"magick-property"));
+        }
+      else
+        {
+          (void) SetImageOption(image_info,"magick-property",value);
+          return(GetImageOption(image_info,"magick-property"));
+        }
+    }
+  return((char *) NULL);
+}
+
 static const char *GetMagickPropertyLetter(ImageInfo *image_info,
   Image *image,const char letter,ExceptionInfo *exception)
 {
@@ -3060,23 +3082,7 @@ static const char *GetMagickPropertyLetter(ImageInfo *image_info,
   }
   if (string != (char *) NULL)
     return(string);
-  if (*value != '\0')
-    {
-      /*
-        Create a cloned copy of result.
-      */
-      if (image != (Image *) NULL)
-        {
-          (void) SetImageArtifact(image,"magick-property",value);
-          return(GetImageArtifact(image,"magick-property"));
-        }
-      else
-        {
-          (void) SetImageOption(image_info,"magick-property",value);
-          return(GetImageOption(image_info,"magick-property"));
-        }
-    }
-  return((char *) NULL);
+  return(CloneMagickPropertyValue(image_info,image,value));
 }
 
 MagickExport const char *GetMagickProperty(ImageInfo *image_info,
