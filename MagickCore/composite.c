@@ -2115,6 +2115,24 @@ static double GetHardMixBurn(const MagickRealType S,const MagickRealType D)
   return(vivid);
 }
 
+static double GetHardMixVivid(const MagickRealType S,
+  const MagickRealType D)
+{
+  double
+    vivid;
+
+  if (S <= 0.5)
+    vivid=GetHardMixBurn(S,D);
+  else
+    {
+      if ((1.0-(2.0*S-1.0)) <= MagickEpsilon)
+        vivid=1.0;
+      else
+        vivid=D/(1.0-(2.0*S-1.0));
+    }
+  return(vivid);
+}
+
 MagickExport MagickBooleanType CompositeImage(Image *image,
   const Image *composite,const CompositeOperator compose,
   const MagickBooleanType clip_to_self,const ssize_t x_offset,
@@ -3590,15 +3608,7 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
 
             S=(Sa > 0.0) ? RoundToUnity(Sca/Sa) : 0.0;
             D=(Da > 0.0) ? RoundToUnity(Dca/Da) : 0.0;
-            if (S <= 0.5)
-              vivid=GetHardMixBurn(S,D);
-            else
-              {
-                if ((1.0-(2.0*S-1.0)) <= MagickEpsilon)
-                  vivid=1.0;
-                else
-                  vivid=D/(1.0-(2.0*S-1.0));
-              }
+            vivid=GetHardMixVivid(S,D);
             hardmix=(vivid < 0.5) ? 0.0 : 1.0;
             pixel=(double) QuantumRange*gamma*RoundToUnity(Sa*Da*hardmix+Sca*
               (1.0-Da)+Dca*(1.0-Sa));
