@@ -1246,6 +1246,36 @@ static void GetCubicBCOverrides(const Image *image,double *B,double *C)
     }
 }
 
+static void ApplyBlurAndSupportOverrides(const Image *image,
+  ResizeFilter *resize_filter)
+{
+  const char
+    *artifact;
+
+  /*
+    Expert blur override.
+  */
+  artifact=GetImageArtifact(image,"filter:blur");
+  if (artifact != (const char *) NULL)
+    resize_filter->blur*=StringToDouble(artifact,(char **) NULL);
+  if (resize_filter->blur < MagickEpsilon)
+    resize_filter->blur=(double) MagickEpsilon;
+  /*
+    Expert override of the support setting.
+  */
+  artifact=GetImageArtifact(image,"filter:support");
+  if (artifact != (const char *) NULL)
+    resize_filter->support=fabs(StringToDouble(artifact,(char **) NULL));
+  /*
+    Scale windowing function separately to the support 'clipping' window
+    that calling operator is planning to actually use. (Expert override)
+  */
+  resize_filter->window_support=resize_filter->support; /* default */
+  artifact=GetImageArtifact(image,"filter:win-support");
+  if (artifact != (const char *) NULL)
+    resize_filter->window_support=fabs(StringToDouble(artifact,(char **) NULL));
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1362,28 +1392,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
     SetResizeFilterLobes(resize_filter,artifact);
   if (resize_filter->filter == Jinc)
     SetJincSupport(resize_filter,filter_type,jinc_zeros);
-  /*
-    Expert blur override.
-  */
-  artifact=GetImageArtifact(image,"filter:blur");
-  if (artifact != (const char *) NULL)
-    resize_filter->blur*=StringToDouble(artifact,(char **) NULL);
-  if (resize_filter->blur < MagickEpsilon)
-    resize_filter->blur=(double) MagickEpsilon;
-  /*
-    Expert override of the support setting.
-  */
-  artifact=GetImageArtifact(image,"filter:support");
-  if (artifact != (const char *) NULL)
-    resize_filter->support=fabs(StringToDouble(artifact,(char **) NULL));
-  /*
-    Scale windowing function separately to the support 'clipping' window
-    that calling operator is planning to actually use. (Expert override)
-  */
-  resize_filter->window_support=resize_filter->support; /* default */
-  artifact=GetImageArtifact(image,"filter:win-support");
-  if (artifact != (const char *) NULL)
-    resize_filter->window_support=fabs(StringToDouble(artifact,(char **) NULL));
+  ApplyBlurAndSupportOverrides(image,resize_filter);
   /*
     Adjust window function scaling to match windowing support for weighting
     function.  This avoids a division on every filter call.
