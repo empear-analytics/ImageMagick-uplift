@@ -288,6 +288,22 @@ static RectangleInfo ClipBoundsTop(RectangleInfo bounds)
   return(bounds);
 }
 
+static RectangleInfo ClipBoundsRight(RectangleInfo bounds,
+  const Image *image)
+{
+  if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) image->columns)
+    bounds.width=(size_t) ((ssize_t) image->columns-bounds.x);
+  return(bounds);
+}
+
+static RectangleInfo ClipBoundsBottom(RectangleInfo bounds,
+  const Image *image)
+{
+  if ((bounds.y+(ssize_t) bounds.height) > (ssize_t) image->rows)
+    bounds.height=(size_t) ((ssize_t) image->rows-bounds.y);
+  return(bounds);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -352,11 +368,9 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     bounds.width=previous->columns;
     bounds.height=previous->rows;
     bounds=ClipBoundsLeft(bounds);
-    if ((bounds.x+(ssize_t) bounds.width) > (ssize_t) coalesce_image->columns)
-      bounds.width=(size_t) ((ssize_t) coalesce_image->columns-bounds.x);
+    bounds=ClipBoundsRight(bounds,coalesce_image);
     bounds=ClipBoundsTop(bounds);
-    if ((bounds.y+(ssize_t) bounds.height) > (ssize_t) coalesce_image->rows)
-      bounds.height=(size_t) ((ssize_t) coalesce_image->rows-bounds.y);
+    bounds=ClipBoundsBottom(bounds,coalesce_image);
     /*
       Replace the dispose image with the new coalesced image.
     */
