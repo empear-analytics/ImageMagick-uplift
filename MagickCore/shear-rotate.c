@@ -191,6 +191,19 @@ static size_t ClipTileExtent(const size_t tile_width,const ssize_t tile_x,
   return(width);
 }
 
+static void AppendRotateTransform(const Image *image,const size_t rotations,
+  Image *rotate_image,ExceptionInfo *exception)
+{
+  char
+    transform[MagickPathExtent];
+
+  (void) FormatLocaleString(transform,MagickPathExtent,
+    "rotate %.17gx%.17g %.17g",(double) image->columns,
+    (double) image->rows,(double) rotations);
+  AppendImageProfileProperty(rotate_image,"hdrgm","hdrgm:Transform",
+    transform,exception);
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -505,16 +518,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   rotate_image->type=image->type;
   rotate_image->page=page;
   if (status != MagickFalse)
-    {
-      char
-        transform[MagickPathExtent];
-
-      (void) FormatLocaleString(transform,MagickPathExtent,
-        "rotate %.17gx%.17g %.17g",(double) image->columns,
-        (double) image->rows,(double) rotations);
-      AppendImageProfileProperty(rotate_image,"hdrgm","hdrgm:Transform",
-        transform,exception);
-    }
+    AppendRotateTransform(image,rotations,rotate_image,exception);
   if (status == MagickFalse)
     rotate_image=DestroyImage(rotate_image);
   return(rotate_image);
