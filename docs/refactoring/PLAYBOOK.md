@@ -1917,7 +1917,11 @@ Q and U, whose first step refuses a block containing `goto`.
    `return(c);` becomes `return(MagickFalse);`, one for one, and the caller writes
    `if (Helper(...) == MagickFalse) return(c);`. Steps 1, 2 and 4 hold as written, with
    `return(c);` in place of `goto L;`. A block returning a variable, or two different
-   values, is not this recipe, except under step 7.
+   values, is not this recipe, except under step 7. Another copy of such a block, in
+   another function and identical to it once the variables are renamed consistently
+   (Recipe D's test, checked by script), may call the same function the same way, with
+   its own variables as arguments and its own `c`, one commit per caller, as Recipe W
+   step 7 allows.
 7. A block whose every exit is the same run of cleanup statements `S` followed by
    `return(v);`, `v` a local of the caller (`GetThresholdMapFile`'s
    `thresholds=DestroyXMLTree(thresholds); map=DestroyThresholdMap(map); return(map);`),
@@ -2041,6 +2045,12 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   functions with the same arguments and returns the same value (`DestroyKernelInfo`
   frees the same kernel, whose members the block wrote through the pointer before the
   exit, as before). On the success path it runs in neither version.
+- Under step 6's other copy the function was cut from the first copy's text, and the
+  second copy is that text with its own variables in place of the first copy's: the
+  call runs the same statements on them, writes its own `v` through the pointer, and
+  on a failure path the caller returns its own `c` from the point where the copy
+  returned it. This is Recipe D's argument for a block that leaves the caller, which
+  D itself, moving copies whole, does not take (Recipe W's *Not covered by*).
 - Under step 7's macro form the argument is Recipe I step 8's with one written
   variable: the helper writes `v` through its pointer, so on a failure path the macro
   in the caller reads the value the block left (`Classify`'s `head`, still NULL when
@@ -2087,6 +2097,9 @@ Step 7's `return(<expr>);` (2026-10-30, task W09): `morphology.c`'s `ParseKernel
 whose `:` geometry parse (size and offset checks) and the `:`/odd-square selection
 around it leave through `return(DestroyKernelInfo(kernel));` when an offset lies
 outside the kernel.
+Step 6's other copy (2026-10-30, task W09): `resize-image.c`'s `HorizontalFilter` and
+`VerticalFilter`, whose contribution-buffer allocation (`return(MagickFalse);` when it
+fails) is the same text in both.
 
 ---
 
@@ -3437,3 +3450,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | E | OpenMP regions: a block inside the structured block of `#pragma omp single` may be extracted by Recipe E under the parallel-loop proviso (it writes no variable declared outside the structured block, and contains no pragma); the pragma and its braces stay, holding the call | `resample.c`'s `SetResampleFilter` (Large Method, 87 lines): its `resample:verbose` dump of the filter LUT sits in an orphaned `omp single` block and writes only its own `Q` and `r_scale` and stdout. The section names only parallel loop bodies; Recipe O step 1 refuses `single` and points to E. A probe: Large Method leaves the function, 5.46 to 5.72 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | T | Step 2: the loop's status may have another name or type, a variable `v` declared outside the loop body that the parallel loop writes only as `v=c;` of one constant and the body reads only in its leading `if (v == c) continue;`; the helper is step 5's and the caller writes `if (Helper(...) == MagickFalse) v=c;`; *Careful* gives the argument and refuses a flag written another value | `attribute.c`'s `IsImageOpaque` (`opaque=MagickFalse;`) and `IdentifyImageMonochrome` (`type=UndefinedType;`), row loops of T's shape whose flag is not called `status`. A probe on `IsImageOpaque`: bumps 2 to 1, cc 10 to 9, Code Duplication leaves the file, 6.08 to 6.52 | mandate (2026-10-24) |
 | 2026-10-30 | WORDING | Wa | Campaign A's Recipe W (Extract Accumulating Block Returning the Loop Status Taking an Input Struct, 2026-10-29) is renamed Wa: campaign B's M112 added a different Recipe W (Extract Block Returning Success for an Early Return) the same day on its own branch, and both reached `main`. B's reached `main` first and keeps W. Campaign A commits made before this rename whose trailer reads `Recipe: W` (W08's `effect.c` steps and the steps that cite Recipe W step 3's member form) mean Wa | Both headings stood in `main` after #75 and #78, which `playbook_lint` refuses as a duplicate code | owner |
+| 2026-10-30 | AMEND | V | Step 6: another copy of a step-6 block, in another function and identical under Recipe D's renaming (checked by script), may call the function the first copy became, with its own arguments and its own `c`, one commit per caller, as Recipe W step 7 allows for W; *Careful* gives the argument | `resize-image.c`'s `HorizontalFilter` and `VerticalFilter`: the contribution-buffer allocation, which throws and returns `MagickFalse` when it fails, is the same text in both. Recipe D moves copies whole and may not leave the caller, and a second helper of the same text would be a duplicate. A probe: 6.29 to 6.31 for the first copy, 6.32 with the second | mandate (2026-10-24) |
