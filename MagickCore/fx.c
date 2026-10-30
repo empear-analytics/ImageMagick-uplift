@@ -4007,6 +4007,44 @@ static fxFltType GetPixelValueSV (const RpnPixelInputs * in,
   return(regA);
 }
 
+static fxFltType GetImageZeroValueU0 (const RpnFirstImageInputs * in,
+  fxFltType regA)
+{
+  FxInfo
+    *const pfx = in->pfx;
+
+  ElementT
+    *const pel = in->pel;
+
+  const Quantum
+    *const p = in->p;
+
+  Image
+    *const pimg = in->pimg;
+
+  const PixelChannel
+    channel = in->channel;
+
+  const ssize_t
+    imgx = in->imgx,
+    imgy = in->imgy;
+
+  RpnPixelInputs
+    rpn_in;
+
+  if (pfx->ImgNum==0) {
+    regA = QuantumScale * (double) p[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
+  } else {
+    rpn_in.pfx=pfx;
+    rpn_in.pel=pel;
+    rpn_in.channel=channel;
+    rpn_in.imgx=imgx;
+    rpn_in.imgy=imgy;
+    regA = GetImageZeroCacheValueU0 (&rpn_in, pimg, regA);
+  }
+  return(regA);
+}
+
 static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *result,
   const fxPixelPosT * pos)
 {
@@ -4458,18 +4496,17 @@ static MagickBooleanType ExecuteRPN (FxInfo * pfx, fxRtT * pfxrt, fxFltType *res
           Image * pimg = pfx->Images[0];
           if ((int) pel->channel_qual < 0) {
             if (pel->channel_qual == NO_CHAN_QUAL || pel->channel_qual == THIS_CHANNEL) {
+              RpnFirstImageInputs
+                first_in;
 
-              if (pfx->ImgNum==0) {
-                regA = QuantumScale * (double) p[pimg->channel_map[WHICH_NON_ATTR_CHAN].offset];
-              } else {
-                rpn_in.pfx=pfx;
-                rpn_in.pel=pel;
-                rpn_in.channel=channel;
-                rpn_in.imgx=imgx;
-                rpn_in.imgy=imgy;
-                regA = GetImageZeroCacheValueU0 (&rpn_in, pimg, regA);
-              }
-
+              first_in.pfx=pfx;
+              first_in.pel=pel;
+              first_in.p=p;
+              first_in.pimg=pimg;
+              first_in.channel=channel;
+              first_in.imgx=imgx;
+              first_in.imgy=imgy;
+              regA = GetImageZeroValueU0 (&first_in, regA);
             } else if (IsHslChannelQualifier(pel->channel_qual) != MagickFalse) {
               regA = GetHslInt (pfx, 0, &xy, pel->channel_qual);
               break;
