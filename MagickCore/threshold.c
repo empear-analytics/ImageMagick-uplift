@@ -1998,6 +1998,13 @@ static MagickBooleanType SetDirectRGBImage(Image *image,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsRangeThresholdWhite(const double pixel,
+  const double low_white,const double high_white)
+{
+  return(((pixel >= low_white) && (pixel <= high_white)) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline Quantum RangeThresholdValue(const double pixel,
   const double low_black,const double low_white,const double high_white,
   const double high_black)
@@ -2009,7 +2016,7 @@ static inline Quantum RangeThresholdValue(const double pixel,
       return(ClampToQuantum((double) QuantumRange*
         MagickSafeReciprocal(low_white-low_black)*(pixel-low_black)));
     else
-      if ((pixel >= low_white) && (pixel <= high_white))
+      if (IsRangeThresholdWhite(pixel,low_white,high_white) != MagickFalse)
         return(QuantumRange);
       else
         if ((pixel > high_white) && (pixel <= high_black))
