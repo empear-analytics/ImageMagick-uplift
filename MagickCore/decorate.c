@@ -202,6 +202,20 @@ static PixelInfo LightenFrameColor(const PixelInfo matte,const Quantum modulate)
   return(color);
 }
 
+static PixelInfo DarkenFrameColor(const PixelInfo matte,const Quantum modulate)
+{
+  PixelInfo
+    color;
+
+  color=matte;
+  color.red=QuantumScale*matte.red*(double) modulate;
+  color.green=QuantumScale*matte.green*(double) modulate;
+  color.blue=QuantumScale*matte.blue*(double) modulate;
+  color.black=QuantumScale*matte.black*(double) modulate;
+  color.alpha=matte.alpha;
+  return(color);
+}
+
 typedef struct _FrameTopBevel
 {
   Image
@@ -522,18 +536,8 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   matte=image->matte_color;
   accentuate=LightenFrameColor(matte,AccentuateModulate);
   highlight=LightenFrameColor(matte,HighlightModulate);
-  shadow=matte;
-  shadow.red=QuantumScale*matte.red*(double) ShadowModulate;
-  shadow.green=QuantumScale*matte.green*(double) ShadowModulate;
-  shadow.blue=QuantumScale*matte.blue*(double) ShadowModulate;
-  shadow.black=QuantumScale*matte.black*(double) ShadowModulate;
-  shadow.alpha=matte.alpha;
-  trough=matte;
-  trough.red=QuantumScale*matte.red*(double) TroughModulate;
-  trough.green=QuantumScale*matte.green*(double) TroughModulate;
-  trough.blue=QuantumScale*matte.blue*(double) TroughModulate;
-  trough.black=QuantumScale*matte.black*(double) TroughModulate;
-  trough.alpha=matte.alpha;
+  shadow=DarkenFrameColor(matte,ShadowModulate);
+  trough=DarkenFrameColor(matte,TroughModulate);
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
