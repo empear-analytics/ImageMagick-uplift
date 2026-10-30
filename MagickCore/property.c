@@ -3882,6 +3882,17 @@ static inline MagickBooleanType IsEscapeEnd(const char *p)
     MagickFalse);
 }
 
+static void TruncatePatternForMessage(char *pattern,const ssize_t offset)
+{
+  if (offset >= 64)
+    {
+      pattern[61]='.';  /* truncate string for error message */
+      pattern[62]='.';
+      pattern[63]='.';
+      pattern[64]='\0';
+    }
+}
+
 static void ScanBracedPattern(char *pattern,ssize_t *offset,ssize_t *depth,
   const char **p)
 {
@@ -4220,13 +4231,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
           /*
             Check for unmatched final ']' for "%[...]".
           */
-          if (offset >= 64)
-            {
-              pattern[61]='.';  /* truncate string for error message */
-              pattern[62]='.';
-              pattern[63]='.';
-              pattern[64]='\0';
-            }
+          TruncatePatternForMessage(pattern,offset);
           (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
             "UnbalancedBraces","\"%%[%s\"",pattern);
           status=MagickFalse;
@@ -4457,13 +4462,7 @@ MagickExport char *InterpretImageProperties(ImageInfo *image_info,Image *image,
         }
 
 PropertyLookupFailure:
-      if (offset >= 64)
-        {
-          pattern[61]='.';  /* truncate string for error message */
-          pattern[62]='.';
-          pattern[63]='.';
-          pattern[64]='\0';
-        }
+      TruncatePatternForMessage(pattern,offset);
       (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
         "UnknownImageProperty","\"%%[%s]\"",pattern);
     }
