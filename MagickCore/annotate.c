@@ -1598,6 +1598,14 @@ static inline MagickBooleanType IsVisibleStroke(const DrawInfo *draw_info,
     (status != MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsInterwordSpace(const DrawInfo *draw_info,
+  const char *text,const ssize_t code)
+{
+  return(((fabs(draw_info->interword_spacing) >= MagickEpsilon) &&
+    (IsUTFSpace(GetUTFCode(text)) != MagickFalse) &&
+    (IsUTFSpace((int) code) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2197,9 +2205,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
             (void) CloneString(&annotate_info->primitive,"path '");
           }
       }
-    if ((fabs(draw_info->interword_spacing) >= MagickEpsilon) &&
-        (IsUTFSpace(GetUTFCode(p+grapheme[i].cluster)) != MagickFalse) &&
-        (IsUTFSpace((int) code) == MagickFalse))
+    if (IsInterwordSpace(draw_info,p+grapheme[i].cluster,code) != MagickFalse)
       origin.x+=(FT_Pos) (64.0*draw_info->interword_spacing);
     else
       if (i == last_character)

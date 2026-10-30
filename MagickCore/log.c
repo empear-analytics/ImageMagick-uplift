@@ -899,6 +899,13 @@ MagickExport MagickBooleanType ListLogInfo(FILE *file,ExceptionInfo *exception)
 }
 
 #if !MAGICKCORE_ZERO_CONFIGURATION_SUPPORT
+static inline MagickBooleanType IsIncludeElementOpen(const char *token,
+  const char *q)
+{
+  return((((*token != '/') && (*(token+1) != '>')) && (*q != '\0')) ?
+    MagickTrue : MagickFalse);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1025,7 +1032,7 @@ static MagickBooleanType LoadLogCache(const LogLoadTarget *target,
         /*
           Include element.
         */
-        while (((*token != '/') && (*(token+1) != '>')) && (*q != '\0'))
+        while (IsIncludeElementOpen(token,q) != MagickFalse)
         {
           (void) CopyMagickString(keyword,token,MagickPathExtent);
           (void) GetNextToken(q,&q,extent,token);

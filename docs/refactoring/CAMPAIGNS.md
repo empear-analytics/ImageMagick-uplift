@@ -73,8 +73,10 @@ of 2026-10-28, MagickCore mean 5.69).
 - **Tools and AGENTS.md.** A change to a tool both campaigns use goes in its own commit and
   is named in the PR body, so the other side picks it up after the merge.
 - **Measurements.** Code Health scores do not depend on the machine, given the same
-  `cs-mcp` and `cs` versions (1.5.13 at the split); record the versions as the baseline
-  does. Oracle results do: each machine verifies against its own baseline, built there.
+  `cs-mcp` and `cs` versions (1.5.16 from the evening of 2026-10-28: a sweep of every
+  MagickCore file at `c74bb179e` scored each file as 1.5.13 did, mean 5.69); record the
+  versions as the baseline does. Oracle results do: each machine verifies against its
+  own baseline, built there.
 
 ## Pull requests
 
@@ -86,7 +88,7 @@ PRs touch different files, so the owner can merge them in any order.
 
 1. Clone `main` into WSL's own filesystem (`~/...`, not `/mnt/c`), with `origin` at
    `empear-analytics/ImageMagick-uplift`, and set `git config core.hooksPath .githooks`.
-2. Install `cs-mcp` 1.5.13 and set `CS_ACCESS_TOKEN`; check that
+2. Install `cs-mcp` 1.5.16 and set `CS_ACCESS_TOKEN`; check that
    `python3 tools/ch.py MagickCore/fx.c` prints a score.
 3. `python3 tools/oracle/oracle.py selfcheck` until it reports 0 nondeterministic
    ([PORTING.md](PORTING.md)), then `python3 tools/oracle/casemap.py` and

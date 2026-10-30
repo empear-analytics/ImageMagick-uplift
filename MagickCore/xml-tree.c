@@ -1733,6 +1733,12 @@ static inline MagickBooleanType IsTagClosed(const char *p,const int terminal)
     MagickFalse);
 }
 
+static inline MagickBooleanType IsInsideXMLTag(const char *p)
+{
+  return(((*p != '\0') && (*p != '/') && (*p != '>')) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline MagickBooleanType IsUnterminatedSection(const char *p,
   const int terminal)
 {
@@ -1830,7 +1836,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
           *p++='\0';
         if (IsNameStartOutsideIgnore(p,ignore_depth) != MagickFalse)
           {
-            if ((*p != '\0') && (*p != '/') && (*p != '>'))
+            if (IsInsideXMLTag(p) != MagickFalse)
               {
                 /*
                   Find tag in default attributes list.
@@ -1841,7 +1847,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                   i++;
                 attribute=root->attributes[i];
               }
-            for (l=0; (*p != '\0') && (*p != '/') && (*p != '>'); l+=2)
+            for (l=0; IsInsideXMLTag(p) != MagickFalse; l+=2)
             {
               /*
                 Attribute.
@@ -1909,7 +1915,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
           }
         else
           {
-            while ((*p != '\0') && (*p != '/') && (*p != '>'))
+            while (IsInsideXMLTag(p) != MagickFalse)
               p++;
           }
         if (*p == '/')

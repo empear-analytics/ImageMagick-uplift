@@ -340,6 +340,55 @@ static MagickBooleanType ExportCharRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportCharQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned char *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToChar(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ExportCharPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -397,50 +446,7 @@ static MagickBooleanType ExportCharPixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelRed(image,p));
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelGreen(image,p));
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelBlue(image,p));
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=ScaleQuantumToChar(GetPixelBlack(image,p));
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
-            break;
-          }
-          default:
-            break;
-        }
+        ExportCharQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
@@ -640,6 +646,55 @@ static MagickBooleanType ExportDoubleRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportDoubleQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,double *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=QuantumScale*(double) GetPixelRed(image,p);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=QuantumScale*(double) GetPixelGreen(image,p);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=QuantumScale*(double) GetPixelBlue(image,p);
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=QuantumScale*(double) GetPixelAlpha(image,p);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=QuantumScale*(double) GetPixelAlpha(image,p);
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=QuantumScale*(double) GetPixelBlack(image,p);
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=QuantumScale*(double) GetPixelIntensity(image,p);
+      break;
+    }
+    default:
+      *q=0;
+  }
+}
+
 static MagickBooleanType ExportDoublePixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -697,50 +752,7 @@ static MagickBooleanType ExportDoublePixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=QuantumScale*(double) GetPixelRed(image,p);
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=QuantumScale*(double) GetPixelGreen(image,p);
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=QuantumScale*(double) GetPixelBlue(image,p);
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=QuantumScale*(double) GetPixelAlpha(image,p);
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=QuantumScale*(double) GetPixelAlpha(image,p);
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=QuantumScale*(double) GetPixelBlack(image,p);
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=QuantumScale*(double) GetPixelIntensity(image,p);
-            break;
-          }
-          default:
-            *q=0;
-        }
+        ExportDoubleQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
@@ -940,6 +952,55 @@ static MagickBooleanType ExportFloatRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportFloatQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,float *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=(float) (QuantumScale*((double) (GetPixelAlpha(image,p))));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelAlpha(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=(float) (QuantumScale*(double) GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelIntensity(image,p));
+      break;
+    }
+    default:
+      *q=0;
+  }
+}
+
 static MagickBooleanType ExportFloatPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -997,50 +1058,7 @@ static MagickBooleanType ExportFloatPixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelRed(image,p));
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=(float) (QuantumScale*((double) (GetPixelAlpha(image,p))));
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelAlpha(image,p));
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=(float) (QuantumScale*(double) GetPixelBlack(image,p));
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=(float) (QuantumScale*(double) GetPixelIntensity(image,p));
-            break;
-          }
-          default:
-            *q=0;
-        }
+        ExportFloatQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
@@ -1240,6 +1258,55 @@ static MagickBooleanType ExportLongRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportLongQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned int *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelAlpha(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToLong(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToLong(ClampToQuantum(GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ExportLongPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1297,50 +1364,7 @@ static MagickBooleanType ExportLongPixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=ScaleQuantumToLong(GetPixelRed(image,p));
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=ScaleQuantumToLong(GetPixelGreen(image,p));
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=ScaleQuantumToLong(GetPixelBlue(image,p));
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=ScaleQuantumToLong(GetPixelAlpha(image,p));
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=ScaleQuantumToLong(GetPixelAlpha(image,p));
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=ScaleQuantumToLong(GetPixelBlack(image,p));
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=ScaleQuantumToLong(ClampToQuantum(GetPixelIntensity(image,p)));
-            break;
-          }
-          default:
-            break;
-        }
+        ExportLongQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
@@ -1541,6 +1565,56 @@ static MagickBooleanType ExportLongLongRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportLongLongQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,MagickSizeType *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToLongLong(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToLongLong(ClampToQuantum(
+        GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ExportLongLongPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1598,51 +1672,7 @@ static MagickBooleanType ExportLongLongPixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=ScaleQuantumToLongLong(GetPixelRed(image,p));
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=ScaleQuantumToLongLong(GetPixelBlack(image,p));
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=ScaleQuantumToLongLong(ClampToQuantum(
-              GetPixelIntensity(image,p)));
-            break;
-          }
-          default:
-            break;
-        }
+        ExportLongLongQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
@@ -1842,6 +1872,58 @@ static MagickBooleanType ExportQuantumRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportQuantumQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=GetPixelRed(image,p);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=GetPixelGreen(image,p);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=GetPixelBlue(image,p);
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=GetPixelAlpha(image,p);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=GetPixelAlpha(image,p);
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=GetPixelBlack(image,p);
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ClampToQuantum(GetPixelIntensity(image,p));
+      break;
+    }
+    default:
+    {
+      *q=(Quantum) 0;
+      break;
+    }
+  }
+}
+
 static MagickBooleanType ExportQuantumPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1899,53 +1981,7 @@ static MagickBooleanType ExportQuantumPixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=(Quantum) 0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=GetPixelRed(image,p);
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=GetPixelGreen(image,p);
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=GetPixelBlue(image,p);
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=GetPixelAlpha(image,p);
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=GetPixelAlpha(image,p);
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=GetPixelBlack(image,p);
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=ClampToQuantum(GetPixelIntensity(image,p));
-            break;
-          }
-          default:
-          {
-            *q=(Quantum) 0;
-            break;
-          }
-        }
+        ExportQuantumQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
@@ -2145,6 +2181,55 @@ static MagickBooleanType ExportShortRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ExportShortQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned short *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToShort(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToShort(ClampToQuantum(GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static MagickBooleanType ExportShortPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -2202,50 +2287,7 @@ static MagickBooleanType ExportShortPixel(const Image *image,
       for (i=0; i < (ssize_t) length; i++)
       {
         *q=0;
-        switch (quantum_map[i])
-        {
-          case RedQuantum:
-          case CyanQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelRed(image,p));
-            break;
-          }
-          case GreenQuantum:
-          case MagentaQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelGreen(image,p));
-            break;
-          }
-          case BlueQuantum:
-          case YellowQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelBlue(image,p));
-            break;
-          }
-          case AlphaQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
-            break;
-          }
-          case OpacityQuantum:
-          {
-            *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
-            break;
-          }
-          case BlackQuantum:
-          {
-            if (image->colorspace == CMYKColorspace)
-              *q=ScaleQuantumToShort(GetPixelBlack(image,p));
-            break;
-          }
-          case IndexQuantum:
-          {
-            *q=ScaleQuantumToShort(ClampToQuantum(GetPixelIntensity(image,p)));
-            break;
-          }
-          default:
-            break;
-        }
+        ExportShortQuantum(image,quantum_map[i],p,q);
         q++;
       }
       p+=(ptrdiff_t) GetPixelChannels(image);
