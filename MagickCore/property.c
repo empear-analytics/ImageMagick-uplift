@@ -1983,12 +1983,6 @@ static void GetXMPProperty(const Image *image,const char *property)
       description=GetXMLTreeChild(rdf,"rdf:Description");
       while (description != (XMLTreeInfo *) NULL)
       {
-        char
-          *xmp_namespace;
-
-        size_t
-          xmp_namespace_length;
-
         node=GetXMLTreeChild(description,(const char *) NULL);
         while (node != (XMLTreeInfo *) NULL)
         {
@@ -2001,17 +1995,7 @@ static void GetXMPProperty(const Image *image,const char *property)
           {
             content=GetXMLTreeContent(child);
             if (SkipXMPValue(content) == MagickFalse)
-              {
-                xmp_namespace=ConstantString(GetXMLTreeTag(node));
-                (void) SubstituteString(&xmp_namespace,"exif:","xmp:");
-                xmp_namespace_length=strlen(xmp_namespace);
-                if (IsNotNamespaceWildcard(xmp_namespace,
-                    xmp_namespace_length) != MagickFalse)
-                  (void) AddValueToSplayTree((SplayTreeInfo *)
-                    image->properties,ConstantString(xmp_namespace),
-                    ConstantString(content));
-                xmp_namespace=DestroyString(xmp_namespace);
-              }
+              AddXMPPropertyValue(image,node,content);
             child=GetXMLTreeSibling(child);
           }
           node=GetXMLTreeSibling(node);
