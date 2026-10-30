@@ -1430,6 +1430,31 @@ static void AddProcessingInstructionTarget(XMLTreeRoot *root,const ssize_t i,
     }
 }
 
+static void AppendProcessingInstruction(XMLTreeRoot *root,const ssize_t i,
+  const char *xml)
+{
+  ssize_t
+    j;
+
+  j=1;
+  while (root->processing_instructions[i][j] != (char *) NULL)
+    j++;
+  root->processing_instructions[i]=(char **) ResizeQuantumMemory(
+    root->processing_instructions[i],(size_t) (j+3),
+    sizeof(**root->processing_instructions));
+  if (root->processing_instructions[i] == (char **) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  root->processing_instructions[i][j+2]=(char *) ResizeQuantumMemory(
+    root->processing_instructions[i][j+1],(size_t) (j+1),
+    sizeof(***root->processing_instructions));
+  if (root->processing_instructions[i][j+2] == (char *) NULL)
+    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
+  (void) CopyMagickString(root->processing_instructions[i][j+2]+j-1,
+    root->root.tag != (char *) NULL ? ">" : "<",2);
+  root->processing_instructions[i][j]=ConstantString(xml);
+  root->processing_instructions[i][j+1]=(char *) NULL;
+}
+
 static void ParseProcessingInstructions(XMLTreeRoot *root,char *xml,
   size_t length)
 {
@@ -1437,8 +1462,7 @@ static void ParseProcessingInstructions(XMLTreeRoot *root,char *xml,
     *target;
 
   ssize_t
-    i,
-    j;
+    i;
 
   target=xml;
   xml[length]='\0';
@@ -1467,23 +1491,7 @@ static void ParseProcessingInstructions(XMLTreeRoot *root,char *xml,
          (strcmp(target,root->processing_instructions[i][0]) != 0))
     i++;
   AddProcessingInstructionTarget(root,i,target);
-  j=1;
-  while (root->processing_instructions[i][j] != (char *) NULL)
-    j++;
-  root->processing_instructions[i]=(char **) ResizeQuantumMemory(
-    root->processing_instructions[i],(size_t) (j+3),
-    sizeof(**root->processing_instructions));
-  if (root->processing_instructions[i] == (char **) NULL)
-    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  root->processing_instructions[i][j+2]=(char *) ResizeQuantumMemory(
-    root->processing_instructions[i][j+1],(size_t) (j+1),
-    sizeof(***root->processing_instructions));
-  if (root->processing_instructions[i][j+2] == (char *) NULL)
-    ThrowFatalException(ResourceLimitFatalError,"MemoryAllocationFailed");
-  (void) CopyMagickString(root->processing_instructions[i][j+2]+j-1,
-    root->root.tag != (char *) NULL ? ">" : "<",2);
-  root->processing_instructions[i][j]=ConstantString(xml);
-  root->processing_instructions[i][j+1]=(char *) NULL;
+  AppendProcessingInstruction(root,i,xml);
 }
 
 static inline MagickBooleanType IsDoctypeTextChar(const char *xml)
