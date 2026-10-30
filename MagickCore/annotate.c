@@ -248,6 +248,16 @@ MagickPrivate void AnnotateComponentTerminus(void)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline double GravityOffsetSign(const size_t extent)
+{
+  return(extent == 0 ? -1.0 : 1.0);
+}
+
+static inline double GravityOffsetFlip(const size_t extent)
+{
+  return(extent == 0 ? 1.0 : -1.0);
+}
+
 static void SplitTextLines(char *text,char **textlist,
   const size_t number_lines)
 {
@@ -394,21 +404,21 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) NorthWestGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+i*
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
           annotate_info->affine.ry*height+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent);
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
           annotate_info->affine.sy*metrics.ascent;
         break;
       }
       case (GravityType) NorthGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
           geometry.width/2.0+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent);
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
           annotate_info->affine.sy*metrics.ascent-annotate_info->affine.rx*
           metrics.width/2.0;
@@ -416,11 +426,11 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) NorthEastGravity:
       {
-        offset.x=(geometry.width == 0 ? 1.0 : -1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
           geometry.width+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent)-1.0;
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
           annotate_info->affine.sy*metrics.ascent-annotate_info->affine.rx*
           metrics.width;
@@ -428,10 +438,10 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) WestGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+i*
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
           annotate_info->affine.ry*height+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           geometry.height/2.0+i*annotate_info->affine.sy*height+
           annotate_info->affine.sy*(metrics.ascent+metrics.descent-
           (number_lines-1.0)*height)/2.0;
@@ -439,11 +449,11 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) CenterGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
           geometry.width/2.0+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           geometry.height/2.0+i*annotate_info->affine.sy*height-
           annotate_info->affine.rx*metrics.width/2.0+annotate_info->affine.sy*
           (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
@@ -451,12 +461,12 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) EastGravity:
       {
-        offset.x=(geometry.width == 0 ? 1.0 : -1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
           geometry.width+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width+
           annotate_info->affine.ry*(metrics.ascent+metrics.descent-
           (number_lines-1.0)*height)/2.0-1.0;
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           geometry.height/2.0+i*annotate_info->affine.sy*height-
           annotate_info->affine.rx*metrics.width+
           annotate_info->affine.sy*(metrics.ascent+metrics.descent-
@@ -465,21 +475,21 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) SouthWestGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+i*
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
           annotate_info->affine.ry*height-annotate_info->affine.ry*
           (number_lines-1.0)*height;
-        offset.y=(geometry.height == 0 ? 1.0 : -1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
           geometry.height+i*annotate_info->affine.sy*height-
           annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
         break;
       }
       case (GravityType) SouthGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
           geometry.width/2.0+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width/2.0-
           annotate_info->affine.ry*(number_lines-1.0)*height/2.0;
-        offset.y=(geometry.height == 0 ? 1.0 : -1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
           geometry.height+i*annotate_info->affine.sy*height-
           annotate_info->affine.rx*metrics.width/2.0-
           annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
@@ -487,11 +497,11 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) SouthEastGravity:
       {
-        offset.x=(geometry.width == 0 ? 1.0 : -1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
           geometry.width+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width-
           annotate_info->affine.ry*(number_lines-1.0)*height-1.0;
-        offset.y=(geometry.height == 0 ? 1.0 : -1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
           geometry.height+i*annotate_info->affine.sy*height-
           annotate_info->affine.rx*metrics.width-
           annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
