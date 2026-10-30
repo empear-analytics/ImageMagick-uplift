@@ -269,6 +269,15 @@ static double EvaluatePow(const Quantum pixel,const double value,
   return(result);
 }
 
+static double EvaluateLog(const Quantum pixel,const double value,
+  double result)
+{
+  if ((QuantumScale*(double) pixel) >= MagickEpsilon)
+    result=(double) QuantumRange*log(QuantumScale*value*
+      (double) pixel+1.0)/log((double) (value+1.0));
+  return(result);
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
@@ -360,9 +369,7 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case LogEvaluateOperator:
     {
-      if ((QuantumScale*(double) pixel) >= MagickEpsilon)
-        result=(double) QuantumRange*log(QuantumScale*value*
-          (double) pixel+1.0)/log((double) (value+1.0));
+      result=EvaluateLog(pixel,value,result);
       break;
     }
     case MaxEvaluateOperator:
