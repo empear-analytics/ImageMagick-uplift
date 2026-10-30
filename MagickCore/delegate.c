@@ -2179,6 +2179,29 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ListDelegateCommands(FILE *file,
+  const DelegateInfo **delegate_info,const ssize_t i,const char *delegate)
+{
+  char
+    **commands;
+
+  ssize_t
+    j;
+
+  commands=StringToList(delegate_info[i]->commands);
+  if (commands == (char **) NULL)
+    return;
+  (void) FormatLocaleFile(file,"%11s%c=%c%s  ",delegate_info[i]->decode ?
+    delegate_info[i]->decode : "",delegate_info[i]->mode <= 0 ? '<' : ' ',
+    delegate_info[i]->mode >= 0 ? '>' : ' ',delegate);
+  (void) FormatLocaleFile(file,"\"%s\"\n",commands[0]);
+  for (j=1; commands[j] != (char *) NULL; j++)
+    (void) FormatLocaleFile(file,"                     \"%s\"\n",commands[j]);
+  for (j=0; commands[j] != (char *) NULL; j++)
+    commands[j]=DestroyString(commands[j]);
+  commands=(char **) RelinquishMagickMemory(commands);
+}
+
 MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -2186,7 +2209,6 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
     **delegate_info;
 
   char
-    **commands,
     delegate[MagickPathExtent];
 
   const char
@@ -2197,9 +2219,6 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
 
   size_t
     number_delegates;
-
-  ssize_t
-    j;
 
   if (file == (const FILE *) NULL)
     file=stdout;
@@ -2228,18 +2247,7 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
         MagickPathExtent);
     (void) ConcatenateMagickString(delegate,"        ",MagickPathExtent);
     delegate[9]='\0';
-    commands=StringToList(delegate_info[i]->commands);
-    if (commands == (char **) NULL)
-      continue;
-    (void) FormatLocaleFile(file,"%11s%c=%c%s  ",delegate_info[i]->decode ?
-      delegate_info[i]->decode : "",delegate_info[i]->mode <= 0 ? '<' : ' ',
-      delegate_info[i]->mode >= 0 ? '>' : ' ',delegate);
-    (void) FormatLocaleFile(file,"\"%s\"\n",commands[0]);
-    for (j=1; commands[j] != (char *) NULL; j++)
-      (void) FormatLocaleFile(file,"                     \"%s\"\n",commands[j]);
-    for (j=0; commands[j] != (char *) NULL; j++)
-      commands[j]=DestroyString(commands[j]);
-    commands=(char **) RelinquishMagickMemory(commands);
+    ListDelegateCommands(file,delegate_info,i,delegate);
   }
   (void) fflush(file);
   delegate_info=(const DelegateInfo **)
