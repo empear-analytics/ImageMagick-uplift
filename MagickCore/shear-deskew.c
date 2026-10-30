@@ -456,6 +456,37 @@ static void SetAverageBackgroundColor(Image *image,const PixelInfo background,
       (double) background.alpha/count);
 }
 
+typedef struct _BackgroundRow
+{
+  Image
+    *image;
+
+  ssize_t
+    offset;
+} BackgroundRow;
+
+static void AccumulateBackgroundRow(const BackgroundRow *row,
+  PixelInfo *background,double *count,const Quantum *magick_restrict *p)
+{
+  Image
+    *const image = row->image;
+
+  const ssize_t
+    offset = row->offset;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if ((x >= offset) && (x < ((ssize_t) image->columns-offset)))
+      continue;
+    *background=AccumulateBackgroundPixel(image,*p,*background);
+    (*count)++;
+    *p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void GetImageBackgroundColor(Image *image,const ssize_t offset,
   ExceptionInfo *exception)
 {
@@ -481,25 +512,20 @@ static void GetImageBackgroundColor(Image *image,const ssize_t offset,
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    BackgroundRow
+      row;
+
     const Quantum
       *magick_restrict p;
-
-    ssize_t
-      x;
 
     if ((y >= offset) && (y < ((ssize_t) image->rows-offset)))
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if ((x >= offset) && (x < ((ssize_t) image->columns-offset)))
-        continue;
-      background=AccumulateBackgroundPixel(image,p,background);
-      count++;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.offset=offset;
+    AccumulateBackgroundRow(&row,&background,&count,&p);
   }
   image_view=DestroyCacheView(image_view);
   SetAverageBackgroundColor(image,background,count);
