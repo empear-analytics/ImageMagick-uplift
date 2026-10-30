@@ -3564,6 +3564,24 @@ static PixelInfo BilinearSparseColor(const SparseColorPlane *plane,
   return(pixel);
 }
 
+static PixelInfo AddWeightedControlColor(const SparseControlColor *control,
+  ssize_t x,const double weight,PixelInfo pixel)
+{
+  if ((GetPixelRedTraits(control->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.red     += control->arguments[x++]*weight;
+  if ((GetPixelGreenTraits(control->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.green   += control->arguments[x++]*weight;
+  if ((GetPixelBlueTraits(control->sparse_image) & UpdatePixelTrait) != 0)
+    pixel.blue    += control->arguments[x++]*weight;
+  if (((GetPixelBlackTraits(control->sparse_image) & UpdatePixelTrait) != 0) &&
+      (control->image->colorspace == CMYKColorspace))
+    pixel.black   += control->arguments[x++]*weight;
+  if (((GetPixelAlphaTraits(control->sparse_image) & UpdatePixelTrait) != 0) &&
+      (control->sparse_image->alpha_trait != UndefinedPixelTrait))
+    pixel.alpha += control->arguments[x++]*weight;
+  return(pixel);
+}
+
 MagickExport Image *SparseColorImage(const Image *image,
   const SparseColorMethod method,const size_t number_arguments,
   const double *arguments,ExceptionInfo *exception)
@@ -3740,20 +3758,15 @@ MagickExport Image *SparseColorImage(const Image *image,
                 + ((double) j-arguments[k+1])*((double) j-arguments[k+1]);
               ssize_t x = (ssize_t) k+2;
 
+              SparseControlColor
+                control;
+
               weight = pow(weight,coeff[0]); /* inverse of power factor */
               weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
-              if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
-                pixel.red     += arguments[x++]*weight;
-              if ((GetPixelGreenTraits(sparse_image) & UpdatePixelTrait) != 0)
-                pixel.green   += arguments[x++]*weight;
-              if ((GetPixelBlueTraits(sparse_image) & UpdatePixelTrait) != 0)
-                pixel.blue    += arguments[x++]*weight;
-              if (((GetPixelBlackTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                  (image->colorspace == CMYKColorspace))
-                pixel.black   += arguments[x++]*weight;
-              if (((GetPixelAlphaTraits(sparse_image) & UpdatePixelTrait) != 0) &&
-                  (sparse_image->alpha_trait != UndefinedPixelTrait))
-                pixel.alpha += arguments[x++]*weight;
+              control.image=image;
+              control.sparse_image=sparse_image;
+              control.arguments=arguments;
+              pixel=AddWeightedControlColor(&control,x,weight,pixel);
               denominator += weight;
             }
             if ((GetPixelRedTraits(sparse_image) & UpdatePixelTrait) != 0)
