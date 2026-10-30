@@ -1136,6 +1136,30 @@ static void ApplyWindowOverride(const Image *image,
     }
 }
 
+static void SetCylindricalResizeFilter(ResizeFilter *resize_filter,
+  const FilterType filter_type)
+{
+  switch (filter_type)
+  {
+    case BoxFilter:
+      /* Support for Cylindrical Box should be sqrt(2)/2 */
+      resize_filter->support=(double) MagickSQ1_2;
+      break;
+    case LanczosFilter:
+    case LanczosSharpFilter:
+    case Lanczos2Filter:
+    case Lanczos2SharpFilter:
+    case LanczosRadiusFilter:
+      resize_filter->filter=filters[JincFilter].function;
+      resize_filter->window=filters[JincFilter].function;
+      resize_filter->scale=filters[JincFilter].scale;
+      /* number of lobes (support window size) remain unchanged */
+      break;
+    default:
+      break;
+  }
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1228,25 +1252,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
 
   /* Filter Modifications for orthogonal/cylindrical usage */
   if (cylindrical != MagickFalse)
-    switch (filter_type)
-    {
-      case BoxFilter:
-        /* Support for Cylindrical Box should be sqrt(2)/2 */
-        resize_filter->support=(double) MagickSQ1_2;
-        break;
-      case LanczosFilter:
-      case LanczosSharpFilter:
-      case Lanczos2Filter:
-      case Lanczos2SharpFilter:
-      case LanczosRadiusFilter:
-        resize_filter->filter=filters[JincFilter].function;
-        resize_filter->window=filters[JincFilter].function;
-        resize_filter->scale=filters[JincFilter].scale;
-        /* number of lobes (support window size) remain unchanged */
-        break;
-      default:
-        break;
-    }
+    SetCylindricalResizeFilter(resize_filter,filter_type);
   /* Global Sharpening (regardless of orthogonal/cylindrical) */
   SharpenResizeFilter(resize_filter,filter_type);
 
