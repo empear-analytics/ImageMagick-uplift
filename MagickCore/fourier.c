@@ -141,6 +141,50 @@ static inline MagickBooleanType IsComplexRowMissing(const Quantum *Ar,
     MagickTrue : MagickFalse);
 }
 
+typedef struct _ComplexUnaryOperands
+{
+  ComplexOperator
+    op;
+
+  double
+    ai,
+    ar;
+} ComplexUnaryOperands;
+
+static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
+  double *cr,double *ci)
+{
+  const ComplexOperator
+    op = unary->op;
+
+  const double
+    ai = unary->ai,
+    ar = unary->ar;
+
+  switch (op)
+  {
+    case ConjugateComplexOperator:
+    default:
+    {
+      (*cr)=ar;
+      (*ci)=(-ai);
+      break;
+    }
+    case MagnitudePhaseComplexOperator:
+    {
+      (*cr)=sqrt(ar*ar+ai*ai);
+      (*ci)=atan2((double) ai,(double) ar)/(2.0*MagickPI)+0.5;
+      break;
+    }
+    case RealImaginaryComplexOperator:
+    {
+      (*cr)=ar*cos(2.0*MagickPI*(ai-0.5));
+      (*ci)=ar*sin(2.0*MagickPI*(ai-0.5));
+      break;
+    }
+  }
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -310,11 +354,15 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
             ci=ai+bi;
             break;
           }
-          case ConjugateComplexOperator:
           default:
           {
-            cr=ar;
-            ci=(-ai);
+            ComplexUnaryOperands
+              unary;
+
+            unary.op=op;
+            unary.ai=ai;
+            unary.ar=ar;
+            ApplyUnaryComplexOperator(&unary,&cr,&ci);
             break;
           }
           case DivideComplexOperator:
@@ -323,22 +371,10 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
             ci=MagickSafeReciprocal(br*br+bi*bi+snr)*(ai*br-ar*bi);
             break;
           }
-          case MagnitudePhaseComplexOperator:
-          {
-            cr=sqrt(ar*ar+ai*ai);
-            ci=atan2((double) ai,(double) ar)/(2.0*MagickPI)+0.5;
-            break;
-          }
           case MultiplyComplexOperator:
           {
             cr=(ar*br-ai*bi);
             ci=(ai*br+ar*bi);
-            break;
-          }
-          case RealImaginaryComplexOperator:
-          {
-            cr=ar*cos(2.0*MagickPI*(ai-0.5));
-            ci=ar*sin(2.0*MagickPI*(ai-0.5));
             break;
           }
           case SubtractComplexOperator:
