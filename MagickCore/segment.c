@@ -825,6 +825,58 @@ static void MoveCrossing(ZeroCrossing *zero_crossing,const ssize_t i,
     zero_crossing[i].crossings[correct]=(short) l;
 }
 
+typedef struct _CrossingCandidates
+{
+  const ZeroCrossing
+    *zero_crossing;
+
+  ssize_t
+    i,
+    j,
+    k,
+    center,
+    left,
+    right;
+} CrossingCandidates;
+
+static ssize_t SelectEvenCrossing(const CrossingCandidates *candidates)
+{
+  const ZeroCrossing
+    *const zero_crossing = candidates->zero_crossing;
+
+  const ssize_t
+    i = candidates->i,
+    j = candidates->j,
+    k = candidates->k,
+    center = candidates->center,
+    left = candidates->left,
+    right = candidates->right;
+
+  ssize_t
+    correct;
+
+  /*
+    Check center for an even number of crossings between k and j.
+  */
+  correct=(-1);
+  if (zero_crossing[i+1].crossings[j] != 0)
+    if (IsEvenCrossing(zero_crossing,i,k,center) != MagickFalse)
+      correct=center;
+  /*
+    Check left for an even number of crossings between k and j.
+  */
+  if (correct == -1)
+    if (IsEvenCrossing(zero_crossing,i,k,left) != MagickFalse)
+      correct=left;
+  /*
+    Check right for an even number of crossings between k and j.
+  */
+  if (correct == -1)
+    if (IsEvenCrossing(zero_crossing,i,k,right) != MagickFalse)
+      correct=right;
+  return(correct);
+}
+
 static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -838,6 +890,9 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
     correct,
     left,
     right;
+
+  CrossingCandidates
+    candidates;
 
   /*
     Consolidate zero crossings.
@@ -863,25 +918,14 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       k=FindCrossingBelow(zero_crossing,i,j);
       if (k < 0)
         k=0;
-      /*
-        Check center for an even number of crossings between k and j.
-      */
-      correct=(-1);
-      if (zero_crossing[i+1].crossings[j] != 0)
-        if (IsEvenCrossing(zero_crossing,i,k,center) != MagickFalse)
-          correct=center;
-      /*
-        Check left for an even number of crossings between k and j.
-      */
-      if (correct == -1)
-        if (IsEvenCrossing(zero_crossing,i,k,left) != MagickFalse)
-          correct=left;
-      /*
-        Check right for an even number of crossings between k and j.
-      */
-      if (correct == -1)
-        if (IsEvenCrossing(zero_crossing,i,k,right) != MagickFalse)
-          correct=right;
+      candidates.zero_crossing=zero_crossing;
+      candidates.i=i;
+      candidates.j=j;
+      candidates.k=k;
+      candidates.center=center;
+      candidates.left=left;
+      candidates.right=right;
+      correct=SelectEvenCrossing(&candidates);
       MoveCrossing(zero_crossing,i,j,correct);
     }
 }
