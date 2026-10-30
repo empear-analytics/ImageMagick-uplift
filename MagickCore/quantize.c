@@ -630,8 +630,8 @@ static void AssignImageRowColors(Image *image,const QCubeInfo *cube_info,
 
 #define AssignImageTag  "Assign/Image"
 
-static MagickBooleanType ReportAssignImageProgress(Image *image,
-  const ssize_t y)
+static MagickBooleanType ReportImageRowProgress(Image *image,
+  const char *tag,const ssize_t y)
 {
   MagickBooleanType
     status;
@@ -642,7 +642,7 @@ static MagickBooleanType ReportAssignImageProgress(Image *image,
       MagickBooleanType
         proceed;
 
-      proceed=SetImageProgress(image,AssignImageTag,(MagickOffsetType) y,
+      proceed=SetImageProgress(image,tag,(MagickOffsetType) y,
         image->rows);
       if (proceed == MagickFalse)
         status=MagickFalse;
@@ -706,7 +706,7 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
         AssignImageRowColors(image,cube_info,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
-        if (ReportAssignImageProgress(image,y) == MagickFalse)
+        if (ReportImageRowProgress(image,AssignImageTag,y) == MagickFalse)
           status=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);
@@ -1865,16 +1865,8 @@ static MagickBooleanType FloydSteinbergDither(Image *image,QCubeInfo *cube_info,
       current[u].blue=pixel.blue-color.blue;
       if (cube.associate_alpha != MagickFalse)
         current[u].alpha=pixel.alpha-color.alpha;
-      if (image->progress_monitor != (MagickProgressMonitor) NULL)
-        {
-          MagickBooleanType
-            proceed;
-
-          proceed=SetImageProgress(image,DitherImageTag,(MagickOffsetType) y,
-            image->rows);
-          if (proceed == MagickFalse)
-            status=MagickFalse;
-        }
+      if (ReportImageRowProgress(image,DitherImageTag,y) == MagickFalse)
+        status=MagickFalse;
     }
   }
   image_view=DestroyCacheView(image_view);
