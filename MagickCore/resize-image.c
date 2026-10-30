@@ -481,8 +481,7 @@ static void FilterVerticalPixel(const Image *image,
     if ((traits == UndefinedPixelTrait) ||
         (resize_traits == UndefinedPixelTrait))
       continue;
-    if (((resize_traits & CopyPixelTrait) != 0) ||
-        (GetPixelWriteMask(resize_image,q) <= (QuantumRange/2)))
+    if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
       {
         j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
           stop-1.0)+0.5);
