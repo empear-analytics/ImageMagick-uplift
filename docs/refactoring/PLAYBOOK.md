@@ -1645,7 +1645,9 @@ Q and U, whose first step refuses a block containing `goto`.
 2. The block writes at most one variable of the caller, `v`, a plain local (not a
    parameter, a global or a `static`) whose address is not taken elsewhere. Writes
    through pointers the block already uses stay as they are; variables it declares move
-   with it.
+   with it. A temporary it writes before reading, and that the caller does not read
+   after the block before writing it again, is declared in the new function and is not
+   `v` (Recipe Y step 2).
 3. Cut the block into a new `static MagickBooleanType` function directly above the
    caller. Each `goto L;` becomes `return(MagickFalse);`, one for one, and the function
    ends with `return(MagickTrue);`. Nothing else in the text changes.
@@ -1733,6 +1735,15 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   against its `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2`.
 - A block that jumps to two labels, or writes two of the caller's variables, is not this
   recipe: skip it.
+- A temporary (step 2) holds nothing the caller uses: every path through the block
+  writes it before reading it, so its value on entry is never read, and the caller
+  writes it again before any later read, so the value the block leaves is never read
+  either. Declared in the new function, it is written and read in the same order, and
+  the caller's own copy, which no statement reads between the call and its next write,
+  is left alone; when nothing else uses it, its declaration goes. This is Recipe Y's
+  step 2 (and Recipe J's step 3) for a block whose inputs fit in parameters. Check by
+  reading every use of the variable in the caller, on every path out of the block,
+  `return(c);` and the jump to `L` included.
 - Under step 6 the caller returns the same constant from the same point: every statement
   the original ran before its `return(c);` has run in the helper, with its writes to `v`
   landed through the pointer, and the caller runs nothing between the call and its own
@@ -1785,6 +1796,8 @@ Step 7's `return(c);` (2026-10-30, task W09): `layer.c`'s `OptimizeLayerFrames`,
 `NoneDispose` reference ends in releasing `bounds` and `disposals`, then
 `return((Image *) NULL);` (nesting 4), and `CoalesceImages`' dispose-image clone, which
 destroys the coalesced list first.
+Step 2's temporary (2026-10-30, task W09): `morphology.c`'s `AcquireKernelInfo`, whose
+token step writes `kernel` and, as a temporary, the parse result `new_kernel`.
 
 ---
 
@@ -2619,3 +2632,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | N, Q, U, W, Y, Z | N step 2: a plain struct value the block only reads (`PixelInfo`, `PointInfo`, `RectangleInfo`) may be a member, copied by `name.v=v;` directly before the call, when every member is set before the call, the block assigns neither it nor a member, takes `&v` only for a callee's pointer-to-`const` parameter that only reads through it (stores and compares no address), no pointer to it is held where the block can write, and the block writes through none of its pointer members; arrays stay out. *Careful* gives the argument (a copy holds the same values while nothing writes the original; a `const` callee sees the copy's address). Q step 3, U step 2, W step 2, Y step 3 and Z step 2 name struct values as N step 2 does | Owner's request of 2026-10-30 after the W08 report (struct-valued read-only members in N and Q). `feature.c`'s `MeanShiftImage`: its convergence block reads `sum_location`, `sum_pixel`, `previous_location`, `previous_pixel` (`PointInfo`/`PixelInfo`) and `count`; `layer.c`'s `CompareImagesBounds` and `OptimizeLayerFrames` (`RectangleInfo try_bounds`, a `PixelInfo` read through `&alpha_pixel`). MeanShiftImage's block also writes the struct values `mean_location` and `mean_pixel`, which Q passes only as scalars, so this amendment alone does not admit it: a probe that also passed them by pointer measured 5.20 to 5.23 | owner |
 | 2026-10-30 | AMEND | Q | Step 1: in a function with no OpenMP region, `status` is a plain local of the caller and may be one of the four written variables, passed by pointer, its reads in the block included; a pointer the block writes through but never assigns is a read-only member, not a written variable. *Careful* gives the argument: K, J and T refuse `status` only because a parallel loop shares it; through `*status` every read and write reaches the caller's variable in the same order, so no guard on its entry value is needed | Owner's request of 2026-10-30 after the W08 report (a sequential form of J and W). `vision.c`'s `ConnectedComponentsImage`: the merge census's neighbour loop (nesting 6, no OpenMP region in the function) writes `status=MagickFalse` and `count` and tests `status`, which J, T and U refuse; in the pointer form its helper takes the struct, `&status` and `&count`. A probe: nesting 6 to 4, 4.18 to 4.21; with the neighbour fetch then moved out of the helper (Recipe E), 4.30 | owner |
 | 2026-10-30 | NEW | I | Extract Block Returning Success Through a Struct of Out-Pointers: a Recipe V block (a `goto L;` or `return(c);` exit) that writes two to four of the caller's locals or by-value parameters, which as separate pointers would give five or more parameters, moves to a `static MagickBooleanType` function taking its read-only inputs (as V, or in Y's input struct) and last a `const` struct holding only the written variables' addresses, bound to `*const` locals and used as `*v` (Recipe O). *Careful* states how it differs from the out-parameter struct Recipe E step 4 forbids: the variables stay the caller's own, only their addresses travel, and nothing is copied back | Owner's request of 2026-10-30 after the W08 report (V with an out-parameter struct). `fx.c`'s `GetFunction`: the coordinate-qualifier block (depth 4, the file's last Deep Nesting) writes `fe`, `funStr`, `chQual` and `expChLimit` and returns `MagickFalse` on one path, refused by V, Y, O, Q and E step 4. A probe: 3.08 to 3.23 | owner |
+| 2026-10-30 | AMEND | V | Step 2: a temporary the block writes before reading, and the caller does not read after it before writing it again, is declared in the new function and is not the one written variable (Recipe Y step 2, Recipe J step 3). *Careful* gives the argument: neither its entry value nor the value the block leaves is ever read | `morphology.c`'s `AcquireKernelInfo`: the token step of its kernel-list loop writes `kernel` and the parse result `new_kernel` (declared at the top of the function, used nowhere else) and returns `(KernelInfo *) NULL` when a parse fails; step 2 counted two written variables, and Recipe Y (whose step 2 already admits the temporary) needs five inputs. A probe of the token step (V) and the `@file` read (Recipe I): the function leaves Bumpy Road Ahead and Complex Method, 2.68 to 2.70 | mandate (2026-10-24) |
