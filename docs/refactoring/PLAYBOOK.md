@@ -2429,6 +2429,136 @@ during task W09, at the owner's request of 2026-10-30.
 
 ---
 
+## Recipe LB - Extract Block Returning Success for a Loop Break
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Brain
+Method*, *Complex Method* or *Large Method*, and the block that would fix it leaves an
+enclosing loop through `break;`: typically a pixel fetch inside a scan loop that gives up
+on the loop when the cache returns NULL (`if ((p == (const Quantum *) NULL) || (q ==
+(Quantum *) NULL)) break;`), as `FloodfillPaintImage`'s span scans do.
+
+**Not covered by:** Recipe E, whose step 7 admits `break;` only of a `switch` and
+`continue;` of a loop, never a `break` that ends a loop; Recipes V, Y and I, whose block
+leaves only through `goto L;` or `return(c);` and contains no `break` that leaves it (V
+step 1); Recipes O, T, K, J, N, Q, U, W and Z, which refuse a block with an exit of its
+own. A `break` cannot be left in the caller as V leaves its jump: it would still sit at
+the block's depth.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. The
+   innermost loop or `switch` around the block is a loop `Lp`, and every `break;` in the
+   block that leaves it ends `Lp`. It contains no `return`, no `goto`, and no `continue`
+   that leaves it; a `break` or `continue` of a loop nested inside the block stays as it
+   is.
+2. The block writes at most one variable `v` of the caller that the caller reads after
+   it, a plain local whose address the caller takes only as the `v` argument of helpers
+   of this recipe (Recipe V step 2). A temporary it writes before reading, and the caller
+   does not read after it before writing it again, is declared in the new function
+   (Recipe Y step 2).
+3. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. Each `break;` that ended `Lp` becomes `return(MagickFalse);`, one for one; the
+   function ends with `return(MagickTrue);`. Write `*v` for every use of `v`, reads
+   included (`(*v)++` for `v++`). Nothing else in the text changes.
+4. Pass the variables the block only reads by value and `v` as a pointer, last, at most
+   four parameters (Recipe V step 4); or put them in one `const` input struct as Recipe Y
+   steps 3 to 5 do, the struct first, a read-only scalar the struct leaves out by value
+   after it, and `v` last, at most four parameters in all. The member form
+   `name->member` (Recipe N step 4) keeps two helpers of one caller from repeating the
+   same `const` locals.
+5. Where the block stood, write `if (Helper(...) == MagickFalse) break;`. It stands where
+   the block stood, inside the same loops and `switch`es, so its `break` ends `Lp`.
+6. Two blocks of one caller whose groups of read variables are the same take the same
+   struct type; the caller fills its one local directly before each call (Recipe Y step
+   5). Check every member and argument by reading.
+
+**Before:**
+
+```c
+    do
+    {
+      if (skip == MagickFalse)
+        {
+          if (x < (ssize_t) image->columns)
+            {
+              p=GetCacheViewVirtualPixels(image_view,x,y,(size_t)
+                ((ssize_t) image->columns-x),1,exception);
+              q=GetCacheViewAuthenticPixels(floodplane_view,x,y,(size_t)
+                ((ssize_t) image->columns-x),1,exception);
+              if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+                break;
+              ...
+              x=FillFloodplaneSpan(&scan,p,q,x);
+              status=SyncCacheViewAuthenticPixels(floodplane_view,exception);
+              if (status == MagickFalse)
+                break;
+            }
+          PushSegmentStack(y,start,x-1,offset);
+```
+
+**After:**
+
+```c
+static MagickBooleanType FillFloodplaneRun(const FloodfillRow *row,ssize_t *x)
+{
+  ...
+  if (*x < (ssize_t) row->image->columns)
+    {
+      p=GetCacheViewVirtualPixels(row->image_view,*x,row->y,(size_t)
+        ((ssize_t) row->image->columns-*x),1,row->exception);
+      ...
+      if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+        return(MagickFalse);
+      ...
+      *x=FillFloodplaneSpan(&scan,p,q,*x);
+      status=SyncCacheViewAuthenticPixels(row->floodplane_view,row->exception);
+      if (status == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+...
+          row.image=image;
+          ...
+          row.exception=exception;
+          if (FillFloodplaneRun(&row,&x) == MagickFalse)
+            break;
+          PushSegmentStack(y,start,x-1,offset);
+```
+
+**Careful:**
+
+- A `break;` that ends `Lp` runs nothing else of the loop body and skips `Lp`'s
+  condition; so does the caller's `break;` right after the helper returns
+  `MagickFalse`. On that path the helper has run every statement the block ran before
+  that `break`, its write to `v` landed through the pointer, and it returns at once;
+  the caller runs nothing between the call and its `break`. On the fall-through path
+  the helper returns `MagickTrue` and the caller goes on with the next statement, as
+  the block fell through. This is Recipe V step 6 with `break;` in place of
+  `return(c);`.
+- Step 1 matters: a block inside a `switch` inside the loop has its `break` end the
+  `switch`, not the loop, and a `break` of a loop nested inside the block ends that
+  loop, which moves with the block unchanged. Read each `break` against its loop.
+- A temporary holds nothing the caller reads (Recipe Y's argument); check it by reading
+  every use in the caller, on the path after `Lp` ends as well as the fall-through. A
+  `status` the block writes and then tests, which the caller overwrites after the loop
+  before any read, is such a temporary.
+- The failure paths are mostly cache fetches no case makes fail: the oracle checks the
+  fall-through path; each `break` is checked by reading against its
+  `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2` per helper.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new
+function, nothing else moved), and steps 1, 2 and 5 checked by reading.
+
+**Provenance:** 2026-10-30, from `paint.c`'s `FloodfillPaintImage`, whose last two
+depth-4 sites, the right-hand fill and the skip scan inside the segment loop's
+`do`-loop, each end the `do`-loop through `break;` when a fetch or a sync fails, the
+plateau W08 recorded. A probe of both: Brain Method and Deep, Nested Complexity leave,
+5.10 to 5.77. Added by Claude Code (Claude Opus 5.5) during task W09, under the mandate
+of 2026-10-24.
+
+---
+
 ## Recipe SD - Split a Selection at its Default
 
 **Use when:** CodeScene reports *Complex Method*, *Bumpy Road Ahead* or *Deep, Nested
@@ -2963,3 +3093,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | V | Step 7: `S return(c);` may be one call of a function-local cleanup-and-throw macro (Recipe I step 8), left unchanged in the caller; in that form `S` may read and write the block's one written variable, passed by pointer, whose writes have landed before the helper returns. *Careful* gives the argument | `segment.c`'s `Classify`: the default cluster (`if (head == NULL)`, allocate, initialise, `head=cluster`) writes `head` and the temporary `cluster` and leaves through `ThrowClassifyException`, which walks the list from `head`; step 7 refused a cleanup that reads the written variable, and Recipe I needs two written variables. A probe: bumps 7 to 6, 5.09 to 5.11 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | D | Casts to the variable's own type: a cast of a plain variable to the exact type it is declared with (`(Image *) image` of an `Image *` parameter) is not a differing value; the script removes such casts, each type checked by reading, before comparing, and the helper is written without them. A block whose every path ends in `return(<expr>);` becomes `return(<call>);` (Recipe E step 7) | `colorspace.c`'s `SetImageGray` and `SetImageMonochrome` (*Code Duplication*): their closing blocks differ in the type set (`type`, `BilevelType`: one value) and in `SyncImagePixelCache((Image *) image,...)`, a no-op cast; a probe of the shared helper, 3.01 to 3.15, the file leaving *Code Duplication* | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | rule 1 | The exception for a set of steps that each lower the score and together raise it covers several blocks of one function as well as several functions; the message names each block with the score it gave alone | `paint.c`'s `FloodfillPaintImage`: its two depth-4 sites, the right-hand fill and the skip scan, each alone 5.10 to 4.84 (the file passes the 1,000-line threshold), both 5.77 (Brain Method and Deep, Nested Complexity leave) | mandate (2026-10-24) |
+| 2026-10-30 | NEW | LB | Extract Block Returning Success for a Loop Break: a block that leaves its enclosing loop through `break;` moves to a `static MagickBooleanType` function, each such `break;` becoming `return(MagickFalse);`, and the caller writes `if (Helper(...) == MagickFalse) break;`; inputs by value or in a `const` struct (Recipe Y), one written variable by pointer, temporaries declared in the helper | `paint.c`'s `FloodfillPaintImage`: its two depth-4 sites end the `do`-loop through `break;` when a fetch or a sync fails, which V, Y and I refuse (V step 1) and E step 7 admits only for a `switch`; a probe of both, 5.10 to 5.77 | mandate (2026-10-24) |
