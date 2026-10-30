@@ -813,6 +813,35 @@ static PixelInfo SetColorMatrixChannel(PixelInfo pixel,const ssize_t h,
   return(pixel);
 }
 
+static void LogColorMatrix(double ColorMatrix[][6])
+{
+  char
+    format[MagickPathExtent],
+    *message;
+
+  ssize_t
+    u,
+    v;
+
+  (void) LogMagickEvent(TransformEvent,GetMagickModule(),
+    "  ColorMatrix image with color matrix:");
+  message=AcquireString("");
+  for (v=0; v < 6; v++)
+  {
+    *message='\0';
+    (void) FormatLocaleString(format,MagickPathExtent,"%.17g: ",(double) v);
+    (void) ConcatenateString(&message,format);
+    for (u=0; u < 6; u++)
+    {
+      (void) FormatLocaleString(format,MagickPathExtent,"%+f ",
+        ColorMatrix[v][u]);
+      (void) ConcatenateString(&message,format);
+    }
+    (void) LogMagickEvent(TransformEvent,GetMagickModule(),"%s",message);
+  }
+  message=DestroyString(message);
+}
+
 MagickExport Image *ColorMatrixImage(const Image *image,
   const KernelInfo *color_matrix,ExceptionInfo *exception)
 {
@@ -843,8 +872,6 @@ MagickExport Image *ColorMatrixImage(const Image *image,
     progress;
 
   ssize_t
-    u,
-    v,
     y;
 
   /*
@@ -869,29 +896,7 @@ MagickExport Image *ColorMatrixImage(const Image *image,
       return((Image *) NULL);
     }
   if (image->debug != MagickFalse)
-    {
-      char
-        format[MagickPathExtent],
-        *message;
-
-      (void) LogMagickEvent(TransformEvent,GetMagickModule(),
-        "  ColorMatrix image with color matrix:");
-      message=AcquireString("");
-      for (v=0; v < 6; v++)
-      {
-        *message='\0';
-        (void) FormatLocaleString(format,MagickPathExtent,"%.17g: ",(double) v);
-        (void) ConcatenateString(&message,format);
-        for (u=0; u < 6; u++)
-        {
-          (void) FormatLocaleString(format,MagickPathExtent,"%+f ",
-            ColorMatrix[v][u]);
-          (void) ConcatenateString(&message,format);
-        }
-        (void) LogMagickEvent(TransformEvent,GetMagickModule(),"%s",message);
-      }
-      message=DestroyString(message);
-    }
+    LogColorMatrix(ColorMatrix);
   /*
     Apply the ColorMatrix to image.
   */
