@@ -789,6 +789,18 @@ static MagickBooleanType IsEvenCrossing(const ZeroCrossing *zero_crossing,
   return((((count % 2) == 0) && (candidate != k)) ? MagickTrue : MagickFalse);
 }
 
+static ssize_t FindCrossingBelow(const ZeroCrossing *zero_crossing,
+  const ssize_t i,const ssize_t j)
+{
+  ssize_t
+    k;
+
+  for (k=j-1; k > 0; k--)
+    if (zero_crossing[i].crossings[k] != 0)
+      break;
+  return(k);
+}
+
 static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
   const size_t number_crossings)
 {
@@ -817,9 +829,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
         property that there are an even number of crossings between
         intervals.
       */
-      for (k=j-1; k > 0; k--)
-        if (zero_crossing[i+1].crossings[k] != 0)
-          break;
+      k=FindCrossingBelow(zero_crossing,i+1,j);
       left=MagickMax(k,0);
       center=j;
       for (k=j+1; k < 255; k++)
@@ -829,9 +839,7 @@ static void ConsolidateCrossings(ZeroCrossing *zero_crossing,
       /*
         K is the zero crossing just left of j.
       */
-      for (k=j-1; k > 0; k--)
-        if (zero_crossing[i].crossings[k] != 0)
-          break;
+      k=FindCrossingBelow(zero_crossing,i,j);
       if (k < 0)
         k=0;
       /*
