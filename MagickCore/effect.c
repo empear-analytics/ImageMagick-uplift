@@ -379,6 +379,12 @@ static void BlurAdaptiveChannel(const AdaptiveChannel *adaptive,
   SetPixelChannel(adaptive->blur_image,channel,ClampToQuantum(gamma*pixel),q);
 }
 
+static void RelinquishAdaptiveKernels(double **kernel,ssize_t w)
+{
+  for (w-=2; w >= 0; w-=2)
+    kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+}
+
 MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -489,8 +495,7 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   }
   if (w < (ssize_t) width)
     {
-      for (w-=2; w >= 0; w-=2)
-        kernel[w]=(double *) RelinquishAlignedMemory(kernel[w]);
+      RelinquishAdaptiveKernels(kernel,w);
       kernel=(double **) RelinquishAlignedMemory(kernel);
       edge_image=DestroyImage(edge_image);
       blur_image=DestroyImage(blur_image);
