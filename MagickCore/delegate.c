@@ -419,18 +419,9 @@ static inline MagickBooleanType IsExecutableToken(const char *token)
   return(MagickFalse);
 }
 
-MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
-  const MagickBooleanType verbose,const char *command,char *message,
-  ExceptionInfo *exception)
+static MagickBooleanType AuthorizeDelegateArguments(char **arguments,
+  const int number_arguments,ExceptionInfo *exception)
 {
-  char
-    **arguments,
-    *sanitize_command;
-
-  int
-    number_arguments,
-    status;
-
   PolicyDomain
     domain;
 
@@ -440,17 +431,6 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   ssize_t
     i;
 
-  status=(-1);
-  arguments=StringToArgv(command,&number_arguments);
-  if (arguments == (char **) NULL)
-    return(status);
-  if (*arguments[1] == '\0')
-    {
-      for (i=0; i < (ssize_t) number_arguments; i++)
-        arguments[i]=DestroyString(arguments[i]);
-      arguments=(char **) RelinquishMagickMemory(arguments);
-      return(-1);
-    }
   rights=ExecutePolicyRights;
   domain=DelegatePolicyDomain;
   for (i=1; i < (ssize_t) number_arguments; i++)
@@ -468,9 +448,41 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
         for (j=0; j < (ssize_t) number_arguments; j++)
           arguments[j]=DestroyString(arguments[j]);
         arguments=(char **) RelinquishMagickMemory(arguments);
-        return(-1);
+        return(MagickFalse);
       }
   }
+  return(MagickTrue);
+}
+
+MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
+  const MagickBooleanType verbose,const char *command,char *message,
+  ExceptionInfo *exception)
+{
+  char
+    **arguments,
+    *sanitize_command;
+
+  int
+    number_arguments,
+    status;
+
+  ssize_t
+    i;
+
+  status=(-1);
+  arguments=StringToArgv(command,&number_arguments);
+  if (arguments == (char **) NULL)
+    return(status);
+  if (*arguments[1] == '\0')
+    {
+      for (i=0; i < (ssize_t) number_arguments; i++)
+        arguments[i]=DestroyString(arguments[i]);
+      arguments=(char **) RelinquishMagickMemory(arguments);
+      return(-1);
+    }
+  if (AuthorizeDelegateArguments(arguments,number_arguments,exception) ==
+      MagickFalse)
+    return(-1);
   if (verbose != MagickFalse)
     {
       (void) FormatLocaleFile(stderr,"%s\n",command);
