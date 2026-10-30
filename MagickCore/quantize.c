@@ -628,11 +628,11 @@ static void AssignImageRowColors(Image *image,const QCubeInfo *cube_info,
   }
 }
 
+#define AssignImageTag  "Assign/Image"
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
-#define AssignImageTag  "Assign/Image"
-
   ColorspaceType
     colorspace;
 
