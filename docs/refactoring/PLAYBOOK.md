@@ -1796,6 +1796,11 @@ Q and U, whose first step refuses a block containing `goto`.
    RelinquishMagickMemory(disposals); return((Image *) NULL);`): the caller writes
    `{ S return(c); }`, and step 2 then holds as well, its one written variable being
    one that `S` neither reads nor writes.
+   `S return(c);` may also be one call of a function-local cleanup-and-throw macro
+   (Recipe I step 8), left unchanged in the caller after
+   `if (Helper(...) == MagickFalse)`; in that form `S` may read and write the block's
+   one written variable `v`, passed as a pointer (step 4), since every write the block
+   made to it has landed before the helper returns.
 
 **Before:**
 
@@ -1878,6 +1883,10 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   keeping `S` in the caller needs neither. The helper's pointer copy is dead once it
   returns, before `S` frees the memory. `refactor_guard.py --calls` shows each call in
   `S` fall by one per copy that merged into the caller's single `S`.
+- Under step 7's macro form the argument is Recipe I step 8's with one written
+  variable: the helper writes `v` through its pointer, so on a failure path the macro
+  in the caller reads the value the block left (`Classify`'s `head`, still NULL when
+  the default cluster's allocation fails), and runs at the same point as before.
 - Under step 7 with `return(c);` the argument is the same with `c` for `v`. The writes
   in `S` (`bounds` and `disposals` relinquished, an image destroyed) are dead on that
   path, since the caller returns `c` at once and reads none of them, but the recipe does
@@ -2935,3 +2944,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | SD | Split a Selection at its Default: a `switch` whose groups all end in `break;` moves some of its groups, the `default` group among them, into a new `static void` function with the same `switch (e)` (built as Recipe O or Z builds one); the caller's `switch` keeps the other groups and a `default:` that calls it | `ComplexImages`' operator `switch` (eight labels, depth 4 in the parallel loop): Recipe Z on the whole `switch` gives a cc-9 helper the gate refuses (5.09); the unary group as its own function, then Z on the binary rest, leaves no helper finding, 4.83 to 5.21 in a probe | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | Step 5: a written variable may be a plain struct value the block assigns whole (`error=f(...,error);`); it goes by pointer like a scalar, `*v` at every use, parenthesised before `->` or `.` (`(*node_info)->child[id]`), as Recipe Z does for `start` and `stop`. *Careful* gives the argument: the pointer names the caller's own object, so every member is read and assigned where it was, and nothing is copied in or out | `quantize.c`'s `ClassifyImageColors`: each row loop's tree descent (the level loop with its node creation, nesting 5, a `continue` of the level loop inside) writes the cursor `node_info` and the struct `error` (`DoublePixelPacket`) and reads six inputs; step 5 named only scalars, as the N row of 2026-10-30 noted for `MeanShiftImage`. A probe of both descents: the function leaves Deep, Nested Complexity, cc 26 to 16, 4.05 to 4.24 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | I | Step 8: a block whose every exit is the same call of a function-local cleanup-and-throw macro (cleanup statements, then `return(c);`) moves with the call left in the caller, as V step 7 leaves `S`; the macro may read and write the written variables, whose writes have landed through the members. In this form a written variable whose address the caller passes only to calls that keep no copy (`memset`, a `static` callee that does not store it) meets step 2, `&v` becoming `v` in the block. *Careful* gives the argument | `segment.c`'s `Classify`: the cluster allocation inside its triple `while` (the file's last depth-4 site in an oracle-reached function) writes `cluster`, `head` and, through `DefineRegion(extrema[Blue],&blue)`, `blue`, and leaves through `ThrowClassifyException`, which frees the list from `head`; step 1 refused V step 7's form and step 2 the address of `blue` (passed to `memset` and `DefineRegion`). A probe of the innermost `while`: `Classify` leaves Deep, Nested Complexity, cc 35 to 33, 4.93 to 4.96 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | V | Step 7: `S return(c);` may be one call of a function-local cleanup-and-throw macro (Recipe I step 8), left unchanged in the caller; in that form `S` may read and write the block's one written variable, passed by pointer, whose writes have landed before the helper returns. *Careful* gives the argument | `segment.c`'s `Classify`: the default cluster (`if (head == NULL)`, allocate, initialise, `head=cluster`) writes `head` and the temporary `cluster` and leaves through `ThrowClassifyException`, which walks the list from `head`; step 7 refused a cleanup that reads the written variable, and Recipe I needs two written variables. A probe: bumps 7 to 6, 5.09 to 5.11 | mandate (2026-10-24) |
