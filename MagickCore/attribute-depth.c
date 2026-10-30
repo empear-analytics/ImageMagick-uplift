@@ -557,6 +557,65 @@ static void DitherImageRow(const DitherRow *row,Quantum *q)
   }
 }
 
+typedef struct _DitherImageInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  double
+    *distortion;
+
+  QuantumAny
+    range;
+
+  size_t
+    channels;
+
+  ExceptionInfo
+    *exception;
+} DitherImageInfo;
+
+static void DitherImageRows(const DitherImageInfo *rows,
+  MagickBooleanType *status)
+{
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) rows->image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    DitherRow
+      row;
+
+    if (*status == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(rows->image_view,0,y,rows->image->columns,1,
+      rows->exception);
+    if (q == (Quantum *) NULL)
+      {
+        *status=MagickFalse;
+        continue;
+      }
+    row.image=rows->image;
+    row.distortion=rows->distortion;
+    row.range=rows->range;
+    row.channels=rows->channels;
+    row.y=y;
+    DitherImageRow(&row,q);
+    if (SyncCacheViewAuthenticPixels(rows->image_view,rows->exception) ==
+        MagickFalse)
+      {
+        *status=MagickFalse;
+        continue;
+      }
+  }
+}
+
 static MagickBooleanType FloydSteinbergImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -575,8 +634,8 @@ static MagickBooleanType FloydSteinbergImageDepth(Image *image,
   size_t
     channels;
 
-  ssize_t
-    y;
+  DitherImageInfo
+    rows;
 
   /*
     Dither pixels with Floyd Steinberg algorithm.
@@ -592,34 +651,13 @@ static MagickBooleanType FloydSteinbergImageDepth(Image *image,
   (void) memset(distortion,0,3*image->columns*channels*sizeof(*distortion));
   range=GetQuantumRange(depth);
   image_view=AcquireAuthenticCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    DitherRow
-      row;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.distortion=distortion;
-    row.range=range;
-    row.channels=channels;
-    row.y=y;
-    DitherImageRow(&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
-  }
+  rows.image=image;
+  rows.image_view=image_view;
+  rows.distortion=distortion;
+  rows.range=range;
+  rows.channels=channels;
+  rows.exception=exception;
+  DitherImageRows(&rows,&status);
   image_view=DestroyCacheView(image_view);
   distortion=(double *) RelinquishMagickMemory(distortion);
   if (status != MagickFalse)
