@@ -1098,6 +1098,32 @@ static inline MagickBooleanType IsCollapsibleSpace(const char *xml,
     (isspace((int) ((unsigned char) *xml)) != 0)) ? MagickTrue : MagickFalse);
 }
 
+static char *ResizeEntityBuffer(char *p,const char *q,const size_t extent)
+{
+  if (p != q)
+    {
+      p=(char *) ResizeQuantumMemory(p,extent+1,sizeof(*p));
+      if (p != (char *) NULL)
+        p[extent]='\0';
+    }
+  else
+    {
+      char
+        *extent_xml;
+
+      extent_xml=(char *) AcquireQuantumMemory(extent+1,
+        sizeof(*extent_xml));
+      if (extent_xml != (char *) NULL)
+        {
+          memset(extent_xml,0,extent*sizeof(*extent_xml));
+          (void) CopyMagickString(extent_xml,p,extent*
+            sizeof(*extent_xml));
+        }
+      p=extent_xml;
+    }
+  return(p);
+}
+
 static char *ParseEntities(char *xml,char **entities,int state)
 {
   char
@@ -1207,27 +1233,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
                   {
                     offset=(ssize_t) (xml-p);
                     extent=((size_t) offset+length+strlen(entity));
-                    if (p != q)
-                      {
-                        p=(char *) ResizeQuantumMemory(p,extent+1,sizeof(*p));
-                        if (p != (char *) NULL)
-                          p[extent]='\0';
-                      }
-                    else
-                      {
-                        char
-                          *extent_xml;
-
-                        extent_xml=(char *) AcquireQuantumMemory(extent+1,
-                          sizeof(*extent_xml));
-                        if (extent_xml != (char *) NULL)
-                          {
-                            memset(extent_xml,0,extent*sizeof(*extent_xml));
-                            (void) CopyMagickString(extent_xml,p,extent*
-                              sizeof(*extent_xml));
-                          }
-                        p=extent_xml;
-                      }
+                    p=ResizeEntityBuffer(p,q,extent);
                     if (p == (char *) NULL)
                       ThrowFatalException(ResourceLimitFatalError,
                         "MemoryAllocationFailed");
