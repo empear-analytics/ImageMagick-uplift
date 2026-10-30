@@ -2305,7 +2305,9 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
 2. List the variables of the caller the block writes: two to four, each a plain local of
    the caller or a by-value parameter of it (`FunctionE fe`), none a global, a `static`
    or an array, and none whose address `&v` the caller takes anywhere (check by
-   `grep`). Writes through pointers the block already uses stay as they are; variables
+   `grep`), except to fill a member of another helper's targets struct under this
+   recipe, filled directly before that helper's call and read by nothing else (Recipe
+   LB step 2's "helpers of this recipe"). Writes through pointers the block already uses stay as they are; variables
    the block declares move with it; a temporary it writes before reading, and the caller
    does not read after it, is declared in the new function (Recipe Y step 2).
 3. Directly above the new function declare a `typedef struct` with one member per
@@ -2490,6 +2492,11 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   before whatever the helper wrote through the members, and the helper takes none of
   the variables `S` writes (`bounds`, `disposals`, `prev_image` in
   `OptimizeLayerFrames`). On the success path `S` runs in neither version.
+- Step 2's exception for another helper's targets struct: that struct is the caller's
+  local, filled directly before its own call and read by nothing else, so its copy of
+  `&v` is used only while that helper runs, which is never while this one runs (C calls
+  do not overlap here: no OpenMP region, step 1). While this helper runs, its member is
+  the only pointer to `v` in use, and no two of its own members name one object.
 - More than four written variables, two labels, two different constants, or a written
   variable whose address the caller takes elsewhere: skip the block.
 
@@ -3229,3 +3236,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | O | Step 2: a written variable whose address the caller passes elsewhere, outside the block, only to calls that keep no copy of it (checked by reading the callee) still qualifies, as in Recipe I step 8; Recipes Z and SD, which rest on O steps 1 to 3, take the same reading. *Careful* gives the argument | `transform.c`'s `TrimImage`: its gravity `switch` (cc 19 in the caller, 11 labels) writes only `geometry`, whose address the caller later passes to `CropImage`, which reads `*geometry` through `GetCropPage` and `ClampCropExtent` and stores no pointer. Recipe SD on the `switch`, then E on the min-size block: 4.76 to 4.83 to 5.00 in a probe, TrimImage leaving Complex and Large Method, neither helper with a finding | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | O | Step 2: a parameter the caller receives by value, of struct or arithmetic type (not a pointer or array), counts as a plain local, under the same rule on its address; Recipes Z and SD read step 2 the same way. *Careful* gives the argument | `transform.c`'s `ApplySpliceGravity` (cc 12): its whole body is the gravity `switch` (eleven labels), which writes only `splice_geometry`, a `RectangleInfo` received by value and returned. Recipe SD (the default group and North, NorthEast and West to a helper taking `&splice_geometry`): 5.15 to 5.31 in a probe, ApplySpliceGravity leaving Complex Method, the helper with no finding | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | I | Step 8: a block whose every exit is the same run of cleanup statements `S` followed by `return(c);` of one constant (Recipe V step 7's `S return(c);`) moves with `S return(c);` left in the caller, as the macro form leaves its call; `S` neither reads nor writes a written variable. Step 1 points to it. *Careful* gives the argument (V step 7's, with the members) | `layer.c`'s `OptimizeLayerFrames`: the duplicate-frame trial (`if ( add_frames )`, nesting 4, one of the function's two depth-4 sites) writes three variables read later (`dup_image`, `dup_bounds`, `cleared`), so V step 7 (one written variable) refuses it, and its failure exit is three plain cleanup statements and `return((Image *) NULL);`, which I step 1 refused and step 8 named only as a macro. A probe with the other depth-4 site (Recipe E): Deep, Nested Complexity leaves, 5.47 to 5.82 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | I | Step 2: a written variable whose address the caller takes only to fill a member of another helper's targets struct under this recipe (filled directly before that call, read by nothing else) still qualifies, as Recipe LB step 2 allows for its own helpers. *Careful* gives the argument | `layer.c`'s `OptimizeLayerFrames`: the finalisation of the dispose choice writes `bgnd_image`, `prev_image`, `dup_image` and `i`, and leaves through the release of `bounds` and `disposals` and `return((Image *) NULL);`; `&dup_image` is already taken for `TryDuplicateFrame`'s targets. A probe: bumps 5 to 3, cc 39 to 33, 5.96 to 5.98 | mandate (2026-10-24) |
