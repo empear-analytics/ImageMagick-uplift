@@ -1169,6 +1169,16 @@ static const TypeInfo *GetFamilyTypeInfo(const DrawInfo *draw_info,
   return(type_info);
 }
 
+static void SetTypeInfoFace(DrawInfo *annotate_info,
+  const TypeInfo *type_info)
+{
+  annotate_info->face=type_info->face;
+  if (type_info->metrics != (char *) NULL)
+    (void) CloneString(&annotate_info->metrics,type_info->metrics);
+  if (type_info->glyphs != (char *) NULL)
+    (void) CloneString(&annotate_info->font,type_info->glyphs);
+}
+
 static MagickBooleanType RenderType(const RenderTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1249,11 +1259,7 @@ static MagickBooleanType RenderType(const RenderTarget *target,
       return(status);
     }
   annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  annotate_info->face=type_info->face;
-  if (type_info->metrics != (char *) NULL)
-    (void) CloneString(&annotate_info->metrics,type_info->metrics);
-  if (type_info->glyphs != (char *) NULL)
-    (void) CloneString(&annotate_info->font,type_info->glyphs);
+  SetTypeInfoFace(annotate_info,type_info);
   freetype.image=image;
   freetype.draw_info=annotate_info;
   freetype.encoding=type_info->encoding;
