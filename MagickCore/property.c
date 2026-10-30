@@ -2276,6 +2276,17 @@ static void CopyClippathKnot(PointInfo *first,PointInfo *last,
   }
 }
 
+static void TraceSVGClippathKnot(char *message,PointInfo *last,
+  PointInfo *point)
+{
+  ssize_t
+    i;
+
+  TraceBezierCurve(message,last,point);
+  for (i=0; i < 3; i++)
+    last[i]=point[i];
+}
+
 static char *TraceSVGClippath(const unsigned char *blob,size_t length,
   const size_t columns,const size_t rows)
 {
@@ -2371,11 +2382,7 @@ static char *TraceSVGClippath(const unsigned char *blob,size_t length,
             CopyClippathKnot(first,last,point);
           }
         else
-          {
-            TraceBezierCurve(message,last,point);
-            for (i=0; i < 3; i++)
-              last[i]=point[i];
-          }
+          TraceSVGClippathKnot(message,last,point);
         (void) ConcatenateString(&path,message);
         in_subpath=MagickTrue;
         knot_count--;
