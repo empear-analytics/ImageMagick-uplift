@@ -948,6 +948,52 @@ static void CopyArgumentParameters(const ArgumentParameters *list,ssize_t *i,
   }
 }
 
+typedef struct _ArgumentFileTargets
+{
+  char
+    ***filelist;
+
+  size_t
+    *number_files;
+} ArgumentFileTargets;
+
+static MagickBooleanType ReadFileList(const char *option,
+  const ArgumentFileTargets *targets)
+{
+  char
+    ***const filelist = targets->filelist;
+
+  size_t
+    *const number_files = targets->number_files;
+
+  char
+    *files;
+
+  ExceptionInfo
+    *exception;
+
+  int
+    length;
+
+  ssize_t
+    j;
+
+  exception=AcquireExceptionInfo();
+  files=FileToString(option,~0UL,exception);
+  exception=DestroyExceptionInfo(exception);
+  if (files == (char *) NULL)
+    return(MagickFalse);
+  (*filelist)=StringToArgv(files,&length);
+  if ((*filelist) == (char **) NULL)
+    return(MagickFalse);
+  files=DestroyString(files);
+  (*filelist)[0]=DestroyString((*filelist)[0]);
+  for (j=0; j < (ssize_t) (length-1); j++)
+    (*filelist)[j]=(*filelist)[j+1];
+  (*number_files)=(size_t) length-1;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
   char ***arguments)
 {
@@ -1044,31 +1090,16 @@ MagickExport MagickBooleanType ExpandFilenames(int *number_arguments,
       }
     else
       {
-        char
-          *files;
-
-        ExceptionInfo
-          *exception;
-
-        int
-          length;
+        ArgumentFileTargets
+          targets;
 
         /*
           Generate file list from file list (e.g. @filelist.txt).
         */
-        exception=AcquireExceptionInfo();
-        files=FileToString(option,~0UL,exception);
-        exception=DestroyExceptionInfo(exception);
-        if (files == (char *) NULL)
+        targets.filelist=(&filelist);
+        targets.number_files=(&number_files);
+        if (ReadFileList(option,&targets) == MagickFalse)
           continue;
-        filelist=StringToArgv(files,&length);
-        if (filelist == (char **) NULL)
-          continue;
-        files=DestroyString(files);
-        filelist[0]=DestroyString(filelist[0]);
-        for (j=0; j < (ssize_t) (length-1); j++)
-          filelist[j]=filelist[j+1];
-        number_files=(size_t) length-1;
       }
     if (filelist == (char **) NULL)
       continue;
