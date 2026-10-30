@@ -1751,6 +1751,16 @@ static MagickBooleanType CountPropertyBracket (const char * p, int * level)
   return(MagickTrue);
 }
 
+static void ScanPropertyBrackets (int * level, char ** p)
+{
+  while (**p) {
+
+    if (CountPropertyBracket (*p, &(*level)) == MagickFalse)
+      break;
+    (*p)++;
+  }
+}
+
 static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
 /* Returns number of characters to swallow.
    Returns "-1" means invalid input.
@@ -1769,12 +1779,7 @@ static ssize_t GetProperty (FxInfo * pfx, fxFltType *val, fxFltType *seconds)
     return 0;
   p = pfx->pex + 2;
 
-  while (*p) {
-
-    if (CountPropertyBracket (p, &level) == MagickFalse)
-      break;
-    p++;
-  }
+  ScanPropertyBrackets (&level, &p);
   if (!*p || level != 0) {
     (void) ThrowMagickException (
       pfx->exception, GetMagickModule(), OptionError,
