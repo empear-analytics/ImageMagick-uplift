@@ -326,6 +326,29 @@ static MagickBooleanType DisassociateAlphaRow(Image *image,
   return(status);
 }
 
+static MagickBooleanType SetTransparentRowToBackground(Image *image,CacheView *image_view,
+  const ssize_t y,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  SetTransparentPixelsToBackground(image,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -404,20 +427,9 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        Quantum
-          *magick_restrict q;
-
         if (status == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        SetTransparentPixelsToBackground(image,q);
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+        if (SetTransparentRowToBackground(image,image_view,y,exception) == MagickFalse)
           status=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);
