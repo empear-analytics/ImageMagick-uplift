@@ -1742,19 +1742,61 @@ static MagickBooleanType AuthorizeDelegateCopy(const char *source,
   return(MagickTrue);
 }
 
+typedef struct _DelegateFileCopy
+{
+  int
+    source_file,
+    destination_file;
+
+  unsigned char
+    *buffer;
+
+  size_t
+    quantum;
+} DelegateFileCopy;
+
+static void CopyDelegateFileData(const DelegateFileCopy *copy,
+  MagickBooleanType *status)
+{
+  const int
+    source_file = copy->source_file,
+    destination_file = copy->destination_file;
+
+  unsigned char
+    *const buffer = copy->buffer;
+
+  const size_t
+    quantum = copy->quantum;
+
+  ssize_t
+    count = 0;
+
+  while ((count=read(source_file,buffer,quantum)) > 0)
+  {
+    ssize_t written = write(destination_file,buffer,(size_t) count);
+    if (written != count)
+      {
+        *status=MagickFalse;
+        break;
+      }
+  }
+  if (count < 0)
+    *status=MagickFalse;
+}
+
 static MagickBooleanType CopyDelegateFile(const char *source,
   const char *destination,const MagickBooleanType overwrite,
   ExceptionInfo *exception)
 {
+  DelegateFileCopy
+    copy;
+
   int
     destination_file = -1,
     source_file = -1;
 
   MagickBooleanType
     status = MagickTrue;
-
-  ssize_t
-    count = 0;
 
   size_t
     quantum = 0;
@@ -1798,17 +1840,11 @@ static MagickBooleanType CopyDelegateFile(const char *source,
       (void) close_utf8(destination_file);
       return(MagickFalse);
     }
-  while ((count=read(source_file,buffer,quantum)) > 0)
-  {
-    ssize_t written = write(destination_file,buffer,(size_t) count);
-    if (written != count)
-      {
-        status=MagickFalse;
-        break;
-      }
-  }
-  if (count < 0)
-    status=MagickFalse;
+  copy.source_file=source_file;
+  copy.destination_file=destination_file;
+  copy.buffer=buffer;
+  copy.quantum=quantum;
+  CopyDelegateFileData(&copy,&status);
   (void) close_utf8(destination_file);
   (void) close_utf8(source_file);
   buffer=(unsigned char *) RelinquishMagickMemory(buffer);
