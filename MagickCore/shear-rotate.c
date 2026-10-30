@@ -178,6 +178,19 @@ static void ReverseRotatedRow(const Image *image,const Image *rotate_image,
   }
 }
 
+static size_t ClipTileExtent(const size_t tile_width,const ssize_t tile_x,
+  const size_t extent)
+{
+  size_t
+    width;
+
+  width=tile_width;
+  if ((tile_width+(size_t) tile_x) > extent)
+    width=(size_t) ((ssize_t) tile_width-(tile_x+(ssize_t) tile_width-
+      (ssize_t) extent));
+  return(width);
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -263,14 +276,8 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
           ssize_t
             y;
 
-          width=tile_width;
-          if ((tile_width+(size_t) tile_x) > image->columns)
-            width=(size_t) ((ssize_t) tile_width-(tile_x+(ssize_t) tile_width-
-              (ssize_t) image->columns));
-          height=tile_height;
-          if ((tile_height+(size_t) tile_y) > image->rows)
-            height=(size_t) ((ssize_t) tile_height-(tile_y+(ssize_t)
-              tile_height-(ssize_t) image->rows));
+          width=ClipTileExtent(tile_width,tile_x,image->columns);
+          height=ClipTileExtent(tile_height,tile_y,image->rows);
           p=GetCacheViewVirtualPixels(image_view,tile_x,tile_y,width,height,
             exception);
           if (p == (const Quantum *) NULL)
@@ -429,14 +436,8 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
           ssize_t
             y;
 
-          width=tile_width;
-          if ((tile_width+(size_t) tile_x) > image->columns)
-            width=(size_t) ((ssize_t) tile_width-(tile_x+(ssize_t) tile_width-
-              (ssize_t) image->columns));
-          height=tile_height;
-          if ((tile_height+(size_t) tile_y) > image->rows)
-            height=(size_t) ((ssize_t) tile_height-(tile_y+(ssize_t)
-              tile_height-(ssize_t) image->rows));
+          width=ClipTileExtent(tile_width,tile_x,image->columns);
+          height=ClipTileExtent(tile_height,tile_y,image->rows);
           p=GetCacheViewVirtualPixels(image_view,tile_x,tile_y,width,height,
             exception);
           if (p == (const Quantum *) NULL)
