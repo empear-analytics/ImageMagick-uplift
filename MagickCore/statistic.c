@@ -256,6 +256,19 @@ static int IntensityCompare(const void *x,const void *y)
 }
 #endif
 
+static double EvaluatePow(const Quantum pixel,const double value,
+  double result)
+{
+  if (fabs(value) <= MagickEpsilon)
+    return(result);
+  if (((double) pixel < 0.0) && ((value-floor(value)) > MagickEpsilon))
+    result=(double) -((double) QuantumRange*pow(-(QuantumScale*(double)
+      pixel),value));
+  else
+    result=(double) QuantumRange*pow(QuantumScale*(double) pixel,value);
+  return(result);
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
@@ -396,13 +409,7 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     }
     case PowEvaluateOperator:
     {
-      if (fabs(value) <= MagickEpsilon)
-        break;
-      if (((double) pixel < 0.0) && ((value-floor(value)) > MagickEpsilon))
-        result=(double) -((double) QuantumRange*pow(-(QuantumScale*(double)
-          pixel),value));
-      else
-        result=(double) QuantumRange*pow(QuantumScale*(double) pixel,value);
+      result=EvaluatePow(pixel,value,result);
       break;
     }
     case RightShiftEvaluateOperator:
