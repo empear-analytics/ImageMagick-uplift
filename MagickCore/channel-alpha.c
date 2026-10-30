@@ -290,6 +290,42 @@ static MagickBooleanType IsAlphaRowOpaque(const Image *image,
   return(status);
 }
 
+static MagickBooleanType DisassociateAlphaRow(Image *image,
+  CacheView *image_view,const ssize_t y,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      gamma,
+      Sa;
+
+    Sa=QuantumScale*(double) GetPixelAlpha(image,q);
+    gamma=MagickSafeReciprocal(Sa);
+    ScaleColorChannels(image,gamma,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
   const AlphaChannelOption alpha_type,ExceptionInfo *exception)
 {
@@ -417,33 +453,9 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          double
-            gamma,
-            Sa;
-
-          Sa=QuantumScale*(double) GetPixelAlpha(image,q);
-          gamma=MagickSafeReciprocal(Sa);
-          ScaleColorChannels(image,gamma,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+        if (DisassociateAlphaRow(image,image_view,y,exception) == MagickFalse)
           status=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);
