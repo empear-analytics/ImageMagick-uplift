@@ -3371,12 +3371,18 @@ go in a struct; Recipe SD, which moves a group of different cases, not copies of
    by script (whitespace and line breaks ignored; no variable renamed). The value is a
    literal or an enumeration constant, the same at each of its positions in one copy
    (Recipe D's *One value at several positions*), and differs between at least two
-   copies.
+   copies. Or the copies read different variables: they are the same token sequence
+   once each copy's variables are renamed consistently (Recipe D's renaming) and the
+   value is replaced by a name, and the value is then a literal, an enumeration constant
+   or a member access of an unwritten variable (`image->columns` in one copy,
+   `image->rows` in another), of one type in every copy, that nothing in the block
+   writes (Recipe TW step 2's differing value). Each copy passes its own variables.
 3. The new function's parameters are the variables a copy reads (Recipe E step 3) and
    the value, at most four in all. The value's parameter is `const` and has the type of
    every object it is assigned to or parameter it is passed to in the block (an
    enumeration's type for an enumeration constant assigned to a member of that type);
    used in an expression or comparison, it has the constant's own type, as in Recipe D.
+   A member-access value's parameter has the member's declared type.
 4. Write one `static` function directly above the caller: the text of one copy, the
    value replaced at each of its positions by the parameter's name, nothing else
    changed. Recipe E step 7's forms apply as for one block (in a `switch` case, a single
@@ -3441,8 +3447,16 @@ static MagickBooleanType SetOpaqueAlphaTrait(Image *image,
   value, and an enumeration constant is a valid value of its enumeration. A parameter of
   another type (an `int` for a `double` literal, a `float` for a `double`) would round
   or truncate: then the parameter takes the constant's own type.
-- Only one value may differ. Two differing values, or a variable that differs, is not
-  this recipe: leave the copies, or move one with Recipe E and report the rest.
+- Only one value may differ. Two differing values, or a variable that differs
+  without step 2's consistent renaming, is not this recipe: leave the copies, or move
+  one with Recipe E and report the rest.
+- Under step 2's renaming each copy passes its own variables, in the positions of the
+  parameters that stand for them, so each call runs its copy's operations on the values
+  its copy read, as in Recipe D. A member-access value is read once, at the call, where
+  the copy read it at each use: the same value only while nothing in the block can
+  change it (Recipe TW's *Careful*); check by reading that the block writes neither the
+  member nor, through any pointer, the struct that holds it. Its parameter, of the
+  member's declared type, converts nothing.
 - `refactor_guard.py` reports the removed copies as deduplication (`WARN`, every value
   still present) and `--calls` moves only the callees of the copies (down by the copies
   removed) and the helper (its definition and one call per copy); anything else stops
@@ -3457,6 +3471,10 @@ reaches it).
 in the trait assigned. Recipe E on the first alone: 7.56 to 7.58; as three Recipe E
 helpers: 7.62, with three functions that differ in one constant; as one helper: 7.62.
 Added by Claude Code (Claude Opus 5.5) during task W10, under the mandate of 2026-10-24.
+Step 2's renaming and member-access value (2026-10-30, task W10): `shear-rotate.c`'s
+`IntegralRotateImage`, whose 90- and 270-degree tile loops each clip the tile's width
+(`tile_width`, `tile_x`, `image->columns`) and height (`tile_height`, `tile_y`,
+`image->rows`) with the same two statements.
 
 ---
 
@@ -3901,3 +3919,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | T | Step 2: the other name's one read may be a leading guard that tests the loop's `status` and `v` together and `continue`s on either; *Careful* gives the argument | `channel-alpha.c`'s `SetImageAlphaChannel` (W10): the `OffIfOpaqueAlphaChannel` row loop guards on `status` and `opaque` together and writes `opaque=MagickFalse;` in its column scan (nesting 4). Probe of the scan as `IsAlphaRowOpaque`: *Deep, Nested Complexity* leaves, bumps 8 to 7, but as the file's seventh function it switches on *Overall Code Complexity*: 6.96 to 6.77 alone, 7.00 with Recipe E on the `AssociateAlphaChannel` column loop | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | rule 1 | The blocks of one function in a set may take different recipes when what lowers each alone is a finding of the whole file that the first new function switches on (*Overall Code Complexity*, from a file's seventh function); the message names each block with its recipe and its score alone, and the `Recipe:` trailer names the recipe of the block that leaves a finding category | `channel-alpha.c`'s `SetImageAlphaChannel` (W10), six functions: Recipe T on the `OffIfOpaqueAlphaChannel` column scan alone 6.96 to 6.77 (*Deep, Nested Complexity* leaves, *Overall Code Complexity* arrives), Recipe E on the `AssociateAlphaChannel` column loop alone 6.38, both 7.00. No one recipe reaches both blocks: E refuses the scan's write of the shared `opaque`, and T has nothing to return for a loop that writes no status | mandate (2026-10-24) |
 | 2026-10-30 | NEW | SV | Extract Sibling Blocks Differing in One Value: copies of one block in one function, the same text except for one literal or enumeration constant and not reported as *Code Duplication*, move to one `static` function taking the value as a `const` parameter of the type it is assigned to; each copy becomes the call with its own value | `channel-alpha.c`'s `SetImageAlphaChannel` (W10): the `DeactivateAlphaChannel`, `DiscreteAlphaChannel` and `OnAlphaChannel` cases differ only in the trait assigned. Recipe E on one: 7.56 to 7.58; one helper for the three: 7.62 (cc 66 to 63) | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | SV | Step 2: the copies may read different variables, the same token sequence under Recipe D's consistent renaming, each copy passing its own; the value may then also be a member access of a variable the block does not write (`image->columns`, `image->rows`), of one type in every copy, as in Recipe TW step 2. Step 3: its parameter has the member's declared type. *Careful* gives the argument | `shear-rotate.c`'s `IntegralRotateImage` (W10): its 90- and 270-degree tile loops clip the width (`width=tile_width;` and an `if` on `tile_x` and `image->columns`) and the height (`tile_height`, `tile_y`, `image->rows`) with the same text, four copies in one function, not reported as *Code Duplication*. SV refuses the renaming, TW wants two functions and five inputs, Recipe E on the first copy alone gives 7.55 to 7.56 and would need a second helper for the height. All four as one helper: 7.55 to 7.60 | mandate (2026-10-24) |
