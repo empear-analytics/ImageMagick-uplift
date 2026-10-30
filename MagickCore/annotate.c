@@ -1664,6 +1664,21 @@ static void SetFreetypeCanvas(Image *image,ExceptionInfo *exception)
     (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
 }
 
+static void DrawFreetypeStroke(Image *image,DrawInfo *annotate_info,
+  const PointInfo *offset,ExceptionInfo *exception)
+{
+  /*
+    Draw text stroke.
+  */
+  annotate_info->linejoin=RoundJoin;
+  annotate_info->affine.tx=offset->x;
+  annotate_info->affine.ty=offset->y;
+  (void) ConcatenateString(&annotate_info->primitive,"'");
+  if (strlen(annotate_info->primitive) > 7)
+    (void) DrawImage(image,annotate_info,exception);
+  (void) CloneString(&annotate_info->primitive,"path '");
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2205,18 +2220,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
         }
         image_view=DestroyCacheView(image_view);
         if (IsVisibleStroke(draw_info,status) != MagickFalse)
-          {
-            /*
-              Draw text stroke.
-            */
-            annotate_info->linejoin=RoundJoin;
-            annotate_info->affine.tx=offset->x;
-            annotate_info->affine.ty=offset->y;
-            (void) ConcatenateString(&annotate_info->primitive,"'");
-            if (strlen(annotate_info->primitive) > 7)
-              (void) DrawImage(image,annotate_info,exception);
-            (void) CloneString(&annotate_info->primitive,"path '");
-          }
+          DrawFreetypeStroke(image,annotate_info,offset,exception);
       }
     if (IsInterwordSpace(draw_info,p+grapheme[i].cluster,code) != MagickFalse)
       origin.x+=(FT_Pos) (64.0*draw_info->interword_spacing);
