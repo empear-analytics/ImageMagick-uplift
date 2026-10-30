@@ -1713,6 +1713,13 @@ static double GetGlyphFillOpacity(const GlyphRasterInfo *raster,
   return(fill_opacity);
 }
 
+static Quantum *SkipGlyphPixel(const Image *image,Quantum *q)
+{
+  if (q != (Quantum *) NULL)
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  return(q);
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -2202,8 +2209,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
             x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
             if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
               {
-                if (q != (Quantum *) NULL)
-                  q+=(ptrdiff_t) GetPixelChannels(image);
+                q=SkipGlyphPixel(image,q);
                 continue;
               }
             raster.bitmap=bitmap;
