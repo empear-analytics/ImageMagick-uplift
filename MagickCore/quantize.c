@@ -909,6 +909,16 @@ static void SumQNodeLeafColor(const QCubeInfo *cube_info,QNodeInfo *node_info,
       ClampPixel((double) OpaqueAlpha);
 }
 
+static DoublePixelPacket MoveQNodeMidpoint(DoublePixelPacket mid,
+  const size_t id,const double bisect)
+{
+  mid.red+=(id & 1) != 0 ? bisect : -bisect;
+  mid.green+=(id & 2) != 0 ? bisect : -bisect;
+  mid.blue+=(id & 4) != 0 ? bisect : -bisect;
+  mid.alpha+=(id & 8) != 0 ? bisect : -bisect;
+  return(mid);
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -983,10 +993,7 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
 
         bisect*=0.5;
         id=ColorToQNodeId(cube_info,&pixel,index);
-        mid.red+=(id & 1) != 0 ? bisect : -bisect;
-        mid.green+=(id & 2) != 0 ? bisect : -bisect;
-        mid.blue+=(id & 4) != 0 ? bisect : -bisect;
-        mid.alpha+=(id & 8) != 0 ? bisect : -bisect;
+        mid=MoveQNodeMidpoint(mid,id,bisect);
         if (node_info->child[id] == (QNodeInfo *) NULL)
           {
             /*
