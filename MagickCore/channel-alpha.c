@@ -67,6 +67,21 @@
 #include "MagickCore/version.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _FlattenSource
+{
+  const Image
+    *image;
+
+  const PixelInfo
+    *p;
+
+  double
+    alpha;
+} FlattenSource;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -99,9 +114,18 @@
 %
 */
 
-static inline void FlattenPixelInfo(const Image *image,const PixelInfo *p,
-  const double alpha,const Quantum *q,const double beta,Quantum *composite)
+static inline void FlattenPixelInfo(const FlattenSource *source,
+  const Quantum *q,const double beta,Quantum *composite)
 {
+  const Image
+    *image = source->image;
+
+  const PixelInfo
+    *p = source->p;
+
+  const double
+    alpha = source->alpha;
+
   double
     Da,
     gamma,
@@ -203,8 +227,13 @@ static void FlattenRowOverBackground(const Image *image,
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    FlattenPixelInfo(image,&image->background_color,
-      image->background_color.alpha,q,(double) GetPixelAlpha(image,q),q);
+    FlattenSource
+      source;
+
+    source.image=image;
+    source.p=(&image->background_color);
+    source.alpha=image->background_color.alpha;
+    FlattenPixelInfo(&source,q,(double) GetPixelAlpha(image,q),q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
