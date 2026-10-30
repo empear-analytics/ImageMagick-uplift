@@ -1320,6 +1320,21 @@ static void GetCubicBCDefaults(const FilterType filter_type,
     }
 }
 
+static void SetGaussianKaiserCoefficients(const Image *image,
+  ResizeFilter *resize_filter)
+{
+  /* User Gaussian Sigma Override - no support change */
+  if ((resize_filter->filter == Gaussian) ||
+      (resize_filter->window == Gaussian) ) {
+    SetGaussianCoefficients(image,resize_filter);
+  }
+
+  /* User Kaiser Alpha Override - no support change */
+  if (IsKaiserResizeFilter(resize_filter) != MagickFalse) {
+    SetKaiserCoefficients(image,resize_filter);
+  }
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1388,16 +1403,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
     Expert Option Modifications.
   */
 
-  /* User Gaussian Sigma Override - no support change */
-  if ((resize_filter->filter == Gaussian) ||
-      (resize_filter->window == Gaussian) ) {
-    SetGaussianCoefficients(image,resize_filter);
-  }
-
-  /* User Kaiser Alpha Override - no support change */
-  if (IsKaiserResizeFilter(resize_filter) != MagickFalse) {
-    SetKaiserCoefficients(image,resize_filter);
-  }
+  SetGaussianKaiserCoefficients(image,resize_filter);
 
   /* Support Overrides */
   artifact=GetImageArtifact(image,"filter:lobes");
