@@ -1248,6 +1248,20 @@ as parameters. K then B is two commits, of which the first adds a finding.
    between the assignments and the call.
 7. Call it with `&name` and `&v` for each written scalar, at most four parameters in
    all; check every member and every argument by reading.
+8. When the written scalars, each its own pointer, would bring the function to five or
+   more parameters, pass their addresses instead in one `const` struct, Recipe I's form
+   (steps 3, 5 and 6): a `typedef struct` directly above the new function with one
+   member per written scalar, in the order the block first writes them, a pointer to the
+   variable's exact type under its name (`const double *magick_restrict k` gives
+   `const double *magick_restrict *k`), holding addresses only. The function takes
+   `const Name *name`, then `const Targets *targets`, and binds each member once at the
+   top of its body, `T *const v = targets->v;`; the text then follows step 5
+   (`(*pixels)[i]` for `pixels[i]`, the parenthesised `*v` of Recipe Z step 4). The
+   caller declares the `Targets` local beside the `Name` local, and directly before the
+   call assigns the input members, then `targets.v=(&v);` per member in member order,
+   with nothing else between them and the call. Inside a parallel loop every address is
+   of a variable declared in the loop body. In this form the block may write up to six
+   such variables, in place of step 1's four.
 
 **Before:**
 
@@ -1347,10 +1361,29 @@ static void SumBilateralPixels(const BilateralSum *sum,double *pixel,
 - Two blocks that differ only by a line or two (a plain and an alpha-blended sum) become
   two helpers that CodeScene may report as *Code Duplication*; measure, and keep the step
   only when no duplication appears.
+- Step 8 is step 7 with the pointers carried in one struct, and Recipe I's argument
+  holds: the written variables stay the caller's own locals, under their own names,
+  read and written directly everywhere else; only their addresses travel, set directly
+  before the call and dead after it, each bound once to a `*const` local, so no pointer
+  is reseated and nothing is copied in or back. Each `*v` is the object `&v` named in
+  step 7, so the operations, their objects and their order are step 7's (Recipe K).
+- Inside a parallel loop the `Targets` local is the loop body's own, filled by each
+  thread, and every address in it must be of a variable declared in the loop body,
+  which each thread owns: an address of `status`, `progress` or anything else declared
+  outside the body would let the callee write a variable the threads share, and refuses
+  the block, as Recipe K step 2 does. The addresses are of distinct locals whose address
+  the caller takes nowhere else, so they alias neither each other nor a member's
+  pointee; a `magick_restrict` on a cursor stays on the pointed-to type of its member, so
+  the cursor's qualifier and the promise it makes are unchanged.
+- The four of step 1 keep the block one accumulation; with the addresses in one
+  parameter the count no longer costs arguments, and step 8 allows six for a sum whose
+  cursors advance in lockstep with its accumulators (`SelectiveBlurImage`'s kernel,
+  pixel and luminance cursors beside `pixel` and `gamma`). A block writing more is
+  skipped.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new
-function, nothing else moved), and steps 1, 3 and 7 checked by reading: the oracle runs
-single-threaded.
+function, nothing else moved), and steps 1, 3 and 7 (step 8: every address, and that
+each is of a loop-body variable) checked by reading: the oracle runs single-threaded.
 
 **Provenance:** 2026-10-29, from `effect.c`'s `BilateralBlurImage`, whose per-channel
 body holds a plain and an alpha-blended weighted sum (`pixel`, `gamma` and the cursor `n`,
@@ -1358,7 +1391,11 @@ reading eight variables): Recipe K gives each helper eleven parameters, Recipe N
 the accumulators, and the per-channel body cannot move (Recipe E step 7) while the two
 sums keep it a Bumpy Road. A probe of the three steps (sums, then the body): the
 function leaves Brain Method and Deep, Nested Complexity, 1.72 to 1.89. Added by Claude
-Code (Claude Opus 5.5) during task W07, under the mandate of 2026-10-24.
+Code (Claude Opus 5.5) during task W07, under the mandate of 2026-10-24. Step 8
+(2026-10-30, task W09): `effect.c`'s `AdaptiveBlurImage` and `AdaptiveSharpenImage`,
+whose plain and alpha-blended kernel sums (nesting 6) write `pixel`, `gamma` and the
+cursors `k` and `pixels`, and `SelectiveBlurImage`'s, which also advance
+`luminance_pixels`: with a pointer each, five or six parameters.
 
 ---
 
@@ -2633,3 +2670,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | Q | Step 1: in a function with no OpenMP region, `status` is a plain local of the caller and may be one of the four written variables, passed by pointer, its reads in the block included; a pointer the block writes through but never assigns is a read-only member, not a written variable. *Careful* gives the argument: K, J and T refuse `status` only because a parallel loop shares it; through `*status` every read and write reaches the caller's variable in the same order, so no guard on its entry value is needed | Owner's request of 2026-10-30 after the W08 report (a sequential form of J and W). `vision.c`'s `ConnectedComponentsImage`: the merge census's neighbour loop (nesting 6, no OpenMP region in the function) writes `status=MagickFalse` and `count` and tests `status`, which J, T and U refuse; in the pointer form its helper takes the struct, `&status` and `&count`. A probe: nesting 6 to 4, 4.18 to 4.21; with the neighbour fetch then moved out of the helper (Recipe E), 4.30 | owner |
 | 2026-10-30 | NEW | I | Extract Block Returning Success Through a Struct of Out-Pointers: a Recipe V block (a `goto L;` or `return(c);` exit) that writes two to four of the caller's locals or by-value parameters, which as separate pointers would give five or more parameters, moves to a `static MagickBooleanType` function taking its read-only inputs (as V, or in Y's input struct) and last a `const` struct holding only the written variables' addresses, bound to `*const` locals and used as `*v` (Recipe O). *Careful* states how it differs from the out-parameter struct Recipe E step 4 forbids: the variables stay the caller's own, only their addresses travel, and nothing is copied back | Owner's request of 2026-10-30 after the W08 report (V with an out-parameter struct). `fx.c`'s `GetFunction`: the coordinate-qualifier block (depth 4, the file's last Deep Nesting) writes `fe`, `funStr`, `chQual` and `expChLimit` and returns `MagickFalse` on one path, refused by V, Y, O, Q and E step 4. A probe: 3.08 to 3.23 | owner |
 | 2026-10-30 | AMEND | V | Step 2: a temporary the block writes before reading, and the caller does not read after it before writing it again, is declared in the new function and is not the one written variable (Recipe Y step 2, Recipe J step 3). *Careful* gives the argument: neither its entry value nor the value the block leaves is ever read | `morphology.c`'s `AcquireKernelInfo`: the token step of its kernel-list loop writes `kernel` and the parse result `new_kernel` (declared at the top of the function, used nowhere else) and returns `(KernelInfo *) NULL` when a parse fails; step 2 counted two written variables, and Recipe Y (whose step 2 already admits the temporary) needs five inputs. A probe of the token step (V) and the `@file` read (Recipe I): the function leaves Bumpy Road Ahead and Complex Method, 2.68 to 2.70 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | Q | Step 8: when the written scalars as separate pointers would give five or more parameters, their addresses go in one `const` struct (Recipe I's form), bound to `*const` locals; inside a parallel loop every address is of a loop-body variable; in this form up to six written variables. *Careful* gives the argument: the variables stay the caller's own, only their addresses travel, and none of a variable the threads share | Session's brief after the W08 report (`effect.c`'s plateau: the adaptive and selective kernel sums advance four or five cursors and accumulators). `AdaptiveBlurImage`'s plain sum writes `pixel`, `gamma`, `k` and `pixels` and reads four inputs: Q gives five parameters. A probe of that sum: nesting 6 to 5, bumps 9 to 8, 2.54 to 2.59 | mandate (2026-10-24) |
