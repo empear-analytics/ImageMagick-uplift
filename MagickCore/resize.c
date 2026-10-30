@@ -1223,6 +1223,29 @@ static double GetCubicCOverride(const Image *image,double C)
   return(C);
 }
 
+static void GetCubicBCOverrides(const Image *image,double *B,double *C)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"filter:b");
+  if (artifact != (const char *) NULL)
+    {
+      *B=StringToDouble(artifact,(char **) NULL);
+      *C=(1.0-*B)/2.0; /* Calculate C to get a Keys cubic filter. */
+      *C=GetCubicCOverride(image,*C);
+    }
+  else
+    {
+      artifact=GetImageArtifact(image,"filter:c");
+      if (artifact != (const char *) NULL)
+        {
+          *C=StringToDouble(artifact,(char **) NULL);
+          *B=1.0-2.0*(*C); /* Calculate B to get a Keys cubic filter. */
+        }
+    }
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1380,22 +1403,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
           B=filters[window_type].B;
           C=filters[window_type].C;
         }
-      artifact=GetImageArtifact(image,"filter:b");
-      if (artifact != (const char *) NULL)
-        {
-          B=StringToDouble(artifact,(char **) NULL);
-          C=(1.0-B)/2.0; /* Calculate C to get a Keys cubic filter. */
-          C=GetCubicCOverride(image,C);
-        }
-      else
-        {
-          artifact=GetImageArtifact(image,"filter:c");
-          if (artifact != (const char *) NULL)
-            {
-              C=StringToDouble(artifact,(char **) NULL);
-              B=1.0-2.0*C; /* Calculate B to get a Keys cubic filter. */
-            }
-        }
+      GetCubicBCOverrides(image,&B,&C);
       SetCubicBCCoefficients(resize_filter,B,C);
     }
 
