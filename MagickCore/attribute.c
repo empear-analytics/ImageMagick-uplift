@@ -203,6 +203,25 @@ static void SelectImageEdge(const ImageEdge *edge,const Quantum **p,
   }
 }
 
+static PixelInfo GetDominantEdgeBackground(const double *census,
+  const PixelInfo *background,PixelInfo edge_background)
+{
+  double
+    edge_census;
+
+  ssize_t
+    i;
+
+  edge_census=(-1.0);
+  for (i=0; i < 4; i++)
+    if (census[i] > edge_census)
+      {
+        edge_background=background[i];
+        edge_census=census[i];
+      }
+  return(edge_background);
+}
+
 static PixelInfo GetEdgeBackgroundColor(const Image *image,
   const CacheView *image_view,ExceptionInfo *exception)
 {
@@ -210,8 +229,7 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
     *artifact;
 
   double
-    census[4],
-    edge_census;
+    census[4];
 
   PixelInfo
     background[4],
@@ -292,14 +310,7 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
     edge_view=DestroyCacheView(edge_view);
     edge_image=DestroyImage(edge_image);
   }
-  edge_census=(-1.0);
-  for (i=0; i < 4; i++)
-    if (census[i] > edge_census)
-      {
-        edge_background=background[i];
-        edge_census=census[i];
-      }
-  return(edge_background);
+  return(GetDominantEdgeBackground(census,background,edge_background));
 }
 
 void TraceConvexHull(PointInfo *vertices,size_t number_vertices,
