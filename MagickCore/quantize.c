@@ -1063,6 +1063,84 @@ static void DescendPrunedClassifyTree(const QNodeDescent *descent,
   }
 }
 
+typedef struct _QCubeRow
+{
+  QCubeInfo
+    *cube_info;
+
+  const Image
+    *image;
+
+  DoublePixelPacket
+    midpoint;
+
+  ExceptionInfo
+    *exception;
+} QCubeRow;
+
+static void ClassifyPrunedImageRow(const QCubeRow *row,
+  const Quantum *magick_restrict *p,DoublePixelPacket *error)
+{
+  QCubeInfo
+    *const cube_info = row->cube_info;
+
+  const Image
+    *const image = row->image;
+
+  const DoublePixelPacket
+    midpoint = row->midpoint;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  DoublePixelPacket
+    pixel;
+
+  QNodeDescent
+    descent;
+
+  QNodeInfo
+    *node_info;
+
+  ssize_t
+    count,
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) count)
+  {
+    /*
+      Start at the root and descend the color cube tree.
+    */
+    count=GetPixelRunLength(image,*p,x);
+    AssociateAlphaPixel(image,cube_info,*p,&pixel);
+    descent.cube_info=cube_info;
+    descent.image=image;
+    descent.pixel=pixel;
+    descent.midpoint=midpoint;
+    descent.count=count;
+    descent.exception=exception;
+    DescendPrunedClassifyTree(&descent,&node_info,error);
+    /*
+      Sum RGB for this leaf for later derivation of the mean cube color.
+    */
+    node_info->number_unique=(size_t) ((ssize_t) node_info->number_unique+
+      count);
+    node_info->total_color.red+=count*QuantumScale*(double)
+      ClampPixel(pixel.red);
+    node_info->total_color.green+=count*QuantumScale*(double)
+      ClampPixel(pixel.green);
+    node_info->total_color.blue+=count*QuantumScale*(double)
+      ClampPixel(pixel.blue);
+    if (cube_info->associate_alpha != MagickFalse)
+      node_info->total_color.alpha+=count*QuantumScale*(double)
+        ClampPixel(pixel.alpha);
+    else
+      node_info->total_color.alpha+=count*QuantumScale*(double)
+        ClampPixel((MagickRealType) OpaqueAlpha);
+    *p+=(ptrdiff_t) count*(ssize_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -1148,46 +1226,18 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
+    QCubeRow
+      row;
 
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
     PruneOversizedColorTree(cube_info);
-    for (x=0; x < (ssize_t) image->columns; x+=(ssize_t) count)
-    {
-      /*
-        Start at the root and descend the color cube tree.
-      */
-      count=GetPixelRunLength(image,p,x);
-      AssociateAlphaPixel(image,cube_info,p,&pixel);
-      descent.cube_info=cube_info;
-      descent.image=image;
-      descent.pixel=pixel;
-      descent.midpoint=midpoint;
-      descent.count=count;
-      descent.exception=exception;
-      DescendPrunedClassifyTree(&descent,&node_info,&error);
-      /*
-        Sum RGB for this leaf for later derivation of the mean cube color.
-      */
-      node_info->number_unique=(size_t) ((ssize_t) node_info->number_unique+
-        count);
-      node_info->total_color.red+=count*QuantumScale*(double)
-        ClampPixel(pixel.red);
-      node_info->total_color.green+=count*QuantumScale*(double)
-        ClampPixel(pixel.green);
-      node_info->total_color.blue+=count*QuantumScale*(double)
-        ClampPixel(pixel.blue);
-      if (cube_info->associate_alpha != MagickFalse)
-        node_info->total_color.alpha+=count*QuantumScale*(double)
-          ClampPixel(pixel.alpha);
-      else
-        node_info->total_color.alpha+=count*QuantumScale*(double)
-          ClampPixel((MagickRealType) OpaqueAlpha);
-      p+=(ptrdiff_t) count*(ssize_t) GetPixelChannels(image);
-    }
+    row.cube_info=cube_info;
+    row.image=image;
+    row.midpoint=midpoint;
+    row.exception=exception;
+    ClassifyPrunedImageRow(&row,&p,&error);
     proceed=SetImageProgress(image,ClassifyImageTag,(MagickOffsetType) y,
       image->rows);
     if (proceed == MagickFalse)
