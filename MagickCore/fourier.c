@@ -336,6 +336,21 @@ static void SelectComplexOperandImages(const Image *images,
     }
 }
 
+static double GetComplexSNR(const Image *images)
+{
+  const char
+    *artifact;
+
+  double
+    snr;
+
+  artifact=GetImageArtifact(images,"complex:snr");
+  snr=0.0;
+  if (artifact != (const char *) NULL)
+    snr=StringToDouble(artifact,(char **) NULL);
+  return(snr);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -348,9 +363,6 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
     *Br_view,
     *Ci_view,
     *Cr_view;
-
-  const char
-    *artifact;
 
   const Image
     *Ai_image,
@@ -420,10 +432,7 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   /*
     Apply complex mathematics to image pixels.
   */
-  artifact=GetImageArtifact(images,"complex:snr");
-  snr=0.0;
-  if (artifact != (const char *) NULL)
-    snr=StringToDouble(artifact,(char **) NULL);
+  snr=GetComplexSNR(images);
   Ar_image=images;
   Ai_image=images->next;
   SelectComplexOperandImages(images,&Br_image,&Bi_image);
