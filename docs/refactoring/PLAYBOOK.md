@@ -2487,6 +2487,14 @@ the block's depth.
 6. Two blocks of one caller whose groups of read variables are the same take the same
    struct type; the caller fills its one local directly before each call (Recipe Y step
    5). Check every member and argument by reading.
+7. A block whose every exit is the same run of statements `S` followed by `continue;`
+   of `Lp` (`i--; continue;`, which retries the iteration) moves the same way, with `S`
+   left in the caller as Recipe V step 7 leaves its cleanup: each `S continue;` becomes
+   `return(MagickFalse);`, one for one, and the caller writes
+   `if (Helper(...) == MagickFalse) { S continue; }`, `S` copied unchanged (checked by
+   script to be identical in every copy). The block writes no variable `S` reads or
+   writes, and contains no `break` that leaves it; steps 1 to 4 hold as written, with
+   `S continue;` in place of `break;`. A bare `continue;` is the form with `S` empty.
 
 **Before:**
 
@@ -2562,6 +2570,14 @@ static MagickBooleanType FillFloodplaneRun(const FloodfillRow *row,ssize_t *x)
 - The failure paths are mostly cache fetches no case makes fail: the oracle checks the
   fall-through path; each `break` is checked by reading against its
   `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2` per helper.
+- Under step 7 the argument is the first point's with `continue;` for `break;`: a
+  `continue;` of `Lp` runs nothing else of the body and goes on to `Lp`'s increment and
+  condition, and so does the caller's, after the helper has returned `MagickFalse` and
+  the caller has run `S`. `S` runs at the same point as before, after every statement
+  the block ran before that exit, on the caller's own variables; the block writes none
+  of them, so `S` reads the values it read before. When `S` writes `Lp`'s counter
+  (`i--;`, so that the increment repeats the same `i`), the counter goes to the helper
+  by value and only the caller writes it.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for each new
 function, nothing else moved), and steps 1, 2 and 5 checked by reading.
@@ -2571,7 +2587,9 @@ depth-4 sites, the right-hand fill and the skip scan inside the segment loop's
 `do`-loop, each end the `do`-loop through `break;` when a fetch or a sync fails, the
 plateau W08 recorded. A probe of both: Brain Method and Deep, Nested Complexity leave,
 5.10 to 5.77. Added by Claude Code (Claude Opus 5.5) during task W09, under the mandate
-of 2026-10-24.
+of 2026-10-24. Step 7 (2026-10-30, task W09): `statistic.c`'s `GetImageStatistics`,
+whose depth check (nesting 5, the file's deepest site) raises a channel's depth and
+retries the pixel through `i--; continue;` of the channel loop.
 
 ---
 
@@ -3111,3 +3129,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | rule 1 | The exception for a set of steps that each lower the score and together raise it covers several blocks of one function as well as several functions; the message names each block with the score it gave alone | `paint.c`'s `FloodfillPaintImage`: its two depth-4 sites, the right-hand fill and the skip scan, each alone 5.10 to 4.84 (the file passes the 1,000-line threshold), both 5.77 (Brain Method and Deep, Nested Complexity leave) | mandate (2026-10-24) |
 | 2026-10-30 | NEW | LB | Extract Block Returning Success for a Loop Break: a block that leaves its enclosing loop through `break;` moves to a `static MagickBooleanType` function, each such `break;` becoming `return(MagickFalse);`, and the caller writes `if (Helper(...) == MagickFalse) break;`; inputs by value or in a `const` struct (Recipe Y), one written variable by pointer, temporaries declared in the helper | `paint.c`'s `FloodfillPaintImage`: its two depth-4 sites end the `do`-loop through `break;` when a fetch or a sync fails, which V, Y and I refuse (V step 1) and E step 7 admits only for a `switch`; a probe of both, 5.10 to 5.77 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | T, U | T step 4 (U step 1): a block that ends the parallel loop body may contain `continue;` of the parallel loop; each becomes `return(status);` and the call `if (Helper(...) == MagickFalse) status=MagickFalse;` is the body's last statement (Recipe E step 7's loop-tail form); *Careful* gives the argument and excludes a block followed by a progress block | `paint.c`'s `FloodfillPaintImage`: its tiling loop body after the status test is a fetch that `continue`s on failure, a fill and a sync; a probe with Recipe U, 6.06 to 6.10 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | LB | Step 7: a block whose every exit is the same run `S` followed by `continue;` of `Lp` moves with `S continue;` left in the caller, `if (Helper(...) == MagickFalse) { S continue; }`, as Recipe V step 7 leaves its cleanup; the block writes nothing `S` reads or writes. *Careful* gives the argument, including `S` writing the loop counter | `statistic.c`'s `GetImageStatistics`: the depth check inside the channel loop (nesting 5) ends in `IncreaseChannelDepth(...); i--; continue;`, which E step 7 refuses (its counter goes by value; the block is not the body's tail) and LB step 1 refuses (a `continue`); its temporaries `depth`, `range` and `status` move with it. A probe: nesting 5 to 4, bumps 4 to 3, 4.73 to 4.76 | mandate (2026-10-24) |
