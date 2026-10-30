@@ -1036,8 +1036,8 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
       node_info=cube_info->root;
       for (level=1; level <= cube_info->depth; level++)
       {
-        double
-          distance;
+        QNodeError
+          node_error;
 
         bisect*=0.5;
         id=ColorToQNodeId(cube_info,&pixel,index);
@@ -1065,17 +1065,10 @@ static MagickBooleanType ClassifyImageColors(QCubeInfo *cube_info,
           Approximate the quantization error represented by this node.
         */
         node_info=node_info->child[id];
-        error.red=QuantumScale*(pixel.red-mid.red);
-        error.green=QuantumScale*(pixel.green-mid.green);
-        error.blue=QuantumScale*(pixel.blue-mid.blue);
-        if (cube_info->associate_alpha != MagickFalse)
-          error.alpha=QuantumScale*(pixel.alpha-mid.alpha);
-        distance=(double) (error.red*error.red+error.green*error.green+
-          error.blue*error.blue+error.alpha*error.alpha);
-        if (IsNaN(distance) != 0)
-          distance=0.0;
-        node_info->quantize_error+=count*sqrt(distance);
-        cube_info->root->quantize_error+=node_info->quantize_error;
+        node_error.cube_info=cube_info;
+        node_error.node_info=node_info;
+        node_error.count=count;
+        error=AddQNodeQuantizeError(&node_error,pixel,mid,error);
         index--;
       }
       /*
