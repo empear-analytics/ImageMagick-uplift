@@ -166,19 +166,43 @@ typedef struct _RadonCell
     y;
 } RadonCell;
 
+typedef struct _RadonPairTargets
+{
+  unsigned short
+    *element,
+    *neighbor;
+} RadonPairTargets;
+
+static MagickBooleanType MergeRadonPairHead(const RadonCell *cell,
+  MatrixInfo *q,const RadonPairTargets *targets)
+{
+  unsigned short
+    *const element = targets->element,
+    *const neighbor = targets->neighbor;
+
+  if (GetMatrixElement(cell->p,cell->x+cell->i,cell->y,element) == MagickFalse)
+    return(MagickFalse);
+  if (GetMatrixElement(cell->p,cell->x+cell->i+(ssize_t) cell->step,
+      cell->y+cell->i,neighbor) == MagickFalse)
+    return(MagickFalse);
+  *neighbor+=*element;
+  if (SetMatrixElement(q,cell->x+2*cell->i,cell->y,neighbor) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void MergeRadonPair(MatrixInfo *q,const RadonCell *cell)
 {
+  RadonPairTargets
+    targets;
+
   unsigned short
     element,
     neighbor;
 
-  if (GetMatrixElement(cell->p,cell->x+cell->i,cell->y,&element) == MagickFalse)
-    return;
-  if (GetMatrixElement(cell->p,cell->x+cell->i+(ssize_t) cell->step,
-      cell->y+cell->i,&neighbor) == MagickFalse)
-    return;
-  neighbor+=element;
-  if (SetMatrixElement(q,cell->x+2*cell->i,cell->y,&neighbor) == MagickFalse)
+  targets.element=(&element);
+  targets.neighbor=(&neighbor);
+  if (MergeRadonPairHead(cell,q,&targets) == MagickFalse)
     return;
   if (GetMatrixElement(cell->p,cell->x+cell->i+(ssize_t) cell->step,
       cell->y+cell->i+1,&neighbor) == MagickFalse)
