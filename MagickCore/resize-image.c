@@ -515,9 +515,6 @@ static MagickBooleanType VerticalFilter(
     *image_view,
     *resize_view;
 
-  ClassType
-    storage_class;
-
   ContributionInfo
     **magick_restrict contributions;
 
@@ -536,8 +533,7 @@ static MagickBooleanType VerticalFilter(
   */
   scale=MagickMax(1.0/y_factor+MagickEpsilon,1.0);
   support=scale*GetResizeFilterSupport(resize_filter);
-  storage_class=support > 0.5 ? DirectClass : image->storage_class;
-  if (SetImageStorageClass(resize_image,storage_class,exception) == MagickFalse)
+  if (SetFilterStorageClass(image,resize_image,support,exception) == MagickFalse)
     return(MagickFalse);
   if (support < 0.5)
     {
