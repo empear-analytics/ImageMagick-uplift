@@ -617,7 +617,11 @@ inside an OpenMP region; Recipe G, which removes one level of nesting, not the b
 3. Every variable of the loop body that the block writes is declared inside the block,
    or is not read after it (a row pointer `q` advanced along the row, say).
 4. The block contains no `return`, `goto`, or a `continue` or `break` of the parallel
-   loop itself; a `continue` or `break` of a loop inside the block is fine.
+   loop itself; a `continue` or `break` of a loop inside the block is fine. One
+   exception: a block that ends the parallel loop body (its last statements, after the
+   statements that stay) may contain `continue;` of the parallel loop. Each becomes
+   `return(status);`, and the call of step 7 is the body's last statement, so both end
+   the iteration at the same point (Recipe E step 7's loop-tail form).
 5. Cut the block into a new `static MagickBooleanType` function directly above the
    caller. It declares a local `status`, set to `MagickTrue` first; every
    `status=MagickFalse;` in the block stays as it is; the function ends with
@@ -691,6 +695,15 @@ static MagickBooleanType MagnifyImageRow(...,Quantum *q,
   depend on the shared value.
 - Variables of the loop body passed by value are copies: step 3 is what makes a write
   to the copy, such as advancing `q`, harmless.
+- Under step 4's exception a `continue;` of the parallel loop ends the iteration
+  where it stands; `return(status);` ends the helper there, and the caller's
+  `if (...) status=MagickFalse;` is the last statement of the body, so the iteration
+  ends after it either way, having run the same statements. The shared `status` gets
+  `MagickFalse` exactly when the block's local did (usually the `status=MagickFalse;`
+  just before the `continue`), deferred to the end of the iteration as everywhere in
+  this recipe. A block followed by a statement that stays (a progress block under
+  `#pragma omp atomic`) is not this exception: its `continue` skipped that statement,
+  and the call would not.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 4 checked by
 reading: the oracle runs single-threaded and cannot see them.
@@ -699,7 +712,9 @@ reading: the oracle runs single-threaded and cannot see them.
 shape in `resize.c`'s `SampleImage`, both refused by the OpenMP rule of Recipe E. (Not
 `InterpolativeResizeImage`, whose block assigns and tests `status`, nor the two filters,
 whose failures `continue` the parallel loop.) Owner's go-ahead the same day. Added by Claude
-Code (Claude Opus 5.5) during task M01, on `magnify.c`.
+Code (Claude Opus 5.5) during task M01, on `magnify.c`. Step 4's exception (2026-10-30,
+task W09): `paint.c`'s `FloodfillPaintImage`, whose tiling loop ends in a fetch that
+sets `status=MagickFalse;` and `continue`s on failure, a fill and a sync.
 
 ---
 
@@ -1514,7 +1529,8 @@ no `status`. T then B is two commits, of which the first adds a finding.
    loop body is `status=MagickFalse;`, and it does not read `status`; every loop-body
    variable it writes is declared in the block or not read after it before being
    written again (those are declared in the new function instead, with any initialiser);
-   no `return`, `goto`, or `continue`/`break` of the parallel loop.
+   no `return`, `goto`, or `continue`/`break` of the parallel loop, except Recipe T step
+   4's `continue;` in a block that ends the parallel loop body.
 2. Put the variables it only reads, scalars, pointers and struct values (Recipe N step
    2) none of which the block writes, in a struct as Recipe N steps 2 and 3 do: one
    member per variable, the variable's exact type and name, a top-level `const` or
@@ -3094,3 +3110,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | D | Casts to the variable's own type: a cast of a plain variable to the exact type it is declared with (`(Image *) image` of an `Image *` parameter) is not a differing value; the script removes such casts, each type checked by reading, before comparing, and the helper is written without them. A block whose every path ends in `return(<expr>);` becomes `return(<call>);` (Recipe E step 7) | `colorspace.c`'s `SetImageGray` and `SetImageMonochrome` (*Code Duplication*): their closing blocks differ in the type set (`type`, `BilevelType`: one value) and in `SyncImagePixelCache((Image *) image,...)`, a no-op cast; a probe of the shared helper, 3.01 to 3.15, the file leaving *Code Duplication* | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | rule 1 | The exception for a set of steps that each lower the score and together raise it covers several blocks of one function as well as several functions; the message names each block with the score it gave alone | `paint.c`'s `FloodfillPaintImage`: its two depth-4 sites, the right-hand fill and the skip scan, each alone 5.10 to 4.84 (the file passes the 1,000-line threshold), both 5.77 (Brain Method and Deep, Nested Complexity leave) | mandate (2026-10-24) |
 | 2026-10-30 | NEW | LB | Extract Block Returning Success for a Loop Break: a block that leaves its enclosing loop through `break;` moves to a `static MagickBooleanType` function, each such `break;` becoming `return(MagickFalse);`, and the caller writes `if (Helper(...) == MagickFalse) break;`; inputs by value or in a `const` struct (Recipe Y), one written variable by pointer, temporaries declared in the helper | `paint.c`'s `FloodfillPaintImage`: its two depth-4 sites end the `do`-loop through `break;` when a fetch or a sync fails, which V, Y and I refuse (V step 1) and E step 7 admits only for a `switch`; a probe of both, 5.10 to 5.77 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | T, U | T step 4 (U step 1): a block that ends the parallel loop body may contain `continue;` of the parallel loop; each becomes `return(status);` and the call `if (Helper(...) == MagickFalse) status=MagickFalse;` is the body's last statement (Recipe E step 7's loop-tail form); *Careful* gives the argument and excludes a block followed by a progress block | `paint.c`'s `FloodfillPaintImage`: its tiling loop body after the status test is a fetch that `continue`s on failure, a fill and a sync; a probe with Recipe U, 6.06 to 6.10 | mandate (2026-10-24) |
