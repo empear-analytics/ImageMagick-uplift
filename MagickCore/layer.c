@@ -304,6 +304,20 @@ static RectangleInfo ClipBoundsBottom(RectangleInfo bounds,
   return(bounds);
 }
 
+static MagickBooleanType ReplaceDisposeImage(const Image *next,
+  const Image *coalesce_image,Image **dispose_image,ExceptionInfo *exception)
+{
+  if (GetPreviousImageInList(next)->dispose != PreviousDispose)
+    {
+      *dispose_image=DestroyImage(*dispose_image);
+      *dispose_image=CloneImage(coalesce_image,0,0,MagickTrue,exception);
+      if (*dispose_image == (Image *) NULL)
+        return(MagickFalse);
+      (*dispose_image)->background_color.alpha_trait=BlendPixelTrait;
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
 {
   Image
@@ -374,16 +388,11 @@ MagickExport Image *CoalesceImages(const Image *image,ExceptionInfo *exception)
     /*
       Replace the dispose image with the new coalesced image.
     */
-    if (GetPreviousImageInList(next)->dispose != PreviousDispose)
+    if (ReplaceDisposeImage(next,coalesce_image,&dispose_image,exception) ==
+        MagickFalse)
       {
-        dispose_image=DestroyImage(dispose_image);
-        dispose_image=CloneImage(coalesce_image,0,0,MagickTrue,exception);
-        if (dispose_image == (Image *) NULL)
-          {
-            coalesce_image=DestroyImageList(coalesce_image);
-            return((Image *) NULL);
-          }
-        dispose_image->background_color.alpha_trait=BlendPixelTrait;
+        coalesce_image=DestroyImageList(coalesce_image);
+        return((Image *) NULL);
       }
     /*
       Clear the overlaid area of the coalesced bounds for background disposal
