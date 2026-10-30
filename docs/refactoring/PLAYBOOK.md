@@ -1812,6 +1812,149 @@ Claude Code (Claude Opus 5.5) during task W08, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe Z - Extract Selection with Out-Parameters Taking an Input Struct
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*,
+and the block that would fix it meets Recipe O in every respect but one: with the
+variables it only reads as parameters and the locals it sets as pointers, the new
+function would take five or more arguments (*Excess Number of Function Arguments*, which
+the pre-commit gate refuses on a new function). The typical case is a colorspace
+`switch` that converts a start and a stop colour together, reading the image, both
+source colours and an illuminant.
+
+**Not covered by:** Recipe O, which passes every input as a parameter (O then B is two
+commits, of which the first adds a finding); Recipe N, whose block writes one value or
+through a pixel pointer, and keeps written variables out of its struct; Recipe Q, whose
+block is a per-pixel accumulation in a parallel loop body or in a function with no
+OpenMP region, not a selection beside a parallel loop; Recipe Y, whose block leaves
+through a jump or a `return`.
+
+**How:**
+
+1. The block meets Recipe O steps 1 to 3: it lies outside every OpenMP region (or in a
+   parallel loop body under O step 1's condition) with no `#pragma` line; every variable
+   it writes is a plain local of the caller whose address is not taken elsewhere, at
+   most four of them; it contains no `return`, `goto`, or `continue` or `break` that
+   leaves it.
+2. Put the variables the block only reads, scalars and pointers, none written in the
+   block, in a struct as Recipe N steps 2 and 3 do: one member per variable, the
+   variable's exact type and name, a top-level `const` or `magick_restrict` left off. A
+   written variable is never a member.
+3. Cut the block into a new `static void` function directly above the caller, taking
+   `const Name *name` first, then one pointer per written variable, in the order the
+   block first writes them. At the top of its body declare one `const` local per member,
+   as Recipe N step 4 does, or write `name->member` at every use of a member.
+4. In the block's text write each written variable `v` as `(*v)` at every use, reads
+   and address-of included (`&start.red` becomes `&(*start).red`), as Recipe O step 5
+   does. Nothing else in the text changes.
+5. In the caller, declare the `Name` local among the declarations at the top of the
+   block that holds the call. Directly before the call, assign every member from the
+   variable of its name, in declaration order, with nothing between the assignments and
+   the call.
+6. Call it where the block stood with `&name` and `&v` for each written variable, at
+   most four arguments in all; check every member and argument by reading.
+
+**Before:**
+
+```c
+  start=(*start_color);
+  stop=(*stop_color);
+  switch (image->colorspace)
+  {
+    case HCLColorspace:
+    {
+      ConvertRGBToHCL(start_color->red,start_color->green,start_color->blue,
+        &start.red,&start.green,&start.blue);
+      ConvertRGBToHCL(stop_color->red,stop_color->green,stop_color->blue,
+        &stop.red,&stop.green,&stop.blue);
+      break;
+    }
+    ...
+    case LabColorspace:
+    {
+      ConvertRGBToLab(start_color->red,start_color->green,start_color->blue,
+        illuminant,&start.red,&start.green,&start.blue);
+      ...
+    }
+    default:
+    {
+      start.red*=QuantumScale;
+      ...
+    }
+  }
+  start.red*=(double) QuantumRange;
+```
+
+**After:**
+
+```c
+typedef struct _ColorThresholdRange
+{
+  Image
+    *image;
+
+  const PixelInfo
+    *start_color,
+    *stop_color;
+
+  IlluminantType
+    illuminant;
+} ColorThresholdRange;
+
+static void ConvertColorThresholdRange(const ColorThresholdRange *range,
+  PixelInfo *start,PixelInfo *stop)
+{
+  switch (range->image->colorspace)
+  {
+    case HCLColorspace:
+    {
+      ConvertRGBToHCL(range->start_color->red,range->start_color->green,
+        range->start_color->blue,&(*start).red,&(*start).green,&(*start).blue);
+      ...
+    }
+    ...
+  }
+}
+...
+  start=(*start_color);
+  stop=(*stop_color);
+  range.image=image;
+  range.start_color=start_color;
+  range.stop_color=stop_color;
+  range.illuminant=illuminant;
+  ConvertColorThresholdRange(&range,&start,&stop);
+  start.red*=(double) QuantumRange;
+```
+
+**Careful:**
+
+- The two parts keep the arguments of the recipes they come from. Every write of the
+  block stays a write through the pointer and nothing more, so a field a path leaves
+  alone keeps the caller's value, and reads go through the pointer too (Recipe O). The
+  members are copied directly before the call from variables the block does not write,
+  so each holds the value the block's own read gave (Recipe N).
+- `(*v).m` is `v->m`; the parenthesised form is the literal `*v` of step 4, which keeps
+  the text a one-for-one substitution the reader can check.
+- Prefer the member form when the `const` locals would push the new function over
+  *Large Method*'s 70 lines: in `ColorThresholdImage` they did (72 lines, 4.42), the
+  member form did not (4.58). Re-wrap a line the prefix pushes past 80 columns; the
+  tokens and their order stay as they were.
+- Out-parameters must name different objects: two locals of the caller whose addresses
+  are not taken elsewhere cannot alias, nor alias a member's pointee.
+- The function must be oracle-verified, with a case for each branch the score rests on
+  where one exists; the guard sees the moved literals but not a write that went missing.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 6 checked by reading.
+
+**Provenance:** 2026-10-30, from `threshold.c`'s `ColorThresholdImage`, whose colorspace
+`switch` sets `start` and `stop` and reads the image, both source colours and the
+illuminant: six arguments under Recipe O. A probe: cc 20 to 13, 146 to 92 lines, 4.46 to
+4.58. Added by Claude Code (Claude Opus 5.5) during task W08, under the mandate of
+2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -2173,3 +2316,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | Y | Extract Block Returning Success Taking an Input Struct: a Recipe V block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and its one written variable by pointer (Recipe V); temporaries it writes before reading, and the caller does not read after it, are declared in the new function (Recipe J step 3) | `visual-effects.c`'s `PlasmaImageProxy`: its middle pixel (`return(MagickTrue)` on a failed fetch; `status` written; five inputs) needs six parameters under Recipe V. A probe: bumps 5 to 4, 3.12 to 3.19 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | Step 2: a variable of the caller that the block writes before reading it, and that the caller does not read after the block before writing it again, is declared in the new function and is not one of the four written variables (Recipe J step 3). Step 5: `&v` of a written scalar becomes `v` | `visual-effects.c`'s `SteganoImage`: its column loop (sequential) advances the cursors `c`, `k` and `j` and writes the temporaries `x`, `pixel` and `q`, declared at the top of the function and used nowhere else; step 1 counted six written locals. A probe of the loop as a helper (nine inputs): the function leaves Deep, Nested Complexity, 3.19 to 3.27 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | F | Step 2: a non-`const` array whose every use is an element read or an argument to a `const`-qualified pointer parameter counts as never written, and moves unchanged | `resize.c`'s `AcquireResizeFilter`: its `static double jinc_zeros[16]` (18 lines of Bessel zeros) is only indexed, and passed to `SetJincSupport`'s `const double *`; it is the last data in the function. A probe: with it and four extractions the function leaves Large Method, 5.83 to 6.18. Machine code and data unchanged (objdump on Linux) | mandate (2026-10-24) |
+| 2026-10-30 | NEW | Z | Extract Selection with Out-Parameters Taking an Input Struct: a Recipe O selection whose inputs would give the new function five or more parameters moves to a `static void` function taking a `const` struct of the inputs it only reads (Recipe N's struct) and one pointer per local it sets (Recipe O) | `threshold.c`'s `ColorThresholdImage`: the colorspace `switch` sets `start` and `stop` and reads four inputs (six arguments under O); a probe 4.46 to 4.58 | mandate (2026-10-24) |
