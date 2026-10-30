@@ -774,6 +774,23 @@ static void ConvertColorThresholdRange(const ColorThresholdRange *range,
   }
 }
 
+static void ColorThresholdRow(Image *image,const PixelInfo *start,
+  const PixelInfo *stop,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MagickBooleanType
+      foreground = MagickTrue;
+
+    foreground=IsPixelInColorRange(image,start,stop,q);
+    SetPixelIndex(image,(Quantum) (foreground != MagickFalse ? 1 : 0),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType ColorThresholdImage(Image *image,
   const PixelInfo *start_color,const PixelInfo *stop_color,
   ExceptionInfo *exception)
@@ -838,9 +855,6 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -852,15 +866,7 @@ MagickExport MagickBooleanType ColorThresholdImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MagickBooleanType
-        foreground = MagickTrue;
-
-      foreground=IsPixelInColorRange(image,&start,&stop,q);
-      SetPixelIndex(image,(Quantum) (foreground != MagickFalse ? 1 : 0),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ColorThresholdRow(image,&start,&stop,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
