@@ -484,8 +484,7 @@ static void FilterVerticalPixel(const Image *image,
     channel=GetPixelChannelChannel(image,i);
     traits=GetPixelChannelTraits(image,channel);
     resize_traits=GetPixelChannelTraits(resize_image,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (resize_traits == UndefinedPixelTrait))
+    if (IsResizeChannelUndefined(traits,resize_traits) != MagickFalse)
       continue;
     if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
       {
