@@ -2865,6 +2865,14 @@ static void SelectMaximumIntensityPixel(const MorphologyIntensityTap *tap,
     }
 }
 
+static double ConvolveChannelValue(const MagickRealType *magick_restrict k,
+  const Quantum *magick_restrict pixels,const ssize_t i,double pixel)
+{
+  if (!IsNaN(*k))
+    pixel+=(*k)*(double) pixels[i];
+  return(pixel);
+}
+
 static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
   const MorphologyPass *pass,ExceptionInfo *exception)
 {
@@ -3262,8 +3270,7 @@ static ssize_t MorphologyPrimitive(const Image *image,Image *morphology_image,
                 {
                   for (u=0; u < (ssize_t) kernel->width; u++)
                   {
-                    if (!IsNaN(*k))
-                      pixel+=(*k)*(double) pixels[i];
+                    pixel=ConvolveChannelValue(k,pixels,i,pixel);
                     k--;
                     pixels+=(ptrdiff_t) GetPixelChannels(image);
                   }
