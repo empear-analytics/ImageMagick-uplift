@@ -114,6 +114,84 @@ typedef struct _FlattenSource
 %
 */
 
+typedef struct _FlattenChannel
+{
+  PixelChannel
+    channel;
+
+  Quantum
+    *composite;
+
+  ssize_t
+    i;
+
+  double
+    gamma;
+
+  const Quantum
+    *q;
+
+  double
+    beta;
+
+  const PixelInfo
+    *p;
+
+  double
+    alpha;
+} FlattenChannel;
+
+static void FlattenColorChannel(const FlattenChannel *flatten)
+{
+  const PixelChannel
+    channel = flatten->channel;
+
+  Quantum
+    *const composite = flatten->composite;
+
+  const ssize_t
+    i = flatten->i;
+
+  const double
+    gamma = flatten->gamma;
+
+  const Quantum
+    *const q = flatten->q;
+
+  const double
+    beta = flatten->beta;
+
+  const PixelInfo
+    *const p = flatten->p;
+
+  const double
+    alpha = flatten->alpha;
+
+  switch (channel)
+  {
+  case RedPixelChannel:
+  {
+    composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
+      (double) p->red,alpha));
+    break;
+  }
+  case GreenPixelChannel:
+  {
+    composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
+      (double) p->green,alpha));
+    break;
+  }
+  case BluePixelChannel:
+  {
+    composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
+      (double) p->blue,alpha));
+    break;
+  }
+    default:
+      break;
+  }
+}
+
 static inline void FlattenPixelInfo(const FlattenSource *source,
   const Quantum *q,const double beta,Quantum *composite)
 {
@@ -149,24 +227,6 @@ static inline void FlattenPixelInfo(const FlattenSource *source,
       continue;
     switch (channel)
     {
-      case RedPixelChannel:
-      {
-        composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
-          (double) p->red,alpha));
-        break;
-      }
-      case GreenPixelChannel:
-      {
-        composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
-          (double) p->green,alpha));
-        break;
-      }
-      case BluePixelChannel:
-      {
-        composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
-          (double) p->blue,alpha));
-        break;
-      }
       case BlackPixelChannel:
       {
         composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
@@ -179,7 +239,21 @@ static inline void FlattenPixelInfo(const FlattenSource *source,
         break;
       }
       default:
+      {
+        FlattenChannel
+          flatten;
+
+        flatten.channel=channel;
+        flatten.composite=composite;
+        flatten.i=i;
+        flatten.gamma=gamma;
+        flatten.q=q;
+        flatten.beta=beta;
+        flatten.p=p;
+        flatten.alpha=alpha;
+        FlattenColorChannel(&flatten);
         break;
+      }
     }
   }
 }
