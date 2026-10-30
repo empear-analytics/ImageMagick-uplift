@@ -1884,6 +1884,86 @@ static MagickBooleanType WriteDelegateImages(
   return(MagickTrue);
 }
 
+static MagickBooleanType ConvertDelegateInput(
+  const DelegateInvocation *request)
+{
+  ImageInfo
+    *const image_info = request->image_info;
+
+  Image
+    *const image = request->image;
+
+  const char
+    *const decode = request->decode,
+    *const encode = request->encode;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
+  const DelegateInfo
+    *const delegate_info = request->delegate_info;
+
+  const MagickBooleanType
+    temporary = request->temporary;
+
+  char
+    *magick;
+
+  DelegateInvocation
+    invocation;
+
+  ImageInfo
+    *clone_info;
+
+  /*
+    Delegate requires a particular image format.
+  */
+  if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
+    {
+      ThrowFileException(exception,FileOpenError,
+        "UnableToCreateTemporaryFile",image_info->unique);
+      return(MagickFalse);
+    }
+  magick=InterpretImageProperties(image_info,image,decode != (char *) NULL ?
+    delegate_info->encode : delegate_info->decode,exception);
+  if (magick == (char *) NULL)
+    {
+      (void) RelinquishUniqueFileResource(image_info->unique);
+      if (temporary != MagickFalse)
+        (void) RelinquishUniqueFileResource(image->filename);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
+      return(MagickFalse);
+    }
+  LocaleUpper(magick);
+  clone_info=CloneImageInfo(image_info);
+  (void) CopyMagickString((char *) clone_info->magick,magick,
+    MagickPathExtent);
+  if (LocaleCompare(magick,"NULL") != 0)
+    (void) CopyMagickString(image->magick,magick,MagickPathExtent);
+  magick=DestroyString(magick);
+  (void) FormatLocaleString(clone_info->filename,MagickPathExtent,"%s:",
+    delegate_info->decode);
+  (void) SetImageInfo(clone_info,(unsigned int) GetImageListLength(image),
+    exception);
+  (void) CopyMagickString(clone_info->filename,image_info->filename,
+    MagickPathExtent);
+  (void) CopyMagickString(image_info->filename,image->filename,
+    MagickPathExtent);
+  invocation.image_info=image_info;
+  invocation.image=image;
+  invocation.decode=decode;
+  invocation.encode=encode;
+  invocation.exception=exception;
+  invocation.delegate_info=delegate_info;
+  invocation.temporary=temporary;
+  if (WriteDelegateImages(&invocation,&clone_info) == MagickFalse)
+    return(MagickFalse);
+  (void) RelinquishUniqueFileResource(image_info->unique);
+  clone_info=DestroyImageInfo(clone_info);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   Image *image,const char *decode,const char *encode,ExceptionInfo *exception)
 {
@@ -1953,61 +2033,18 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
     }
   if (IsTwoStepDelegate(delegate_info,decode,encode) != MagickFalse)
     {
-      char
-        *magick;
-
       DelegateInvocation
-        invocation;
+        request;
 
-      ImageInfo
-        *clone_info;
-
-      /*
-        Delegate requires a particular image format.
-      */
-      if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
-        {
-          ThrowFileException(exception,FileOpenError,
-            "UnableToCreateTemporaryFile",image_info->unique);
-          return(MagickFalse);
-        }
-      magick=InterpretImageProperties(image_info,image,decode != (char *) NULL ?
-        delegate_info->encode : delegate_info->decode,exception);
-      if (magick == (char *) NULL)
-        {
-          (void) RelinquishUniqueFileResource(image_info->unique);
-          if (temporary != MagickFalse)
-            (void) RelinquishUniqueFileResource(image->filename);
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
-          return(MagickFalse);
-        }
-      LocaleUpper(magick);
-      clone_info=CloneImageInfo(image_info);
-      (void) CopyMagickString((char *) clone_info->magick,magick,
-        MagickPathExtent);
-      if (LocaleCompare(magick,"NULL") != 0)
-        (void) CopyMagickString(image->magick,magick,MagickPathExtent);
-      magick=DestroyString(magick);
-      (void) FormatLocaleString(clone_info->filename,MagickPathExtent,"%s:",
-        delegate_info->decode);
-      (void) SetImageInfo(clone_info,(unsigned int) GetImageListLength(image),
-        exception);
-      (void) CopyMagickString(clone_info->filename,image_info->filename,
-        MagickPathExtent);
-      (void) CopyMagickString(image_info->filename,image->filename,
-        MagickPathExtent);
-      invocation.image_info=image_info;
-      invocation.image=image;
-      invocation.decode=decode;
-      invocation.encode=encode;
-      invocation.exception=exception;
-      invocation.delegate_info=delegate_info;
-      invocation.temporary=temporary;
-      if (WriteDelegateImages(&invocation,&clone_info) == MagickFalse)
+      request.image_info=image_info;
+      request.image=image;
+      request.decode=decode;
+      request.encode=encode;
+      request.exception=exception;
+      request.delegate_info=delegate_info;
+      request.temporary=temporary;
+      if (ConvertDelegateInput(&request) == MagickFalse)
         return(MagickFalse);
-      (void) RelinquishUniqueFileResource(image_info->unique);
-      clone_info=DestroyImageInfo(clone_info);
     }
   /*
     Invoke delegate.
