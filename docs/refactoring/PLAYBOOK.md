@@ -2448,7 +2448,9 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
 1. The block meets Recipe V steps 1, 3 and 6: it lies outside every OpenMP region and has
    no `#pragma` line; it leaves the function only through `goto L;` to one label, or only
    through `return(c);` of one constant `c` (written `return c;` in some files); no
-   `continue` or `break` leaves it. Recipe V step 7's cleanup form is not this recipe,
+   `continue` or `break` leaves it. In a `void` function, a plain `return;` at every
+   exit stands for `return(c);`: each becomes `return(MagickFalse);` and the caller
+   writes `return;` (step 7). Recipe V step 7's cleanup form is not this recipe,
    except as step 8 admits it.
 2. List the variables of the caller the block writes: two to four, each a plain local of
    the caller or a by-value parameter of it (`FunctionE fe`), none a global, a `static`
@@ -2481,7 +2483,12 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    variable's address, `targets.v=(&v);`, in member order, with nothing between the
    assignments and the call.
 7. Where the block stood, write `if (Helper(...,&targets) == MagickFalse) goto L;` (or
-   `return(c);`), and check every argument, member and address by reading.
+   `return(c);`, or `return;`), and check every argument, member and address by
+   reading. A block of another function of the file whose step-5 text would equal,
+   under Recipe D's renaming (checked by script), the body of a function this recipe
+   already made calls that function instead of a second copy, with its own targets
+   local and its own exit, one commit per caller, as Recipe W step 7 and Recipe LB
+   step 6 allow.
 8. A block whose every exit is the same call of a function-local cleanup-and-throw
    macro `M(...)`, whose expansion is a run of cleanup statements ending in
    `return(c);` of one constant `c` (`Classify`'s `ThrowClassifyException`, which frees
@@ -2660,6 +2667,16 @@ static MagickBooleanType ApplyCoordQualifier (FxInfo * pfx,
   struct may be of Recipe I, LB step 8 or Q step 8: all three hold addresses only and
   hand them to their own helper alone. While this helper runs, its member is
   the only pointer to `v` in use, and no two of its own members name one object.
+- A plain `return;` of a `void` function (step 1) is `return(c);` without a value: on
+  a failure path the helper has run every statement the block ran before that exit and
+  returns at once, and the caller's `return;` ends the caller at the same point, after
+  the same writes, with nothing to return; on the success path the caller goes on with
+  the next statement. The `void` caller may itself be a loop body moved by Recipe E
+  step 7, whose `return;` was the loop's `continue;`.
+- Under step 7's reuse the existing function's body is the text step 5 would cut from
+  the second block, so calling it is calling the function the step would have made, a
+  copy the file then does not carry; the second caller fills its own targets struct
+  with the addresses of its own locals, which step 2 checks for that caller.
 - More than four written variables, two labels, two different constants, or a written
   variable whose address the caller takes elsewhere: skip the block.
 
@@ -3753,3 +3770,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | I | Step 2: the exception for another helper's targets struct covers a struct of Recipe I, LB step 8 or Q step 8, filled directly before its own call or declared `const` with the addresses (Q step 8's `const` form), read by nothing but that call; LB step 8, which rests on step 2, takes the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleImage` (W10): Recipe Q moved the Y direction's row loop to `AccumulateScaleRows`, whose `const` targets struct holds `&n`, `&status`, `&number_rows` and `&next_row` among six; the pending read after the loop (nesting 4, the function's last depth-4 site) writes those four and ends the row loop through `break;`. Recipe LB step 8: Deep, Nested Complexity leaves `ScaleImage`, 7.40 to 7.88 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | O | Step 2: a written variable whose address the caller takes only to fill a member of another helper's targets struct (Recipe I step 2's exception: I, LB step 8 or Q step 8, the `const` form included) still qualifies; Recipes K, Q, Z and SD, which rest on O step 2, take the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleImage` (W10): the row-span restart `if (scale.y <= 0) { ... }` writes `scale` and `next_row`, whose addresses only the `const` targets structs of `AccumulateScaleRows` (Q) and `ReadPendingScaleRow` (LB) hold. Recipe O: cc 27 to 26, 7.88 to 7.90 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | N | Step 2: a plain struct local that meets (b) to (d) but not (a), a member of it never set on the path to the call, may be one of the group by address: a `const T *v` member filled `name.v=(&v);`, each `v.m` in the block written `(*v).m` (Recipe E step 3's form); Recipes Q, U, Wa, Y, Z and LB, which take their input struct from N step 2, take the same reading. *Careful* gives the argument | `resize-scale.c`'s `ScaleScanlineX` (W10): its partial-column block `if (scale.x > 0) { ... }` (cc 11 in the caller, the bumps that keep Complex Method) reads `scale.x` of a `PointInfo` whose `y` is never set, so `name.scale=scale;` would read an indeterminate member, and writes `pixel`, `next_column`, `t` and `span`. A probe of Recipe Q step 8 with `scale` by address: Complex Method leaves `ScaleScanlineX`, 7.90 to 8.15 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | I | Step 1: in a `void` function a plain `return;` at every exit stands for `return(c);`, each becoming `return(MagickFalse);` with `return;` in the caller (step 7). Step 7: a block of another function whose step-5 text equals, under Recipe D's renaming (checked by script), the body of a function this recipe made calls that function, one commit per caller, as W step 7 and LB step 6 allow. *Careful* gives both arguments | `shear-deskew.c`'s `RadonProjection` (W10): its pair-merge row loops (nesting 5) share a head (two reads, a sum, a write) that leaves through `continue;`; once the first loop's body moved to the `void` `MergeRadonPair` (Recipe N with E step 7) the head leaves through `return;` and writes `element` and `neighbor`, which the tail reads, so W step 3 and LB step 1 refuse it. Moving the second loop's body as it is gives *Code Duplication* with `MergeRadonPair` (7.39 in a probe); with the head moved first and the second body calling it, `RadonProjection` leaves Complex Method and Bumpy Road Ahead, 7.78 to 7.86 | mandate (2026-10-24) |
