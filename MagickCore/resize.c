@@ -1112,6 +1112,30 @@ static void ApplyFilterOverride(const Image *image,const char *artifact,
     }
 }
 
+static void ApplyWindowOverride(const Image *image,
+  const MagickBooleanType cylindrical,FilterType *filter_type,
+  FilterType *window_type)
+{
+  const char
+    *artifact;
+
+  /* Window specified, but no filter function?  Assume Sinc/Jinc. */
+  artifact=GetImageArtifact(image,"filter:window");
+  if (artifact != (const char *) NULL)
+    {
+      ssize_t
+        option;
+
+      option=ParseCommandOption(MagickFilterOptions,MagickFalse,artifact);
+      if (IsFilterOption(option) != MagickFalse)
+        {
+          *filter_type= cylindrical != MagickFalse ? JincFilter
+                                                 : SincFastFilter;
+          *window_type=(FilterType) option;
+        }
+    }
+}
+
 MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   const FilterType filter,const MagickBooleanType cylindrical,
   ExceptionInfo *exception)
@@ -1191,23 +1215,7 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
   if (IsStringTrue(artifact) != MagickFalse)
     ApplyFilterOverride(image,artifact,&filter_type,&window_type);
   else
-    {
-      /* Window specified, but no filter function?  Assume Sinc/Jinc. */
-      artifact=GetImageArtifact(image,"filter:window");
-      if (artifact != (const char *) NULL)
-        {
-          ssize_t
-            option;
-
-          option=ParseCommandOption(MagickFilterOptions,MagickFalse,artifact);
-          if (IsFilterOption(option) != MagickFalse)
-            {
-              filter_type= cylindrical != MagickFalse ? JincFilter
-                                                     : SincFastFilter;
-              window_type=(FilterType) option;
-            }
-        }
-    }
+    ApplyWindowOverride(image,cylindrical,&filter_type,&window_type);
 
   /* Assign the real functions to use for the filters selected. */
   resize_filter->filter=filters[filter_type].function;
