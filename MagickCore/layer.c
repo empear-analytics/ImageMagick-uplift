@@ -1184,6 +1184,97 @@ static MagickBooleanType ReferenceNoneDisposeImage(
   return(MagickTrue);
 }
 
+typedef struct _DuplicateFrameTrial
+{
+  MagickBooleanType
+    add_frames;
+
+  const Image
+    *curr;
+
+  RectangleInfo
+    *bounds;
+
+  DisposeType
+    *disposals;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} DuplicateFrameTrial;
+
+typedef struct _DuplicateFrameTargets
+{
+  Image
+    **dup_image;
+
+  RectangleInfo
+    *dup_bounds;
+
+  MagickBooleanType
+    *cleared;
+} DuplicateFrameTargets;
+
+static MagickBooleanType TryDuplicateFrame(const DuplicateFrameTrial *trial,
+  const DuplicateFrameTargets *targets)
+{
+  const MagickBooleanType
+    add_frames = trial->add_frames;
+
+  const Image
+    *const curr = trial->curr;
+
+  RectangleInfo
+    *const bounds = trial->bounds;
+
+  DisposeType
+    *const disposals = trial->disposals;
+
+  const ssize_t
+    i = trial->i;
+
+  ExceptionInfo
+    *const exception = trial->exception;
+
+  Image
+    **const dup_image = targets->dup_image;
+
+  RectangleInfo
+    *const dup_bounds = targets->dup_bounds;
+
+  MagickBooleanType
+    *const cleared = targets->cleared;
+
+  RectangleInfo
+    try_bounds;
+
+if ( add_frames )
+  {
+    *dup_image=CloneImage(curr->previous,0,0,MagickTrue,exception);
+    if (*dup_image == (Image *) NULL)
+      return(MagickFalse);
+    (*dup_image)->background_color.alpha_trait=BlendPixelTrait;
+    *dup_bounds=CompareImagesBounds(*dup_image,curr,CompareClearLayer,exception);
+    ClearBounds(*dup_image,dup_bounds,exception);
+    try_bounds=CompareImagesBounds(*dup_image,curr,CompareAnyLayer,exception);
+    if ( *cleared ||
+           (*dup_bounds).width*(*dup_bounds).height
+              +try_bounds.width*try_bounds.height
+           < bounds[i].width * bounds[i].height )
+      {
+        *cleared=MagickFalse;
+        bounds[i]=try_bounds;
+        disposals[i-1]=DupDispose;
+        /* to be finalised later, if found to be optimal */
+      }
+    else
+      (*dup_bounds).width=(*dup_bounds).height=0;
+  }
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1192,6 +1283,12 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
 
   DisposeType
     *disposals;
+
+  DuplicateFrameTargets
+    targets;
+
+  DuplicateFrameTrial
+    trial;
 
   Image
     *prev_image,
@@ -1362,32 +1459,21 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
           This method will always clear all the pixels that need to be cleared.
         */
         dup_bounds.width=dup_bounds.height=0; /* no dup, no pixel added */
-        if ( add_frames )
+        trial.add_frames=add_frames;
+        trial.curr=curr;
+        trial.bounds=bounds;
+        trial.disposals=disposals;
+        trial.i=i;
+        trial.exception=exception;
+        targets.dup_image=(&dup_image);
+        targets.dup_bounds=(&dup_bounds);
+        targets.cleared=(&cleared);
+        if (TryDuplicateFrame(&trial,&targets) == MagickFalse)
           {
-            dup_image=CloneImage(curr->previous,0,0,MagickTrue,exception);
-            if (dup_image == (Image *) NULL)
-              {
-                bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-                disposals=(DisposeType *) RelinquishMagickMemory(disposals);
-                prev_image=DestroyImage(prev_image);
-                return((Image *) NULL);
-              }
-            dup_image->background_color.alpha_trait=BlendPixelTrait;
-            dup_bounds=CompareImagesBounds(dup_image,curr,CompareClearLayer,exception);
-            ClearBounds(dup_image,&dup_bounds,exception);
-            try_bounds=CompareImagesBounds(dup_image,curr,CompareAnyLayer,exception);
-            if ( cleared ||
-                   dup_bounds.width*dup_bounds.height
-                      +try_bounds.width*try_bounds.height
-                   < bounds[i].width * bounds[i].height )
-              {
-                cleared=MagickFalse;
-                bounds[i]=try_bounds;
-                disposals[i-1]=DupDispose;
-                /* to be finalised later, if found to be optimal */
-              }
-            else
-              dup_bounds.width=dup_bounds.height=0;
+            bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+            disposals=(DisposeType *) RelinquishMagickMemory(disposals);
+            prev_image=DestroyImage(prev_image);
+            return((Image *) NULL);
           }
         /*
           Now compare against a simple background disposal
