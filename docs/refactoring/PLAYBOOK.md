@@ -1677,6 +1677,133 @@ probe of the work-image clone: nesting 6 to 5, 2.46 to 2.51. Cleanup labels reac
 
 ---
 
+## Recipe Y - Extract Block Returning Success Taking an Input Struct
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Complex
+Method* or *Large Method*, and the block that would fix it meets Recipe V in every respect
+but one: with the variables it only reads as parameters and its written variable as a
+pointer, the new function would take five or more arguments (*Excess Number of Function
+Arguments*, which the pre-commit gate refuses on a new function). The typical case is one
+pixel of a recursive subdivision that fetches its neighbours from cache views and leaves
+through `return(c);` when a fetch fails, reading the views, the segment, the midpoint and
+the noise amplitude.
+
+**Not covered by:** Recipe V, which passes every input as a parameter and skips a block
+that needs more than four (step 4); Recipe N, whose block meets Recipe E and so leaves
+through no `goto` and no `return` of its own; Recipe U, whose block lies in a parallel loop
+and returns the loop status, not a jump. V then B is two commits, of which the first adds
+a finding.
+
+**How:**
+
+1. The block meets Recipe V steps 1 and 2: it lies outside every OpenMP region with no
+   `#pragma` line; it leaves the function only through `goto L;` to one label, or only
+   through `return(c);` of one constant `c` (Recipe V step 6); it writes at most one
+   variable `v` of the caller that the caller reads after it, a plain local whose address
+   is not taken elsewhere.
+2. Every other variable of the caller that the block writes, it writes before reading it
+   in the block, and the caller does not read it after the block before writing it again
+   (a pixel pointer, a coordinate): it is declared in the new function instead, as
+   Recipe J step 3 and Recipe U step 1 do.
+3. Put the variables the block only reads, scalars and pointers, none written in the
+   block, in a struct as Recipe N steps 2 and 3 do: one member per variable, the
+   variable's exact type and name, a top-level `const` or `magick_restrict` left off.
+   Neither `v` nor a variable of step 2 is ever a member.
+4. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller, taking `const Name *name` first and then `v` as a pointer. At the top of its
+   body declare one `const` local per member, as Recipe N step 4 does (or write
+   `name->member` at every use, its member form), then the variables of step 2. In the
+   text write `*v` for every use of `v`, reads included (Recipe V step 4); each `goto L;`
+   or `return(c);` becomes `return(MagickFalse);`, one for one; the function ends with
+   `return(MagickTrue);`. Nothing else in the text changes.
+5. In the caller, declare the `Name` local among the declarations at the top of the block
+   that holds the call. Directly before the call, assign every member from the variable
+   of its name, in declaration order, with nothing between the assignments and the call.
+6. Where the block stood, write `if (Helper(&name,&v) == MagickFalse) goto L;` (or
+   `return(c);`), and check every member and argument by reading.
+
+**Before:**
+
+```c
+  if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) ||
+      (fabs(segment->y1-segment->y2) >= MagickEpsilon))
+    {
+      /*
+        Middle pixel.
+      */
+      x=CastDoubleToSsizeT(ceil(segment->x1-0.5));
+      y=CastDoubleToSsizeT(ceil(segment->y1-0.5));
+      u=GetCacheViewVirtualPixels(context->u_view,x,y,1,1,context->exception);
+      ...
+      if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
+        return(MagickTrue);
+      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+      status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
+    }
+```
+
+**After:**
+
+```c
+static MagickBooleanType SetPlasmaMiddlePixel(const PlasmaMidpoint *midpoint,
+  MagickStatusType *status)
+{
+  const PlasmaContext
+    *const context = midpoint->context;
+  ...
+  ssize_t
+    x,
+    y;
+
+  if ((fabs(segment->x1-segment->x2) >= MagickEpsilon) ||
+      (fabs(segment->y1-segment->y2) >= MagickEpsilon))
+    {
+      ...
+      if (IsPlasmaPixelMissing(u,v,q) != MagickFalse)
+        return(MagickFalse);
+      SetPlasmaPixelChannels(context->image,context->random_info,u,v,q,plasma);
+      *status=SyncCacheViewAuthenticPixels(context->image_view,context->exception);
+    }
+  return(MagickTrue);
+}
+...
+  midpoint.context=context;
+  ...
+  midpoint.plasma=plasma;
+  if (SetPlasmaMiddlePixel(&midpoint,&status) == MagickFalse)
+    return(MagickTrue);
+```
+
+**Careful:**
+
+- The three parts keep the arguments of the recipes they come from. The caller jumps or
+  returns from the same point as before, after every write the block made to `v` has
+  landed through the pointer, and goes on with the next statement where the block fell
+  through (Recipe V). The members are copied directly before the call from variables the
+  block does not write (Recipe N).
+- A variable of step 2 holds nothing the caller reads: the block writes it before its
+  own first read, and the caller writes it again before its next read. The new function's
+  own copy therefore changes no value anyone sees. A variable the block reads before
+  writing it (a cursor carried in) is not one: skip the block.
+- `return(c);` with `c` itself `MagickTrue` becomes `return(MagickFalse);` like any
+  other constant: the helper's result says whether the block fell through, and the
+  caller returns `c` when it did not.
+- The failure paths are mostly cache fetches that no case makes fail: the oracle checks
+  the fall-through path; the jumps are checked by reading, each against its
+  `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2`.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 2 and 6 checked by reading.
+
+**Provenance:** 2026-10-30, from `visual-effects.c`'s `PlasmaImageProxy`, whose middle
+pixel leaves through `return(MagickTrue);` when a fetch fails, writes `status` and the
+temporaries `x`, `y`, `u`, `v` and `q`, and reads the context, the segment, both
+midpoints and the plasma amplitude: Recipe V gives the helper six parameters. A probe:
+bumps 5 to 4, 3.12 to 3.19. Its bottom and top pixels have the same shape. Added by
+Claude Code (Claude Opus 5.5) during task W08, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -2032,3 +2159,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-29 | AMEND | V | Step 6: a block that leaves through `return(c);` of one constant `c` of the caller's return type, in place of `goto L;`, moves the same way; each `return(c);` becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) return(c);`. *Careful* gives the argument and notes the warning location the oracle normalises | `morphology.c`'s `MorphologyImage`: its `convolve:scale` branch (clone the kernel if it is the caller's, `return((Image *) NULL)` when the clone fails, scale it) is its only depth-4 site and both its bumps; Recipe E's step 6 covers only the throw macros' hidden returns and step 4 refuses the status plus `curr_kernel`. A probe: `MorphologyImage` keeps only its public signature's Excess Arguments, 2.55 to 2.62 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | N | Step 4: instead of the `const` locals, the body may write `name->member` at every use of a member (Recipe B step 3's form, as Recipes U and W step 3 already allow); *Careful* gives the argument and names the duplication it avoids | `distort.c`'s `SparseColorImage`: the Voronoi search beside `ManhattanSparseColor`, and the Bilinear plane beside the Barycentric one, are reported as Code Duplication with `const` locals (2.70 to 2.57); in the member form neither is (2.70 to 2.74). With the remaining cases the function leaves Brain Method and Deep, Nested Complexity, 2.70 to 3.01 in a probe | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | Q | Step 4: the member form of Recipe N step 4 | `SparseColorImage`'s inverse-distance accumulation (`pixel`, `denominator` written, eight inputs): with `const` locals its helper would repeat `ManhattanSparseColor`'s seven locals and loop header; in the member form no duplication | mandate (2026-10-24) |
+| 2026-10-30 | NEW | Y | Extract Block Returning Success Taking an Input Struct: a Recipe V block whose inputs would give the new function five or more parameters moves to a `static MagickBooleanType` function taking a `const` struct of the inputs it only reads (Recipe N) and its one written variable by pointer (Recipe V); temporaries it writes before reading, and the caller does not read after it, are declared in the new function (Recipe J step 3) | `visual-effects.c`'s `PlasmaImageProxy`: its middle pixel (`return(MagickTrue)` on a failed fetch; `status` written; five inputs) needs six parameters under Recipe V. A probe: bumps 5 to 4, 3.12 to 3.19 | mandate (2026-10-24) |
