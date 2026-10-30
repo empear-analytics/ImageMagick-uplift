@@ -2179,6 +2179,21 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ListDelegatePath(FILE *file,const char *path,
+  const DelegateInfo **delegate_info,const ssize_t i)
+{
+  if ((path == (const char *) NULL) ||
+      (LocaleCompare(path,delegate_info[i]->path) != 0))
+    {
+      if (delegate_info[i]->path != (char *) NULL)
+        (void) FormatLocaleFile(file,"\nPath: %s\n\n",delegate_info[i]->path);
+      (void) FormatLocaleFile(file,"Delegate                Command\n");
+      (void) FormatLocaleFile(file,
+        "-------------------------------------------------"
+        "------------------------------\n");
+    }
+}
+
 static void ListDelegateCommands(FILE *file,
   const DelegateInfo **delegate_info,const ssize_t i,const char *delegate)
 {
@@ -2230,16 +2245,7 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
   {
     if (delegate_info[i]->stealth != MagickFalse)
       continue;
-    if ((path == (const char *) NULL) ||
-        (LocaleCompare(path,delegate_info[i]->path) != 0))
-      {
-        if (delegate_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",delegate_info[i]->path);
-        (void) FormatLocaleFile(file,"Delegate                Command\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
-      }
+    ListDelegatePath(file,path,delegate_info,i);
     path=delegate_info[i]->path;
     *delegate='\0';
     if (delegate_info[i]->encode != (char *) NULL)
