@@ -193,6 +193,14 @@ static void NormalizeContributions(ContributionInfo *contribution,
     contribution[i].weight*=density;
 }
 
+static inline MagickBooleanType IsResizeChannelCopied(
+  const Image *resize_image,const PixelTrait resize_traits,const Quantum *q)
+{
+  return((((resize_traits & CopyPixelTrait) != 0) ||
+    (GetPixelWriteMask(resize_image,q) <= (QuantumRange/2))) ? MagickTrue :
+    MagickFalse);
+}
+
 static void FilterHorizontalPixel(const Image *image,
   const Image *resize_image,const ContributionInfo *contribution,
   const ssize_t n,const ssize_t start,const ssize_t stop,const double bisect,
@@ -225,8 +233,7 @@ static void FilterHorizontalPixel(const Image *image,
     if ((traits == UndefinedPixelTrait) ||
         (resize_traits == UndefinedPixelTrait))
       continue;
-    if (((resize_traits & CopyPixelTrait) != 0) ||
-        (GetPixelWriteMask(resize_image,q) <= (QuantumRange/2)))
+    if (IsResizeChannelCopied(resize_image,resize_traits,q) != MagickFalse)
       {
         j=(ssize_t) (MagickMin(MagickMax(bisect,(double) start),(double)
           stop-1.0)+0.5);
