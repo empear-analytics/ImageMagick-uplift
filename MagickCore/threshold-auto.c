@@ -347,13 +347,32 @@ static double OTSUThreshold(const Image *image,const double *histogram,
   return(100.0*threshold/MaxIntensity);
 }
 
+static ssize_t FindTriangleMaxBin(const double *histogram)
+{
+  double
+    count;
+
+  ssize_t
+    i,
+    max;
+
+  max=0;  /* find max bin, bin with largest count */
+  count=0.0;
+  for (i=0; i <= (ssize_t) MaxIntensity; i++)
+    if (histogram[i] > count)
+      {
+        max=i;
+        count=histogram[i];
+      }
+  return(max);
+}
+
 static double TriangleThreshold(const double *histogram)
 {
   double
     a,
     b,
     c,
-    count,
     distance,
     inverse_ratio,
     max_distance,
@@ -389,14 +408,7 @@ static double TriangleThreshold(const double *histogram)
         end=i;
         break;
       }
-  max=0;  /* find max bin, bin with largest count */
-  count=0.0;
-  for (i=0; i <= (ssize_t) MaxIntensity; i++)
-    if (histogram[i] > count)
-      {
-        max=i;
-        count=histogram[i];
-      }
+  max=FindTriangleMaxBin(histogram);
   /*
     Compute threshold at split point.
   */
