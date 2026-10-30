@@ -2857,6 +2857,17 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
 5. The kept groups stay where they were, unchanged. Check by reading that every label
    of the original `switch` is in exactly one of the two, `default` in the new one, and
    check every member and argument as Recipe O step 6 or Z step 6 says.
+6. Locals the caller derives from its parameters. When the moved groups read `const`
+   locals declared at the top of the caller's body whose initialisers read only the
+   caller's parameters (`const ssize_t e = neighbours->e, ...`), and neither the caller
+   before the `switch` nor the moved groups write those parameters or anything their
+   initialisers read through them, the new function may take the caller's parameters
+   instead (the same types and names, in the same order), and declare at the top of its
+   body those of the locals the moved groups read, each with its own initialiser's text
+   unchanged. Step 4's call then passes the caller's parameters by name. A local the
+   caller no longer reads after the cut leaves the caller's declaration. The moved groups
+   need not be adjacent in the `switch`, and the step may be repeated on the same
+   `switch`, whose `default` group is then the earlier call.
 
 **Before:**
 
@@ -2962,6 +2973,19 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   not by position, once no group falls through.
 - Choose the split along what the groups read when you can (the unary operators read
   `ar` and `ai` only): the new function then takes fewer inputs.
+- Under step 6 the new function evaluates each initialiser again on entry, where the
+  caller evaluated it at the top of its body. The value is the same because the
+  initialiser reads only parameters, passed unchanged, and objects that nothing has
+  written since (in `magnify.c` the groups write the pixel buffer behind
+  `magnify->destination`, never the `Hq2XNeighbours` offsets). The form costs a
+  signature and a declaration where Recipe Z's struct type, its fill and its `const`
+  locals cost about forty lines, which can take a file over *Lines of Code in a Single
+  File*. Repeating it is a chain: a value of a label moved by the second step reaches
+  the outer `default`, then the second function's `switch`; one moved by the first
+  step falls through both `default`s to the first function's `switch`, each `break`
+  ending its own `switch`, as the first point argues for one step. Choose the groups
+  so that the new functions do not repeat each other's shape: two functions of the
+  same groups' kind are reported as *Code Duplication*.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), a case for each moved label where one exists, and steps 1 and 5
@@ -2973,7 +2997,11 @@ the whole `switch` gives a helper of cc 9, a *Complex Method* the gate refuses (
 probe); the unary group (conjugate with `default`, magnitude-phase, real-imaginary) as its
 own function, then Z on the binary rest, leaves neither helper with a finding: 4.83 to
 4.85 to 5.21 in a probe. Added by Claude Code (Claude Opus 5.5) during task W09, under the
-mandate of 2026-10-24.
+mandate of 2026-10-24. Step 6 (2026-10-30, task W10): `magnify.c`'s
+`Hq2XHelper`, a rule table of twenty labels reading six offsets the function derives
+from its `Hq2XNeighbours` parameter. Recipe Z's struct for the nine inputs took the file
+to 1,031 lines (*Lines of Code in a Single File*, 6.39 in a probe); step 6's form, twice,
+takes `Hq2XHelper` out of *Complex Method* and *Large Method*: 7.48 to 7.66 to 8.13.
 
 ---
 
@@ -3673,3 +3701,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | TW | Extract Twin Blocks into One Function Taking an Input Struct: two functions' copies of one block, the same text once each copy's variables are renamed consistently and differing in at most one value (checked by script), move to one `static` function taking a `const` struct of the inputs (Recipe N), its members named for their roles and filled in each caller from that copy's variables; read-then-written inputs go by value, temporaries written before read are declared in the function; both copies in one commit (rule 1) | `shear.c`'s `XShearImage` and `YShearImage`: the left/up and right/down pixel-transfer cases of their direction `switch`es hold the depth-4 sites; Recipe N names members after one copy's variables, Recipe D needs a reported duplication and would take seven parameters. A probe: one function's cases alone 6.47 to 5.99, both 6.47 to 6.63 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | K | Step 3: a variable of the caller that the block writes before reading it, and that the caller does not read after the block before writing it again, is declared in the new function and is not one of the four written variables (Recipe J step 3, Recipe Q step 2); *Careful* gives the argument | `shear.c`'s `CropToFitImage`: its minimum/maximum scan over the four extent corners (a bump: four `if`s in a `for`) writes `min` and `max` and the loop counter `i`, which the caller also uses for the corner loop before it; step 6 would pass `i` by pointer as a third written local. A probe of the scan as a helper (step 6): 7.29 to 7.53 | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | H | *Use when*: also a function whose leading `#define` run holds helper macros with branches or many lines, which CodeScene counts in that function's cyclomatic complexity and length; the step is then kept for its own measured effect under rule 2. *Careful* says when the step is flat and when it is measured | `magnify.c` (W10): `Fish2XBottomRightPixel`'s `Corner` (one `if`, 16 lines), `Epbx2X`'s `HelperCond` (a conjunction and three disjunctions) and `Hq2XHelper`'s `caseA`/`caseB`; each hoist preprocessed identically. Probes from 6.90: `Fish2XBottomRightPixel` 7.19 (leaves *Large Method*), `Epbx2X` 7.11, `Hq2XHelper` 6.97 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | SD | Step 6: when the moved groups read `const` locals the caller initialises from its parameters only, the new function may take the caller's parameters and repeat the declarations of the locals it reads, initialisers unchanged; a local the caller no longer reads leaves its declaration; moved groups need not be adjacent, and the step may repeat on the same `switch`. *Careful* gives the argument, the chain, and the duplication to avoid | `magnify.c`'s `Hq2XHelper` (W10): the six neighbour offsets come from its `Hq2XNeighbours` parameter; Recipe Z's struct for nine inputs took the file over *Lines of Code in a Single File* (6.39 in a probe), step 6 twice gives 7.48 to 8.13 | mandate (2026-10-24) |
