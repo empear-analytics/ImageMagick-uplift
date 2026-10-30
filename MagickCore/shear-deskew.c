@@ -429,6 +429,71 @@ static void PackRadonRowReversed(const Quantum *magick_restrict p,
     }
 }
 
+typedef struct _RadonRowSource
+{
+  CacheView
+    *image_view;
+
+  const Image
+    *image;
+
+  double
+    threshold;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+
+  MatrixInfo
+    *source_matrices;
+} RadonRowSource;
+
+static MagickBooleanType ReadRadonRowReversed(const RadonRowSource *source,
+  unsigned short *bits)
+{
+  CacheView
+    *const image_view = source->image_view;
+
+  const Image
+    *const image = source->image;
+
+  const double
+    threshold = source->threshold;
+
+  const ssize_t
+    y = source->y;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  MatrixInfo
+    *const source_matrices = source->source_matrices;
+
+  const Quantum
+    *magick_restrict p;
+
+  MagickBooleanType
+    status;
+
+  RadonRow
+    row;
+
+  status=MagickTrue;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  row.image=image;
+  row.threshold=threshold;
+  row.y=y;
+  PackRadonRowReversed(p,source_matrices,bits,&row);
+  return(status);
+}
+
 static void DestroyRadonMatrices(MatrixInfo *source_matrices,
   MatrixInfo *destination_matrices)
 {
@@ -486,24 +551,19 @@ static MagickBooleanType RadonTransform(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
-    RadonRow
-      row;
+    RadonRowSource
+      source;
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    row.image=image;
-    row.threshold=threshold;
-    row.y=y;
-    PackRadonRowReversed(p,source_matrices,bits,&row);
+    source.image_view=image_view;
+    source.image=image;
+    source.threshold=threshold;
+    source.y=y;
+    source.exception=exception;
+    source.source_matrices=source_matrices;
+    if (ReadRadonRowReversed(&source,bits) == MagickFalse)
+      status=MagickFalse;
   }
   RadonProjection(source_matrices,destination_matrices,-1,projection);
   (void) NullMatrix(source_matrices);
