@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from cs_mcp_session import exchange
@@ -209,46 +210,69 @@ def merge_head() -> str | None:
     return result.stdout.strip() if result.returncode == 0 else None
 
 
+@dataclass(frozen=True)
+class GateContext:
+    """What every staged file is judged against: the merged branch, if any, and the
+    score a split-off file must reach (None: new code must score 10.0)."""
+    merged: str | None
+    bar: float | None
+
+
+def shrunk_previous(path: str, previous_path: str | None) -> str | None:
+    """The HEAD content of an existing staged file that loses lines, or None."""
+    previous_exists, previous = show("HEAD", previous_path or path)
+    if not previous_exists:
+        return None
+    staged_exists, staged = show_staged(path)
+    if not staged_exists:
+        return None
+    return previous if staged.count("\n") < previous.count("\n") else None
+
+
 def split_bar(paths: list[tuple[str, str | None]], exe: str) -> float | None:
     """The lowest HEAD score among staged existing files that shrink, or None."""
     bars: list[float] = []
     for path, previous_path in paths:
-        previous_exists, previous = show("HEAD", previous_path or path)
-        staged_exists, staged = show_staged(path)
-        if previous_exists and staged_exists and staged.count("\n") < previous.count("\n"):
-            old_file = temp_file(previous, Path(path).suffix)
-            try:
-                bars.append(score(old_file, exe))
-            finally:
-                cleanup_temp_files((old_file,))
+        previous = shrunk_previous(path, previous_path)
+        if previous is None:
+            continue
+        old_file = temp_file(previous, Path(path).suffix)
+        try:
+            bars.append(score(old_file, exe))
+        finally:
+            cleanup_temp_files((old_file,))
     return min(bars) if bars else None
 
 
-def check(path: str, exe: str, previous_path: str | None = None,
-          merged: str | None = None, bar: float | None = None) -> str | None:
+def came_unchanged(path: str, staged: str, merged: str | None) -> bool:
+    """True when a merge brings the file in exactly as the merged branch has it."""
+    if merged is None:
+        return False
+    theirs_exists, theirs = show(merged, path)
+    return theirs_exists and theirs == staged
+
+
+def check(path: str, exe: str, previous_path: str | None,
+          context: GateContext) -> str | None:
     staged_exists, staged = show_staged(path)
     if not staged_exists:
         return f"{path}: could not read staged content"
-
-    if merged is not None:
-        theirs_exists, theirs = show(merged, path)
-        if theirs_exists and theirs == staged:
-            return None
+    if came_unchanged(path, staged, context.merged):
+        return None
 
     baseline_path = previous_path if previous_path is not None else path
     previous_exists, previous = show("HEAD", baseline_path)
     if not previous_exists:
-        return check_new_file(path, exe, staged, bar)
+        return check_new_file(path, exe, staged, context.bar)
     return check_revised_file(path, exe, previous, staged)
 
 
 def collect_failures(paths: list[tuple[str, str | None]], exe: str) -> list[str]:
     failures: list[str] = []
-    merged = merge_head()
-    bar = split_bar(paths, exe)
+    context = GateContext(merge_head(), split_bar(paths, exe))
     for path, previous_path in paths:
         try:
-            reason = check(path, exe, previous_path, merged, bar)
+            reason = check(path, exe, previous_path, context)
         except Exception as exc:  # pragma: no cover
             reason = f"{path}: {exc}"
         if reason:
