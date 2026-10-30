@@ -206,6 +206,16 @@ static void BilevelPixel(const Image *image,const double threshold,
   }
 }
 
+static MagickBooleanType SetDirectNonGrayImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if (IsGrayColorspace(image->colorspace) == MagickFalse)
+    (void) SetImageColorspace(image,sRGBColorspace,exception);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType BilevelImage(Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -227,10 +237,8 @@ MagickExport MagickBooleanType BilevelImage(Image *image,const double threshold,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (SetDirectNonGrayImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if (IsGrayColorspace(image->colorspace) == MagickFalse)
-    (void) SetImageColorspace(image,sRGBColorspace,exception);
   /*
     Bilevel threshold image.
   */
