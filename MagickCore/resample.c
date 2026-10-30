@@ -543,6 +543,15 @@ static MagickBooleanType ResampleLimitedPixel(const ResampleLimitPoint *point,
   return(status);
 }
 
+static double WeightByPixelAlpha(const ResampleFilter *resample_filter,
+  const Quantum *pixels,const PixelInfo *pixel,double weight)
+{
+  if (pixel->alpha_trait != UndefinedPixelTrait)
+    weight*=QuantumScale*((double)
+      GetPixelAlpha(resample_filter->image,pixels));
+  return(weight);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -749,9 +758,7 @@ MagickExport MagickBooleanType ResamplePixelColor(
           GetPixelAlpha(resample_filter->image,pixels);
         divisor_m += weight;
 
-        if (pixel->alpha_trait != UndefinedPixelTrait)
-          weight*=QuantumScale*((double)
-            GetPixelAlpha(resample_filter->image,pixels));
+        weight=WeightByPixelAlpha(resample_filter,pixels,pixel,weight);
         pixel->red+=weight*(double)
           GetPixelRed(resample_filter->image,pixels);
         pixel->green+=weight*(double)
