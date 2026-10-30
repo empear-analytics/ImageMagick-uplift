@@ -4289,6 +4289,35 @@ static MagickBooleanType CompositeTextureRow(const TextureTiles *tiles,
   return(status);
 }
 
+static MagickBooleanType TileTextureImage(Image *image,Image *texture_image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  ssize_t
+    y;
+
+  /*
+    Tile texture onto the image background.
+  */
+  for (y=0; y < (ssize_t) image->rows; y+=(ssize_t) texture_image->rows)
+  {
+    TextureTiles
+      tiles;
+
+    if (status == MagickFalse)
+      continue;
+    tiles.image=image;
+    tiles.texture_image=texture_image;
+    tiles.y=y;
+    status=CompositeTextureRow(&tiles,status,exception);
+    if (ReportTextureProgress(image,y) == MagickFalse)
+      status=MagickFalse;
+  }
+  (void) SetImageProgress(image,TextureImageTag,(MagickOffsetType)
+    image->rows,image->rows);
+  texture_image=DestroyImage(texture_image);
+  return(status);
+}
+
 MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
   ExceptionInfo *exception)
 {
@@ -4321,29 +4350,7 @@ MagickExport MagickBooleanType TextureImage(Image *image,const Image *texture,
     exception);
   status=MagickTrue;
   if (IsTextureComposited(image,texture_image) != MagickFalse)
-    {
-      /*
-        Tile texture onto the image background.
-      */
-      for (y=0; y < (ssize_t) image->rows; y+=(ssize_t) texture_image->rows)
-      {
-        TextureTiles
-          tiles;
-
-        if (status == MagickFalse)
-          continue;
-        tiles.image=image;
-        tiles.texture_image=texture_image;
-        tiles.y=y;
-        status=CompositeTextureRow(&tiles,status,exception);
-        if (ReportTextureProgress(image,y) == MagickFalse)
-          status=MagickFalse;
-      }
-      (void) SetImageProgress(image,TextureImageTag,(MagickOffsetType)
-        image->rows,image->rows);
-      texture_image=DestroyImage(texture_image);
-      return(status);
-    }
+    return(TileTextureImage(image,texture_image,status,exception));
   /*
     Tile texture onto the image background (optimized).
   */
