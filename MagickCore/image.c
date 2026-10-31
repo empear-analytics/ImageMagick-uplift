@@ -4250,14 +4250,34 @@ static void SyncImagePageAndQualitySettings(const ImageInfo *image_info,
     (void) ParsePageGeometryOption(option,&image->tile_offset);
 }
 
-MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
-  Image *image,ExceptionInfo *exception)
+static void SyncImageUnitsSettings(const ImageInfo *image_info,Image *image)
 {
   const char
     *option;
 
   ResolutionType
     units;
+
+  option=GetImageOption(image_info,"units");
+  units=image_info->units;
+  if (option != (const char *) NULL)
+    units=(ResolutionType) ParseCommandOption(MagickResolutionOptions,
+      MagickFalse,option);
+  if (units != UndefinedResolution)
+    {
+      ConvertResolutionUnits(image,units);
+      image->units=units;
+      option=GetImageOption(image_info,"density");
+      if (option != (const char *) NULL)
+        SetImageResolutionFromDensity(image,option);
+    }
+}
+
+MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
+  Image *image,ExceptionInfo *exception)
+{
+  const char
+    *option;
 
   /*
     Sync image options.
@@ -4280,19 +4300,7 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
   if (option != (const char *) NULL)
     image->type=(ImageType) ParseCommandOption(MagickTypeOptions,MagickFalse,
       option);
-  option=GetImageOption(image_info,"units");
-  units=image_info->units;
-  if (option != (const char *) NULL)
-    units=(ResolutionType) ParseCommandOption(MagickResolutionOptions,
-      MagickFalse,option);
-  if (units != UndefinedResolution)
-    {
-      ConvertResolutionUnits(image,units);
-      image->units=units;
-      option=GetImageOption(image_info,"density");
-      if (option != (const char *) NULL)
-        SetImageResolutionFromDensity(image,option);
-    }
+  SyncImageUnitsSettings(image_info,image);
   option=GetImageOption(image_info,"virtual-pixel");
   if (option != (const char *) NULL)
     (void) SetImageVirtualPixelMethod(image,(VirtualPixelMethod)
