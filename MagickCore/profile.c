@@ -741,6 +741,34 @@ static void SetLCMSInfoIntent(const Image *image,LCMSInfo *target_info)
     }
   }
 }
+
+static void SetImageTypeFromSignature(Image *image,
+  const cmsColorSpaceSignature signature)
+{
+  switch (signature)
+  {
+    case cmsSigRgbData:
+    {
+      image->type=image->alpha_trait == UndefinedPixelTrait ?
+        TrueColorType : TrueColorAlphaType;
+      break;
+    }
+    case cmsSigCmykData:
+    {
+      image->type=image->alpha_trait == UndefinedPixelTrait ?
+        ColorSeparationType : ColorSeparationAlphaType;
+      break;
+    }
+    case cmsSigGrayData:
+    {
+      image->type=image->alpha_trait == UndefinedPixelTrait ?
+        GrayscaleType : GrayscaleAlphaType;
+      break;
+    }
+    default:
+      break;
+  }
+}
 #endif
 
 static unsigned char
@@ -1487,29 +1515,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
             }
             image_view=DestroyCacheView(image_view);
             (void) SetImageColorspace(image,target_info.colorspace,exception);
-            switch (signature)
-            {
-              case cmsSigRgbData:
-              {
-                image->type=image->alpha_trait == UndefinedPixelTrait ?
-                  TrueColorType : TrueColorAlphaType;
-                break;
-              }
-              case cmsSigCmykData:
-              {
-                image->type=image->alpha_trait == UndefinedPixelTrait ?
-                  ColorSeparationType : ColorSeparationAlphaType;
-                break;
-              }
-              case cmsSigGrayData:
-              {
-                image->type=image->alpha_trait == UndefinedPixelTrait ?
-                  GrayscaleType : GrayscaleAlphaType;
-                break;
-              }
-              default:
-                break;
-            }
+            SetImageTypeFromSignature(image,signature);
             target_info.pixels=DestroyPixelTLS(target_info.pixels);
             source_info.pixels=DestroyPixelTLS(source_info.pixels);
             transform=DestroyTransformTLS(transform);
