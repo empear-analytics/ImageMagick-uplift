@@ -463,6 +463,21 @@ static void AdvanceAppendOffset(const Image *next,const MagickBooleanType stack,
     }
 }
 
+static void AddAppendExtent(const Image *next,const MagickBooleanType stack,
+  size_t *width,size_t *height)
+{
+  if (stack != MagickFalse)
+    {
+      if (next->columns > *width)
+        *width=next->columns;
+      *height+=next->rows;
+      return;
+    }
+  *width+=next->columns;
+  if (next->rows > *height)
+    *height=next->rows;
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -532,16 +547,7 @@ MagickExport Image *AppendImages(const Image *images,
     if (next->alpha_trait != UndefinedPixelTrait)
       alpha_trait=BlendPixelTrait;
     number_images++;
-    if (stack != MagickFalse)
-      {
-        if (next->columns > width)
-          width=next->columns;
-        height+=next->rows;
-        continue;
-      }
-    width+=next->columns;
-    if (next->rows > height)
-      height=next->rows;
+    AddAppendExtent(next,stack,&width,&height);
   }
   /*
     Append images.
