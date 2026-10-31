@@ -195,6 +195,42 @@ static MagickRealType LowerHullEdgeValue(const Quantum *r,const Quantum *s,
   return(v);
 }
 
+typedef struct _HullFirstPass
+{
+  size_t
+    columns;
+
+  Quantum
+    *p,
+    *q,
+    *r;
+} HullFirstPass;
+
+static void RaiseHullRow(const HullFirstPass *pass,ssize_t i)
+{
+  const size_t
+    columns = pass->columns;
+
+  Quantum
+    *const p = pass->p,
+    *const q = pass->q,
+    *const r = pass->r;
+
+  MagickRealType
+    v;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    v=(MagickRealType) p[i];
+    v=RaiseHullValue(r,i,v);
+    q[i]=(Quantum) v;
+    i++;
+  }
+}
+
 static void Hull(const HullBuffers *hull,const ssize_t x_offset,
   const ssize_t y_offset,const int polarity)
 {
@@ -234,6 +270,9 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
 #endif
   for (y=0; y < (ssize_t) rows; y++)
   {
+    HullFirstPass
+      pass;
+
     MagickRealType
       v;
 
@@ -241,15 +280,13 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
       i,
       x;
 
+    pass.columns=columns;
+    pass.p=p;
+    pass.q=q;
+    pass.r=r;
     i=(2*y+1)+y*(ssize_t) columns;
     if (polarity > 0)
-      for (x=0; x < (ssize_t) columns; x++)
-      {
-        v=(MagickRealType) p[i];
-        v=RaiseHullValue(r,i,v);
-        q[i]=(Quantum) v;
-        i++;
-      }
+      RaiseHullRow(&pass,i);
     else
       for (x=0; x < (ssize_t) columns; x++)
       {
