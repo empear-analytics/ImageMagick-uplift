@@ -1316,6 +1316,29 @@ static void PrintImageClippingPath(FILE *file,Image *image,
     }
 }
 
+static void PrintImageColorsSummary(FILE *file,const Image *image)
+{
+  char
+    buffer[MagickPathExtent];
+
+  if (image->storage_class == DirectClass)
+    {
+      if (image->total_colors != 0)
+        {
+          (void) FormatMagickSize(image->total_colors,MagickFalse,"B",
+            MagickPathExtent,buffer);
+          (void) FormatLocaleFile(file,"%s ",buffer);
+        }
+    }
+  else
+    if (image->total_colors <= image->colors)
+      (void) FormatLocaleFile(file,"%.17gc ",(double)
+        image->colors);
+    else
+      (void) FormatLocaleFile(file,"%.17g=>%.17gc ",(double)
+        image->total_colors,(double) image->colors);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1453,22 +1476,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       if (colorspace != UndefinedColorspace)
         (void) FormatLocaleFile(file,"%s ",CommandOptionToMnemonic(
           MagickColorspaceOptions,(ssize_t) colorspace));
-      if (image->storage_class == DirectClass)
-        {
-          if (image->total_colors != 0)
-            {
-              (void) FormatMagickSize(image->total_colors,MagickFalse,"B",
-                MagickPathExtent,buffer);
-              (void) FormatLocaleFile(file,"%s ",buffer);
-            }
-        }
-      else
-        if (image->total_colors <= image->colors)
-          (void) FormatLocaleFile(file,"%.17gc ",(double)
-            image->colors);
-        else
-          (void) FormatLocaleFile(file,"%.17g=>%.17gc ",(double)
-            image->total_colors,(double) image->colors);
+      PrintImageColorsSummary(file,image);
       if (image->error.mean_error_per_pixel != 0.0)
         (void) FormatLocaleFile(file,"%.17g/%f/%fdb ",(double)
           (image->error.mean_error_per_pixel+0.5),
