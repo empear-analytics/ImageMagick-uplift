@@ -2235,6 +2235,23 @@ static MagickBooleanType ParseDoctype(XMLTreeRoot *root,const int terminal,
   return(MagickTrue);
 }
 
+static MagickBooleanType SkipComment(char **p,const int terminal,
+  ExceptionInfo *exception)
+{
+  /*
+    Comment.
+  */
+  *p=strstr(*p+3,"--");
+  if ((*p == (char *) NULL) || ((*(*p+=2) != '>') && (**p != '\0')) ||
+      ((**p == '\0') && (terminal != '>')))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","unclosed <!--");
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2406,15 +2423,8 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
       else
         if (strncmp(p,"!--",3) == 0)
           {
-            /*
-              Comment.
-            */
-            p=strstr(p+3,"--");
-            if ((p == (char *) NULL) || ((*(p+=2) != '>') && (*p != '\0')) ||
-                ((*p == '\0') && (terminal != '>')))
+            if (SkipComment(&p,terminal,exception) == MagickFalse)
               {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  OptionWarning,"ParseError","unclosed <!--");
                 utf8=DestroyString(utf8);
                 return(&root->root);
               }
