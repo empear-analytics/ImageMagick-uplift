@@ -1808,6 +1808,18 @@ static void SetSpliceBackground(Image *splice_image,
   (void) SetImageBackgroundColor(splice_image,exception);
 }
 
+static MagickBooleanType PrepareSpliceImage(Image *splice_image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(splice_image,DirectClass,exception) == MagickFalse)
+    {
+      splice_image=DestroyImage(splice_image);
+      return(MagickFalse);
+    }
+  SetSpliceBackground(splice_image,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -1848,12 +1860,8 @@ MagickExport Image *SpliceImage(const Image *image,
     image->rows+splice_geometry.height,MagickTrue,exception);
   if (splice_image == (Image *) NULL)
     return((Image *) NULL);
-  if (SetImageStorageClass(splice_image,DirectClass,exception) == MagickFalse)
-    {
-      splice_image=DestroyImage(splice_image);
-      return((Image *) NULL);
-    }
-  SetSpliceBackground(splice_image,exception);
+  if (PrepareSpliceImage(splice_image,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     Respect image geometry.
   */
