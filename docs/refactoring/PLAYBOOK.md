@@ -3117,6 +3117,11 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    it, no `continue`, `return` or `goto`: no group falls through into another. The
    last group of the `switch` may instead end at its closing brace, without `break;`,
    when it moves and stays the last group of the new `switch` (`default: *q=0;`).
+   A *chain*, a run of groups each of which but the last ends in `magick_fallthrough;`
+   and runs into the next, counts as one group when all of it moves, its groups in
+   their order and adjacent; its groups may then also hold a `break;` of this `switch`
+   inside a selection (`if (...) { ...; break; }`). The usual chain is
+   quantum-import.c's `case 24:`, `case 64:`, `default:`.
 2. Choose the groups that move: the group carrying `default:`, and others beside it.
    Together their bodies meet Recipe O steps 1 to 3 (OpenMP, written variables, exits),
    as one selection does.
@@ -3255,6 +3260,13 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   controlling expression's type and promotions are those of the same text.
 - The order of groups within each `switch` is the original order; C selects by label,
   not by position, once no group falls through.
+- A chain (step 1) moves whole and in order, so each of its groups still runs into the
+  same next group, and the last into nothing, as before; `magick_fallthrough;` stays
+  before the next label, so `-Wimplicit-fallthrough` sees what it saw. A `break;`
+  inside one of its groups ends the new `switch`; the function returns at once, and
+  the outer `default`'s `break;` ends the outer `switch`, where the original `break;`
+  ended the original. A kept group may not be part of a chain: it would run into a
+  moved group, which is no longer there.
 - Choose the split along what the groups read when you can (the unary operators read
   `ar` and `ai` only): the new function then takes fewer inputs.
 - Under step 6 the new function evaluates each initialiser again on entry, where the
@@ -5276,3 +5288,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | NEW | VC | Extract Loop-Tail Block Returning Success for a Cleanup Exit: a block at the tail of a loop body (or followed by its `continue;`) whose exits are `continue;` of that loop and one cleanup return of the function in a form Recipe V step 6 or 7 or Recipe I step 8 admits moves to a `static MagickBooleanType` function: each `continue;` becomes `return(MagickTrue);`, each exit `return(MagickFalse);`, the caller keeps the exit's text | `xml-tree.c`'s `ParseInternalDoctype` (campaign B, task M116): its `<!ATTLIST` branch and the attribute loop's body mix `continue;` with `predefined_entities=...RelinquishMagickMemory(...); return(MagickFalse);`, which V, Y, I and W (no `continue`) and OC (no `return`) refuse; they hold the function's nesting of 5; a probe: 4.05 to 4.21 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | SD | Step 1: the `switch`'s last group may end at its closing brace instead of `break;`, when it moves and stays last in the new `switch`; *Careful* gives the argument | `stream.c`'s `StreamLongLongQuantum`, `StreamQuantumQuantum`, `StreamDoubleQuantum` and `StreamFloatQuantum` (campaign B, task M117): channel `switch`es of cc 13 whose `default: *q=0;` (or `*q=(Quantum) 0;`) has no `break;`; their three siblings without that quirk went from 4.63 to 5.10 by SD | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | O | *Use when*: the block may be a loop as well as a selection (steps 1 to 6 never depended on it); step 2: a variable written before read passes as a pointer, not declared in the new function, when the caller's store before the block would otherwise be left with no use; no recipe deletes that store | `identify.c`'s `IdentifyImage` (campaign B, task M117, a574c1d63): the transparent-pixel scan writes `p`, `y`, `found` and `x`; declaring `x` in the helper leaves the caller's `x=0;` set but unused, which fails the macOS CI build. The owner left both questions to the session (2026-10-31) | owner |
+| 2026-10-31 | AMEND | SD | Step 1: a chain of groups linked by `magick_fallthrough;` counts as one group when all of it moves, in order; its groups may hold a `break;` inside a selection. *Careful* gives the argument | `quantum-import.c`'s depth dispatchers (campaign B, task M118), sixteen `switch (quantum_info->depth)` of cc 9 to 13 whose `case 24:` and `case 64:` test the floating-point format, `break;` inside the `if`, and fall through to `default:`; step 1 refused every one. SD with the chain moved (and `case 32:` beside it where cc 13 needs it) on fourteen of them in a probe: 3.83 to 5.54 | mandate (2026-10-24) |
