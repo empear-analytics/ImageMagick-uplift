@@ -217,6 +217,18 @@ static void CombineImageRow(const CombineImageRowInfo *image_row)
   }
 }
 
+static void SetCombineImageColorspace(const Image *image,Image *combine_image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  if (colorspace != UndefinedColorspace)
+    (void) SetImageColorspace(combine_image,colorspace,exception);
+  else
+    if (fabs(image->gamma-1.0) <= MagickEpsilon)
+      (void) SetImageColorspace(combine_image,RGBColorspace,exception);
+    else
+      (void) SetImageColorspace(combine_image,sRGBColorspace,exception);
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -257,13 +269,7 @@ MagickExport Image *CombineImages(const Image *image,
       combine_image=DestroyImage(combine_image);
       return((Image *) NULL);
     }
-  if (colorspace != UndefinedColorspace)
-    (void) SetImageColorspace(combine_image,colorspace,exception);
-  else
-    if (fabs(image->gamma-1.0) <= MagickEpsilon)
-      (void) SetImageColorspace(combine_image,RGBColorspace,exception);
-    else
-      (void) SetImageColorspace(combine_image,sRGBColorspace,exception);
+  SetCombineImageColorspace(image,combine_image,colorspace,exception);
   number_channels=GetImageListLength(image);
   switch (combine_image->colorspace)
   {
