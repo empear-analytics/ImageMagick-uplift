@@ -99,14 +99,16 @@ for run in runs:
                 a = t; typedefs.append(m.group(1)); continue
         break
     b = last[2] + 1
-    incomment = False; intype = False; bad = []; depth = 0
+    incomment = False; intype = False; bad = []; depth = 0; inner = []
     for n in range(a, b):
         if any(s <= n <= e for s, e in spans): continue
         t = L[n].strip()
         if intype:
             intype = not re.match(r"^} \w+;$", L[n]); continue
-        if re.match(r"^typedef struct _\w+$", L[n]) and (n < spans[0][0]):
-            intype = True; continue
+        if re.match(r"^typedef struct _\w+$", L[n]):
+            intype = True; inner.append(n); continue
+        if t.startswith("#define") or (n > 0 and L[n - 1].rstrip().endswith("\\")):
+            continue
         if incomment:
             if "*/" in t: incomment = False
             continue
@@ -117,6 +119,10 @@ for run in runs:
         if re.match(r"#\s*endif\b", t) and depth > 0: depth -= 1; continue
         if t: bad.append((n + 1, t))
     if depth: bad.append(("unbalanced conditional", depth))
+    for n in inner:
+        e = n
+        while not re.match(r"^} \w+;$", L[e]): e += 1
+        typedefs.append(L[e][2:-1])
     if bad: sys.exit("refused: top-level code in the region: %s" % bad[:5])
     cuts.append((a, b))
 first = order[idx[0]]
@@ -128,6 +134,8 @@ for a, b in reversed(cuts):
     while 1 < a < len(rest_lines) and rest_lines[a - 1] == "" and rest_lines[a] == "" and rest_lines[a - 2] == "":
         del rest_lines[a]
 rest = "\n".join(rest_lines)
+for tname in typedefs:
+    if re.search(r"\b%s\b" % tname, rest): sys.exit("refused: type %s moves with the region but the kept part uses it" % tname)
 defined = lambda text: set(re.findall(r"^\s*#\s*define\s+(\w+)", text, re.M))
 for mname in defined(rest):
     if re.search(r"\b%s\b" % mname, region): sys.exit("refused: macro %s used in the region" % mname)
