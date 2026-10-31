@@ -1114,6 +1114,17 @@ static void SetFlipPage(Image *flip_image,RectangleInfo page)
   flip_image->page=page;
 }
 
+static Image *FinishFlipImage(const Image *image,Image *flip_image,
+  const MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (status != MagickFalse)
+    AppendTransformProperty(image,flip_image,"flip %.17gx%.17g",
+      exception);
+  if (status == MagickFalse)
+    flip_image=DestroyImage(flip_image);
+  return(flip_image);
+}
+
 MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
 {
 #define FlipImageTag  "Flip/Image"
@@ -1197,12 +1208,7 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
   image_view=DestroyCacheView(image_view);
   flip_image->type=image->type;
   SetFlipPage(flip_image,page);
-  if (status != MagickFalse)
-    AppendTransformProperty(image,flip_image,"flip %.17gx%.17g",
-      exception);
-  if (status == MagickFalse)
-    flip_image=DestroyImage(flip_image);
-  return(flip_image);
+  return(FinishFlipImage(image,flip_image,status,exception));
 }
 
 /*
