@@ -1520,6 +1520,32 @@ static void PrintGrayOrChannelStatistics(const Image *image,
   }
 }
 
+static void PrintCMYKOrOtherStatistics(const Image *image,
+  const ColorspaceType colorspace,ChannelStatisticsReport report)
+{
+  switch (colorspace)
+  {
+    case CMYKColorspace:
+    {
+      if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelStatistics(&report,CyanPixelChannel,"Cyan");
+      if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelStatistics(&report,MagentaPixelChannel,
+          "Magenta");
+      if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelStatistics(&report,YellowPixelChannel,"Yellow");
+      if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelStatistics(&report,BlackPixelChannel,"Black");
+      break;
+    }
+    default:
+    {
+      PrintGrayOrChannelStatistics(image,colorspace,report);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1766,22 +1792,9 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
             (void) PrintChannelStatistics(&report,BluePixelChannel,"Blue");
           break;
         }
-        case CMYKColorspace:
-        {
-          if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(&report,CyanPixelChannel,"Cyan");
-          if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(&report,MagentaPixelChannel,
-              "Magenta");
-          if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(&report,YellowPixelChannel,"Yellow");
-          if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(&report,BlackPixelChannel,"Black");
-          break;
-        }
         default:
         {
-          PrintGrayOrChannelStatistics(image,colorspace,report);
+          PrintCMYKOrOtherStatistics(image,colorspace,report);
           break;
         }
       }
