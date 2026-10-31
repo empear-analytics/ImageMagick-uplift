@@ -2196,6 +2196,61 @@ static MagickBooleanType RelabelMergedObject(const CCObjectMerge *object_merge,
   return(status);
 }
 
+typedef struct _CCLabelRow
+{
+  const Image
+    *image;
+
+  MatrixInfo
+    *equivalences;
+
+  CCObjectInfo
+    *object;
+
+  Image
+    *component_image;
+
+  ssize_t
+    y;
+} CCLabelRow;
+
+static void LabelObjectRow(const CCLabelRow *label_row,
+  const CCLabelTargets label_targets)
+{
+  const Image
+    *const image = label_row->image;
+
+  MatrixInfo
+    *const equivalences = label_row->equivalences;
+
+  CCObjectInfo
+    *const object = label_row->object;
+
+  Image
+    *const component_image = label_row->component_image;
+
+  const ssize_t
+    y = label_row->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) component_image->columns; x++)
+  {
+    CCLabelPixel
+      label_pixel;
+
+    label_pixel.image=image;
+    label_pixel.equivalences=equivalences;
+    label_pixel.object=object;
+    label_pixel.component_image=component_image;
+    label_pixel.x=x;
+    label_pixel.y=y;
+    if (LabelObjectPixel(&label_pixel,&label_targets) == MagickFalse)
+      break;
+  }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2326,8 +2381,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     const CCLabelTargets
       label_targets = { &status, &n, &p, &q };
 
-    ssize_t
-      x;
+    CCLabelRow
+      label_row;
 
     if (status == MagickFalse)
       continue;
@@ -2339,20 +2394,12 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) component_image->columns; x++)
-    {
-      CCLabelPixel
-        label_pixel;
-
-      label_pixel.image=image;
-      label_pixel.equivalences=equivalences;
-      label_pixel.object=object;
-      label_pixel.component_image=component_image;
-      label_pixel.x=x;
-      label_pixel.y=y;
-      if (LabelObjectPixel(&label_pixel,&label_targets) == MagickFalse)
-        break;
-    }
+    label_row.image=image;
+    label_row.equivalences=equivalences;
+    label_row.object=object;
+    label_row.component_image=component_image;
+    label_row.y=y;
+    LabelObjectRow(&label_row,label_targets);
     if (n > (ssize_t) MaxColormapSize)
       break;
     if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
