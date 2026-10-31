@@ -1278,6 +1278,30 @@ static MagickBooleanType InterpolateIntegerPixelChannel(
   return(status);
 }
 
+static void InterpolatePointPixelChannel(const ChannelInterpolation grid,
+  const PixelInterpolateMethod interpolate,double *pixel,
+  MagickBooleanType *status)
+{
+  switch (interpolate)
+  {
+    default:
+    {
+      InterpolateGridPixelChannel(grid,interpolate,pixel,status);
+      break;
+    }
+    case IntegerInterpolatePixel:
+    {
+      (*status)=InterpolateIntegerPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+    case NearestInterpolatePixel:
+    {
+      (*status)=InterpolateNearestPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannel(
   const Image *magick_restrict image,const CacheView_ *image_view,
   const PixelChannel channel,const PixelInterpolateMethod method,const double x,
@@ -1332,17 +1356,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     }
     default:
     {
-      InterpolateGridPixelChannel(grid,interpolate,pixel,&status);
-      break;
-    }
-    case IntegerInterpolatePixel:
-    {
-      status=InterpolateIntegerPixelChannel(&grid,pixel,status);
-      break;
-    }
-    case NearestInterpolatePixel:
-    {
-      status=InterpolateNearestPixelChannel(&grid,pixel,status);
+      InterpolatePointPixelChannel(grid,interpolate,pixel,&status);
       break;
     }
   }
