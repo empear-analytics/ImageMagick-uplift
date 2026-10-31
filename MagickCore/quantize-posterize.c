@@ -324,11 +324,43 @@ typedef struct _PosterizeMapInfo
     *exception;
 } PosterizeMapInfo;
 
+static void FillPosterizeMap(const PosterizeMapInfo *map_info,
+  const MagickRealType scale,Quantum *q)
+{
+  Image
+    *const image = map_info->image,
+    *const map_image = map_info->map_image;
+
+  const size_t
+    levels = map_info->levels,
+    number_columns = map_info->number_columns;
+
+  ssize_t
+    c,
+    x;
+
+  for (x=0; x < (ssize_t) number_columns; x++)
+  {
+    size_t remainder = (size_t) x;
+    for (c=0; c < (ssize_t) GetPixelChannels(image); c++)
+    {
+      PixelChannel channel = GetPixelChannelChannel(image,c);
+      PixelTrait traits = GetPixelChannelTraits(image,channel);
+      if ((traits & UpdatePixelTrait) != 0)
+        {
+          size_t value = remainder % levels;
+          SetPixelChannel(map_image,channel,(const Quantum) (scale*value),q);
+          remainder=(remainder-value)/levels;
+        }
+    }
+    q+=(ptrdiff_t) GetPixelChannels(map_image);
+  }
+}
+
 static MagickBooleanType PopulatePosterizeMap(const PosterizeMapInfo *map_info,
   MagickBooleanType *status)
 {
   Image
-    *const image = map_info->image,
     *const map_image = map_info->map_image;
 
   const size_t
@@ -347,10 +379,6 @@ static MagickBooleanType PopulatePosterizeMap(const PosterizeMapInfo *map_info,
   Quantum
     *magick_restrict q;
 
-  ssize_t
-    c,
-    x;
-
   /*
     Populate the map image.
   */
@@ -363,22 +391,7 @@ static MagickBooleanType PopulatePosterizeMap(const PosterizeMapInfo *map_info,
       *status=MagickFalse;
       return(MagickFalse);
     }
-  for (x=0; x < (ssize_t) number_columns; x++)
-  {
-    size_t remainder = (size_t) x;
-    for (c=0; c < (ssize_t) GetPixelChannels(image); c++)
-    {
-      PixelChannel channel = GetPixelChannelChannel(image,c);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      if ((traits & UpdatePixelTrait) != 0)
-        {
-          size_t value = remainder % levels;
-          SetPixelChannel(map_image,channel,(const Quantum) (scale*value),q);
-          remainder=(remainder-value)/levels;
-        }
-    }
-    q+=(ptrdiff_t) GetPixelChannels(map_image);
-  }
+  FillPosterizeMap(map_info,scale,q);
   if (SyncCacheViewAuthenticPixels(map_image_view,exception) == MagickFalse)
     {
       map_image_view=DestroyCacheView(map_image_view);
