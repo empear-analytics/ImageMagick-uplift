@@ -2536,6 +2536,52 @@ static inline MagickBooleanType IsNextDirectoryOffset(const ssize_t offset,
     (level < (MaxDirectoryStack-2))) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _ExifTagInfo
+{
+  const Image
+    *image;
+
+  EndianType
+    endian;
+
+  unsigned char
+    *directory,
+    *ifd0;
+
+  size_t
+    number_bytes;
+
+  unsigned char
+    *p;
+} ExifTagInfo;
+
+static void SyncExifXResolution(const ExifTagInfo *exif_tag)
+{
+  const Image
+    *const image = exif_tag->image;
+
+  const EndianType
+    endian = exif_tag->endian;
+
+  unsigned char
+    *const directory = exif_tag->directory;
+
+  unsigned char
+    *const ifd0 = exif_tag->ifd0;
+
+  const size_t
+    number_bytes = exif_tag->number_bytes;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  if (directory != ifd0)
+    return;
+  (void) WriteProfileLong(endian,(size_t) (image->resolution.x+0.5),p);
+  if (number_bytes == 8)
+    (void) WriteProfileLong(endian,1UL,p+4);
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -2645,6 +2691,9 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
       continue;
     for ( ; entry < number_entries; entry++)
     {
+      ExifTagInfo
+        exif_tag;
+
       int
         components;
 
@@ -2692,6 +2741,12 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
             continue;  /* prevent overflow */
           p=(unsigned char *) (exif+offset);
         }
+      exif_tag.image=image;
+      exif_tag.endian=endian;
+      exif_tag.directory=directory;
+      exif_tag.ifd0=ifd0;
+      exif_tag.number_bytes=number_bytes;
+      exif_tag.p=p;
       switch (tag_value)
       {
         case TAG_IMAGE_WIDTH:
@@ -2712,11 +2767,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
         }
         case 0x011a:
         {
-          if (directory != ifd0)
-            break;
-          (void) WriteProfileLong(endian,(size_t) (image->resolution.x+0.5),p);
-          if (number_bytes == 8)
-            (void) WriteProfileLong(endian,1UL,p+4);
+          SyncExifXResolution(&exif_tag);
           break;
         }
         case 0x011b:
