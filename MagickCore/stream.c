@@ -2249,6 +2249,32 @@ static void StreamFloatBGRPixels(const Image *image,
   }
 }
 
+static void StreamFloatBGRAPixels(const Image *image,
+  const QuantumInfo *quantum_info,float *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=(float) ((QuantumScale*(double) GetPixelBlue(image,p))*
+      quantum_info->scale+quantum_info->minimum);
+    *q++=(float) ((QuantumScale*(double) GetPixelGreen(image,p))*
+      quantum_info->scale+quantum_info->minimum);
+    *q++=(float) ((QuantumScale*(double) GetPixelRed(image,p))*
+      quantum_info->scale+quantum_info->minimum);
+    *q++=(float) ((QuantumScale*(double) GetPixelAlpha(image,p))*
+      quantum_info->scale+quantum_info->minimum);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2632,21 +2658,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         }
       if (LocaleCompare(stream_info->map,"BGRA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=(float) ((QuantumScale*(double) GetPixelBlue(image,p))*
-              quantum_info->scale+quantum_info->minimum);
-            *q++=(float) ((QuantumScale*(double) GetPixelGreen(image,p))*
-              quantum_info->scale+quantum_info->minimum);
-            *q++=(float) ((QuantumScale*(double) GetPixelRed(image,p))*
-              quantum_info->scale+quantum_info->minimum);
-            *q++=(float) ((QuantumScale*(double) GetPixelAlpha(image,p))*
-              quantum_info->scale+quantum_info->minimum);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamFloatBGRAPixels(image,quantum_info,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRP") == 0)
