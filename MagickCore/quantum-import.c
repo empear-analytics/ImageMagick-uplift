@@ -7377,6 +7377,37 @@ static void ImportAnyDepthRGBOQuantum(const Image *image,
   }
 }
 
+static void ImportOtherDepthRGBOQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import24BitFloatRGBOQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import64BitFloatRGBOQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ImportAnyDepthRGBOQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -7404,27 +7435,9 @@ static void ImportRGBOQuantum(const Image *image,QuantumInfo *quantum_info,
       Import32BitRGBOQuantum(image,quantum_info,span);
       break;
     }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import24BitFloatRGBOQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import64BitFloatRGBOQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ImportAnyDepthRGBOQuantum(image,quantum_info,span);
+      ImportOtherDepthRGBOQuantum(image,quantum_info,span);
       break;
     }
   }
