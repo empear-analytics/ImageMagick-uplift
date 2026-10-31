@@ -1115,6 +1115,42 @@ static MagickBooleanType InterpolateCubicPixelChannel(
   return(status);
 }
 
+static MagickBooleanType InterpolateBilinearPixelChannel(
+  const ChannelInterpolation *grid,double *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  double
+    alpha[16],
+    gamma,
+    pixels[16];
+
+  PointInfo
+    delta,
+    epsilon;
+
+  p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
+    2,2,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  LoadInterpolatePixels(grid->image,grid->channel,grid->traits,p,4,alpha,
+    pixels);
+  delta.x=grid->x-grid->x_offset;
+  delta.y=grid->y-grid->y_offset;
+  epsilon.x=1.0-delta.x;
+  epsilon.y=1.0-delta.y;
+  gamma=((epsilon.y*(epsilon.x*alpha[0]+delta.x*alpha[1])+delta.y*
+    (epsilon.x*alpha[2]+delta.x*alpha[3])));
+  gamma=MagickSafeReciprocal(gamma);
+  *pixel=gamma*(epsilon.y*(epsilon.x*pixels[0]+delta.x*pixels[1])+delta.y*
+    (epsilon.x*pixels[2]+delta.x*pixels[3]));
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannel(
   const Image *magick_restrict image,const CacheView_ *image_view,
   const PixelChannel channel,const PixelInterpolateMethod method,const double x,
@@ -1209,26 +1245,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     case BilinearInterpolatePixel:
     default:
     {
-      PointInfo
-        delta,
-        epsilon;
-
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      LoadInterpolatePixels(image,channel,traits,p,4,alpha,pixels);
-      delta.x=x-x_offset;
-      delta.y=y-y_offset;
-      epsilon.x=1.0-delta.x;
-      epsilon.y=1.0-delta.y;
-      gamma=((epsilon.y*(epsilon.x*alpha[0]+delta.x*alpha[1])+delta.y*
-        (epsilon.x*alpha[2]+delta.x*alpha[3])));
-      gamma=MagickSafeReciprocal(gamma);
-      *pixel=gamma*(epsilon.y*(epsilon.x*pixels[0]+delta.x*pixels[1])+delta.y*
-        (epsilon.x*pixels[2]+delta.x*pixels[3]));
+      status=InterpolateBilinearPixelChannel(&grid,pixel,status);
       break;
     }
     case BlendInterpolatePixel:
