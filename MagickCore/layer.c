@@ -794,6 +794,31 @@ static ssize_t FindDifferingPixel(const DifferingPixelScan *scan,
   return(i);
 }
 
+static ssize_t FindFirstDifferingColumn(const Image *alpha_image,
+  const Image *beta_image,const DifferingPixelScan scan,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *p,
+    *q;
+
+  ssize_t
+    x,
+    y;
+
+  for (x=0; x < (ssize_t) alpha_image->columns; x++)
+  {
+    p=GetVirtualPixels(alpha_image,x,0,1,alpha_image->rows,exception);
+    q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
+    if (IsEitherRowMissing(p,q) != MagickFalse)
+      break;
+    y=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->rows);
+    if (y < (ssize_t) alpha_image->rows)
+      break;
+  }
+  return(x);
+}
+
 static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   const Image *beta_image,const LayerMethod method,ExceptionInfo *exception)
 {
@@ -823,16 +848,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
       alpha_image->filename);
   GetPixelInfo(alpha_image,&alpha_pixel);
   GetPixelInfo(beta_image,&beta_pixel);
-  for (x=0; x < (ssize_t) alpha_image->columns; x++)
-  {
-    p=GetVirtualPixels(alpha_image,x,0,1,alpha_image->rows,exception);
-    q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
-    if (IsEitherRowMissing(p,q) != MagickFalse)
-      break;
-    y=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->rows);
-    if (y < (ssize_t) alpha_image->rows)
-      break;
-  }
+  x=FindFirstDifferingColumn(alpha_image,beta_image,scan,exception);
   if (x >= (ssize_t) alpha_image->columns)
     {
       /*
