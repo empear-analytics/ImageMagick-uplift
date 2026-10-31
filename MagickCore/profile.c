@@ -1955,6 +1955,18 @@ static void SetResourceBlockProfile(const ResourceBlockEntry *entry,
   }
 }
 
+static const unsigned char *ReadResolutionResourceBlock(Image *image,
+  const ssize_t count,const unsigned char *p)
+{
+  /*
+    Resolution.
+  */
+  if (count < 16)
+    return(p);
+  p=ReadResolutionResource(image,p);
+  return(p);
+}
+
 static void GetProfilesFromResourceBlock(Image *image,
   const StringInfo *resource_block,ExceptionInfo *exception)
 {
@@ -2001,12 +2013,7 @@ static void GetProfilesFromResourceBlock(Image *image,
     {
       case 0x03ed:
       {
-        /*
-          Resolution.
-        */
-        if (count < 16)
-          break;
-        p=ReadResolutionResource(image,p);
+        p=ReadResolutionResourceBlock(image,count,p);
         break;
       }
       default:
