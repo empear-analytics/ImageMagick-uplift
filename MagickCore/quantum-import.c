@@ -6623,67 +6623,7 @@ static void ImportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
 static void ImportUnpacked10BitRGBAQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,unsigned int pixel)
 {
-  const MagickSizeType
-    number_pixels = span->number_pixels;
-
-  const unsigned char
-    *magick_restrict p = span->p;
-
-  Quantum
-    *magick_restrict q = span->q;
-
-  ssize_t
-    x;
-
-  ssize_t
-    i;
-
-  size_t
-    quantum;
-
-  ssize_t
-    n;
-
-  n=0;
-  quantum=0;
-  for (x=0; x < (ssize_t) number_pixels; x++)
-  {
-    for (i=0; i < 4; i++)
-    {
-      switch (n % 3)
-      {
-        case 0:
-        {
-          p=PushLongPixel(quantum_info->endian,p,&pixel);
-          quantum=(size_t) (ScaleShortToQuantum((unsigned short)
-            (((pixel >> 22) & 0x3ff) << 6)));
-          break;
-        }
-        case 1:
-        {
-          quantum=(size_t) (ScaleShortToQuantum((unsigned short)
-            (((pixel >> 12) & 0x3ff) << 6)));
-          break;
-        }
-        case 2:
-        {
-          quantum=(size_t) (ScaleShortToQuantum((unsigned short)
-            (((pixel >> 2) & 0x3ff) << 6)));
-          break;
-        }
-      }
-      switch (i)
-      {
-        case 0: SetPixelRed(image,(Quantum) quantum,q); break;
-        case 1: SetPixelGreen(image,(Quantum) quantum,q); break;
-        case 2: SetPixelBlue(image,(Quantum) quantum,q); break;
-        case 3: SetPixelAlpha(image,(Quantum) quantum,q); break;
-      }
-      n++;
-    }
-    p+=(ptrdiff_t) quantum_info->pad;
-    q+=(ptrdiff_t) GetPixelChannels(image);
-  }
+  ImportUnpacked10BitBGRAQuantum(image,quantum_info,span,pixel);
 }
 
 static void Import10BitRGBAQuantum(const Image *image,QuantumInfo *quantum_info,
