@@ -482,6 +482,82 @@ static void ApplyArithmeticEvaluateOperator(const Quantum pixel,
   }
 }
 
+typedef struct _EvaluateOperands
+{
+  RandomInfo
+    *random_info;
+
+  Quantum
+    pixel;
+
+  MagickEvaluateOperator
+    op;
+
+  double
+    value;
+} EvaluateOperands;
+
+static void ApplyNoiseEvaluateOperator(const EvaluateOperands *operands,
+  double *result)
+{
+  RandomInfo
+    *const random_info = operands->random_info;
+
+  const Quantum
+    pixel = operands->pixel;
+
+  const MagickEvaluateOperator
+    op = operands->op;
+
+  const double
+    value = operands->value;
+
+  switch (op)
+  {
+    default:
+    {
+      ApplyArithmeticEvaluateOperator(pixel,op,value,result);
+      break;
+    }
+    case GaussianNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        GaussianNoise,value);
+      break;
+    }
+    case ImpulseNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        ImpulseNoise,value);
+      break;
+    }
+    case LaplacianNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        LaplacianNoise,value);
+      break;
+    }
+    case MultiplicativeNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        MultiplicativeGaussianNoise,value);
+      break;
+    }
+    case PoissonNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        PoissonNoise,value);
+      break;
+    }
+    case UniformNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        UniformNoise,value);
+      break;
+    }
+  }
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
@@ -493,25 +569,14 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   {
     default:
     {
-      ApplyArithmeticEvaluateOperator(pixel,op,value,&result);
-      break;
-    }
-    case GaussianNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,GaussianNoise,
-        value);
-      break;
-    }
-    case ImpulseNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,ImpulseNoise,
-        value);
-      break;
-    }
-    case LaplacianNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,
-        LaplacianNoise,value);
+      EvaluateOperands
+        operands;
+
+      operands.random_info=random_info;
+      operands.pixel=pixel;
+      operands.op=op;
+      operands.value=value;
+      ApplyNoiseEvaluateOperator(&operands,&result);
       break;
     }
     case MaxEvaluateOperator:
@@ -534,27 +599,9 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
       result=MagickMin((double) pixel,value);
       break;
     }
-    case MultiplicativeNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,
-        MultiplicativeGaussianNoise,value);
-      break;
-    }
-    case PoissonNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,PoissonNoise,
-        value);
-      break;
-    }
     case SetEvaluateOperator:
     {
       result=value;
-      break;
-    }
-    case UniformNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,UniformNoise,
-        value);
       break;
     }
   }
