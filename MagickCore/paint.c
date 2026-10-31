@@ -542,14 +542,6 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     {
       if (skip == MagickFalse)
         {
-          row.image=image;
-          row.floodplane_image=floodplane_image;
-          row.image_view=image_view;
-          row.floodplane_view=floodplane_view;
-          row.target=target;
-          row.invert=invert;
-          row.y=y;
-          row.exception=exception;
           if (FillFloodplaneRun(&row,&x) == MagickFalse)
             break;
           PushSegmentStack(y,start,x-1,offset);
@@ -560,14 +552,6 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
       x++;
       if (x <= x2)
         {
-          row.image=image;
-          row.floodplane_image=floodplane_image;
-          row.image_view=image_view;
-          row.floodplane_view=floodplane_view;
-          row.target=target;
-          row.invert=invert;
-          row.y=y;
-          row.exception=exception;
           if (SkipFloodplaneRun(&row,x2,&x) == MagickFalse)
             break;
         }
