@@ -7659,6 +7659,37 @@ static void ImportBGRGrayFamilyQuantum(const Image *image,
   }
 }
 
+static void ImportChannelFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span)
+{
+  switch (quantum_type)
+  {
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      ImportPixelChannel(image,quantum_info,&span,BluePixelChannel);
+      break;
+    }
+    case CbYCrYQuantum:
+    {
+      ImportCbYCrYQuantum(image,quantum_info,&span);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      ImportPixelChannel(image,quantum_info,&span,GreenPixelChannel);
+      break;
+    }
+    default:
+    {
+      ImportBGRGrayFamilyQuantum(image,quantum_info,quantum_type,span);
+      break;
+    }
+  }
+}
+
 MagickExport size_t ImportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,const unsigned char *magick_restrict pixels,
@@ -7723,12 +7754,6 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       ImportBlackQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      ImportPixelChannel(image,quantum_info,&span,BluePixelChannel);
-      break;
-    }
     case CMYKQuantum:
     {
       ImportCMYKQuantum(image,quantum_info,&span,exception);
@@ -7749,17 +7774,6 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       ImportCMYKOQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case CbYCrYQuantum:
-    {
-      ImportCbYCrYQuantum(image,quantum_info,&span);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      ImportPixelChannel(image,quantum_info,&span,GreenPixelChannel);
-      break;
-    }
     case IndexQuantum:
     {
       ImportIndexQuantum(image,quantum_info,&span,exception);
@@ -7777,7 +7791,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
     default:
     {
-      ImportBGRGrayFamilyQuantum(image,quantum_info,quantum_type,span);
+      ImportChannelFamilyQuantum(image,quantum_info,quantum_type,span);
       break;
     }
   }
