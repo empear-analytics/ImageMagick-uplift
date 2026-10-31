@@ -103,6 +103,21 @@
 #include "MagickCore/version.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _FunctionArguments
+{
+  const MagickFunction
+    function;
+
+  const size_t
+    number_parameters;
+
+  const double
+    *parameters;
+} FunctionArguments;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -211,9 +226,8 @@ static double ApplyArctanFunction(Quantum pixel,
   return(result);
 }
 
-static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
-  const size_t number_parameters,const double *parameters,
-  ExceptionInfo *exception)
+static Quantum ApplyFunction(Quantum pixel,
+  const FunctionArguments *arguments,ExceptionInfo *exception)
 {
   double
     result;
@@ -223,7 +237,7 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
 
   (void) exception;
   result=0.0;
-  switch (function)
+  switch (arguments->function)
   {
     case PolynomialFunction:
     {
@@ -232,24 +246,27 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
         c1*x^2+c2*x+c3).
       */
       result=0.0;
-      for (i=0; i < (ssize_t) number_parameters; i++)
-        result=result*QuantumScale*(double) pixel+parameters[i];
+      for (i=0; i < (ssize_t) arguments->number_parameters; i++)
+        result=result*QuantumScale*(double) pixel+arguments->parameters[i];
       result*=(double) QuantumRange;
       break;
     }
     case SinusoidFunction:
     {
-      result=ApplySinusoidFunction(pixel,number_parameters,parameters);
+      result=ApplySinusoidFunction(pixel,arguments->number_parameters,
+        arguments->parameters);
       break;
     }
     case ArcsinFunction:
     {
-      result=ApplyArcsinFunction(pixel,number_parameters,parameters);
+      result=ApplyArcsinFunction(pixel,arguments->number_parameters,
+        arguments->parameters);
       break;
     }
     case ArctanFunction:
     {
-      result=ApplyArctanFunction(pixel,number_parameters,parameters);
+      result=ApplyArctanFunction(pixel,arguments->number_parameters,
+        arguments->parameters);
       break;
     }
     case UndefinedFunction:
@@ -262,6 +279,9 @@ static void ApplyFunctionToPixel(const Image *image,
   const MagickFunction function,const size_t number_parameters,
   const double *parameters,ExceptionInfo *exception,Quantum *magick_restrict q)
 {
+  const FunctionArguments
+    arguments = { function, number_parameters, parameters };
+
   ssize_t
     i;
 
@@ -271,8 +291,7 @@ static void ApplyFunctionToPixel(const Image *image,
     PixelTrait traits = GetPixelChannelTraits(image,channel);
     if ((traits & UpdatePixelTrait) == 0)
       continue;
-    q[i]=ApplyFunction(q[i],function,number_parameters,parameters,
-      exception);
+    q[i]=ApplyFunction(q[i],&arguments,exception);
   }
 }
 
