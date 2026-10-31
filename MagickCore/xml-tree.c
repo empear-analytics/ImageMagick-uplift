@@ -2572,6 +2572,78 @@ static MagickBooleanType ParseDeclaration(const DeclarationInfo *declaration,
   return(MagickTrue);
 }
 
+typedef struct _MarkupTargets
+{
+  char
+    **p,
+    **tag;
+
+  ssize_t
+    *l;
+
+  size_t
+    *ignore_depth;
+} MarkupTargets;
+
+static MagickBooleanType ParseMarkup(XMLTreeRoot *root,const int terminal,
+  ExceptionInfo *exception,const MarkupTargets *markup)
+{
+  char
+    **const p = markup->p;
+
+  char
+    **const tag = markup->tag;
+
+  ssize_t
+    *const l = markup->l;
+
+  size_t
+    *const ignore_depth = markup->ignore_depth;
+
+  if (**p == '/')
+    {
+      EndTagTargets
+        targets;
+
+      targets.p=p;
+      targets.ignore_depth=ignore_depth;
+      if (ParseEndTag(root,terminal,exception,&targets) == MagickFalse)
+        {
+          return(MagickFalse);
+        }
+    }
+  else
+    if (strncmp(*p,"!--",3) == 0)
+      {
+        if (SkipComment(p,terminal,exception) == MagickFalse)
+          {
+            return(MagickFalse);
+          }
+      }
+    else
+      {
+        DeclarationInfo
+          declaration;
+
+        DeclarationTargets
+          declaration_targets;
+
+        declaration.root=root;
+        declaration.ignore_depth=*ignore_depth;
+        declaration.terminal=terminal;
+        declaration.exception=exception;
+        declaration_targets.p=p;
+        declaration_targets.tag=tag;
+        declaration_targets.l=l;
+        if (ParseDeclaration(&declaration,&declaration_targets) ==
+            MagickFalse)
+          {
+            return(MagickFalse);
+          }
+      }
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2695,50 +2767,20 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
           }
       }
     else
-      if (*p == '/')
-        {
-          EndTagTargets
-            targets;
+      {
+        MarkupTargets
+          markup;
 
-          targets.p=(&p);
-          targets.ignore_depth=(&ignore_depth);
-          if (ParseEndTag(root,terminal,exception,&targets) == MagickFalse)
-            {
-              utf8=DestroyString(utf8);
-              return(&root->root);
-            }
-        }
-      else
-        if (strncmp(p,"!--",3) == 0)
+        markup.p=(&p);
+        markup.tag=(&tag);
+        markup.l=(&l);
+        markup.ignore_depth=(&ignore_depth);
+        if (ParseMarkup(root,terminal,exception,&markup) == MagickFalse)
           {
-            if (SkipComment(&p,terminal,exception) == MagickFalse)
-              {
-                utf8=DestroyString(utf8);
-                return(&root->root);
-              }
+            utf8=DestroyString(utf8);
+            return(&root->root);
           }
-        else
-          {
-            DeclarationInfo
-              declaration;
-
-            DeclarationTargets
-              declaration_targets;
-
-            declaration.root=root;
-            declaration.ignore_depth=ignore_depth;
-            declaration.terminal=terminal;
-            declaration.exception=exception;
-            declaration_targets.p=(&p);
-            declaration_targets.tag=(&tag);
-            declaration_targets.l=(&l);
-            if (ParseDeclaration(&declaration,&declaration_targets) ==
-                MagickFalse)
-              {
-                utf8=DestroyString(utf8);
-                return(&root->root);
-              }
-          }
+      }
      if ((p == (char *) NULL) || (*p == '\0'))
        break;
      *p++='\0';
