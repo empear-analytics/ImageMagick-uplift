@@ -333,6 +333,16 @@ static void NormalizeContributionDensity(ContributionInfo *contribution,
     }
 }
 
+static MagickBooleanType DestroyFilterResources(CacheView *image_view,
+  CacheView *resize_view,ContributionInfo **contributions,
+  const MagickBooleanType status)
+{
+  resize_view=DestroyCacheView(resize_view);
+  image_view=DestroyCacheView(image_view);
+  contributions=DestroyContributionTLS(contributions);
+  return(status);
+}
+
 static MagickBooleanType HorizontalFilter(
   const ResizeFilter *magick_restrict resize_filter,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
@@ -449,10 +459,7 @@ static MagickBooleanType HorizontalFilter(
           status=MagickFalse;
       }
   }
-  resize_view=DestroyCacheView(resize_view);
-  image_view=DestroyCacheView(image_view);
-  contributions=DestroyContributionTLS(contributions);
-  return(status);
+  return(DestroyFilterResources(image_view,resize_view,contributions,status));
 }
 
 static void FilterVerticalPixel(const Image *image,
