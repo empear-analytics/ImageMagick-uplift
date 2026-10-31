@@ -427,6 +427,22 @@ static MagickBooleanType StoreDespeckleChannel(const DespeckleStore *store,
 
 #define DespeckleImageTag  "Despeckle/Image"
 
+static MagickBooleanType ReportDespeckleProgress(const Image *image,
+  const ssize_t i,MagickBooleanType status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,DespeckleImageTag,(MagickOffsetType) i,
+        GetPixelChannels(image));
+      if (proceed == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -581,16 +597,7 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
     store.channel=channel;
     store.pixels=pixels;
     status=StoreDespeckleChannel(&store,status,exception);
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,DespeckleImageTag,(MagickOffsetType) i,
-          GetPixelChannels(image));
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    status=ReportDespeckleProgress(image,i,status);
   }
   despeckle_view=DestroyCacheView(despeckle_view);
   image_view=DestroyCacheView(image_view);
