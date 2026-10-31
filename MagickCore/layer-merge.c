@@ -166,11 +166,11 @@ static void ExtendToMosaicBounds(const Image *image,size_t *width,
   }
 }
 
+#define MergeLayersTag  "Merge/Layers"
+
 MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
-#define MergeLayersTag  "Merge/Layers"
-
   Image
     *canvas;
 
