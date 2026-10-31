@@ -2024,6 +2024,37 @@ static void ImportAnyDepthBGROQuantum(const Image *image,
   }
 }
 
+static void ImportOtherDepthBGROQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import24BitFloatBGROQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import64BitFloatBGROQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ImportAnyDepthBGROQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ImportBGROQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -2051,27 +2082,9 @@ static void ImportBGROQuantum(const Image *image,QuantumInfo *quantum_info,
       Import32BitBGROQuantum(image,quantum_info,span);
       break;
     }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import24BitFloatBGROQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import64BitFloatBGROQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ImportAnyDepthBGROQuantum(image,quantum_info,span);
+      ImportOtherDepthBGROQuantum(image,quantum_info,span);
       break;
     }
   }
