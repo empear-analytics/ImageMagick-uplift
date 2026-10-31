@@ -1277,6 +1277,14 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    each thread fills its own.
 8. Check by reading that every member is assigned, from the variable of its name, and
    that every other argument fills the parameter it names.
+   *Sibling blocks* (the cases of one `switch`, each moved under this recipe in its own
+   commit) may share one `Name` and one local: the typedef holds the union of their
+   groups, and each new function reads only the members its block reads (the member
+   form of step 4, or `const` locals for those members alone). The local is filled
+   once, by step 6's assignments, at a point every call follows, and nothing on any path
+   from the fill to a call writes a member's variable (Recipe B step 5's condition):
+   checked by reading every path, the paths through blocks that stay in the caller
+   included.
 
 **Before:**
 
@@ -1372,6 +1380,13 @@ static void ThresholdWaveletLevel(float *pixels,
   every read gives the value the block's own read of the variable gave. `->` binds
   tighter than a cast or an arithmetic operator, so `(double) name->i-x` groups as
   `(double) i-x` did.
+- Under *Sibling blocks* (step 8), each call reads the values the members took at the
+  fill. Nothing between the fill and the call writes a member's variable, so each holds
+  the value the block's own read would have given, as in the single-call form; the
+  argument is Recipe B's for one struct serving several calls. A block that writes a
+  member's variable itself (a coordinate it computes before reading it) declares its own
+  variable (Recipe E step 4) and does not read that member, and once moved it no longer
+  writes the caller's variable.
 - Two helpers that unpack the same members into `const` locals (the Manhattan and
   Voronoi nearest-point searches of `SparseColorImage`), or that test the same five
   channel traits, are reported as *Code Duplication*; the member form removes the
@@ -3784,3 +3799,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | V | Step 7: `return(v);` after the shared cleanup `S` may be `return(e);` of a side-effect-free expression (no call, assignment, increment or decrement), the same text at every exit (checked by script), reading no variable the block writes; Recipe I step 8 follows. *Careful* gives the argument | `xml-tree.c`'s `NewXMLTree` (campaign B, task M115; the owner left the ruling to the session, 2026-10-30): about twelve exits end in `utf8=DestroyString(utf8); return(&root->root);`, which is neither a local, a constant nor a call | owner |
 | 2026-10-30 | AMEND | O | Step 2: a parameter of pointer type (declared `T *p`) whose own value the block assigns counts as a plain local, passed as `T **p` and written `(*p)`; writes through it stay writes through it. Recipes V, W, LB, I and OC read "plain local" the same way (V step 2 says so). *Careful* gives the argument | `xml-tree.c`'s `ParseEntities` and `ParseInternalDoctype` (campaign B, task M115; the owner left the ruling to the session, 2026-10-30): their blocks advance the `xml` parameter itself, which step 2 refused although the pointer object is the function's own (C11 6.9.1p9) | owner |
 | 2026-10-30 | NEW | NS | Name a Constant Selection: a recurring `(c ? k1 : k2)` that picks one of two literals of one type, with a side-effect-free `c`, becomes a call of a `static inline` function returning that type; all sites in one function per commit; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `annotate.c`'s `AnnotateImage` (campaign B, task M115): eighteen gravity signs such as `(geometry.width == 0 ? -1.0 : 1.0)` in one `switch`, cc 56 to 38 in a probe with identical object code; P names only boolean conditions, and SD's helpers would inherit the decisions (a three-case gravity helper would be a *Complex Method*) | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | N | Step 8, *Sibling blocks*: the cases of one `switch`, each moved under this recipe in its own commit, may share one `Name` (the union of their groups; each function reads only its own members) and one local filled once, where nothing on any path from the fill to a call writes a member's variable (Recipe B step 5's condition) | `pixel.c`'s `InterpolatePixelChannels` (campaign B, task M116): eight cases read the same eight inputs; a fill before each call adds nine lines per case to a function the step is meant to shrink | mandate (2026-10-24) |
