@@ -206,6 +206,14 @@ static MagickBooleanType BuildClutMap(const Image *clut_image,
   return(status);
 }
 
+static inline MagickBooleanType IsGrayImageWithColorClut(const Image *image,
+  const Image *clut_image)
+{
+  return(((IsGrayColorspace(image->colorspace) != MagickFalse) &&
+    (IsGrayColorspace(clut_image->colorspace) == MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
 static void ActivateClutAlpha(Image *image,const Image *clut_image,
   ExceptionInfo *exception)
 {
@@ -242,8 +250,7 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
-  if ((IsGrayColorspace(image->colorspace) != MagickFalse) &&
-      (IsGrayColorspace(clut_image->colorspace) == MagickFalse))
+  if (IsGrayImageWithColorClut(image,clut_image) != MagickFalse)
     (void) SetImageColorspace(image,sRGBColorspace,exception);
   clut_map=(PixelInfo *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*clut_map));
   if (clut_map == (PixelInfo *) NULL)
