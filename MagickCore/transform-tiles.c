@@ -208,11 +208,59 @@ static RectangleInfo GetTilePage(const Image *image)
   return(page);
 }
 
+static Image *CropFixedSizeTiles(const Image *image,RectangleInfo geometry,
+  ExceptionInfo *exception)
+{
+  Image
+    *next,
+    *crop_image;
+
+  RectangleInfo
+    page;
+
+  size_t
+    height,
+    width;
+
+  ssize_t
+    x,
+    y;
+
+  /*
+    Crop into tiles of fixed size WxH.
+  */
+  page=GetTilePage(image);
+  width=geometry.width;
+  if (width == 0)
+    width=page.width;
+  height=geometry.height;
+  if (height == 0)
+    height=page.height;
+  next=(Image *) NULL;
+  crop_image=NewImageList();
+  for (y=0; y < (ssize_t) page.height; y+=(ssize_t) height)
+  {
+    for (x=0; x < (ssize_t) page.width; x+=(ssize_t) width)
+    {
+      geometry.width=width;
+      geometry.height=height;
+      geometry.x=x;
+      geometry.y=y;
+      next=CropImage(image,&geometry,exception);
+      if (next == (Image *) NULL)
+        break;
+      AppendImageToList(&crop_image,next);
+    }
+    if (next == (Image *) NULL)
+      break;
+  }
+  return(crop_image);
+}
+
 MagickExport Image *CropImageToTiles(const Image *image,
   const char *crop_geometry,ExceptionInfo *exception)
 {
   Image
-    *next,
     *crop_image;
 
   MagickStatusType
@@ -317,47 +365,6 @@ MagickExport Image *CropImageToTiles(const Image *image,
       return(crop_image);
     }
   if ((image->columns > geometry.width) || (image->rows > geometry.height))
-    {
-      RectangleInfo
-        page;
-
-      size_t
-        height,
-        width;
-
-      ssize_t
-        x,
-        y;
-
-      /*
-        Crop into tiles of fixed size WxH.
-      */
-      page=GetTilePage(image);
-      width=geometry.width;
-      if (width == 0)
-        width=page.width;
-      height=geometry.height;
-      if (height == 0)
-        height=page.height;
-      next=(Image *) NULL;
-      crop_image=NewImageList();
-      for (y=0; y < (ssize_t) page.height; y+=(ssize_t) height)
-      {
-        for (x=0; x < (ssize_t) page.width; x+=(ssize_t) width)
-        {
-          geometry.width=width;
-          geometry.height=height;
-          geometry.x=x;
-          geometry.y=y;
-          next=CropImage(image,&geometry,exception);
-          if (next == (Image *) NULL)
-            break;
-          AppendImageToList(&crop_image,next);
-        }
-        if (next == (Image *) NULL)
-          break;
-      }
-      return(crop_image);
-    }
+    return(CropFixedSizeTiles(image,geometry,exception));
   return(CloneImage(image,0,0,MagickTrue,exception));
 }
