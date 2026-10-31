@@ -585,6 +585,30 @@ static void LogColorCorrection(const Image *image,
     }
 }
 
+static MagickBooleanType LoadColorCorrection(
+  const char *color_correction_collection,ColorCorrection *color_correction,
+  ExceptionInfo *exception)
+{
+  XMLTreeInfo
+    *cc,
+    *ccc;
+
+  if (color_correction_collection == (const char *) NULL)
+    return(MagickFalse);
+  ccc=NewXMLTree((const char *) color_correction_collection,exception);
+  if (ccc == (XMLTreeInfo *) NULL)
+    return(MagickFalse);
+  cc=GetXMLTreeChild(ccc,"ColorCorrection");
+  if (cc == (XMLTreeInfo *) NULL)
+    {
+      ccc=DestroyXMLTree(ccc);
+      return(MagickFalse);
+    }
+  *color_correction=ParseColorCorrection(cc);
+  ccc=DestroyXMLTree(ccc);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   const char *color_correction_collection,ExceptionInfo *exception)
 {
@@ -608,10 +632,6 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   ssize_t
     y;
 
-  XMLTreeInfo
-    *cc,
-    *ccc;
-
   /*
     Allocate and initialize cdl maps.
   */
@@ -619,19 +639,9 @@ MagickExport MagickBooleanType ColorDecisionListImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (color_correction_collection == (const char *) NULL)
+  if (LoadColorCorrection(color_correction_collection,&color_correction,
+        exception) == MagickFalse)
     return(MagickFalse);
-  ccc=NewXMLTree((const char *) color_correction_collection,exception);
-  if (ccc == (XMLTreeInfo *) NULL)
-    return(MagickFalse);
-  cc=GetXMLTreeChild(ccc,"ColorCorrection");
-  if (cc == (XMLTreeInfo *) NULL)
-    {
-      ccc=DestroyXMLTree(ccc);
-      return(MagickFalse);
-    }
-  color_correction=ParseColorCorrection(cc);
-  ccc=DestroyXMLTree(ccc);
   LogColorCorrection(image,color_correction);
   cdl_map=(PixelInfo *) AcquireQuantumMemory(MaxMap+1UL,sizeof(*cdl_map));
   if (cdl_map == (PixelInfo *) NULL)
