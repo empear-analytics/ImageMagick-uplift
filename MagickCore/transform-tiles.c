@@ -359,12 +359,30 @@ static Image *CropAreaTiles(const Image *image,RectangleInfo geometry,
   return(crop_image);
 }
 
-MagickExport Image *CropImageToTiles(const Image *image,
-  const char *crop_geometry,ExceptionInfo *exception)
+static Image *CropSingleRegion(const Image *image,
+  const RectangleInfo geometry,const MagickStatusType flags,
+  ExceptionInfo *exception)
 {
   Image
     *crop_image;
 
+  /*
+    Crop a single region at +X+Y.
+  */
+  crop_image=CropImage(image,&geometry,exception);
+  if ((crop_image != (Image *) NULL) && ((flags & AspectValue) != 0))
+    {
+      crop_image->page.width=geometry.width;
+      crop_image->page.height=geometry.height;
+      crop_image->page.x-=geometry.x;
+      crop_image->page.y-=geometry.y;
+    }
+  return(crop_image);
+}
+
+MagickExport Image *CropImageToTiles(const Image *image,
+  const char *crop_geometry,ExceptionInfo *exception)
+{
   MagickStatusType
     flags;
 
@@ -379,20 +397,7 @@ MagickExport Image *CropImageToTiles(const Image *image,
   if ((flags & AreaValue) != 0)
     return(CropAreaTiles(image,geometry,flags,exception));
   if (IsSingleRegionCrop(geometry,flags) != MagickFalse)
-    {
-      /*
-        Crop a single region at +X+Y.
-      */
-      crop_image=CropImage(image,&geometry,exception);
-      if ((crop_image != (Image *) NULL) && ((flags & AspectValue) != 0))
-        {
-          crop_image->page.width=geometry.width;
-          crop_image->page.height=geometry.height;
-          crop_image->page.x-=geometry.x;
-          crop_image->page.y-=geometry.y;
-        }
-      return(crop_image);
-    }
+    return(CropSingleRegion(image,geometry,flags,exception));
   if ((image->columns > geometry.width) || (image->rows > geometry.height))
     return(CropFixedSizeTiles(image,geometry,exception));
   return(CloneImage(image,0,0,MagickTrue,exception));
