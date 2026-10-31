@@ -444,6 +444,44 @@ static void ApplyTranscendentalEvaluateOperator(const Quantum pixel,
   }
 }
 
+static void ApplyArithmeticEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
+  switch (op)
+  {
+    default:
+    {
+      ApplyTranscendentalEvaluateOperator(pixel,op,value,result);
+      break;
+    }
+    case DivideEvaluateOperator:
+    {
+      (*result)=(double) pixel/(value == 0.0 ? 1.0 : value);
+      break;
+    }
+    case MultiplyEvaluateOperator:
+    {
+      (*result)=(double) pixel*value;
+      break;
+    }
+    case RootMeanSquareEvaluateOperator:
+    {
+      (*result)=((double) pixel*(double) pixel+value);
+      break;
+    }
+    case SubtractEvaluateOperator:
+    {
+      (*result)=(double) pixel-value;
+      break;
+    }
+    case SumEvaluateOperator:
+    {
+      (*result)=(double) pixel+value;
+      break;
+    }
+  }
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
@@ -455,12 +493,7 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   {
     default:
     {
-      ApplyTranscendentalEvaluateOperator(pixel,op,value,&result);
-      break;
-    }
-    case DivideEvaluateOperator:
-    {
-      result=(double) pixel/(value == 0.0 ? 1.0 : value);
+      ApplyArithmeticEvaluateOperator(pixel,op,value,&result);
       break;
     }
     case GaussianNoiseEvaluateOperator:
@@ -507,35 +540,15 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
         MultiplicativeGaussianNoise,value);
       break;
     }
-    case MultiplyEvaluateOperator:
-    {
-      result=(double) pixel*value;
-      break;
-    }
     case PoissonNoiseEvaluateOperator:
     {
       result=(double) GenerateDifferentialNoise(random_info,pixel,PoissonNoise,
         value);
       break;
     }
-    case RootMeanSquareEvaluateOperator:
-    {
-      result=((double) pixel*(double) pixel+value);
-      break;
-    }
     case SetEvaluateOperator:
     {
       result=value;
-      break;
-    }
-    case SubtractEvaluateOperator:
-    {
-      result=(double) pixel-value;
-      break;
-    }
-    case SumEvaluateOperator:
-    {
-      result=(double) pixel+value;
       break;
     }
     case UniformNoiseEvaluateOperator:
