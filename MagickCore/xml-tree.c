@@ -1088,13 +1088,25 @@ static ssize_t WriteUTF8Bytes(char *utf8,ssize_t j,const int c)
   return(j);
 }
 
+static int CombineUTF16Surrogates(const char *content,const ssize_t i,
+  const int encoding,int c)
+{
+  int
+    byte;
+
+  byte=(encoding != 0) ? ((content[i] & 0xff) << 8) |
+    (content[i+1] & 0xff) : ((content[i+1] & 0xff) << 8) |
+    (content[i] & 0xff);
+  c=(((c & 0x3ff) << 10) | (byte & 0x3ff))+0x10000;
+  return(c);
+}
+
 static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
 {
   char
     *utf8;
 
   int
-    byte,
     c,
     encoding;
 
@@ -1126,10 +1138,7 @@ static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
       ((content[i+1] & 0xff) << 8) | (content[i] & 0xff);
     if ((c >= 0xd800) && (c <= 0xdfff) && ((i+=2) < (ssize_t) (*length-1)))
       {
-        byte=(encoding != 0) ? ((content[i] & 0xff) << 8) |
-          (content[i+1] & 0xff) : ((content[i+1] & 0xff) << 8) |
-          (content[i] & 0xff);
-        c=(((c & 0x3ff) << 10) | (byte & 0x3ff))+0x10000;
+        c=CombineUTF16Surrogates(content,i,encoding,c);
       }
     if ((size_t) (j+MagickPathExtent) > extent)
       {
