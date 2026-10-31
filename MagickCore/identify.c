@@ -1968,6 +1968,23 @@ static void PrintImageTimes(FILE *file,const Image *image,
     NULL));
 }
 
+static void GetRequestedFeatures(const Image *image,
+  ChannelFeatures **channel_features,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  size_t
+    distance;
+
+  artifact=GetImageArtifact(image,"identify:features");
+  if (artifact != (const char *) NULL)
+    {
+      distance=StringToUnsignedLong(artifact);
+      *channel_features=GetImageFeatures(image,distance,exception);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2001,8 +2018,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     ping;
 
   size_t
-    depth,
-    distance;
+    depth;
 
   struct stat
     properties;
@@ -2087,12 +2103,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
           channel_moments=GetImageMoments(image,exception);
           channel_phash=GetImagePerceptualHash(image,exception);
         }
-      artifact=GetImageArtifact(image,"identify:features");
-      if (artifact != (const char *) NULL)
-        {
-          distance=StringToUnsignedLong(artifact);
-          channel_features=GetImageFeatures(image,distance,exception);
-        }
+      GetRequestedFeatures(image,&channel_features,exception);
     }
   (void) FormatLocaleFile(file,"Image:\n  Filename: %s\n",image->filename);
   PrintImageBaseFilename(file,image);
