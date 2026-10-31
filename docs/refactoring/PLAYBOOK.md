@@ -967,7 +967,11 @@ merges code, not parameters.
    arithmetic on these (`1.0/scale`), not a call, a dereference or anything with a side
    effect. Member accesses (`shear.x`, `image->rows`) and casts of these forms are
    allowed too, but only in a struct filled directly before the one call that uses it,
-   with no statement between.
+   with no statement between. So is the address of a plain local of the caller,
+   written `(&v)`, for a pointer parameter whose argument was `&v` (a progress counter
+   the callee increments): the address does not change while the function runs, so
+   writes to `v` between the fill and a call (by an earlier call, through it) do not
+   count against step 5.
 5. Declare the local among the declarations at the top of the block that holds its
    calls (the loop body, for a struct per iteration), never after a statement: the
    macOS CI job compiles with `-Wdeclaration-after-statement -Werror`. Nothing may
@@ -977,7 +981,12 @@ merges code, not parameters.
    Otherwise declare it without `const` or initialiser, and fill it at that point,
    `name.member=expr;` for every member in declaration order, with nothing between.
 6. A struct declared outside a `#pragma omp` region and read inside it is `const`, and
-   none of its members point to data the region writes through the struct.
+   none of its members point to data the region writes through the struct. A struct
+   the function reaches only through its `const Name *name` parameter, a local of the
+   caller filled before the call (step 5) and written by nothing until the call
+   returns, counts as `const` here. A member whose target the region writes (a
+   progress counter, `exception`) is bound to a `const` local of its old name at the
+   top of the body (step 3), and the region uses the local.
 7. At each call, replace the group with `&name`, and check by reading that every member
    is initialised from the argument it replaces.
 8. Build: a call left with the old arguments does not compile.
@@ -1050,6 +1059,15 @@ static inline void CopyPixels(const MagnifyPixels *magnify,
   every call. Step 5 keeps its operands unchanged until the last call, so each call
   receives the value it computed before; the member has the parameter's type, so the
   value is rounded to it exactly as the argument was.
+- An address member (`(&offset)`) is the value the argument `&offset` had: the same
+  address at every call, whatever the earlier calls wrote to `offset` through it.
+- A struct reached through a pointer to `const` (step 6) is read by every thread of the
+  region and written by none: the caller filled it before the call and runs nothing
+  until the call returns. A thread reading `name->member` in the region reads the value
+  the parameter held, as it read the parameter before. A member whose target the region
+  writes is read once, into the bound local, outside the region; the region writes
+  through the local exactly as it wrote through the parameter, so a `#pragma omp
+  atomic` statement on it (`(*progress)++;`) keeps its text.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (no call may appear or
 vanish), and steps 4 to 7 checked by reading.
@@ -4218,3 +4236,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | rule 1 | A set whose blocks lie in several functions of the file may take different recipes when *Overall Code Complexity* is what lowers each block alone and no smaller set rule 1 already admits raises the score; the message names each block with its function, recipe and score alone, and each smaller set's score | `layer-merge.c`'s `MergeImageLayers` (W10), six functions at 9.63 (its one finding Complex Method, cc 13): Recipe Z on the method `switch` alone 9.38, Recipe E on the virtual-canvas block alone 9.09, Recipe E on the loop bodies of `ExtendToLayerBounds` and `ExtendToMosaicBounds` alone 9.04 each; every pair and every set of three 9.04 to 9.38 (the blocks of `MergeImageLayers` together 9.38, the two loop bodies together 9.04); all four 10.00 (mean cc under 4, no finding). The two loop bodies are what bring the mean under the threshold, and they are not blocks of `MergeImageLayers` | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | E | Step 7, `switch` form: when the block writes `v` before it reads it on every path, the new function declares `v` without an initialiser instead of taking it by value (step 4's rule for a variable written before it is read); the block still becomes `v=Helper(...);` and each `break;` `return(v);` | `gem.c`'s `GenerateDifferentialNoise` (W10): its Laplacian case leaves the `switch` through `break;` on its `alpha <= 0.5` branch and sets `noise` on every path, but the caller never sets `noise` before the `switch`, so taking it by value would read an uninitialised variable. With the Laplacian, impulse, multiplicative-Gaussian and Poisson cases as helpers and `GetOptimalKernelWidth2D`'s normalisation loop (rule 1's set), *Overall Code Complexity* leaves and Bumpy Road Ahead and Large Method go: 9.21 to 9.68 in a probe | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | V, Y | V step 7: the cleanup run `S` may be followed by a `return(<expr>);` of the step's last form in place of `return(v);`, both left in the caller. Y step 1: the block may leave only through exits of one of V step 7's forms, written in the caller as V step 7 writes them (step 6); Y step 4: after `v`, the pointers the block writes through that the struct leaves out (Recipe N step 2), at most four parameters. *Careful* gives the argument | `resize-image.c`'s `ResizeImage` (W10, cc 12, 88 lines): the filter-image clone and the two filter passes read eight variables and write `status` and the temporaries `filter_image`, `offset` and `span`; the one exit is `resize_filter=DestroyResizeFilter(resize_filter); return(DestroyImage(resize_image));`, which V step 7 names only as `S return(v);` or a lone `return(<expr>);`, and Recipe Y admits only `goto L;` or `return(c);`. A probe: `ResizeImage` leaves *Large Method* (cc 12 to 10), 6.46 to 6.59 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | B | Step 4: the address of a plain local, `(&v)`, may fill a pointer member; writes to `v` between the fill and a call do not count against step 5. Step 6: a struct the function reaches only through its `const Name *` parameter, filled by the caller before the call and written by nothing until it returns, counts as `const`; a member whose target the region writes is bound to a `const` local at the top of the body (step 3) and the region uses the local. *Careful* gives the argument | `resize-image.c`'s `HorizontalFilter` and `VerticalFilter` (W10, 7 arguments each): `resize_filter`, the scale factor, `span` and `&offset` are the same at every call in `ApplyResizeFilterPass`'s branch. `&offset` is neither an identifier nor arithmetic (step 4's letter), and the struct, filled member by member after `span` is computed, cannot be a `const` local (step 6's letter), though the filters read `resize_filter`, the factor and `span` in their parallel loops. Binding every member to a local instead grows each filter (102 to 108 lines) while it keeps *Large Method*. A probe: `HorizontalFilter` leaves *Excess Number of Function Arguments*, 6.63 to 6.83 | mandate (2026-10-24) |
