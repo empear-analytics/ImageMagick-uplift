@@ -3187,6 +3187,51 @@ static void StreamLongLongPixels(const StreamInfo *stream_info,
   StreamLongLongMapPixels(image,quantum_map,length,q);
 }
 
+static void StreamQuantumPixels(const StreamInfo *stream_info,
+  const Image *image,QuantumType *quantum_map,size_t length)
+{
+  Quantum
+    *q;
+
+  q=(Quantum *) stream_info->pixels;
+  if (LocaleCompare(stream_info->map,"BGR") == 0)
+    {
+      StreamQuantumBGRPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"BGRA") == 0)
+    {
+      StreamQuantumBGRAPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"BGRP") == 0)
+    {
+      StreamQuantumBGRPPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"I") == 0)
+    {
+      StreamQuantumIPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"RGB") == 0)
+    {
+      StreamQuantumRGBPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"RGBA") == 0)
+    {
+      StreamQuantumRGBAPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"RGBP") == 0)
+    {
+      StreamQuantumRGBPPixels(image,q);
+      return;
+    }
+  StreamQuantumMapPixels(image,quantum_map,length,q);
+}
+
 static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -3346,46 +3391,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
     }
     case QuantumPixel:
     {
-      Quantum
-        *q;
-
-      q=(Quantum *) stream_info->pixels;
-      if (LocaleCompare(stream_info->map,"BGR") == 0)
-        {
-          StreamQuantumBGRPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"BGRA") == 0)
-        {
-          StreamQuantumBGRAPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"BGRP") == 0)
-        {
-          StreamQuantumBGRPPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"I") == 0)
-        {
-          StreamQuantumIPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"RGB") == 0)
-        {
-          StreamQuantumRGBPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"RGBA") == 0)
-        {
-          StreamQuantumRGBAPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"RGBP") == 0)
-        {
-          StreamQuantumRGBPPixels(image,q);
-          break;
-        }
-      StreamQuantumMapPixels(image,quantum_map,length,q);
+      StreamQuantumPixels(stream_info,image,quantum_map,length);
       break;
     }
     case ShortPixel:
