@@ -96,6 +96,167 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _CombineChannelRowInfo
+{
+  Image
+    *combine_image;
+
+  const Image
+    *next;
+
+  Quantum
+    *pixels;
+
+  ssize_t
+    i;
+} CombineChannelRowInfo;
+
+static void CombineChannelRow(const CombineChannelRowInfo *channel_row,
+  const Quantum *magick_restrict p)
+{
+  Image
+    *const combine_image = channel_row->combine_image;
+
+  const Image
+    *const next = channel_row->next;
+
+  Quantum
+    *const pixels = channel_row->pixels;
+
+  const ssize_t
+    i = channel_row->i;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  q=pixels;
+  for (x=0; x < (ssize_t) combine_image->columns; x++)
+  {
+    if (x < (ssize_t) next->columns)
+      {
+        q[i]=(Quantum) GetPixelIntensity(next,p);
+        p+=(ptrdiff_t) GetPixelChannels(next);
+      }
+    q+=(ptrdiff_t) GetPixelChannels(combine_image);
+  }
+}
+
+typedef struct _CombineImageRowInfo
+{
+  const Image
+    *image;
+
+  Image
+    *combine_image;
+
+  Quantum
+    *pixels;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} CombineImageRowInfo;
+
+static void CombineImageRow(const CombineImageRowInfo *image_row)
+{
+  const Image
+    *const image = image_row->image;
+
+  Image
+    *const combine_image = image_row->combine_image;
+
+  Quantum
+    *const pixels = image_row->pixels;
+
+  const ssize_t
+    y = image_row->y;
+
+  ExceptionInfo
+    *const exception = image_row->exception;
+
+  CacheView
+    *image_view;
+
+  const Image
+    *next;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    i;
+
+  next=image;
+  for (i=0; i < (ssize_t) GetPixelChannels(combine_image); i++)
+  {
+    CombineChannelRowInfo
+      channel_row;
+
+    PixelChannel channel = GetPixelChannelChannel(combine_image,i);
+    PixelTrait traits = GetPixelChannelTraits(combine_image,channel);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    if (next == (Image *) NULL)
+      continue;
+    image_view=AcquireVirtualCacheView(next,exception);
+    p=GetCacheViewVirtualPixels(image_view,0,y,next->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      continue;
+    channel_row.combine_image=combine_image;
+    channel_row.next=next;
+    channel_row.pixels=pixels;
+    channel_row.i=i;
+    CombineChannelRow(&channel_row,p);
+    image_view=DestroyCacheView(image_view);
+    next=GetNextImageInList(next);
+  }
+}
+
+static void SetCombineImageColorspace(const Image *image,Image *combine_image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  if (colorspace != UndefinedColorspace)
+    (void) SetImageColorspace(combine_image,colorspace,exception);
+  else
+    if (fabs(image->gamma-1.0) <= MagickEpsilon)
+      (void) SetImageColorspace(combine_image,RGBColorspace,exception);
+    else
+      (void) SetImageColorspace(combine_image,sRGBColorspace,exception);
+}
+
+static void SetCombineCMYKChannels(Image *combine_image,
+  const size_t number_channels,ExceptionInfo *exception)
+{
+  switch (combine_image->colorspace)
+  {
+    case CMYKColorspace:
+    {
+      if (number_channels > 4)
+        combine_image->alpha_trait=BlendPixelTrait;
+      if (number_channels > 5)
+        SetPixelMetaChannels(combine_image,number_channels-5,exception);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static Image *FinishCombineImage(Image *combine_image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    combine_image=DestroyImage(combine_image);
+  else
+    combine_image->type=UndefinedType;
+  return(combine_image);
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -136,13 +297,7 @@ MagickExport Image *CombineImages(const Image *image,
       combine_image=DestroyImage(combine_image);
       return((Image *) NULL);
     }
-  if (colorspace != UndefinedColorspace)
-    (void) SetImageColorspace(combine_image,colorspace,exception);
-  else
-    if (fabs(image->gamma-1.0) <= MagickEpsilon)
-      (void) SetImageColorspace(combine_image,RGBColorspace,exception);
-    else
-      (void) SetImageColorspace(combine_image,sRGBColorspace,exception);
+  SetCombineImageColorspace(image,combine_image,colorspace,exception);
   number_channels=GetImageListLength(image);
   switch (combine_image->colorspace)
   {
@@ -164,16 +319,11 @@ MagickExport Image *CombineImages(const Image *image,
         SetPixelMetaChannels(combine_image,number_channels-2,exception);
       break;
     }
-    case CMYKColorspace:
+    default:
     {
-      if (number_channels > 4)
-        combine_image->alpha_trait=BlendPixelTrait;
-      if (number_channels > 5)
-        SetPixelMetaChannels(combine_image,number_channels-5,exception);
+      SetCombineCMYKChannels(combine_image,number_channels,exception);
       break;
     }
-    default:
-      break;
   }
   /*
     Combine images.
@@ -187,21 +337,11 @@ MagickExport Image *CombineImages(const Image *image,
 #endif
   for (y=0; y < (ssize_t) combine_image->rows; y++)
   {
-    CacheView
-      *image_view;
-
-    const Image
-      *next;
-
-    const Quantum
-      *magick_restrict p;
+    CombineImageRowInfo
+      image_row;
 
     Quantum
-      *pixels,
-      *magick_restrict q;
-
-    ssize_t
-      i;
+      *pixels;
 
     if (status == MagickFalse)
       continue;
@@ -212,35 +352,12 @@ MagickExport Image *CombineImages(const Image *image,
         status=MagickFalse;
         continue;
       }
-    next=image;
-    for (i=0; i < (ssize_t) GetPixelChannels(combine_image); i++)
-    {
-      ssize_t
-        x;
-
-      PixelChannel channel = GetPixelChannelChannel(combine_image,i);
-      PixelTrait traits = GetPixelChannelTraits(combine_image,channel);
-      if (traits == UndefinedPixelTrait)
-        continue;
-      if (next == (Image *) NULL)
-        continue;
-      image_view=AcquireVirtualCacheView(next,exception);
-      p=GetCacheViewVirtualPixels(image_view,0,y,next->columns,1,exception);
-      if (p == (const Quantum *) NULL)
-        continue;
-      q=pixels;
-      for (x=0; x < (ssize_t) combine_image->columns; x++)
-      {
-        if (x < (ssize_t) next->columns)
-          {
-            q[i]=(Quantum) GetPixelIntensity(next,p);
-            p+=(ptrdiff_t) GetPixelChannels(next);
-          }
-        q+=(ptrdiff_t) GetPixelChannels(combine_image);
-      }
-      image_view=DestroyCacheView(image_view);
-      next=GetNextImageInList(next);
-    }
+    image_row.image=image;
+    image_row.combine_image=combine_image;
+    image_row.pixels=pixels;
+    image_row.y=y;
+    image_row.exception=exception;
+    CombineImageRow(&image_row);
     if (SyncCacheViewAuthenticPixels(combine_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -259,9 +376,6 @@ MagickExport Image *CombineImages(const Image *image,
       }
   }
   combine_view=DestroyCacheView(combine_view);
-  if (status == MagickFalse)
-    combine_image=DestroyImage(combine_image);
-  else
-    combine_image->type=UndefinedType;
+  combine_image=FinishCombineImage(combine_image,status);
   return(combine_image);
 }

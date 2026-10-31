@@ -222,6 +222,17 @@ static PixelInfo GetDominantEdgeBackground(const double *census,
   return(edge_background);
 }
 
+static const char *GetEdgeBackgroundArtifact(const Image *image)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"convex-hull:background-color");
+  if (artifact == (const char *) NULL)
+    artifact=GetImageArtifact(image,"background");
+  return(artifact);
+}
+
 static PixelInfo GetEdgeBackgroundColor(const Image *image,
   const CacheView *image_view,ExceptionInfo *exception)
 {
@@ -242,9 +253,7 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
     Most dominant color of edges/corners is the background color of the image.
   */
   memset(&edge_background,0,sizeof(edge_background));
-  artifact=GetImageArtifact(image,"convex-hull:background-color");
-  if (artifact == (const char *) NULL)
-    artifact=GetImageArtifact(image,"background");
+  artifact=GetEdgeBackgroundArtifact(image);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static)
 #endif
@@ -313,6 +322,26 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
   return(GetDominantEdgeBackground(census,background,edge_background));
 }
 
+static size_t TraceForwardHullChain(PointInfo **chain,PointInfo *vertices,
+  size_t number_vertices)
+{
+  size_t
+    n;
+
+  ssize_t
+    i;
+
+  n=0;
+  for (i=0; i < (ssize_t) number_vertices; i++)
+  {
+    while ((n >= 2) &&
+           (LexicographicalOrder(chain[n-2],chain[n-1],&vertices[i]) <= 0.0))
+      n--;
+    chain[n++]=(&vertices[i]);
+  }
+  return(n);
+}
+
 void TraceConvexHull(PointInfo *vertices,size_t number_vertices,
   PointInfo ***monotone_chain,size_t *chain_length)
 {
@@ -330,14 +359,7 @@ void TraceConvexHull(PointInfo *vertices,size_t number_vertices,
     Construct the upper and lower hulls: rightmost to leftmost counterclockwise.
   */
   chain=(*monotone_chain);
-  n=0;
-  for (i=0; i < (ssize_t) number_vertices; i++)
-  {
-    while ((n >= 2) &&
-           (LexicographicalOrder(chain[n-2],chain[n-1],&vertices[i]) <= 0.0))
-      n--;
-    chain[n++]=(&vertices[i]);
-  }
+  n=TraceForwardHullChain(chain,vertices,number_vertices);
   demark=n+1;
   for (i=(ssize_t) number_vertices-2; i >= 0; i--)
   {
@@ -349,14 +371,154 @@ void TraceConvexHull(PointInfo *vertices,size_t number_vertices,
   *chain_length=n;
 }
 
+typedef struct _ConvexHullRow
+{
+  const Image
+    *image;
+
+  PixelInfo
+    background;
+
+  PointInfo
+    *vertices;
+
+  ssize_t
+    y;
+} ConvexHullRow;
+
+static void AddConvexHullRowVertices(const ConvexHullRow *row,size_t *n,
+  const Quantum **p)
+{
+  const Image
+    *image = row->image;
+
+  const PixelInfo
+    background = row->background;
+
+  PointInfo
+    *const vertices = row->vertices;
+
+  const ssize_t
+    y = row->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PixelInfo
+      pixel;
+
+    GetPixelInfoPixel(image,*p,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&background) == MagickFalse)
+      {
+        vertices[*n].x=(double) x;
+        vertices[*n].y=(double) y;
+        (*n)++;
+      }
+    *p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void RelinquishConvexHullMemory(MemoryInfo *monotone_info,
+  MemoryInfo *vertices_info)
+{
+  if (monotone_info != (MemoryInfo *) NULL)
+    monotone_info=(MemoryInfo *) RelinquishVirtualMemory(monotone_info);
+  if (vertices_info != (MemoryInfo *) NULL)
+    vertices_info=RelinquishVirtualMemory(vertices_info);
+}
+
+static void CopyConvexHullVertices(PointInfo *convex_hull,
+  PointInfo **monotone_chain,size_t *number_vertices)
+{
+  size_t
+    n;
+
+  if (convex_hull != (PointInfo *) NULL)
+    for (n=0; n < *number_vertices; n++)
+      convex_hull[n]=(*monotone_chain[n]);
+}
+
+typedef struct _ConvexHullScan
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  PixelInfo
+    background;
+
+  PointInfo
+    *vertices;
+
+  ExceptionInfo
+    *exception;
+} ConvexHullScan;
+
+static size_t ScanConvexHullVertices(const ConvexHullScan *scan)
+{
+  const Image
+    *const image = scan->image;
+
+  CacheView
+    *const image_view = scan->image_view;
+
+  const PixelInfo
+    background = scan->background;
+
+  PointInfo
+    *const vertices = scan->vertices;
+
+  ExceptionInfo
+    *const exception = scan->exception;
+
+  MagickBooleanType
+    status;
+
+  size_t
+    n;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  n=0;
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    ConvexHullRow
+      row;
+
+    const Quantum
+      *p;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    row.image=image;
+    row.background=background;
+    row.vertices=vertices;
+    row.y=y;
+    AddConvexHullRowVertices(&row,&n,&p);
+  }
+  return(n);
+}
+
 MagickExport PointInfo *GetImageConvexHull(const Image *image,
   size_t *number_vertices,ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
-  MagickBooleanType
-    status;
+  ConvexHullScan
+    scan;
 
   MemoryInfo
     *monotone_info,
@@ -373,9 +535,6 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
   size_t
     n;
 
-  ssize_t
-    y;
-
   /*
     Identify convex hull vertices of image foreground object(s).
   */
@@ -391,49 +550,19 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
   if ((vertices_info == (MemoryInfo *) NULL) ||
       (monotone_info == (MemoryInfo *) NULL))
     {
-      if (monotone_info != (MemoryInfo *) NULL)
-        monotone_info=(MemoryInfo *) RelinquishVirtualMemory(monotone_info);
-      if (vertices_info != (MemoryInfo *) NULL)
-        vertices_info=RelinquishVirtualMemory(vertices_info);
+      RelinquishConvexHullMemory(monotone_info,vertices_info);
       return((PointInfo *) NULL);
     }
   vertices=(PointInfo *) GetVirtualMemoryBlob(vertices_info);
   monotone_chain=(PointInfo **) GetVirtualMemoryBlob(monotone_info);
   image_view=AcquireVirtualCacheView(image,exception);
   background=GetEdgeBackgroundColor(image,image_view,exception);
-  status=MagickTrue;
-  n=0;
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *p;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PixelInfo
-        pixel;
-
-      GetPixelInfoPixel(image,p,&pixel);
-      if (IsFuzzyEquivalencePixelInfo(&pixel,&background) == MagickFalse)
-        {
-          vertices[n].x=(double) x;
-          vertices[n].y=(double) y;
-          n++;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
+  scan.image=image;
+  scan.image_view=image_view;
+  scan.background=background;
+  scan.vertices=vertices;
+  scan.exception=exception;
+  n=ScanConvexHullVertices(&scan);
   image_view=DestroyCacheView(image_view);
   /*
     Return the convex hull of the image foreground object(s).
@@ -441,9 +570,7 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
   TraceConvexHull(vertices,n,&monotone_chain,number_vertices);
   convex_hull=(PointInfo *) AcquireQuantumMemory(*number_vertices,
     sizeof(*convex_hull));
-  if (convex_hull != (PointInfo *) NULL)
-    for (n=0; n < *number_vertices; n++)
-      convex_hull[n]=(*monotone_chain[n]);
+  CopyConvexHullVertices(convex_hull,monotone_chain,number_vertices);
   monotone_info=RelinquishVirtualMemory(monotone_info);
   vertices_info=RelinquishVirtualMemory(vertices_info);
   return(convex_hull);
@@ -588,6 +715,16 @@ MagickExport ImageType GetImageType(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ImageType GetIdentifiedGrayType(const Image *image,
+  MagickBooleanType status,ImageType type)
+{
+  if ((type == GrayscaleType) && (image->alpha_trait != UndefinedPixelTrait))
+    type=GrayscaleAlphaType;
+  if (status == MagickFalse)
+    return(UndefinedType);
+  return(type);
+}
+
 MagickExport ImageType IdentifyImageGray(const Image *image,
   ExceptionInfo *exception)
 {
@@ -645,11 +782,7 @@ MagickExport ImageType IdentifyImageGray(const Image *image,
     }
   }
   image_view=DestroyCacheView(image_view);
-  if ((type == GrayscaleType) && (image->alpha_trait != UndefinedPixelTrait))
-    type=GrayscaleAlphaType;
-  if (status == MagickFalse)
-    return(UndefinedType);
-  return(type);
+  return(GetIdentifiedGrayType(image,status,type));
 }
 
 /*
@@ -1027,12 +1160,58 @@ static MagickBooleanType SetImageTypeBilevel(Image *image,
   return(status);
 }
 
-MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
+static MagickBooleanType QuantizeImageToPalette(Image *image,
+  const ImageInfo *image_info,MagickBooleanType status,
   ExceptionInfo *exception)
+{
+  QuantizeInfo
+    *quantize_info;
+
+  if ((image->storage_class == DirectClass) || (image->colors > 256))
+    {
+      quantize_info=AcquireQuantizeInfo(image_info);
+      quantize_info->number_colors=256;
+      status=QuantizeImage(quantize_info,image,exception);
+      quantize_info=DestroyQuantizeInfo(quantize_info);
+    }
+  return(status);
+}
+
+static MagickBooleanType TransformImageToCMYK(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (image->colorspace != CMYKColorspace)
+    status=TransformImageColorspace(image,CMYKColorspace,exception);
+  return(status);
+}
+
+static ImageInfo *AcquireImageTypeInfo(const Image *image)
 {
   const char
     *artifact;
 
+  ImageInfo
+    *image_info;
+
+  image_info=AcquireImageInfo();
+  image_info->dither=image->dither;
+  artifact=GetImageArtifact(image,"dither");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"dither",artifact);
+  return(image_info);
+}
+
+static MagickBooleanType TransformImageToGray(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (IsGrayImageType(image->type) == MagickFalse)
+    status=TransformImageColorspace(image,GRAYColorspace,exception);
+  return(status);
+}
+
+MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
+  ExceptionInfo *exception)
+{
   ImageInfo
     *image_info;
 
@@ -1047,11 +1226,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   assert(image->signature == MagickCoreSignature);
   status=MagickTrue;
-  image_info=AcquireImageInfo();
-  image_info->dither=image->dither;
-  artifact=GetImageArtifact(image,"dither");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"dither",artifact);
+  image_info=AcquireImageTypeInfo(image);
   switch (type)
   {
     case BilevelType:
@@ -1061,28 +1236,20 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     }
     case GrayscaleType:
     {
-      if (IsGrayImageType(image->type) == MagickFalse)
-        status=TransformImageColorspace(image,GRAYColorspace,exception);
+      status=TransformImageToGray(image,status,exception);
       image->alpha_trait=UndefinedPixelTrait;
       break;
     }
     case GrayscaleAlphaType:
     {
-      if (IsGrayImageType(image->type) == MagickFalse)
-        status=TransformImageColorspace(image,GRAYColorspace,exception);
+      status=TransformImageToGray(image,status,exception);
       SetOpaqueAlphaIfMissing(image,exception);
       break;
     }
     case PaletteType:
     {
       status=TransformImageTosRGB(image,status,exception);
-      if ((image->storage_class == DirectClass) || (image->colors > 256))
-        {
-          quantize_info=AcquireQuantizeInfo(image_info);
-          quantize_info->number_colors=256;
-          status=QuantizeImage(quantize_info,image,exception);
-          quantize_info=DestroyQuantizeInfo(quantize_info);
-        }
+      status=QuantizeImageToPalette(image,image_info,status,exception);
       image->alpha_trait=UndefinedPixelTrait;
       break;
     }
@@ -1126,8 +1293,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     }
     case ColorSeparationType:
     {
-      if (image->colorspace != CMYKColorspace)
-        status=TransformImageColorspace(image,CMYKColorspace,exception);
+      status=TransformImageToCMYK(image,status,exception);
       status=SetImageDirectClass(image,status,exception);
       image->alpha_trait=UndefinedPixelTrait;
       break;

@@ -180,6 +180,632 @@ static Quantum *SetFramePixels(const Image *image,const PixelInfo *color,
   return(q);
 }
 
+static PixelInfo LightenFrameColor(const PixelInfo matte,const Quantum modulate)
+{
+  PixelInfo
+    color;
+
+  color=matte;
+  color.red=(QuantumScale*(((double) QuantumRange-(double)
+    modulate)*matte.red+((double) QuantumRange*(double)
+    modulate)));
+  color.green=(QuantumScale*(((double) QuantumRange-(double)
+    modulate)*matte.green+((double) QuantumRange*(double)
+    modulate)));
+  color.blue=(QuantumScale*(((double) QuantumRange-(double)
+    modulate)*matte.blue+((double) QuantumRange*(double)
+    modulate)));
+  color.black=(QuantumScale*(((double) QuantumRange-(double)
+    modulate)*matte.black+((double) QuantumRange*(double)
+    modulate)));
+  color.alpha=matte.alpha;
+  return(color);
+}
+
+static PixelInfo DarkenFrameColor(const PixelInfo matte,const Quantum modulate)
+{
+  PixelInfo
+    color;
+
+  color=matte;
+  color.red=QuantumScale*matte.red*(double) modulate;
+  color.green=QuantumScale*matte.green*(double) modulate;
+  color.blue=QuantumScale*matte.blue*(double) modulate;
+  color.black=QuantumScale*matte.black*(double) modulate;
+  color.alpha=matte.alpha;
+  return(color);
+}
+
+typedef struct _FrameTopBevel
+{
+  Image
+    *frame_image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    accentuate,
+    highlight,
+    shadow;
+} FrameTopBevel;
+
+static Quantum *DrawFrameTopOuterBevel(const FrameTopBevel *top_bevel,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = top_bevel->frame_image;
+
+  const FrameInfo
+    *const frame_info = top_bevel->frame_info;
+
+  const PixelInfo
+    accentuate = top_bevel->accentuate,
+    highlight = top_bevel->highlight,
+    shadow = top_bevel->shadow;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) frame_info->outer_bevel; y++)
+  {
+    for (x=0; x < ((ssize_t) frame_image->columns-y); x++)
+    {
+      if (x < y)
+        SetPixelViaPixelInfo(frame_image,&highlight,q);
+      else
+        SetPixelViaPixelInfo(frame_image,&accentuate,q);
+      q+=(ptrdiff_t) GetPixelChannels(frame_image);
+    }
+    for ( ; x < (ssize_t) frame_image->columns; x++)
+    {
+      SetPixelViaPixelInfo(frame_image,&shadow,q);
+      q+=(ptrdiff_t) GetPixelChannels(frame_image);
+    }
+  }
+  return(q);
+}
+
+typedef struct _FrameTopInnerBevel
+{
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    highlight,
+    matte,
+    shadow,
+    trough;
+
+  size_t
+    bevel_width;
+} FrameTopInnerBevel;
+
+static Quantum *DrawFrameTopInnerBevel(const FrameTopInnerBevel *top_inner,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = top_inner->frame_image;
+
+  const Image
+    *const image = top_inner->image;
+
+  const FrameInfo
+    *const frame_info = top_inner->frame_info;
+
+  const PixelInfo
+    highlight = top_inner->highlight,
+    matte = top_inner->matte,
+    shadow = top_inner->shadow,
+    trough = top_inner->trough;
+
+  const size_t
+    bevel_width = top_inner->bevel_width;
+
+  size_t
+    width;
+
+  ssize_t
+    x,
+    y;
+
+  for (y=0; y < (ssize_t) frame_info->inner_bevel; y++)
+  {
+    q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+    q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
+    width=image->columns+((size_t) frame_info->inner_bevel << 1)-
+      (size_t) y;
+    for (x=0; x < (ssize_t) width; x++)
+    {
+      if (x < y)
+        SetPixelViaPixelInfo(frame_image,&shadow,q);
+      else
+        SetPixelViaPixelInfo(frame_image,&trough,q);
+      q+=(ptrdiff_t) GetPixelChannels(frame_image);
+    }
+    for ( ; x < ((ssize_t) image->columns+2*frame_info->inner_bevel); x++)
+    {
+      SetPixelViaPixelInfo(frame_image,&highlight,q);
+      q+=(ptrdiff_t) GetPixelChannels(frame_image);
+    }
+    width=frame_info->width-(size_t) frame_info->x-
+      image->columns-bevel_width;
+    q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+    q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+  }
+  return(q);
+}
+
+typedef struct _FrameBottomInnerBevel
+{
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    accentuate,
+    highlight,
+    matte,
+    shadow;
+
+  size_t
+    bevel_width;
+} FrameBottomInnerBevel;
+
+static Quantum *DrawFrameBottomInnerRow(
+  const FrameBottomInnerBevel *bottom_inner,const ssize_t y,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = bottom_inner->frame_image;
+
+  const Image
+    *const image = bottom_inner->image;
+
+  const FrameInfo
+    *const frame_info = bottom_inner->frame_info;
+
+  const PixelInfo
+    accentuate = bottom_inner->accentuate,
+    highlight = bottom_inner->highlight,
+    matte = bottom_inner->matte,
+    shadow = bottom_inner->shadow;
+
+  const size_t
+    bevel_width = bottom_inner->bevel_width;
+
+  size_t
+    width;
+
+  ssize_t
+    x;
+
+  q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+  q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
+  for (x=0; x < y; x++)
+  {
+    SetPixelViaPixelInfo(frame_image,&shadow,q);
+    q+=(ptrdiff_t) GetPixelChannels(frame_image);
+  }
+  for ( ; x < ((ssize_t) image->columns+2*frame_info->inner_bevel); x++)
+  {
+    if (x >= ((ssize_t) image->columns+2*frame_info->inner_bevel-y))
+      SetPixelViaPixelInfo(frame_image,&highlight,q);
+    else
+      SetPixelViaPixelInfo(frame_image,&accentuate,q);
+    q+=(ptrdiff_t) GetPixelChannels(frame_image);
+  }
+  width=(size_t) ((ssize_t) frame_info->width-frame_info->x-
+    (ssize_t) image->columns-(ssize_t) bevel_width);
+  q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+  q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+  return(q);
+}
+
+typedef struct _FrameBottomOuterBevel
+{
+  Image
+    *frame_image;
+
+  PixelInfo
+    highlight,
+    shadow,
+    trough;
+} FrameBottomOuterBevel;
+
+static Quantum *DrawFrameBottomOuterRow(
+  const FrameBottomOuterBevel *bottom_outer,const ssize_t y,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = bottom_outer->frame_image;
+
+  const PixelInfo
+    highlight = bottom_outer->highlight,
+    shadow = bottom_outer->shadow,
+    trough = bottom_outer->trough;
+
+  ssize_t
+    x;
+
+  for (x=0; x < y; x++)
+  {
+    SetPixelViaPixelInfo(frame_image,&highlight,q);
+    q+=(ptrdiff_t) GetPixelChannels(frame_image);
+  }
+  for ( ; x < (ssize_t) frame_image->columns; x++)
+  {
+    if (x >= ((ssize_t) frame_image->columns-y))
+      SetPixelViaPixelInfo(frame_image,&shadow,q);
+    else
+      SetPixelViaPixelInfo(frame_image,&trough,q);
+    q+=(ptrdiff_t) GetPixelChannels(frame_image);
+  }
+  return(q);
+}
+
+typedef struct _FrameTopBorder
+{
+  CacheView
+    *frame_view;
+
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    accentuate,
+    highlight,
+    matte,
+    shadow,
+    trough;
+
+  size_t
+    bevel_width,
+    height;
+
+  ExceptionInfo
+    *exception;
+} FrameTopBorder;
+
+static void DrawFrameTopBorder(const FrameTopBorder *top_border)
+{
+  CacheView
+    *const frame_view = top_border->frame_view;
+
+  Image
+    *const frame_image = top_border->frame_image;
+
+  const Image
+    *const image = top_border->image;
+
+  const FrameInfo
+    *const frame_info = top_border->frame_info;
+
+  const PixelInfo
+    accentuate = top_border->accentuate,
+    highlight = top_border->highlight,
+    matte = top_border->matte,
+    shadow = top_border->shadow,
+    trough = top_border->trough;
+
+  const size_t
+    bevel_width = top_border->bevel_width,
+    height = top_border->height;
+
+  ExceptionInfo
+    *const exception = top_border->exception;
+
+  ssize_t
+    y;
+
+  FrameTopBevel
+    top_bevel;
+
+  FrameTopInnerBevel
+    top_inner;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    width;
+
+  /*
+    Draw top of ornamental border.
+  */
+  q=QueueCacheViewAuthenticPixels(frame_view,0,0,frame_image->columns,
+    height,exception);
+  if (q != (Quantum *) NULL)
+    {
+      /*
+        Draw top of ornamental border.
+      */
+      top_bevel.frame_image=frame_image;
+      top_bevel.frame_info=frame_info;
+      top_bevel.accentuate=accentuate;
+      top_bevel.highlight=highlight;
+      top_bevel.shadow=shadow;
+      q=DrawFrameTopOuterBevel(&top_bevel,q);
+      for (y=0; y < (frame_info->y-(ssize_t) bevel_width); y++)
+      {
+        q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+        width=frame_image->columns-2*(size_t) frame_info->outer_bevel;
+        q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+        q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+      }
+      top_inner.frame_image=frame_image;
+      top_inner.image=image;
+      top_inner.frame_info=frame_info;
+      top_inner.highlight=highlight;
+      top_inner.matte=matte;
+      top_inner.shadow=shadow;
+      top_inner.trough=trough;
+      top_inner.bevel_width=bevel_width;
+      q=DrawFrameTopInnerBevel(&top_inner,q);
+      (void) SyncCacheViewAuthenticPixels(frame_view,exception);
+    }
+}
+
+typedef struct _FrameBottomBorder
+{
+  CacheView
+    *frame_view;
+
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    accentuate,
+    highlight,
+    matte,
+    shadow,
+    trough;
+
+  size_t
+    bevel_width;
+
+  ExceptionInfo
+    *exception;
+} FrameBottomBorder;
+
+static void DrawFrameBottomBorder(const FrameBottomBorder *bottom_border,
+  size_t height)
+{
+  CacheView
+    *const frame_view = bottom_border->frame_view;
+
+  Image
+    *const frame_image = bottom_border->frame_image;
+
+  const Image
+    *const image = bottom_border->image;
+
+  const FrameInfo
+    *const frame_info = bottom_border->frame_info;
+
+  const PixelInfo
+    accentuate = bottom_border->accentuate,
+    highlight = bottom_border->highlight,
+    matte = bottom_border->matte,
+    shadow = bottom_border->shadow,
+    trough = bottom_border->trough;
+
+  const size_t
+    bevel_width = bottom_border->bevel_width;
+
+  ExceptionInfo
+    *const exception = bottom_border->exception;
+
+  ssize_t
+    y;
+
+  size_t
+    width;
+
+  Quantum
+    *magick_restrict q;
+
+  /*
+    Draw bottom of ornamental border.
+  */
+  q=QueueCacheViewAuthenticPixels(frame_view,0,(ssize_t) (frame_image->rows-
+    height),frame_image->columns,height,exception);
+  if (q != (Quantum *) NULL)
+    {
+      /*
+        Draw bottom of ornamental border.
+      */
+      for (y=frame_info->inner_bevel-1; y >= 0; y--)
+      {
+        FrameBottomInnerBevel
+          bottom_inner;
+
+        bottom_inner.frame_image=frame_image;
+        bottom_inner.image=image;
+        bottom_inner.frame_info=frame_info;
+        bottom_inner.accentuate=accentuate;
+        bottom_inner.highlight=highlight;
+        bottom_inner.matte=matte;
+        bottom_inner.shadow=shadow;
+        bottom_inner.bevel_width=bevel_width;
+        q=DrawFrameBottomInnerRow(&bottom_inner,y,q);
+      }
+      height=(size_t) ((ssize_t) frame_info->height-frame_info->y-(ssize_t)
+        image->rows-(ssize_t) bevel_width);
+      for (y=0; y < (ssize_t) height; y++)
+      {
+        q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+        width=(size_t) ((ssize_t) frame_image->columns-2*(ssize_t)
+          frame_info->outer_bevel);
+        q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+        q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+      }
+      for (y=frame_info->outer_bevel-1; y >= 0; y--)
+      {
+        FrameBottomOuterBevel
+          bottom_outer;
+
+        bottom_outer.frame_image=frame_image;
+        bottom_outer.highlight=highlight;
+        bottom_outer.shadow=shadow;
+        bottom_outer.trough=trough;
+        q=DrawFrameBottomOuterRow(&bottom_outer,y,q);
+      }
+      (void) SyncCacheViewAuthenticPixels(frame_view,exception);
+    }
+}
+
+static void SetFrameImageAttributes(Image *frame_image,const Image *image,
+  ExceptionInfo *exception)
+{
+  if ((IsPixelInfoGray(&frame_image->border_color) == MagickFalse) &&
+      (IsGrayColorspace(frame_image->colorspace) != MagickFalse))
+    (void) SetImageColorspace(frame_image,sRGBColorspace,exception);
+  if ((frame_image->matte_color.alpha_trait != UndefinedPixelTrait) &&
+      (frame_image->alpha_trait == UndefinedPixelTrait))
+    (void) SetImageAlpha(frame_image,OpaqueAlpha,exception);
+  frame_image->page=image->page;
+  if ((image->page.width != 0) && (image->page.height != 0))
+    {
+      frame_image->page.width+=frame_image->columns-image->columns;
+      frame_image->page.height+=frame_image->rows-image->rows;
+    }
+}
+
+typedef struct _FrameSide
+{
+  Image
+    *frame_image;
+
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  PixelInfo
+    highlight,
+    matte,
+    shadow;
+
+  size_t
+    bevel_width;
+} FrameSide;
+
+static Quantum *DrawFrameSideRow(const FrameSide *frame_side,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const frame_image = frame_side->frame_image;
+
+  const Image
+    *const image = frame_side->image;
+
+  const FrameInfo
+    *const frame_info = frame_side->frame_info;
+
+  const PixelInfo
+    highlight = frame_side->highlight,
+    matte = frame_side->matte,
+    shadow = frame_side->shadow;
+
+  const size_t
+    bevel_width = frame_side->bevel_width;
+
+  size_t
+    width;
+
+  q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
+  q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
+  q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->inner_bevel,q);
+  /*
+    Set frame interior pixels.
+  */
+  q=SetFramePixels(frame_image,&frame_image->border_color,(ssize_t)
+    image->columns,q);
+  q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->inner_bevel,q);
+  width=frame_info->width-(size_t) frame_info->x-image->columns-bevel_width;
+  q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
+  q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+  return(q);
+}
+
+typedef struct _FrameComposite
+{
+  const Image
+    *image;
+
+  const FrameInfo
+    *frame_info;
+
+  CompositeOperator
+    compose;
+
+  size_t
+    bevel_width;
+
+  ExceptionInfo
+    *exception;
+} FrameComposite;
+
+static Image *CompositeFrameImage(const FrameComposite *frame_composite,
+  MagickBooleanType status,Image *frame_image)
+{
+  const Image
+    *const image = frame_composite->image;
+
+  const FrameInfo
+    *const frame_info = frame_composite->frame_info;
+
+  const CompositeOperator
+    compose = frame_composite->compose;
+
+  const size_t
+    bevel_width = frame_composite->bevel_width;
+
+  ExceptionInfo
+    *const exception = frame_composite->exception;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  x_offset=frame_info->outer_bevel+(frame_info->x-(ssize_t) bevel_width)+
+    frame_info->inner_bevel;
+  y_offset=frame_info->outer_bevel+(frame_info->y-(ssize_t) bevel_width)+
+    frame_info->inner_bevel;
+  if (status != MagickFalse)
+    status=CompositeImage(frame_image,image,compose,MagickTrue,x_offset,
+      y_offset,exception);
+  if (status == MagickFalse)
+    frame_image=DestroyImage(frame_image);
+  return(frame_image);
+}
+
 MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
   const CompositeOperator compose,ExceptionInfo *exception)
 {
@@ -191,6 +817,9 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
 
   Image
     *frame_image;
+
+  FrameComposite
+    frame_composite;
 
   MagickBooleanType
     status;
@@ -242,62 +871,15 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
       frame_image=DestroyImage(frame_image);
       return((Image *) NULL);
     }
-  if ((IsPixelInfoGray(&frame_image->border_color) == MagickFalse) &&
-      (IsGrayColorspace(frame_image->colorspace) != MagickFalse))
-    (void) SetImageColorspace(frame_image,sRGBColorspace,exception);
-  if ((frame_image->matte_color.alpha_trait != UndefinedPixelTrait) &&
-      (frame_image->alpha_trait == UndefinedPixelTrait))
-    (void) SetImageAlpha(frame_image,OpaqueAlpha,exception);
-  frame_image->page=image->page;
-  if ((image->page.width != 0) && (image->page.height != 0))
-    {
-      frame_image->page.width+=frame_image->columns-image->columns;
-      frame_image->page.height+=frame_image->rows-image->rows;
-    }
+  SetFrameImageAttributes(frame_image,image,exception);
   /*
     Initialize 3D effects color.
   */
   matte=image->matte_color;
-  accentuate=matte;
-  accentuate.red=(QuantumScale*(((double) QuantumRange-(double)
-    AccentuateModulate)*matte.red+((double) QuantumRange*(double)
-    AccentuateModulate)));
-  accentuate.green=(QuantumScale*(((double) QuantumRange-(double)
-    AccentuateModulate)*matte.green+((double) QuantumRange*(double)
-    AccentuateModulate)));
-  accentuate.blue=(QuantumScale*(((double) QuantumRange-(double)
-    AccentuateModulate)*matte.blue+((double) QuantumRange*(double)
-    AccentuateModulate)));
-  accentuate.black=(QuantumScale*(((double) QuantumRange-(double)
-    AccentuateModulate)*matte.black+((double) QuantumRange*(double)
-    AccentuateModulate)));
-  accentuate.alpha=matte.alpha;
-  highlight=matte;
-  highlight.red=(QuantumScale*(((double) QuantumRange-(double)
-    HighlightModulate)*matte.red+((double) QuantumRange*(double)
-    HighlightModulate)));
-  highlight.green=(QuantumScale*(((double) QuantumRange-(double)
-    HighlightModulate)*matte.green+((double) QuantumRange*(double)
-    HighlightModulate)));
-  highlight.blue=(QuantumScale*(((double) QuantumRange-(double)
-    HighlightModulate)*matte.blue+((double) QuantumRange*(double)
-    HighlightModulate)));
-  highlight.black=(QuantumScale*(((double) QuantumRange-(double)
-    HighlightModulate)*matte.black+((double) QuantumRange*(double)
-    HighlightModulate)));
-  highlight.alpha=matte.alpha;
-  shadow=matte;
-  shadow.red=QuantumScale*matte.red*(double) ShadowModulate;
-  shadow.green=QuantumScale*matte.green*(double) ShadowModulate;
-  shadow.blue=QuantumScale*matte.blue*(double) ShadowModulate;
-  shadow.black=QuantumScale*matte.black*(double) ShadowModulate;
-  shadow.alpha=matte.alpha;
-  trough=matte;
-  trough.red=QuantumScale*matte.red*(double) TroughModulate;
-  trough.green=QuantumScale*matte.green*(double) TroughModulate;
-  trough.blue=QuantumScale*matte.blue*(double) TroughModulate;
-  trough.black=QuantumScale*matte.black*(double) TroughModulate;
-  trough.alpha=matte.alpha;
+  accentuate=LightenFrameColor(matte,AccentuateModulate);
+  highlight=LightenFrameColor(matte,HighlightModulate);
+  shadow=DarkenFrameColor(matte,ShadowModulate);
+  trough=DarkenFrameColor(matte,TroughModulate);
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -306,74 +888,22 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     bevel_width)+frame_info->inner_bevel);
   if (height != 0)
     {
-      Quantum
-        *magick_restrict q;
+      FrameTopBorder
+        top_border;
 
-      ssize_t
-        x;
-
-      size_t
-        width;
-
-      /*
-        Draw top of ornamental border.
-      */
-      q=QueueCacheViewAuthenticPixels(frame_view,0,0,frame_image->columns,
-        height,exception);
-      if (q != (Quantum *) NULL)
-        {
-          /*
-            Draw top of ornamental border.
-          */
-          for (y=0; y < (ssize_t) frame_info->outer_bevel; y++)
-          {
-            for (x=0; x < ((ssize_t) frame_image->columns-y); x++)
-            {
-              if (x < y)
-                SetPixelViaPixelInfo(frame_image,&highlight,q);
-              else
-                SetPixelViaPixelInfo(frame_image,&accentuate,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for ( ; x < (ssize_t) frame_image->columns; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&shadow,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-          }
-          for (y=0; y < (frame_info->y-(ssize_t) bevel_width); y++)
-          {
-            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-            width=frame_image->columns-2*(size_t) frame_info->outer_bevel;
-            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
-          }
-          for (y=0; y < (ssize_t) frame_info->inner_bevel; y++)
-          {
-            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-            q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
-            width=image->columns+((size_t) frame_info->inner_bevel << 1)-
-              (size_t) y;
-            for (x=0; x < (ssize_t) width; x++)
-            {
-              if (x < y)
-                SetPixelViaPixelInfo(frame_image,&shadow,q);
-              else
-                SetPixelViaPixelInfo(frame_image,&trough,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for ( ; x < ((ssize_t) image->columns+2*frame_info->inner_bevel); x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&highlight,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            width=frame_info->width-(size_t) frame_info->x-
-              image->columns-bevel_width;
-            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
-          }
-          (void) SyncCacheViewAuthenticPixels(frame_view,exception);
-        }
+      top_border.frame_view=frame_view;
+      top_border.frame_image=frame_image;
+      top_border.image=image;
+      top_border.frame_info=frame_info;
+      top_border.accentuate=accentuate;
+      top_border.highlight=highlight;
+      top_border.matte=matte;
+      top_border.shadow=shadow;
+      top_border.trough=trough;
+      top_border.bevel_width=bevel_width;
+      top_border.height=height;
+      top_border.exception=exception;
+      DrawFrameTopBorder(&top_border);
     }
   /*
     Draw sides of ornamental border.
@@ -384,11 +914,11 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    FrameSide
+      frame_side;
+
     Quantum
       *magick_restrict q;
-
-    size_t
-      width;
 
     /*
       Initialize scanline with matte color.
@@ -402,18 +932,14 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
         status=MagickFalse;
         continue;
       }
-    q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-    q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
-    q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->inner_bevel,q);
-    /*
-      Set frame interior pixels.
-    */
-    q=SetFramePixels(frame_image,&frame_image->border_color,(ssize_t)
-      image->columns,q);
-    q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->inner_bevel,q);
-    width=frame_info->width-(size_t) frame_info->x-image->columns-bevel_width;
-    q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-    q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
+    frame_side.frame_image=frame_image;
+    frame_side.image=image;
+    frame_side.frame_info=frame_info;
+    frame_side.highlight=highlight;
+    frame_side.matte=matte;
+    frame_side.shadow=shadow;
+    frame_side.bevel_width=bevel_width;
+    q=DrawFrameSideRow(&frame_side,q);
     if (SyncCacheViewAuthenticPixels(frame_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -435,87 +961,29 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     frame_info->outer_bevel);
   if (height != 0)
     {
-      size_t
-        width;
+      FrameBottomBorder
+        bottom_border;
 
-      ssize_t
-        x;
-
-      Quantum
-        *magick_restrict q;
-
-      /*
-        Draw bottom of ornamental border.
-      */
-      q=QueueCacheViewAuthenticPixels(frame_view,0,(ssize_t) (frame_image->rows-
-        height),frame_image->columns,height,exception);
-      if (q != (Quantum *) NULL)
-        {
-          /*
-            Draw bottom of ornamental border.
-          */
-          for (y=frame_info->inner_bevel-1; y >= 0; y--)
-          {
-            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-            q=SetFramePixels(frame_image,&matte,(frame_info->x-(ssize_t) bevel_width),q);
-            for (x=0; x < y; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&shadow,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for ( ; x < ((ssize_t) image->columns+2*frame_info->inner_bevel); x++)
-            {
-              if (x >= ((ssize_t) image->columns+2*frame_info->inner_bevel-y))
-                SetPixelViaPixelInfo(frame_image,&highlight,q);
-              else
-                SetPixelViaPixelInfo(frame_image,&accentuate,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            width=(size_t) ((ssize_t) frame_info->width-frame_info->x-
-              (ssize_t) image->columns-(ssize_t) bevel_width);
-            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
-          }
-          height=(size_t) ((ssize_t) frame_info->height-frame_info->y-(ssize_t)
-            image->rows-(ssize_t) bevel_width);
-          for (y=0; y < (ssize_t) height; y++)
-          {
-            q=SetFramePixels(frame_image,&highlight,(ssize_t) frame_info->outer_bevel,q);
-            width=(size_t) ((ssize_t) frame_image->columns-2*(ssize_t)
-              frame_info->outer_bevel);
-            q=SetFramePixels(frame_image,&matte,(ssize_t) width,q);
-            q=SetFramePixels(frame_image,&shadow,(ssize_t) frame_info->outer_bevel,q);
-          }
-          for (y=frame_info->outer_bevel-1; y >= 0; y--)
-          {
-            for (x=0; x < y; x++)
-            {
-              SetPixelViaPixelInfo(frame_image,&highlight,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-            for ( ; x < (ssize_t) frame_image->columns; x++)
-            {
-              if (x >= ((ssize_t) frame_image->columns-y))
-                SetPixelViaPixelInfo(frame_image,&shadow,q);
-              else
-                SetPixelViaPixelInfo(frame_image,&trough,q);
-              q+=(ptrdiff_t) GetPixelChannels(frame_image);
-            }
-          }
-          (void) SyncCacheViewAuthenticPixels(frame_view,exception);
-        }
+      bottom_border.frame_view=frame_view;
+      bottom_border.frame_image=frame_image;
+      bottom_border.image=image;
+      bottom_border.frame_info=frame_info;
+      bottom_border.accentuate=accentuate;
+      bottom_border.highlight=highlight;
+      bottom_border.matte=matte;
+      bottom_border.shadow=shadow;
+      bottom_border.trough=trough;
+      bottom_border.bevel_width=bevel_width;
+      bottom_border.exception=exception;
+      DrawFrameBottomBorder(&bottom_border,height);
     }
   frame_view=DestroyCacheView(frame_view);
   image_view=DestroyCacheView(image_view);
-  x_offset=frame_info->outer_bevel+(frame_info->x-(ssize_t) bevel_width)+
-    frame_info->inner_bevel;
-  y_offset=frame_info->outer_bevel+(frame_info->y-(ssize_t) bevel_width)+
-    frame_info->inner_bevel;
-  if (status != MagickFalse)
-    status=CompositeImage(frame_image,image,compose,MagickTrue,x_offset,
-      y_offset,exception);
-  if (status == MagickFalse)
-    frame_image=DestroyImage(frame_image);
-  return(frame_image);
+  frame_composite.image=image;
+  frame_composite.frame_info=frame_info;
+  frame_composite.compose=compose;
+  frame_composite.bevel_width=bevel_width;
+  frame_composite.exception=exception;
+  return(CompositeFrameImage(&frame_composite,status,frame_image));
 }
 

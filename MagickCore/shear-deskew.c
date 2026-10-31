@@ -122,6 +122,183 @@
 %
 */
 
+static size_t SumRadonColumnDeltas(MatrixInfo *p,const ssize_t x)
+{
+  size_t
+    sum;
+
+  ssize_t
+    y;
+
+  sum=0;
+  for (y=0; y < (ssize_t) (GetMatrixRows(p)-1); y++)
+  {
+    ssize_t
+      delta;
+
+    unsigned short
+      element,
+      neighbor;
+
+    if (GetMatrixElement(p,x,y,&element) == MagickFalse)
+      continue;
+    if (GetMatrixElement(p,x,y+1,&neighbor) == MagickFalse)
+      continue;
+    delta=(ssize_t) element-(ssize_t) neighbor;
+    sum+=(size_t) (delta*delta);
+  }
+  return(sum);
+}
+
+typedef struct _RadonCell
+{
+  MatrixInfo
+    *p;
+
+  ssize_t
+    x,
+    i;
+
+  size_t
+    step;
+
+  ssize_t
+    y;
+} RadonCell;
+
+typedef struct _RadonPairTargets
+{
+  unsigned short
+    *element,
+    *neighbor;
+} RadonPairTargets;
+
+static MagickBooleanType MergeRadonPairHead(const RadonCell *cell,
+  MatrixInfo *q,const RadonPairTargets *targets)
+{
+  unsigned short
+    *const element = targets->element,
+    *const neighbor = targets->neighbor;
+
+  if (GetMatrixElement(cell->p,cell->x+cell->i,cell->y,element) == MagickFalse)
+    return(MagickFalse);
+  if (GetMatrixElement(cell->p,cell->x+cell->i+(ssize_t) cell->step,
+      cell->y+cell->i,neighbor) == MagickFalse)
+    return(MagickFalse);
+  *neighbor+=*element;
+  if (SetMatrixElement(q,cell->x+2*cell->i,cell->y,neighbor) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static void MergeRadonPair(MatrixInfo *q,const RadonCell *cell)
+{
+  RadonPairTargets
+    targets;
+
+  unsigned short
+    element,
+    neighbor;
+
+  targets.element=(&element);
+  targets.neighbor=(&neighbor);
+  if (MergeRadonPairHead(cell,q,&targets) == MagickFalse)
+    return;
+  if (GetMatrixElement(cell->p,cell->x+cell->i+(ssize_t) cell->step,
+      cell->y+cell->i+1,&neighbor) == MagickFalse)
+    return;
+  neighbor+=element;
+  if (SetMatrixElement(q,cell->x+2*cell->i+1,cell->y,&neighbor) == MagickFalse)
+    return;
+}
+
+static void MergeRadonPairEdge(MatrixInfo *q,const RadonCell *cell)
+{
+  RadonPairTargets
+    targets;
+
+  unsigned short
+    element,
+    neighbor;
+
+  targets.element=(&element);
+  targets.neighbor=(&neighbor);
+  if (MergeRadonPairHead(cell,q,&targets) == MagickFalse)
+    return;
+  if (SetMatrixElement(q,cell->x+2*cell->i+1,cell->y,&element) == MagickFalse)
+    return;
+}
+
+typedef struct _RadonEdgeCell
+{
+  MatrixInfo
+    *p;
+
+  ssize_t
+    x,
+    i;
+} RadonEdgeCell;
+
+static void CopyRadonElement(MatrixInfo *q,const ssize_t y,
+  const RadonEdgeCell *edge)
+{
+  unsigned short
+    element;
+
+  if (GetMatrixElement(edge->p,edge->x+edge->i,y,&element) == MagickFalse)
+    return;
+  if (SetMatrixElement(q,edge->x+2*edge->i,y,&element) == MagickFalse)
+    return;
+  if (SetMatrixElement(q,edge->x+2*edge->i+1,y,&element) == MagickFalse)
+    return;
+}
+
+static void MergeRadonColumnPairs(MatrixInfo *p,MatrixInfo *q,
+  const ssize_t x,const size_t step)
+{
+  ssize_t
+    i,
+    y;
+
+  for (i=0; i < (ssize_t) step; i++)
+  {
+    for (y=0; y < ((ssize_t) GetMatrixRows(p)-i-1); y++)
+    {
+      RadonCell
+        cell;
+
+      cell.p=p;
+      cell.x=x;
+      cell.i=i;
+      cell.step=step;
+      cell.y=y;
+      MergeRadonPair(q,&cell);
+    }
+    for ( ; y < ((ssize_t) GetMatrixRows(p)-i); y++)
+    {
+      RadonCell
+        cell;
+
+      cell.p=p;
+      cell.x=x;
+      cell.i=i;
+      cell.step=step;
+      cell.y=y;
+      MergeRadonPairEdge(q,&cell);
+    }
+    for ( ; y < (ssize_t) GetMatrixRows(p); y++)
+    {
+      RadonEdgeCell
+        edge;
+
+      edge.p=p;
+      edge.x=x;
+      edge.i=i;
+      CopyRadonElement(q,y,&edge);
+    }
+  }
+}
+
 static void RadonProjection(MatrixInfo *source_matrices,
   MatrixInfo *destination_matrices,const ssize_t sign,size_t *projection)
 {
@@ -142,53 +319,7 @@ static void RadonProjection(MatrixInfo *source_matrices,
   {
     for (x=0; x < (ssize_t) GetMatrixColumns(p); x+=2*(ssize_t) step)
     {
-      ssize_t
-        i,
-        y;
-
-      unsigned short
-        element,
-        neighbor;
-
-      for (i=0; i < (ssize_t) step; i++)
-      {
-        for (y=0; y < ((ssize_t) GetMatrixRows(p)-i-1); y++)
-        {
-          if (GetMatrixElement(p,x+i,y,&element) == MagickFalse)
-            continue;
-          if (GetMatrixElement(p,x+i+(ssize_t) step,y+i,&neighbor) == MagickFalse)
-            continue;
-          neighbor+=element;
-          if (SetMatrixElement(q,x+2*i,y,&neighbor) == MagickFalse)
-            continue;
-          if (GetMatrixElement(p,x+i+(ssize_t) step,y+i+1,&neighbor) == MagickFalse)
-            continue;
-          neighbor+=element;
-          if (SetMatrixElement(q,x+2*i+1,y,&neighbor) == MagickFalse)
-            continue;
-        }
-        for ( ; y < ((ssize_t) GetMatrixRows(p)-i); y++)
-        {
-          if (GetMatrixElement(p,x+i,y,&element) == MagickFalse)
-            continue;
-          if (GetMatrixElement(p,x+i+(ssize_t) step,y+i,&neighbor) == MagickFalse)
-            continue;
-          neighbor+=element;
-          if (SetMatrixElement(q,x+2*i,y,&neighbor) == MagickFalse)
-            continue;
-          if (SetMatrixElement(q,x+2*i+1,y,&element) == MagickFalse)
-            continue;
-        }
-        for ( ; y < (ssize_t) GetMatrixRows(p); y++)
-        {
-          if (GetMatrixElement(p,x+i,y,&element) == MagickFalse)
-            continue;
-          if (SetMatrixElement(q,x+2*i,y,&element) == MagickFalse)
-            continue;
-          if (SetMatrixElement(q,x+2*i+1,y,&element) == MagickFalse)
-            continue;
-        }
-      }
+      MergeRadonColumnPairs(p,q,x,step);
     }
     swap=p;
     p=q;
@@ -203,26 +334,7 @@ static void RadonProjection(MatrixInfo *source_matrices,
     size_t
       sum;
 
-    ssize_t
-      y;
-
-    sum=0;
-    for (y=0; y < (ssize_t) (GetMatrixRows(p)-1); y++)
-    {
-      ssize_t
-        delta;
-
-      unsigned short
-        element,
-        neighbor;
-
-      if (GetMatrixElement(p,x,y,&element) == MagickFalse)
-        continue;
-      if (GetMatrixElement(p,x,y+1,&neighbor) == MagickFalse)
-        continue;
-      delta=(ssize_t) element-(ssize_t) neighbor;
-      sum+=(size_t) (delta*delta);
-    }
+    sum=SumRadonColumnDeltas(p,x);
     projection[(ssize_t) GetMatrixColumns(p)+sign*x-1]=sum;
   }
 }
@@ -234,6 +346,161 @@ static inline MagickBooleanType IsPixelBelowThreshold(const Image *image,
     ((MagickRealType) GetPixelGreen(image,p) < threshold) ||
     ((MagickRealType) GetPixelBlue(image,p) < threshold)) ?
     MagickTrue : MagickFalse);
+}
+
+static void FillBitCountTable(unsigned short *bits)
+{
+  size_t
+    count;
+
+  ssize_t
+    j;
+
+  unsigned char
+    c;
+
+  for (j=0; j < 256; j++)
+  {
+    c=(unsigned char) j;
+    for (count=0; c != 0; c>>=1)
+      count+=c & 0x01;
+    bits[j]=(unsigned short) count;
+  }
+}
+
+typedef struct _RadonRow
+{
+  const Image
+    *image;
+
+  double
+    threshold;
+
+  ssize_t
+    y;
+} RadonRow;
+
+static void PackRadonRowReversed(const Quantum *magick_restrict p,
+  MatrixInfo *source_matrices,unsigned short *bits,const RadonRow *row)
+{
+  const Image
+    *const image = row->image;
+
+  const double
+    threshold = row->threshold;
+
+  const ssize_t
+    y = row->y;
+
+  size_t
+    bit,
+    byte;
+
+  ssize_t
+    i,
+    x;
+
+  unsigned short
+    value;
+
+  bit=0;
+  byte=0;
+  i=(ssize_t) (image->columns+7)/8;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    byte<<=1;
+    if (IsPixelBelowThreshold(image,p,threshold) != MagickFalse)
+      byte|=0x01;
+    bit++;
+    if (bit == 8)
+      {
+        value=bits[byte];
+        (void) SetMatrixElement(source_matrices,--i,y,&value);
+        bit=0;
+        byte=0;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (bit != 0)
+    {
+      byte<<=(8-bit);
+      value=bits[byte];
+      (void) SetMatrixElement(source_matrices,--i,y,&value);
+    }
+}
+
+typedef struct _RadonRowSource
+{
+  CacheView
+    *image_view;
+
+  const Image
+    *image;
+
+  double
+    threshold;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+
+  MatrixInfo
+    *source_matrices;
+} RadonRowSource;
+
+static MagickBooleanType ReadRadonRowReversed(const RadonRowSource *source,
+  unsigned short *bits)
+{
+  CacheView
+    *const image_view = source->image_view;
+
+  const Image
+    *const image = source->image;
+
+  const double
+    threshold = source->threshold;
+
+  const ssize_t
+    y = source->y;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  MatrixInfo
+    *const source_matrices = source->source_matrices;
+
+  const Quantum
+    *magick_restrict p;
+
+  MagickBooleanType
+    status;
+
+  RadonRow
+    row;
+
+  status=MagickTrue;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  row.image=image;
+  row.threshold=threshold;
+  row.y=y;
+  PackRadonRowReversed(p,source_matrices,bits,&row);
+  return(status);
+}
+
+static void DestroyRadonMatrices(MatrixInfo *source_matrices,
+  MatrixInfo *destination_matrices)
+{
+  if (destination_matrices != (MatrixInfo *) NULL)
+    destination_matrices=DestroyMatrixInfo(destination_matrices);
+  if (source_matrices != (MatrixInfo *) NULL)
+    source_matrices=DestroyMatrixInfo(source_matrices);
 }
 
 static MagickBooleanType RadonTransform(const Image *image,
@@ -250,15 +517,10 @@ static MagickBooleanType RadonTransform(const Image *image,
     status;
 
   size_t
-    count,
     width;
 
   ssize_t
-    j,
     y;
-
-  unsigned char
-    c;
 
   unsigned short
     bits[256];
@@ -271,10 +533,7 @@ static MagickBooleanType RadonTransform(const Image *image,
   if ((source_matrices == (MatrixInfo *) NULL) ||
       (destination_matrices == (MatrixInfo *) NULL))
     {
-      if (destination_matrices != (MatrixInfo *) NULL)
-        destination_matrices=DestroyMatrixInfo(destination_matrices);
-      if (source_matrices != (MatrixInfo *) NULL)
-        source_matrices=DestroyMatrixInfo(source_matrices);
+      DestroyRadonMatrices(source_matrices,destination_matrices);
       return(MagickFalse);
     }
   if (NullMatrix(source_matrices) == MagickFalse)
@@ -283,13 +542,7 @@ static MagickBooleanType RadonTransform(const Image *image,
       source_matrices=DestroyMatrixInfo(source_matrices);
       return(MagickFalse);
     }
-  for (j=0; j < 256; j++)
-  {
-    c=(unsigned char) j;
-    for (count=0; c != 0; c>>=1)
-      count+=c & 0x01;
-    bits[j]=(unsigned short) count;
-  }
+  FillBitCountTable(bits);
   status=MagickTrue;
   image_view=AcquireVirtualCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -298,52 +551,19 @@ static MagickBooleanType RadonTransform(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
-    size_t
-      bit,
-      byte;
-
-    ssize_t
-      i,
-      x;
-
-    unsigned short
-      value;
+    RadonRowSource
+      source;
 
     if (status == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    bit=0;
-    byte=0;
-    i=(ssize_t) (image->columns+7)/8;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      byte<<=1;
-      if (IsPixelBelowThreshold(image,p,threshold) != MagickFalse)
-        byte|=0x01;
-      bit++;
-      if (bit == 8)
-        {
-          value=bits[byte];
-          (void) SetMatrixElement(source_matrices,--i,y,&value);
-          bit=0;
-          byte=0;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (bit != 0)
-      {
-        byte<<=(8-bit);
-        value=bits[byte];
-        (void) SetMatrixElement(source_matrices,--i,y,&value);
-      }
+    source.image_view=image_view;
+    source.image=image;
+    source.threshold=threshold;
+    source.y=y;
+    source.exception=exception;
+    source.source_matrices=source_matrices;
+    if (ReadRadonRowReversed(&source,bits) == MagickFalse)
+      status=MagickFalse;
   }
   RadonProjection(source_matrices,destination_matrices,-1,projection);
   (void) NullMatrix(source_matrices);
@@ -407,6 +627,62 @@ static MagickBooleanType RadonTransform(const Image *image,
   return(MagickTrue);
 }
 
+static PixelInfo AccumulateBackgroundPixel(const Image *image,
+  const Quantum *magick_restrict p,PixelInfo background)
+{
+  background.red+=QuantumScale*(double) GetPixelRed(image,p);
+  background.green+=QuantumScale*(double) GetPixelGreen(image,p);
+  background.blue+=QuantumScale*(double) GetPixelBlue(image,p);
+  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+    background.alpha+=QuantumScale*(double) GetPixelAlpha(image,p);
+  return(background);
+}
+
+static void SetAverageBackgroundColor(Image *image,const PixelInfo background,
+  const double count)
+{
+  image->background_color.red=(double) ClampToQuantum((double) QuantumRange*
+    (double) background.red/count);
+  image->background_color.green=(double) ClampToQuantum((double) QuantumRange*
+    (double) background.green/count);
+  image->background_color.blue=(double) ClampToQuantum((double) QuantumRange*
+    (double) background.blue/count);
+  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+    image->background_color.alpha=(double) ClampToQuantum((double) QuantumRange*
+      (double) background.alpha/count);
+}
+
+typedef struct _BackgroundRow
+{
+  Image
+    *image;
+
+  ssize_t
+    offset;
+} BackgroundRow;
+
+static void AccumulateBackgroundRow(const BackgroundRow *row,
+  PixelInfo *background,double *count,const Quantum *magick_restrict *p)
+{
+  Image
+    *const image = row->image;
+
+  const ssize_t
+    offset = row->offset;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if ((x >= offset) && (x < ((ssize_t) image->columns-offset)))
+      continue;
+    *background=AccumulateBackgroundPixel(image,*p,*background);
+    (*count)++;
+    *p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static void GetImageBackgroundColor(Image *image,const ssize_t offset,
   ExceptionInfo *exception)
 {
@@ -432,40 +708,23 @@ static void GetImageBackgroundColor(Image *image,const ssize_t offset,
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    BackgroundRow
+      row;
+
     const Quantum
       *magick_restrict p;
-
-    ssize_t
-      x;
 
     if ((y >= offset) && (y < ((ssize_t) image->rows-offset)))
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       continue;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      if ((x >= offset) && (x < ((ssize_t) image->columns-offset)))
-        continue;
-      background.red+=QuantumScale*(double) GetPixelRed(image,p);
-      background.green+=QuantumScale*(double) GetPixelGreen(image,p);
-      background.blue+=QuantumScale*(double) GetPixelBlue(image,p);
-      if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-        background.alpha+=QuantumScale*(double) GetPixelAlpha(image,p);
-      count++;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.offset=offset;
+    AccumulateBackgroundRow(&row,&background,&count,&p);
   }
   image_view=DestroyCacheView(image_view);
-  image->background_color.red=(double) ClampToQuantum((double) QuantumRange*
-    (double) background.red/count);
-  image->background_color.green=(double) ClampToQuantum((double) QuantumRange*
-    (double) background.green/count);
-  image->background_color.blue=(double) ClampToQuantum((double) QuantumRange*
-    (double) background.blue/count);
-  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-    image->background_color.alpha=(double) ClampToQuantum((double) QuantumRange*
-      (double) background.alpha/count);
+  SetAverageBackgroundColor(image,background,count);
 }
 
 static ssize_t FindDeskewSkew(const size_t *projection,const size_t width)
@@ -490,6 +749,38 @@ static ssize_t FindDeskewSkew(const size_t *projection,const size_t width)
   return(skew);
 }
 
+static Image *AutoCropDeskewImage(const Image *image,Image *clone_image,
+  AffineMatrix affine_matrix,ExceptionInfo *exception)
+{
+  Image
+    *crop_image,
+    *deskew_image,
+    *median_image;
+
+  RectangleInfo
+    geometry;
+
+  deskew_image=AffineTransformImage(clone_image,&affine_matrix,exception);
+  clone_image=DestroyImage(clone_image);
+  if (deskew_image == (Image *) NULL)
+    return((Image *) NULL);
+  median_image=StatisticImage(deskew_image,MedianStatistic,3,3,exception);
+  if (median_image == (Image *) NULL)
+    {
+      deskew_image=DestroyImage(deskew_image);
+      return((Image *) NULL);
+    }
+  geometry=GetImageBoundingBox(median_image,exception);
+  median_image=DestroyImage(median_image);
+  if (image->debug != MagickFalse)
+    (void) LogMagickEvent(TransformEvent,GetMagickModule(),"  Deskew geometry: "
+      "%.17gx%.17g%+.20g%+.20g",(double) geometry.width,(double)
+      geometry.height,(double) geometry.x,(double) geometry.y);
+  crop_image=CropImage(deskew_image,&geometry,exception);
+  deskew_image=DestroyImage(deskew_image);
+  return(crop_image);
+}
+
 MagickExport Image *DeskewImage(const Image *image,const double threshold,
   ExceptionInfo *exception)
 {
@@ -504,15 +795,10 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
 
   Image
     *clone_image,
-    *crop_image,
-    *deskew_image,
-    *median_image;
+    *deskew_image;
 
   MagickBooleanType
     status;
-
-  RectangleInfo
-    geometry;
 
   size_t
     *projection,
@@ -574,23 +860,5 @@ MagickExport Image *DeskewImage(const Image *image,const double threshold,
   */
   GetImageBackgroundColor(clone_image,(ssize_t) StringToLong(artifact),
     exception);
-  deskew_image=AffineTransformImage(clone_image,&affine_matrix,exception);
-  clone_image=DestroyImage(clone_image);
-  if (deskew_image == (Image *) NULL)
-    return((Image *) NULL);
-  median_image=StatisticImage(deskew_image,MedianStatistic,3,3,exception);
-  if (median_image == (Image *) NULL)
-    {
-      deskew_image=DestroyImage(deskew_image);
-      return((Image *) NULL);
-    }
-  geometry=GetImageBoundingBox(median_image,exception);
-  median_image=DestroyImage(median_image);
-  if (image->debug != MagickFalse)
-    (void) LogMagickEvent(TransformEvent,GetMagickModule(),"  Deskew geometry: "
-      "%.17gx%.17g%+.20g%+.20g",(double) geometry.width,(double)
-      geometry.height,(double) geometry.x,(double) geometry.y);
-  crop_image=CropImage(deskew_image,&geometry,exception);
-  deskew_image=DestroyImage(deskew_image);
-  return(crop_image);
+  return(AutoCropDeskewImage(image,clone_image,affine_matrix,exception));
 }

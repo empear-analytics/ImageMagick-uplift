@@ -107,6 +107,16 @@ struct _ResizeFilter
   size_t
     signature;
 };
+
+typedef struct _ResizeFilterReport
+{
+  const ResizeFilter
+    *resize_filter;
+
+  const double
+    B,
+    C;
+} ResizeFilterReport;
 
 /*
   Forward declarations.
@@ -904,9 +914,16 @@ static FilterType GetWeightingFilterType(
 }
 
 static void ReportResizeFilter(const Image *image,
-  const ResizeFilter *resize_filter,FilterType filter_type,
-  FilterType window_type,const double B,const double C)
+  const ResizeFilterReport *report,FilterType filter_type,
+  FilterType window_type)
 {
+  const ResizeFilter
+    *resize_filter = report->resize_filter;
+
+  const double
+    B = report->B,
+    C = report->C;
+
   double
     support,
     x;
@@ -1446,7 +1463,10 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
     #pragma omp single
 #endif
     {
-      ReportResizeFilter(image,resize_filter,filter_type,window_type,B,C);
+      const ResizeFilterReport
+        report = { resize_filter, B, C };
+
+      ReportResizeFilter(image,&report,filter_type,window_type);
     }
   return(resize_filter);
 }
@@ -1900,6 +1920,37 @@ MagickPrivate double GetResizeFilterWeight(const ResizeFilter *resize_filter,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsResizeSizeZero(const size_t columns,
+  const size_t rows)
+{
+  return(((columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsResizeSizeUnchanged(const Image *image,
+  const size_t columns,const size_t rows)
+{
+  return(((columns == image->columns) && (rows == image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsChannelTraitUndefined(
+  const PixelTrait traits,const PixelTrait resize_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    (resize_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType SetDirectClassOrDestroy(Image *resize_image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(resize_image,DirectClass,exception) == MagickFalse)
+    {
+      resize_image=DestroyImage(resize_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -1934,18 +1985,15 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((columns == 0) || (rows == 0))
+  if (IsResizeSizeZero(columns,rows) != MagickFalse)
     ThrowImageException(ImageError,"NegativeOrZeroImageSize");
-  if ((columns == image->columns) && (rows == image->rows))
+  if (IsResizeSizeUnchanged(image,columns,rows) != MagickFalse)
     return(CloneImage(image,0,0,MagickTrue,exception));
   resize_image=CloneImage(image,columns,rows,MagickTrue,exception);
   if (resize_image == (Image *) NULL)
     return((Image *) NULL);
-  if (SetImageStorageClass(resize_image,DirectClass,exception) == MagickFalse)
-    {
-      resize_image=DestroyImage(resize_image);
-      return((Image *) NULL);
-    }
+  if (SetDirectClassOrDestroy(resize_image,exception) == MagickFalse)
+    return((Image *) NULL);
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -1991,8 +2039,7 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
         resize_traits=GetPixelChannelTraits(resize_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (resize_traits == UndefinedPixelTrait))
+        if (IsChannelTraitUndefined(traits,resize_traits) != MagickFalse)
           continue;
         offset.x=((double) x+0.5)*scale.x-0.5;
         status=InterpolatePixelChannels(image,image_view,resize_image,method,
@@ -2061,65 +2108,95 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
-  const size_t rows,const double delta_x,const double rigidity,
-  ExceptionInfo *exception)
+static void SetLiquidRescalePixelChannels(const Image *image,
+  Image *rescale_image,gfloat *packet,Quantum *magick_restrict p)
 {
-#define LiquidRescaleImageTag  "Rescale/Image"
+  ssize_t
+    i;
 
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel
+      channel;
+
+    PixelTrait
+      rescale_traits,
+      traits;
+
+    channel=GetPixelChannelChannel(image,i);
+    traits=GetPixelChannelTraits(image,channel);
+    rescale_traits=GetPixelChannelTraits(rescale_image,channel);
+    if (IsChannelTraitUndefined(traits,rescale_traits) != MagickFalse)
+      continue;
+    SetPixelChannel(rescale_image,channel,ClampToQuantum(QuantumRange*
+      packet[i]),p);
+  }
+}
+
+static gfloat *ImportLiquidRescaleRow(const Image *image,
+  const Quantum *magick_restrict p,gfloat *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      *q++=(gfloat) (QuantumScale*(double) p[i]);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
+static void ExportLiquidRescalePixels(const Image *image,
+  Image *rescale_image,LqrCarver *carver,ExceptionInfo *exception)
+{
   CacheView
-    *image_view,
     *rescale_view;
 
   gfloat
-    *packet,
-    *pixels;
-
-  Image
-    *rescale_image;
+    *packet;
 
   int
     x_offset,
     y_offset;
 
-  LqrCarver
-    *carver;
+  rescale_view=AcquireAuthenticCacheView(rescale_image,exception);
+  (void) lqr_carver_scan_reset(carver);
+  while (lqr_carver_scan_ext(carver,&x_offset,&y_offset,(void **) &packet) != 0)
+  {
+    Quantum
+      *magick_restrict p;
 
-  LqrRetVal
-    lqr_status;
+    p=QueueCacheViewAuthenticPixels(rescale_view,x_offset,y_offset,1,1,
+      exception);
+    if (p == (Quantum *) NULL)
+      break;
+    SetLiquidRescalePixelChannels(image,rescale_image,packet,p);
+    if (SyncCacheViewAuthenticPixels(rescale_view,exception) == MagickFalse)
+      break;
+  }
+  rescale_view=DestroyCacheView(rescale_view);
+}
 
-  MagickBooleanType
-    status;
-
-  MemoryInfo
-    *pixel_info;
+static void ImportLiquidRescalePixels(const Image *image,gfloat *pixels,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
 
   gfloat
     *q;
 
+  MagickBooleanType
+    status;
+
   ssize_t
     y;
 
-  /*
-    Liquid rescale image.
-  */
-  assert(image != (const Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  assert(exception != (ExceptionInfo *) NULL);
-  assert(exception->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((columns == 0) || (rows == 0))
-    ThrowImageException(ImageError,"NegativeOrZeroImageSize");
-  if ((columns == image->columns) && (rows == image->rows))
-    return(CloneImage(image,0,0,MagickTrue,exception));
-  if ((columns <= 2) || (rows <= 2))
-    return(ResizeImage(image,columns,rows,image->filter,exception));
-  pixel_info=AcquireVirtualMemory(image->columns,image->rows*MaxPixelChannels*
-    sizeof(*pixels));
-  if (pixel_info == (MemoryInfo *) NULL)
-    return((Image *) NULL);
-  pixels=(gfloat *) GetVirtualMemoryBlob(pixel_info);
   status=MagickTrue;
   q=pixels;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -2127,9 +2204,6 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   {
     const Quantum
       *magick_restrict p;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -2139,28 +2213,23 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-        *q++=(gfloat) (QuantumScale*(double) p[i]);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    q=ImportLiquidRescaleRow(image,p,q);
   }
   image_view=DestroyCacheView(image_view);
-  carver=lqr_carver_new_ext(pixels,(int) image->columns,(int) image->rows,
-    (int) GetPixelChannels(image),LQR_COLDEPTH_32F);
-  if (carver == (LqrCarver *) NULL)
-    {
-      pixel_info=RelinquishVirtualMemory(pixel_info);
-      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-    }
-  lqr_carver_set_preserve_input_image(carver);
-  lqr_status=lqr_carver_init(carver,(gint) delta_x,(gfloat) rigidity);
-  lqr_status=lqr_carver_resize(carver,(gint) columns,(gint) rows);
-  (void) lqr_status;
+}
+
+static inline MagickBooleanType IsTooSmallToCarve(const size_t columns,
+  const size_t rows)
+{
+  return(((columns <= 2) || (rows <= 2)) ? MagickTrue : MagickFalse);
+}
+
+static Image *AcquireLiquidRescaledImage(const Image *image,
+  LqrCarver *carver,MemoryInfo *pixel_info,ExceptionInfo *exception)
+{
+  Image
+    *rescale_image;
+
   rescale_image=CloneImage(image,(size_t) lqr_carver_get_width(carver),
     (size_t) lqr_carver_get_height(carver),MagickTrue,exception);
   if (rescale_image == (Image *) NULL)
@@ -2174,45 +2243,63 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
       rescale_image=DestroyImage(rescale_image);
       return((Image *) NULL);
     }
-  rescale_view=AcquireAuthenticCacheView(rescale_image,exception);
-  (void) lqr_carver_scan_reset(carver);
-  while (lqr_carver_scan_ext(carver,&x_offset,&y_offset,(void **) &packet) != 0)
-  {
-    Quantum
-      *magick_restrict p;
-
-    ssize_t
-      i;
-
-    p=QueueCacheViewAuthenticPixels(rescale_view,x_offset,y_offset,1,1,
-      exception);
-    if (p == (Quantum *) NULL)
-      break;
-    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    {
-      PixelChannel
-        channel;
-
-      PixelTrait
-        rescale_traits,
-        traits;
-
-      channel=GetPixelChannelChannel(image,i);
-      traits=GetPixelChannelTraits(image,channel);
-      rescale_traits=GetPixelChannelTraits(rescale_image,channel);
-      if ((traits == UndefinedPixelTrait) ||
-          (rescale_traits == UndefinedPixelTrait))
-        continue;
-      SetPixelChannel(rescale_image,channel,ClampToQuantum(QuantumRange*
-        packet[i]),p);
-    }
-    if (SyncCacheViewAuthenticPixels(rescale_view,exception) == MagickFalse)
-      break;
-  }
-  rescale_view=DestroyCacheView(rescale_view);
+  ExportLiquidRescalePixels(image,rescale_image,carver,exception);
   pixel_info=RelinquishVirtualMemory(pixel_info);
   lqr_carver_destroy(carver);
   return(rescale_image);
+}
+
+MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
+  const size_t rows,const double delta_x,const double rigidity,
+  ExceptionInfo *exception)
+{
+#define LiquidRescaleImageTag  "Rescale/Image"
+
+  gfloat
+    *pixels;
+
+  LqrCarver
+    *carver;
+
+  LqrRetVal
+    lqr_status;
+
+  MemoryInfo
+    *pixel_info;
+
+  /*
+    Liquid rescale image.
+  */
+  assert(image != (const Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  assert(exception != (ExceptionInfo *) NULL);
+  assert(exception->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  if (IsResizeSizeZero(columns,rows) != MagickFalse)
+    ThrowImageException(ImageError,"NegativeOrZeroImageSize");
+  if (IsResizeSizeUnchanged(image,columns,rows) != MagickFalse)
+    return(CloneImage(image,0,0,MagickTrue,exception));
+  if (IsTooSmallToCarve(columns,rows) != MagickFalse)
+    return(ResizeImage(image,columns,rows,image->filter,exception));
+  pixel_info=AcquireVirtualMemory(image->columns,image->rows*MaxPixelChannels*
+    sizeof(*pixels));
+  if (pixel_info == (MemoryInfo *) NULL)
+    return((Image *) NULL);
+  pixels=(gfloat *) GetVirtualMemoryBlob(pixel_info);
+  ImportLiquidRescalePixels(image,pixels,exception);
+  carver=lqr_carver_new_ext(pixels,(int) image->columns,(int) image->rows,
+    (int) GetPixelChannels(image),LQR_COLDEPTH_32F);
+  if (carver == (LqrCarver *) NULL)
+    {
+      pixel_info=RelinquishVirtualMemory(pixel_info);
+      ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
+    }
+  lqr_carver_set_preserve_input_image(carver);
+  lqr_status=lqr_carver_init(carver,(gint) delta_x,(gfloat) rigidity);
+  lqr_status=lqr_carver_resize(carver,(gint) columns,(gint) rows);
+  (void) lqr_status;
+  return(AcquireLiquidRescaledImage(image,carver,pixel_info,exception));
 }
 #else
 MagickExport Image *LiquidRescaleImage(const Image *image,

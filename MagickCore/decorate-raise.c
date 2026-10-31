@@ -116,16 +116,118 @@ static void BlendPixelChannels(const Image *image,const Quantum factor,
   }
 }
 
-MagickExport MagickBooleanType RaiseImage(Image *image,
-  const RectangleInfo *raise_info,const MagickBooleanType raise,
-  ExceptionInfo *exception)
-{
 #define AccentuateFactor  ScaleCharToQuantum(135)
 #define HighlightFactor  ScaleCharToQuantum(190)
 #define ShadowFactor  ScaleCharToQuantum(190)
 #define RaiseImageTag  "Raise/Image"
 #define TroughFactor  ScaleCharToQuantum(135)
 
+typedef struct _RaiseSide
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *raise_info;
+
+  Quantum
+    foreground,
+    background;
+} RaiseSide;
+
+static void DrawRaiseSideRow(const RaiseSide *raise_side,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const image = raise_side->image;
+
+  const RectangleInfo
+    *const raise_info = raise_side->raise_info;
+
+  const Quantum
+    foreground = raise_side->foreground,
+    background = raise_side->background;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) raise_info->width; x++)
+  {
+    BlendPixelChannels(image,HighlightFactor,foreground,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  for ( ; x < (ssize_t) (image->columns-raise_info->width); x++)
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  for ( ; x < (ssize_t) image->columns; x++)
+  {
+    BlendPixelChannels(image,ShadowFactor,background,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+typedef struct _RaiseTop
+{
+  Image
+    *image;
+
+  Quantum
+    foreground,
+    background;
+} RaiseTop;
+
+static void DrawRaiseTopRow(const RaiseTop *raise_top,const ssize_t y,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const image = raise_top->image;
+
+  const Quantum
+    foreground = raise_top->foreground,
+    background = raise_top->background;
+
+  ssize_t
+    x;
+
+  for (x=0; x < y; x++)
+  {
+    BlendPixelChannels(image,HighlightFactor,foreground,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  for ( ; x < ((ssize_t) image->columns-y); x++)
+  {
+    BlendPixelChannels(image,AccentuateFactor,foreground,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  for ( ; x < (ssize_t) image->columns; x++)
+  {
+    BlendPixelChannels(image,ShadowFactor,background,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static inline MagickBooleanType IsBevelTooWide(const Image *image,
+  const RectangleInfo *raise_info)
+{
+  return(((image->columns <= (raise_info->width << 1)) ||
+    (image->rows <= (raise_info->height << 1))) ? MagickTrue : MagickFalse);
+}
+
+static void SelectRaiseColors(const MagickBooleanType raise,
+  Quantum *foreground,Quantum *background)
+{
+  *foreground=QuantumRange;
+  *background=(Quantum) 0;
+  if (raise == MagickFalse)
+    {
+      *foreground=(Quantum) 0;
+      *background=QuantumRange;
+    }
+}
+
+MagickExport MagickBooleanType RaiseImage(Image *image,
+  const RectangleInfo *raise_info,const MagickBooleanType raise,
+  ExceptionInfo *exception)
+{
   CacheView
     *image_view;
 
@@ -147,17 +249,10 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
   assert(raise_info != (RectangleInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((image->columns <= (raise_info->width << 1)) ||
-      (image->rows <= (raise_info->height << 1)))
+  if (IsBevelTooWide(image,raise_info) != MagickFalse)
     ThrowBinaryException(OptionError,"ImageSizeMustExceedBevelWidth",
       image->filename);
-  foreground=QuantumRange;
-  background=(Quantum) 0;
-  if (raise == MagickFalse)
-    {
-      foreground=(Quantum) 0;
-      background=QuantumRange;
-    }
+  SelectRaiseColors(raise,&foreground,&background);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
   /*
@@ -172,11 +267,11 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) raise_info->height; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
+
+    RaiseTop
+      raise_top;
 
     if (status == MagickFalse)
       continue;
@@ -186,21 +281,10 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < y; x++)
-    {
-      BlendPixelChannels(image,HighlightFactor,foreground,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    for ( ; x < ((ssize_t) image->columns-y); x++)
-    {
-      BlendPixelChannels(image,AccentuateFactor,foreground,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    for ( ; x < (ssize_t) image->columns; x++)
-    {
-      BlendPixelChannels(image,ShadowFactor,background,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    raise_top.image=image;
+    raise_top.foreground=foreground;
+    raise_top.background=background;
+    DrawRaiseTopRow(&raise_top,y,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -223,11 +307,11 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
 #endif
   for (y=(ssize_t) raise_info->height; y < (ssize_t) (image->rows-raise_info->height); y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
+
+    RaiseSide
+      raise_side;
 
     if (status == MagickFalse)
       continue;
@@ -237,18 +321,11 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) raise_info->width; x++)
-    {
-      BlendPixelChannels(image,HighlightFactor,foreground,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    for ( ; x < (ssize_t) (image->columns-raise_info->width); x++)
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    for ( ; x < (ssize_t) image->columns; x++)
-    {
-      BlendPixelChannels(image,ShadowFactor,background,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    raise_side.image=image;
+    raise_side.raise_info=raise_info;
+    raise_side.foreground=foreground;
+    raise_side.background=background;
+    DrawRaiseSideRow(&raise_side,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)

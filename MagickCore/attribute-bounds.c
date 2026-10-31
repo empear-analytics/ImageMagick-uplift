@@ -401,6 +401,13 @@ static inline MagickBooleanType IsEmptyBoundingBox(const RectangleInfo bounds)
     (bounds.y > (ssize_t) bounds.height)) ? MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsBelowLeftOfBounds(const ssize_t x,
+  const ssize_t y,const RectangleInfo bounding_box)
+{
+  return(((x < (ssize_t) bounding_box.width) &&
+    (y > (ssize_t) bounding_box.height)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
   ExceptionInfo *exception)
 {
@@ -539,8 +546,7 @@ MagickExport RectangleInfo GetImageBoundingBox(const Image *image,
       if ((y > (ssize_t) bounding_box.height) &&
           (IsFuzzyEquivalencePixelInfo(&pixel,&target[2]) == MagickFalse))
         bounding_box.height=(size_t) y;
-      if ((x < (ssize_t) bounding_box.width) &&
-          (y > (ssize_t) bounding_box.height) &&
+      if ((IsBelowLeftOfBounds(x,y,bounding_box) != MagickFalse) &&
           (IsFuzzyEquivalencePixelInfo(&pixel,&target[3]) == MagickFalse))
         {
           bounding_box.width=(size_t) x;

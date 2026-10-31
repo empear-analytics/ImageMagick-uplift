@@ -134,17 +134,39 @@ static inline MagickBooleanType IsKapurBufferMissing(
     MagickTrue : MagickFalse);
 }
 
+#define MaxIntensity  255
+
+static size_t FindKapurThreshold(const double *black_entropy,
+  const double *white_entropy)
+{
+  double
+    maximum_entropy;
+
+  ssize_t
+    j;
+
+  size_t
+    threshold;
+
+  maximum_entropy=black_entropy[0]+white_entropy[0];
+  threshold=0;
+  for (j=1; j <= MaxIntensity; j++)
+    if ((black_entropy[j]+white_entropy[j]) > maximum_entropy)
+      {
+        maximum_entropy=black_entropy[j]+white_entropy[j];
+        threshold=(size_t) j;
+      }
+  return(threshold);
+}
+
 static double KapurThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
-#define MaxIntensity  255
-
   double
     *black_entropy,
     *cumulative_histogram,
     entropy,
     epsilon,
-    maximum_entropy,
     *white_entropy;
 
   ssize_t
@@ -216,14 +238,7 @@ static double KapurThreshold(const Image *image,const double *histogram,
   /*
     Find histogram bin with maximum entropy.
   */
-  maximum_entropy=black_entropy[0]+white_entropy[0];
-  threshold=0;
-  for (j=1; j <= MaxIntensity; j++)
-    if ((black_entropy[j]+white_entropy[j]) > maximum_entropy)
-      {
-        maximum_entropy=black_entropy[j]+white_entropy[j];
-        threshold=(size_t) j;
-      }
+  threshold=FindKapurThreshold(black_entropy,white_entropy);
   /*
     Free resources.
   */
@@ -332,13 +347,99 @@ static double OTSUThreshold(const Image *image,const double *histogram,
   return(100.0*threshold/MaxIntensity);
 }
 
+static ssize_t FindTriangleStartBin(const double *histogram)
+{
+  ssize_t
+    i,
+    start;
+
+  start=0;  /* find start bin, first bin not zero count */
+  for (i=0; i <= (ssize_t) MaxIntensity; i++)
+    if (histogram[i] > 0.0)
+      {
+        start=i;
+        break;
+      }
+  return(start);
+}
+
+static ssize_t FindTriangleMaxBin(const double *histogram)
+{
+  double
+    count;
+
+  ssize_t
+    i,
+    max;
+
+  max=0;  /* find max bin, bin with largest count */
+  count=0.0;
+  for (i=0; i <= (ssize_t) MaxIntensity; i++)
+    if (histogram[i] > count)
+      {
+        max=i;
+        count=histogram[i];
+      }
+  return(max);
+}
+
+typedef struct _TriangleLine
+{
+  double
+    a,
+    b,
+    c,
+    inverse_ratio;
+
+  const double
+    *histogram;
+
+  ssize_t
+    max,
+    start;
+} TriangleLine;
+
+static void ScanTriangleBelowPeak(const TriangleLine *line,ssize_t *threshold,
+  double *max_distance)
+{
+  const double
+    a = line->a,
+    b = line->b,
+    c = line->c,
+    inverse_ratio = line->inverse_ratio;
+
+  const double
+    *histogram = line->histogram;
+
+  const ssize_t
+    max = line->max,
+    start = line->start;
+
+  double
+    distance,
+    segment;
+
+  ssize_t
+    i;
+
+  for (i=start; i < max; i++)
+  {
+    segment=inverse_ratio*(a*i+b*histogram[i]+c);
+    distance=sqrt(segment*segment);
+    if ((distance > *max_distance) && (segment > 0.0))
+      {
+        *threshold=i;
+        *max_distance=distance;
+      }
+  }
+}
+
 static double TriangleThreshold(const double *histogram)
 {
   double
     a,
     b,
     c,
-    count,
     distance,
     inverse_ratio,
     max_distance,
@@ -357,16 +458,13 @@ static double TriangleThreshold(const double *histogram)
     start,
     threshold;
 
+  TriangleLine
+    line;
+
   /*
     Compute optimal threshold with triangle algorithm.
   */
-  start=0;  /* find start bin, first bin not zero count */
-  for (i=0; i <= (ssize_t) MaxIntensity; i++)
-    if (histogram[i] > 0.0)
-      {
-        start=i;
-        break;
-      }
+  start=FindTriangleStartBin(histogram);
   end=0;  /* find end bin, last bin not zero count */
   for (i=(ssize_t) MaxIntensity; i >= 0; i--)
     if (histogram[i] > 0.0)
@@ -374,14 +472,7 @@ static double TriangleThreshold(const double *histogram)
         end=i;
         break;
       }
-  max=0;  /* find max bin, bin with largest count */
-  count=0.0;
-  for (i=0; i <= (ssize_t) MaxIntensity; i++)
-    if (histogram[i] > count)
-      {
-        max=i;
-        count=histogram[i];
-      }
+  max=FindTriangleMaxBin(histogram);
   /*
     Compute threshold at split point.
   */
@@ -398,15 +489,15 @@ static double TriangleThreshold(const double *histogram)
   threshold=0;
   max_distance=0.0;
   if (x2 == (double) start)
-    for (i=start; i < max; i++)
     {
-      segment=inverse_ratio*(a*i+b*histogram[i]+c);
-      distance=sqrt(segment*segment);
-      if ((distance > max_distance) && (segment > 0.0))
-        {
-          threshold=i;
-          max_distance=distance;
-        }
+      line.a=a;
+      line.b=b;
+      line.c=c;
+      line.inverse_ratio=inverse_ratio;
+      line.histogram=histogram;
+      line.max=max;
+      line.start=start;
+      ScanTriangleBelowPeak(&line,&threshold,&max_distance);
     }
   else
     for (i=end; i > max; i--)
@@ -422,44 +513,15 @@ static double TriangleThreshold(const double *histogram)
   return(100.0*threshold/MaxIntensity);
 }
 
-MagickExport MagickBooleanType AutoThresholdImage(Image *image,
-  const AutoThresholdMethod method,ExceptionInfo *exception)
+static void FormIntensityHistogram(const Image *image,double *histogram,
+  ExceptionInfo *exception)
 {
   CacheView
     *image_view;
 
-  char
-    property[MagickPathExtent];
-
-  double
-    gamma,
-    *histogram,
-    sum,
-    threshold;
-
-  MagickBooleanType
-    status;
-
-  ssize_t
-    i;
-
   ssize_t
     y;
 
-  /*
-    Form histogram.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  histogram=(double *) AcquireQuantumMemory(MaxIntensity+1UL,
-    sizeof(*histogram));
-  if (histogram == (double *) NULL)
-    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
-      image->filename);
-  status=MagickTrue;
-  (void) memset(histogram,0,(MaxIntensity+1UL)*sizeof(*histogram));
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
@@ -480,18 +542,32 @@ MagickExport MagickBooleanType AutoThresholdImage(Image *image,
     }
   }
   image_view=DestroyCacheView(image_view);
-  /*
-    Normalize histogram.
-  */
+}
+
+static void NormalizeHistogram(double *histogram)
+{
+  double
+    gamma,
+    sum;
+
+  ssize_t
+    i;
+
   sum=0.0;
   for (i=0; i <= (ssize_t) MaxIntensity; i++)
     sum+=histogram[i];
   gamma=MagickSafeReciprocal(sum);
   for (i=0; i <= (ssize_t) MaxIntensity; i++)
     histogram[i]=gamma*histogram[i];
-  /*
-    Discover threshold from histogram.
-  */
+}
+
+static double DiscoverHistogramThreshold(const Image *image,
+  const AutoThresholdMethod method,const double *histogram,
+  ExceptionInfo *exception)
+{
+  double
+    threshold;
+
   switch (method)
   {
     case KapurThresholdMethod:
@@ -511,6 +587,45 @@ MagickExport MagickBooleanType AutoThresholdImage(Image *image,
       break;
     }
   }
+  return(threshold);
+}
+
+MagickExport MagickBooleanType AutoThresholdImage(Image *image,
+  const AutoThresholdMethod method,ExceptionInfo *exception)
+{
+  char
+    property[MagickPathExtent];
+
+  double
+    *histogram,
+    threshold;
+
+  MagickBooleanType
+    status;
+
+  /*
+    Form histogram.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  histogram=(double *) AcquireQuantumMemory(MaxIntensity+1UL,
+    sizeof(*histogram));
+  if (histogram == (double *) NULL)
+    ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
+      image->filename);
+  status=MagickTrue;
+  (void) memset(histogram,0,(MaxIntensity+1UL)*sizeof(*histogram));
+  FormIntensityHistogram(image,histogram,exception);
+  /*
+    Normalize histogram.
+  */
+  NormalizeHistogram(histogram);
+  /*
+    Discover threshold from histogram.
+  */
+  threshold=DiscoverHistogramThreshold(image,method,histogram,exception);
   histogram=(double *) RelinquishMagickMemory(histogram);
   if (threshold < 0.0)
     status=MagickFalse;

@@ -175,6 +175,13 @@ static inline size_t ColorToNodeId(const PixelInfo *pixel,size_t index)
   return(id);
 }
 
+static inline MagickRealType GetColorMatchAlpha(
+  const PixelInfo *magick_restrict p)
+{
+  return(p->alpha_trait == UndefinedPixelTrait ? (MagickRealType) OpaqueAlpha :
+    p->alpha);
+}
+
 static inline MagickBooleanType IsPixelInfoColorMatch(
   const PixelInfo *magick_restrict p,const PixelInfo *magick_restrict q)
 {
@@ -182,8 +189,7 @@ static inline MagickBooleanType IsPixelInfoColorMatch(
     alpha,
     beta;
 
-  alpha=p->alpha_trait == UndefinedPixelTrait ? (MagickRealType) OpaqueAlpha :
-    p->alpha;
+  alpha=GetColorMatchAlpha(p);
   beta=q->alpha_trait == UndefinedPixelTrait ? (MagickRealType) OpaqueAlpha :
     q->alpha;
   if (AbsolutePixelValue(alpha-beta) >= MagickEpsilon)
@@ -423,6 +429,118 @@ static ssize_t MatchHNodeColor(HNodeInfo *node_info,const PixelInfo pixel)
   return(i);
 }
 
+typedef struct _HNodeCount
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  HCubeInfo
+    *cube_info;
+
+  HNodeInfo
+    *node_info;
+
+  PixelInfo
+    pixel;
+
+  ExceptionInfo
+    *exception;
+} HNodeCount;
+
+static MagickBooleanType CountHNodeColor(const HNodeCount *count)
+{
+  const Image
+    *const image = count->image;
+
+  const Quantum
+    *const p = count->p;
+
+  HCubeInfo
+    *const cube_info = count->cube_info;
+
+  HNodeInfo
+    *const node_info = count->node_info;
+
+  const PixelInfo
+    pixel = count->pixel;
+
+  ExceptionInfo
+    *const exception = count->exception;
+
+  HNodeColor
+    color;
+
+  ssize_t
+    i;
+
+  i=MatchHNodeColor(node_info,pixel);
+  if (i < (ssize_t) node_info->number_unique)
+    node_info->list[i].count++;
+  else
+    {
+      color.image=image;
+      color.p=p;
+      color.cube_info=cube_info;
+      color.node_info=node_info;
+      color.pixel=pixel;
+      color.i=i;
+      color.exception=exception;
+      if (AppendHNodeColor(&color) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ClassifyRowColors(const Image *image,
+  const Quantum *p,HCubeInfo *cube_info,ExceptionInfo *exception)
+{
+  HNodeInfo
+    *node_info;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    HCubeDescent
+      descent;
+
+    HCubeLeaf
+      targets;
+
+    HNodeCount
+      count;
+
+    /*
+      Start at the root and proceed level by level.
+    */
+    descent.image=image;
+    descent.p=p;
+    descent.cube_info=cube_info;
+    descent.exception=exception;
+    targets.node_info=(&node_info);
+    targets.pixel=(&pixel);
+    if (DescendHCube(&descent,&targets) == MagickFalse)
+      return(MagickFalse);
+    count.image=image;
+    count.p=p;
+    count.cube_info=cube_info;
+    count.node_info=node_info;
+    count.pixel=pixel;
+    count.exception=exception;
+    if (CountHNodeColor(&count) == MagickFalse)
+      return(MagickFalse);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(MagickTrue);
+}
+
 static HCubeInfo *ClassifyImageColors(const Image *image,
   ExceptionInfo *exception)
 {
@@ -440,15 +558,8 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
   PixelInfo
     pixel;
 
-  HNodeInfo
-    *node_info;
-
   const Quantum
     *p;
-
-  ssize_t
-    i,
-    x;
 
   ssize_t
     y;
@@ -474,45 +585,8 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      HCubeDescent
-        descent;
-
-      HCubeLeaf
-        targets;
-
-      HNodeColor
-        color;
-
-      /*
-        Start at the root and proceed level by level.
-      */
-      descent.image=image;
-      descent.p=p;
-      descent.cube_info=cube_info;
-      descent.exception=exception;
-      targets.node_info=(&node_info);
-      targets.pixel=(&pixel);
-      if (DescendHCube(&descent,&targets) == MagickFalse)
-        return(0);
-      i=MatchHNodeColor(node_info,pixel);
-      if (i < (ssize_t) node_info->number_unique)
-        node_info->list[i].count++;
-      else
-        {
-          color.image=image;
-          color.p=p;
-          color.cube_info=cube_info;
-          color.node_info=node_info;
-          color.pixel=pixel;
-          color.i=i;
-          color.exception=exception;
-          if (AppendHNodeColor(&color) == MagickFalse)
-            return(0);
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    if (ClassifyRowColors(image,p,cube_info,exception) == MagickFalse)
+      return(0);
     proceed=SetImageProgress(image,EvaluateImageTag,(MagickOffsetType) y,
       image->rows);
     if (proceed == MagickFalse)
@@ -968,6 +1042,117 @@ static ssize_t FindHNodeColor(HNodeInfo *node_info,const PixelInfo pixel)
   return(i);
 }
 
+typedef struct _HPixelCheck
+{
+  const Image
+    *image;
+
+  HCubeInfo
+    *cube_info;
+
+  size_t
+    max_colors;
+
+  ExceptionInfo
+    *exception;
+} HPixelCheck;
+
+static MagickBooleanType CheckPixelColor(const HPixelCheck *check,
+  const Quantum **p)
+{
+  const Image
+    *const image = check->image;
+
+  HCubeInfo
+    *const cube_info = check->cube_info;
+
+  const size_t
+    max_colors = check->max_colors;
+
+  ExceptionInfo
+    *const exception = check->exception;
+
+  HCubeDescent
+    descent;
+
+  HCubeLeaf
+    targets;
+
+  HColorEntry
+    entry;
+
+  HNodeInfo
+    *node_info;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    i;
+
+  /*
+    Start at the root and proceed level by level.
+  */
+  descent.image=image;
+  descent.p=(*p);
+  descent.cube_info=cube_info;
+  descent.exception=exception;
+  targets.node_info=(&node_info);
+  targets.pixel=(&pixel);
+  if (DescendHCube(&descent,&targets) == MagickFalse)
+    return(MagickFalse);
+  i=FindHNodeColor(node_info,pixel);
+  if (i < (ssize_t) node_info->number_unique)
+    node_info->list[i].count++;
+  else
+    {
+      entry.image=image;
+      entry.p=(*p);
+      entry.cube_info=cube_info;
+      entry.node_info=node_info;
+      entry.i=i;
+      entry.max_colors=max_colors;
+      entry.exception=exception;
+      if (AddHNodeColor(&entry) == MagickFalse)
+        return(MagickFalse);
+    }
+  (*p)+=(ptrdiff_t) GetPixelChannels(image);
+  return(MagickTrue);
+}
+
+static MagickBooleanType CheckRowColors(const HPixelCheck *row,
+  const Quantum *p)
+{
+  const Image
+    *const image = row->image;
+
+  HCubeInfo
+    *const cube_info = row->cube_info;
+
+  const size_t
+    max_colors = row->max_colors;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    HPixelCheck
+      check;
+
+    check.image=image;
+    check.cube_info=cube_info;
+    check.max_colors=max_colors;
+    check.exception=exception;
+    if (CheckPixelColor(&check,&p) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType CheckImageColors(const Image *image,
   const size_t max_colors,ExceptionInfo *exception)
 {
@@ -980,20 +1165,11 @@ static MagickBooleanType CheckImageColors(const Image *image,
   HCubeInfo
     *cube_info;
 
-  HNodeInfo
-    *node_info;
-
   PixelInfo
     pixel,
     target;
 
-  size_t
-    id,
-    index,
-    level;
-
   ssize_t
-    i,
     y;
 
   if (image->storage_class == PseudoClass)
@@ -1013,60 +1189,17 @@ static MagickBooleanType CheckImageColors(const Image *image,
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
+    HPixelCheck
+      row;
 
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      HColorEntry
-        entry;
-
-      /*
-        Start at the root and proceed level by level.
-      */
-      node_info=cube_info->root;
-      index=MaxTreeDepth-1;
-      for (level=1; level < MaxTreeDepth; level++)
-      {
-        HNodeChild
-          child;
-
-        GetPixelInfoPixel(image,p,&pixel);
-        id=ColorToNodeId(&pixel,index);
-        child.image=image;
-        child.cube_info=cube_info;
-        child.node_info=node_info;
-        child.id=id;
-        child.level=level;
-        child.exception=exception;
-        if (AcquireHNodeChild(&child) == MagickFalse)
-          break;
-        node_info=node_info->child[id];
-        index--;
-      }
-      if (level < MaxTreeDepth)
-        break;
-      i=FindHNodeColor(node_info,pixel);
-      if (i < (ssize_t) node_info->number_unique)
-        node_info->list[i].count++;
-      else
-        {
-          entry.image=image;
-          entry.p=p;
-          entry.cube_info=cube_info;
-          entry.node_info=node_info;
-          entry.i=i;
-          entry.max_colors=max_colors;
-          entry.exception=exception;
-          if (AddHNodeColor(&entry) == MagickFalse)
-            break;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (x < (ssize_t) image->columns)
+    row.image=image;
+    row.cube_info=cube_info;
+    row.max_colors=max_colors;
+    row.exception=exception;
+    if (CheckRowColors(&row,p) == MagickFalse)
       break;
   }
   image_view=DestroyCacheView(image_view);

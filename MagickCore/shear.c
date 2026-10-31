@@ -136,6 +136,27 @@ typedef struct _CropToFitRegion
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void GetExtentLimits(const PointInfo *extent,PointInfo *min,
+  PointInfo *max)
+{
+  ssize_t
+    i;
+
+  *min=extent[0];
+  *max=extent[0];
+  for (i=1; i < 4; i++)
+  {
+    if ((*min).x > extent[i].x)
+      (*min).x=extent[i].x;
+    if ((*min).y > extent[i].y)
+      (*min).y=extent[i].y;
+    if ((*max).x < extent[i].x)
+      (*max).x=extent[i].x;
+    if ((*max).y < extent[i].y)
+      (*max).y=extent[i].y;
+  }
+}
+
 static MagickBooleanType CropToFitImage(Image **image,
   const CropToFitRegion *region,ExceptionInfo *exception)
 {
@@ -183,19 +204,7 @@ static MagickBooleanType CropToFitImage(Image **image,
     extent[i].x+=(double) (*image)->columns/2.0;
     extent[i].y+=(double) (*image)->rows/2.0;
   }
-  min=extent[0];
-  max=extent[0];
-  for (i=1; i < 4; i++)
-  {
-    if (min.x > extent[i].x)
-      min.x=extent[i].x;
-    if (min.y > extent[i].y)
-      min.y=extent[i].y;
-    if (max.x < extent[i].x)
-      max.x=extent[i].x;
-    if (max.y < extent[i].y)
-      max.y=extent[i].y;
-  }
+  GetExtentLimits(extent,&min,&max);
   geometry.x=CastDoubleToSsizeT(ceil(min.x-0.5));
   geometry.y=CastDoubleToSsizeT(ceil(min.y-0.5));
   geometry.width=(size_t) CastDoubleToSsizeT(floor(max.x-min.x+0.5));
@@ -248,6 +257,145 @@ static MagickBooleanType CropToFitImage(Image **image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _ShearSpan
+{
+  Image
+    *image;
+
+  PixelInfo
+    background;
+
+  double
+    area;
+
+  size_t
+    length,
+    extent;
+
+  ssize_t
+    offset,
+    step;
+} ShearSpan;
+
+static void TransferPixelsForward(Quantum *magick_restrict p,PixelInfo pixel,
+  PixelInfo destination,const ShearSpan *span)
+{
+  Image
+    *image = span->image;
+
+  const PixelInfo
+    background = span->background;
+
+  const double
+    area = span->area;
+
+  const size_t
+    length = span->length;
+
+  const ssize_t
+    offset = span->offset,
+    step = span->step;
+
+  PixelInfo
+    source;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    i;
+
+  /*
+    Transfer pixels forward: left-to-right or top-to-bottom.
+  */
+  if (step > offset)
+    return;
+  q=p-step*(ssize_t) GetPixelChannels(image);
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    if ((offset+i) < step)
+      {
+        p+=(ptrdiff_t) GetPixelChannels(image);
+        GetPixelInfoPixel(image,p,&pixel);
+        q+=(ptrdiff_t) GetPixelChannels(image);
+        continue;
+      }
+    GetPixelInfoPixel(image,p,&source);
+    CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
+      &source,(double) GetPixelAlpha(image,p),area,&destination);
+    SetPixelViaPixelInfo(image,&destination,q);
+    GetPixelInfoPixel(image,p,&pixel);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
+    &background,(double) background.alpha,area,&destination);
+  SetPixelViaPixelInfo(image,&destination,q);
+  q+=(ptrdiff_t) GetPixelChannels(image);
+  for (i=0; i < (step-1); i++)
+  {
+    SetPixelViaPixelInfo(image,&background,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void TransferPixelsBackward(Quantum *magick_restrict p,PixelInfo pixel,
+  PixelInfo destination,const ShearSpan *span)
+{
+  Image
+    *image = span->image;
+
+  const PixelInfo
+    background = span->background;
+
+  const double
+    area = span->area;
+
+  const size_t
+    length = span->length,
+    extent = span->extent;
+
+  const ssize_t
+    offset = span->offset,
+    step = span->step;
+
+  PixelInfo
+    source;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    i;
+
+  /*
+    Transfer pixels backward: right-to-left or bottom-to-top.
+  */
+  p+=(ptrdiff_t) length*GetPixelChannels(image);
+  q=p+step*(ssize_t) GetPixelChannels(image);
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    p-=(ptrdiff_t)GetPixelChannels(image);
+    q-=GetPixelChannels(image);
+    if ((size_t) (offset+(ssize_t) length+step-i) > extent)
+      continue;
+    GetPixelInfoPixel(image,p,&source);
+    CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
+      &source,(double) GetPixelAlpha(image,p),area,&destination);
+    SetPixelViaPixelInfo(image,&destination,q);
+    GetPixelInfoPixel(image,p,&pixel);
+  }
+  CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
+    &background,(double) background.alpha,area,&destination);
+  q-=GetPixelChannels(image);
+  SetPixelViaPixelInfo(image,&destination,q);
+  for (i=0; i < (step-1); i++)
+  {
+    q-=GetPixelChannels(image);
+    SetPixelViaPixelInfo(image,&background,q);
+  }
+}
+
 static MagickBooleanType XShearImage(Image *image,const double degrees,
   const ShearRegion *region,ExceptionInfo *exception)
 {
@@ -309,14 +457,15 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
       destination;
 
     Quantum
-      *magick_restrict p,
-      *magick_restrict q;
+      *magick_restrict p;
 
     ShearDirection
       direction;
 
+    ShearSpan
+      span;
+
     ssize_t
-      i,
       step;
 
     if (status == MagickFalse)
@@ -352,35 +501,14 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
         /*
           Transfer pixels left-to-right.
         */
-        if (step > x_offset)
-          break;
-        q=p-step*(ssize_t) GetPixelChannels(image);
-        for (i=0; i < (ssize_t) width; i++)
-        {
-          if ((x_offset+i) < step)
-            {
-              p+=(ptrdiff_t) GetPixelChannels(image);
-              GetPixelInfoPixel(image,p,&pixel);
-              q+=(ptrdiff_t) GetPixelChannels(image);
-              continue;
-            }
-          GetPixelInfoPixel(image,p,&source);
-          CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-            &source,(double) GetPixelAlpha(image,p),area,&destination);
-          SetPixelViaPixelInfo(image,&destination,q);
-          GetPixelInfoPixel(image,p,&pixel);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-          &background,(double) background.alpha,area,&destination);
-        SetPixelViaPixelInfo(image,&destination,q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        for (i=0; i < (step-1); i++)
-        {
-          SetPixelViaPixelInfo(image,&background,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        span.image=image;
+        span.background=background;
+        span.area=area;
+        span.length=width;
+        span.extent=image->columns;
+        span.offset=x_offset;
+        span.step=step;
+        TransferPixelsForward(p,pixel,destination,&span);
         break;
       }
       case RIGHT:
@@ -388,29 +516,14 @@ static MagickBooleanType XShearImage(Image *image,const double degrees,
         /*
           Transfer pixels right-to-left.
         */
-        p+=(ptrdiff_t) width*GetPixelChannels(image);
-        q=p+step*(ssize_t) GetPixelChannels(image);
-        for (i=0; i < (ssize_t) width; i++)
-        {
-          p-=(ptrdiff_t)GetPixelChannels(image);
-          q-=GetPixelChannels(image);
-          if ((size_t) (x_offset+(ssize_t) width+step-i) > image->columns)
-            continue;
-          GetPixelInfoPixel(image,p,&source);
-          CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-            &source,(double) GetPixelAlpha(image,p),area,&destination);
-          SetPixelViaPixelInfo(image,&destination,q);
-          GetPixelInfoPixel(image,p,&pixel);
-        }
-        CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-          &background,(double) background.alpha,area,&destination);
-        q-=GetPixelChannels(image);
-        SetPixelViaPixelInfo(image,&destination,q);
-        for (i=0; i < (step-1); i++)
-        {
-          q-=GetPixelChannels(image);
-          SetPixelViaPixelInfo(image,&background,q);
-        }
+        span.image=image;
+        span.background=background;
+        span.area=area;
+        span.length=width;
+        span.extent=image->columns;
+        span.offset=x_offset;
+        span.step=step;
+        TransferPixelsBackward(p,pixel,destination,&span);
         break;
       }
     }
@@ -530,14 +643,15 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
       destination;
 
     Quantum
-      *magick_restrict p,
-      *magick_restrict q;
+      *magick_restrict p;
 
     ShearDirection
       direction;
 
+    ShearSpan
+      span;
+
     ssize_t
-      i,
       step;
 
     if (status == MagickFalse)
@@ -573,36 +687,14 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
         /*
           Transfer pixels top-to-bottom.
         */
-        if (step > y_offset)
-          break;
-        q=p-step*(ssize_t) GetPixelChannels(image);
-        for (i=0; i < (ssize_t) height; i++)
-        {
-          if ((y_offset+i) < step)
-            {
-              p+=(ptrdiff_t) GetPixelChannels(image);
-              GetPixelInfoPixel(image,p,&pixel);
-              q+=(ptrdiff_t) GetPixelChannels(image);
-              continue;
-            }
-          GetPixelInfoPixel(image,p,&source);
-          CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-            &source,(double) GetPixelAlpha(image,p),area,
-            &destination);
-          SetPixelViaPixelInfo(image,&destination,q);
-          GetPixelInfoPixel(image,p,&pixel);
-          p+=(ptrdiff_t) GetPixelChannels(image);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-          &background,(double) background.alpha,area,&destination);
-        SetPixelViaPixelInfo(image,&destination,q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-        for (i=0; i < (step-1); i++)
-        {
-          SetPixelViaPixelInfo(image,&background,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        span.image=image;
+        span.background=background;
+        span.area=area;
+        span.length=height;
+        span.extent=image->rows;
+        span.offset=y_offset;
+        span.step=step;
+        TransferPixelsForward(p,pixel,destination,&span);
         break;
       }
       case DOWN:
@@ -610,30 +702,14 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
         /*
           Transfer pixels bottom-to-top.
         */
-        p+=(ptrdiff_t) height*GetPixelChannels(image);
-        q=p+step*(ssize_t) GetPixelChannels(image);
-        for (i=0; i < (ssize_t) height; i++)
-        {
-          p-=(ptrdiff_t)GetPixelChannels(image);
-          q-=GetPixelChannels(image);
-          if ((size_t) (y_offset+(ssize_t) height+step-i) > image->rows)
-            continue;
-          GetPixelInfoPixel(image,p,&source);
-          CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-            &source,(double) GetPixelAlpha(image,p),area,
-            &destination);
-          SetPixelViaPixelInfo(image,&destination,q);
-          GetPixelInfoPixel(image,p,&pixel);
-        }
-        CompositePixelInfoAreaBlend(&pixel,(double) pixel.alpha,
-          &background,(double) background.alpha,area,&destination);
-        q-=GetPixelChannels(image);
-        SetPixelViaPixelInfo(image,&destination,q);
-        for (i=0; i < (step-1); i++)
-        {
-          q-=GetPixelChannels(image);
-          SetPixelViaPixelInfo(image,&background,q);
-        }
+        span.image=image;
+        span.background=background;
+        span.area=area;
+        span.length=height;
+        span.extent=image->rows;
+        span.offset=y_offset;
+        span.step=step;
+        TransferPixelsBackward(p,pixel,destination,&span);
         break;
       }
     }
@@ -696,6 +772,25 @@ static MagickBooleanType YShearImage(Image *image,const double degrees,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static Image *SurroundImageWithBorder(const Image *image,Image *integral_image,
+  const RectangleInfo bounds,ExceptionInfo *exception)
+{
+  Image
+    *rotate_image;
+
+  RectangleInfo
+    border_info;
+
+  integral_image->border_color=integral_image->background_color;
+  integral_image->compose=CopyCompositeOp;
+  border_info.width=(size_t) bounds.x;
+  border_info.height=(size_t) bounds.y;
+  rotate_image=BorderImage(integral_image,&border_info,image->compose,
+    exception);
+  integral_image=DestroyImage(integral_image);
+  return(rotate_image);
+}
+
 static Image *ShearIntegralImage(const Image *image,Image *integral_image,
   const PointInfo shear,ExceptionInfo *exception)
 {
@@ -706,7 +801,6 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
     status;
 
   RectangleInfo
-    border_info,
     bounds;
 
   ShearRegion
@@ -725,12 +819,7 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
   /*
     Surround image with border.
   */
-  integral_image->border_color=integral_image->background_color;
-  integral_image->compose=CopyCompositeOp;
-  border_info.width=(size_t) bounds.x;
-  border_info.height=(size_t) bounds.y;
-  shear_image=BorderImage(integral_image,&border_info,image->compose,exception);
-  integral_image=DestroyImage(integral_image);
+  shear_image=SurroundImageWithBorder(image,integral_image,bounds,exception);
   if (shear_image == (Image *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   /*
@@ -761,6 +850,33 @@ static Image *ShearIntegralImage(const Image *image,Image *integral_image,
   return(shear_image);
 }
 
+static Image *CropShearedImage(Image *shear_image,const Image *image,
+  CropToFitRegion crop_region,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=CropToFitImage(&shear_image,&crop_region,exception);
+  shear_image->alpha_trait=image->alpha_trait;
+  shear_image->compose=image->compose;
+  shear_image->page.width=0;
+  shear_image->page.height=0;
+  if (status == MagickFalse)
+    shear_image=DestroyImage(shear_image);
+  return(shear_image);
+}
+
+static MagickBooleanType IsDiscontinuousAngle(const double angle)
+{
+  return(((angle != 0.0) && (fmod(angle,90.0) == 0.0)) ? MagickTrue :
+    MagickFalse);
+}
+
+static MagickBooleanType IsZeroShear(const PointInfo shear)
+{
+  return(((shear.x == 0.0) && (shear.y == 0.0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ShearImage(const Image *image,const double x_shear,
   const double y_shear,ExceptionInfo *exception)
 {
@@ -771,9 +887,6 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
     *integral_image,
     *shear_image;
 
-  MagickBooleanType
-    status;
-
   PointInfo
     shear;
 
@@ -783,9 +896,9 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((x_shear != 0.0) && (fmod(x_shear,90.0) == 0.0))
+  if (IsDiscontinuousAngle(x_shear) != MagickFalse)
     ThrowImageException(ImageError,"AngleIsDiscontinuous");
-  if ((y_shear != 0.0) && (fmod(y_shear,90.0) == 0.0))
+  if (IsDiscontinuousAngle(y_shear) != MagickFalse)
     ThrowImageException(ImageError,"AngleIsDiscontinuous");
   /*
     Initialize shear angle.
@@ -795,7 +908,7 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   shear.x=(-tan(DegreesToRadians(fmod(x_shear,360.0))));
   shear.y=tan(DegreesToRadians(fmod(y_shear,360.0)));
-  if ((shear.x == 0.0) && (shear.y == 0.0))
+  if (IsZeroShear(shear) != MagickFalse)
     return(integral_image);
   if (SetImageStorageClass(integral_image,DirectClass,exception) == MagickFalse)
     {
@@ -812,14 +925,7 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
   crop_region.width=(MagickRealType) image->columns;
   crop_region.height=(MagickRealType) image->rows;
   crop_region.rotate=MagickFalse;
-  status=CropToFitImage(&shear_image,&crop_region,exception);
-  shear_image->alpha_trait=image->alpha_trait;
-  shear_image->compose=image->compose;
-  shear_image->page.width=0;
-  shear_image->page.height=0;
-  if (status == MagickFalse)
-    shear_image=DestroyImage(shear_image);
-  return(shear_image);
+  return(CropShearedImage(shear_image,image,crop_region,exception));
 }
 
 /*
@@ -861,6 +967,98 @@ MagickExport Image *ShearImage(const Image *image,const double x_shear,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static RectangleInfo GetRotationBounds(const size_t width,
+  const size_t height,const PointInfo shear)
+{
+  RectangleInfo
+    bounds;
+
+  size_t
+    shear_width;
+
+  bounds.width=CastDoubleToSizeT(fabs((double) height*shear.x)+width+0.5);
+  bounds.height=CastDoubleToSizeT(fabs((double) bounds.width*shear.y)+height+0.5);
+  shear_width=CastDoubleToSizeT(fabs((double) bounds.height*shear.x)+
+    bounds.width+0.5);
+  bounds.x=CastDoubleToSsizeT(floor((double) ((shear_width > bounds.width) ?
+    width : bounds.width-shear_width+2)/2.0+0.5));
+  bounds.y=CastDoubleToSsizeT(floor(((double) bounds.height-height+2)/2.0+0.5));
+  return(bounds);
+}
+
+typedef struct _ShearRotation
+{
+  PointInfo
+    shear;
+
+  RectangleInfo
+    bounds;
+
+  size_t
+    height,
+    width;
+
+  ExceptionInfo
+    *exception;
+} ShearRotation;
+
+static MagickBooleanType ApplyRotationShears(const ShearRotation *rotation,
+  Image **rotate_image)
+{
+  const PointInfo
+    shear = rotation->shear;
+
+  const RectangleInfo
+    bounds = rotation->bounds;
+
+  const size_t
+    height = rotation->height,
+    width = rotation->width;
+
+  ExceptionInfo
+    *exception = rotation->exception;
+
+  MagickBooleanType
+    status;
+
+  ShearRegion
+    first_pass,
+    second_pass,
+    third_pass;
+
+  first_pass.width=width;
+  first_pass.height=height;
+  first_pass.x_offset=bounds.x;
+  first_pass.y_offset=(ssize_t) ((*rotate_image)->rows-height)/2;
+  status=XShearImage(*rotate_image,shear.x,&first_pass,exception);
+  if (status == MagickFalse)
+    {
+      *rotate_image=DestroyImage(*rotate_image);
+      return(MagickFalse);
+    }
+  second_pass.width=bounds.width;
+  second_pass.height=height;
+  second_pass.x_offset=(ssize_t) ((*rotate_image)->columns-bounds.width)/2;
+  second_pass.y_offset=bounds.y;
+  status=YShearImage(*rotate_image,shear.y,&second_pass,exception);
+  if (status == MagickFalse)
+    {
+      *rotate_image=DestroyImage(*rotate_image);
+      return(MagickFalse);
+    }
+  third_pass.width=bounds.width;
+  third_pass.height=bounds.height;
+  third_pass.x_offset=(ssize_t) ((*rotate_image)->columns-bounds.width)/2;
+  third_pass.y_offset=(ssize_t) ((*rotate_image)->rows-bounds.height)/2;
+  status=XShearImage(*rotate_image,shear.x,&third_pass,exception);
+  if (status == MagickFalse)
+    {
+      *rotate_image=DestroyImage(*rotate_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   ExceptionInfo *exception)
 {
@@ -871,9 +1069,6 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
     *integral_image,
     *rotate_image;
 
-  MagickBooleanType
-    status;
-
   MagickRealType
     angle;
 
@@ -881,18 +1076,14 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
     shear;
 
   RectangleInfo
-    border_info,
     bounds;
 
-  ShearRegion
-    first_pass,
-    second_pass,
-    third_pass;
+  ShearRotation
+    rotation;
 
   size_t
     height,
     rotations,
-    shear_width,
     width;
 
   /*
@@ -918,7 +1109,7 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   shear.x=(-tan((double) DegreesToRadians(angle)/2.0));
   shear.y=sin((double) DegreesToRadians(angle));
-  if ((shear.x == 0.0) && (shear.y == 0.0))
+  if (IsZeroShear(shear) != MagickFalse)
     return(integral_image);
   if (SetImageStorageClass(integral_image,DirectClass,exception) == MagickFalse)
     {
@@ -932,69 +1123,27 @@ MagickExport Image *ShearRotateImage(const Image *image,const double degrees,
   */
   width=integral_image->columns;
   height=integral_image->rows;
-  bounds.width=CastDoubleToSizeT(fabs((double) height*shear.x)+width+0.5);
-  bounds.height=CastDoubleToSizeT(fabs((double) bounds.width*shear.y)+height+0.5);
-  shear_width=CastDoubleToSizeT(fabs((double) bounds.height*shear.x)+
-    bounds.width+0.5);
-  bounds.x=CastDoubleToSsizeT(floor((double) ((shear_width > bounds.width) ?
-    width : bounds.width-shear_width+2)/2.0+0.5));
-  bounds.y=CastDoubleToSsizeT(floor(((double) bounds.height-height+2)/2.0+0.5));
+  bounds=GetRotationBounds(width,height,shear);
   /*
     Surround image with a border.
   */
-  integral_image->border_color=integral_image->background_color;
-  integral_image->compose=CopyCompositeOp;
-  border_info.width=(size_t) bounds.x;
-  border_info.height=(size_t) bounds.y;
-  rotate_image=BorderImage(integral_image,&border_info,image->compose,
-    exception);
-  integral_image=DestroyImage(integral_image);
+  rotate_image=SurroundImageWithBorder(image,integral_image,bounds,exception);
   if (rotate_image == (Image *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   /*
     Rotate the image.
   */
-  first_pass.width=width;
-  first_pass.height=height;
-  first_pass.x_offset=bounds.x;
-  first_pass.y_offset=(ssize_t) (rotate_image->rows-height)/2;
-  status=XShearImage(rotate_image,shear.x,&first_pass,exception);
-  if (status == MagickFalse)
-    {
-      rotate_image=DestroyImage(rotate_image);
-      return((Image *) NULL);
-    }
-  second_pass.width=bounds.width;
-  second_pass.height=height;
-  second_pass.x_offset=(ssize_t) (rotate_image->columns-bounds.width)/2;
-  second_pass.y_offset=bounds.y;
-  status=YShearImage(rotate_image,shear.y,&second_pass,exception);
-  if (status == MagickFalse)
-    {
-      rotate_image=DestroyImage(rotate_image);
-      return((Image *) NULL);
-    }
-  third_pass.width=bounds.width;
-  third_pass.height=bounds.height;
-  third_pass.x_offset=(ssize_t) (rotate_image->columns-bounds.width)/2;
-  third_pass.y_offset=(ssize_t) (rotate_image->rows-bounds.height)/2;
-  status=XShearImage(rotate_image,shear.x,&third_pass,exception);
-  if (status == MagickFalse)
-    {
-      rotate_image=DestroyImage(rotate_image);
-      return((Image *) NULL);
-    }
+  rotation.shear=shear;
+  rotation.bounds=bounds;
+  rotation.height=height;
+  rotation.width=width;
+  rotation.exception=exception;
+  if (ApplyRotationShears(&rotation,&rotate_image) == MagickFalse)
+    return((Image *) NULL);
   crop_region.x_shear=shear.x;
   crop_region.y_shear=shear.y;
   crop_region.width=(MagickRealType) width;
   crop_region.height=(MagickRealType) height;
   crop_region.rotate=MagickTrue;
-  status=CropToFitImage(&rotate_image,&crop_region,exception);
-  rotate_image->alpha_trait=image->alpha_trait;
-  rotate_image->compose=image->compose;
-  rotate_image->page.width=0;
-  rotate_image->page.height=0;
-  if (status == MagickFalse)
-    rotate_image=DestroyImage(rotate_image);
-  return(rotate_image);
+  return(CropShearedImage(rotate_image,image,crop_region,exception));
 }
