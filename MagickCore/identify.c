@@ -1905,6 +1905,28 @@ static void PrintImageAnimation(FILE *file,const Image *image)
       (void) FormatLocaleFile(file,"  Scene: %.17g\n",(double) image->scene);
 }
 
+static void PrintImageStorageDetails(FILE *file,Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  (void) FormatLocaleFile(file,"  Compression: %s\n",CommandOptionToMnemonic(
+    MagickCompressOptions,(ssize_t) image->compression));
+  if (image->quality != UndefinedCompressionQuality)
+    (void) FormatLocaleFile(file,"  Quality: %.17g\n",(double) image->quality);
+  (void) FormatLocaleFile(file,"  Orientation: %s\n",CommandOptionToMnemonic(
+    MagickOrientationOptions,(ssize_t) image->orientation));
+  if (image->montage != (char *) NULL)
+    (void) FormatLocaleFile(file,"  Montage: %s\n",image->montage);
+  if (image->directory != (char *) NULL)
+    PrintImageDirectory(file,image,exception);
+  PrintImageClippingPath(file,image,exception);
+  artifact=GetImageArtifact(image,"identify:convex-hull");
+  if (IsStringTrue(artifact) != MagickFalse)
+    PrintConvexHullAndBoundingBox(file,image,exception);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2092,20 +2114,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   PrintImageColors(file,image,exception);
   PrintImageLayout(file,image);
   PrintImageAnimation(file,image);
-  (void) FormatLocaleFile(file,"  Compression: %s\n",CommandOptionToMnemonic(
-    MagickCompressOptions,(ssize_t) image->compression));
-  if (image->quality != UndefinedCompressionQuality)
-    (void) FormatLocaleFile(file,"  Quality: %.17g\n",(double) image->quality);
-  (void) FormatLocaleFile(file,"  Orientation: %s\n",CommandOptionToMnemonic(
-    MagickOrientationOptions,(ssize_t) image->orientation));
-  if (image->montage != (char *) NULL)
-    (void) FormatLocaleFile(file,"  Montage: %s\n",image->montage);
-  if (image->directory != (char *) NULL)
-    PrintImageDirectory(file,image,exception);
-  PrintImageClippingPath(file,image,exception);
-  artifact=GetImageArtifact(image,"identify:convex-hull");
-  if (IsStringTrue(artifact) != MagickFalse)
-    PrintConvexHullAndBoundingBox(file,image,exception);
+  PrintImageStorageDetails(file,image,exception);
   PrintImageProfiles(file,image);
   PrintImageProperties(file,image,exception);
   PrintImageArtifacts(file,image);
