@@ -1160,6 +1160,23 @@ static MagickBooleanType SetImageTypeBilevel(Image *image,
   return(status);
 }
 
+static MagickBooleanType QuantizeImageToPalette(Image *image,
+  const ImageInfo *image_info,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  QuantizeInfo
+    *quantize_info;
+
+  if ((image->storage_class == DirectClass) || (image->colors > 256))
+    {
+      quantize_info=AcquireQuantizeInfo(image_info);
+      quantize_info->number_colors=256;
+      status=QuantizeImage(quantize_info,image,exception);
+      quantize_info=DestroyQuantizeInfo(quantize_info);
+    }
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -1209,13 +1226,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     case PaletteType:
     {
       status=TransformImageTosRGB(image,status,exception);
-      if ((image->storage_class == DirectClass) || (image->colors > 256))
-        {
-          quantize_info=AcquireQuantizeInfo(image_info);
-          quantize_info->number_colors=256;
-          status=QuantizeImage(quantize_info,image,exception);
-          quantize_info=DestroyQuantizeInfo(quantize_info);
-        }
+      status=QuantizeImageToPalette(image,image_info,status,exception);
       image->alpha_trait=UndefinedPixelTrait;
       break;
     }
