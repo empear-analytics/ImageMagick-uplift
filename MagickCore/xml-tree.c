@@ -2185,6 +2185,56 @@ static void SkipDoctypeDeclaration(char **p,ssize_t *l)
   *p+=(ptrdiff_t) strcspn(*p+1,"[]>")+1;
 }
 
+typedef struct _DoctypeTargets
+{
+  char
+    **p,
+    **tag;
+
+  ssize_t
+    *l;
+} DoctypeTargets;
+
+static MagickBooleanType ParseDoctype(XMLTreeRoot *root,const int terminal,
+  ExceptionInfo *exception,const DoctypeTargets *targets)
+{
+  char
+    **const p = targets->p;
+
+  char
+    **const tag = targets->tag;
+
+  ssize_t
+    *const l = targets->l;
+
+  MagickBooleanType
+    status;
+
+  /*
+    DTD.
+  */
+  SkipDoctypeDeclaration(p,l);
+  if ((**p == '\0') && (terminal != '>'))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","unclosed <!DOCTYPE");
+      return(MagickFalse);
+    }
+  if (*l != 0)
+    *tag=strchr(*tag,'[')+1;
+  if (*l != 0)
+    {
+      status=ParseInternalDoctype(root,*tag,(size_t) (*p-*tag),
+        exception);
+      if (status == MagickFalse)
+        {
+          return(MagickFalse);
+        }
+      (*p)++;
+    }
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2197,9 +2247,6 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
   int
     c,
     terminal;
-
-  MagickBooleanType
-    status;
 
   size_t
     ignore_depth,
@@ -2396,29 +2443,17 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
           else
             if (strncmp(p,"!DOCTYPE",8) == 0)
               {
-                /*
-                  DTD.
-                */
-                SkipDoctypeDeclaration(&p,&l);
-                if ((*p == '\0') && (terminal != '>'))
+                DoctypeTargets
+                  targets;
+
+                targets.p=(&p);
+                targets.tag=(&tag);
+                targets.l=(&l);
+                if (ParseDoctype(root,terminal,exception,&targets) ==
+                    MagickFalse)
                   {
-                    (void) ThrowMagickException(exception,GetMagickModule(),
-                      OptionWarning,"ParseError","unclosed <!DOCTYPE");
                     utf8=DestroyString(utf8);
                     return(&root->root);
-                  }
-                if (l != 0)
-                  tag=strchr(tag,'[')+1;
-                if (l != 0)
-                  {
-                    status=ParseInternalDoctype(root,tag,(size_t) (p-tag),
-                      exception);
-                    if (status == MagickFalse)
-                      {
-                        utf8=DestroyString(utf8);
-                        return(&root->root);
-                      }
-                    p++;
                   }
               }
             else
