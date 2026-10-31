@@ -140,6 +140,21 @@ typedef struct _ContributionInfo
     pixel;
 } ContributionInfo;
 
+typedef struct _HorizontalFilterPass
+{
+  const ResizeFilter
+    *magick_restrict resize_filter;
+
+  double
+    x_factor;
+
+  MagickSizeType
+    span;
+
+  MagickOffsetType
+    *magick_restrict progress;
+} HorizontalFilterPass;
+
 static ContributionInfo **DestroyContributionTLS(
   ContributionInfo **contribution)
 {
@@ -343,12 +358,13 @@ static MagickBooleanType DestroyFilterResources(CacheView *image_view,
   return(status);
 }
 
-static MagickBooleanType HorizontalFilter(
-  const ResizeFilter *magick_restrict resize_filter,
+static MagickBooleanType HorizontalFilter(const HorizontalFilterPass *pass,
   const Image *magick_restrict image,Image *magick_restrict resize_image,
-  const double x_factor,const MagickSizeType span,
-  MagickOffsetType *magick_restrict progress,ExceptionInfo *exception)
+  ExceptionInfo *exception)
 {
+  MagickOffsetType
+    *magick_restrict const progress = pass->progress;
+
 #define ResizeImageTag  "Resize/Image"
 
   CacheView
@@ -371,8 +387,8 @@ static MagickBooleanType HorizontalFilter(
   /*
     Apply filter to resize horizontally from image to resize image.
   */
-  scale=MagickMax(1.0/x_factor+MagickEpsilon,1.0);
-  support=scale*GetResizeFilterSupport(resize_filter);
+  scale=MagickMax(1.0/pass->x_factor+MagickEpsilon,1.0);
+  support=scale*GetResizeFilterSupport(pass->resize_filter);
   if (SetFilterStorageClass(image,resize_image,support,exception) == MagickFalse)
     return(MagickFalse);
   ClampFilterSupport(&support,&scale);
@@ -413,7 +429,7 @@ static MagickBooleanType HorizontalFilter(
 
     if (status == MagickFalse)
       continue;
-    bisect=(double) (x+0.5)/x_factor+MagickEpsilon;
+    bisect=(double) (x+0.5)/pass->x_factor+MagickEpsilon;
     start=(ssize_t) MagickMax(bisect-support+0.5,0.0);
     stop=(ssize_t) MagickMin(bisect+support+0.5,(double) image->columns);
     density=0.0;
@@ -421,7 +437,7 @@ static MagickBooleanType HorizontalFilter(
     for (n=0; n < (stop-start); n++)
     {
       contribution[n].pixel=start+n;
-      contribution[n].weight=GetResizeFilterWeight(resize_filter,scale*
+      contribution[n].weight=GetResizeFilterWeight(pass->resize_filter,scale*
         ((double) (start+n)-bisect+0.5));
       density+=contribution[n].weight;
     }
@@ -454,7 +470,7 @@ static MagickBooleanType HorizontalFilter(
         #pragma omp atomic
 #endif
         (*progress)++;
-        proceed=SetImageProgress(image,ResizeImageTag,*progress,span);
+        proceed=SetImageProgress(image,ResizeImageTag,*progress,pass->span);
         if (proceed == MagickFalse)
           status=MagickFalse;
       }
@@ -742,6 +758,9 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
   MagickSizeType
     span;
 
+  HorizontalFilterPass
+    horizontal;
+
   if (x_factor > y_factor)
     filter_image=CloneImage(image,columns,image->rows,MagickTrue,exception);
   else
@@ -755,8 +774,11 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
   if (x_factor > y_factor)
     {
       span=(MagickSizeType) (filter_image->columns+rows);
-      *status=HorizontalFilter(resize_filter,image,filter_image,x_factor,span,
-        &offset,exception);
+      horizontal.resize_filter=resize_filter;
+      horizontal.x_factor=x_factor;
+      horizontal.span=span;
+      horizontal.progress=(&offset);
+      *status=HorizontalFilter(&horizontal,image,filter_image,exception);
       *status&=(MagickStatusType) VerticalFilter(resize_filter,filter_image,
         resize_image,y_factor,span,&offset,exception);
     }
@@ -765,8 +787,12 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
       span=(MagickSizeType) (filter_image->rows+columns);
       *status=VerticalFilter(resize_filter,image,filter_image,y_factor,span,
         &offset,exception);
-      *status&=(MagickStatusType) HorizontalFilter(resize_filter,filter_image,
-        resize_image,x_factor,span,&offset,exception);
+      horizontal.resize_filter=resize_filter;
+      horizontal.x_factor=x_factor;
+      horizontal.span=span;
+      horizontal.progress=(&offset);
+      *status&=(MagickStatusType) HorizontalFilter(&horizontal,filter_image,
+        resize_image,exception);
     }
   /*
     Free resources.
