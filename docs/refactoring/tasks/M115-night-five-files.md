@@ -13,12 +13,12 @@ steps of each file before pushing.
 | File | Code Health | Commits |
 | --- | --- | --- |
 | `utility.c` | 3.65 → **5.55** | 32 |
-| `delegate.c` | 2.61 → **4.16** | 24 |
+| `delegate.c` | 2.61 → **4.16** | 25 |
 | `annotate.c` | 2.93 → 3.35 | 25 |
 | `xml-tree.c` | 2.44 → 3.09 | 24 |
 | `property.c` | 2.07 → 2.43 | 23 |
 
-128 refactor commits and 5 playbook commits. Every refactor commit passed the build, the
+129 refactor commits and 5 playbook commits. Every refactor commit passed the build, the
 literal and call guards, `ci_warnings.sh`, the oracle on the cases reaching its function
 (0 diverged) and the pre-commit gate. The whole catalogue ran after each file: 15,906
 cases, 1 diverged, the known `gaps/c5651ffad8` (logcfg).
