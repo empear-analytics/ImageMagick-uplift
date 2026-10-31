@@ -2475,6 +2475,37 @@ static MagickBooleanType ImportShortRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ImportShortAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const unsigned short *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case AlphaQuantum:
+    {
+      SetPixelAlpha(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      SetPixelAlpha(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case BlackQuantum:
+    {
+      SetPixelBlack(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case IndexQuantum:
+    {
+      SetPixelGray(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static void ImportShortQuantum(const Image *image,const QuantumType quantum,
   const unsigned short *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -2498,28 +2529,11 @@ static void ImportShortQuantum(const Image *image,const QuantumType quantum,
       SetPixelBlue(image,ScaleShortToQuantum(*p),q);
       break;
     }
-    case AlphaQuantum:
-    {
-      SetPixelAlpha(image,ScaleShortToQuantum(*p),q);
-      break;
-    }
-    case OpacityQuantum:
-    {
-      SetPixelAlpha(image,ScaleShortToQuantum(*p),q);
-      break;
-    }
-    case BlackQuantum:
-    {
-      SetPixelBlack(image,ScaleShortToQuantum(*p),q);
-      break;
-    }
-    case IndexQuantum:
-    {
-      SetPixelGray(image,ScaleShortToQuantum(*p),q);
-      break;
-    }
     default:
+    {
+      ImportShortAlphaIndexQuantum(image,quantum,p,q);
       break;
+    }
   }
 }
 
