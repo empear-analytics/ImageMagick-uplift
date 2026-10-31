@@ -2144,6 +2144,35 @@ static inline void RangeThresholdChannels(const Image *image,
   }
 }
 
+typedef struct _RangeThresholdRow
+{
+  double
+    low_black,
+    low_white,
+    high_white,
+    high_black;
+} RangeThresholdRow;
+
+static void RangeThresholdPixels(const Image *image,
+  const RangeThresholdRow *row,Quantum *magick_restrict q)
+{
+  const double
+    low_black = row->low_black,
+    low_white = row->low_white,
+    high_white = row->high_white,
+    high_black = row->high_black;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    RangeThresholdChannels(image,low_black,low_white,high_white,high_black,
+      q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType RangeThresholdImage(Image *image,
   const double low_black,const double low_white,const double high_white,
   const double high_black,ExceptionInfo *exception)
@@ -2180,11 +2209,11 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
+
+    RangeThresholdRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -2194,12 +2223,11 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      RangeThresholdChannels(image,low_black,low_white,high_white,high_black,
-        q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.low_black=low_black;
+    row.low_white=low_white;
+    row.high_white=high_white;
+    row.high_black=high_black;
+    RangeThresholdPixels(image,&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
