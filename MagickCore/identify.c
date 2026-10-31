@@ -1762,6 +1762,20 @@ static void PrintCMYKFeatures(FILE *file,const Image *image,
       channel_features);
 }
 
+static void PrintRGBFeatures(FILE *file,const Image *image,
+  const ChannelFeatures *channel_features)
+{
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelFeatures(file,RedPixelChannel,"Red",
+      channel_features);
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelFeatures(file,GreenPixelChannel,"Green",
+      channel_features);
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelFeatures(file,BluePixelChannel,"Blue",
+      channel_features);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1949,15 +1963,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         case RGBColorspace:
         case sRGBColorspace:
         {
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelFeatures(file,RedPixelChannel,"Red",
-              channel_features);
-          if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelFeatures(file,GreenPixelChannel,"Green",
-              channel_features);
-          if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelFeatures(file,BluePixelChannel,"Blue",
-              channel_features);
+          PrintRGBFeatures(file,image,channel_features);
           break;
         }
         case CMYKColorspace:
