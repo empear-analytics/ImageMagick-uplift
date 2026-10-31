@@ -1261,6 +1261,23 @@ static MagickBooleanType InterpolateNearestPixelChannel(
   return(status);
 }
 
+static MagickBooleanType InterpolateIntegerPixelChannel(
+  const ChannelInterpolation *grid,double *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
+    1,1,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  *pixel=(double) GetPixelChannel(grid->image,grid->channel,p);
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannel(
   const Image *magick_restrict image,const CacheView_ *image_view,
   const PixelChannel channel,const PixelInterpolateMethod method,const double x,
@@ -1268,9 +1285,6 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
 {
   ChannelInterpolation
     grid;
-
-  const Quantum
-    *magick_restrict p;
 
   MagickBooleanType
     status;
@@ -1323,13 +1337,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     }
     case IntegerInterpolatePixel:
     {
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,1,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      *pixel=(double) GetPixelChannel(image,channel,p);
+      status=InterpolateIntegerPixelChannel(&grid,pixel,status);
       break;
     }
     case NearestInterpolatePixel:
