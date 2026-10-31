@@ -4221,27 +4221,12 @@ static void SyncImageRenderingSettings(const ImageInfo *image_info,
       MagickOrientationOptions,MagickFalse,option);
 }
 
-MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
-  Image *image,ExceptionInfo *exception)
+static void SyncImagePageAndQualitySettings(const ImageInfo *image_info,
+  Image *image)
 {
   const char
     *option;
 
-  ResolutionType
-    units;
-
-  /*
-    Sync image options.
-  */
-  assert(image_info != (const ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  SyncImageColorAndCodecSettings(image_info,image,exception);
-  SyncImageDepthAndFilterSettings(image_info,image);
-  SyncImageRenderingSettings(image_info,image,exception);
   option=GetImageOption(image_info,"page");
   if (option != (const char *) NULL)
     (void) ParsePageGeometryOption(option,&image->page);
@@ -4263,6 +4248,30 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
   option=GetImageOption(image_info,"tile-offset");
   if (option != (const char *) NULL)
     (void) ParsePageGeometryOption(option,&image->tile_offset);
+}
+
+MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
+  Image *image,ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  ResolutionType
+    units;
+
+  /*
+    Sync image options.
+  */
+  assert(image_info != (const ImageInfo *) NULL);
+  assert(image_info->signature == MagickCoreSignature);
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  SyncImageColorAndCodecSettings(image_info,image,exception);
+  SyncImageDepthAndFilterSettings(image_info,image);
+  SyncImageRenderingSettings(image_info,image,exception);
+  SyncImagePageAndQualitySettings(image_info,image);
   option=GetImageOption(image_info,"transparent-color");
   if (option != (const char *) NULL)
     (void) QueryColorCompliance(option,AllCompliance,&image->transparent_color,
