@@ -2411,6 +2411,74 @@ static void SetBlendedPixelInfo(double *alpha,const PixelInfo *pixels,
   pixel->alpha=gamma*pixels[0].alpha;   /* divide by number of pixels */
 }
 
+static MagickBooleanType InterpolateBlendPixelInfo(
+  const PixelInfoInterpolation *grid,PixelInfo *pixels,PixelInfo *pixel,
+  MagickBooleanType status)
+{
+  const Quantum
+    *p;
+
+  double
+    alpha[16],
+    gamma;
+
+  ssize_t
+    i;
+
+  p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
+    2,2,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (i=0; i < 4L; i++)
+  {
+    GetPixelInfoPixel(grid->image,p+i*(ssize_t) GetPixelChannels(grid->image),
+      pixels+i);
+    AlphaBlendPixelInfo(grid->image,p+i*(ssize_t) GetPixelChannels(grid->image),
+      pixels+i,alpha+i);
+  }
+  gamma=1.0;  /* number of pixels blended together (its variable) */
+  for (i=0; i <= 1L; i++)
+  {
+    if ((grid->y-grid->y_offset) >= 0.75)
+      {
+        alpha[i]=alpha[i+2];  /* take right pixels */
+        pixels[i]=pixels[i+2];
+      }
+    else
+      if ((grid->y-grid->y_offset) > 0.25)
+        {
+          gamma=2.0;  /* blend both pixels in row */
+          alpha[i]+=alpha[i+2];  /* add up alpha weights */
+          pixels[i].red+=pixels[i+2].red;
+          pixels[i].green+=pixels[i+2].green;
+          pixels[i].blue+=pixels[i+2].blue;
+          pixels[i].black+=pixels[i+2].black;
+          pixels[i].alpha+=pixels[i+2].alpha;
+        }
+  }
+  if ((grid->x-grid->x_offset) >= 0.75)
+    {
+      alpha[0]=alpha[1];
+      pixels[0]=pixels[1];
+    }
+  else
+    if ((grid->x-grid->x_offset) > 0.25)
+      {
+        gamma*=2.0;  /* blend both rows */
+        alpha[0]+= alpha[1];  /* add up alpha weights */
+        pixels[0].red+=pixels[1].red;
+        pixels[0].green+=pixels[1].green;
+        pixels[0].blue+=pixels[1].blue;
+        pixels[0].black+=pixels[1].black;
+        pixels[0].alpha+=pixels[1].alpha;
+      }
+  SetBlendedPixelInfo(alpha,pixels,gamma,pixel);
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
   const CacheView_ *image_view,const PixelInterpolateMethod method,
   const double x,const double y,PixelInfo *pixel,ExceptionInfo *exception)
@@ -2420,10 +2488,6 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
 
   const Quantum
     *p;
-
-  double
-    alpha[16],
-    gamma;
 
   MagickBooleanType
     status;
@@ -2435,7 +2499,6 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
     interpolate;
 
   ssize_t
-    i,
     x_offset,
     y_offset;
 
@@ -2479,55 +2542,7 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
     }
     case BlendInterpolatePixel:
     {
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < 4L; i++)
-      {
-        GetPixelInfoPixel(image,p+i*(ssize_t) GetPixelChannels(image),pixels+i);
-        AlphaBlendPixelInfo(image,p+i*(ssize_t) GetPixelChannels(image),
-          pixels+i,alpha+i);
-      }
-      gamma=1.0;  /* number of pixels blended together (its variable) */
-      for (i=0; i <= 1L; i++)
-      {
-        if ((y-y_offset) >= 0.75)
-          {
-            alpha[i]=alpha[i+2];  /* take right pixels */
-            pixels[i]=pixels[i+2];
-          }
-        else
-          if ((y-y_offset) > 0.25)
-            {
-              gamma=2.0;  /* blend both pixels in row */
-              alpha[i]+=alpha[i+2];  /* add up alpha weights */
-              pixels[i].red+=pixels[i+2].red;
-              pixels[i].green+=pixels[i+2].green;
-              pixels[i].blue+=pixels[i+2].blue;
-              pixels[i].black+=pixels[i+2].black;
-              pixels[i].alpha+=pixels[i+2].alpha;
-            }
-      }
-      if ((x-x_offset) >= 0.75)
-        {
-          alpha[0]=alpha[1];
-          pixels[0]=pixels[1];
-        }
-      else
-        if ((x-x_offset) > 0.25)
-          {
-            gamma*=2.0;  /* blend both rows */
-            alpha[0]+= alpha[1];  /* add up alpha weights */
-            pixels[0].red+=pixels[1].red;
-            pixels[0].green+=pixels[1].green;
-            pixels[0].blue+=pixels[1].blue;
-            pixels[0].black+=pixels[1].black;
-            pixels[0].alpha+=pixels[1].alpha;
-          }
-      SetBlendedPixelInfo(alpha,pixels,gamma,pixel);
+      status=InterpolateBlendPixelInfo(&grid,pixels,pixel,status);
       break;
     }
     case CatromInterpolatePixel:
