@@ -2260,6 +2260,20 @@ static Image *FinishTransverseImage(const Image *image,
   return(transverse_image);
 }
 
+static MagickBooleanType SyncTransverseRow(CacheView *transverse_view,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status,
+    sync;
+
+  status=MagickTrue;
+  sync=SyncCacheViewAuthenticPixels(transverse_view,exception);
+  if (sync == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 {
 #define TransverseImageTag  "Transverse/Image"
@@ -2303,9 +2317,6 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MagickBooleanType
-      sync;
-
     const Quantum
       *magick_restrict p;
 
@@ -2323,8 +2334,7 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
         continue;
       }
     TransversePixelRow(image,transverse_image,p,q);
-    sync=SyncCacheViewAuthenticPixels(transverse_view,exception);
-    if (sync == MagickFalse)
+    if (SyncTransverseRow(transverse_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
