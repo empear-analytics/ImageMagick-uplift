@@ -1996,6 +1996,76 @@ static size_t OpenOrIgnoreXMLTag(XMLTreeRoot *root,char *tag,
   return(ignore_depth);
 }
 
+typedef struct _AttributeValueInfo
+{
+  XMLTreeRoot
+    *root;
+
+  char
+    **attribute,
+    ***attributes,
+    **p;
+
+  ssize_t
+    *l;
+
+  ExceptionInfo
+    *exception;
+} AttributeValueInfo;
+
+static MagickBooleanType ParseAttributeValue(const AttributeValueInfo *value)
+{
+  XMLTreeRoot
+    *const root = value->root;
+
+  char
+    **const attribute = value->attribute;
+
+  char
+    ***const attributes = value->attributes;
+
+  char
+    **const p = value->p;
+
+  ssize_t
+    *const l = value->l;
+
+  ExceptionInfo
+    *const exception = value->exception;
+
+  int
+    c;
+
+  *(*p)++='\0';
+  *p+=(ptrdiff_t) strspn(*p,XMLWhitespace "=");
+  c=(**p);
+  if ((c == '"') || (c == '\''))
+    {
+      /*
+        Attributes value.
+      */
+      (*p)++;
+      (*attributes)[*l+1]=*p;
+      while ((**p != '\0') && (**p != c))
+        (*p)++;
+      if (**p != '\0')
+        *(*p)++='\0';
+      else
+        {
+          (*attributes)[*l]=ConstantString("");
+          (*attributes)[*l+1]=ConstantString("");
+          (void) DestroyXMLTreeAttributes(*attributes);
+          (void) ThrowMagickException(exception,
+            GetMagickModule(),OptionWarning,"ParseError",
+            "missing %c",c);
+          return(MagickFalse);
+        }
+      DecodeAttributeValue(root,attribute,*attributes,*l);
+    }
+  (*attributes)[*l]=ConstantString((*attributes)[*l]);
+  return(MagickTrue);
+}
+
 typedef struct _TagAttributeTargets
 {
   char
@@ -2018,9 +2088,6 @@ static MagickBooleanType ParseTagAttributes(XMLTreeRoot *root,
   ssize_t
     *const l = targets->l;
 
-  int
-    c;
-
   for (*l=0; IsInsideXMLTag(*p) != MagickFalse; *l+=2)
   {
     /*
@@ -2041,33 +2108,17 @@ static MagickBooleanType ParseTagAttributes(XMLTreeRoot *root,
       (*attributes)[*l]=ConstantString("");
     else
       {
-        *(*p)++='\0';
-        *p+=(ptrdiff_t) strspn(*p,XMLWhitespace "=");
-        c=(**p);
-        if ((c == '"') || (c == '\''))
-          {
-            /*
-              Attributes value.
-            */
-            (*p)++;
-            (*attributes)[*l+1]=*p;
-            while ((**p != '\0') && (**p != c))
-              (*p)++;
-            if (**p != '\0')
-              *(*p)++='\0';
-            else
-              {
-                (*attributes)[*l]=ConstantString("");
-                (*attributes)[*l+1]=ConstantString("");
-                (void) DestroyXMLTreeAttributes(*attributes);
-                (void) ThrowMagickException(exception,
-                  GetMagickModule(),OptionWarning,"ParseError",
-                  "missing %c",c);
-                return(MagickFalse);
-              }
-            DecodeAttributeValue(root,attribute,*attributes,*l);
-          }
-        (*attributes)[*l]=ConstantString((*attributes)[*l]);
+        AttributeValueInfo
+          value;
+
+        value.root=root;
+        value.attribute=attribute;
+        value.attributes=attributes;
+        value.p=p;
+        value.l=l;
+        value.exception=exception;
+        if (ParseAttributeValue(&value) == MagickFalse)
+          return(MagickFalse);
       }
     while (isspace((int) ((unsigned char) **p)) != 0)
       (*p)++;
