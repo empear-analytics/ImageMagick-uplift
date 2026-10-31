@@ -649,10 +649,7 @@ static MagickBooleanType VerticalFilter(
           status=MagickFalse;
       }
   }
-  resize_view=DestroyCacheView(resize_view);
-  image_view=DestroyCacheView(image_view);
-  contributions=DestroyContributionTLS(contributions);
-  return(status);
+  return(DestroyFilterResources(image_view,resize_view,contributions,status));
 }
 
 static inline MagickBooleanType IsMitchellResize(const Image *image,
