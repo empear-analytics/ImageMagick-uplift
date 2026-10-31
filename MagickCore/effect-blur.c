@@ -2864,6 +2864,14 @@ static MagickBooleanType BlurRotationalRow(const RotationalRow *row,
   return(status);
 }
 
+static void RelinquishRotationalTables(double *cos_theta,double *sin_theta)
+{
+  if (cos_theta != (double *) NULL)
+    cos_theta=(double *) RelinquishMagickMemory(cos_theta);
+  if (sin_theta != (double *) NULL)
+    sin_theta=(double *) RelinquishMagickMemory(sin_theta);
+}
+
 MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   ExceptionInfo *exception)
 {
@@ -2923,10 +2931,7 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   sin_theta=(double *) AcquireQuantumMemory((size_t) n,sizeof(*sin_theta));
   if ((cos_theta == (double *) NULL) || (sin_theta == (double *) NULL))
     {
-      if (cos_theta != (double *) NULL)
-        cos_theta=(double *) RelinquishMagickMemory(cos_theta);
-      if (sin_theta != (double *) NULL)
-        sin_theta=(double *) RelinquishMagickMemory(sin_theta);
+      RelinquishRotationalTables(cos_theta,sin_theta);
       blur_image=DestroyImage(blur_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
