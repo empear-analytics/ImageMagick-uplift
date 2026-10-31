@@ -313,6 +313,26 @@ static PixelInfo GetEdgeBackgroundColor(const Image *image,
   return(GetDominantEdgeBackground(census,background,edge_background));
 }
 
+static size_t TraceForwardHullChain(PointInfo **chain,PointInfo *vertices,
+  size_t number_vertices)
+{
+  size_t
+    n;
+
+  ssize_t
+    i;
+
+  n=0;
+  for (i=0; i < (ssize_t) number_vertices; i++)
+  {
+    while ((n >= 2) &&
+           (LexicographicalOrder(chain[n-2],chain[n-1],&vertices[i]) <= 0.0))
+      n--;
+    chain[n++]=(&vertices[i]);
+  }
+  return(n);
+}
+
 void TraceConvexHull(PointInfo *vertices,size_t number_vertices,
   PointInfo ***monotone_chain,size_t *chain_length)
 {
@@ -330,14 +350,7 @@ void TraceConvexHull(PointInfo *vertices,size_t number_vertices,
     Construct the upper and lower hulls: rightmost to leftmost counterclockwise.
   */
   chain=(*monotone_chain);
-  n=0;
-  for (i=0; i < (ssize_t) number_vertices; i++)
-  {
-    while ((n >= 2) &&
-           (LexicographicalOrder(chain[n-2],chain[n-1],&vertices[i]) <= 0.0))
-      n--;
-    chain[n++]=(&vertices[i]);
-  }
+  n=TraceForwardHullChain(chain,vertices,number_vertices);
   demark=n+1;
   for (i=(ssize_t) number_vertices-2; i >= 0; i--)
   {
