@@ -3385,6 +3385,21 @@ static MagickBooleanType SetStereoRow(const StereoRow *stereo_row,
   return(MagickTrue);
 }
 
+static MagickBooleanType CloneStereoImage(const Image *left_image,
+  Image **stereo_image,ExceptionInfo *exception)
+{
+  *stereo_image=CloneImage(left_image,left_image->columns,left_image->rows,
+    MagickTrue,exception);
+  if (*stereo_image == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(*stereo_image,DirectClass,exception) == MagickFalse)
+    {
+      *stereo_image=DestroyImage(*stereo_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   const Image *right_image,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -3417,15 +3432,8 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   /*
     Initialize stereo image attributes.
   */
-  stereo_image=CloneImage(left_image,left_image->columns,left_image->rows,
-    MagickTrue,exception);
-  if (stereo_image == (Image *) NULL)
+  if (CloneStereoImage(left_image,&stereo_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(stereo_image,DirectClass,exception) == MagickFalse)
-    {
-      stereo_image=DestroyImage(stereo_image);
-      return((Image *) NULL);
-    }
   (void) SetImageColorspace(stereo_image,sRGBColorspace,exception);
   /*
     Copy left image to red channel and right image to blue channel.
