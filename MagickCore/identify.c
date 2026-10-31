@@ -1847,12 +1847,31 @@ static void PrintImageErrorAndRendering(FILE *file,const Image *image)
       (double) image->extract_info.x,(double) image->extract_info.y);
 }
 
+static void PrintImageColors(FILE *file,const Image *image,
+  ExceptionInfo *exception)
+{
+  char
+    color[MagickPathExtent];
+
+  (void) QueryColorname(image,&image->matte_color,SVGCompliance,color,
+    exception);
+  (void) FormatLocaleFile(file,"  Matte color: %s\n",color);
+  (void) QueryColorname(image,&image->background_color,SVGCompliance,color,
+    exception);
+  (void) FormatLocaleFile(file,"  Background color: %s\n",color);
+  (void) QueryColorname(image,&image->border_color,SVGCompliance,color,
+    exception);
+  (void) FormatLocaleFile(file,"  Border color: %s\n",color);
+  (void) QueryColorname(image,&image->transparent_color,SVGCompliance,color,
+    exception);
+  (void) FormatLocaleFile(file,"  Transparent color: %s\n",color);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
   char
-    buffer[MagickPathExtent],
-    color[MagickPathExtent];
+    buffer[MagickPathExtent];
 
   ChannelFeatures
     *channel_features;
@@ -2032,18 +2051,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     }
   PrintImageColormapEntries(file,image,exception);
   PrintImageErrorAndRendering(file,image);
-  (void) QueryColorname(image,&image->matte_color,SVGCompliance,color,
-    exception);
-  (void) FormatLocaleFile(file,"  Matte color: %s\n",color);
-  (void) QueryColorname(image,&image->background_color,SVGCompliance,color,
-    exception);
-  (void) FormatLocaleFile(file,"  Background color: %s\n",color);
-  (void) QueryColorname(image,&image->border_color,SVGCompliance,color,
-    exception);
-  (void) FormatLocaleFile(file,"  Border color: %s\n",color);
-  (void) QueryColorname(image,&image->transparent_color,SVGCompliance,color,
-    exception);
-  (void) FormatLocaleFile(file,"  Transparent color: %s\n",color);
+  PrintImageColors(file,image,exception);
   (void) FormatLocaleFile(file,"  Interlace: %s\n",CommandOptionToMnemonic(
     MagickInterlaceOptions,(ssize_t) image->interlace));
   (void) FormatLocaleFile(file,"  Intensity: %s\n",CommandOptionToMnemonic(
