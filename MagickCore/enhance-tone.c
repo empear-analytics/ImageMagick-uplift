@@ -1555,6 +1555,12 @@ static void GammaColormap(Image *image,const Quantum *gamma_map)
   }
 }
 
+static void ScaleImageGamma(Image *image,const double gamma)
+{
+  if (image->gamma != 0.0)
+    image->gamma*=gamma;
+}
+
 MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
   ExceptionInfo *exception)
 {
@@ -1634,8 +1640,7 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
   }
   image_view=DestroyCacheView(image_view);
   gamma_map=(Quantum *) RelinquishMagickMemory(gamma_map);
-  if (image->gamma != 0.0)
-    image->gamma*=gamma;
+  ScaleImageGamma(image,gamma);
   return(status);
 }
 
