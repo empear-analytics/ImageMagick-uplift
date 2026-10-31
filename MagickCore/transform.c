@@ -771,6 +771,20 @@ static MagickBooleanType CheckCropExtent(const Image *image,
   return(MagickTrue);
 }
 
+static Image *CropOutsideCanvas(const Image *image,
+  const RectangleInfo *geometry,const RectangleInfo bounding_box,
+  ExceptionInfo *exception)
+{
+  /*
+    Crop is not within virtual canvas, return 1 pixel transparent image.
+  */
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "GeometryDoesNotContainImage","(\"%.17gx%.17g%+.20g%+.20g\") `%s'",
+    (double) geometry->width,(double) geometry->height,
+    (double) geometry->x,(double) geometry->y,image->filename);
+  return(CropOutsideImage(image,bounding_box,exception));
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -809,16 +823,7 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   bounding_box=GetCropBoundingBox(image);
   page=GetCropPage(geometry,bounding_box);
   if (IsCropOutsideImage(image,bounding_box,page) != MagickFalse)
-    {
-      /*
-        Crop is not within virtual canvas, return 1 pixel transparent image.
-      */
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "GeometryDoesNotContainImage","(\"%.17gx%.17g%+.20g%+.20g\") `%s'",
-        (double) geometry->width,(double) geometry->height,
-        (double) geometry->x,(double) geometry->y,image->filename);
-      return(CropOutsideImage(image,bounding_box,exception));
-    }
+    return(CropOutsideCanvas(image,geometry,bounding_box,exception));
   ClipCropOffset(&page.x,&page.width,bounding_box.x);
   ClipCropOffset(&page.y,&page.height,bounding_box.y);
   page=ClampCropExtent(image,geometry,page);
