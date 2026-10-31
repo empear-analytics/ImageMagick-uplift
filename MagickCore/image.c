@@ -1680,6 +1680,12 @@ MagickExport VirtualPixelMethod GetImageVirtualPixelMethod(const Image *image)
 %
 */
 #if defined(MAGICKCORE_HDRI_SUPPORT)
+static inline MagickBooleanType IsHighDynamicRangeValue(const double pixel)
+{
+  return(((pixel < 0.0) || (pixel > (double) QuantumRange) ||
+    (pixel != (double) ((QuantumAny) pixel))) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType IsIntegralQuantumPixel(const Image *image,
   const Quantum *p)
 {
@@ -1702,8 +1708,7 @@ static MagickBooleanType IsIntegralQuantumPixel(const Image *image,
     if (traits == UndefinedPixelTrait)
       continue;
     pixel=(double) p[i];
-    if ((pixel < 0.0) || (pixel > (double) QuantumRange) ||
-        (pixel != (double) ((QuantumAny) pixel)))
+    if (IsHighDynamicRangeValue(pixel) != MagickFalse)
       {
         status=MagickFalse;
         break;
