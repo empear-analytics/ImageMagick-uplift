@@ -3792,6 +3792,152 @@ function under this recipe, Recipe E and Recipe Q: 8.05 to 10.0. Added by Claude
 
 ---
 
+## Recipe RF - Reuse a Struct Fill Across Calls
+
+**Use when:** CodeScene reports *Large Method* on a function in which
+earlier steps (Recipes N, Q, U, Y, LB, B) left one struct local filled member by member
+directly before each of several calls, and a later fill assigns every member the same
+expression as an earlier one, with nothing in between that writes the local or anything
+those expressions read (`FloodfillPaintImage`'s `FloodfillRow row`, filled with the same
+eight assignments before `FillFloodplaneLeft`, `FillFloodplaneRun` and
+`SkipFloodplaneRun` in one iteration of its segment loop).
+
+**Not covered by:** Recipe D, which replaces copies of a block with calls to one
+function and whose *Use when* is a reported *Code Duplication*; Recipes N (step 6), Y,
+LB and B, which place a fill directly before each call and say nothing of a later call
+reading an earlier fill; the prohibition on deleting code that looks dead, which is
+about code some path or configuration may reach: a repeated fill runs, and stores
+values the members already hold.
+
+**How:**
+
+1. Find two fills `F1` and `F2` of one struct local `name`: runs of `name.m=e;`
+   assignments in which `F2` assigns the same members as `F1`, in the same order, each
+   from the same expression text. Check this by script.
+2. Every expression `e` of the fill is an identifier or a member access (`row.y=y;`,
+   `row.target=target;`): no call, no increment, nothing with a side effect.
+3. `F1` runs on every path to `F2`, after the last time that path reaches `name`'s
+   declaration: `F1` precedes `F2` in the same block, or in a block enclosing it, and no
+   `goto`, `case` label or loop back edge reaches `F2` without passing `F1` since the
+   declaration (a loop that encloses `F2` but not `F1` lies wholly inside the region
+   in which `name` is declared, so its back edge does not reach the declaration again).
+4. On every path from `F1` to `F2`, the loop back edges included, nothing writes `name`
+   or a member of it, and nothing writes a variable an expression of the fill reads.
+   Check by reading every statement and expanded macro on those paths, and every callee
+   they call: `&name` may be passed only to a `const Name *` parameter whose function
+   writes nothing through it (no cast removes the `const`), and no address of a
+   variable the fill reads may be passed to anything that writes through it.
+5. Delete `F2`. Nothing else changes. Several repeated fills of the same `name` in one
+   function, each meeting steps 1 to 4 against the same `F1`, go in one commit.
+6. Run `sh tools/obj_identical.sh MagickCore/<file>.c` and give its verdict in the
+   commit message: `IDENTICAL` proves the step for the build's configuration. When it
+   differs (the compiler kept a store it could not prove redundant), the oracle and
+   the reading of steps 3 and 4 are the evidence.
+
+**Before:**
+
+```c
+    row.image=image;
+    ...
+    row.y=y;
+    row.exception=exception;
+    if (FillFloodplaneLeft(&row,x1,&x) == MagickFalse)
+      break;
+    ...
+    do
+    {
+      if (skip == MagickFalse)
+        {
+          row.image=image;
+          ...
+          row.y=y;
+          row.exception=exception;
+          if (FillFloodplaneRun(&row,&x) == MagickFalse)
+            break;
+          PushSegmentStack(y,start,x-1,offset);
+          ...
+        }
+      ...
+      if (x <= x2)
+        {
+          row.image=image;
+          ...
+          row.exception=exception;
+          if (SkipFloodplaneRun(&row,x2,&x) == MagickFalse)
+            break;
+        }
+      start=x;
+    } while (x <= x2);
+```
+
+**After:**
+
+```c
+    row.image=image;
+    ...
+    row.y=y;
+    row.exception=exception;
+    if (FillFloodplaneLeft(&row,x1,&x) == MagickFalse)
+      break;
+    ...
+    do
+    {
+      if (skip == MagickFalse)
+        {
+          if (FillFloodplaneRun(&row,&x) == MagickFalse)
+            break;
+          PushSegmentStack(y,start,x-1,offset);
+          ...
+        }
+      ...
+      if (x <= x2)
+        {
+          if (SkipFloodplaneRun(&row,x2,&x) == MagickFalse)
+            break;
+        }
+      start=x;
+    } while (x <= x2);
+```
+
+**Careful:**
+
+- A struct member holds the value last stored in it. `F2` stores in each member the
+  value of an expression whose operands nothing has written since `F1` evaluated the
+  same expression, so it leaves every member as it was, and each call after `F2` reads
+  the same values with or without it. Step 2 keeps the expressions free of side
+  effects, so evaluating them once fewer changes nothing else.
+- A local declared without an initialiser in a loop body becomes indeterminate each
+  time its declaration is reached (C11 6.2.4): a fill made before that point, in an
+  earlier iteration or before the loop, does not serve a call after it. Step 3 is
+  what rules this out.
+- A `const Name *` parameter does not by itself prove the callee leaves the struct
+  alone: C permits writing through a pointer whose `const` a cast removed when the
+  object itself is not `const`. Step 4 reads the callees.
+- A variable a fill reads that changes between the fills (a loop counter `y` advanced
+  by a loop around `F2` alone, an `x` passed by address to a callee) makes the fills
+  differ in value though they agree in text: step 4 refuses it.
+- A macro on the path counts with its expansion: `PushSegmentStack` writes `s` and the
+  segment it points to, and on overflow destroys the views and returns, leaving the
+  function; it writes no variable the fill reads.
+- `refactor_guard.py` sees no literal and no call move (the fills hold neither);
+  `--calls` must report nothing.
+
+**Evidence level:** oracle, with `tools/obj_identical.sh` (step 6), and steps 3 and 4
+checked by reading.
+
+**Provenance:** 2026-10-31, from `paint.c`'s `FloodfillPaintImage` (W10): three LB
+steps (W09) left the `FloodfillRow` local filled with the same eight assignments before
+each of its three calls in one iteration of the segment loop; `y` is set once per
+iteration before the first fill, and nothing between the fills writes `row` or what
+they read. A probe deleting the second and third fills: 6.19 to 6.24 (172 to 156
+lines), object code `IDENTICAL`. A script finds runs of three or more identical
+`name.m=...;` assignments repeated within one file in `effect.c`, `morphology.c`,
+`vision.c`, `fx.c`, `layer.c`, `shear.c` and others, mostly fills of this campaign's
+helpers; whether each meets steps 3 and 4 is unchecked. Added by Claude Code (Claude
+Opus 5.5) during task W10, under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -4256,3 +4402,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | B | Step 4: the address of a plain local, `(&v)`, may fill a pointer member; writes to `v` between the fill and a call do not count against step 5. Step 6: a struct the function reaches only through its `const Name *` parameter, filled by the caller before the call and written by nothing until it returns, counts as `const`; a member whose target the region writes is bound to a `const` local at the top of the body (step 3) and the region uses the local. *Careful* gives the argument | `resize-image.c`'s `HorizontalFilter` and `VerticalFilter` (W10, 7 arguments each): `resize_filter`, the scale factor, `span` and `&offset` are the same at every call in `ApplyResizeFilterPass`'s branch. `&offset` is neither an identifier nor arithmetic (step 4's letter), and the struct, filled member by member after `span` is computed, cannot be a `const` local (step 6's letter), though the filters read `resize_filter`, the factor and `span` in their parallel loops. Binding every member to a local instead grows each filter (102 to 108 lines) while it keeps *Large Method*. A probe: `HorizontalFilter` leaves *Excess Number of Function Arguments*, 6.63 to 6.83 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | E | Step 3: a `const` struct local of the caller, initialised at its declaration, which the block neither assigns nor writes a member of and whose address it takes only as `&s` passed to a pointer-to-`const` parameter of a callee (which reads the members and may write through its pointer members), goes by value as a parameter of its exact type, the block's `&s` unchanged: Recipe TW step 2's form, for one block | `layer.c`'s `CompareImagesBounds` (W10): after Recipe B bundled `FindDifferingPixel`'s arguments into the `const DifferingPixelScan scan` (with `&alpha_pixel` and `&beta_pixel` as members), the first column scan passes `&scan`; a probe moving that scan loop to a function taking `scan` by value, 6.57 to 6.62, `CompareImagesBounds` leaving Large Method (75 lines), bumps 4 to 3, cc 15 to 12 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | Y | Step 4: a variable the block reads on entry and then writes, and that the caller does not read after the block before writing it again, goes by value right after the struct, its text unchanged (Recipe E step 4's by-value input, as Recipe TW step 2 has it); it is neither a member nor `v` | `layer.c`'s `CompareImagesLayers` (W10): its first frame loop, `i=0; next=GetNextImageInList(next); for ( ; next != ...; ...) { ... }`, advances `next`, which the caller sets again (`next=GetFirstImageInList(image);`) before any later read, and leaves through V step 7's `image_a=DestroyImage(image_a); bounds=... RelinquishMagickMemory(bounds); return((Image *) NULL);`. A probe with `next` by value: 6.62 to 6.70, `CompareImagesLayers` leaving Bumpy Road Ahead | mandate (2026-10-24) |
+| 2026-10-31 | NEW | RF | Reuse a Struct Fill Across Calls: a fill of a struct local that repeats an earlier fill of the same members from the same side-effect-free expressions, with nothing in between that writes the local or what the expressions read, is deleted; the later calls read the earlier fill | `paint.c`'s `FloodfillPaintImage` (W10): three LB steps left `FloodfillRow row` filled with the same eight assignments before each of `FillFloodplaneLeft`, `FillFloodplaneRun` and `SkipFloodplaneRun` in one iteration; a probe deleting the second and third fills, 6.19 to 6.24 (172 to 156 lines), object code `IDENTICAL` | mandate (2026-10-24) |
