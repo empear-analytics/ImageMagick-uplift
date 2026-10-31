@@ -299,6 +299,16 @@ static RectangleInfo ClampChopExtent(const Image *image,
   return(extent);
 }
 
+static Image *FinishChopImage(const Image *image,Image *chop_image,
+  CacheView *image_view,const MagickBooleanType status)
+{
+  image_view=DestroyCacheView(image_view);
+  chop_image->type=image->type;
+  if (status == MagickFalse)
+    chop_image=DestroyImage(chop_image);
+  return(chop_image);
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
@@ -443,11 +453,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
       }
   }
   chop_view=DestroyCacheView(chop_view);
-  image_view=DestroyCacheView(image_view);
-  chop_image->type=image->type;
-  if (status == MagickFalse)
-    chop_image=DestroyImage(chop_image);
-  return(chop_image);
+  return(FinishChopImage(image,chop_image,image_view,status));
 }
 
 /*
