@@ -165,6 +165,46 @@ static void DrawRaiseSideRow(const RaiseSide *raise_side,
   }
 }
 
+typedef struct _RaiseTop
+{
+  Image
+    *image;
+
+  Quantum
+    foreground,
+    background;
+} RaiseTop;
+
+static void DrawRaiseTopRow(const RaiseTop *raise_top,const ssize_t y,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const image = raise_top->image;
+
+  const Quantum
+    foreground = raise_top->foreground,
+    background = raise_top->background;
+
+  ssize_t
+    x;
+
+  for (x=0; x < y; x++)
+  {
+    BlendPixelChannels(image,HighlightFactor,foreground,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  for ( ; x < ((ssize_t) image->columns-y); x++)
+  {
+    BlendPixelChannels(image,AccentuateFactor,foreground,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  for ( ; x < (ssize_t) image->columns; x++)
+  {
+    BlendPixelChannels(image,ShadowFactor,background,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType RaiseImage(Image *image,
   const RectangleInfo *raise_info,const MagickBooleanType raise,
   ExceptionInfo *exception)
@@ -215,11 +255,11 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) raise_info->height; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
+
+    RaiseTop
+      raise_top;
 
     if (status == MagickFalse)
       continue;
@@ -229,21 +269,10 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < y; x++)
-    {
-      BlendPixelChannels(image,HighlightFactor,foreground,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    for ( ; x < ((ssize_t) image->columns-y); x++)
-    {
-      BlendPixelChannels(image,AccentuateFactor,foreground,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    for ( ; x < (ssize_t) image->columns; x++)
-    {
-      BlendPixelChannels(image,ShadowFactor,background,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    raise_top.image=image;
+    raise_top.foreground=foreground;
+    raise_top.background=background;
+    DrawRaiseTopRow(&raise_top,y,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
