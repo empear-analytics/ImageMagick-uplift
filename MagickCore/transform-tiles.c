@@ -208,6 +208,63 @@ static RectangleInfo GetTilePage(const Image *image)
   return(page);
 }
 
+typedef struct _FixedTileRow
+{
+  const Image
+    *image;
+
+  RectangleInfo
+    page;
+
+  size_t
+    width,
+    height;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} FixedTileRow;
+
+static void CropFixedSizeTileRow(const FixedTileRow *row,Image **next,
+  Image **crop_image)
+{
+  const Image
+    *const image = row->image;
+
+  const RectangleInfo
+    page = row->page;
+
+  const size_t
+    width = row->width,
+    height = row->height;
+
+  const ssize_t
+    y = row->y;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  RectangleInfo
+    geometry;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) page.width; x+=(ssize_t) width)
+  {
+    geometry.width=width;
+    geometry.height=height;
+    geometry.x=x;
+    geometry.y=y;
+    *next=CropImage(image,&geometry,exception);
+    if (*next == (Image *) NULL)
+      break;
+    AppendImageToList(crop_image,*next);
+  }
+}
+
 static Image *CropFixedSizeTiles(const Image *image,RectangleInfo geometry,
   ExceptionInfo *exception)
 {
@@ -223,7 +280,6 @@ static Image *CropFixedSizeTiles(const Image *image,RectangleInfo geometry,
     width;
 
   ssize_t
-    x,
     y;
 
   /*
@@ -240,17 +296,16 @@ static Image *CropFixedSizeTiles(const Image *image,RectangleInfo geometry,
   crop_image=NewImageList();
   for (y=0; y < (ssize_t) page.height; y+=(ssize_t) height)
   {
-    for (x=0; x < (ssize_t) page.width; x+=(ssize_t) width)
-    {
-      geometry.width=width;
-      geometry.height=height;
-      geometry.x=x;
-      geometry.y=y;
-      next=CropImage(image,&geometry,exception);
-      if (next == (Image *) NULL)
-        break;
-      AppendImageToList(&crop_image,next);
-    }
+    FixedTileRow
+      row;
+
+    row.image=image;
+    row.page=page;
+    row.width=width;
+    row.height=height;
+    row.y=y;
+    row.exception=exception;
+    CropFixedSizeTileRow(&row,&next,&crop_image);
     if (next == (Image *) NULL)
       break;
   }
