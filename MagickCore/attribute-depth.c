@@ -141,6 +141,14 @@ static size_t GetMaximumDepth(const size_t *current_depth,
   return(depth);
 }
 
+static MagickBooleanType CheckColormapValueDepth(const MagickRealType value,
+  const QuantumAny range,MagickBooleanType atDepth)
+{
+  if (IsPixelAtDepth(ClampToQuantum(value),range) == MagickFalse)
+    atDepth=MagickFalse;
+  return(atDepth);
+}
+
 static void RaiseColormapEntryDepth(const Image *image,size_t *current_depth,
   const int id,const ssize_t i)
 {
@@ -155,16 +163,13 @@ static void RaiseColormapEntryDepth(const Image *image,size_t *current_depth,
     atDepth=MagickTrue;
     range=GetQuantumRange(current_depth[id]);
     if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].red),range) == MagickFalse)
-        atDepth=MagickFalse;
+      atDepth=CheckColormapValueDepth(image->colormap[i].red,range,atDepth);
     if ((atDepth != MagickFalse) &&
         (GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].green),range) == MagickFalse)
-        atDepth=MagickFalse;
+      atDepth=CheckColormapValueDepth(image->colormap[i].green,range,atDepth);
     if ((atDepth != MagickFalse) &&
         (GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].blue),range) == MagickFalse)
-        atDepth=MagickFalse;
+      atDepth=CheckColormapValueDepth(image->colormap[i].blue,range,atDepth);
     if ((atDepth != MagickFalse))
       break;
     current_depth[id]++;
