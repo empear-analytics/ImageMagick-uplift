@@ -21,6 +21,9 @@ flagged as a close reading before pushing.
 | `threshold.c` | 5.20 → 5.35 | 6 |
 | `feature.c` | 5.23 → 5.24 | 1 |
 | `visual-effects.c` | 3.27 → 3.50 | 10 |
+| `distort.c` | 3.01 (no legal step) | 0 |
+| `enhance.c` | 2.97 (saturated) | 0 |
+| `morphology.c` | 2.71 (saturated) | 0 |
 
 68 refactor commits (E 24, N 12, W 9, SD 6, V 4, D 3, Q 3, H 2, T 2, I 1, LB 1, O 1, U 1)
 and two docs commits (plateau rows, this report). No new recipe and no amendment. Every refactor commit ran the
@@ -59,7 +62,25 @@ playbook.
   returning one constant (V or Y). The other functions are held by the parallel-loop
   skeleton or by Deep Nesting under a shared `status`.
 
+- **The other three red files are saturated for a session's budget.** Stub probes found
+  the lever in each (`distort.c`: `DistortImage` alone 4.00; `morphology.c`: all four big
+  functions together 4.76; `enhance.c`: six or seven of its largest functions brought
+  to a bare skeleton, 3.02 to 3.69), and no chain of legal steps reaches it: see the
+  plateau rows. `enhance.c` would also cross the function-count cliff (twelve extra
+  functions, -0.07). Recipe S, or the function-pointer merge, is the lever for all three.
+
 ### For the owner
+
+- **`distort.c`, two rulings** (the pass made no commits for want of them):
+  (1) `DistortImage`'s resample site, `status=ResamplePixelColor(...)` and its test in
+  the parallel loop, is refused by T, U and J, which allow only `status=MagickFalse;`.
+  A new recipe would cover it: the helper returns the call's result and the caller
+  writes `status=Helper(...)`, the same write at the same point (`resize.c`'s
+  `InterpolativeResizeImage` and `feature.c`'s `MeanShiftImage` have the same site).
+  (2) The `Cylinder2Plane` and `Plane2Cylinder` cases hold a never-compiled `#if 0`
+  debug block naming `i` and `j`; the preprocessor-branch rule keeps it from moving with
+  its case. With both, about 11 steps take the file from 3.01 to about 3.55, all flat
+  but the last (a probe).
 
 - **Recipe D without a *Code Duplication* finding** (`vision.c` 2221d8d57): eight
   identical threshold-range parses inside `ConnectedComponentsImage` became calls of one
@@ -89,6 +110,11 @@ playbook.
   *Large Method*; the later W step took the function to 79 lines, still a *Large Method*.
 
 ### Noticed, not changed (possible upstream bugs)
+
+- `distort.c` `DistortImage`: `status=ResamplePixelColor` can overwrite an earlier
+  failure with `MagickTrue` (W07); `enhance.c` `NegateImage`'s grayscale path returns
+  `MagickTrue` after a failed row (W07); `morphology.c` `AcquireKernelInfo` leaks
+  `kernel_cache` on a parse error (W07).
 
 - `visual-effects.c`: `PlasmaImageProxy` returns `MagickFalse` from its right-pixel
   block when pixels are missing, `MagickTrue` from the left, bottom and top blocks;
