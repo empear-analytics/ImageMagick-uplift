@@ -464,6 +464,36 @@ static void BlurAdaptiveRow(const AdaptiveBlurRow *row,
   }
 }
 
+typedef struct _AdaptiveEdge
+{
+  const Image
+    *image;
+
+  double
+    radius,
+    sigma;
+} AdaptiveEdge;
+
+static MagickBooleanType PrepareAdaptiveEdge(const AdaptiveEdge *edge,
+  Image **edge_image,ExceptionInfo *exception)
+{
+  Image
+    *gaussian_image;
+
+  *edge_image=EdgeImage(edge->image,edge->radius,exception);
+  if (*edge_image == (Image *) NULL)
+    return(MagickFalse);
+  (void) AutoLevelImage(*edge_image,exception);
+  gaussian_image=BlurImage(*edge_image,edge->radius,edge->sigma,exception);
+  if (gaussian_image != (Image *) NULL)
+    {
+      *edge_image=DestroyImage(*edge_image);
+      *edge_image=gaussian_image;
+    }
+  (void) AutoLevelImage(*edge_image,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -475,10 +505,12 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   double
     **kernel;
 
+  AdaptiveEdge
+    edge;
+
   Image
     *blur_image,
-    *edge_image,
-    *gaussian_image;
+    *edge_image;
 
   MagickBooleanType
     status;
@@ -512,20 +544,14 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   /*
     Edge detect the image brightness channel, level, blur, and level again.
   */
-  edge_image=EdgeImage(image,radius,exception);
-  if (edge_image == (Image *) NULL)
+  edge.image=image;
+  edge.radius=radius;
+  edge.sigma=sigma;
+  if (PrepareAdaptiveEdge(&edge,&edge_image,exception) == MagickFalse)
     {
       blur_image=DestroyImage(blur_image);
       return((Image *) NULL);
     }
-  (void) AutoLevelImage(edge_image,exception);
-  gaussian_image=BlurImage(edge_image,radius,sigma,exception);
-  if (gaussian_image != (Image *) NULL)
-    {
-      edge_image=DestroyImage(edge_image);
-      edge_image=gaussian_image;
-    }
-  (void) AutoLevelImage(edge_image,exception);
   /*
     Create a set of kernels from maximum (radius,sigma) to minimum.
   */
