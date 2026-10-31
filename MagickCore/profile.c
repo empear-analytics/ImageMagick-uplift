@@ -2538,6 +2538,9 @@ static inline MagickBooleanType IsNextDirectoryOffset(const ssize_t offset,
 
 typedef struct _ExifTagInfo
 {
+  const Image
+    *image;
+
   EndianType
     endian;
 
@@ -2575,6 +2578,37 @@ static void SyncExifResolution(const ExifTagInfo *exif_tag,
   (void) WriteProfileLong(endian,(size_t) (resolution+0.5),p);
   if (number_bytes == 8)
     (void) WriteProfileLong(endian,1UL,p+4);
+}
+
+static void SyncExifOrientation(const ExifTagInfo *exif_tag)
+{
+  const Image
+    *const image = exif_tag->image;
+
+  const EndianType
+    endian = exif_tag->endian;
+
+  unsigned char
+    *const directory = exif_tag->directory;
+
+  unsigned char
+    *const ifd0 = exif_tag->ifd0;
+
+  const size_t
+    number_bytes = exif_tag->number_bytes;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  if (directory != ifd0)
+    return;
+  if (number_bytes == 4)
+    {
+      (void) WriteProfileLong(endian,(size_t) image->orientation,p);
+      return;
+    }
+  (void) WriteProfileShort(endian,(unsigned short) image->orientation,
+    p);
 }
 
 static void SyncExifProfile(const Image *image,unsigned char *exif,
@@ -2736,6 +2770,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
             continue;  /* prevent overflow */
           p=(unsigned char *) (exif+offset);
         }
+      exif_tag.image=image;
       exif_tag.endian=endian;
       exif_tag.directory=directory;
       exif_tag.ifd0=ifd0;
@@ -2771,15 +2806,7 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
         }
         case 0x0112:
         {
-          if (directory != ifd0)
-            break;
-          if (number_bytes == 4)
-            {
-              (void) WriteProfileLong(endian,(size_t) image->orientation,p);
-              break;
-            }
-          (void) WriteProfileShort(endian,(unsigned short) image->orientation,
-            p);
+          SyncExifOrientation(&exif_tag);
           break;
         }
         case 0x0128:
