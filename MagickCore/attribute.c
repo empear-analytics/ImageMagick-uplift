@@ -398,6 +398,15 @@ static void AddConvexHullRowVertices(const ConvexHullRow *row,size_t *n,
   }
 }
 
+static void RelinquishConvexHullMemory(MemoryInfo *monotone_info,
+  MemoryInfo *vertices_info)
+{
+  if (monotone_info != (MemoryInfo *) NULL)
+    monotone_info=(MemoryInfo *) RelinquishVirtualMemory(monotone_info);
+  if (vertices_info != (MemoryInfo *) NULL)
+    vertices_info=RelinquishVirtualMemory(vertices_info);
+}
+
 MagickExport PointInfo *GetImageConvexHull(const Image *image,
   size_t *number_vertices,ExceptionInfo *exception)
 {
@@ -440,10 +449,7 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
   if ((vertices_info == (MemoryInfo *) NULL) ||
       (monotone_info == (MemoryInfo *) NULL))
     {
-      if (monotone_info != (MemoryInfo *) NULL)
-        monotone_info=(MemoryInfo *) RelinquishVirtualMemory(monotone_info);
-      if (vertices_info != (MemoryInfo *) NULL)
-        vertices_info=RelinquishVirtualMemory(vertices_info);
+      RelinquishConvexHullMemory(monotone_info,vertices_info);
       return((PointInfo *) NULL);
     }
   vertices=(PointInfo *) GetVirtualMemoryBlob(vertices_info);
