@@ -2126,6 +2126,89 @@ static MagickBooleanType ParseTagAttributes(XMLTreeRoot *root,
   return(MagickTrue);
 }
 
+typedef struct _AttributeSectionInfo
+{
+  XMLTreeRoot
+    *root;
+
+  char
+    *tag;
+
+  size_t
+    ignore_depth;
+
+  ExceptionInfo
+    *exception;
+} AttributeSectionInfo;
+
+typedef struct _AttributeSectionTargets
+{
+  char
+    ***attribute,
+    ***attributes,
+    **p;
+
+  ssize_t
+    *l;
+} AttributeSectionTargets;
+
+static MagickBooleanType ParseStartTagAttributes(
+  const AttributeSectionInfo *section,
+  const AttributeSectionTargets *section_targets)
+{
+  XMLTreeRoot
+    *const root = section->root;
+
+  char
+    *const tag = section->tag;
+
+  const size_t
+    ignore_depth = section->ignore_depth;
+
+  ExceptionInfo
+    *const exception = section->exception;
+
+  char
+    ***const attribute = section_targets->attribute;
+
+  char
+    ***const attributes = section_targets->attributes;
+
+  char
+    **const p = section_targets->p;
+
+  ssize_t
+    *const l = section_targets->l;
+
+  if (IsNameStartOutsideIgnore(*p,ignore_depth) != MagickFalse)
+    {
+      TagAttributeTargets
+        targets;
+
+      if (IsInsideXMLTag(*p) != MagickFalse)
+        {
+          /*
+            Find tag in default attributes list.
+          */
+          *attribute=FindDefaultAttributes(root,tag);
+        }
+      targets.attributes=attributes;
+      targets.p=p;
+      targets.l=l;
+      if (ParseTagAttributes(root,*attribute,exception,&targets) ==
+          MagickFalse)
+        {
+          return(MagickFalse);
+        }
+    }
+  else
+    {
+      while (IsInsideXMLTag(*p) != MagickFalse)
+        (*p)++;
+    }
+  return(MagickTrue);
+}
+
 typedef struct _EndTagTargets
 {
   char
@@ -2454,6 +2537,12 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
     c=(*p);
     if (IsXMLNameStart(p,c) != MagickFalse)
       {
+        AttributeSectionInfo
+          section;
+
+        AttributeSectionTargets
+          section_targets;
+
         StartTagInfo
           start_tag;
 
@@ -2473,32 +2562,18 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
         p+=(ptrdiff_t) strcspn(p,XMLWhitespace "/>");
         while (isspace((int) ((unsigned char) *p)) != 0)
           *p++='\0';
-        if (IsNameStartOutsideIgnore(p,ignore_depth) != MagickFalse)
+        section.root=root;
+        section.tag=tag;
+        section.ignore_depth=ignore_depth;
+        section.exception=exception;
+        section_targets.attribute=(&attribute);
+        section_targets.attributes=(&attributes);
+        section_targets.p=(&p);
+        section_targets.l=(&l);
+        if (ParseStartTagAttributes(&section,&section_targets) == MagickFalse)
           {
-            TagAttributeTargets
-              targets;
-
-            if (IsInsideXMLTag(p) != MagickFalse)
-              {
-                /*
-                  Find tag in default attributes list.
-                */
-                attribute=FindDefaultAttributes(root,tag);
-              }
-            targets.attributes=(&attributes);
-            targets.p=(&p);
-            targets.l=(&l);
-            if (ParseTagAttributes(root,attribute,exception,&targets) ==
-                MagickFalse)
-              {
-                utf8=DestroyString(utf8);
-                return(&root->root);
-              }
-          }
-        else
-          {
-            while (IsInsideXMLTag(p) != MagickFalse)
-              p++;
+            utf8=DestroyString(utf8);
+            return(&root->root);
           }
         start_tag.root=root;
         start_tag.tag=tag;
