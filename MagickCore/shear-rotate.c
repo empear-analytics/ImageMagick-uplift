@@ -114,6 +114,96 @@
 %    o rotations: Specifies the number of 90 degree rotations.
 %
 */
+static void CopyRotatedPixelChannels(const Image *image,
+  const Image *rotate_image,const Quantum *p,Quantum *q)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait rotate_traits = GetPixelChannelTraits(rotate_image,
+      channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (rotate_traits == UndefinedPixelTrait))
+      continue;
+    SetPixelChannel(rotate_image,channel,p[i],q);
+  }
+}
+
+static Image *CloneRotatedImage(const Image *image,size_t rotations,
+  ExceptionInfo *exception)
+{
+  Image
+    *rotate_image;
+
+  switch (rotations)
+  {
+    case 0:
+    default:
+    {
+      rotate_image=CloneImage(image,0,0,MagickTrue,exception);
+      break;
+    }
+    case 2:
+    {
+      rotate_image=CloneImage(image,image->columns,image->rows,MagickTrue,
+        exception);
+      break;
+    }
+    case 1:
+    case 3:
+    {
+      rotate_image=CloneImage(image,image->rows,image->columns,MagickTrue,
+        exception);
+      break;
+    }
+  }
+  return(rotate_image);
+}
+
+static void ReverseRotatedRow(const Image *image,const Image *rotate_image,
+  const Quantum *p,Quantum *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    q-=GetPixelChannels(rotate_image);
+    CopyRotatedPixelChannels(image,rotate_image,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static size_t ClipTileExtent(const size_t tile_width,const ssize_t tile_x,
+  const size_t extent)
+{
+  size_t
+    width;
+
+  width=tile_width;
+  if ((tile_width+(size_t) tile_x) > extent)
+    width=(size_t) ((ssize_t) tile_width-(tile_x+(ssize_t) tile_width-
+      (ssize_t) extent));
+  return(width);
+}
+
+static void AppendRotateTransform(const Image *image,const size_t rotations,
+  Image *rotate_image,ExceptionInfo *exception)
+{
+  char
+    transform[MagickPathExtent];
+
+  (void) FormatLocaleString(transform,MagickPathExtent,
+    "rotate %.17gx%.17g %.17g",(double) image->columns,
+    (double) image->rows,(double) rotations);
+  AppendImageProfileProperty(rotate_image,"hdrgm","hdrgm:Transform",
+    transform,exception);
+}
+
 MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   ExceptionInfo *exception)
 {
@@ -141,28 +231,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   assert(image != (Image *) NULL);
   page=image->page;
   rotations%=4;
-  switch (rotations)
-  {
-    case 0:
-    default:
-    {
-      rotate_image=CloneImage(image,0,0,MagickTrue,exception);
-      break;
-    }
-    case 2:
-    {
-      rotate_image=CloneImage(image,image->columns,image->rows,MagickTrue,
-        exception);
-      break;
-    }
-    case 1:
-    case 3:
-    {
-      rotate_image=CloneImage(image,image->rows,image->columns,MagickTrue,
-        exception);
-      break;
-    }
-  }
+  rotate_image=CloneRotatedImage(image,rotations,exception);
   if (rotate_image == (Image *) NULL)
     return((Image *) NULL);
   if (rotations == 0)
@@ -220,14 +289,8 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
           ssize_t
             y;
 
-          width=tile_width;
-          if ((tile_width+(size_t) tile_x) > image->columns)
-            width=(size_t) ((ssize_t) tile_width-(tile_x+(ssize_t) tile_width-
-              (ssize_t) image->columns));
-          height=tile_height;
-          if ((tile_height+(size_t) tile_y) > image->rows)
-            height=(size_t) ((ssize_t) tile_height-(tile_y+(ssize_t)
-              tile_height-(ssize_t) image->rows));
+          width=ClipTileExtent(tile_width,tile_x,image->columns);
+          height=ClipTileExtent(tile_height,tile_y,image->rows);
           p=GetCacheViewVirtualPixels(image_view,tile_x,tile_y,width,height,
             exception);
           if (p == (const Quantum *) NULL)
@@ -257,20 +320,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
               GetPixelChannels(image);
             for (x=0; x < (ssize_t) height; x++)
             {
-              ssize_t
-                i;
-
-              for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-              {
-                PixelChannel channel = GetPixelChannelChannel(image,i);
-                PixelTrait traits = GetPixelChannelTraits(image,channel);
-                PixelTrait rotate_traits = GetPixelChannelTraits(rotate_image,
-                  channel);
-                if ((traits == UndefinedPixelTrait) ||
-                    (rotate_traits == UndefinedPixelTrait))
-                  continue;
-                SetPixelChannel(rotate_image,channel,tile_pixels[i],q);
-              }
+              CopyRotatedPixelChannels(image,rotate_image,tile_pixels,q);
               tile_pixels-=width*GetPixelChannels(image);
               q+=(ptrdiff_t) GetPixelChannels(rotate_image);
             }
@@ -321,9 +371,6 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -335,25 +382,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
             continue;
           }
         q+=(ptrdiff_t) GetPixelChannels(rotate_image)*image->columns;
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          ssize_t
-            i;
-
-          q-=GetPixelChannels(rotate_image);
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            PixelTrait rotate_traits = GetPixelChannelTraits(rotate_image,
-              channel);
-            if ((traits == UndefinedPixelTrait) ||
-                (rotate_traits == UndefinedPixelTrait))
-              continue;
-            SetPixelChannel(rotate_image,channel,p[i],q);
-          }
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        ReverseRotatedRow(image,rotate_image,p,q);
         sync=SyncCacheViewAuthenticPixels(rotate_view,exception);
         if (sync == MagickFalse)
           status=MagickFalse;
@@ -420,14 +449,8 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
           ssize_t
             y;
 
-          width=tile_width;
-          if ((tile_width+(size_t) tile_x) > image->columns)
-            width=(size_t) ((ssize_t) tile_width-(tile_x+(ssize_t) tile_width-
-              (ssize_t) image->columns));
-          height=tile_height;
-          if ((tile_height+(size_t) tile_y) > image->rows)
-            height=(size_t) ((ssize_t) tile_height-(tile_y+(ssize_t)
-              tile_height-(ssize_t) image->rows));
+          width=ClipTileExtent(tile_width,tile_x,image->columns);
+          height=ClipTileExtent(tile_height,tile_y,image->rows);
           p=GetCacheViewVirtualPixels(image_view,tile_x,tile_y,width,height,
             exception);
           if (p == (const Quantum *) NULL)
@@ -456,20 +479,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
               GetPixelChannels(image);
             for (x=0; x < (ssize_t) height; x++)
             {
-              ssize_t
-                i;
-
-              for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-              {
-                PixelChannel channel = GetPixelChannelChannel(image,i);
-                PixelTrait traits = GetPixelChannelTraits(image,channel);
-                PixelTrait rotate_traits = GetPixelChannelTraits(rotate_image,
-                  channel);
-                if ((traits == UndefinedPixelTrait) ||
-                    (rotate_traits == UndefinedPixelTrait))
-                  continue;
-                SetPixelChannel(rotate_image,channel,tile_pixels[i],q);
-              }
+              CopyRotatedPixelChannels(image,rotate_image,tile_pixels,q);
               tile_pixels+=width*GetPixelChannels(image);
               q+=(ptrdiff_t) GetPixelChannels(rotate_image);
             }
@@ -508,16 +518,7 @@ MagickExport Image *IntegralRotateImage(const Image *image,size_t rotations,
   rotate_image->type=image->type;
   rotate_image->page=page;
   if (status != MagickFalse)
-    {
-      char
-        transform[MagickPathExtent];
-
-      (void) FormatLocaleString(transform,MagickPathExtent,
-        "rotate %.17gx%.17g %.17g",(double) image->columns,
-        (double) image->rows,(double) rotations);
-      AppendImageProfileProperty(rotate_image,"hdrgm","hdrgm:Transform",
-        transform,exception);
-    }
+    AppendRotateTransform(image,rotations,rotate_image,exception);
   if (status == MagickFalse)
     rotate_image=DestroyImage(rotate_image);
   return(rotate_image);

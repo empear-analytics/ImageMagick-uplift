@@ -83,6 +83,15 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static double FinishTotalInkDensity(CacheView *image_view,
+  const MagickBooleanType status,double total_ink_density)
+{
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    total_ink_density=0.0;
+  return(total_ink_density);
+}
+
 MagickExport double GetImageTotalInkDensity(Image *image,
   ExceptionInfo *exception)
 {
@@ -147,8 +156,5 @@ MagickExport double GetImageTotalInkDensity(Image *image,
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
   }
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    total_ink_density=0.0;
-  return(total_ink_density);
+  return(FinishTotalInkDensity(image_view,status,total_ink_density));
 }

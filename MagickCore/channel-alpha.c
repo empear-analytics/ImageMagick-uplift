@@ -67,6 +67,21 @@
 #include "MagickCore/version.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _FlattenSource
+{
+  const Image
+    *image;
+
+  const PixelInfo
+    *p;
+
+  double
+    alpha;
+} FlattenSource;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -99,9 +114,96 @@
 %
 */
 
-static inline void FlattenPixelInfo(const Image *image,const PixelInfo *p,
-  const double alpha,const Quantum *q,const double beta,Quantum *composite)
+typedef struct _FlattenChannel
 {
+  PixelChannel
+    channel;
+
+  Quantum
+    *composite;
+
+  ssize_t
+    i;
+
+  double
+    gamma;
+
+  const Quantum
+    *q;
+
+  double
+    beta;
+
+  const PixelInfo
+    *p;
+
+  double
+    alpha;
+} FlattenChannel;
+
+static void FlattenColorChannel(const FlattenChannel *flatten)
+{
+  const PixelChannel
+    channel = flatten->channel;
+
+  Quantum
+    *const composite = flatten->composite;
+
+  const ssize_t
+    i = flatten->i;
+
+  const double
+    gamma = flatten->gamma;
+
+  const Quantum
+    *const q = flatten->q;
+
+  const double
+    beta = flatten->beta;
+
+  const PixelInfo
+    *const p = flatten->p;
+
+  const double
+    alpha = flatten->alpha;
+
+  switch (channel)
+  {
+  case RedPixelChannel:
+  {
+    composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
+      (double) p->red,alpha));
+    break;
+  }
+  case GreenPixelChannel:
+  {
+    composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
+      (double) p->green,alpha));
+    break;
+  }
+  case BluePixelChannel:
+  {
+    composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
+      (double) p->blue,alpha));
+    break;
+  }
+    default:
+      break;
+  }
+}
+
+static inline void FlattenPixelInfo(const FlattenSource *source,
+  const Quantum *q,const double beta,Quantum *composite)
+{
+  const Image
+    *image = source->image;
+
+  const PixelInfo
+    *p = source->p;
+
+  const double
+    alpha = source->alpha;
+
   double
     Da,
     gamma,
@@ -125,24 +227,6 @@ static inline void FlattenPixelInfo(const Image *image,const PixelInfo *p,
       continue;
     switch (channel)
     {
-      case RedPixelChannel:
-      {
-        composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
-          (double) p->red,alpha));
-        break;
-      }
-      case GreenPixelChannel:
-      {
-        composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
-          (double) p->green,alpha));
-        break;
-      }
-      case BluePixelChannel:
-      {
-        composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
-          (double) p->blue,alpha));
-        break;
-      }
       case BlackPixelChannel:
       {
         composite[i]=ClampToQuantum(gamma*MagickOver_((double) q[i],beta,
@@ -155,7 +239,21 @@ static inline void FlattenPixelInfo(const Image *image,const PixelInfo *p,
         break;
       }
       default:
+      {
+        FlattenChannel
+          flatten;
+
+        flatten.channel=channel;
+        flatten.composite=composite;
+        flatten.i=i;
+        flatten.gamma=gamma;
+        flatten.q=q;
+        flatten.beta=beta;
+        flatten.p=p;
+        flatten.alpha=alpha;
+        FlattenColorChannel(&flatten);
         break;
+      }
     }
   }
 }
@@ -203,8 +301,13 @@ static void FlattenRowOverBackground(const Image *image,
 
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    FlattenPixelInfo(image,&image->background_color,
-      image->background_color.alpha,q,(double) GetPixelAlpha(image,q),q);
+    FlattenSource
+      source;
+
+    source.image=image;
+    source.p=(&image->background_color);
+    source.alpha=image->background_color.alpha;
+    FlattenPixelInfo(&source,q,(double) GetPixelAlpha(image,q),q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
@@ -221,6 +324,180 @@ static void SetShapeAlphaPixels(const Image *image,PixelInfo pixel,
     SetPixelViaPixelInfo(image,&pixel,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
+}
+
+static void AssociateAlphaRow(const Image *image,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      gamma;
+
+    gamma=QuantumScale*(double) GetPixelAlpha(image,q);
+    ScaleColorChannels(image,gamma,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static MagickBooleanType IsAlphaRowOpaque(const Image *image,
+  const Quantum *magick_restrict p)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    if (GetPixelAlpha(image,p) != OpaqueAlpha)
+      {
+        status=MagickFalse;
+        break;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(status);
+}
+
+static MagickBooleanType DisassociateAlphaRow(Image *image,
+  CacheView *image_view,const ssize_t y,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      gamma,
+      Sa;
+
+    Sa=QuantumScale*(double) GetPixelAlpha(image,q);
+    gamma=MagickSafeReciprocal(Sa);
+    ScaleColorChannels(image,gamma,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
+static MagickBooleanType SetTransparentRowToBackground(Image *image,CacheView *image_view,
+  const ssize_t y,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  SetTransparentPixelsToBackground(image,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
+typedef struct _ShapeAlphaRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  PixelInfo
+    background;
+
+  ExceptionInfo
+    *exception;
+} ShapeAlphaRow;
+
+static MagickBooleanType SetShapeAlphaRow(const ShapeAlphaRow *row)
+{
+  Image
+    *const image = row->image;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  const ssize_t
+    y = row->y;
+
+  const PixelInfo
+    background = row->background;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  MagickBooleanType
+    status;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    *magick_restrict q;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  pixel=background;
+  SetShapeAlphaPixels(image,pixel,q);
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
+static MagickBooleanType SetOpaqueAlphaTrait(Image *image,
+  const PixelTrait alpha_trait,MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    status=SetImageAlpha(image,OpaqueAlpha,exception);
+  image->alpha_trait=alpha_trait;
+  return(status);
+}
+
+static MagickBooleanType SetMissingAlphaOpaque(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    status=SetImageAlpha(image,OpaqueAlpha,exception);
+  return(status);
 }
 
 MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
@@ -267,9 +544,6 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         Quantum
           *magick_restrict q;
 
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
         q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
@@ -279,15 +553,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
             status=MagickFalse;
             continue;
           }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          double
-            gamma;
-
-          gamma=QuantumScale*(double) GetPixelAlpha(image,q);
-          ScaleColorChannels(image,gamma,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        AssociateAlphaRow(image,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
       }
@@ -312,20 +578,9 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        Quantum
-          *magick_restrict q;
-
         if (status == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        SetTransparentPixelsToBackground(image,q);
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+        if (SetTransparentRowToBackground(image,image_view,y,exception) == MagickFalse)
           status=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);
@@ -340,9 +595,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     case DeactivateAlphaChannel:
     {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status=SetImageAlpha(image,OpaqueAlpha,exception);
-      image->alpha_trait=CopyPixelTrait;
+      status=SetOpaqueAlphaTrait(image,CopyPixelTrait,status,exception);
       break;
     }
     case DisassociateAlphaChannel:
@@ -361,33 +614,9 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        Quantum
-          *magick_restrict q;
-
-        ssize_t
-          x;
-
         if (status == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          double
-            gamma,
-            Sa;
-
-          Sa=QuantumScale*(double) GetPixelAlpha(image,q);
-          gamma=MagickSafeReciprocal(Sa);
-          ScaleColorChannels(image,gamma,q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+        if (DisassociateAlphaRow(image,image_view,y,exception) == MagickFalse)
           status=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);
@@ -396,9 +625,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     case DiscreteAlphaChannel:
     {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status=SetImageAlpha(image,OpaqueAlpha,exception);
-      image->alpha_trait=UpdatePixelTrait;
+      status=SetOpaqueAlphaTrait(image,UpdatePixelTrait,status,exception);
       break;
     }
     case ExtractAlphaChannel:
@@ -435,9 +662,6 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
         const Quantum
           *magick_restrict p;
 
-        ssize_t
-          x;
-
         if ((status == MagickFalse) || (opaque == MagickFalse))
           continue;
         p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -446,15 +670,8 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
             status=MagickFalse;
             continue;
           }
-        for (x=0; x < (ssize_t) image->columns; x++)
-        {
-          if (GetPixelAlpha(image,p) != OpaqueAlpha)
-            {
-              opaque=MagickFalse;
-              break;
-            }
-          p+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        if (IsAlphaRowOpaque(image,p) == MagickFalse)
+          opaque=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);
       if (opaque != MagickFalse)
@@ -463,9 +680,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     case OnAlphaChannel:
     {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status=SetImageAlpha(image,OpaqueAlpha,exception);
-      image->alpha_trait=BlendPixelTrait;
+      status=SetOpaqueAlphaTrait(image,BlendPixelTrait,status,exception);
       break;
     }
     case OpaqueAlphaChannel:
@@ -512,8 +727,7 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
     }
     case SetAlphaChannel:
     {
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        status=SetImageAlpha(image,OpaqueAlpha,exception);
+      status=SetMissingAlphaOpaque(image,status,exception);
       break;
     }
     case ShapeAlphaChannel:
@@ -537,24 +751,17 @@ MagickExport MagickBooleanType SetImageAlphaChannel(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        PixelInfo
-          pixel;
-
-        Quantum
-          *magick_restrict q;
+        ShapeAlphaRow
+          row;
 
         if (status == MagickFalse)
           continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        pixel=background;
-        SetShapeAlphaPixels(image,pixel,q);
-        if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+        row.image=image;
+        row.image_view=image_view;
+        row.y=y;
+        row.background=background;
+        row.exception=exception;
+        if (SetShapeAlphaRow(&row) == MagickFalse)
           status=MagickFalse;
       }
       image_view=DestroyCacheView(image_view);

@@ -149,22 +149,157 @@ static double GenerateGaussianNoise(RandomInfo *random_info,
   return(noise);
 }
 
-MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
-  const Quantum pixel,const NoiseType noise_type,const double attenuate)
+static double GenerateImpulseNoise(const Quantum pixel,
+  const double attenuate,const double alpha)
 {
   double
-    alpha,
+    noise;
+
+  if (alpha < (SigmaImpulse/2.0))
+    noise=0.0;
+  else
+    if (alpha >= (1.0-(SigmaImpulse/2.0)))
+      noise=(double) QuantumRange;
+    else
+      noise=(double) pixel;
+  return(noise);
+}
+
+static double GenerateLaplacianNoise(const Quantum pixel,
+  const double attenuate,const double alpha)
+{
+  double
+    beta,
+    noise;
+
+  if (alpha <= 0.5)
+    {
+      if (alpha <= MagickEpsilon)
+        noise=(double) (pixel-QuantumRange);
+      else
+        noise=(double) pixel+(double) QuantumRange*SigmaLaplacian*
+          log(2.0*alpha)+0.5;
+      return(noise);
+    }
+  beta=1.0-alpha;
+  if (beta <= (0.5*MagickEpsilon))
+    noise=(double) (pixel+QuantumRange);
+  else
+    noise=(double) pixel-(double) QuantumRange*SigmaLaplacian*
+      log(2.0*beta)+0.5;
+  return(noise);
+}
+
+static double GenerateMultiplicativeGaussianNoise(RandomInfo *random_info,
+  const Quantum pixel,const double attenuate,const double alpha)
+{
+  double
     beta,
     noise,
     sigma;
 
-  alpha=GetPseudoRandomValue(random_info);
+  sigma=1.0;
+  if (alpha > MagickEpsilon)
+    sigma=sqrt(-2.0*log(alpha));
+  beta=GetPseudoRandomValue(random_info);
+  noise=(double) pixel+(double) pixel*SigmaMultiplicativeGaussian*sigma*
+    cos((double) (2.0*MagickPI*beta))/2.0;
+  return(noise);
+}
+
+static double GeneratePoissonNoise(RandomInfo *random_info,
+  const Quantum pixel,const double attenuate,double alpha)
+{
+  double
+    beta,
+    noise,
+    poisson;
+
+  ssize_t
+    i;
+
+  poisson=exp(-SigmaPoisson*QuantumScale*(double) pixel);
+  for (i=0; alpha > poisson; i++)
+  {
+    beta=GetPseudoRandomValue(random_info);
+    alpha*=beta;
+  }
+  noise=(double) QuantumRange*i*MagickSafeReciprocal(SigmaPoisson);
+  return(noise);
+}
+
+typedef struct _SingleDrawNoiseInfo
+{
+  Quantum
+    pixel;
+
+  NoiseType
+    noise_type;
+
+  double
+    attenuate,
+    alpha;
+} SingleDrawNoiseInfo;
+
+static void GenerateSingleDrawNoise(
+  const SingleDrawNoiseInfo *single_draw_noise_info,double *noise)
+{
+  const Quantum
+    pixel = single_draw_noise_info->pixel;
+
+  const NoiseType
+    noise_type = single_draw_noise_info->noise_type;
+
+  const double
+    attenuate = single_draw_noise_info->attenuate,
+    alpha = single_draw_noise_info->alpha;
+
   switch (noise_type)
   {
     case UniformNoise:
     default:
     {
-      noise=(double) pixel+(double) QuantumRange*SigmaUniform*(alpha-0.5);
+      (*noise)=(double) pixel+(double) QuantumRange*SigmaUniform*(alpha-0.5);
+      break;
+    }
+    case ImpulseNoise:
+    {
+      (*noise)=GenerateImpulseNoise(pixel,attenuate,alpha);
+      break;
+    }
+    case LaplacianNoise:
+    {
+      (*noise)=GenerateLaplacianNoise(pixel,attenuate,alpha);
+      break;
+    }
+    case RandomNoise:
+    {
+      (*noise)=(double) QuantumRange*SigmaRandom*alpha;
+      break;
+    }
+  }
+}
+
+MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
+  const Quantum pixel,const NoiseType noise_type,const double attenuate)
+{
+  double
+    alpha,
+    noise;
+
+  alpha=GetPseudoRandomValue(random_info);
+  switch (noise_type)
+  {
+    default:
+    {
+      SingleDrawNoiseInfo
+        single_draw_noise_info;
+
+      single_draw_noise_info.pixel=pixel;
+      single_draw_noise_info.noise_type=noise_type;
+      single_draw_noise_info.attenuate=attenuate;
+      single_draw_noise_info.alpha=alpha;
+      GenerateSingleDrawNoise(&single_draw_noise_info,&noise);
       break;
     }
     case GaussianNoise:
@@ -172,66 +307,15 @@ MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
       noise=GenerateGaussianNoise(random_info,pixel,attenuate,alpha);
       break;
     }
-    case ImpulseNoise:
-    {
-      if (alpha < (SigmaImpulse/2.0))
-        noise=0.0;
-      else
-        if (alpha >= (1.0-(SigmaImpulse/2.0)))
-          noise=(double) QuantumRange;
-        else
-          noise=(double) pixel;
-      break;
-    }
-    case LaplacianNoise:
-    {
-      if (alpha <= 0.5)
-        {
-          if (alpha <= MagickEpsilon)
-            noise=(double) (pixel-QuantumRange);
-          else
-            noise=(double) pixel+(double) QuantumRange*SigmaLaplacian*
-              log(2.0*alpha)+0.5;
-          break;
-        }
-      beta=1.0-alpha;
-      if (beta <= (0.5*MagickEpsilon))
-        noise=(double) (pixel+QuantumRange);
-      else
-        noise=(double) pixel-(double) QuantumRange*SigmaLaplacian*
-          log(2.0*beta)+0.5;
-      break;
-    }
     case MultiplicativeGaussianNoise:
     {
-      sigma=1.0;
-      if (alpha > MagickEpsilon)
-        sigma=sqrt(-2.0*log(alpha));
-      beta=GetPseudoRandomValue(random_info);
-      noise=(double) pixel+(double) pixel*SigmaMultiplicativeGaussian*sigma*
-        cos((double) (2.0*MagickPI*beta))/2.0;
+      noise=GenerateMultiplicativeGaussianNoise(random_info,pixel,attenuate,
+        alpha);
       break;
     }
     case PoissonNoise:
     {
-      double
-        poisson;
-
-      ssize_t
-        i;
-
-      poisson=exp(-SigmaPoisson*QuantumScale*(double) pixel);
-      for (i=0; alpha > poisson; i++)
-      {
-        beta=GetPseudoRandomValue(random_info);
-        alpha*=beta;
-      }
-      noise=(double) QuantumRange*i*MagickSafeReciprocal(SigmaPoisson);
-      break;
-    }
-    case RandomNoise:
-    {
-      noise=(double) QuantumRange*SigmaRandom*alpha;
+      noise=GeneratePoissonNoise(random_info,pixel,attenuate,alpha);
       break;
     }
   }
@@ -309,6 +393,19 @@ MagickPrivate size_t GetOptimalKernelWidth1D(const double radius,
   return((size_t) (width-2));
 }
 
+static double SumGaussianKernel2D(double normalize,const ssize_t j,
+  const double alpha,const double beta)
+{
+  ssize_t
+    u,
+    v;
+
+  for (v=(-j); v <= j; v++)
+    for (u=(-j); u <= j; u++)
+      normalize+=exp(-((double) (u*u+v*v))*alpha)*beta;
+  return(normalize);
+}
+
 MagickPrivate size_t GetOptimalKernelWidth2D(const double radius,
   const double sigma)
 {
@@ -323,9 +420,7 @@ MagickPrivate size_t GetOptimalKernelWidth2D(const double radius,
     width;
 
   ssize_t
-    j,
-    u,
-    v;
+    j;
 
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
@@ -340,9 +435,7 @@ MagickPrivate size_t GetOptimalKernelWidth2D(const double radius,
   {
     normalize=0.0;
     j=(ssize_t) (width-1)/2;
-    for (v=(-j); v <= j; v++)
-      for (u=(-j); u <= j; u++)
-        normalize+=exp(-((double) (u*u+v*v))*alpha)*beta;
+    normalize=SumGaussianKernel2D(normalize,j,alpha,beta);
     value=exp(-((double) (j*j))*alpha)*beta/normalize;
     if ((value < QuantumScale) || (value < MagickEpsilon))
       break;

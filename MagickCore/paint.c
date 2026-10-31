@@ -542,14 +542,6 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
     {
       if (skip == MagickFalse)
         {
-          row.image=image;
-          row.floodplane_image=floodplane_image;
-          row.image_view=image_view;
-          row.floodplane_view=floodplane_view;
-          row.target=target;
-          row.invert=invert;
-          row.y=y;
-          row.exception=exception;
           if (FillFloodplaneRun(&row,&x) == MagickFalse)
             break;
           PushSegmentStack(y,start,x-1,offset);
@@ -560,14 +552,6 @@ MagickExport MagickBooleanType FloodfillPaintImage(Image *image,
       x++;
       if (x <= x2)
         {
-          row.image=image;
-          row.floodplane_image=floodplane_image;
-          row.image_view=image_view;
-          row.floodplane_view=floodplane_view;
-          row.target=target;
-          row.invert=invert;
-          row.y=y;
-          row.exception=exception;
           if (SkipFloodplaneRun(&row,x2,&x) == MagickFalse)
             break;
         }
@@ -1101,6 +1085,18 @@ static void OilPaintRow(const OilPaintRowInfo *row,
   }
 }
 
+static MagickBooleanType PrepareOilPaintImage(Image *linear_image,
+  Image *paint_image,ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(paint_image,DirectClass,exception) == MagickFalse)
+    {
+      linear_image=DestroyImage(linear_image);
+      paint_image=DestroyImage(paint_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *OilPaintImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1140,12 +1136,8 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
   paint_image=CloneImage(image,0,0,MagickTrue,exception);
   if ((linear_image == (Image *) NULL) || (paint_image == (Image *) NULL))
     return(DestroyOilPaintClones(linear_image,paint_image));
-  if (SetImageStorageClass(paint_image,DirectClass,exception) == MagickFalse)
-    {
-      linear_image=DestroyImage(linear_image);
-      paint_image=DestroyImage(paint_image);
-      return((Image *) NULL);
-    }
+  if (PrepareOilPaintImage(linear_image,paint_image,exception) == MagickFalse)
+    return((Image *) NULL);
   histograms=AcquireHistogramTLS(NumberPaintBins);
   if (histograms == (size_t **) NULL)
     {
@@ -1286,6 +1278,50 @@ static inline void SetUpdatableFillChannels(const Image *image,
     SetPixelAlpha(image,(Quantum) conform_fill->alpha,q);
 }
 
+typedef struct _OpaquePaintRow
+{
+  Image
+    *image;
+
+  MagickBooleanType
+    invert;
+
+  PixelInfo
+    conform_fill,
+    conform_target,
+    zero;
+} OpaquePaintRow;
+
+static void OpaquePaintRowPixels(const OpaquePaintRow *row,
+  Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const MagickBooleanType
+    invert = row->invert;
+
+  const PixelInfo
+    conform_fill = row->conform_fill,
+    conform_target = row->conform_target,
+    zero = row->zero;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  pixel=zero;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    GetPixelInfoPixel(image,q,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&conform_target) != invert)
+      SetUpdatableFillChannels(image,&conform_fill,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType OpaquePaintImage(Image *image,
   const PixelInfo *target,const PixelInfo *fill,const MagickBooleanType invert,
   ExceptionInfo *exception)
@@ -1332,14 +1368,11 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    PixelInfo
-      pixel;
+    OpaquePaintRow
+      row;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1349,14 +1382,12 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    pixel=zero;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      GetPixelInfoPixel(image,q,&pixel);
-      if (IsFuzzyEquivalencePixelInfo(&pixel,&conform_target) != invert)
-        SetUpdatableFillChannels(image,&conform_fill,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.invert=invert;
+    row.conform_fill=conform_fill;
+    row.conform_target=conform_target;
+    row.zero=zero;
+    OpaquePaintRowPixels(&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -1417,6 +1448,68 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _TransparentPaintRow
+{
+  Image
+    *image;
+
+  const PixelInfo
+    *target;
+
+  Quantum
+    opacity;
+
+  MagickBooleanType
+    invert;
+
+  PixelInfo
+    zero;
+} TransparentPaintRow;
+
+static void TransparentPaintRowPixels(const TransparentPaintRow *row,
+  Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const PixelInfo
+    *target = row->target;
+
+  const Quantum
+    opacity = row->opacity;
+
+  const MagickBooleanType
+    invert = row->invert;
+
+  const PixelInfo
+    zero = row->zero;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  pixel=zero;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    GetPixelInfoPixel(image,q,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,target) != invert)
+      SetPixelAlpha(image,opacity,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static MagickBooleanType PrepareTransparentImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType TransparentPaintImage(Image *image,
   const PixelInfo *target,const Quantum opacity,const MagickBooleanType invert,
   ExceptionInfo *exception)
@@ -1443,10 +1536,8 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
   assert(target != (PixelInfo *) NULL);
   if (IsEventLogging() != MagickFalse) 
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (PrepareTransparentImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if ((image->alpha_trait & BlendPixelTrait) == 0)
-    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
   /*
     Make image color transparent.
   */
@@ -1460,14 +1551,11 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    PixelInfo
-      pixel;
-
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
+
+    TransparentPaintRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -1477,14 +1565,12 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    pixel=zero;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      GetPixelInfoPixel(image,q,&pixel);
-      if (IsFuzzyEquivalencePixelInfo(&pixel,target) != invert)
-        SetPixelAlpha(image,opacity,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.target=target;
+    row.opacity=opacity;
+    row.invert=invert;
+    row.zero=zero;
+    TransparentPaintRowPixels(&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)

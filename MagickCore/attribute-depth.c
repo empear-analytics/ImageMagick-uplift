@@ -141,6 +141,14 @@ static size_t GetMaximumDepth(const size_t *current_depth,
   return(depth);
 }
 
+static MagickBooleanType CheckColormapValueDepth(const MagickRealType value,
+  const QuantumAny range,MagickBooleanType atDepth)
+{
+  if (IsPixelAtDepth(ClampToQuantum(value),range) == MagickFalse)
+    atDepth=MagickFalse;
+  return(atDepth);
+}
+
 static void RaiseColormapEntryDepth(const Image *image,size_t *current_depth,
   const int id,const ssize_t i)
 {
@@ -155,16 +163,13 @@ static void RaiseColormapEntryDepth(const Image *image,size_t *current_depth,
     atDepth=MagickTrue;
     range=GetQuantumRange(current_depth[id]);
     if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].red),range) == MagickFalse)
-        atDepth=MagickFalse;
+      atDepth=CheckColormapValueDepth(image->colormap[i].red,range,atDepth);
     if ((atDepth != MagickFalse) &&
         (GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].green),range) == MagickFalse)
-        atDepth=MagickFalse;
+      atDepth=CheckColormapValueDepth(image->colormap[i].green,range,atDepth);
     if ((atDepth != MagickFalse) &&
         (GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-      if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].blue),range) == MagickFalse)
-        atDepth=MagickFalse;
+      atDepth=CheckColormapValueDepth(image->colormap[i].blue,range,atDepth);
     if ((atDepth != MagickFalse))
       break;
     current_depth[id]++;
@@ -276,6 +281,13 @@ static MagickBooleanType RaiseImageRowDepth(const DepthScan *scan)
   return(status);
 }
 
+static inline MagickBooleanType IsOpaqueColormapImage(const Image *image)
+{
+  return(((image->storage_class == PseudoClass) &&
+    ((image->alpha_trait & BlendPixelTrait) == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -310,8 +322,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
   status=MagickTrue;
   for (i=0; i < (ssize_t) number_threads; i++)
     current_depth[i]=1;
-  if ((image->storage_class == PseudoClass) &&
-      ((image->alpha_trait & BlendPixelTrait) == 0))
+  if (IsOpaqueColormapImage(image) != MagickFalse)
     {
       return(GetColormapDepth(image,current_depth,number_threads));
     }
@@ -805,6 +816,14 @@ static inline MagickBooleanType IsFloydSteinbergDither(const char *artifact)
     MagickFalse);
 }
 
+static MagickBooleanType FinishImageDepth(Image *image,const size_t depth,
+  const MagickBooleanType status)
+{
+  if (status != MagickFalse)
+    image->depth=depth;
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -950,7 +969,5 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
-  if (status != MagickFalse)
-    image->depth=depth;
-  return(status);
+  return(FinishImageDepth(image,depth,status));
 }

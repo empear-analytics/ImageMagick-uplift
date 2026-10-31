@@ -97,6 +97,28 @@
 #include "MagickCore/xml-tree-private.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _AdaptiveThresholdPixelInfo
+{
+  const Image
+    *image,
+    *threshold_image;
+
+  size_t
+    width,
+    height;
+
+  MagickSizeType
+    number_pixels;
+
+  double
+    bias,
+    *channel_bias,
+    *channel_sum;
+} AdaptiveThresholdPixelInfo;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -157,18 +179,58 @@ static void SumThresholdWindow(const Image *image,
   }
 }
 
-static void AdaptiveThresholdPixel(const Image *image,
-  const Image *threshold_image,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q,const ssize_t center,const size_t width,
-  const size_t height,const MagickSizeType number_pixels,const double bias,
-  double *channel_bias,double *channel_sum)
+static void SlideThresholdWindow(const AdaptiveThresholdPixelInfo *pixel_info,
+  const Quantum *magick_restrict p,const ssize_t i,const PixelChannel channel)
 {
+  const Image
+    *const image = pixel_info->image;
+
+  const size_t
+    width = pixel_info->width,
+    height = pixel_info->height;
+
+  double
+    *const channel_bias = pixel_info->channel_bias,
+    *const channel_sum = pixel_info->channel_sum;
+
   const Quantum
     *magick_restrict pixels;
 
   ssize_t
-    i,
     v;
+
+  channel_sum[channel]-=channel_bias[channel];
+  channel_bias[channel]=0.0;
+  pixels=p;
+  for (v=0; v < (ssize_t) height; v++)
+  {
+    channel_bias[channel]+=(double) pixels[i];
+    pixels+=(width-1)*GetPixelChannels(image);
+    channel_sum[channel]+=(double) pixels[i];
+    pixels+=(ptrdiff_t) GetPixelChannels(image)*(image->columns+1);
+  }
+}
+
+static void AdaptiveThresholdPixel(
+  const AdaptiveThresholdPixelInfo *pixel_info,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,
+  const ssize_t center)
+{
+  const Image
+    *const image = pixel_info->image,
+    *const threshold_image = pixel_info->threshold_image;
+
+  const MagickSizeType
+    number_pixels = pixel_info->number_pixels;
+
+  const double
+    bias = pixel_info->bias;
+
+  double
+    *const channel_sum = pixel_info->channel_sum;
+
+  ssize_t
+    i;
 
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
@@ -187,20 +249,105 @@ static void AdaptiveThresholdPixel(const Image *image,
         SetPixelChannel(threshold_image,channel,p[center+i],q);
         continue;
       }
-    channel_sum[channel]-=channel_bias[channel];
-    channel_bias[channel]=0.0;
-    pixels=p;
-    for (v=0; v < (ssize_t) height; v++)
-    {
-      channel_bias[channel]+=(double) pixels[i];
-      pixels+=(width-1)*GetPixelChannels(image);
-      channel_sum[channel]+=(double) pixels[i];
-      pixels+=(ptrdiff_t) GetPixelChannels(image)*(image->columns+1);
-    }
+    SlideThresholdWindow(pixel_info,p,i,channel);
     mean=(double) (channel_sum[channel]/number_pixels+bias);
     SetPixelChannel(threshold_image,channel,(Quantum) ((double)
       p[center+i] <= mean ? 0 : QuantumRange),q);
   }
+}
+
+typedef struct _AdaptiveThresholdInfo
+{
+  const Image
+    *image;
+
+  Image
+    *threshold_image;
+
+  size_t
+    width,
+    height;
+
+  MagickSizeType
+    number_pixels;
+
+  double
+    bias;
+} AdaptiveThresholdInfo;
+
+static void AdaptiveThresholdRow(const AdaptiveThresholdInfo *info,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = info->image;
+
+  Image
+    *const threshold_image = info->threshold_image;
+
+  const size_t
+    width = info->width,
+    height = info->height;
+
+  const MagickSizeType
+    number_pixels = info->number_pixels;
+
+  const double
+    bias = info->bias;
+
+  double
+    channel_bias[MaxPixelChannels],
+    channel_sum[MaxPixelChannels];
+
+  const AdaptiveThresholdPixelInfo
+    pixel_info = { image, threshold_image, width, height, number_pixels,
+      bias, channel_bias, channel_sum };
+
+  ssize_t
+    center,
+    i,
+    x;
+
+  center=(ssize_t) GetPixelChannels(image)*((ssize_t) image->columns+
+    (ssize_t) width)*((ssize_t) height/2L)+(ssize_t) GetPixelChannels(image)*
+    ((ssize_t) width/2);
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    PixelTrait threshold_traits=GetPixelChannelTraits(threshold_image,
+      channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (threshold_traits == UndefinedPixelTrait))
+      continue;
+    if ((threshold_traits & CopyPixelTrait) != 0)
+      {
+        SetPixelChannel(threshold_image,channel,p[center+i],q);
+        continue;
+      }
+    SumThresholdWindow(image,p,i,width,height,&channel_bias[channel],
+      &channel_sum[channel]);
+  }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    AdaptiveThresholdPixel(&pixel_info,p,q,center);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(threshold_image);
+  }
+}
+
+static MagickBooleanType SetThresholdStorageClass(Image *threshold_image,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=SetImageStorageClass(threshold_image,DirectClass,exception);
+  if (status == MagickFalse)
+    {
+      threshold_image=DestroyImage(threshold_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
 }
 
 MagickExport Image *AdaptiveThresholdImage(const Image *image,
@@ -242,12 +389,8 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
     return((Image *) NULL);
   if ((width == 0) || (height == 0))
     return(threshold_image);
-  status=SetImageStorageClass(threshold_image,DirectClass,exception);
-  if (status == MagickFalse)
-    {
-      threshold_image=DestroyImage(threshold_image);
-      return((Image *) NULL);
-    }
+  if (SetThresholdStorageClass(threshold_image,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     Threshold image.
   */
@@ -262,20 +405,14 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    double
-      channel_bias[MaxPixelChannels],
-      channel_sum[MaxPixelChannels];
+    AdaptiveThresholdInfo
+      info;
 
     const Quantum
       *magick_restrict p;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      center,
-      i,
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -288,33 +425,13 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
         status=MagickFalse;
         continue;
       }
-    center=(ssize_t) GetPixelChannels(image)*((ssize_t) image->columns+
-      (ssize_t) width)*((ssize_t) height/2L)+(ssize_t) GetPixelChannels(image)*
-      ((ssize_t) width/2);
-    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    {
-      PixelChannel channel = GetPixelChannelChannel(image,i);
-      PixelTrait traits = GetPixelChannelTraits(image,channel);
-      PixelTrait threshold_traits=GetPixelChannelTraits(threshold_image,
-        channel);
-      if ((traits == UndefinedPixelTrait) ||
-          (threshold_traits == UndefinedPixelTrait))
-        continue;
-      if ((threshold_traits & CopyPixelTrait) != 0)
-        {
-          SetPixelChannel(threshold_image,channel,p[center+i],q);
-          continue;
-        }
-      SumThresholdWindow(image,p,i,width,height,&channel_bias[channel],
-        &channel_sum[channel]);
-    }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      AdaptiveThresholdPixel(image,threshold_image,p,q,center,width,height,
-        number_pixels,bias,channel_bias,channel_sum);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(threshold_image);
-    }
+    info.image=image;
+    info.threshold_image=threshold_image;
+    info.width=width;
+    info.height=height;
+    info.number_pixels=number_pixels;
+    info.bias=bias;
+    AdaptiveThresholdRow(&info,p,q);
     if (SyncCacheViewAuthenticPixels(threshold_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)

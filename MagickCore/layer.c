@@ -65,6 +65,23 @@
 #include "MagickCore/string_.h"
 #include "MagickCore/thread-private.h"
 #include "MagickCore/transform.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _DifferingPixelScan
+{
+  LayerMethod
+    method;
+
+  const Image
+    *alpha_image,
+    *beta_image;
+
+  PixelInfo
+    *alpha_pixel,
+    *beta_pixel;
+} DifferingPixelScan;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -179,6 +196,39 @@ static inline MagickBooleanType IsEitherRowMissing(const Quantum *p,
     MagickTrue : MagickFalse);
 }
 
+typedef struct _ClearedPixelScan
+{
+  const Image
+    *image1,
+    *image2;
+
+  RectangleInfo
+    *bounds;
+} ClearedPixelScan;
+
+static ssize_t FindClearedPixel(const ClearedPixelScan *scan,const Quantum *p,
+  const Quantum *q)
+{
+  const Image
+    *const image1 = scan->image1,
+    *const image2 = scan->image2;
+
+  RectangleInfo
+    *const bounds = scan->bounds;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) bounds->width; x++)
+  {
+    if (IsPixelCleared(image1,p,image2,q) != MagickFalse)
+      break;
+    p+=(ptrdiff_t) GetPixelChannels(image1);
+    q+=(ptrdiff_t) GetPixelChannels(image2);
+  }
+  return(x);
+}
+
 static MagickBooleanType IsBoundsCleared(const Image *image1,
   const Image *image2,RectangleInfo *bounds,ExceptionInfo *exception)
 {
@@ -196,17 +246,17 @@ static MagickBooleanType IsBoundsCleared(const Image *image1,
     return(MagickFalse);
   for (y=0; y < (ssize_t) bounds->height; y++)
   {
+    ClearedPixelScan
+      scan;
+
     p=GetVirtualPixels(image1,bounds->x,bounds->y+y,bounds->width,1,exception);
     q=GetVirtualPixels(image2,bounds->x,bounds->y+y,bounds->width,1,exception);
     if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
-    for (x=0; x < (ssize_t) bounds->width; x++)
-    {
-      if (IsPixelCleared(image1,p,image2,q) != MagickFalse)
-        break;
-      p+=(ptrdiff_t) GetPixelChannels(image1);
-      q+=(ptrdiff_t) GetPixelChannels(image2);
-    }
+    scan.image1=image1;
+    scan.image2=image2;
+    scan.bounds=bounds;
+    x=FindClearedPixel(&scan,p,q);
     if (x < (ssize_t) bounds->width)
       break;
   }
@@ -715,11 +765,20 @@ static MagickBooleanType ComparePixels(const LayerMethod method,
 %
 */
 
-static ssize_t FindDifferingPixel(const LayerMethod method,
-  const Image *alpha_image,const Image *beta_image,const Quantum *p,
-  const Quantum *q,const ssize_t count,PixelInfo *alpha_pixel,
-  PixelInfo *beta_pixel)
+static ssize_t FindDifferingPixel(const DifferingPixelScan *scan,
+  const Quantum *p,const Quantum *q,const ssize_t count)
 {
+  const LayerMethod
+    method = scan->method;
+
+  const Image
+    *alpha_image = scan->alpha_image,
+    *beta_image = scan->beta_image;
+
+  PixelInfo
+    *alpha_pixel = scan->alpha_pixel,
+    *beta_pixel = scan->beta_pixel;
+
   ssize_t
     i;
 
@@ -735,6 +794,31 @@ static ssize_t FindDifferingPixel(const LayerMethod method,
   return(i);
 }
 
+static ssize_t FindFirstDifferingColumn(const Image *alpha_image,
+  const Image *beta_image,const DifferingPixelScan scan,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *p,
+    *q;
+
+  ssize_t
+    x,
+    y;
+
+  for (x=0; x < (ssize_t) alpha_image->columns; x++)
+  {
+    p=GetVirtualPixels(alpha_image,x,0,1,alpha_image->rows,exception);
+    q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
+    if (IsEitherRowMissing(p,q) != MagickFalse)
+      break;
+    y=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->rows);
+    if (y < (ssize_t) alpha_image->rows)
+      break;
+  }
+  return(x);
+}
+
 static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   const Image *beta_image,const LayerMethod method,ExceptionInfo *exception)
 {
@@ -745,6 +829,9 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
   PixelInfo
     alpha_pixel,
     beta_pixel;
+
+  const DifferingPixelScan
+    scan = { method, alpha_image, beta_image, (&alpha_pixel), (&beta_pixel) };
 
   RectangleInfo
     bounds;
@@ -761,17 +848,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
       alpha_image->filename);
   GetPixelInfo(alpha_image,&alpha_pixel);
   GetPixelInfo(beta_image,&beta_pixel);
-  for (x=0; x < (ssize_t) alpha_image->columns; x++)
-  {
-    p=GetVirtualPixels(alpha_image,x,0,1,alpha_image->rows,exception);
-    q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
-    if (IsEitherRowMissing(p,q) != MagickFalse)
-      break;
-    y=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
-      alpha_image->rows,&alpha_pixel,&beta_pixel);
-    if (y < (ssize_t) alpha_image->rows)
-      break;
-  }
+  x=FindFirstDifferingColumn(alpha_image,beta_image,scan,exception);
   if (x >= (ssize_t) alpha_image->columns)
     {
       /*
@@ -790,8 +867,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
     if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
-    y=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
-      alpha_image->rows,&alpha_pixel,&beta_pixel);
+    y=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->rows);
     if (y < (ssize_t) alpha_image->rows)
       break;
   }
@@ -802,8 +878,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
     if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
-    x=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
-      alpha_image->columns,&alpha_pixel,&beta_pixel);
+    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
     if (x < (ssize_t) alpha_image->columns)
       break;
   }
@@ -814,8 +889,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
     if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
-    x=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
-      alpha_image->columns,&alpha_pixel,&beta_pixel);
+    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
     if (x < (ssize_t) alpha_image->columns)
       break;
   }
@@ -869,22 +943,140 @@ static inline MagickBooleanType IsUnchangedFrameBounds(
     MagickFalse);
 }
 
+typedef struct _LayerFrameComparison
+{
+  Image
+    *image_a;
+
+  RectangleInfo
+    *bounds;
+
+  LayerMethod
+    method;
+
+  ExceptionInfo
+    *exception;
+} LayerFrameComparison;
+
+static MagickBooleanType CompareLayerFrames(
+  const LayerFrameComparison *frames,const Image *next)
+{
+  Image
+    *const image_a = frames->image_a;
+
+  RectangleInfo
+    *const bounds = frames->bounds;
+
+  const LayerMethod
+    method = frames->method;
+
+  ExceptionInfo
+    *const exception = frames->exception;
+
+  Image
+    *image_b;
+
+  ssize_t
+    i;
+
+  i=0;
+  next=GetNextImageInList(next);
+  for ( ; next != (const Image *) NULL; next=GetNextImageInList(next))
+  {
+    image_b=CloneImage(image_a,0,0,MagickTrue,exception);
+    if (image_b == (Image *) NULL)
+      return(MagickFalse);
+    image_b->background_color.alpha_trait=BlendPixelTrait;
+    (void) CompositeImage(image_a,next,CopyCompositeOp,MagickTrue,next->page.x,
+      next->page.y,exception);
+    bounds[i]=CompareImagesBounds(image_b,image_a,method,exception);
+    image_b=DestroyImage(image_b);
+    i++;
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireCompareCanvas(const Image *next,
+  Image **image_a,ExceptionInfo *exception)
+{
+  *image_a=CloneImage(next,next->page.width,next->page.height,
+    MagickTrue,exception);
+  if (*image_a == (Image *) NULL)
+    return(MagickFalse);
+  (*image_a)->background_color.alpha_trait=BlendPixelTrait;
+  (*image_a)->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(*image_a,exception);
+  (*image_a)->page=next->page;
+  (*image_a)->page.x=0;
+  (*image_a)->page.y=0;
+  (void) CompositeImage(*image_a,next,CopyCompositeOp,MagickTrue,next->page.x,
+    next->page.y,exception);
+  return(MagickTrue);
+}
+
+static void DeconstructLayerFrames(RectangleInfo *bounds,
+  ExceptionInfo *exception,const Image **next,Image **layers)
+{
+  Image
+    *image_a,
+    *image_b;
+
+  ssize_t
+    i;
+
+  i=0;
+  *next=GetNextImageInList(*next);
+  for ( ; *next != (const Image *) NULL; *next=GetNextImageInList(*next))
+  {
+    if (IsUnchangedFrameBounds(bounds,i) != MagickFalse)
+      {
+        /*
+          An empty frame is returned from CompareImageBounds(), which means the
+          current frame is identical to the previous frame.
+        */
+        i++;
+        continue;
+      }
+    image_a=CloneImage(*next,0,0,MagickTrue,exception);
+    if (image_a == (Image *) NULL)
+      break;
+    image_a->background_color.alpha_trait=BlendPixelTrait;
+    image_b=CropImage(image_a,&bounds[i],exception);
+    image_a=DestroyImage(image_a);
+    if (image_b == (Image *) NULL)
+      break;
+    AppendImageToList(&(*layers),image_b);
+    i++;
+  }
+}
+
+static Image *FinishDeconstructedLayers(RectangleInfo *bounds,
+  const Image *next,Image *layers)
+{
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  if (next != (Image *) NULL)
+    {
+      layers=DestroyImageList(layers);
+      return((Image *) NULL);
+    }
+  return(GetFirstImageInList(layers));
+}
+
 MagickExport Image *CompareImagesLayers(const Image *image,
   const LayerMethod method,ExceptionInfo *exception)
 {
   Image
     *image_a,
-    *image_b,
     *layers;
+
+  LayerFrameComparison
+    frames;
 
   RectangleInfo
     *bounds;
 
   const Image
     *next;
-
-  ssize_t
-    i;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -906,42 +1098,24 @@ MagickExport Image *CompareImagesLayers(const Image *image,
   /*
     Set up first comparison images.
   */
-  image_a=CloneImage(next,next->page.width,next->page.height,
-    MagickTrue,exception);
-  if (image_a == (Image *) NULL)
+  if (AcquireCompareCanvas(next,&image_a,exception) == MagickFalse)
     {
       bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
       return((Image *) NULL);
     }
-  image_a->background_color.alpha_trait=BlendPixelTrait;
-  image_a->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(image_a,exception);
-  image_a->page=next->page;
-  image_a->page.x=0;
-  image_a->page.y=0;
-  (void) CompositeImage(image_a,next,CopyCompositeOp,MagickTrue,next->page.x,
-    next->page.y,exception);
   /*
     Compute the bounding box of changes for the later images
   */
-  i=0;
-  next=GetNextImageInList(next);
-  for ( ; next != (const Image *) NULL; next=GetNextImageInList(next))
-  {
-    image_b=CloneImage(image_a,0,0,MagickTrue,exception);
-    if (image_b == (Image *) NULL)
-      {
-        image_a=DestroyImage(image_a);
-        bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-        return((Image *) NULL);
-      }
-    image_b->background_color.alpha_trait=BlendPixelTrait;
-    (void) CompositeImage(image_a,next,CopyCompositeOp,MagickTrue,next->page.x,
-      next->page.y,exception);
-    bounds[i]=CompareImagesBounds(image_b,image_a,method,exception);
-    image_b=DestroyImage(image_b);
-    i++;
-  }
+  frames.image_a=image_a;
+  frames.bounds=bounds;
+  frames.method=method;
+  frames.exception=exception;
+  if (CompareLayerFrames(&frames,next) == MagickFalse)
+    {
+      image_a=DestroyImage(image_a);
+      bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+      return((Image *) NULL);
+    }
   image_a=DestroyImage(image_a);
   /*
     Clone first image in sequence.
@@ -957,37 +1131,8 @@ MagickExport Image *CompareImagesLayers(const Image *image,
   /*
     Deconstruct the image sequence.
   */
-  i=0;
-  next=GetNextImageInList(next);
-  for ( ; next != (const Image *) NULL; next=GetNextImageInList(next))
-  {
-    if (IsUnchangedFrameBounds(bounds,i) != MagickFalse)
-      {
-        /*
-          An empty frame is returned from CompareImageBounds(), which means the
-          current frame is identical to the previous frame.
-        */
-        i++;
-        continue;
-      }
-    image_a=CloneImage(next,0,0,MagickTrue,exception);
-    if (image_a == (Image *) NULL)
-      break;
-    image_a->background_color.alpha_trait=BlendPixelTrait;
-    image_b=CropImage(image_a,&bounds[i],exception);
-    image_a=DestroyImage(image_a);
-    if (image_b == (Image *) NULL)
-      break;
-    AppendImageToList(&layers,image_b);
-    i++;
-  }
-  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-  if (next != (Image *) NULL)
-    {
-      layers=DestroyImageList(layers);
-      return((Image *) NULL);
-    }
-  return(GetFirstImageInList(layers));
+  DeconstructLayerFrames(bounds,exception,&next,&layers);
+  return(FinishDeconstructedLayers(bounds,next,layers));
 }
 
 /*
@@ -1395,6 +1540,22 @@ static MagickBooleanType FinaliseDisposeChoice(const DisposeChoice *choice,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireTransparentFrame(const Image *curr,
+  Image **prev_image,ExceptionInfo *exception)
+{
+  *prev_image=CloneImage(curr,curr->columns,curr->rows,MagickTrue,exception);
+  if (*prev_image == (Image *) NULL)
+    return(MagickFalse);
+  (*prev_image)->page=curr->page;  /* ERROR: <-- should not be need, but is! */
+  (*prev_image)->page.x=0;
+  (*prev_image)->page.y=0;
+  (*prev_image)->dispose=NoneDispose;
+  (*prev_image)->background_color.alpha_trait=BlendPixelTrait;
+  (*prev_image)->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(*prev_image,exception);
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1480,20 +1641,12 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   /*
     Initialise Previous Image as fully transparent
   */
-  prev_image=CloneImage(curr,curr->columns,curr->rows,MagickTrue,exception);
-  if (prev_image == (Image *) NULL)
+  if (AcquireTransparentFrame(curr,&prev_image,exception) == MagickFalse)
     {
       bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
       disposals=(DisposeType *) RelinquishMagickMemory(disposals);
       return((Image *) NULL);
     }
-  prev_image->page=curr->page;  /* ERROR: <-- should not be need, but is! */
-  prev_image->page.x=0;
-  prev_image->page.y=0;
-  prev_image->dispose=NoneDispose;
-  prev_image->background_color.alpha_trait=BlendPixelTrait;
-  prev_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(prev_image,exception);
   /*
     Figure out the area of overlay of the first frame
     No pixel could be cleared as all pixels are already cleared.

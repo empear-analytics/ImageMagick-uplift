@@ -445,6 +445,64 @@ static inline MagickBooleanType IsPixelListStatistic(const StatisticType type)
     (type == NonpeakStatistic)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _StatisticOperands
+{
+  StatisticType
+    type;
+
+  double
+    area,
+    minimum,
+    maximum,
+    sum,
+    sum_squared;
+} StatisticOperands;
+
+static void ComputeStatisticPixel(const StatisticOperands *operands,
+  Quantum *pixel)
+{
+  const StatisticType
+    type = operands->type;
+
+  const double
+    area = operands->area,
+    minimum = operands->minimum,
+    maximum = operands->maximum,
+    sum = operands->sum,
+    sum_squared = operands->sum_squared;
+
+  switch (type)
+  {
+    case ContrastStatistic:
+    {
+      (*pixel)=ClampToQuantum(MagickAbsoluteValue((maximum-minimum)*
+        MagickSafeReciprocal(maximum+minimum)));
+      break;
+    }
+    case GradientStatistic:
+    {
+      (*pixel)=ClampToQuantum(MagickAbsoluteValue(maximum-minimum));
+      break;
+    }
+    case MeanStatistic:
+    default:
+    {
+      (*pixel)=ClampToQuantum(sum/area);
+      break;
+    }
+    case RootMeanSquareStatistic:
+    {
+      (*pixel)=ClampToQuantum(sqrt(sum_squared/area));
+      break;
+    }
+    case StandardDeviationStatistic:
+    {
+      (*pixel)=ClampToQuantum(sqrt(sum_squared/area-(sum/area*sum/area)));
+      break;
+    }
+  }
+}
+
 static Quantum GetStatisticPixel(const StatisticType type,
   PixelList **magick_restrict pixel_list,const int id,const double area,
   const double minimum,const double maximum,const double sum,
@@ -455,26 +513,23 @@ static Quantum GetStatisticPixel(const StatisticType type,
 
   switch (type)
   {
-    case ContrastStatistic:
-    {
-      pixel=ClampToQuantum(MagickAbsoluteValue((maximum-minimum)*
-        MagickSafeReciprocal(maximum+minimum)));
-      break;
-    }
-    case GradientStatistic:
-    {
-      pixel=ClampToQuantum(MagickAbsoluteValue(maximum-minimum));
-      break;
-    }
     case MaximumStatistic:
     {
       pixel=ClampToQuantum(maximum);
       break;
     }
-    case MeanStatistic:
     default:
     {
-      pixel=ClampToQuantum(sum/area);
+      StatisticOperands
+        operands;
+
+      operands.type=type;
+      operands.area=area;
+      operands.minimum=minimum;
+      operands.maximum=maximum;
+      operands.sum=sum;
+      operands.sum_squared=sum_squared;
+      ComputeStatisticPixel(&operands,&pixel);
       break;
     }
     case MedianStatistic:
@@ -497,18 +552,118 @@ static Quantum GetStatisticPixel(const StatisticType type,
       GetNonpeakPixelList(pixel_list[id],&pixel);
       break;
     }
-    case RootMeanSquareStatistic:
-    {
-      pixel=ClampToQuantum(sqrt(sum_squared/area));
-      break;
-    }
-    case StandardDeviationStatistic:
-    {
-      pixel=ClampToQuantum(sqrt(sum_squared/area-(sum/area*sum/area)));
-      break;
-    }
   }
   return(pixel);
+}
+
+typedef struct _StatisticChannel
+{
+  const Image
+    *image,
+    *statistic_image;
+
+  StatisticType
+    type;
+
+  size_t
+    width,
+    height;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    i;
+
+  PixelList
+    **magick_restrict pixel_list;
+
+  int
+    id;
+
+  PixelChannel
+    channel;
+} StatisticChannel;
+
+static void SetStatisticChannel(const StatisticChannel *statistic,
+  Quantum *magick_restrict q)
+{
+  const Image
+    *const image = statistic->image,
+    *const statistic_image = statistic->statistic_image;
+
+  const StatisticType
+    type = statistic->type;
+
+  const size_t
+    width = statistic->width,
+    height = statistic->height;
+
+  const Quantum
+    *magick_restrict const p = statistic->p;
+
+  const ssize_t
+    i = statistic->i;
+
+  PixelList
+    **magick_restrict const pixel_list = statistic->pixel_list;
+
+  const int
+    id = statistic->id;
+
+  const PixelChannel
+    channel = statistic->channel;
+
+  double
+    area,
+    maximum,
+    minimum,
+    sum,
+    sum_squared;
+
+  Quantum
+    pixel;
+
+  const Quantum
+    *magick_restrict pixels;
+
+  ssize_t
+    u;
+
+  ssize_t
+    v;
+
+  pixels=p;
+  area=0.0;
+  minimum=pixels[i];
+  maximum=pixels[i];
+  sum=0.0;
+  sum_squared=0.0;
+  ResetPixelList(pixel_list[id]);
+  for (v=0; v < (ssize_t) MagickMax(height,1); v++)
+  {
+    for (u=0; u < (ssize_t) MagickMax(width,1); u++)
+    {
+      if (IsPixelListStatistic(type) != MagickFalse)
+        {
+          InsertPixelList(pixels[i],pixel_list[id]);
+          pixels+=(ptrdiff_t) GetPixelChannels(image);
+          continue;
+        }
+      area++;
+      if ((double) pixels[i] < minimum)
+        minimum=(double) pixels[i];
+      if ((double) pixels[i] > maximum)
+        maximum=(double) pixels[i];
+      sum+=(double) pixels[i];
+      sum_squared+=(double) pixels[i]*(double) pixels[i];
+      pixels+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
+  }
+  pixel=GetStatisticPixel(type,pixel_list,id,area,minimum,maximum,sum,
+    sum_squared);
+  SetPixelChannel(statistic_image,channel,pixel,q);
 }
 
 static void StatisticImagePixel(const Image *image,
@@ -522,24 +677,8 @@ static void StatisticImagePixel(const Image *image,
 
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    double
-      area,
-      maximum,
-      minimum,
-      sum,
-      sum_squared;
-
-    Quantum
-      pixel;
-
-    const Quantum
-      *magick_restrict pixels;
-
-    ssize_t
-      u;
-
-    ssize_t
-      v;
+    StatisticChannel
+      statistic;
 
     PixelChannel channel = GetPixelChannelChannel(image,i);
     PixelTrait traits = GetPixelChannelTraits(image,channel);
@@ -554,38 +693,37 @@ static void StatisticImagePixel(const Image *image,
         SetPixelChannel(statistic_image,channel,p[center+i],q);
         continue;
       }
-    pixels=p;
-    area=0.0;
-    minimum=pixels[i];
-    maximum=pixels[i];
-    sum=0.0;
-    sum_squared=0.0;
-    ResetPixelList(pixel_list[id]);
-    for (v=0; v < (ssize_t) MagickMax(height,1); v++)
-    {
-      for (u=0; u < (ssize_t) MagickMax(width,1); u++)
-      {
-        if (IsPixelListStatistic(type) != MagickFalse)
-          {
-            InsertPixelList(pixels[i],pixel_list[id]);
-            pixels+=(ptrdiff_t) GetPixelChannels(image);
-            continue;
-          }
-        area++;
-        if ((double) pixels[i] < minimum)
-          minimum=(double) pixels[i];
-        if ((double) pixels[i] > maximum)
-          maximum=(double) pixels[i];
-        sum+=(double) pixels[i];
-        sum_squared+=(double) pixels[i]*(double) pixels[i];
-        pixels+=(ptrdiff_t) GetPixelChannels(image);
-      }
-      pixels+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-    }
-    pixel=GetStatisticPixel(type,pixel_list,id,area,minimum,maximum,sum,
-      sum_squared);
-    SetPixelChannel(statistic_image,channel,pixel,q);
+    statistic.image=image;
+    statistic.statistic_image=statistic_image;
+    statistic.type=type;
+    statistic.width=width;
+    statistic.height=height;
+    statistic.p=p;
+    statistic.i=i;
+    statistic.pixel_list=pixel_list;
+    statistic.id=id;
+    statistic.channel=channel;
+    SetStatisticChannel(&statistic,q);
   }
+}
+
+static MagickBooleanType AcquireStatisticImage(const Image *image,
+  Image **statistic_image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  *statistic_image=CloneImage(image,0,0,MagickTrue,
+    exception);
+  if (*statistic_image == (Image *) NULL)
+    return(MagickFalse);
+  status=SetImageStorageClass(*statistic_image,DirectClass,exception);
+  if (status == MagickFalse)
+    {
+      *statistic_image=DestroyImage(*statistic_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
 }
 
 MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
@@ -622,16 +760,8 @@ MagickExport Image *StatisticImage(const Image *image,const StatisticType type,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
-  statistic_image=CloneImage(image,0,0,MagickTrue,
-    exception);
-  if (statistic_image == (Image *) NULL)
+  if (AcquireStatisticImage(image,&statistic_image,exception) == MagickFalse)
     return((Image *) NULL);
-  status=SetImageStorageClass(statistic_image,DirectClass,exception);
-  if (status == MagickFalse)
-    {
-      statistic_image=DestroyImage(statistic_image);
-      return((Image *) NULL);
-    }
   pixel_list=AcquirePixelListTLS(MagickMax(width,1),MagickMax(height,1));
   if (pixel_list == (PixelList **) NULL)
     {

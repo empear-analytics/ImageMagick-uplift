@@ -128,175 +128,176 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport ChannelMoments *GetImageMoments(const Image *image,
-  ExceptionInfo *exception)
+typedef struct _MomentPixel
 {
-#define MaxNumberImageMoments  8
+  const Image
+    *image;
 
-  CacheView
-    *image_view;
-
-  ChannelMoments
-    *channel_moments;
-
-  double
-    channels,
-    M00[2*MaxPixelChannels+1] = { 0.0 },
-    M01[2*MaxPixelChannels+1] = { 0.0 },
-    M02[2*MaxPixelChannels+1] = { 0.0 },
-    M03[2*MaxPixelChannels+1] = { 0.0 },
-    M10[2*MaxPixelChannels+1] = { 0.0 },
-    M11[2*MaxPixelChannels+1] = { 0.0 },
-    M12[2*MaxPixelChannels+1] = { 0.0 },
-    M20[2*MaxPixelChannels+1] = { 0.0 },
-    M21[2*MaxPixelChannels+1] = { 0.0 },
-    M22[2*MaxPixelChannels+1] = { 0.0 },
-    M30[2*MaxPixelChannels+1] = { 0.0 };
-
-  PointInfo
-    centroid[2*MaxPixelChannels+1] = {{ 0 }};
+  const Quantum
+    *p;
 
   ssize_t
-    c,
+    x,
     y;
+} MomentPixel;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  channel_moments=(ChannelMoments *) AcquireQuantumMemory(MaxPixelChannels+1,
-    sizeof(*channel_moments));
-  if (channel_moments == (ChannelMoments *) NULL)
-    return(channel_moments);
-  (void) memset(channel_moments,0,(MaxPixelChannels+1)*
-    sizeof(*channel_moments));
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
+static void AccumulateRawMoments(const MomentPixel *moment_pixel,double *M00,
+  double *M10,double *M01)
+{
+  const Image
+    *const image = moment_pixel->image;
+
+  const Quantum
+    *const p = moment_pixel->p;
+
+  const ssize_t
+    x = moment_pixel->x,
+    y = moment_pixel->y;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
-    const Quantum
-      *magick_restrict p;
+    double
+      pixel;
 
-    ssize_t
-      x;
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    pixel=QuantumScale*p[i];
+    M00[channel]+=pixel;
+    M00[CompositePixelChannel]+=pixel;
+    M10[channel]+=x*pixel;
+    M10[CompositePixelChannel]+=x*pixel;
+    M01[channel]+=y*pixel;
+    M01[CompositePixelChannel]+=y*pixel;
+  }
+}
 
-    /*
-      Compute center of mass (centroid).
-    */
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) image->columns; x++)
+typedef struct _MomentArrays
+{
+  double
+    *M00,
+    *M01,
+    *M02,
+    *M03,
+    *M10,
+    *M11,
+    *M12,
+    *M20,
+    *M21,
+    *M22,
+    *M30;
+
+  PointInfo
+    *centroid;
+} MomentArrays;
+
+static void AccumulateCentralMoments(const MomentPixel *moment_pixel,
+  const MomentArrays *moments)
+{
+  const Image
+    *const image = moment_pixel->image;
+
+  const Quantum
+    *const p = moment_pixel->p;
+
+  const ssize_t
+    x = moment_pixel->x,
+    y = moment_pixel->y;
+
+  double
+    *const M02 = moments->M02,
+    *const M03 = moments->M03,
+    *const M11 = moments->M11,
+    *const M12 = moments->M12,
+    *const M20 = moments->M20,
+    *const M21 = moments->M21,
+    *const M22 = moments->M22,
+    *const M30 = moments->M30;
+
+  const PointInfo
+    *const centroid = moments->centroid;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    M11[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
+      QuantumScale*(double) p[i];
+    M11[CompositePixelChannel]+=(x-centroid[channel].x)*(y-
+      centroid[channel].y)*QuantumScale*(double) p[i];
+    M20[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+      QuantumScale*(double) p[i];
+    M20[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+      centroid[channel].x)*QuantumScale*(double) p[i];
+    M02[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
+      QuantumScale*(double) p[i];
+    M02[CompositePixelChannel]+=(y-centroid[channel].y)*(y-
+      centroid[channel].y)*QuantumScale*(double) p[i];
+    M21[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+      (y-centroid[channel].y)*QuantumScale*(double) p[i];
+    M21[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+      centroid[channel].x)*(y-centroid[channel].y)*QuantumScale*(double)
+      p[i];
+    M12[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
+      (y-centroid[channel].y)*QuantumScale*(double) p[i];
+    M12[CompositePixelChannel]+=(x-centroid[channel].x)*(y-
+      centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+      p[i];
+    M22[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+      (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+      p[i];
+    M22[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+      centroid[channel].x)*(y-centroid[channel].y)*(y-centroid[channel].y)*
+      QuantumScale*(double) p[i];
+    M30[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
+      (x-centroid[channel].x)*QuantumScale*(double) p[i];
+    M30[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
+      centroid[channel].x)*(x-centroid[channel].x)*QuantumScale*(double)
+      p[i];
+    M03[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
+      (y-centroid[channel].y)*QuantumScale*(double) p[i];
+    M03[CompositePixelChannel]+=(y-centroid[channel].y)*(y-
+      centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
+      p[i];
+  }
+}
+
+static void RotateEllipseAngle(ChannelMoments *channel_moments,
+  const ssize_t c,const double *M20,const double *M02)
+{
+  if (fabs(M20[c]-M02[c]) >= 0.0)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          pixel;
-
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        pixel=QuantumScale*p[i];
-        M00[channel]+=pixel;
-        M00[CompositePixelChannel]+=pixel;
-        M10[channel]+=x*pixel;
-        M10[CompositePixelChannel]+=x*pixel;
-        M01[channel]+=y*pixel;
-        M01[CompositePixelChannel]+=y*pixel;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
+      if ((M20[c]-M02[c]) < 0.0)
+        channel_moments[c].ellipse_angle+=90.0;
+      else
+        channel_moments[c].ellipse_angle+=180.0;
     }
-  }
-  for (c=0; c <= MaxPixelChannels; c++)
-  {
-    /*
-       Compute center of mass (centroid).
-    */
-    centroid[c].x=M10[c]*MagickSafeReciprocal(M00[c]);
-    centroid[c].y=M01[c]*MagickSafeReciprocal(M00[c]);
-  }
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
+}
 
-    ssize_t
-      x;
+static void ComputeEllipseMoments(ChannelMoments *channel_moments,
+  const MomentArrays *moments)
+{
+  const double
+    *const M00 = moments->M00,
+    *const M02 = moments->M02,
+    *const M11 = moments->M11,
+    *const M20 = moments->M20;
 
-    /*
-      Compute the image moments.
-    */
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
+  const PointInfo
+    *const centroid = moments->centroid;
 
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) == 0)
-          continue;
-        M11[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
-          QuantumScale*(double) p[i];
-        M11[CompositePixelChannel]+=(x-centroid[channel].x)*(y-
-          centroid[channel].y)*QuantumScale*(double) p[i];
-        M20[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          QuantumScale*(double) p[i];
-        M20[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
-          centroid[channel].x)*QuantumScale*(double) p[i];
-        M02[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
-          QuantumScale*(double) p[i];
-        M02[CompositePixelChannel]+=(y-centroid[channel].y)*(y-
-          centroid[channel].y)*QuantumScale*(double) p[i];
-        M21[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (y-centroid[channel].y)*QuantumScale*(double) p[i];
-        M21[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
-          centroid[channel].x)*(y-centroid[channel].y)*QuantumScale*(double)
-          p[i];
-        M12[channel]+=(x-centroid[channel].x)*(y-centroid[channel].y)*
-          (y-centroid[channel].y)*QuantumScale*(double) p[i];
-        M12[CompositePixelChannel]+=(x-centroid[channel].x)*(y-
-          centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
-          p[i];
-        M22[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (y-centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
-          p[i];
-        M22[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
-          centroid[channel].x)*(y-centroid[channel].y)*(y-centroid[channel].y)*
-          QuantumScale*(double) p[i];
-        M30[channel]+=(x-centroid[channel].x)*(x-centroid[channel].x)*
-          (x-centroid[channel].x)*QuantumScale*(double) p[i];
-        M30[CompositePixelChannel]+=(x-centroid[channel].x)*(x-
-          centroid[channel].x)*(x-centroid[channel].x)*QuantumScale*(double)
-          p[i];
-        M03[channel]+=(y-centroid[channel].y)*(y-centroid[channel].y)*
-          (y-centroid[channel].y)*QuantumScale*(double) p[i];
-        M03[CompositePixelChannel]+=(y-centroid[channel].y)*(y-
-          centroid[channel].y)*(y-centroid[channel].y)*QuantumScale*(double)
-          p[i];
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
-  channels=(double) GetImageChannels(image);
-  M00[CompositePixelChannel]/=channels;
-  M01[CompositePixelChannel]/=channels;
-  M02[CompositePixelChannel]/=channels;
-  M03[CompositePixelChannel]/=channels;
-  M10[CompositePixelChannel]/=channels;
-  M11[CompositePixelChannel]/=channels;
-  M12[CompositePixelChannel]/=channels;
-  M20[CompositePixelChannel]/=channels;
-  M21[CompositePixelChannel]/=channels;
-  M22[CompositePixelChannel]/=channels;
-  M30[CompositePixelChannel]/=channels;
+  ssize_t
+    c;
+
   for (c=0; c <= MaxPixelChannels; c++)
   {
     /*
@@ -318,15 +319,7 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
       }
     else
       if (M11[c] < 0.0)
-        {
-          if (fabs(M20[c]-M02[c]) >= 0.0)
-            {
-              if ((M20[c]-M02[c]) < 0.0)
-                channel_moments[c].ellipse_angle+=90.0;
-              else
-                channel_moments[c].ellipse_angle+=180.0;
-            }
-        }
+        RotateEllipseAngle(channel_moments,c,M20,M02);
       else
         if ((fabs(M20[c]-M02[c]) >= 0.0) && ((M20[c]-M02[c]) < 0.0))
           channel_moments[c].ellipse_angle+=90.0;
@@ -339,24 +332,79 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
       MagickSafeReciprocal(MagickPI*channel_moments[c].ellipse_axis.x*
       channel_moments[c].ellipse_axis.y+MagickEpsilon);
   }
-  for (c=0; c <= MaxPixelChannels; c++)
+}
+
+typedef struct _MomentImage
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} MomentImage;
+
+static void AccumulateRawMomentRows(const MomentImage *moment_image,
+  double *M00,double *M10,double *M01)
+{
+  const Image
+    *const image = moment_image->image;
+
+  CacheView
+    *const image_view = moment_image->image_view;
+
+  ExceptionInfo
+    *const exception = moment_image->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) image->rows; y++)
   {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x;
+
     /*
-      Normalize image moments.
+      Compute center of mass (centroid).
     */
-    M10[c]=0.0;
-    M01[c]=0.0;
-    M11[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(1.0+1.0)/2.0));
-    M20[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+0.0)/2.0));
-    M02[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(0.0+2.0)/2.0));
-    M21[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+1.0)/2.0));
-    M12[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(1.0+2.0)/2.0));
-    M22[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+2.0)/2.0));
-    M30[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(3.0+0.0)/2.0));
-    M03[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(0.0+3.0)/2.0));
-    M00[c]=1.0;
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      MomentPixel
+        moment_pixel;
+
+      moment_pixel.image=image;
+      moment_pixel.p=p;
+      moment_pixel.x=x;
+      moment_pixel.y=y;
+      AccumulateRawMoments(&moment_pixel,M00,M10,M01);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
   }
-  image_view=DestroyCacheView(image_view);
+}
+
+static void ComputeHuInvariants(ChannelMoments *channel_moments,
+  const MomentArrays *moments)
+{
+  const double
+    *const M02 = moments->M02,
+    *const M03 = moments->M03,
+    *const M11 = moments->M11,
+    *const M12 = moments->M12,
+    *const M20 = moments->M20,
+    *const M21 = moments->M21,
+    *const M30 = moments->M30;
+
+  ssize_t
+    c;
+
   for (c=0; c <= MaxPixelChannels; c++)
   {
     /*
@@ -384,6 +432,185 @@ MagickExport ChannelMoments *GetImageMoments(const Image *image,
       (M03[c]+M21[c])*(M03[c]+M21[c]))-(M20[c]-M02[c])*(M30[c]+M12[c])*
       (M03[c]+M21[c]);
   }
+}
+
+static void AverageCompositeMoments(const Image *image,
+  const MomentArrays *moments)
+{
+  double
+    *const M00 = moments->M00,
+    *const M01 = moments->M01,
+    *const M02 = moments->M02,
+    *const M03 = moments->M03,
+    *const M10 = moments->M10,
+    *const M11 = moments->M11,
+    *const M12 = moments->M12,
+    *const M20 = moments->M20,
+    *const M21 = moments->M21,
+    *const M22 = moments->M22,
+    *const M30 = moments->M30;
+
+  double
+    channels;
+
+  channels=(double) GetImageChannels(image);
+  M00[CompositePixelChannel]/=channels;
+  M01[CompositePixelChannel]/=channels;
+  M02[CompositePixelChannel]/=channels;
+  M03[CompositePixelChannel]/=channels;
+  M10[CompositePixelChannel]/=channels;
+  M11[CompositePixelChannel]/=channels;
+  M12[CompositePixelChannel]/=channels;
+  M20[CompositePixelChannel]/=channels;
+  M21[CompositePixelChannel]/=channels;
+  M22[CompositePixelChannel]/=channels;
+  M30[CompositePixelChannel]/=channels;
+}
+
+static void NormalizeMoments(const MomentArrays *moments)
+{
+  double
+    *const M00 = moments->M00,
+    *const M01 = moments->M01,
+    *const M02 = moments->M02,
+    *const M03 = moments->M03,
+    *const M10 = moments->M10,
+    *const M11 = moments->M11,
+    *const M12 = moments->M12,
+    *const M20 = moments->M20,
+    *const M21 = moments->M21,
+    *const M22 = moments->M22,
+    *const M30 = moments->M30;
+
+  ssize_t
+    c;
+
+  for (c=0; c <= MaxPixelChannels; c++)
+  {
+    /*
+      Normalize image moments.
+    */
+    M10[c]=0.0;
+    M01[c]=0.0;
+    M11[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(1.0+1.0)/2.0));
+    M20[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+0.0)/2.0));
+    M02[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(0.0+2.0)/2.0));
+    M21[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+1.0)/2.0));
+    M12[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(1.0+2.0)/2.0));
+    M22[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(2.0+2.0)/2.0));
+    M30[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(3.0+0.0)/2.0));
+    M03[c]*=MagickSafeReciprocal(pow(M00[c],1.0+(0.0+3.0)/2.0));
+    M00[c]=1.0;
+  }
+}
+
+static void ComputeCentroids(PointInfo *centroid,const double *M00,
+  const double *M10,const double *M01)
+{
+  ssize_t
+    c;
+
+  for (c=0; c <= MaxPixelChannels; c++)
+  {
+    /*
+       Compute center of mass (centroid).
+    */
+    centroid[c].x=M10[c]*MagickSafeReciprocal(M00[c]);
+    centroid[c].y=M01[c]*MagickSafeReciprocal(M00[c]);
+  }
+}
+
+static void AccumulateCentralMomentRow(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t y,const MomentArrays *moments)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MomentPixel
+      moment_pixel;
+
+    moment_pixel.image=image;
+    moment_pixel.p=p;
+    moment_pixel.x=x;
+    moment_pixel.y=y;
+    AccumulateCentralMoments(&moment_pixel,moments);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+MagickExport ChannelMoments *GetImageMoments(const Image *image,
+  ExceptionInfo *exception)
+{
+#define MaxNumberImageMoments  8
+
+  CacheView
+    *image_view;
+
+  ChannelMoments
+    *channel_moments;
+
+  MomentImage
+    moment_image;
+
+  double
+    M00[2*MaxPixelChannels+1] = { 0.0 },
+    M01[2*MaxPixelChannels+1] = { 0.0 },
+    M02[2*MaxPixelChannels+1] = { 0.0 },
+    M03[2*MaxPixelChannels+1] = { 0.0 },
+    M10[2*MaxPixelChannels+1] = { 0.0 },
+    M11[2*MaxPixelChannels+1] = { 0.0 },
+    M12[2*MaxPixelChannels+1] = { 0.0 },
+    M20[2*MaxPixelChannels+1] = { 0.0 },
+    M21[2*MaxPixelChannels+1] = { 0.0 },
+    M22[2*MaxPixelChannels+1] = { 0.0 },
+    M30[2*MaxPixelChannels+1] = { 0.0 };
+
+  PointInfo
+    centroid[2*MaxPixelChannels+1] = {{ 0 }};
+
+  const MomentArrays
+    moments = { M00, M01, M02, M03, M10, M11, M12, M20, M21, M22, M30,
+      centroid };
+
+  ssize_t
+    y;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  channel_moments=(ChannelMoments *) AcquireQuantumMemory(MaxPixelChannels+1,
+    sizeof(*channel_moments));
+  if (channel_moments == (ChannelMoments *) NULL)
+    return(channel_moments);
+  (void) memset(channel_moments,0,(MaxPixelChannels+1)*
+    sizeof(*channel_moments));
+  image_view=AcquireVirtualCacheView(image,exception);
+  moment_image.image=image;
+  moment_image.image_view=image_view;
+  moment_image.exception=exception;
+  AccumulateRawMomentRows(&moment_image,M00,M10,M01);
+  ComputeCentroids(centroid,M00,M10,M01);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    /*
+      Compute the image moments.
+    */
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    AccumulateCentralMomentRow(image,p,y,&moments);
+  }
+  AverageCompositeMoments(image,&moments);
+  ComputeEllipseMoments(channel_moments,&moments);
+  NormalizeMoments(&moments);
+  image_view=DestroyCacheView(image_view);
+  ComputeHuInvariants(channel_moments,&moments);
   if (y < (ssize_t) image->rows)
     channel_moments=(ChannelMoments *) RelinquishMagickMemory(channel_moments);
   return(channel_moments);

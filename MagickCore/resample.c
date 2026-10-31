@@ -560,6 +560,83 @@ static void AccumulateBlackChannel(const ResampleFilter *resample_filter,
       GetPixelBlack(resample_filter->image,pixels);
 }
 
+typedef struct _ResamplePixelSource
+{
+  ResampleFilter
+    *resample_filter;
+
+  const Quantum
+    *pixels;
+
+  PixelInfo
+    *pixel;
+} ResamplePixelSource;
+
+static void AccumulateResampledPixel(const ResamplePixelSource *source,
+  double *divisor_m,double *weight,double *divisor_c)
+{
+  ResampleFilter
+    *const resample_filter = source->resample_filter;
+
+  const Quantum
+    *const pixels = source->pixels;
+
+  PixelInfo
+    *const pixel = source->pixel;
+
+  pixel->alpha+=*weight*(double)
+    GetPixelAlpha(resample_filter->image,pixels);
+  *divisor_m += *weight;
+
+  *weight=WeightByPixelAlpha(resample_filter,pixels,pixel,*weight);
+  pixel->red+=*weight*(double)
+    GetPixelRed(resample_filter->image,pixels);
+  pixel->green+=*weight*(double)
+    GetPixelGreen(resample_filter->image,pixels);
+  pixel->blue+=*weight*(double)
+    GetPixelBlue(resample_filter->image,pixels);
+  AccumulateBlackChannel(resample_filter,pixels,*weight,pixel);
+  *divisor_c += *weight;
+}
+
+static void CountTileHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0,ssize_t *hit)
+{
+  switch ( resample_filter->virtual_pixel ) {
+    case VerticalTileVirtualPixelMethod:
+      if (IsAreaOutsideColumns(resample_filter,u0) != MagickFalse)
+        (*hit)++;  /* outside the vertically tiled images. */
+      break;
+    case DitherVirtualPixelMethod:
+      if (IsAreaOutsideDitherCorner(resample_filter,u0,v0) != MagickFalse)
+        (*hit)++;
+      break;
+    default:
+      break;
+  }
+}
+
+static void CountEdgeHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0,ssize_t *hit)
+{
+  switch ( resample_filter->virtual_pixel ) {
+    case UndefinedVirtualPixelMethod:
+    case EdgeVirtualPixelMethod:
+      if (IsAreaOutsideCorner(resample_filter,u0,v0) != MagickFalse)
+        (*hit)++;
+      break;
+    case HorizontalTileVirtualPixelMethod:
+      if (IsAreaOutsideRows(resample_filter,v0) != MagickFalse)
+        (*hit)++;  /* outside the horizontally tiled images. */
+      break;
+    default:
+    {
+      CountTileHits(resample_filter,u0,v0,hit);
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -643,23 +720,11 @@ MagickExport MagickBooleanType ResamplePixelColor(
         hit++;
       break;
 
-    case UndefinedVirtualPixelMethod:
-    case EdgeVirtualPixelMethod:
-      if (IsAreaOutsideCorner(resample_filter,u0,v0) != MagickFalse)
-        hit++;
+    default:
+    {
+      CountEdgeHits(resample_filter,u0,v0,&hit);
       break;
-    case HorizontalTileVirtualPixelMethod:
-      if (IsAreaOutsideRows(resample_filter,v0) != MagickFalse)
-        hit++;  /* outside the horizontally tiled images. */
-      break;
-    case VerticalTileVirtualPixelMethod:
-      if (IsAreaOutsideColumns(resample_filter,u0) != MagickFalse)
-        hit++;  /* outside the vertically tiled images. */
-      break;
-    case DitherVirtualPixelMethod:
-      if (IsAreaOutsideDitherCorner(resample_filter,u0,v0) != MagickFalse)
-        hit++;
-      break;
+    }
     case TileVirtualPixelMethod:
     case MirrorVirtualPixelMethod:
     case RandomVirtualPixelMethod:
@@ -750,6 +815,9 @@ MagickExport MagickBooleanType ResamplePixelColor(
 
     /* count up the weighted pixel colors */
     for( u=0; u<uw; u++ ) {
+      ResamplePixelSource
+        source;
+
       weight = 0.0;
 #if FILTER_LUT
       /* Note that the ellipse has been pre-scaled so F = WLUT_WIDTH */
@@ -762,19 +830,10 @@ MagickExport MagickBooleanType ResamplePixelColor(
              sqrt(Q));    /* a SquareRoot!  Arrggghhhhh... */
 #endif
 
-        pixel->alpha+=weight*(double)
-          GetPixelAlpha(resample_filter->image,pixels);
-        divisor_m += weight;
-
-        weight=WeightByPixelAlpha(resample_filter,pixels,pixel,weight);
-        pixel->red+=weight*(double)
-          GetPixelRed(resample_filter->image,pixels);
-        pixel->green+=weight*(double)
-          GetPixelGreen(resample_filter->image,pixels);
-        pixel->blue+=weight*(double)
-          GetPixelBlue(resample_filter->image,pixels);
-        AccumulateBlackChannel(resample_filter,pixels,weight,pixel);
-        divisor_c += weight;
+        source.resample_filter=resample_filter;
+        source.pixels=pixels;
+        source.pixel=pixel;
+        AccumulateResampledPixel(&source,&divisor_m,&weight,&divisor_c);
 
         hit++;
 #if DEBUG_HIT_MISS
@@ -1123,6 +1182,62 @@ static inline void ClampUpAxes(const double dux,
 }
 
 #endif
+
+typedef struct _ResampleEllipse
+{
+  ResampleFilter
+    *resample_filter;
+
+  double
+    A,
+    B,
+    C;
+} ResampleEllipse;
+
+static MagickBooleanType FitResampleEllipse(const ResampleEllipse *ellipse,
+  double *F)
+{
+  ResampleFilter
+    *const resample_filter = ellipse->resample_filter;
+
+  const double
+    A = ellipse->A,
+    B = ellipse->B,
+    C = ellipse->C;
+
+  if ( (4*A*C - B*B) > MagickMaximumValue ) {
+    resample_filter->limit_reached = MagickTrue;
+    return(MagickFalse);
+  }
+
+  /* Scale ellipse to match the filters support
+     (that is, multiply F by the square of the support)
+     Simpler to just multiply it by the support twice!
+  */
+  *F *= resample_filter->support;
+  *F *= resample_filter->support;
+
+  /* Orthogonal bounds of the ellipse */
+  resample_filter->Ulimit = sqrt(C*(*F)/(A*C-0.25*B*B));
+  resample_filter->Vlimit = sqrt(A*(*F)/(A*C-0.25*B*B));
+
+  /* Horizontally aligned parallelogram fitted to Ellipse */
+  resample_filter->Uwidth = sqrt(*F/A); /* Half of the parallelogram width */
+  resample_filter->slope = -B/(2.0*A); /* Reciprocal slope of the parallelogram */
+
+  return(MagickTrue);
+}
+
+static MagickBooleanType CheckResampleAreaLimit(ResampleFilter *resample_filter)
+{
+  if ( (resample_filter->Uwidth * resample_filter->Vlimit)
+         > (4.0*resample_filter->image_area)) {
+    resample_filter->limit_reached = MagickTrue;
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1189,6 +1304,9 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
   const double dux,const double duy,const double dvx,const double dvy)
 {
   double A,B,C,F;
+
+  ResampleEllipse
+    ellipse;
 
   assert(resample_filter != (ResampleFilter *) NULL);
   assert(resample_filter->signature == MagickCoreSignature);
@@ -1310,25 +1428,12 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
      the average of the whole image is needed to get a reasonable
      result. Calculate only as needed.
   */
-  if ( (4*A*C - B*B) > MagickMaximumValue ) {
-    resample_filter->limit_reached = MagickTrue;
+  ellipse.resample_filter=resample_filter;
+  ellipse.A=A;
+  ellipse.B=B;
+  ellipse.C=C;
+  if (FitResampleEllipse(&ellipse,&F) == MagickFalse)
     return;
-  }
-
-  /* Scale ellipse to match the filters support
-     (that is, multiply F by the square of the support)
-     Simpler to just multiply it by the support twice!
-  */
-  F *= resample_filter->support;
-  F *= resample_filter->support;
-
-  /* Orthogonal bounds of the ellipse */
-  resample_filter->Ulimit = sqrt(C*F/(A*C-0.25*B*B));
-  resample_filter->Vlimit = sqrt(A*F/(A*C-0.25*B*B));
-
-  /* Horizontally aligned parallelogram fitted to Ellipse */
-  resample_filter->Uwidth = sqrt(F/A); /* Half of the parallelogram width */
-  resample_filter->slope = -B/(2.0*A); /* Reciprocal slope of the parallelogram */
 
 #if DEBUG_ELLIPSE
   (void) FormatLocaleFile(stderr, "Ulimit=%lf; Vlimit=%lf; UWidth=%lf; Slope=%lf;\n",
@@ -1340,11 +1445,8 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
    * This limit needs more work, as it is too slow for larger images
    * with tiled views of the horizon.
   */
-  if ( (resample_filter->Uwidth * resample_filter->Vlimit)
-         > (4.0*resample_filter->image_area)) {
-    resample_filter->limit_reached = MagickTrue;
+  if (CheckResampleAreaLimit(resample_filter) == MagickFalse)
     return;
-  }
 
   /* Scale ellipse formula to directly index the Filter Lookup Table */
   { double scale;

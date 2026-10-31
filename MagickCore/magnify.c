@@ -252,9 +252,6 @@ static inline void Eagle2X(const Image *source,const Quantum *pixels,
     CopyPixels(&magnify,8,3);
 }
 
-static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
-  const ssize_t destination_offset,const Hq2XNeighbours *neighbours)
-{
 #define caseA(N,A,B,C,D) \
   case N: \
   { \
@@ -274,109 +271,15 @@ static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
     break; \
   }
 
+static void Hq2XApplyRulesFrom17(const unsigned int rule,
+  const MagnifyPixels *magnify,const ssize_t destination_offset,
+  const Hq2XNeighbours *neighbours)
+{
   const ssize_t e = neighbours->e, a = neighbours->a, b = neighbours->b,
     d = neighbours->d, f = neighbours->f, h = neighbours->h;
 
   switch (rule)
   {
-    case 0:
-    {
-      CopyPixels(magnify,e,destination_offset);
-      break;
-    }
-    caseA(1,e,e,e,a)
-    caseA(2,e,e,e,d)
-    caseA(3,e,e,e,b)
-    caseA(4,e,e,d,b)
-    caseA(5,e,e,a,b)
-    caseA(6,e,e,a,d)
-    caseB(7,e,e,e,e,e,b,b,d)
-    caseB(8,e,e,e,e,e,d,d,b)
-    caseB(9,e,e,e,e,e,e,d,b)
-    caseB(10,e,e,d,d,d,b,b,b)
-    case 11:
-    {
-      const ssize_t
-        offsets[16] = { e, e, e, e, e, e, e, e, e, e, e, e, e, e, d, b };
-
-      MixPixels(magnify,offsets,16,destination_offset);
-      break;
-    }
-    case 12:
-    {
-      if (PixelsEqual(magnify->source,b,d,magnify->channels))
-        {
-          const ssize_t
-            offsets[4] = { e, e, d, b };
-
-          MixPixels(magnify,offsets,4,destination_offset);
-        }
-      else
-        CopyPixels(magnify,e,destination_offset);
-      break;
-    }
-    case 13:
-    {
-      if (PixelsEqual(magnify->source,b,d,magnify->channels))
-        {
-          const ssize_t
-            offsets[8] = { e, e, d, d, d, b, b, b };
-
-          MixPixels(magnify,offsets,8,destination_offset);
-        }
-      else
-        CopyPixels(magnify,e,destination_offset);
-      break;
-    }
-    case 14:
-    {
-      if (PixelsEqual(magnify->source,b,d,magnify->channels))
-        {
-          const ssize_t
-            offsets[16] = { e, e, e, e, e, e, e, e, e, e, e, e, e, e, d, b };
-
-          MixPixels(magnify,offsets,16,destination_offset);
-        }
-      else
-        CopyPixels(magnify,e,destination_offset);
-      break;
-    }
-    case 15:
-    {
-      if (PixelsEqual(magnify->source,b,d,magnify->channels))
-        {
-          const ssize_t
-            offsets[4] = { e, e, d, b };
-
-          MixPixels(magnify,offsets,4,destination_offset);
-        }
-      else
-        {
-          const ssize_t
-            offsets[4] = { e, e, e, a };
-
-          MixPixels(magnify,offsets,4,destination_offset);
-        }
-      break;
-    }
-    case 16:
-    {
-      if (PixelsEqual(magnify->source,b,d,magnify->channels))
-        {
-          const ssize_t
-            offsets[8] = { e, e, e, e, e, e, d, b };
-
-          MixPixels(magnify,offsets,8,destination_offset);
-        }
-      else
-        {
-          const ssize_t
-            offsets[4] = { e, e, e, a };
-
-          MixPixels(magnify,offsets,4,destination_offset);
-        }
-      break;
-    }
     case 17:
     {
       if (PixelsEqual(magnify->source,b,d,magnify->channels))
@@ -429,6 +332,137 @@ static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
 
           MixPixels(magnify,offsets,4,destination_offset);
         }
+      break;
+    }
+  }
+}
+
+static void Hq2XApplyRulesFrom13(const unsigned int rule,
+  const MagnifyPixels *magnify,const ssize_t destination_offset,
+  const Hq2XNeighbours *neighbours)
+{
+  const ssize_t e = neighbours->e, a = neighbours->a, b = neighbours->b,
+    d = neighbours->d;
+
+  switch (rule)
+  {
+    case 13:
+    {
+      if (PixelsEqual(magnify->source,b,d,magnify->channels))
+        {
+          const ssize_t
+            offsets[8] = { e, e, d, d, d, b, b, b };
+
+          MixPixels(magnify,offsets,8,destination_offset);
+        }
+      else
+        CopyPixels(magnify,e,destination_offset);
+      break;
+    }
+    case 14:
+    {
+      if (PixelsEqual(magnify->source,b,d,magnify->channels))
+        {
+          const ssize_t
+            offsets[16] = { e, e, e, e, e, e, e, e, e, e, e, e, e, e, d, b };
+
+          MixPixels(magnify,offsets,16,destination_offset);
+        }
+      else
+        CopyPixels(magnify,e,destination_offset);
+      break;
+    }
+    case 15:
+    {
+      if (PixelsEqual(magnify->source,b,d,magnify->channels))
+        {
+          const ssize_t
+            offsets[4] = { e, e, d, b };
+
+          MixPixels(magnify,offsets,4,destination_offset);
+        }
+      else
+        {
+          const ssize_t
+            offsets[4] = { e, e, e, a };
+
+          MixPixels(magnify,offsets,4,destination_offset);
+        }
+      break;
+    }
+    default:
+    {
+      Hq2XApplyRulesFrom17(rule,magnify,destination_offset,neighbours);
+      break;
+    }
+  }
+}
+
+static void Hq2XHelper(const unsigned int rule,const MagnifyPixels *magnify,
+  const ssize_t destination_offset,const Hq2XNeighbours *neighbours)
+{
+  const ssize_t e = neighbours->e, a = neighbours->a, b = neighbours->b,
+    d = neighbours->d;
+
+  switch (rule)
+  {
+    case 0:
+    {
+      CopyPixels(magnify,e,destination_offset);
+      break;
+    }
+    caseA(1,e,e,e,a)
+    caseA(2,e,e,e,d)
+    caseA(3,e,e,e,b)
+    caseA(4,e,e,d,b)
+    caseA(5,e,e,a,b)
+    caseA(6,e,e,a,d)
+    caseB(7,e,e,e,e,e,b,b,d)
+    caseB(8,e,e,e,e,e,d,d,b)
+    caseB(9,e,e,e,e,e,e,d,b)
+    caseB(10,e,e,d,d,d,b,b,b)
+    case 11:
+    {
+      const ssize_t
+        offsets[16] = { e, e, e, e, e, e, e, e, e, e, e, e, e, e, d, b };
+
+      MixPixels(magnify,offsets,16,destination_offset);
+      break;
+    }
+    case 12:
+    {
+      if (PixelsEqual(magnify->source,b,d,magnify->channels))
+        {
+          const ssize_t
+            offsets[4] = { e, e, d, b };
+
+          MixPixels(magnify,offsets,4,destination_offset);
+        }
+      else
+        CopyPixels(magnify,e,destination_offset);
+      break;
+    }
+    case 16:
+    {
+      if (PixelsEqual(magnify->source,b,d,magnify->channels))
+        {
+          const ssize_t
+            offsets[8] = { e, e, e, e, e, e, d, b };
+
+          MixPixels(magnify,offsets,8,destination_offset);
+        }
+      else
+        {
+          const ssize_t
+            offsets[4] = { e, e, e, a };
+
+          MixPixels(magnify,offsets,4,destination_offset);
+        }
+      break;
+    }
+    default:
+    {
+      Hq2XApplyRulesFrom13(rule,magnify,destination_offset,neighbours);
       break;
     }
   }
@@ -555,10 +589,70 @@ static inline MagickBooleanType IsFish2XAntiDiagonal(const int bd,
     MagickFalse);
 }
 
-static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
-  const Quantum *pixels,const size_t channels,
-  const MagickFloatType *intensities)
+typedef struct _Fish2XLadder
 {
+  const MagnifyPixels
+    *magnify;
+
+  const MagickFloatType
+    *intensities;
+
+  int
+    ab,
+    ad,
+    ae,
+    bd,
+    be,
+    de;
+} Fish2XLadder;
+
+static void Fish2XBottomRightBlend(const Fish2XLadder *ladder,
+  const ssize_t *pixels_offsets)
+{
+#define Line(A,B,C,D) \
+  { \
+    if (ladder->intensities[C] > ladder->intensities[A]) \
+      Mix2Pixels(ladder->magnify,C,D,3); \
+    else \
+      Mix2Pixels(ladder->magnify,A,B,3); \
+  }
+
+  if (IsFish2XMainDiagonal(ladder->ae,ladder->bd,ladder->intensities) !=
+      MagickFalse)
+    {
+      Mix2Pixels(ladder->magnify,0,4,3);
+      return;
+    }
+  if (IsFish2XAntiDiagonal(ladder->bd,ladder->ae,ladder->intensities) !=
+      MagickFalse)
+    {
+      Mix2Pixels(ladder->magnify,1,3,3);
+      return;
+    }
+  if (ladder->ab)
+    {
+      Line(0,1,3,4)
+      return;
+    }
+  if (ladder->de)
+    {
+      Line(3,4,0,1)
+      return;
+    }
+  if (ladder->ad)
+    {
+      Line(0,3,1,4)
+      return;
+    }
+  if (ladder->be)
+    {
+      Line(1,4,0,3)
+      return;
+    }
+  MixPixels(ladder->magnify,pixels_offsets,4,3);
+#undef Line
+}
+
 #define Corner(A,B,C,D) \
   { \
     if (intensities[B] > intensities[A]) \
@@ -577,16 +671,15 @@ static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
       } \
   }
 
-#define Line(A,B,C,D) \
-  { \
-    if (intensities[C] > intensities[A]) \
-      Mix2Pixels(magnify,C,D,3); \
-    else \
-      Mix2Pixels(magnify,A,B,3); \
-  }
-
+static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
+  const Quantum *pixels,const size_t channels,
+  const MagickFloatType *intensities)
+{
   const ssize_t
     pixels_offsets[4] = { 0, 1, 3, 4 };
+
+  Fish2XLadder
+    ladder;
 
   int
     ab,
@@ -627,39 +720,16 @@ static void Fish2XBottomRightPixel(const MagnifyPixels *magnify,
       Corner(3,0,4,1)
       return;
     }
-  if (IsFish2XMainDiagonal(ae,bd,intensities) != MagickFalse)
-    {
-      Mix2Pixels(magnify,0,4,3);
-      return;
-    }
-  if (IsFish2XAntiDiagonal(bd,ae,intensities) != MagickFalse)
-    {
-      Mix2Pixels(magnify,1,3,3);
-      return;
-    }
-  if (ab)
-    {
-      Line(0,1,3,4)
-      return;
-    }
-  if (de)
-    {
-      Line(3,4,0,1)
-      return;
-    }
-  if (ad)
-    {
-      Line(0,3,1,4)
-      return;
-    }
-  if (be)
-    {
-      Line(1,4,0,3)
-      return;
-    }
-  MixPixels(magnify,pixels_offsets,4,3);
+  ladder.magnify=magnify;
+  ladder.intensities=intensities;
+  ladder.ab=ab;
+  ladder.ad=ad;
+  ladder.ae=ae;
+  ladder.bd=bd;
+  ladder.be=be;
+  ladder.de=de;
+  Fish2XBottomRightBlend(&ladder,pixels_offsets);
 #undef Corner
-#undef Line
 }
 
 static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
@@ -682,13 +752,13 @@ static void Fish2X(const Image *source,const Quantum *pixels,Quantum *result,
   Fish2XBottomRightPixel(&magnify,pixels,channels,intensities);
 }
 
+#define WeightVar(M,N) const int w_##M##_##N = \
+  PixelsEqual(pixels,M,N,channels) ? 0 : 1;
+
 static void Xbr2X(const Image *magick_unused(source),const Quantum *pixels,
   Quantum *result,const size_t channels)
 {
   const MagnifyPixels magnify = { pixels, result, channels };
-
-#define WeightVar(M,N) const int w_##M##_##N = \
-  PixelsEqual(pixels,M,N,channels) ? 0 : 1;
 
   WeightVar(12,11)
   WeightVar(12,7)
@@ -787,6 +857,23 @@ static void Scale2X(const Image *magick_unused(source),const Quantum *pixels,
       CopyPixels(&magnify,4,3);
 }
 
+static inline MagickBooleanType IsEpbx2XCornerConsistent(
+  const Quantum *pixels,const size_t channels)
+{
+  return((
+        (
+          !PixelsEqual(pixels,0,8,channels) ||
+           PixelsEqual(pixels,4,6,channels) ||
+           PixelsEqual(pixels,3,2,channels)
+        ) &&
+        (
+          !PixelsEqual(pixels,6,2,channels) ||
+           PixelsEqual(pixels,4,0,channels) ||
+           PixelsEqual(pixels,4,8,channels)
+        )
+  ) ? MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsEpbx2XBlendable(const Quantum *pixels,
   const size_t channels)
 {
@@ -798,25 +885,11 @@ static inline MagickBooleanType IsEpbx2XBlendable(const Quantum *pixels,
       PixelsEqual(pixels,4,7,channels) ||
       PixelsEqual(pixels,4,5,channels) ||
       PixelsEqual(pixels,4,1,channels) ||
-      (
-        (
-          !PixelsEqual(pixels,0,8,channels) ||
-           PixelsEqual(pixels,4,6,channels) ||
-           PixelsEqual(pixels,3,2,channels)
-        ) &&
-        (
-          !PixelsEqual(pixels,6,2,channels) ||
-           PixelsEqual(pixels,4,0,channels) ||
-           PixelsEqual(pixels,4,8,channels)
-        )
-      )
+      (IsEpbx2XCornerConsistent(pixels,channels) != MagickFalse)
     )
   ) ? MagickTrue : MagickFalse);
 }
 
-static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
-  Quantum *result,const size_t channels)
-{
 #define HelperCond(a,b,c,d,e,f,g) ( \
   PixelsEqual(pixels,a,b,channels) && ( \
     PixelsEqual(pixels,c,d,channels) || \
@@ -826,6 +899,9 @@ static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
     ) \
   )
 
+static void Epbx2X(const Image *magick_unused(source),const Quantum *pixels,
+  Quantum *result,const size_t channels)
+{
   const MagnifyPixels magnify = { pixels, result, channels };
 
   ssize_t

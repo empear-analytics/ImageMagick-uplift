@@ -93,6 +93,22 @@
 #endif
 
 /*
+  Typedef declarations.
+*/
+typedef struct _SampleRow
+{
+  const Image
+    *image,
+    *sample_image;
+
+  CacheView
+    *image_view;
+
+  PointInfo
+    sample_offset;
+} SampleRow;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -148,10 +164,19 @@ static void CopySamplePixel(const Image *image,const Image *sample_image,
   }
 }
 
-static MagickBooleanType SampleImageRow(const Image *image,
-  const Image *sample_image,CacheView *image_view,const PointInfo sample_offset,
+static MagickBooleanType SampleImageRow(const SampleRow *row,
   const ssize_t y,Quantum *q,ExceptionInfo *exception)
 {
+  const Image
+    *image = row->image,
+    *sample_image = row->sample_image;
+
+  CacheView
+    *image_view = row->image_view;
+
+  const PointInfo
+    sample_offset = row->sample_offset;
+
   MagickBooleanType
     status;
 
@@ -187,6 +212,45 @@ static MagickBooleanType SampleImageRow(const Image *image,
     q+=(ptrdiff_t) GetPixelChannels(sample_image);
   }
   return(status);
+}
+
+static PointInfo GetSampleOffset(const Image *image)
+{
+  PointInfo
+    sample_offset;
+
+  sample_offset.x=0.5-MagickEpsilon;
+  sample_offset.y=sample_offset.x;
+  {
+    const char
+      *value;
+
+    value=GetImageArtifact(image,"sample:offset");
+    if (value != (char *) NULL)
+      {
+        GeometryInfo
+          geometry_info;
+
+        MagickStatusType
+          flags;
+
+        (void) ParseGeometry(value,&geometry_info);
+        flags=ParseGeometry(value,&geometry_info);
+        sample_offset.x=sample_offset.y=geometry_info.rho/100.0-MagickEpsilon;
+        if ((flags & SigmaValue) != 0)
+          sample_offset.y=geometry_info.sigma/100.0-MagickEpsilon;
+      }
+  }
+  return(sample_offset);
+}
+
+static Image *FinishSampleImage(const Image *image,Image *sample_image,
+  const MagickBooleanType status)
+{
+  sample_image->type=image->type;
+  if (status == MagickFalse)
+    sample_image=DestroyImage(sample_image);
+  return(sample_image);
 }
 
 MagickExport Image *SampleImage(const Image *image,const size_t columns,
@@ -232,28 +296,7 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
   /*
     Set the sampling offset, default is in the mid-point of sample regions.
   */
-  sample_offset.x=0.5-MagickEpsilon;
-  sample_offset.y=sample_offset.x;
-  {
-    const char
-      *value;
-
-    value=GetImageArtifact(image,"sample:offset");
-    if (value != (char *) NULL)
-      {
-        GeometryInfo
-          geometry_info;
-
-        MagickStatusType
-          flags;
-
-        (void) ParseGeometry(value,&geometry_info);
-        flags=ParseGeometry(value,&geometry_info);
-        sample_offset.x=sample_offset.y=geometry_info.rho/100.0-MagickEpsilon;
-        if ((flags & SigmaValue) != 0)
-          sample_offset.y=geometry_info.sigma/100.0-MagickEpsilon;
-      }
-  }
+  sample_offset=GetSampleOffset(image);
   /*
     Sample each row.
   */
@@ -267,6 +310,8 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
 #endif
   for (y=0; y < (ssize_t) sample_image->rows; y++)
   {
+    const SampleRow row = { image, sample_image, image_view, sample_offset };
+
     Quantum
       *magick_restrict q;
 
@@ -282,8 +327,7 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
     /*
       Sample each column.
     */
-    if (SampleImageRow(image,sample_image,image_view,sample_offset,y,q,
-          exception) == MagickFalse)
+    if (SampleImageRow(&row,y,q,exception) == MagickFalse)
       status=MagickFalse;
     if (SyncCacheViewAuthenticPixels(sample_view,exception) == MagickFalse)
       status=MagickFalse;
@@ -299,8 +343,5 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
   }
   image_view=DestroyCacheView(image_view);
   sample_view=DestroyCacheView(sample_view);
-  sample_image->type=image->type;
-  if (status == MagickFalse)
-    sample_image=DestroyImage(sample_image);
-  return(sample_image);
+  return(FinishSampleImage(image,sample_image,status));
 }

@@ -255,49 +255,18 @@ static void SetMinimumBoundingBoxProperties(Image *image,
     GetMagickPrecision(),vertices[caliper_info.v].y);
 }
 
-MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
-  size_t *number_vertices,ExceptionInfo *exception)
+static CaliperInfo GetMinimumAreaCaliper(const Image *image,
+  PointInfo *vertices,const size_t number_hull_vertices)
 {
   CaliperInfo
     caliper_info;
 
-  const char
-    *artifact;
-
   double
-    angle,
-    diameter,
-    distance;
-
-  PointInfo
-    *bounding_box,
-    *vertices;
-
-  size_t
-    number_hull_vertices;
+    diameter;
 
   ssize_t
     i;
 
-  /*
-    Generate the minimum bounding box with the "Rotating Calipers" algorithm.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  *number_vertices=0;
-  vertices=GetImageConvexHull(image,&number_hull_vertices,exception);
-  if (vertices == (PointInfo *) NULL)
-    return((PointInfo *) NULL);
-  *number_vertices=4;
-  bounding_box=(PointInfo *) AcquireQuantumMemory(*number_vertices,
-    sizeof(*bounding_box));
-  if (bounding_box == (PointInfo *) NULL)
-    {
-      vertices=(PointInfo *) RelinquishMagickMemory(vertices);
-      return((PointInfo *) NULL);
-    }
   caliper_info.area=2.0*image->columns*image->rows;
   caliper_info.width=(double) image->columns+image->rows;
   caliper_info.height=0.0;
@@ -358,6 +327,125 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
         caliper_info.v=v;
       }
   }
+  return(caliper_info);
+}
+
+static PointInfo FindNearestEdge(PointInfo *bounding_box,double distance)
+{
+  PointInfo
+    delta,
+    point;
+
+  ssize_t
+    i;
+
+  point=MoveBoxToOrigin(bounding_box);
+  for (i=0; i < 4; i++)
+  {
+    double
+      d,
+      intercept,
+      slope;
+
+    delta.x=bounding_box[(i+1) % 4].x-bounding_box[i].x;
+    delta.y=bounding_box[(i+1) % 4].y-bounding_box[i].y;
+    slope=delta.y*MagickSafeReciprocal(delta.x);
+    intercept=bounding_box[(i+1) % 4].y-slope*bounding_box[i].x;
+    d=fabs((slope*bounding_box[i].x-bounding_box[i].y+intercept)*
+      MagickSafeReciprocal(sqrt(slope*slope+1.0)));
+    if ((i == 0) || (d < distance))
+      {
+        distance=d;
+        point=delta;
+      }
+  }
+  return(point);
+}
+
+static double GetLandscapeAngle(double angle,const double p_length,
+  const double q_length)
+{
+  if (p_length > q_length)
+    angle+=(angle < 0.0) ? 90.0 : -90.0;
+  return(angle);
+}
+
+static double GetOrientedBoxAngle(const char *artifact,
+  PointInfo *bounding_box,const CaliperInfo caliper_info,const double distance)
+{
+  double
+    angle,
+    length,
+    q_length,
+    p_length;
+
+  PointInfo
+    point;
+
+  /*
+    Find smallest perpendicular distance from edge to origin.
+  */
+  point=FindNearestEdge(bounding_box,distance);
+  angle=RadiansToDegrees(atan(point.y*MagickSafeReciprocal(point.x)));
+  length=hypot(point.x,point.y);
+  p_length=fabs((double) MagickMax(caliper_info.width,caliper_info.height)-
+    length);
+  q_length=fabs(length-(double) MagickMin(caliper_info.width,
+    caliper_info.height));
+  if (LocaleCompare(artifact,"landscape") == 0)
+    {
+      angle=GetLandscapeAngle(angle,p_length,q_length);
+    }
+  else
+    if (LocaleCompare(artifact,"portrait") == 0)
+      {
+        if (p_length < q_length)
+          angle+=(angle >= 0.0) ? 90.0 : -90.0;
+      }
+  return(angle);
+}
+
+MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
+  size_t *number_vertices,ExceptionInfo *exception)
+{
+  CaliperInfo
+    caliper_info;
+
+  const char
+    *artifact;
+
+  double
+    angle,
+    diameter,
+    distance;
+
+  PointInfo
+    *bounding_box,
+    *vertices;
+
+  size_t
+    number_hull_vertices;
+
+  /*
+    Generate the minimum bounding box with the "Rotating Calipers" algorithm.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  *number_vertices=0;
+  vertices=GetImageConvexHull(image,&number_hull_vertices,exception);
+  if (vertices == (PointInfo *) NULL)
+    return((PointInfo *) NULL);
+  *number_vertices=4;
+  bounding_box=(PointInfo *) AcquireQuantumMemory(*number_vertices,
+    sizeof(*bounding_box));
+  if (bounding_box == (PointInfo *) NULL)
+    {
+      vertices=(PointInfo *) RelinquishMagickMemory(vertices);
+      return((PointInfo *) NULL);
+    }
+  caliper_info=GetMinimumAreaCaliper(image,vertices,number_hull_vertices);
   /*
     Initialize minimum bounding box.
   */
@@ -391,57 +479,7 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   GetMinimumBoxAngle(bounding_box,&angle,&distance);
   artifact=GetImageArtifact(image,"minimum-bounding-box:orientation");
   if (artifact != (const char *) NULL)
-    {
-      double
-        length,
-        q_length,
-        p_length;
-
-      PointInfo
-        delta,
-        point;
-
-      /*
-        Find smallest perpendicular distance from edge to origin.
-      */
-      point=MoveBoxToOrigin(bounding_box);
-      for (i=0; i < 4; i++)
-      {
-        double
-          d,
-          intercept,
-          slope;
-
-        delta.x=bounding_box[(i+1) % 4].x-bounding_box[i].x;
-        delta.y=bounding_box[(i+1) % 4].y-bounding_box[i].y;
-        slope=delta.y*MagickSafeReciprocal(delta.x);
-        intercept=bounding_box[(i+1) % 4].y-slope*bounding_box[i].x;
-        d=fabs((slope*bounding_box[i].x-bounding_box[i].y+intercept)*
-          MagickSafeReciprocal(sqrt(slope*slope+1.0)));
-        if ((i == 0) || (d < distance))
-          {
-            distance=d;
-            point=delta;
-          }
-      }
-      angle=RadiansToDegrees(atan(point.y*MagickSafeReciprocal(point.x)));
-      length=hypot(point.x,point.y);
-      p_length=fabs((double) MagickMax(caliper_info.width,caliper_info.height)-
-        length);
-      q_length=fabs(length-(double) MagickMin(caliper_info.width,
-        caliper_info.height));
-      if (LocaleCompare(artifact,"landscape") == 0)
-        {
-          if (p_length > q_length)
-            angle+=(angle < 0.0) ? 90.0 : -90.0;
-        }
-      else
-        if (LocaleCompare(artifact,"portrait") == 0)
-          {
-            if (p_length < q_length)
-              angle+=(angle >= 0.0) ? 90.0 : -90.0;
-          }
-    }
+    angle=GetOrientedBoxAngle(artifact,bounding_box,caliper_info,distance);
   (void) FormatImageProperty(image,"minimum-bounding-box:angle","%.*g",
     GetMagickPrecision(),angle);
   (void) FormatImageProperty(image,"minimum-bounding-box:unrotate","%.*g",
