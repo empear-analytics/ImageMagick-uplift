@@ -429,6 +429,71 @@ static ssize_t MatchHNodeColor(HNodeInfo *node_info,const PixelInfo pixel)
   return(i);
 }
 
+typedef struct _HNodeCount
+{
+  const Image
+    *image;
+
+  const Quantum
+    *p;
+
+  HCubeInfo
+    *cube_info;
+
+  HNodeInfo
+    *node_info;
+
+  PixelInfo
+    pixel;
+
+  ExceptionInfo
+    *exception;
+} HNodeCount;
+
+static MagickBooleanType CountHNodeColor(const HNodeCount *count)
+{
+  const Image
+    *const image = count->image;
+
+  const Quantum
+    *const p = count->p;
+
+  HCubeInfo
+    *const cube_info = count->cube_info;
+
+  HNodeInfo
+    *const node_info = count->node_info;
+
+  const PixelInfo
+    pixel = count->pixel;
+
+  ExceptionInfo
+    *const exception = count->exception;
+
+  HNodeColor
+    color;
+
+  ssize_t
+    i;
+
+  i=MatchHNodeColor(node_info,pixel);
+  if (i < (ssize_t) node_info->number_unique)
+    node_info->list[i].count++;
+  else
+    {
+      color.image=image;
+      color.p=p;
+      color.cube_info=cube_info;
+      color.node_info=node_info;
+      color.pixel=pixel;
+      color.i=i;
+      color.exception=exception;
+      if (AppendHNodeColor(&color) == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static HCubeInfo *ClassifyImageColors(const Image *image,
   ExceptionInfo *exception)
 {
@@ -453,7 +518,6 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
     *p;
 
   ssize_t
-    i,
     x;
 
   ssize_t
@@ -488,8 +552,8 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
       HCubeLeaf
         targets;
 
-      HNodeColor
-        color;
+      HNodeCount
+        count;
 
       /*
         Start at the root and proceed level by level.
@@ -502,21 +566,14 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
       targets.pixel=(&pixel);
       if (DescendHCube(&descent,&targets) == MagickFalse)
         return(0);
-      i=MatchHNodeColor(node_info,pixel);
-      if (i < (ssize_t) node_info->number_unique)
-        node_info->list[i].count++;
-      else
-        {
-          color.image=image;
-          color.p=p;
-          color.cube_info=cube_info;
-          color.node_info=node_info;
-          color.pixel=pixel;
-          color.i=i;
-          color.exception=exception;
-          if (AppendHNodeColor(&color) == MagickFalse)
-            return(0);
-        }
+      count.image=image;
+      count.p=p;
+      count.cube_info=cube_info;
+      count.node_info=node_info;
+      count.pixel=pixel;
+      count.exception=exception;
+      if (CountHNodeColor(&count) == MagickFalse)
+        return(0);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
     proceed=SetImageProgress(image,EvaluateImageTag,(MagickOffsetType) y,
