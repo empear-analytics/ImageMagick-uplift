@@ -2978,6 +2978,13 @@ static void WriteResolutionResource(const Image *image,unsigned char *p)
   WriteProfileShort(MSBEndian,(unsigned short) image->units,p+12);
 }
 
+static inline MagickBooleanType IsInvalid8BimNameCount(const ssize_t count,
+  const size_t length)
+{
+  return(((count >= (ssize_t) length) || (count < 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 static inline MagickBooleanType IsInvalid8BimResourceCount(const ssize_t count,
   const size_t length)
 {
@@ -3052,7 +3059,7 @@ static void Sync8BimProfile(const Image *image,const StringInfo *profile)
       return;
     id=(unsigned short) ReadProfileMSBShort(&p,&length);
     count=(ssize_t) ReadProfileByte(&p,&length);
-    if ((count >= (ssize_t) length) || (count < 0))
+    if (IsInvalid8BimNameCount(count,length) != MagickFalse)
       return;
     p+=(ptrdiff_t) count;
     length-=(size_t) count;
