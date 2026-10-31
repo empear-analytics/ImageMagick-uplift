@@ -3273,6 +3273,37 @@ static void ImportAnyDepthCMYKOQuantum(const Image *image,
   }
 }
 
+static void ImportOtherDepthCMYKOQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import24BitFloatCMYKOQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import64BitFloatCMYKOQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ImportAnyDepthCMYKOQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ImportCMYKOQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
@@ -3299,27 +3330,9 @@ static void ImportCMYKOQuantum(const Image *image,QuantumInfo *quantum_info,
       Import32BitCMYKOQuantum(image,quantum_info,span);
       break;
     }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import24BitFloatCMYKOQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import64BitFloatCMYKOQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ImportAnyDepthCMYKOQuantum(image,quantum_info,span);
+      ImportOtherDepthCMYKOQuantum(image,quantum_info,span);
       break;
     }
   }
