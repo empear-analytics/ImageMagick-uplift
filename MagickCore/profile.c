@@ -2611,6 +2611,31 @@ static void SyncExifOrientation(const ExifTagInfo *exif_tag)
     p);
 }
 
+static void SyncExifIfd0Tag(const unsigned short tag_value,
+  const ExifTagInfo exif_tag,const Image *image)
+{
+  switch (tag_value)
+  {
+    case 0x011a:
+    {
+      SyncExifResolution(&exif_tag,image->resolution.x);
+      break;
+    }
+    case 0x011b:
+    {
+      SyncExifResolution(&exif_tag,image->resolution.y);
+      break;
+    }
+    case 0x0112:
+    {
+      SyncExifOrientation(&exif_tag);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -2794,21 +2819,6 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
               image->columns : image->rows,format,components,q,p);
           break;
         }
-        case 0x011a:
-        {
-          SyncExifResolution(&exif_tag,image->resolution.x);
-          break;
-        }
-        case 0x011b:
-        {
-          SyncExifResolution(&exif_tag,image->resolution.y);
-          break;
-        }
-        case 0x0112:
-        {
-          SyncExifOrientation(&exif_tag);
-          break;
-        }
         case 0x0128:
         {
           if (directory != ifd0)
@@ -2822,7 +2832,10 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
           break;
         }
         default:
+        {
+          SyncExifIfd0Tag(tag_value,exif_tag,image);
           break;
+        }
       }
       if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) !=
           MagickFalse)
