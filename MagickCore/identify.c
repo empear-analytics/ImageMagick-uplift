@@ -1599,6 +1599,24 @@ static void PrintImageFormat(FILE *file,const Image *image,
     }
 }
 
+static void PrintImageBaseGeometryAndResolution(FILE *file,
+  const Image *image)
+{
+  if ((image->magick_columns != 0) || (image->magick_rows != 0))
+    if ((image->magick_columns != image->columns) ||
+        (image->magick_rows != image->rows))
+      (void) FormatLocaleFile(file,"  Base geometry: %.17gx%.17g\n",(double)
+        image->magick_columns,(double) image->magick_rows);
+  if ((image->resolution.x != 0.0) && (image->resolution.y != 0.0))
+    {
+      (void) FormatLocaleFile(file,"  Resolution: %gx%g\n",image->resolution.x,
+        image->resolution.y);
+      (void) FormatLocaleFile(file,"  Print size: %gx%g\n",(double)
+        image->columns/image->resolution.x,(double) image->rows/
+        image->resolution.y);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1755,19 +1773,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   (void) FormatLocaleFile(file,"  Geometry: %.17gx%.17g%+.20g%+.20g\n",(double)
     image->columns,(double) image->rows,(double) image->tile_offset.x,(double)
     image->tile_offset.y);
-  if ((image->magick_columns != 0) || (image->magick_rows != 0))
-    if ((image->magick_columns != image->columns) ||
-        (image->magick_rows != image->rows))
-      (void) FormatLocaleFile(file,"  Base geometry: %.17gx%.17g\n",(double)
-        image->magick_columns,(double) image->magick_rows);
-  if ((image->resolution.x != 0.0) && (image->resolution.y != 0.0))
-    {
-      (void) FormatLocaleFile(file,"  Resolution: %gx%g\n",image->resolution.x,
-        image->resolution.y);
-      (void) FormatLocaleFile(file,"  Print size: %gx%g\n",(double)
-        image->columns/image->resolution.x,(double) image->rows/
-        image->resolution.y);
-    }
+  PrintImageBaseGeometryAndResolution(file,image);
   (void) FormatLocaleFile(file,"  Units: %s\n",CommandOptionToMnemonic(
     MagickResolutionOptions,(ssize_t) image->units));
   (void) FormatLocaleFile(file,"  Colorspace: %s\n",CommandOptionToMnemonic(
