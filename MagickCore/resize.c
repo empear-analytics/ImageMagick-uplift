@@ -2105,6 +2105,37 @@ static gfloat *ImportLiquidRescaleRow(const Image *image,
   return(q);
 }
 
+static void ExportLiquidRescalePixels(const Image *image,
+  Image *rescale_image,LqrCarver *carver,ExceptionInfo *exception)
+{
+  CacheView
+    *rescale_view;
+
+  gfloat
+    *packet;
+
+  int
+    x_offset,
+    y_offset;
+
+  rescale_view=AcquireAuthenticCacheView(rescale_image,exception);
+  (void) lqr_carver_scan_reset(carver);
+  while (lqr_carver_scan_ext(carver,&x_offset,&y_offset,(void **) &packet) != 0)
+  {
+    Quantum
+      *magick_restrict p;
+
+    p=QueueCacheViewAuthenticPixels(rescale_view,x_offset,y_offset,1,1,
+      exception);
+    if (p == (Quantum *) NULL)
+      break;
+    SetLiquidRescalePixelChannels(image,rescale_image,packet,p);
+    if (SyncCacheViewAuthenticPixels(rescale_view,exception) == MagickFalse)
+      break;
+  }
+  rescale_view=DestroyCacheView(rescale_view);
+}
+
 MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   const size_t rows,const double delta_x,const double rigidity,
   ExceptionInfo *exception)
@@ -2112,19 +2143,13 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
 #define LiquidRescaleImageTag  "Rescale/Image"
 
   CacheView
-    *image_view,
-    *rescale_view;
+    *image_view;
 
   gfloat
-    *packet,
     *pixels;
 
   Image
     *rescale_image;
-
-  int
-    x_offset,
-    y_offset;
 
   LqrCarver
     *carver;
@@ -2207,22 +2232,7 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
       rescale_image=DestroyImage(rescale_image);
       return((Image *) NULL);
     }
-  rescale_view=AcquireAuthenticCacheView(rescale_image,exception);
-  (void) lqr_carver_scan_reset(carver);
-  while (lqr_carver_scan_ext(carver,&x_offset,&y_offset,(void **) &packet) != 0)
-  {
-    Quantum
-      *magick_restrict p;
-
-    p=QueueCacheViewAuthenticPixels(rescale_view,x_offset,y_offset,1,1,
-      exception);
-    if (p == (Quantum *) NULL)
-      break;
-    SetLiquidRescalePixelChannels(image,rescale_image,packet,p);
-    if (SyncCacheViewAuthenticPixels(rescale_view,exception) == MagickFalse)
-      break;
-  }
-  rescale_view=DestroyCacheView(rescale_view);
+  ExportLiquidRescalePixels(image,rescale_image,carver,exception);
   pixel_info=RelinquishVirtualMemory(pixel_info);
   lqr_carver_destroy(carver);
   return(rescale_image);
