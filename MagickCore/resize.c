@@ -2191,6 +2191,31 @@ static inline MagickBooleanType IsTooSmallToCarve(const size_t columns,
   return(((columns <= 2) || (rows <= 2)) ? MagickTrue : MagickFalse);
 }
 
+static Image *AcquireLiquidRescaledImage(const Image *image,
+  LqrCarver *carver,MemoryInfo *pixel_info,ExceptionInfo *exception)
+{
+  Image
+    *rescale_image;
+
+  rescale_image=CloneImage(image,(size_t) lqr_carver_get_width(carver),
+    (size_t) lqr_carver_get_height(carver),MagickTrue,exception);
+  if (rescale_image == (Image *) NULL)
+    {
+      pixel_info=RelinquishVirtualMemory(pixel_info);
+      return((Image *) NULL);
+    }
+  if (SetImageStorageClass(rescale_image,DirectClass,exception) == MagickFalse)
+    {
+      pixel_info=RelinquishVirtualMemory(pixel_info);
+      rescale_image=DestroyImage(rescale_image);
+      return((Image *) NULL);
+    }
+  ExportLiquidRescalePixels(image,rescale_image,carver,exception);
+  pixel_info=RelinquishVirtualMemory(pixel_info);
+  lqr_carver_destroy(carver);
+  return(rescale_image);
+}
+
 MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   const size_t rows,const double delta_x,const double rigidity,
   ExceptionInfo *exception)
@@ -2199,9 +2224,6 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
 
   gfloat
     *pixels;
-
-  Image
-    *rescale_image;
 
   LqrCarver
     *carver;
@@ -2244,23 +2266,7 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   lqr_status=lqr_carver_init(carver,(gint) delta_x,(gfloat) rigidity);
   lqr_status=lqr_carver_resize(carver,(gint) columns,(gint) rows);
   (void) lqr_status;
-  rescale_image=CloneImage(image,(size_t) lqr_carver_get_width(carver),
-    (size_t) lqr_carver_get_height(carver),MagickTrue,exception);
-  if (rescale_image == (Image *) NULL)
-    {
-      pixel_info=RelinquishVirtualMemory(pixel_info);
-      return((Image *) NULL);
-    }
-  if (SetImageStorageClass(rescale_image,DirectClass,exception) == MagickFalse)
-    {
-      pixel_info=RelinquishVirtualMemory(pixel_info);
-      rescale_image=DestroyImage(rescale_image);
-      return((Image *) NULL);
-    }
-  ExportLiquidRescalePixels(image,rescale_image,carver,exception);
-  pixel_info=RelinquishVirtualMemory(pixel_info);
-  lqr_carver_destroy(carver);
-  return(rescale_image);
+  return(AcquireLiquidRescaledImage(image,carver,pixel_info,exception));
 }
 #else
 MagickExport Image *LiquidRescaleImage(const Image *image,
