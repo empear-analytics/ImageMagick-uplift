@@ -560,6 +560,23 @@ static void AccumulateBlackChannel(const ResampleFilter *resample_filter,
       GetPixelBlack(resample_filter->image,pixels);
 }
 
+static void CountTileHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0,ssize_t *hit)
+{
+  switch ( resample_filter->virtual_pixel ) {
+    case VerticalTileVirtualPixelMethod:
+      if (IsAreaOutsideColumns(resample_filter,u0) != MagickFalse)
+        (*hit)++;  /* outside the vertically tiled images. */
+      break;
+    case DitherVirtualPixelMethod:
+      if (IsAreaOutsideDitherCorner(resample_filter,u0,v0) != MagickFalse)
+        (*hit)++;
+      break;
+    default:
+      break;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -652,14 +669,11 @@ MagickExport MagickBooleanType ResamplePixelColor(
       if (IsAreaOutsideRows(resample_filter,v0) != MagickFalse)
         hit++;  /* outside the horizontally tiled images. */
       break;
-    case VerticalTileVirtualPixelMethod:
-      if (IsAreaOutsideColumns(resample_filter,u0) != MagickFalse)
-        hit++;  /* outside the vertically tiled images. */
+    default:
+    {
+      CountTileHits(resample_filter,u0,v0,&hit);
       break;
-    case DitherVirtualPixelMethod:
-      if (IsAreaOutsideDitherCorner(resample_filter,u0,v0) != MagickFalse)
-        hit++;
-      break;
+    }
     case TileVirtualPixelMethod:
     case MirrorVirtualPixelMethod:
     case RandomVirtualPixelMethod:
