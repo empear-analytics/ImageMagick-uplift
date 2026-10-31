@@ -980,29 +980,12 @@ static MagickBooleanType ExportFloatRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportFloatQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,float *magick_restrict q)
+static void ExportFloatAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  float *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=(float) (QuantumScale*(double) GetPixelRed(image,p));
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-      break;
-    }
     case AlphaQuantum:
     {
       *q=(float) (QuantumScale*((double) (GetPixelAlpha(image,p))));
@@ -1026,6 +1009,37 @@ static void ExportFloatQuantum(const Image *image,const QuantumType quantum,
     }
     default:
       *q=0;
+  }
+}
+
+static void ExportFloatQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,float *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      break;
+    }
+    default:
+    {
+      ExportFloatAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
   }
 }
 
