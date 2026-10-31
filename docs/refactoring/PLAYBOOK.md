@@ -1318,7 +1318,9 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    member is read that the block did not read.
    When the caller is itself a function that binds `const` locals from the members of
    its own `const Name *name` parameter (a helper of this recipe, of Recipe Y or of
-   Recipe LB's struct form), and every variable of the group is one of those locals,
+   Recipe LB's struct form, or a function whose parameters Recipe B bundled, in the
+   form of its step 3 that binds a `const` local of each old name), and every
+   variable of the group is one of those locals,
    bound from the member of its own name and type and not written since, the new
    function may take that `name` in place of a new struct (`PopulatePosterizeMap`'s
    `map_info`, passed on to its column loop): the caller passes `name` unchanged, the
@@ -1445,7 +1447,12 @@ static void ThresholdWaveletLevel(float *pixels,
   the call runs (it reaches the caller only through a pointer to `const`, and its
   address goes nowhere else), so each member still holds the value the caller's
   `const` local holds at the call, which is the value the block read. Nothing is
-  copied, so no member is read that was not set.
+  copied, so no member is read that was not set. A Recipe B struct is the same: its
+  local holds the argument expressions, `const` with them as its initialiser or filled
+  member by member, and B step 5 keeps every identifier of them unwritten up to the
+  last call. A pointer member the block writes through (`channel_sum`, under Recipe
+  Q's read-only pointers) is read, not written: the new function reaches the same
+  array through the same address the caller's `const` local held.
 - Recipe E's limit on what the block writes stands: one value returned, or writes
   through a pointer the block already used for pixel data. A block writing more is
   skipped, as in Recipe E.
@@ -4179,3 +4186,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | NEW | AR | Extract Block Through a Struct of Array Pointers: a block outside OpenMP that reads or updates, element by element, several local arrays of the caller (each used only as `v[e]` or passed whole to a pointer parameter) moves to a `static` function taking one `const` struct of pointers to the arrays' first elements, initialised once in the caller (`const Name name = { v1, ... };`) and bound `T *const v = name->v;`, the block's text unchanged; other inputs and at most one returned variable as in Recipe E, or an input struct as in Recipe N | `statistic-moments.c`'s `GetImageMoments` (W10): the second pixel pass writes eight moment arrays per pixel (Q step 8 admits six), the composite average and the normalisation write eleven, the ellipse and Hu loops read four and seven; E, N, K and Q refuse them. A probe with this recipe, E and Q: 8.05 to 10.0 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | N | Step 2: when the caller binds `const` locals from its own `const Name *name` parameter (a helper of N, Y or LB's struct form) and the whole group is such locals, the new function may take that `name` unchanged instead of a new struct: no typedef, no local, no assignment; it binds the members its block reads. *Careful* gives the argument | `quantize-posterize.c`'s `PopulatePosterizeMap` (W10): its column loop reads `image`, `map_image`, `levels` and `number_columns`, all bound from its `PosterizeMapInfo`, plus `scale` and `q`. Step 3's letter would add a second struct of the same four members and refill it from the locals just bound from the first. With the column loop as a helper the file has twelve functions and its mean cyclomatic complexity falls under 4: *Overall Code Complexity* leaves, 8.89 to 9.47 in a probe | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | E | Step 4: a variable the block writes before reading on every path, but only through a test a compiler cannot follow (a first-pass `(i == 0)` that short-circuits the comparison reading it), so that declaring it in the new function draws a may-be-uninitialised warning, goes by value when the caller sets it before the block and nothing after the block reads it, as the read-on-entry form already allows | `attribute-hull.c`'s `GetImageMinimumBoundingBox` (W10): its edge loop sets `distance` on the first pass and compares against it on the others; declared in the helper as step 4's letter says, clang reports `-Wconditional-uninitialized` and MSVC C4701 (an error in the Windows jobs, the reason for commit 151be9bde). The loop with `MoveBoxToOrigin` as `FindNearestEdge`: 9.31 to 9.42 in a probe | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | N | Step 2's pass-through form: the caller may also be a function whose parameters Recipe B bundled into `const Name *name`, binding a `const` local of each old name from its member (B step 3). Through Recipe Q step 3, which builds its struct as N step 2 does, the form serves Q too. *Careful* gives the argument | `threshold-adaptive.c`'s `AdaptiveThresholdPixel` (W10): after Recipe B (11 arguments to 4) its sliding-window update (cc 9) reads `image`, `width`, `height`, `channel_bias` and `channel_sum`, all bound from its `AdaptiveThresholdPixelInfo`, plus `p`, `i` and `channel`. The letter would add a second struct of those five members, filled from the locals just bound from the first. The update as a helper: 8.88 to 9.11 in a probe | mandate (2026-10-24) |
