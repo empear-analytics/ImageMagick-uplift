@@ -4003,6 +4003,29 @@ static ssize_t ReadBlobGzip(BlobInfo *magick_restrict blob_info,
 }
 #endif
 
+#if defined(MAGICKCORE_BZLIB_DELEGATE)
+static ssize_t ReadBlobBZip(BlobInfo *magick_restrict blob_info,
+  const size_t length,unsigned char *q,ssize_t count)
+{
+  size_t
+    i;
+
+  for (i=0; i < length; i+=(size_t) count)
+  {
+    count=(ssize_t) BZ2_bzread(blob_info->file_info.bzfile,q+i,(int)
+      MagickMin(length-i,MagickMaxBufferExtent));
+    if (count <= 0)
+      {
+        count=0;
+        if (errno != EINTR)
+          break;
+      }
+  }
+  count=(ssize_t) i;
+  return(count);
+}
+#endif
+
 MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
 {
   BlobInfo
@@ -4105,21 +4128,7 @@ MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
       int
         status;
 
-      size_t
-        i;
-
-      for (i=0; i < length; i+=(size_t) count)
-      {
-        count=(ssize_t) BZ2_bzread(blob_info->file_info.bzfile,q+i,(int)
-          MagickMin(length-i,MagickMaxBufferExtent));
-        if (count <= 0)
-          {
-            count=0;
-            if (errno != EINTR)
-              break;
-          }
-      }
-      count=(ssize_t) i;
+      count=ReadBlobBZip(blob_info,length,q,count);
       status=BZ_OK;
       (void) BZ2_bzerror(blob_info->file_info.bzfile,&status);
       if ((count != (ssize_t) length) && (status != BZ_OK))
