@@ -550,6 +550,18 @@ static MagickBooleanType ClampImageColormap(Image *image,
   return(SyncImage(image,exception));
 }
 
+static void ClampPixelRow(const Image *image,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ClampPixelChannels(image,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
 {
 #define ClampImageTag  "Clamp/Image"
@@ -584,9 +596,6 @@ MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -598,11 +607,7 @@ MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ClampPixelChannels(image,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ClampPixelRow(image,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -1545,6 +1550,52 @@ static ThresholdMap *GetNamedThresholdMap(const char *threshold_map,
   return(GetThresholdMap(token,exception));
 }
 
+static MagickBooleanType CheckOrderedDitherMap(const ThresholdMap *map,
+  const char *threshold_map,ExceptionInfo *exception)
+{
+  if (map == (ThresholdMap *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : '%s'","ordered-dither",threshold_map);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _OrderedDitherRow
+{
+  ThresholdMap
+    *map;
+
+  ssize_t
+    y;
+} OrderedDitherRow;
+
+static void OrderedDitherPixels(const Image *image,const double *levels,
+  const OrderedDitherRow *row,Quantum *magick_restrict q)
+{
+  ThresholdMap
+    *const map = row->map;
+
+  const ssize_t
+    y = row->y;
+
+  OrderedDither
+    ordered_dither;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ordered_dither.map=map;
+    ordered_dither.x=x;
+    ordered_dither.y=y;
+    OrderedDitherPixel(image,levels,&ordered_dither,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1584,12 +1635,8 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
     p++;
   threshold_map=p;
   map=GetNamedThresholdMap(threshold_map,p,exception);
-  if (map == (ThresholdMap *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "InvalidArgument","%s : '%s'","ordered-dither",threshold_map);
-      return(MagickFalse);
-    }
+  if (CheckOrderedDitherMap(map,threshold_map,exception) == MagickFalse)
+    return(MagickFalse);
   GetDitherLevels(threshold_map,levels);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
@@ -1602,11 +1649,8 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    OrderedDither
-      ordered_dither;
-
-    ssize_t
-      x;
+    OrderedDitherRow
+      row;
 
     Quantum
       *magick_restrict q;
@@ -1619,14 +1663,9 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ordered_dither.map=map;
-      ordered_dither.x=x;
-      ordered_dither.y=y;
-      OrderedDitherPixel(image,levels,&ordered_dither,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.map=map;
+    row.y=y;
+    OrderedDitherPixels(image,levels,&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -1705,6 +1744,35 @@ static void PerceptiblePixel(const Image *image,const double epsilon,
   }
 }
 
+static MagickBooleanType PerceptibleImageColormap(Image *image,
+  const double epsilon,ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  PixelInfo
+    *magick_restrict q;
+
+  q=image->colormap;
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    if ((GetPixelChannelTraits(image,RedPixelChannel) & UpdatePixelTrait) != 0)
+      q->red=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->red),
+        epsilon);
+    if ((GetPixelChannelTraits(image,GreenPixelChannel) & UpdatePixelTrait) != 0)
+      q->green=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->green),
+        epsilon);
+    if ((GetPixelChannelTraits(image,BluePixelChannel) & UpdatePixelTrait) != 0)
+      q->blue=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->blue),
+        epsilon);
+    if ((GetPixelChannelTraits(image,AlphaPixelChannel) & UpdatePixelTrait) != 0)
+      q->alpha=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->alpha),
+        epsilon);
+    q++;
+  }
+  return(SyncImage(image,exception));
+}
+
 MagickExport MagickBooleanType PerceptibleImage(Image *image,
   const double epsilon,ExceptionInfo *exception)
 {
@@ -1727,32 +1795,7 @@ MagickExport MagickBooleanType PerceptibleImage(Image *image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (image->storage_class == PseudoClass)
-    {
-      ssize_t
-        i;
-
-      PixelInfo
-        *magick_restrict q;
-
-      q=image->colormap;
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        if ((GetPixelChannelTraits(image,RedPixelChannel) & UpdatePixelTrait) != 0)
-          q->red=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->red),
-            epsilon);
-        if ((GetPixelChannelTraits(image,GreenPixelChannel) & UpdatePixelTrait) != 0)
-          q->green=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->green),
-            epsilon);
-        if ((GetPixelChannelTraits(image,BluePixelChannel) & UpdatePixelTrait) != 0)
-          q->blue=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->blue),
-            epsilon);
-        if ((GetPixelChannelTraits(image,AlphaPixelChannel) & UpdatePixelTrait) != 0)
-          q->alpha=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->alpha),
-            epsilon);
-        q++;
-      }
-      return(SyncImage(image,exception));
-    }
+    return(PerceptibleImageColormap(image,epsilon,exception));
   /*
     Perceptible image.
   */
@@ -1875,6 +1918,49 @@ static void RandomThresholdPixel(const Image *image,
   }
 }
 
+typedef struct _RandomThresholdRow
+{
+  double
+    min_threshold,
+    max_threshold;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  int
+    id;
+} RandomThresholdRow;
+
+static void RandomThresholdPixels(const Image *image,
+  const RandomThresholdRow *row,Quantum *magick_restrict q)
+{
+  const double
+    min_threshold = row->min_threshold,
+    max_threshold = row->max_threshold;
+
+  RandomInfo
+    **magick_restrict const random_info = row->random_info;
+
+  const int
+    id = row->id;
+
+  RandomThreshold
+    random_threshold;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    random_threshold.min_threshold=min_threshold;
+    random_threshold.max_threshold=max_threshold;
+    random_threshold.random_info=random_info;
+    random_threshold.id=id;
+    RandomThresholdPixel(image,&random_threshold,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType RandomThresholdImage(Image *image,
   const double min_threshold, const double max_threshold,ExceptionInfo *exception)
 {
@@ -1928,11 +2014,8 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    RandomThreshold
-      random_threshold;
-
-    ssize_t
-      x;
+    RandomThresholdRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -1942,15 +2025,11 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      random_threshold.min_threshold=min_threshold;
-      random_threshold.max_threshold=max_threshold;
-      random_threshold.random_info=random_info;
-      random_threshold.id=id;
-      RandomThresholdPixel(image,&random_threshold,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.min_threshold=min_threshold;
+    row.max_threshold=max_threshold;
+    row.random_info=random_info;
+    row.id=id;
+    RandomThresholdPixels(image,&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -2073,6 +2152,35 @@ static inline void RangeThresholdChannels(const Image *image,
   }
 }
 
+typedef struct _RangeThresholdRow
+{
+  double
+    low_black,
+    low_white,
+    high_white,
+    high_black;
+} RangeThresholdRow;
+
+static void RangeThresholdPixels(const Image *image,
+  const RangeThresholdRow *row,Quantum *magick_restrict q)
+{
+  const double
+    low_black = row->low_black,
+    low_white = row->low_white,
+    high_white = row->high_white,
+    high_black = row->high_black;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    RangeThresholdChannels(image,low_black,low_white,high_white,high_black,
+      q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType RangeThresholdImage(Image *image,
   const double low_black,const double low_white,const double high_white,
   const double high_black,ExceptionInfo *exception)
@@ -2109,11 +2217,11 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
+
+    RangeThresholdRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -2123,12 +2231,11 @@ MagickExport MagickBooleanType RangeThresholdImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      RangeThresholdChannels(image,low_black,low_white,high_white,high_black,
-        q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.low_black=low_black;
+    row.low_white=low_white;
+    row.high_white=high_white;
+    row.high_black=high_black;
+    RangeThresholdPixels(image,&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)

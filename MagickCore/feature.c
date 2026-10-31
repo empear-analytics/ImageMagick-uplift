@@ -491,6 +491,18 @@ static CannyInfo SuppressCannyNonMaxima(MatrixInfo *canny_cache,
   return(pixel);
 }
 
+static MagickBooleanType SetCannyEdgeGray(Image *edge_image,
+  ExceptionInfo *exception)
+{
+  if (TransformImageColorspace(edge_image,GRAYColorspace,exception) == MagickFalse)
+    {
+      edge_image=DestroyImage(edge_image);
+      return(MagickFalse);
+    }
+  (void) SetImageAlphaChannel(edge_image,OffAlphaChannel,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -550,12 +562,8 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   kernel_info=DestroyKernelInfo(kernel_info);
   if (edge_image == (Image *) NULL)
     return((Image *) NULL);
-  if (TransformImageColorspace(edge_image,GRAYColorspace,exception) == MagickFalse)
-    {
-      edge_image=DestroyImage(edge_image);
-      return((Image *) NULL);
-    }
-  (void) SetImageAlphaChannel(edge_image,OffAlphaChannel,exception);
+  if (SetCannyEdgeGray(edge_image,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     Find the intensity gradient of the image.
   */

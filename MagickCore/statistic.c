@@ -292,28 +292,21 @@ static double EvaluateLeftShift(const Quantum pixel,const double value)
   return(result);
 }
 
-static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
-  const MagickEvaluateOperator op,const double value)
+static void ApplyBasicEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
 {
-  double
-    result;
-
-  ssize_t
-    i;
-
-  result=0.0;
   switch (op)
   {
     case UndefinedEvaluateOperator:
       break;
     case AbsEvaluateOperator:
     {
-      result=(double) fabs((double) pixel+value);
+      (*result)=(double) fabs((double) pixel+value);
       break;
     }
     case AddEvaluateOperator:
     {
-      result=(double) pixel+value;
+      (*result)=(double) pixel+value;
       break;
     }
     case AddModulusEvaluateOperator:
@@ -324,64 +317,266 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
         result, where floor() is replaced by trunc() and could return a
         negative result (which is clipped).
       */
-      result=(double) pixel+value;
-      result-=((double) QuantumRange+1.0)*floor(result/((double)
+      (*result)=(double) pixel+value;
+      (*result)-=((double) QuantumRange+1.0)*floor((*result)/((double)
         QuantumRange+1.0));
       break;
     }
     case AndEvaluateOperator:
     {
-      result=(double) ((ssize_t) pixel & (ssize_t) (value+0.5));
+      (*result)=(double) ((ssize_t) pixel & (ssize_t) (value+0.5));
       break;
     }
     case CosineEvaluateOperator:
     {
-      result=(double) QuantumRange*(0.5*cos((double) (2.0*MagickPI*
+      (*result)=(double) QuantumRange*(0.5*cos((double) (2.0*MagickPI*
         QuantumScale*(double) pixel*value))+0.5);
       break;
     }
-    case DivideEvaluateOperator:
+    default:
+      break;
+  }
+}
+
+static void ApplyThresholdEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
+  switch (op)
+  {
+    default:
     {
-      result=(double) pixel/(value == 0.0 ? 1.0 : value);
+      ApplyBasicEvaluateOperator(pixel,op,value,result);
       break;
     }
-    case ExponentialEvaluateOperator:
+    case ThresholdEvaluateOperator:
     {
-      result=(double) QuantumRange*exp(value*QuantumScale*(double) pixel);
+      (*result)=(double) (((double) pixel <= value) ? 0 : QuantumRange);
       break;
     }
-    case GaussianNoiseEvaluateOperator:
+    case ThresholdBlackEvaluateOperator:
     {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,GaussianNoise,
-        value);
+      (*result)=(double) (((double) pixel <= value) ? 0 : pixel);
       break;
     }
-    case ImpulseNoiseEvaluateOperator:
+    case ThresholdWhiteEvaluateOperator:
     {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,ImpulseNoise,
-        value);
+      (*result)=(double) (((double) pixel > value) ? QuantumRange : pixel);
       break;
     }
-    case InverseLogEvaluateOperator:
+  }
+}
+
+static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
+  ssize_t
+    i;
+
+  switch (op)
+  {
+    default:
     {
-      result=(double) QuantumRange*pow((value+1.0),QuantumScale*(double)
-        pixel-1.0)*MagickSafeReciprocal(value);
-      break;
-    }
-    case LaplacianNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,
-        LaplacianNoise,value);
+      ApplyThresholdEvaluateOperator(pixel,op,value,result);
       break;
     }
     case LeftShiftEvaluateOperator:
     {
-      result=EvaluateLeftShift(pixel,value);
+      (*result)=EvaluateLeftShift(pixel,value);
+      break;
+    }
+    case OrEvaluateOperator:
+    {
+      (*result)=(double) ((ssize_t) pixel | (ssize_t) (value+0.5));
+      break;
+    }
+    case RightShiftEvaluateOperator:
+    {
+      (*result)=(double) pixel;
+      for (i=0; i < (ssize_t) value; i++)
+        (*result)/=2.0;
+      break;
+    }
+    case XorEvaluateOperator:
+    {
+      (*result)=(double) ((ssize_t) pixel ^ (ssize_t) (value+0.5));
+      break;
+    }
+  }
+}
+
+static void ApplyTranscendentalEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
+  switch (op)
+  {
+    default:
+    {
+      ApplyBitwiseEvaluateOperator(pixel,op,value,result);
+      break;
+    }
+    case ExponentialEvaluateOperator:
+    {
+      (*result)=(double) QuantumRange*exp(value*QuantumScale*(double) pixel);
+      break;
+    }
+    case InverseLogEvaluateOperator:
+    {
+      (*result)=(double) QuantumRange*pow((value+1.0),QuantumScale*(double)
+        pixel-1.0)*MagickSafeReciprocal(value);
       break;
     }
     case LogEvaluateOperator:
     {
-      result=EvaluateLog(pixel,value,result);
+      (*result)=EvaluateLog(pixel,value,(*result));
+      break;
+    }
+    case PowEvaluateOperator:
+    {
+      (*result)=EvaluatePow(pixel,value,(*result));
+      break;
+    }
+    case SineEvaluateOperator:
+    {
+      (*result)=(double) QuantumRange*(0.5*sin((double) (2.0*MagickPI*
+        QuantumScale*(double) pixel*value))+0.5);
+      break;
+    }
+  }
+}
+
+static void ApplyArithmeticEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
+  switch (op)
+  {
+    default:
+    {
+      ApplyTranscendentalEvaluateOperator(pixel,op,value,result);
+      break;
+    }
+    case DivideEvaluateOperator:
+    {
+      (*result)=(double) pixel/(value == 0.0 ? 1.0 : value);
+      break;
+    }
+    case MultiplyEvaluateOperator:
+    {
+      (*result)=(double) pixel*value;
+      break;
+    }
+    case RootMeanSquareEvaluateOperator:
+    {
+      (*result)=((double) pixel*(double) pixel+value);
+      break;
+    }
+    case SubtractEvaluateOperator:
+    {
+      (*result)=(double) pixel-value;
+      break;
+    }
+    case SumEvaluateOperator:
+    {
+      (*result)=(double) pixel+value;
+      break;
+    }
+  }
+}
+
+typedef struct _EvaluateOperands
+{
+  RandomInfo
+    *random_info;
+
+  Quantum
+    pixel;
+
+  MagickEvaluateOperator
+    op;
+
+  double
+    value;
+} EvaluateOperands;
+
+static void ApplyNoiseEvaluateOperator(const EvaluateOperands *operands,
+  double *result)
+{
+  RandomInfo
+    *const random_info = operands->random_info;
+
+  const Quantum
+    pixel = operands->pixel;
+
+  const MagickEvaluateOperator
+    op = operands->op;
+
+  const double
+    value = operands->value;
+
+  switch (op)
+  {
+    default:
+    {
+      ApplyArithmeticEvaluateOperator(pixel,op,value,result);
+      break;
+    }
+    case GaussianNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        GaussianNoise,value);
+      break;
+    }
+    case ImpulseNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        ImpulseNoise,value);
+      break;
+    }
+    case LaplacianNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        LaplacianNoise,value);
+      break;
+    }
+    case MultiplicativeNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        MultiplicativeGaussianNoise,value);
+      break;
+    }
+    case PoissonNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        PoissonNoise,value);
+      break;
+    }
+    case UniformNoiseEvaluateOperator:
+    {
+      (*result)=(double) GenerateDifferentialNoise(random_info,pixel,
+        UniformNoise,value);
+      break;
+    }
+  }
+}
+
+static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
+  const MagickEvaluateOperator op,const double value)
+{
+  double
+    result;
+
+  result=0.0;
+  switch (op)
+  {
+    default:
+    {
+      EvaluateOperands
+        operands;
+
+      operands.random_info=random_info;
+      operands.pixel=pixel;
+      operands.op=op;
+      operands.value=value;
+      ApplyNoiseEvaluateOperator(&operands,&result);
       break;
     }
     case MaxEvaluateOperator:
@@ -404,90 +599,9 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
       result=MagickMin((double) pixel,value);
       break;
     }
-    case MultiplicativeNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,
-        MultiplicativeGaussianNoise,value);
-      break;
-    }
-    case MultiplyEvaluateOperator:
-    {
-      result=(double) pixel*value;
-      break;
-    }
-    case OrEvaluateOperator:
-    {
-      result=(double) ((ssize_t) pixel | (ssize_t) (value+0.5));
-      break;
-    }
-    case PoissonNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,PoissonNoise,
-        value);
-      break;
-    }
-    case PowEvaluateOperator:
-    {
-      result=EvaluatePow(pixel,value,result);
-      break;
-    }
-    case RightShiftEvaluateOperator:
-    {
-      result=(double) pixel;
-      for (i=0; i < (ssize_t) value; i++)
-        result/=2.0;
-      break;
-    }
-    case RootMeanSquareEvaluateOperator:
-    {
-      result=((double) pixel*(double) pixel+value);
-      break;
-    }
     case SetEvaluateOperator:
     {
       result=value;
-      break;
-    }
-    case SineEvaluateOperator:
-    {
-      result=(double) QuantumRange*(0.5*sin((double) (2.0*MagickPI*
-        QuantumScale*(double) pixel*value))+0.5);
-      break;
-    }
-    case SubtractEvaluateOperator:
-    {
-      result=(double) pixel-value;
-      break;
-    }
-    case SumEvaluateOperator:
-    {
-      result=(double) pixel+value;
-      break;
-    }
-    case ThresholdEvaluateOperator:
-    {
-      result=(double) (((double) pixel <= value) ? 0 : QuantumRange);
-      break;
-    }
-    case ThresholdBlackEvaluateOperator:
-    {
-      result=(double) (((double) pixel <= value) ? 0 : pixel);
-      break;
-    }
-    case ThresholdWhiteEvaluateOperator:
-    {
-      result=(double) (((double) pixel > value) ? QuantumRange : pixel);
-      break;
-    }
-    case UniformNoiseEvaluateOperator:
-    {
-      result=(double) GenerateDifferentialNoise(random_info,pixel,UniformNoise,
-        value);
-      break;
-    }
-    case XorEvaluateOperator:
-    {
-      result=(double) ((ssize_t) pixel ^ (ssize_t) (value+0.5));
       break;
     }
   }
@@ -762,6 +876,71 @@ static void EvaluateMedianRow(const EvaluateMedian *median,const Quantum **p,
   }
 }
 
+typedef struct _EvaluateImagesRows
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  size_t
+    number_images;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  int
+    id;
+
+  MagickEvaluateOperator
+    op;
+} EvaluateImagesRows;
+
+static void AccumulateEvaluateRows(const EvaluateImagesRows *rows,
+  const Quantum **p,PixelChannels *evaluate_pixel)
+{
+  Image
+    *const image = rows->image;
+
+  const Image
+    *const images = rows->images;
+
+  const size_t
+    number_images = rows->number_images;
+
+  RandomInfo
+    **magick_restrict const random_info = rows->random_info;
+
+  const int
+    id = rows->id;
+
+  const MagickEvaluateOperator
+    op = rows->op;
+
+  const Image
+    *next;
+
+  EvaluateRow
+    row;
+
+  ssize_t
+    j;
+
+  next=images;
+  for (j=0; j < (ssize_t) number_images; j++)
+  {
+    row.image=image;
+    row.next=next;
+    row.random_info=random_info;
+    row.id=id;
+    row.op=op;
+    row.j=j;
+    AccumulateEvaluateRow(&row,p,evaluate_pixel);
+    next=GetNextImageInList(next);
+  }
+}
+
 typedef struct _EvaluateFetch
 {
   CacheView
@@ -810,6 +989,16 @@ static void AcquireEvaluateViews(const Image *images,
   }
 }
 
+static void DestroyEvaluateViews(const size_t number_images,
+  CacheView **image_view)
+{
+  ssize_t
+    n;
+
+  for (n=0; n < (ssize_t) number_images; n++)
+    image_view[n]=DestroyCacheView(image_view[n]);
+}
+
 static MagickBooleanType AcquireDirectImageCanvas(const Image *images,
   Image **image,ExceptionInfo *exception)
 {
@@ -852,7 +1041,6 @@ MagickExport Image *EvaluateImages(const Image *images,
     number_images;
 
   ssize_t
-    n,
     y;
 
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -984,9 +1172,6 @@ MagickExport Image *EvaluateImages(const Image *images,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        const Image
-          *next;
-
         const int
           id = GetOpenMPThreadId();
 
@@ -996,8 +1181,8 @@ MagickExport Image *EvaluateImages(const Image *images,
         EvaluateFetch
           fetch;
 
-        EvaluateRow
-          row;
+        EvaluateImagesRows
+          rows;
 
         PixelChannels
           *evaluate_pixel;
@@ -1033,18 +1218,13 @@ MagickExport Image *EvaluateImages(const Image *images,
           }
         evaluate_pixel=evaluate_pixels[id];
         ClearPolynomialPixels(image,evaluate_pixel);
-        next=images;
-        for (j=0; j < (ssize_t) number_images; j++)
-        {
-          row.image=image;
-          row.next=next;
-          row.random_info=random_info;
-          row.id=id;
-          row.op=op;
-          row.j=j;
-          AccumulateEvaluateRow(&row,p,evaluate_pixel);
-          next=GetNextImageInList(next);
-        }
+        rows.image=image;
+        rows.images=images;
+        rows.number_images=number_images;
+        rows.random_info=random_info;
+        rows.id=id;
+        rows.op=op;
+        AccumulateEvaluateRows(&rows,p,evaluate_pixel);
         NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
         SetEvaluatePixels(image,evaluate_pixel,q);
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
@@ -1066,8 +1246,7 @@ MagickExport Image *EvaluateImages(const Image *images,
           }
       }
     }
-  for (n=0; n < (ssize_t) number_images; n++)
-    image_view[n]=DestroyCacheView(image_view[n]);
+  DestroyEvaluateViews(number_images,image_view);
   image_view=(CacheView **) RelinquishMagickMemory(image_view);
   evaluate_view=DestroyCacheView(evaluate_view);
   evaluate_pixels=DestroyPixelTLS(images,evaluate_pixels);

@@ -299,6 +299,16 @@ static RectangleInfo ClampChopExtent(const Image *image,
   return(extent);
 }
 
+static Image *FinishChopImage(const Image *image,Image *chop_image,
+  CacheView *image_view,const MagickBooleanType status)
+{
+  image_view=DestroyCacheView(image_view);
+  chop_image->type=image->type;
+  if (status == MagickFalse)
+    chop_image=DestroyImage(chop_image);
+  return(chop_image);
+}
+
 MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
   ExceptionInfo *exception)
 {
@@ -443,11 +453,7 @@ MagickExport Image *ChopImage(const Image *image,const RectangleInfo *chop_info,
       }
   }
   chop_view=DestroyCacheView(chop_view);
-  image_view=DestroyCacheView(image_view);
-  chop_image->type=image->type;
-  if (status == MagickFalse)
-    chop_image=DestroyImage(chop_image);
-  return(chop_image);
+  return(FinishChopImage(image,chop_image,image_view,status));
 }
 
 /*
@@ -753,6 +759,32 @@ static RectangleInfo GetCropPage(const RectangleInfo *geometry,
   return(page);
 }
 
+static MagickBooleanType CheckCropExtent(const Image *image,
+  const RectangleInfo page,ExceptionInfo *exception)
+{
+  if ((page.width == 0) || (page.height == 0))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "GeometryDoesNotContainImage","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static Image *CropOutsideCanvas(const Image *image,
+  const RectangleInfo *geometry,const RectangleInfo bounding_box,
+  ExceptionInfo *exception)
+{
+  /*
+    Crop is not within virtual canvas, return 1 pixel transparent image.
+  */
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "GeometryDoesNotContainImage","(\"%.17gx%.17g%+.20g%+.20g\") `%s'",
+    (double) geometry->width,(double) geometry->height,
+    (double) geometry->x,(double) geometry->y,image->filename);
+  return(CropOutsideImage(image,bounding_box,exception));
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -791,27 +823,14 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   bounding_box=GetCropBoundingBox(image);
   page=GetCropPage(geometry,bounding_box);
   if (IsCropOutsideImage(image,bounding_box,page) != MagickFalse)
-    {
-      /*
-        Crop is not within virtual canvas, return 1 pixel transparent image.
-      */
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "GeometryDoesNotContainImage","(\"%.17gx%.17g%+.20g%+.20g\") `%s'",
-        (double) geometry->width,(double) geometry->height,
-        (double) geometry->x,(double) geometry->y,image->filename);
-      return(CropOutsideImage(image,bounding_box,exception));
-    }
+    return(CropOutsideCanvas(image,geometry,bounding_box,exception));
   ClipCropOffset(&page.x,&page.width,bounding_box.x);
   ClipCropOffset(&page.y,&page.height,bounding_box.y);
   page=ClampCropExtent(image,geometry,page);
   bounding_box.x+=page.x;
   bounding_box.y+=page.y;
-  if ((page.width == 0) || (page.height == 0))
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "GeometryDoesNotContainImage","`%s'",image->filename);
-      return((Image *) NULL);
-    }
+  if (CheckCropExtent(image,page,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     Initialize crop image attributes.
   */
@@ -1106,6 +1125,17 @@ static void SetFlipPage(Image *flip_image,RectangleInfo page)
   flip_image->page=page;
 }
 
+static Image *FinishFlipImage(const Image *image,Image *flip_image,
+  const MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (status != MagickFalse)
+    AppendTransformProperty(image,flip_image,"flip %.17gx%.17g",
+      exception);
+  if (status == MagickFalse)
+    flip_image=DestroyImage(flip_image);
+  return(flip_image);
+}
+
 MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
 {
 #define FlipImageTag  "Flip/Image"
@@ -1189,12 +1219,7 @@ MagickExport Image *FlipImage(const Image *image,ExceptionInfo *exception)
   image_view=DestroyCacheView(image_view);
   flip_image->type=image->type;
   SetFlipPage(flip_image,page);
-  if (status != MagickFalse)
-    AppendTransformProperty(image,flip_image,"flip %.17gx%.17g",
-      exception);
-  if (status == MagickFalse)
-    flip_image=DestroyImage(flip_image);
-  return(flip_image);
+  return(FinishFlipImage(image,flip_image,status,exception));
 }
 
 /*
@@ -1794,6 +1819,28 @@ static void SetSpliceBackground(Image *splice_image,
   (void) SetImageBackgroundColor(splice_image,exception);
 }
 
+static MagickBooleanType PrepareSpliceImage(Image *splice_image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(splice_image,DirectClass,exception) == MagickFalse)
+    {
+      splice_image=DestroyImage(splice_image);
+      return(MagickFalse);
+    }
+  SetSpliceBackground(splice_image,exception);
+  return(MagickTrue);
+}
+
+static Image *FinishSpliceImage(Image *splice_image,CacheView *splice_view,
+  CacheView *image_view,const MagickBooleanType status)
+{
+  splice_view=DestroyCacheView(splice_view);
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    splice_image=DestroyImage(splice_image);
+  return(splice_image);
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -1834,12 +1881,8 @@ MagickExport Image *SpliceImage(const Image *image,
     image->rows+splice_geometry.height,MagickTrue,exception);
   if (splice_image == (Image *) NULL)
     return((Image *) NULL);
-  if (SetImageStorageClass(splice_image,DirectClass,exception) == MagickFalse)
-    {
-      splice_image=DestroyImage(splice_image);
-      return((Image *) NULL);
-    }
-  SetSpliceBackground(splice_image,exception);
+  if (PrepareSpliceImage(splice_image,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     Respect image geometry.
   */
@@ -1948,11 +1991,7 @@ MagickExport Image *SpliceImage(const Image *image,
           status=MagickFalse;
       }
   }
-  splice_view=DestroyCacheView(splice_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    splice_image=DestroyImage(splice_image);
-  return(splice_image);
+  return(FinishSpliceImage(splice_image,splice_view,image_view,status));
 }
 
 /*
@@ -2231,6 +2270,49 @@ static void SetTransversePage(Image *transverse_image)
   transverse_image->page=page;
 }
 
+static void TransversePixelRow(const Image *image,
+  const Image *transverse_image,const Quantum *p,Quantum *q)
+{
+  ssize_t
+    x;
+
+  q+=(ptrdiff_t) GetPixelChannels(transverse_image)*image->columns;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    q-=GetPixelChannels(transverse_image);
+    CopyPixelChannelsTo(image,transverse_image,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static Image *FinishTransverseImage(const Image *image,
+  Image *transverse_image,const MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  transverse_image->type=image->type;
+  SetTransversePage(transverse_image);
+  if (status != MagickFalse)
+    AppendTransformProperty(image,transverse_image,"transverse %.17gx%.17g",
+      exception);
+  if (status == MagickFalse)
+    transverse_image=DestroyImage(transverse_image);
+  return(transverse_image);
+}
+
+static MagickBooleanType SyncTransverseRow(CacheView *transverse_view,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status,
+    sync;
+
+  status=MagickTrue;
+  sync=SyncCacheViewAuthenticPixels(transverse_view,exception);
+  if (sync == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 {
 #define TransverseImageTag  "Transverse/Image"
@@ -2274,17 +2356,11 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MagickBooleanType
-      sync;
-
     const Quantum
       *magick_restrict p;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -2296,15 +2372,8 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
         status=MagickFalse;
         continue;
       }
-    q+=(ptrdiff_t) GetPixelChannels(transverse_image)*image->columns;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      q-=GetPixelChannels(transverse_image);
-      CopyPixelChannelsTo(image,transverse_image,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    sync=SyncCacheViewAuthenticPixels(transverse_view,exception);
-    if (sync == MagickFalse)
+    TransversePixelRow(image,transverse_image,p,q);
+    if (SyncTransverseRow(transverse_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
@@ -2322,14 +2391,7 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
   }
   transverse_view=DestroyCacheView(transverse_view);
   image_view=DestroyCacheView(image_view);
-  transverse_image->type=image->type;
-  SetTransversePage(transverse_image);
-  if (status != MagickFalse)
-    AppendTransformProperty(image,transverse_image,"transverse %.17gx%.17g",
-      exception);
-  if (status == MagickFalse)
-    transverse_image=DestroyImage(transverse_image);
-  return(transverse_image);
+  return(FinishTransverseImage(image,transverse_image,status,exception));
 }
 
 /*

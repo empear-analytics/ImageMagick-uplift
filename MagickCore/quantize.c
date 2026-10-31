@@ -666,6 +666,33 @@ static inline MagickBooleanType IsColorspaceRestoreNeeded(
     MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType FinishAssignImageColors(Image *image,
+  QCubeInfo *cube_info,const ColorspaceType colorspace,
+  ExceptionInfo *exception)
+{
+  if (cube_info->quantize_info->measure_error != MagickFalse)
+    (void) GetImageQuantizeError(image,exception);
+  if (IsMonochromeQuantize(cube_info) != MagickFalse)
+    SetMonochromeColormap(image);
+  (void) SyncImage(image,exception);
+  if (IsColorspaceRestoreNeeded(cube_info,colorspace) != MagickFalse)
+    (void) TransformImageColorspace(image,colorspace,exception);
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireAssignImageColormap(Image *image,
+  QCubeInfo *cube_info,ExceptionInfo *exception)
+{
+  if (cube_info->quantize_info->colorspace != UndefinedColorspace)
+    (void) TransformImageColorspace(image,cube_info->quantize_info->colorspace,
+      exception);
+  cube_info->transparent_pixels=0;
+  cube_info->transparent_index=(-1);
+  if (SetImageColormap(image,cube_info,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -679,12 +706,7 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
     Allocate image colormap.
   */
   colorspace=image->colorspace;
-  if (cube_info->quantize_info->colorspace != UndefinedColorspace)
-    (void) TransformImageColorspace(image,cube_info->quantize_info->colorspace,
-      exception);
-  cube_info->transparent_pixels=0;
-  cube_info->transparent_index=(-1);
-  if (SetImageColormap(image,cube_info,exception) == MagickFalse)
+  if (AcquireAssignImageColormap(image,cube_info,exception) == MagickFalse)
     return(MagickFalse);
   /*
     Create a reduced color image.
@@ -727,14 +749,7 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
       }
       image_view=DestroyCacheView(image_view);
     }
-  if (cube_info->quantize_info->measure_error != MagickFalse)
-    (void) GetImageQuantizeError(image,exception);
-  if (IsMonochromeQuantize(cube_info) != MagickFalse)
-    SetMonochromeColormap(image);
-  (void) SyncImage(image,exception);
-  if (IsColorspaceRestoreNeeded(cube_info,colorspace) != MagickFalse)
-    (void) TransformImageColorspace(image,colorspace,exception);
-  return(MagickTrue);
+  return(FinishAssignImageColors(image,cube_info,colorspace,exception));
 }
 
 /*
@@ -3400,6 +3415,37 @@ static void ReportKmeansProgress(Image *image,const ssize_t n,
     }
 }
 
+static void LogKmeansDistortion(const Image *image,const ssize_t n,
+  const double distortion,const double previous_tolerance)
+{
+  if (image->debug != MagickFalse)
+    (void) LogMagickEvent(ImageEvent,GetMagickModule(),
+      "distortion[%.17g]: %*g %*g\n",(double) n,GetMagickPrecision(),
+      distortion,GetMagickPrecision(),fabs(distortion-previous_tolerance));
+}
+
+static void ReleaseKmeansClusters(Image *image,
+  const MagickBooleanType verbose,KmeansInfo **kmeans_pixels,
+  ExceptionInfo *exception)
+{
+  if (verbose != MagickFalse)
+    ListKmeansColors(image);
+  SetKmeansDominantColor(image,exception);
+  kmeans_pixels=DestroyKmeansTLS(kmeans_pixels);
+}
+
+static MagickBooleanType FinishKmeansImage(Image *image,
+  const size_t max_iterations,const MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    (void) SetImageProgress(image,KmeansImageTag,(MagickOffsetType)
+      max_iterations-1,max_iterations);
+  if (status == MagickFalse)
+    return(status);
+  return(SyncImage(image,exception));
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -3508,26 +3554,15 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
       Calculate the new means (centroids) of the pixels in the new clusters.
     */
     distortion=UpdateKmeansCentroids(image,kmeans_pixels);
-    if (image->debug != MagickFalse)
-      (void) LogMagickEvent(ImageEvent,GetMagickModule(),
-        "distortion[%.17g]: %*g %*g\n",(double) n,GetMagickPrecision(),
-        distortion,GetMagickPrecision(),fabs(distortion-previous_tolerance));
+    LogKmeansDistortion(image,n,distortion,previous_tolerance);
     if (fabs(distortion-previous_tolerance) <= tolerance)
       break;
     previous_tolerance=distortion;
     ReportKmeansProgress(image,n,max_iterations,&status);
   }
   image_view=DestroyCacheView(image_view);
-  if (verbose != MagickFalse)
-    ListKmeansColors(image);
-  SetKmeansDominantColor(image,exception);
-  kmeans_pixels=DestroyKmeansTLS(kmeans_pixels);
-  if (image->progress_monitor != (MagickProgressMonitor) NULL)
-    (void) SetImageProgress(image,KmeansImageTag,(MagickOffsetType)
-      max_iterations-1,max_iterations);
-  if (status == MagickFalse)
-    return(status);
-  return(SyncImage(image,exception));
+  ReleaseKmeansClusters(image,verbose,kmeans_pixels,exception);
+  return(FinishKmeansImage(image,max_iterations,status,exception));
 }
 
 
