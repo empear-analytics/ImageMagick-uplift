@@ -2151,6 +2151,70 @@ static double GetRepeatOffset(const double offset,const double extent)
   return(repeat);
 }
 
+typedef struct _RepeatGradientInfo
+{
+  const GradientInfo
+    *gradient;
+
+  double
+    length,
+    offset,
+    repeat;
+
+  MagickBooleanType
+    antialias;
+} RepeatGradientInfo;
+
+static PixelInfo GetRepeatGradientColor(const RepeatGradientInfo *repeat_info,
+  PixelInfo composite)
+{
+  const GradientInfo
+    *gradient = repeat_info->gradient;
+
+  const double
+    length = repeat_info->length,
+    offset = repeat_info->offset,
+    repeat = repeat_info->repeat;
+
+  const MagickBooleanType
+    antialias = repeat_info->antialias;
+
+  double
+    alpha;
+
+  ssize_t
+    i,
+    j;
+
+  for (i=0; i < (ssize_t) gradient->number_stops; i++)
+    if (offset < gradient->stops[i].offset)
+      break;
+  if (i == 0)
+    composite=gradient->stops[0].color;
+  else
+    if (i == (ssize_t) gradient->number_stops)
+      composite=gradient->stops[gradient->number_stops-1].color;
+    else
+      {
+        j=i;
+        i--;
+        alpha=(offset-gradient->stops[i].offset)/
+          (gradient->stops[j].offset-gradient->stops[i].offset);
+        if (antialias != MagickFalse)
+          {
+            if (gradient->type == LinearGradient)
+              alpha=length-repeat;
+            else
+              alpha=gradient->radius-repeat;
+            i=0;
+            j=(ssize_t) gradient->number_stops-1L;
+          }
+        CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
+          &gradient->stops[j].color,alpha,&composite);
+      }
+  return(composite);
+}
+
 MagickExport MagickBooleanType DrawGradientImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -2211,7 +2275,6 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
   for (y=bounding_box.y; y < (ssize_t) height; y++)
   {
     double
-      alpha,
       offset;
 
     PixelInfo
@@ -2225,8 +2288,6 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
       width;
 
     ssize_t
-      i,
-      j,
       x;
 
     if (status == MagickFalse)
@@ -2288,6 +2349,9 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
           MagickBooleanType
             antialias;
 
+          RepeatGradientInfo
+            repeat_info;
+
           antialias=MagickFalse;
           repeat=0.0;
           if ((x != CastDoubleToSsizeT(ceil(gradient_vector->x1-0.5))) ||
@@ -2309,32 +2373,12 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
                   offset=repeat*MagickSafeReciprocal(gradient->radius);
                 }
             }
-          for (i=0; i < (ssize_t) gradient->number_stops; i++)
-            if (offset < gradient->stops[i].offset)
-              break;
-          if (i == 0)
-            composite=gradient->stops[0].color;
-          else
-            if (i == (ssize_t) gradient->number_stops)
-              composite=gradient->stops[gradient->number_stops-1].color;
-            else
-              {
-                j=i;
-                i--;
-                alpha=(offset-gradient->stops[i].offset)/
-                  (gradient->stops[j].offset-gradient->stops[i].offset);
-                if (antialias != MagickFalse)
-                  {
-                    if (gradient->type == LinearGradient)
-                      alpha=length-repeat;
-                    else
-                      alpha=gradient->radius-repeat;
-                    i=0;
-                    j=(ssize_t) gradient->number_stops-1L;
-                  }
-                CompositePixelInfoBlend(&gradient->stops[i].color,1.0-alpha,
-                  &gradient->stops[j].color,alpha,&composite);
-              }
+          repeat_info.gradient=gradient;
+          repeat_info.length=length;
+          repeat_info.offset=offset;
+          repeat_info.repeat=repeat;
+          repeat_info.antialias=antialias;
+          composite=GetRepeatGradientColor(&repeat_info,composite);
           break;
         }
       }
