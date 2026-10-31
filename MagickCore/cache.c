@@ -3227,6 +3227,30 @@ static ssize_t GetVirtualPixelRows(const VirtualPixelRows *virtual_rows,
   return(v);
 }
 
+static const Quantum *ReadCacheRegionPixels(
+  CacheInfo *magick_restrict cache_info,NexusInfo *magick_restrict nexus_info,
+  Quantum *magick_restrict pixels,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  /*
+    Pixel request is inside cache extents.
+  */
+  if (nexus_info->authentic_pixel_cache != MagickFalse)
+    return(pixels);
+  status=ReadPixelCachePixels(cache_info,nexus_info,exception);
+  if (status == MagickFalse)
+    return((const Quantum *) NULL);
+  if (cache_info->metacontent_extent != 0)
+    {
+      status=ReadPixelCacheMetacontent(cache_info,nexus_info,exception);
+      if (status == MagickFalse)
+        return((const Quantum *) NULL);
+    }
+  return(pixels);
+}
+
 MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   const VirtualPixelMethod virtual_pixel_method,const ssize_t x,const ssize_t y,
   const size_t columns,const size_t rows,NexusInfo *nexus_info,
@@ -3293,26 +3317,7 @@ MagickPrivate const Quantum *GetVirtualPixelCacheNexus(const Image *image,
   number_pixels=(MagickSizeType) cache_info->columns*cache_info->rows;
   if ((offset >= 0) && (((MagickSizeType) offset+length) < number_pixels))
     if (IsRegionInsideCache(cache_info,x,y,columns,rows) != MagickFalse)
-      {
-        MagickBooleanType
-          status;
-
-        /*
-          Pixel request is inside cache extents.
-        */
-        if (nexus_info->authentic_pixel_cache != MagickFalse)
-          return(pixels);
-        status=ReadPixelCachePixels(cache_info,nexus_info,exception);
-        if (status == MagickFalse)
-          return((const Quantum *) NULL);
-        if (cache_info->metacontent_extent != 0)
-          {
-            status=ReadPixelCacheMetacontent(cache_info,nexus_info,exception);
-            if (status == MagickFalse)
-              return((const Quantum *) NULL);
-          }
-        return(pixels);
-      }
+      return(ReadCacheRegionPixels(cache_info,nexus_info,pixels,exception));
   /*
     Pixel request is outside cache extents.
   */
