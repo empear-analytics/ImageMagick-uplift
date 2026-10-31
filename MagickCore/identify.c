@@ -1546,6 +1546,26 @@ static void PrintCMYKOrOtherStatistics(const Image *image,
   }
 }
 
+static void PrintGrayOrChannelsFeatures(FILE *file,const Image *image,
+  const ColorspaceType colorspace,const ChannelFeatures *channel_features)
+{
+  switch (colorspace)
+  {
+    case GRAYColorspace:
+    {
+      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelFeatures(file,GrayPixelChannel,"Gray",
+          channel_features);
+      break;
+    }
+    default:
+    {
+      PrintChannelsFeatures(file,image,channel_features);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1879,16 +1899,9 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
               channel_features);
           break;
         }
-        case GRAYColorspace:
-        {
-          if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelFeatures(file,GrayPixelChannel,"Gray",
-              channel_features);
-          break;
-        }
         default:
         {
-          PrintChannelsFeatures(file,image,channel_features);
+          PrintGrayOrChannelsFeatures(file,image,colorspace,channel_features);
           break;
         }
       }
