@@ -1884,6 +1884,22 @@ static void CountAdjacentObjectsInRow(const CCAdjacentRow *adjacent_row,
   }
 }
 
+static void SortObjects(const Image *image,const Image *component_image,
+  CCObjectInfo *object)
+{
+  ssize_t
+    i,
+    key,
+    order;
+
+  order=GetObjectSortOrder(image);
+  key=GetObjectSortKey(image);
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+     object[i].key=order*key;
+  qsort((void *) object,component_image->colors,sizeof(*object),
+    CCObjectInfoCompare);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2429,10 +2445,6 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       CCObjectStatistics
         object_statistics;
 
-      ssize_t
-        key,
-        order;
-
       /*
         Report statistics on each unique object.
       */
@@ -2444,12 +2456,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       status=AccumulateObjectStatistics(object,&object_statistics,status);
       NormalizeObjectStatistics(component_image,object);
       component_view=DestroyCacheView(component_view);
-      order=GetObjectSortOrder(image);
-      key=GetObjectSortKey(image);
-      for (i=0; i < (ssize_t) component_image->colors; i++)
-         object[i].key=order*key;
-      qsort((void *) object,component_image->colors,sizeof(*object),
-        CCObjectInfoCompare);
+      SortObjects(image,component_image,object);
       if (objects == (CCObjectInfo **) NULL)
         {
           PrintObjectsHeader(image,metrics,n);
