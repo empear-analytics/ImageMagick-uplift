@@ -2883,14 +2883,8 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   if (blur_image != (Image *) NULL)
     return(blur_image);
 #endif
-  blur_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (blur_image == (Image *) NULL)
+  if (CloneDirectImage(image,&blur_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(blur_image,DirectClass,exception) == MagickFalse)
-    {
-      blur_image=DestroyImage(blur_image);
-      return((Image *) NULL);
-    }
   blur_center.x=(double) (image->columns-1)/2.0;
   blur_center.y=(double) (image->rows-1)/2.0;
   blur_radius=hypot(blur_center.x,blur_center.y);
