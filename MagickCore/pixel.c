@@ -1201,6 +1201,43 @@ static MagickBooleanType InterpolateAveragePixelChannel(
   return(status);
 }
 
+static void InterpolateGridPixelChannel(const ChannelInterpolation grid,
+  const PixelInterpolateMethod interpolate,double *pixel,
+  MagickBooleanType *status)
+{
+  switch (interpolate)
+  {
+    case BilinearInterpolatePixel:
+    default:
+    {
+      (*status)=InterpolateBilinearPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+    case BlendInterpolatePixel:
+    {
+      (*status)=InterpolateBlendPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+    case CatromInterpolatePixel:
+    {
+      (*status)=InterpolateCubicPixelChannel(&grid,CatromWeights,pixel,
+        (*status));
+      break;
+    }
+    case MeshInterpolatePixel:
+    {
+      (*status)=InterpolateMeshPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+    case SplineInterpolatePixel:
+    {
+      (*status)=InterpolateCubicPixelChannel(&grid,SplineWeights,pixel,
+        (*status));
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannel(
   const Image *magick_restrict image,const CacheView_ *image_view,
   const PixelChannel channel,const PixelInterpolateMethod method,const double x,
@@ -1256,20 +1293,9 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
       status=InterpolateAveragePixelChannel(&grid,interpolate,pixel,status);
       break;
     }
-    case BilinearInterpolatePixel:
     default:
     {
-      status=InterpolateBilinearPixelChannel(&grid,pixel,status);
-      break;
-    }
-    case BlendInterpolatePixel:
-    {
-      status=InterpolateBlendPixelChannel(&grid,pixel,status);
-      break;
-    }
-    case CatromInterpolatePixel:
-    {
-      status=InterpolateCubicPixelChannel(&grid,CatromWeights,pixel,status);
+      InterpolateGridPixelChannel(grid,interpolate,pixel,&status);
       break;
     }
     case IntegerInterpolatePixel:
@@ -1294,16 +1320,6 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
           break;
         }
       *pixel=(double) GetPixelChannel(image,channel,p);
-      break;
-    }
-    case MeshInterpolatePixel:
-    {
-      status=InterpolateMeshPixelChannel(&grid,pixel,status);
-      break;
-    }
-    case SplineInterpolatePixel:
-    {
-      status=InterpolateCubicPixelChannel(&grid,SplineWeights,pixel,status);
       break;
     }
   }
