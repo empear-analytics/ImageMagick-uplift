@@ -335,6 +335,21 @@ static void AdaptiveThresholdRow(const AdaptiveThresholdInfo *info,
   }
 }
 
+static MagickBooleanType SetThresholdStorageClass(Image *threshold_image,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=SetImageStorageClass(threshold_image,DirectClass,exception);
+  if (status == MagickFalse)
+    {
+      threshold_image=DestroyImage(threshold_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *AdaptiveThresholdImage(const Image *image,
   const size_t width,const size_t height,const double bias,
   ExceptionInfo *exception)
@@ -374,12 +389,8 @@ MagickExport Image *AdaptiveThresholdImage(const Image *image,
     return((Image *) NULL);
   if ((width == 0) || (height == 0))
     return(threshold_image);
-  status=SetImageStorageClass(threshold_image,DirectClass,exception);
-  if (status == MagickFalse)
-    {
-      threshold_image=DestroyImage(threshold_image);
-      return((Image *) NULL);
-    }
+  if (SetThresholdStorageClass(threshold_image,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     Threshold image.
   */
