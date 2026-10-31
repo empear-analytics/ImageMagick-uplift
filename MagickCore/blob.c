@@ -627,6 +627,19 @@ static inline MagickBooleanType IsWrittenBlobFailure(const int status,
     (blob_info->mode == AppendBinaryBlobMode))) ? MagickTrue : MagickFalse);
 }
 
+static void CloseBlobFile(BlobInfo *blob_info)
+{
+  int
+    status;
+
+  if (blob_info->file_info.file != (FILE *) NULL)
+    {
+      status=fclose(blob_info->file_info.file);
+      if (status != 0)
+        ThrowBlobException(blob_info);
+    }
+}
+
 static void SynchronizeBlobFile(BlobInfo *blob_info,int status)
 {
   if (blob_info->synchronize != MagickFalse)
@@ -724,12 +737,7 @@ MagickExport MagickBooleanType CloseBlob(Image *image)
       break;
     case FileStream:
     {
-      if (blob_info->file_info.file != (FILE *) NULL)
-        {
-          status=fclose(blob_info->file_info.file);
-          if (status != 0)
-            ThrowBlobException(blob_info);
-        }
+      CloseBlobFile(blob_info);
       break;
     }
     case PipeStream:
@@ -761,12 +769,7 @@ MagickExport MagickBooleanType CloseBlob(Image *image)
       break;
     case BlobStream:
     {
-      if (blob_info->file_info.file != (FILE *) NULL)
-        {
-          status=fclose(blob_info->file_info.file);
-          if (status != 0)
-            ThrowBlobException(blob_info);
-        }
+      CloseBlobFile(blob_info);
       break;
     }
     case CustomStream:
