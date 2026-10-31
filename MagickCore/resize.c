@@ -1933,6 +1933,13 @@ static inline MagickBooleanType IsResizeSizeUnchanged(const Image *image,
     MagickTrue : MagickFalse);
 }
 
+static inline MagickBooleanType IsChannelTraitUndefined(
+  const PixelTrait traits,const PixelTrait resize_traits)
+{
+  return(((traits == UndefinedPixelTrait) ||
+    (resize_traits == UndefinedPixelTrait)) ? MagickTrue : MagickFalse);
+}
+
 static MagickBooleanType SetDirectClassOrDestroy(Image *resize_image,
   ExceptionInfo *exception)
 {
@@ -2032,8 +2039,7 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
         channel=GetPixelChannelChannel(image,i);
         traits=GetPixelChannelTraits(image,channel);
         resize_traits=GetPixelChannelTraits(resize_image,channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (resize_traits == UndefinedPixelTrait))
+        if (IsChannelTraitUndefined(traits,resize_traits) != MagickFalse)
           continue;
         offset.x=((double) x+0.5)*scale.x-0.5;
         status=InterpolatePixelChannels(image,image_view,resize_image,method,
@@ -2120,8 +2126,7 @@ static void SetLiquidRescalePixelChannels(const Image *image,
     channel=GetPixelChannelChannel(image,i);
     traits=GetPixelChannelTraits(image,channel);
     rescale_traits=GetPixelChannelTraits(rescale_image,channel);
-    if ((traits == UndefinedPixelTrait) ||
-        (rescale_traits == UndefinedPixelTrait))
+    if (IsChannelTraitUndefined(traits,rescale_traits) != MagickFalse)
       continue;
     SetPixelChannel(rescale_image,channel,ClampToQuantum(QuantumRange*
       packet[i]),p);
