@@ -136,6 +136,28 @@
 %
 */
 
+static double ApplySinusoidFunction(Quantum pixel,
+  const size_t number_parameters,const double *parameters)
+{
+  double
+    amplitude,
+    bias,
+    frequency,
+    phase,
+    result;
+
+  /*
+    Sinusoid: frequency, phase, amplitude, bias.
+  */
+  frequency=(number_parameters >= 1) ? parameters[0] : 1.0;
+  phase=(number_parameters >= 2) ? parameters[1] : 0.0;
+  amplitude=(number_parameters >= 3) ? parameters[2] : 0.5;
+  bias=(number_parameters >= 4) ? parameters[3] : 0.5;
+  result=(double) QuantumRange*(amplitude*sin((double) (2.0*
+    MagickPI*(frequency*QuantumScale*(double) pixel+phase/360.0)))+bias);
+  return(result);
+}
+
 static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
   const size_t number_parameters,const double *parameters,
   ExceptionInfo *exception)
@@ -164,21 +186,7 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
     }
     case SinusoidFunction:
     {
-      double
-        amplitude,
-        bias,
-        frequency,
-        phase;
-
-      /*
-        Sinusoid: frequency, phase, amplitude, bias.
-      */
-      frequency=(number_parameters >= 1) ? parameters[0] : 1.0;
-      phase=(number_parameters >= 2) ? parameters[1] : 0.0;
-      amplitude=(number_parameters >= 3) ? parameters[2] : 0.5;
-      bias=(number_parameters >= 4) ? parameters[3] : 0.5;
-      result=(double) QuantumRange*(amplitude*sin((double) (2.0*
-        MagickPI*(frequency*QuantumScale*(double) pixel+phase/360.0)))+bias);
+      result=ApplySinusoidFunction(pixel,number_parameters,parameters);
       break;
     }
     case ArcsinFunction:
