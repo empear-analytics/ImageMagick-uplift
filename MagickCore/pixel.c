@@ -2399,6 +2399,18 @@ static MagickBooleanType InterpolateAveragePixelInfo(
   return(status);
 }
 
+static void SetBlendedPixelInfo(double *alpha,const PixelInfo *pixels,
+  double gamma,PixelInfo *pixel)
+{
+  gamma=1.0/gamma;
+  alpha[0]=MagickSafeReciprocal(alpha[0]);
+  pixel->red=alpha[0]*pixels[0].red;
+  pixel->green=alpha[0]*pixels[0].green;  /* divide by sum of alpha */
+  pixel->blue=alpha[0]*pixels[0].blue;
+  pixel->black=alpha[0]*pixels[0].black;
+  pixel->alpha=gamma*pixels[0].alpha;   /* divide by number of pixels */
+}
+
 MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
   const CacheView_ *image_view,const PixelInterpolateMethod method,
   const double x,const double y,PixelInfo *pixel,ExceptionInfo *exception)
@@ -2515,13 +2527,7 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
             pixels[0].black+=pixels[1].black;
             pixels[0].alpha+=pixels[1].alpha;
           }
-      gamma=1.0/gamma;
-      alpha[0]=MagickSafeReciprocal(alpha[0]);
-      pixel->red=alpha[0]*pixels[0].red;
-      pixel->green=alpha[0]*pixels[0].green;  /* divide by sum of alpha */
-      pixel->blue=alpha[0]*pixels[0].blue;
-      pixel->black=alpha[0]*pixels[0].black;
-      pixel->alpha=gamma*pixels[0].alpha;   /* divide by number of pixels */
+      SetBlendedPixelInfo(alpha,pixels,gamma,pixel);
       break;
     }
     case CatromInterpolatePixel:
