@@ -36,6 +36,7 @@ every step that read a recipe closely, before pushing.
 | `shear.c` | 6.47 → 7.62 |
 | `montage.c` | 6.61 → 7.36 |
 | `resample.c` | 7.30 → 7.42 |
+| `attribute-depth.c` | 7.03 → 7.33 |
 | `attribute.c` | 6.58 → 7.11 |
 | `resize.c` | 6.50 → 7.08 |
 | `layer.c` | 6.51 → 7.07 |
@@ -45,7 +46,7 @@ every step that read a recipe closely, before pushing.
 | `channel.c` | 6.93 (no legal step; see *For the owner*) |
 | `effect.c` | 3.52 (no legal step; saturated, see below) |
 
-256 commits: 208 refactor steps, 33 playbook commits, 15 docs commits (plateau rows and
+262 commits: 211 refactor steps, 34 playbook commits, 17 docs commits (plateau rows and
 this report). 34 file passes; six files reached 10.0 and eight more passed 9. Every refactor commit ran the oracle on its function's cases (0 diverged) and
 passed the pre-commit gate; the whole catalogue ran after each file: 15,900 cases,
 0 diverged.
@@ -121,6 +122,10 @@ passed the pre-commit gate; the whole catalogue ran after each file: 15,900 case
 - **Guard-only steps:** `resize.c`'s `LiquidRescaleImage` (seven E/P steps, +0.38) is
   compiled but reached by no case, so those steps rest on the guard and reading, as
   AGENTS.md allows for E and P. A `-liquid-rescale` case would make them oracle-verified.
+- **Code no oracle build compiles:** `attribute-depth.c`'s `GetImageDepth` and
+  `SetImageDepth` keep most of their findings inside `#if !defined(MAGICKCORE_HDRI_SUPPORT)`
+  depth-map branches; the oracle builds are HDRI, so that code cannot be refactored or
+  verified. A non-HDRI (Q16 without HDRI) oracle build would open it, and others like it.
 - **Readings worth a look:** Recipe Q for building a tile list through
   `AppendImageToList` (`transform-tiles.c`); a one-line `const` struct initialiser used to
   keep `SampleImage` at 70 lines (`resize-sample.c`, a form used 52 times before).
