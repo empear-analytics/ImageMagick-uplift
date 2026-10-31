@@ -2160,6 +2160,43 @@ static MagickBooleanType DiscardOversizedProfile(StringInfo *profile,
   return(MagickTrue);
 }
 
+typedef struct _StoredProfileInfo
+{
+  Image
+    *image;
+
+  StringInfo
+    *profile;
+
+  MagickBooleanType
+    recursive;
+
+  ExceptionInfo
+    *exception;
+} StoredProfileInfo;
+
+static void SyncStoredProfile(const StoredProfileInfo *stored,
+  const char *key)
+{
+  Image
+    *const image = stored->image;
+
+  StringInfo
+    *const profile = stored->profile;
+
+  const MagickBooleanType
+    recursive = stored->recursive;
+
+  ExceptionInfo
+    *const exception = stored->exception;
+
+  if (LocaleCompare(key,"8bim") == 0)
+    GetProfilesFromResourceBlock(image,profile,exception);
+  else
+    if (recursive == MagickFalse)
+      WriteTo8BimProfile(image,key,profile);
+}
+
 static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
   StringInfo *profile,const MagickBooleanType recursive,
   ExceptionInfo *exception)
@@ -2208,11 +2245,14 @@ static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
     profile=DestroyStringInfo(profile);
   else
     {
-      if (LocaleCompare(key,"8bim") == 0)
-        GetProfilesFromResourceBlock(image,profile,exception);
-      else
-        if (recursive == MagickFalse)
-          WriteTo8BimProfile(image,key,profile);
+      StoredProfileInfo
+        stored;
+
+      stored.image=image;
+      stored.profile=profile;
+      stored.recursive=recursive;
+      stored.exception=exception;
+      SyncStoredProfile(&stored,key);
     }
   return(status);
 }
