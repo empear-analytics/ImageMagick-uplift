@@ -3010,6 +3010,40 @@ static MagickBooleanType ExportShortPixel(const Image *image,
   return(ExportShortMapPixels(&loop,q));
 }
 
+static MagickBooleanType ExportMapQuantumOPR(const char *map,const ssize_t i,
+  QuantumType *quantum_map,ExceptionInfo *exception)
+{
+  switch (map[i])
+  {
+    case 'o':
+    case 'O':
+    {
+      quantum_map[i]=OpacityQuantum;
+      break;
+    }
+    case 'P':
+    case 'p':
+    {
+      quantum_map[i]=UndefinedQuantum;
+      break;
+    }
+    case 'R':
+    case 'r':
+    {
+      quantum_map[i]=RedQuantum;
+      break;
+    }
+    default:
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",map);
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ExportImagePixels(const Image *image,
   const ssize_t x,const ssize_t y,const size_t width,const size_t height,
   const char *map,const StorageType type,void *pixels,ExceptionInfo *exception)
@@ -3104,24 +3138,6 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
           "ColorSeparatedImageRequired","`%s'",map);
         return(MagickFalse);
       }
-      case 'o':
-      case 'O':
-      {
-        quantum_map[i]=OpacityQuantum;
-        break;
-      }
-      case 'P':
-      case 'p':
-      {
-        quantum_map[i]=UndefinedQuantum;
-        break;
-      }
-      case 'R':
-      case 'r':
-      {
-        quantum_map[i]=RedQuantum;
-        break;
-      }
       case 'Y':
       case 'y':
       {
@@ -3135,10 +3151,9 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
       }
       default:
       {
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "UnrecognizedPixelMap","`%s'",map);
-        return(MagickFalse);
+        if (ExportMapQuantumOPR(map,i,quantum_map,exception) == MagickFalse)
+          return(MagickFalse);
+        break;
       }
     }
   }
