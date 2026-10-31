@@ -7765,6 +7765,27 @@ static void ImportIndexFamilyQuantum(const Image *image,
   }
 }
 
+static void SwapCbYCrPixels(const Image *image,CacheView *image_view,
+  const MagickSizeType number_pixels,ssize_t *x)
+{
+  Quantum
+    quantum;
+
+  Quantum
+    *magick_restrict q;
+
+  q=GetAuthenticPixelQueue(image);
+  if (image_view != (CacheView *) NULL)
+    q=GetCacheViewAuthenticPixelQueue(image_view);
+  for ((*x)=0; (*x) < (ssize_t) number_pixels; (*x)++)
+  {
+    quantum=GetPixelRed(image,q);
+    SetPixelRed(image,GetPixelGreen(image,q),q);
+    SetPixelGreen(image,quantum,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport size_t ImportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,const unsigned char *magick_restrict pixels,
@@ -7831,21 +7852,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     }
   }
   if (IsCbYCrQuantumType(quantum_type) != MagickFalse)
-    {
-      Quantum
-        quantum;
-
-      q=GetAuthenticPixelQueue(image);
-      if (image_view != (CacheView *) NULL)
-        q=GetCacheViewAuthenticPixelQueue(image_view);
-      for (x=0; x < (ssize_t) number_pixels; x++)
-      {
-        quantum=GetPixelRed(image,q);
-        SetPixelRed(image,GetPixelGreen(image,q),q);
-        SetPixelGreen(image,quantum,q);
-        q+=(ptrdiff_t) GetPixelChannels(image);
-      }
-    }
+    SwapCbYCrPixels(image,image_view,number_pixels,&x);
   if (quantum_info->alpha_type == AssociatedQuantumAlpha)
     DisassociateQuantumAlpha(image,image_view,number_pixels);
   return(extent);
