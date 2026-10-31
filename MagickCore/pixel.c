@@ -1151,6 +1151,56 @@ static MagickBooleanType InterpolateBilinearPixelChannel(
   return(status);
 }
 
+static MagickBooleanType InterpolateAveragePixelChannel(
+  const ChannelInterpolation *grid,const PixelInterpolateMethod interpolate,
+  double *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  double
+    alpha[16],
+    gamma,
+    pixels[16];
+
+  ssize_t
+    count,
+    i,
+    x_offset = grid->x_offset,
+    y_offset = grid->y_offset;
+
+  count=2;  /* size of the area to average - default nearest 4 */
+  if (interpolate == Average9InterpolatePixel)
+    {
+      count=3;
+      x_offset=CastDoubleToSsizeT(floor(grid->x+0.5)-1.0);
+      y_offset=CastDoubleToSsizeT(floor(grid->y+0.5)-1.0);
+    }
+  else
+    if (interpolate == Average16InterpolatePixel)
+      {
+        count=4;
+        x_offset--;
+        y_offset--;
+      }
+  p=GetCacheViewVirtualPixels(grid->image_view,x_offset,y_offset,
+    (size_t) count,(size_t) count,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  count*=count;  /* Number of pixels to average */
+  LoadInterpolatePixels(grid->image,grid->channel,grid->traits,p,count,alpha,
+    pixels);
+  for (i=0; i < (ssize_t) count; i++)
+  {
+    gamma=MagickSafeReciprocal(alpha[i])/count;
+    *pixel+=gamma*pixels[i];
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannel(
   const Image *magick_restrict image,const CacheView_ *image_view,
   const PixelChannel channel,const PixelInterpolateMethod method,const double x,
@@ -1162,11 +1212,6 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
   const Quantum
     *magick_restrict p;
 
-  double
-    alpha[16],
-    gamma,
-    pixels[16];
-
   MagickBooleanType
     status;
 
@@ -1177,7 +1222,6 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     traits;
 
   ssize_t
-    i,
     x_offset,
     y_offset;
 
@@ -1209,37 +1253,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     case Average9InterpolatePixel:  /* nearest 9 neighbours */
     case Average16InterpolatePixel:  /* nearest 16 neighbours */
     {
-      ssize_t
-        count;
-
-      count=2;  /* size of the area to average - default nearest 4 */
-      if (interpolate == Average9InterpolatePixel)
-        {
-          count=3;
-          x_offset=CastDoubleToSsizeT(floor(x+0.5)-1.0);
-          y_offset=CastDoubleToSsizeT(floor(y+0.5)-1.0);
-        }
-      else
-        if (interpolate == Average16InterpolatePixel)
-          {
-            count=4;
-            x_offset--;
-            y_offset--;
-          }
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,(size_t) count,
-        (size_t) count,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      count*=count;  /* Number of pixels to average */
-      LoadInterpolatePixels(image,channel,traits,p,count,alpha,pixels);
-      for (i=0; i < (ssize_t) count; i++)
-      {
-        gamma=MagickSafeReciprocal(alpha[i])/count;
-        *pixel+=gamma*pixels[i];
-      }
+      status=InterpolateAveragePixelChannel(&grid,interpolate,pixel,status);
       break;
     }
     case BilinearInterpolatePixel:
