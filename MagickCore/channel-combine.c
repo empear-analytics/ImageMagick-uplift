@@ -229,6 +229,24 @@ static void SetCombineImageColorspace(const Image *image,Image *combine_image,
       (void) SetImageColorspace(combine_image,sRGBColorspace,exception);
 }
 
+static void SetCombineCMYKChannels(Image *combine_image,
+  const size_t number_channels,ExceptionInfo *exception)
+{
+  switch (combine_image->colorspace)
+  {
+    case CMYKColorspace:
+    {
+      if (number_channels > 4)
+        combine_image->alpha_trait=BlendPixelTrait;
+      if (number_channels > 5)
+        SetPixelMetaChannels(combine_image,number_channels-5,exception);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -291,16 +309,11 @@ MagickExport Image *CombineImages(const Image *image,
         SetPixelMetaChannels(combine_image,number_channels-2,exception);
       break;
     }
-    case CMYKColorspace:
+    default:
     {
-      if (number_channels > 4)
-        combine_image->alpha_trait=BlendPixelTrait;
-      if (number_channels > 5)
-        SetPixelMetaChannels(combine_image,number_channels-5,exception);
+      SetCombineCMYKChannels(combine_image,number_channels,exception);
       break;
     }
-    default:
-      break;
   }
   /*
     Combine images.
