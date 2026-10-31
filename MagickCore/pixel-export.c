@@ -340,29 +340,12 @@ static MagickBooleanType ExportCharRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportCharQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,unsigned char *magick_restrict q)
+static void ExportCharAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  unsigned char *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=ScaleQuantumToChar(GetPixelRed(image,p));
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=ScaleQuantumToChar(GetPixelGreen(image,p));
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=ScaleQuantumToChar(GetPixelBlue(image,p));
-      break;
-    }
     case AlphaQuantum:
     {
       *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
@@ -386,6 +369,37 @@ static void ExportCharQuantum(const Image *image,const QuantumType quantum,
     }
     default:
       break;
+  }
+}
+
+static void ExportCharQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned char *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelBlue(image,p));
+      break;
+    }
+    default:
+    {
+      ExportCharAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
   }
 }
 
