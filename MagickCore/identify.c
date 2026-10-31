@@ -1947,12 +1947,30 @@ static void PrintImageSizes(FILE *file,const Image *image)
   (void) FormatLocaleFile(file,"  Pixel cache type: %s\n",buffer);
 }
 
-MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
-  const MagickBooleanType verbose,ExceptionInfo *exception)
+static void PrintImageTimes(FILE *file,const Image *image,
+  const double elapsed_time,const double user_time)
 {
   char
     buffer[MagickPathExtent];
 
+  if (elapsed_time > MagickEpsilon)
+    {
+      (void) FormatMagickSize((MagickSizeType) ((double) image->columns*
+        image->rows/elapsed_time+0.5),MagickFalse,"P",MagickPathExtent,buffer);
+      (void) FormatLocaleFile(file,"  Pixels per second: %s\n",buffer);
+    }
+  PrintImageTimeToLive(file,image);
+  (void) FormatLocaleFile(file,"  User time: %0.3fu\n",user_time);
+  (void) FormatLocaleFile(file,"  Elapsed time: %lu:%02lu.%03lu\n",
+    (unsigned long) (elapsed_time/60.0),(unsigned long) ceil(fmod(elapsed_time,
+    60.0)),(unsigned long) (1000.0*(elapsed_time-floor(elapsed_time))));
+  (void) FormatLocaleFile(file,"  Version: %s\n",GetMagickVersion((size_t *)
+    NULL));
+}
+
+MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
+  const MagickBooleanType verbose,ExceptionInfo *exception)
+{
   ChannelFeatures
     *channel_features;
 
@@ -2140,19 +2158,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   PrintImageArtifacts(file,image);
   PrintImageRegistry(file,exception);
   PrintImageSizes(file,image);
-  if (elapsed_time > MagickEpsilon)
-    {
-      (void) FormatMagickSize((MagickSizeType) ((double) image->columns*
-        image->rows/elapsed_time+0.5),MagickFalse,"P",MagickPathExtent,buffer);
-      (void) FormatLocaleFile(file,"  Pixels per second: %s\n",buffer);
-    }
-  PrintImageTimeToLive(file,image);
-  (void) FormatLocaleFile(file,"  User time: %0.3fu\n",user_time);
-  (void) FormatLocaleFile(file,"  Elapsed time: %lu:%02lu.%03lu\n",
-    (unsigned long) (elapsed_time/60.0),(unsigned long) ceil(fmod(elapsed_time,
-    60.0)),(unsigned long) (1000.0*(elapsed_time-floor(elapsed_time))));
-  (void) FormatLocaleFile(file,"  Version: %s\n",GetMagickVersion((size_t *)
-    NULL));
+  PrintImageTimes(file,image,elapsed_time,user_time);
   (void) fflush(file);
   return(ferror(file) != 0 ? MagickFalse : MagickTrue);
 }
