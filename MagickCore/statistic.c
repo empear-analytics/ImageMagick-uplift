@@ -924,6 +924,16 @@ static void AcquireEvaluateViews(const Image *images,
   }
 }
 
+static void DestroyEvaluateViews(const size_t number_images,
+  CacheView **image_view)
+{
+  ssize_t
+    n;
+
+  for (n=0; n < (ssize_t) number_images; n++)
+    image_view[n]=DestroyCacheView(image_view[n]);
+}
+
 static MagickBooleanType AcquireDirectImageCanvas(const Image *images,
   Image **image,ExceptionInfo *exception)
 {
@@ -966,7 +976,6 @@ MagickExport Image *EvaluateImages(const Image *images,
     number_images;
 
   ssize_t
-    n,
     y;
 
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -1180,8 +1189,7 @@ MagickExport Image *EvaluateImages(const Image *images,
           }
       }
     }
-  for (n=0; n < (ssize_t) number_images; n++)
-    image_view[n]=DestroyCacheView(image_view[n]);
+  DestroyEvaluateViews(number_images,image_view);
   image_view=(CacheView **) RelinquishMagickMemory(image_view);
   evaluate_view=DestroyCacheView(evaluate_view);
   evaluate_pixels=DestroyPixelTLS(images,evaluate_pixels);
