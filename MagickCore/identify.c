@@ -1341,9 +1341,9 @@ static void PrintImageColorsSummary(FILE *file,const Image *image)
 
 static void PrintImageSummaryHeader(FILE *file,const Image *image)
 {
-  if (*image->magick_filename != '\0')
-    if (LocaleCompare(image->magick_filename,image->filename) != 0)
-      (void) FormatLocaleFile(file,"%s=>",image->magick_filename);
+  if ((*image->magick_filename != '\0') &&
+      (LocaleCompare(image->magick_filename,image->filename) != 0))
+    (void) FormatLocaleFile(file,"%s=>",image->magick_filename);
   if (IsSingleUnnumberedImage(image) != MagickFalse)
     (void) FormatLocaleFile(file,"%s ",image->filename);
   else
