@@ -65,6 +65,23 @@
 #include "MagickCore/string_.h"
 #include "MagickCore/thread-private.h"
 #include "MagickCore/transform.h"
+
+/*
+  Typedef declarations.
+*/
+typedef struct _DifferingPixelScan
+{
+  LayerMethod
+    method;
+
+  const Image
+    *alpha_image,
+    *beta_image;
+
+  PixelInfo
+    *alpha_pixel,
+    *beta_pixel;
+} DifferingPixelScan;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -715,11 +732,20 @@ static MagickBooleanType ComparePixels(const LayerMethod method,
 %
 */
 
-static ssize_t FindDifferingPixel(const LayerMethod method,
-  const Image *alpha_image,const Image *beta_image,const Quantum *p,
-  const Quantum *q,const ssize_t count,PixelInfo *alpha_pixel,
-  PixelInfo *beta_pixel)
+static ssize_t FindDifferingPixel(const DifferingPixelScan *scan,
+  const Quantum *p,const Quantum *q,const ssize_t count)
 {
+  const LayerMethod
+    method = scan->method;
+
+  const Image
+    *alpha_image = scan->alpha_image,
+    *beta_image = scan->beta_image;
+
+  PixelInfo
+    *alpha_pixel = scan->alpha_pixel,
+    *beta_pixel = scan->beta_pixel;
+
   ssize_t
     i;
 
@@ -746,6 +772,9 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     alpha_pixel,
     beta_pixel;
 
+  const DifferingPixelScan
+    scan = { method, alpha_image, beta_image, (&alpha_pixel), (&beta_pixel) };
+
   RectangleInfo
     bounds;
 
@@ -767,8 +796,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
     if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
-    y=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
-      alpha_image->rows,&alpha_pixel,&beta_pixel);
+    y=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->rows);
     if (y < (ssize_t) alpha_image->rows)
       break;
   }
@@ -790,8 +818,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     q=GetVirtualPixels(beta_image,x,0,1,beta_image->rows,exception);
     if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
-    y=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
-      alpha_image->rows,&alpha_pixel,&beta_pixel);
+    y=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->rows);
     if (y < (ssize_t) alpha_image->rows)
       break;
   }
@@ -802,8 +829,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
     if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
-    x=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
-      alpha_image->columns,&alpha_pixel,&beta_pixel);
+    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
     if (x < (ssize_t) alpha_image->columns)
       break;
   }
@@ -814,8 +840,7 @@ static RectangleInfo CompareImagesBounds(const Image *alpha_image,
     q=GetVirtualPixels(beta_image,0,y,beta_image->columns,1,exception);
     if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
-    x=FindDifferingPixel(method,alpha_image,beta_image,p,q,(ssize_t)
-      alpha_image->columns,&alpha_pixel,&beta_pixel);
+    x=FindDifferingPixel(&scan,p,q,(ssize_t) alpha_image->columns);
     if (x < (ssize_t) alpha_image->columns)
       break;
   }
