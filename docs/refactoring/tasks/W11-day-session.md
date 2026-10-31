@@ -70,6 +70,16 @@ playbook.
   plateau rows. `enhance.c` would also cross the function-count cliff (twelve extra
   functions, -0.07). Recipe S, or the function-pointer merge, is the lever for all three.
 
+- **`effect.c` was split (Recipe S).** The owner read `W11-split-proposal.md` and said
+  "You can do this. Keep going."; the session read that as the go-ahead for the file the
+  proposal names. The blur and convolution family (eleven public functions, 46 functions,
+  3,312 lines) is now `MagickCore/effect-blur.c` (commit 5408dde16): `effect.c` 3.52 to
+  4.10 (2,602 lines), `effect-blur.c` 4.91 (3,416 lines), the whole oracle 15,900 cases,
+  0 diverged, guards over the pair unchanged (674 literals, 1052 call sites), the eleven
+  public functions the only exported symbols of the new object. Confirm the go-ahead or
+  revert the commit; the Windows build configuration outside this repository still needs
+  the file.
+
 ### For the owner
 
 - **`distort.c`, two rulings** (the pass made no commits for want of them):

@@ -2,7 +2,9 @@
 
 Recipe S needs the owner's go-ahead per file. This is the plan, measured by dry run
 (`tools/split_source.py --out`, both halves scored with `tools/ch.py`, `cs-mcp` 1.5.16);
-nothing in `MagickCore/` or the build files has changed.
+when written, nothing in `MagickCore/` or the build files had changed. **Done for
+`effect.c` (commit 5408dde16) after the owner said "You can do this. Keep going."; the
+measured numbers below held (4.10 and 4.91).**
 
 ## Recommendation: `effect.c`, one split, then maybe a second
 
