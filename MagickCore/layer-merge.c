@@ -125,6 +125,25 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ExtendToLayerPage(const Image *next,RectangleInfo *page,
+  size_t *width,size_t *height)
+{
+  if ((*page).x > next->page.x)
+    {
+      *width=(size_t) ((ssize_t) *width+(*page).x-next->page.x);
+      (*page).x=next->page.x;
+    }
+  if ((*page).y > next->page.y)
+    {
+      *height=(size_t) ((ssize_t) *height+(*page).y-next->page.y);
+      (*page).y=next->page.y;
+    }
+  if ((ssize_t) *width < (next->page.x+(ssize_t) next->columns-(*page).x))
+    *width=(size_t) (next->page.x+(ssize_t) next->columns-(*page).x);
+  if ((ssize_t) *height < (next->page.y+(ssize_t) next->rows-(*page).y))
+    *height=(size_t) (next->page.y+(ssize_t) next->rows-(*page).y);
+}
+
 static void ExtendToLayerBounds(const Image *image,RectangleInfo *page,
   size_t *width,size_t *height)
 {
@@ -133,22 +152,7 @@ static void ExtendToLayerBounds(const Image *image,RectangleInfo *page,
 
   next=GetNextImageInList(image);
   for ( ; next != (Image *) NULL;  next=GetNextImageInList(next))
-  {
-    if ((*page).x > next->page.x)
-      {
-        *width=(size_t) ((ssize_t) *width+(*page).x-next->page.x);
-        (*page).x=next->page.x;
-      }
-    if ((*page).y > next->page.y)
-      {
-        *height=(size_t) ((ssize_t) *height+(*page).y-next->page.y);
-        (*page).y=next->page.y;
-      }
-    if ((ssize_t) *width < (next->page.x+(ssize_t) next->columns-(*page).x))
-      *width=(size_t) (next->page.x+(ssize_t) next->columns-(*page).x);
-    if ((ssize_t) *height < (next->page.y+(ssize_t) next->rows-(*page).y))
-      *height=(size_t) (next->page.y+(ssize_t) next->rows-(*page).y);
-  }
+    ExtendToLayerPage(next,page,width,height);
 }
 
 static void SelectPageExtent(const RectangleInfo page,size_t *width,
@@ -160,6 +164,15 @@ static void SelectPageExtent(const RectangleInfo page,size_t *width,
     *height=page.height;
 }
 
+static void ExtendToMosaicPage(const Image *next,size_t *width,
+  size_t *height)
+{
+  if ((ssize_t) *width < (next->page.x+(ssize_t) next->columns))
+    *width=(size_t) next->page.x+next->columns;
+  if ((ssize_t) *height < (next->page.y+(ssize_t) next->rows))
+    *height=(size_t) next->page.y+next->rows;
+}
+
 static void ExtendToMosaicBounds(const Image *image,size_t *width,
   size_t *height)
 {
@@ -167,15 +180,61 @@ static void ExtendToMosaicBounds(const Image *image,size_t *width,
     *next;
 
   for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
-  {
-    if ((ssize_t) *width < (next->page.x+(ssize_t) next->columns))
-      *width=(size_t) next->page.x+next->columns;
-    if ((ssize_t) *height < (next->page.y+(ssize_t) next->rows))
-      *height=(size_t) next->page.y+next->rows;
-  }
+    ExtendToMosaicPage(next,width,height);
 }
 
 #define MergeLayersTag  "Merge/Layers"
+
+typedef struct _MergeCanvasInfo
+{
+  Image
+    *image;
+
+  LayerMethod
+    method;
+} MergeCanvasInfo;
+
+static void SelectCanvasGeometry(const MergeCanvasInfo *canvas_info,
+  size_t *width,size_t *height,RectangleInfo *page)
+{
+  switch (canvas_info->method)
+  {
+    case TrimBoundsLayer:
+    case MergeLayer:
+    default:
+    {
+      ExtendToLayerBounds(canvas_info->image,page,width,height);
+      break;
+    }
+    case FlattenLayer:
+    {
+      SelectPageExtent((*page),width,height);
+      (*page).x=0;
+      (*page).y=0;
+      break;
+    }
+    case MosaicLayer:
+    {
+      SelectPageExtent((*page),width,height);
+      ExtendToMosaicBounds(canvas_info->image,width,height);
+      (*page).width=(*width);
+      (*page).height=(*height);
+      (*page).x=0;
+      (*page).y=0;
+    }
+    break;
+  }
+}
+
+static RectangleInfo SetDefaultVirtualCanvas(RectangleInfo page,
+  const size_t width,const size_t height)
+{
+  if (page.width == 0)
+    page.width=page.x < 0 ? width : (size_t) ((ssize_t) width+page.x);
+  if (page.height == 0)
+    page.height=page.y < 0 ? height : (size_t) ((ssize_t) height+page.y);
+  return(page);
+}
 
 static Image *TrimLayerBounds(Image *image,const RectangleInfo page,
   const size_t width,const size_t height)
@@ -240,6 +299,9 @@ MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
   Image
     *canvas;
 
+  MergeCanvasInfo
+    canvas_info;
+
   RectangleInfo
     page;
 
@@ -259,40 +321,13 @@ MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
   page=image->page;
   width=image->columns;
   height=image->rows;
-  switch (method)
-  {
-    case TrimBoundsLayer:
-    case MergeLayer:
-    default:
-    {
-      ExtendToLayerBounds(image,&page,&width,&height);
-      break;
-    }
-    case FlattenLayer:
-    {
-      SelectPageExtent(page,&width,&height);
-      page.x=0;
-      page.y=0;
-      break;
-    }
-    case MosaicLayer:
-    {
-      SelectPageExtent(page,&width,&height);
-      ExtendToMosaicBounds(image,&width,&height);
-      page.width=width;
-      page.height=height;
-      page.x=0;
-      page.y=0;
-    }
-    break;
-  }
+  canvas_info.image=image;
+  canvas_info.method=method;
+  SelectCanvasGeometry(&canvas_info,&width,&height,&page);
   /*
     Set virtual canvas size if not defined.
   */
-  if (page.width == 0)
-    page.width=page.x < 0 ? width : (size_t) ((ssize_t) width+page.x);
-  if (page.height == 0)
-    page.height=page.y < 0 ? height : (size_t) ((ssize_t) height+page.y);
+  page=SetDefaultVirtualCanvas(page,width,height);
   /*
     Handle "TrimBoundsLayer" method separately to normal 'layer merge'.
   */
