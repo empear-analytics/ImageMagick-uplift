@@ -269,6 +269,24 @@ static inline MagickBooleanType IsPosterizeDitherMap(
     MagickTrue : MagickFalse);
 }
 
+static size_t CountPosterizeChannels(const Image *image)
+{
+  size_t
+    channels = 0;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) != 0)
+      channels++;
+  }
+  return(channels);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -299,19 +317,10 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
         *map_image;
 
       size_t
-        channels = 0,
+        channels,
         number_columns;
 
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel channel = GetPixelChannelChannel(image,i);
-        PixelTrait traits = GetPixelChannelTraits(image,channel);
-        if ((traits & UpdatePixelTrait) != 0)
-          channels++;
-      }
+      channels=CountPosterizeChannels(image);
       number_columns=(size_t) pow((double) levels,(double) channels);
       map_image=CloneImage(image,number_columns,1,MagickTrue,exception);
       if (map_image == (Image *) NULL)
