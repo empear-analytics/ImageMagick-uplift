@@ -179,24 +179,15 @@ static void SumThresholdWindow(const Image *image,
   }
 }
 
-static void AdaptiveThresholdPixel(
-  const AdaptiveThresholdPixelInfo *pixel_info,
-  const Quantum *magick_restrict p,Quantum *magick_restrict q,
-  const ssize_t center)
+static void SlideThresholdWindow(const AdaptiveThresholdPixelInfo *pixel_info,
+  const Quantum *magick_restrict p,const ssize_t i,const PixelChannel channel)
 {
   const Image
-    *const image = pixel_info->image,
-    *const threshold_image = pixel_info->threshold_image;
+    *const image = pixel_info->image;
 
   const size_t
     width = pixel_info->width,
     height = pixel_info->height;
-
-  const MagickSizeType
-    number_pixels = pixel_info->number_pixels;
-
-  const double
-    bias = pixel_info->bias;
 
   double
     *const channel_bias = pixel_info->channel_bias,
@@ -206,8 +197,40 @@ static void AdaptiveThresholdPixel(
     *magick_restrict pixels;
 
   ssize_t
-    i,
     v;
+
+  channel_sum[channel]-=channel_bias[channel];
+  channel_bias[channel]=0.0;
+  pixels=p;
+  for (v=0; v < (ssize_t) height; v++)
+  {
+    channel_bias[channel]+=(double) pixels[i];
+    pixels+=(width-1)*GetPixelChannels(image);
+    channel_sum[channel]+=(double) pixels[i];
+    pixels+=(ptrdiff_t) GetPixelChannels(image)*(image->columns+1);
+  }
+}
+
+static void AdaptiveThresholdPixel(
+  const AdaptiveThresholdPixelInfo *pixel_info,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,
+  const ssize_t center)
+{
+  const Image
+    *const image = pixel_info->image,
+    *const threshold_image = pixel_info->threshold_image;
+
+  const MagickSizeType
+    number_pixels = pixel_info->number_pixels;
+
+  const double
+    bias = pixel_info->bias;
+
+  double
+    *const channel_sum = pixel_info->channel_sum;
+
+  ssize_t
+    i;
 
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
   {
@@ -226,16 +249,7 @@ static void AdaptiveThresholdPixel(
         SetPixelChannel(threshold_image,channel,p[center+i],q);
         continue;
       }
-    channel_sum[channel]-=channel_bias[channel];
-    channel_bias[channel]=0.0;
-    pixels=p;
-    for (v=0; v < (ssize_t) height; v++)
-    {
-      channel_bias[channel]+=(double) pixels[i];
-      pixels+=(width-1)*GetPixelChannels(image);
-      channel_sum[channel]+=(double) pixels[i];
-      pixels+=(ptrdiff_t) GetPixelChannels(image)*(image->columns+1);
-    }
+    SlideThresholdWindow(pixel_info,p,i,channel);
     mean=(double) (channel_sum[channel]/number_pixels+bias);
     SetPixelChannel(threshold_image,channel,(Quantum) ((double)
       p[center+i] <= mean ? 0 : QuantumRange),q);
