@@ -349,6 +349,55 @@ void TraceConvexHull(PointInfo *vertices,size_t number_vertices,
   *chain_length=n;
 }
 
+typedef struct _ConvexHullRow
+{
+  const Image
+    *image;
+
+  PixelInfo
+    background;
+
+  PointInfo
+    *vertices;
+
+  ssize_t
+    y;
+} ConvexHullRow;
+
+static void AddConvexHullRowVertices(const ConvexHullRow *row,size_t *n,
+  const Quantum **p)
+{
+  const Image
+    *image = row->image;
+
+  const PixelInfo
+    background = row->background;
+
+  PointInfo
+    *const vertices = row->vertices;
+
+  const ssize_t
+    y = row->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PixelInfo
+      pixel;
+
+    GetPixelInfoPixel(image,*p,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&background) == MagickFalse)
+      {
+        vertices[*n].x=(double) x;
+        vertices[*n].y=(double) y;
+        (*n)++;
+      }
+    *p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport PointInfo *GetImageConvexHull(const Image *image,
   size_t *number_vertices,ExceptionInfo *exception)
 {
@@ -405,11 +454,11 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
   n=0;
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    ConvexHullRow
+      row;
+
     const Quantum
       *p;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -419,20 +468,11 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PixelInfo
-        pixel;
-
-      GetPixelInfoPixel(image,p,&pixel);
-      if (IsFuzzyEquivalencePixelInfo(&pixel,&background) == MagickFalse)
-        {
-          vertices[n].x=(double) x;
-          vertices[n].y=(double) y;
-          n++;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.background=background;
+    row.vertices=vertices;
+    row.y=y;
+    AddConvexHullRowVertices(&row,&n,&p);
   }
   image_view=DestroyCacheView(image_view);
   /*
