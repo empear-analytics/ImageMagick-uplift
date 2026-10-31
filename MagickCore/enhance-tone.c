@@ -816,9 +816,22 @@ static void StretchColormap(Image *image,const Quantum *stretch_map)
   }
 }
 
-static void StretchImageRow(const Image *image,const Quantum *black,
-  const Quantum *white,const Quantum *stretch_map,Quantum *q)
+typedef struct _StretchMaps
 {
+  const Quantum
+    *black,
+    *white,
+    *stretch_map;
+} StretchMaps;
+
+static void StretchImageRow(const Image *image,const StretchMaps *maps,
+  Quantum *q)
+{
+  const Quantum
+    *black = maps->black,
+    *white = maps->white,
+    *stretch_map = maps->stretch_map;
+
   ssize_t
     x;
 
@@ -1014,6 +1027,9 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    const StretchMaps
+      maps = { black, white, stretch_map };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -1022,7 +1038,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    StretchImageRow(image,black,white,stretch_map,q);
+    StretchImageRow(image,&maps,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
