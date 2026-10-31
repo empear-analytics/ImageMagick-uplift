@@ -511,6 +511,50 @@ static void MapCLAHEHistogram(const RangeInfo *range_info,
   }
 }
 
+typedef struct _CLAHETileColumn
+{
+  const RectangleInfo
+    *clahe_info,
+    *tile_info;
+
+  ssize_t
+    x;
+} CLAHETileColumn;
+
+static void SelectCLAHETileColumn(const CLAHETileColumn *tile_column,
+  RectangleInfo *tile,OffsetInfo *offset)
+{
+  const RectangleInfo
+    *const clahe_info = tile_column->clahe_info,
+    *const tile_info = tile_column->tile_info;
+
+  const ssize_t
+    x = tile_column->x;
+
+  (*tile).width=tile_info->width;
+  (*tile).x=x-1;
+  (*offset).x=(*tile).x+1;
+  if (x == 0)
+    {
+      /*
+        Left column.
+      */
+      (*tile).width=tile_info->width >> 1;
+      (*tile).x=0;
+      (*offset).x=0;
+    }
+  else
+    if (x == (ssize_t) clahe_info->x)
+      {
+        /*
+          Right column.
+        */
+        (*tile).width=(tile_info->width+1) >> 1;
+        (*tile).x=clahe_info->x-1;
+        (*offset).x=(*tile).x;
+      }
+}
+
 typedef struct _CLAHEInterpolation
 {
   const RectangleInfo
@@ -589,28 +633,13 @@ static void InterpolateCLAHETiles(const CLAHEInterpolation *interpolation,
         Q21,
         Q22;
 
-      tile.width=tile_info->width;
-      tile.x=x-1;
-      offset.x=tile.x+1;
-      if (x == 0)
-        {
-          /*
-            Left column.
-          */
-          tile.width=tile_info->width >> 1;
-          tile.x=0;
-          offset.x=0;
-        }
-      else
-        if (x == (ssize_t) clahe_info->x)
-          {
-            /*
-              Right column.
-            */
-            tile.width=(tile_info->width+1) >> 1;
-            tile.x=clahe_info->x-1;
-            offset.x=tile.x;
-          }
+      CLAHETileColumn
+        tile_column;
+
+      tile_column.clahe_info=clahe_info;
+      tile_column.tile_info=tile_info;
+      tile_column.x=x;
+      SelectCLAHETileColumn(&tile_column,&tile,&offset);
       Q12=(double) number_bins*(tile.y*clahe_info->x+tile.x);
       Q22=(double) number_bins*(tile.y*clahe_info->x+offset.x);
       Q11=(double) number_bins*(offset.y*clahe_info->x+tile.x);
