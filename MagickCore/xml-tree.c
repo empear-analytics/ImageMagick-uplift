@@ -1265,6 +1265,41 @@ static void NormalizeLineEndings(char *xml)
     }
 }
 
+static void DecodeCharacterReference(char **xml)
+{
+  char
+    *entity;
+
+  int
+    c;
+
+  /*
+    Character reference.
+  */
+  if ((*xml)[2] != 'x')
+    c=(int) strtol(*xml+2,&entity,10);  /* base 10 */
+  else
+    c=(int) strtol(*xml+3,&entity,16);  /* base 16 */
+  if ((c == 0) || (*entity != ';'))
+    {
+      /*
+        Not a character reference.
+      */
+      (*xml)++;
+      return;
+    }
+  if (c < 0x80)
+    *((*xml)++)=(char) c;
+  else
+    {
+      /*
+        Multi-byte UTF-8 sequence.
+      */
+      *xml=WriteUTF8Sequence(*xml,c);
+    }
+  (void) memmove(*xml,strchr(*xml,';')+1,strlen(strchr(*xml,';')));
+}
+
 static void DecodeEntityReference(char **entities,char *q,char **p,
   char **xml)
 {
@@ -1317,12 +1352,8 @@ static void DecodeEntityReference(char **entities,char *q,char **p,
 static char *ParseEntities(char *xml,char **entities,int state)
 {
   char
-    *entity,
     *p,
     *q;
-
-  int
-    c;
 
   /*
     Normalize line endings.
@@ -1345,33 +1376,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
         '*' for non-CDATA attributes normalization
     */
     if ((state != 'c') && (strncmp(xml,"&#",2) == 0))
-      {
-        /*
-          Character reference.
-        */
-        if (xml[2] != 'x')
-          c=(int) strtol(xml+2,&entity,10);  /* base 10 */
-        else
-          c=(int) strtol(xml+3,&entity,16);  /* base 16 */
-        if ((c == 0) || (*entity != ';'))
-          {
-            /*
-              Not a character reference.
-            */
-            xml++;
-            continue;
-          }
-        if (c < 0x80)
-          *(xml++)=(char) c;
-        else
-          {
-            /*
-              Multi-byte UTF-8 sequence.
-            */
-            xml=WriteUTF8Sequence(xml,c);
-          }
-        (void) memmove(xml,strchr(xml,';')+1,strlen(strchr(xml,';')));
-      }
+      DecodeCharacterReference(&xml);
     else
       if (IsEntityReference(xml,state) != MagickFalse)
         DecodeEntityReference(entities,q,&p,&xml);
