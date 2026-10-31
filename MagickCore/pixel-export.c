@@ -3369,39 +3369,44 @@ static void ExportPixelsOfType(const ExportTypeRequest *request,
   }
 }
 
-MagickExport MagickBooleanType ExportImagePixels(const Image *image,
-  const ssize_t x,const ssize_t y,const size_t width,const size_t height,
-  const char *map,const StorageType type,void *pixels,ExceptionInfo *exception)
+typedef struct _ExportMapParse
 {
-  MagickBooleanType
-    status;
+  const Image
+    *image;
 
-  QuantumType
-    *quantum_map;
-
-  RectangleInfo
-    roi;
-
-  ssize_t
-    i;
+  const char
+    *map;
 
   size_t
     length;
 
-  ExportPixelBuffer buffer;
+  QuantumType
+    *quantum_map;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  length=strlen(map);
-  quantum_map=(QuantumType *) AcquireQuantumMemory(length,sizeof(*quantum_map));
-  if (quantum_map == (QuantumType *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(MagickFalse);
-    }
+  ExceptionInfo
+    *exception;
+} ExportMapParse;
+
+static MagickBooleanType ExportMapQuantums(const ExportMapParse *parse)
+{
+  const Image
+    *image = parse->image;
+
+  const char
+    *map = parse->map;
+
+  const size_t
+    length = parse->length;
+
+  QuantumType
+    *quantum_map = parse->quantum_map;
+
+  ExceptionInfo
+    *exception = parse->exception;
+
+  ssize_t
+    i;
+
   for (i=0; i < (ssize_t) length; i++)
   {
     switch (map[i])
@@ -3421,6 +3426,49 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
       }
     }
   }
+  return(MagickTrue);
+}
+
+MagickExport MagickBooleanType ExportImagePixels(const Image *image,
+  const ssize_t x,const ssize_t y,const size_t width,const size_t height,
+  const char *map,const StorageType type,void *pixels,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  QuantumType
+    *quantum_map;
+
+  RectangleInfo
+    roi;
+
+  ExportMapParse
+    parse;
+
+  size_t
+    length;
+
+  ExportPixelBuffer buffer;
+
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  length=strlen(map);
+  quantum_map=(QuantumType *) AcquireQuantumMemory(length,sizeof(*quantum_map));
+  if (quantum_map == (QuantumType *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  parse.image=image;
+  parse.map=map;
+  parse.length=length;
+  parse.quantum_map=quantum_map;
+  parse.exception=exception;
+  if (ExportMapQuantums(&parse) == MagickFalse)
+    return(MagickFalse);
   roi.width=width;
   roi.height=height;
   roi.x=x;
