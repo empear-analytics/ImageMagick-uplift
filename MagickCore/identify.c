@@ -1293,13 +1293,35 @@ static void PrintImageRegistry(FILE *file,ExceptionInfo *exception)
     }
 }
 
+static void PrintImageClippingPath(FILE *file,Image *image,
+  ExceptionInfo *exception)
+{
+  char
+    key[MagickPathExtent];
+
+  const char
+    *value;
+
+  (void) FormatLocaleString(key,MagickPathExtent,"8BIM:1999,2998:#1");
+  value=GetImageProperty(image,key,exception);
+  if (value != (const char *) NULL)
+    {
+      /*
+        Display clipping path.
+      */
+      (void) FormatLocaleFile(file,"  Clipping path: ");
+      if (strlen(value) > 80)
+        (void) fputc('\n',file);
+      (void) FormatLocaleFile(file,"%s\n",value);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
   char
     buffer[MagickPathExtent],
-    color[MagickPathExtent],
-    key[MagickPathExtent];
+    color[MagickPathExtent];
 
   ChannelFeatures
     *channel_features;
@@ -1318,8 +1340,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
 
   const char
     *artifact,
-    *locate,
-    *value;
+    *locate;
 
   const MagickInfo
     *magick_info;
@@ -1874,18 +1895,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     (void) FormatLocaleFile(file,"  Montage: %s\n",image->montage);
   if (image->directory != (char *) NULL)
     PrintImageDirectory(file,image,exception);
-  (void) FormatLocaleString(key,MagickPathExtent,"8BIM:1999,2998:#1");
-  value=GetImageProperty(image,key,exception);
-  if (value != (const char *) NULL)
-    {
-      /*
-        Display clipping path.
-      */
-      (void) FormatLocaleFile(file,"  Clipping path: ");
-      if (strlen(value) > 80)
-        (void) fputc('\n',file);
-      (void) FormatLocaleFile(file,"%s\n",value);
-    }
+  PrintImageClippingPath(file,image,exception);
   artifact=GetImageArtifact(image,"identify:convex-hull");
   if (IsStringTrue(artifact) != MagickFalse)
     PrintConvexHullAndBoundingBox(file,image,exception);
