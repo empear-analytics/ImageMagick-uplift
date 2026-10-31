@@ -1893,6 +1893,63 @@ static void GetModulateColorspace(const Image *image,
     }
 }
 
+typedef struct _ModulateRow
+{
+  Image
+    *image;
+
+  ColorspaceType
+    colorspace;
+
+  double
+    percent_hue,
+    percent_saturation,
+    percent_brightness;
+
+  IlluminantType
+    illuminant;
+} ModulateRow;
+
+static void ModulateImageRow(const ModulateRow *modulate_row,Quantum *q)
+{
+  Image
+    *const image = modulate_row->image;
+
+  const ColorspaceType
+    colorspace = modulate_row->colorspace;
+
+  const double
+    percent_hue = modulate_row->percent_hue,
+    percent_saturation = modulate_row->percent_saturation,
+    percent_brightness = modulate_row->percent_brightness;
+
+  const IlluminantType
+    illuminant = modulate_row->illuminant;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    const ModulateInfo modulate_info = { colorspace, percent_hue,
+      percent_saturation, percent_brightness, illuminant };
+
+    double
+      blue,
+      green,
+      red;
+
+    red=(double) GetPixelRed(image,q);
+    green=(double) GetPixelGreen(image,q);
+    blue=(double) GetPixelBlue(image,q);
+    ModulateColor(&modulate_info,&red,&green,&blue);
+    SetPixelRed(image,ClampToQuantum(red),q);
+    SetPixelGreen(image,ClampToQuantum(green),q);
+    SetPixelBlue(image,ClampToQuantum(blue),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ExceptionInfo *exception)
 {
@@ -1977,11 +2034,11 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    ModulateRow
+      modulate_row;
+
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1991,25 +2048,13 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      const ModulateInfo modulate_info = { colorspace, percent_hue,
-        percent_saturation, percent_brightness, illuminant };
-
-      double
-        blue,
-        green,
-        red;
-
-      red=(double) GetPixelRed(image,q);
-      green=(double) GetPixelGreen(image,q);
-      blue=(double) GetPixelBlue(image,q);
-      ModulateColor(&modulate_info,&red,&green,&blue);
-      SetPixelRed(image,ClampToQuantum(red),q);
-      SetPixelGreen(image,ClampToQuantum(green),q);
-      SetPixelBlue(image,ClampToQuantum(blue),q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    modulate_row.image=image;
+    modulate_row.colorspace=colorspace;
+    modulate_row.percent_hue=percent_hue;
+    modulate_row.percent_saturation=percent_saturation;
+    modulate_row.percent_brightness=percent_brightness;
+    modulate_row.illuminant=illuminant;
+    ModulateImageRow(&modulate_row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
