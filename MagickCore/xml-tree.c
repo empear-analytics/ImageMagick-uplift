@@ -1363,6 +1363,15 @@ static void DecodeEntityReference(char **entities,char *q,char **p,
       }
 }
 
+static MagickBooleanType SkipEntityText(char **xml,int state)
+{
+  while (IsEntityTextChar(*xml,state) != MagickFalse)
+    (*xml)++;
+  if (**xml == '\0')
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static char *SkipEntityTextChar(char *xml,int state)
 {
   if (IsCollapsibleSpace(xml,state) != MagickFalse)
@@ -1386,9 +1395,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
   NormalizeLineEndings(xml);
   for (xml=p; ; )
   {
-    while (IsEntityTextChar(xml,state) != MagickFalse)
-      xml++;
-    if (*xml == '\0')
+    if (SkipEntityText(&xml,state) == MagickFalse)
       break;
     /*
       States include:
