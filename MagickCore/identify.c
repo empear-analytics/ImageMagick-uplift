@@ -1427,6 +1427,40 @@ static void PrintImageHistogram(FILE *file,Image *image,
     }
 }
 
+static void PrintTransparentPixel(FILE *file,const Image *image,ssize_t *x,
+  ExceptionInfo *exception)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    y;
+
+  MagickBooleanType
+    found = MagickFalse;
+
+  p=(const Quantum *) NULL;
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    p=GetVirtualPixels(image,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    for (*x=0; *x < (ssize_t) image->columns; (*x)++)
+    {
+      if (GetPixelAlpha(image,p) == (Quantum) TransparentAlpha)
+        {
+          found=MagickTrue;
+          break;
+        }
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    if (found != MagickFalse)
+      break;
+  }
+  if (found != MagickFalse)
+    PrintAlphaColor(file,image,p,exception);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1476,8 +1510,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
 
   ssize_t
     i,
-    x,
-    y;
+    x;
 
   struct stat
     properties;
@@ -1835,31 +1868,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
           (double) QuantumRange);
       x=0;
       if (image->alpha_trait != UndefinedPixelTrait)
-        {
-          MagickBooleanType
-            found = MagickFalse;
-
-          p=(const Quantum *) NULL;
-          for (y=0; y < (ssize_t) image->rows; y++)
-          {
-            p=GetVirtualPixels(image,0,y,image->columns,1,exception);
-            if (p == (const Quantum *) NULL)
-              break;
-            for (x=0; x < (ssize_t) image->columns; x++)
-            {
-              if (GetPixelAlpha(image,p) == (Quantum) TransparentAlpha)
-                {
-                  found=MagickTrue;
-                  break;
-                }
-              p+=(ptrdiff_t) GetPixelChannels(image);
-            }
-            if (found != MagickFalse)
-              break;
-          }
-          if (found != MagickFalse)
-            PrintAlphaColor(file,image,p,exception);
-        }
+        PrintTransparentPixel(file,image,&x,exception);
       PrintImageHistogram(file,image,exception);
     }
   PrintImageColormapEntries(file,image,exception);
