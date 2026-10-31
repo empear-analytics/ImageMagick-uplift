@@ -1617,6 +1617,20 @@ static void PrintImageBaseGeometryAndResolution(FILE *file,
     }
 }
 
+static void PrintImageType(FILE *file,const Image *image,
+  ExceptionInfo *exception)
+{
+  ImageType
+    type;
+
+  type=IdentifyImageType(image,exception);
+  (void) FormatLocaleFile(file,"  Type: %s\n",CommandOptionToMnemonic(
+    MagickTypeOptions,(ssize_t) type));
+  if (image->type != type)
+    (void) FormatLocaleFile(file,"  Base type: %s\n",CommandOptionToMnemonic(
+      MagickTypeOptions,(ssize_t) image->type));
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1650,9 +1664,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     elapsed_time,
     scale,
     user_time;
-
-  ImageType
-    type;
 
   MagickBooleanType
     ping;
@@ -1778,12 +1789,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     MagickResolutionOptions,(ssize_t) image->units));
   (void) FormatLocaleFile(file,"  Colorspace: %s\n",CommandOptionToMnemonic(
     MagickColorspaceOptions,(ssize_t) colorspace));
-  type=IdentifyImageType(image,exception);
-  (void) FormatLocaleFile(file,"  Type: %s\n",CommandOptionToMnemonic(
-    MagickTypeOptions,(ssize_t) type));
-  if (image->type != type)
-    (void) FormatLocaleFile(file,"  Base type: %s\n",CommandOptionToMnemonic(
-      MagickTypeOptions,(ssize_t) image->type));
+  PrintImageType(file,image,exception);
   (void) FormatLocaleFile(file,"  Endianness: %s\n",CommandOptionToMnemonic(
     MagickEndianOptions,(ssize_t) image->endian));
   if (depth != 0)
