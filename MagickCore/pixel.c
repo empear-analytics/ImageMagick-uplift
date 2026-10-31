@@ -2592,6 +2592,22 @@ MagickExport MagickBooleanType IsFuzzyEquivalencePixel(const Image *image,
 %    o q: Pixel q.
 %
 */
+static double GetFuzzyHueDistance(const PixelInfo *p,double pixel)
+{
+  if (IsHueCompatibleColorspace(p->colorspace) != MagickFalse)
+    {
+      /*
+        This calculates a arc distance for hue-- it should be a vector
+        angle of 'S'/'W' length with 'L'/'B' forming appropriate cones.
+        In other words this is a hack - Anthony.
+      */
+      if (fabs((double) pixel) > ((double) QuantumRange/2.0))
+        pixel-=(double) QuantumRange;
+      pixel*=2.0;
+    }
+  return(pixel);
+}
+
 MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
   const PixelInfo *q)
 {
@@ -2645,17 +2661,7 @@ MagickExport MagickBooleanType IsFuzzyEquivalencePixelInfo(const PixelInfo *p,
   distance*=3.0;  /* rescale appropriately */
   fuzz*=3.0;
   pixel=p->red-q->red;
-  if (IsHueCompatibleColorspace(p->colorspace) != MagickFalse)
-    {
-      /*
-        This calculates a arc distance for hue-- it should be a vector
-        angle of 'S'/'W' length with 'L'/'B' forming appropriate cones.
-        In other words this is a hack - Anthony.
-      */
-      if (fabs((double) pixel) > ((double) QuantumRange/2.0))
-        pixel-=(double) QuantumRange;
-      pixel*=2.0;
-    }
+  pixel=GetFuzzyHueDistance(p,pixel);
   distance+=pixel*pixel*scale;
   if (MagickSafeSignificantError(distance,fuzz) != MagickFalse)
     return(MagickFalse);
