@@ -1946,6 +1946,17 @@ static MagickBooleanType PrepareHaldClutImage(Image *image,
   return(MagickTrue);
 }
 
+static double GetHaldArea(const Image *hald_image,const double point)
+{
+  double
+    area;
+
+  area=point;
+  if (hald_image->interpolate == NearestInterpolatePixel)
+    area=(point < 0.5) ? 0.0 : 1.0;
+  return(area);
+}
+
 MagickExport MagickBooleanType HaldClutImage(Image *image,
   const Image *hald_image,ExceptionInfo *exception)
 {
@@ -2046,9 +2057,7 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
         fmod(offset+level,width),floor((offset+level)/width),&pixel2,exception);
       if (status == MagickFalse)
         break;
-      area=point.y;
-      if (hald_image->interpolate == NearestInterpolatePixel)
-        area=(point.y < 0.5) ? 0.0 : 1.0;
+      area=GetHaldArea(hald_image,point.y);
       CompositePixelInfoAreaBlend(&pixel1,pixel1.alpha,&pixel2,pixel2.alpha,
         area,&pixel3);
       offset+=cube_size;
@@ -2062,9 +2071,7 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
         break;
       CompositePixelInfoAreaBlend(&pixel1,pixel1.alpha,&pixel2,pixel2.alpha,
         area,&pixel4);
-      area=point.z;
-      if (hald_image->interpolate == NearestInterpolatePixel)
-        area=(point.z < 0.5)? 0.0 : 1.0;
+      area=GetHaldArea(hald_image,point.z);
       CompositePixelInfoAreaBlend(&pixel3,pixel3.alpha,&pixel4,pixel4.alpha,
         area,&pixel);
       SetHaldPixel(image,pixel,q);
