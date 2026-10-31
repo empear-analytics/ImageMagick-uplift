@@ -206,6 +206,14 @@ static MagickBooleanType BuildClutMap(const Image *clut_image,
   return(status);
 }
 
+static void ActivateClutAlpha(Image *image,const Image *clut_image,
+  ExceptionInfo *exception)
+{
+  if ((clut_image->alpha_trait != UndefinedPixelTrait) &&
+      ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0))
+    (void) SetImageAlphaChannel(image,ActivateAlphaChannel,exception);
+}
+
 MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
   const PixelInterpolateMethod method,ExceptionInfo *exception)
 {
@@ -284,9 +292,7 @@ MagickExport MagickBooleanType ClutImage(Image *image,const Image *clut_image,
   }
   image_view=DestroyCacheView(image_view);
   clut_map=(PixelInfo *) RelinquishMagickMemory(clut_map);
-  if ((clut_image->alpha_trait != UndefinedPixelTrait) &&
-      ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0))
-    (void) SetImageAlphaChannel(image,ActivateAlphaChannel,exception);
+  ActivateClutAlpha(image,clut_image,exception);
   return(status);
 }
 
