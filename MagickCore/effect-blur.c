@@ -391,6 +391,79 @@ static MagickBooleanType AcquireAdaptiveBlurKernel(double **kernel,
   return(MagickTrue);
 }
 
+typedef struct _AdaptiveBlurRow
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  Image
+    *edge_image;
+
+  CacheView
+    *image_view;
+
+  double
+    **kernel;
+
+  size_t
+    width;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} AdaptiveBlurRow;
+
+static void BlurAdaptiveRow(const AdaptiveBlurRow *row,
+  const Quantum *magick_restrict r,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->blur_image->columns; x++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      i;
+
+    ssize_t
+      center,
+      j;
+
+    j=GetAdaptiveKernelIndex(row->edge_image,r,row->width);
+    p=GetCacheViewVirtualPixels(row->image_view,x-((ssize_t) row->width-j)/2L,
+      row->y-((ssize_t) row->width-j)/2L,row->width-(size_t) j,
+      row->width-(size_t) j,row->exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    center=(ssize_t) (GetPixelChannels(row->image)*(row->width-(size_t) j)*
+      ((row->width-(size_t) j)/2L)+GetPixelChannels(row->image)*
+      ((row->width-(size_t) j)/2));
+    for (i=0; i < (ssize_t) GetPixelChannels(row->blur_image); i++)
+    {
+      AdaptiveChannel
+        adaptive;
+
+      adaptive.image=row->image;
+      adaptive.blur_image=row->blur_image;
+      adaptive.kernel=row->kernel;
+      adaptive.p=p;
+      adaptive.width=row->width;
+      adaptive.j=j;
+      adaptive.center=center;
+      BlurAdaptiveChannel(&adaptive,i,q);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(row->blur_image);
+    r+=(ptrdiff_t) GetPixelChannels(row->edge_image);
+  }
+}
+
 MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -499,8 +572,8 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    AdaptiveBlurRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -512,42 +585,15 @@ MagickExport Image *AdaptiveBlurImage(const Image *image,const double radius,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) blur_image->columns; x++)
-    {
-      const Quantum
-        *magick_restrict p;
-
-      ssize_t
-        i;
-
-      ssize_t
-        center,
-        j;
-
-      j=GetAdaptiveKernelIndex(edge_image,r,width);
-      p=GetCacheViewVirtualPixels(image_view,x-((ssize_t) width-j)/2L,y-
-        ((ssize_t) width-j)/2L,width-(size_t) j,width-(size_t) j,exception);
-      if (p == (const Quantum *) NULL)
-        break;
-      center=(ssize_t) (GetPixelChannels(image)*(width-(size_t) j)*
-        ((width-(size_t) j)/2L)+GetPixelChannels(image)*((width-(size_t) j)/2));
-      for (i=0; i < (ssize_t) GetPixelChannels(blur_image); i++)
-      {
-        AdaptiveChannel
-          adaptive;
-
-        adaptive.image=image;
-        adaptive.blur_image=blur_image;
-        adaptive.kernel=kernel;
-        adaptive.p=p;
-        adaptive.width=width;
-        adaptive.j=j;
-        adaptive.center=center;
-        BlurAdaptiveChannel(&adaptive,i,q);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(blur_image);
-      r+=(ptrdiff_t) GetPixelChannels(edge_image);
-    }
+    row.image=image;
+    row.blur_image=blur_image;
+    row.edge_image=edge_image;
+    row.image_view=image_view;
+    row.kernel=kernel;
+    row.width=width;
+    row.y=y;
+    row.exception=exception;
+    BlurAdaptiveRow(&row,r,q);
     if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
