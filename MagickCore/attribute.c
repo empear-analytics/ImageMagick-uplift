@@ -1177,6 +1177,14 @@ static MagickBooleanType QuantizeImageToPalette(Image *image,
   return(status);
 }
 
+static MagickBooleanType TransformImageToCMYK(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (image->colorspace != CMYKColorspace)
+    status=TransformImageColorspace(image,CMYKColorspace,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -1270,8 +1278,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     }
     case ColorSeparationType:
     {
-      if (image->colorspace != CMYKColorspace)
-        status=TransformImageColorspace(image,CMYKColorspace,exception);
+      status=TransformImageToCMYK(image,status,exception);
       status=SetImageDirectClass(image,status,exception);
       image->alpha_trait=UndefinedPixelTrait;
       break;
