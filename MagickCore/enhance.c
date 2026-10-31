@@ -759,6 +759,22 @@ static RectangleInfo GetCLAHETileInfo(const Image *image,const size_t width,
 
 #define CLAHEImageTag  "CLAHE/Image"
 
+static void UpdateCLAHEProgress(const Image *image,MagickOffsetType *progress,
+  MagickBooleanType *status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      (*progress)++;
+      proceed=SetImageProgress(image,CLAHEImageTag,(*progress),2*
+        GetPixelChannels(image));
+      if (proceed == MagickFalse)
+        (*status)=MagickFalse;
+    }
+}
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
@@ -849,17 +865,7 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
       pixels[n++]=ScaleQuantumToShort(p[0]);
       p+=(ptrdiff_t) GetPixelChannels(image);
     }
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        progress++;
-        proceed=SetImageProgress(image,CLAHEImageTag,progress,2*
-          GetPixelChannels(image));
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    UpdateCLAHEProgress(image,&progress,&status);
   }
   image_view=DestroyCacheView(image_view);
   status=CLAHE(&clahe_info,&tile_info,&range_info,number_bins == 0 ?
