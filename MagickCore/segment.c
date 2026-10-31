@@ -639,6 +639,20 @@ static MagickBooleanType FormGreenClusters(short **extrema,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireSquares(double **squares)
+{
+  ssize_t
+    i;
+
+  *squares=(double *) AcquireQuantumMemory(513UL,sizeof(*(*squares)));
+  if ((*squares) == (double *) NULL)
+    return(MagickFalse);
+  (*squares)+=255;
+  for (i=(-255); i <= 255; i++)
+    (*squares)[i]=(double) i*(double) i;
+  return(MagickTrue);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -688,9 +702,6 @@ static MagickBooleanType Classify(Image *image,short **extrema,
 
   MagickStatusType
     status;
-
-  ssize_t
-    i;
 
   double
     *squares;
@@ -795,13 +806,9 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   /*
     Speed up distance calculations.
   */
-  squares=(double *) AcquireQuantumMemory(513UL,sizeof(*squares));
-  if (squares == (double *) NULL)
+  if (AcquireSquares(&squares) == MagickFalse)
     ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  squares+=255;
-  for (i=(-255); i <= 255; i++)
-    squares[i]=(double) i*(double) i;
   /*
     Allocate image colormap.
   */
