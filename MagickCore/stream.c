@@ -2696,29 +2696,11 @@ static void StreamLongLongQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-static void StreamQuantumQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *p,Quantum *q)
+static void StreamQuantumAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *p,Quantum *q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=GetPixelRed(image,p);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=GetPixelGreen(image,p);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=GetPixelBlue(image,p);
-      break;
-    }
     case AlphaQuantum:
     {
       *q=GetPixelAlpha(image,p);
@@ -2742,6 +2724,37 @@ static void StreamQuantumQuantum(const Image *image,const QuantumType quantum,
     }
     default:
       *q=(Quantum) 0;
+  }
+}
+
+static void StreamQuantumQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *p,Quantum *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=GetPixelRed(image,p);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=GetPixelGreen(image,p);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=GetPixelBlue(image,p);
+      break;
+    }
+    default:
+    {
+      StreamQuantumAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
   }
 }
 
