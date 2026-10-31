@@ -3143,7 +3143,10 @@ helper returns a status the caller tests, which here would always lead to the sa
    followed directly by `continue;` of the innermost loop around it, `Lp`; every
    `continue;` in it that leaves it continues `Lp`. It contains no `return`, no `goto`,
    and no `break` that leaves it; a `break` or `continue` of a loop or `switch` nested
-   inside it stays as it is.
+   inside it stays as it is. A block that is the last statements of `Lp`'s body (its
+   tail, after statements that stay) counts as followed by `continue;`: the end of the
+   body ends the iteration as that `continue;` would. Step 5 then writes the call as
+   the body's last statement, with no `continue;` after it.
 2. The variables of the caller it writes meet Recipe O step 2 (plain locals, addresses
    not taken elsewhere); with those it only reads, at most four parameters.
 3. Cut the block into a new `static void` function directly above the caller. Each
@@ -3227,7 +3230,10 @@ static void DecodeDelegateEscape(const char **p,char **q)
   `v` a pointer parameter is `*(*v)++`, not `**v++`. Check each by reading, and let the
   oracle cover the reached paths.
 - A block not followed by `continue;` (one after which the loop body goes on) is not this
-  recipe.
+  recipe. A block that ends the body is (step 1): in C, `continue;` in a loop body
+  jumps to the end of that body (C11 6.8.6.2), so falling off the end and running
+  `continue;` are the same transfer, and the call, as the body's last statement, is
+  followed by that same end.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 3 and 5 checked by reading.
@@ -3237,7 +3243,11 @@ backslash case is an inner `switch` on the next character that advances `p` and 
 ends each case with `continue;` of the scan loop, followed by a `continue;` for the
 `default` path; it holds the function's nesting of 4. A probe: nesting 4 gone, cc 45 to
 33, delegate.c 3.83 to 4.05. Added by Claude Code (Claude Opus 5.5) during task M115
-(campaign B), under the mandate of 2026-10-24.
+(campaign B), under the mandate of 2026-10-24. Step 1's body tail (2026-10-31, campaign
+B, task M116): `image.c`'s `AppendImages`, whose scan loop ends in the extent update
+(stacked: widen and `continue;`; otherwise add the columns and take the taller height),
+writing `width` and `height`; part of the probe that takes the function from 4 bumps
+to 3.
 
 ---
 
@@ -3814,3 +3824,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | NEW | NS | Name a Constant Selection: a recurring `(c ? k1 : k2)` that picks one of two literals of one type, with a side-effect-free `c`, becomes a call of a `static inline` function returning that type; all sites in one function per commit; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `annotate.c`'s `AnnotateImage` (campaign B, task M115): eighteen gravity signs such as `(geometry.width == 0 ? -1.0 : 1.0)` in one `switch`, cc 56 to 38 in a probe with identical object code; P names only boolean conditions, and SD's helpers would inherit the decisions (a three-case gravity helper would be a *Complex Method*) | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | N | Step 8, *Sibling blocks*: the cases of one `switch`, each moved under this recipe in its own commit, may share one `Name` (the union of their groups; each function reads only its own members) and one local filled once, where nothing on any path from the fill to a call writes a member's variable (Recipe B step 5's condition) | `pixel.c`'s `InterpolatePixelChannels` (campaign B, task M116): eight cases read the same eight inputs; a fill before each call adds nine lines per case to a function the step is meant to shrink | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | T | Step 2: with the other name, the body may also read `v` after the block in the same iteration (the test that ends an inner loop the block sits in); *Careful* gives the argument: the caller's `v=c;` lands as the call returns, before that read | `image.c`'s `IsHighDynamicRangeImage` (campaign B, task M116): its channel loop sets `hdri=MagickTrue;` and breaks, then the column loop breaks on `hdri`, which step 2 refused; it holds the file's only *Deep, Nested Complexity*, 2.77 to 2.90 in a probe | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | OC | Step 1: a block that is the tail of `Lp`'s body counts as followed by `continue;` (the end of the body is where `continue;` jumps); the call is then the body's last statement. *Careful* gives the argument | `image.c`'s `AppendImages` (campaign B, task M116): its scan loop ends in the stacked/side-by-side extent update, which `continue`s on one branch and falls off the end on the other, writing `width` and `height`; O refuses its `continue`, E step 7's tail form its two outputs | mandate (2026-10-24) |
