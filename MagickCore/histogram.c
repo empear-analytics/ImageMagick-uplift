@@ -175,6 +175,13 @@ static inline size_t ColorToNodeId(const PixelInfo *pixel,size_t index)
   return(id);
 }
 
+static inline MagickRealType GetColorMatchAlpha(
+  const PixelInfo *magick_restrict p)
+{
+  return(p->alpha_trait == UndefinedPixelTrait ? (MagickRealType) OpaqueAlpha :
+    p->alpha);
+}
+
 static inline MagickBooleanType IsPixelInfoColorMatch(
   const PixelInfo *magick_restrict p,const PixelInfo *magick_restrict q)
 {
@@ -182,8 +189,7 @@ static inline MagickBooleanType IsPixelInfoColorMatch(
     alpha,
     beta;
 
-  alpha=p->alpha_trait == UndefinedPixelTrait ? (MagickRealType) OpaqueAlpha :
-    p->alpha;
+  alpha=GetColorMatchAlpha(p);
   beta=q->alpha_trait == UndefinedPixelTrait ? (MagickRealType) OpaqueAlpha :
     q->alpha;
   if (AbsolutePixelValue(alpha-beta) >= MagickEpsilon)
