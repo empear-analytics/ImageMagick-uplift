@@ -2833,6 +2833,31 @@ static void StreamFloatMapPixels(const Image *image,
   }
 }
 
+static void StreamLongMapPixels(const Image *image,
+  const QuantumType *quantum_map,const size_t length,unsigned int *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    i,
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      *q=0;
+      StreamLongQuantum(image,quantum_map[i],p,q);
+      q++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -3171,19 +3196,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
           StreamLongRGBPPixels(image,q);
           break;
         }
-      p=GetAuthenticPixelQueue(image);
-      if (p == (const Quantum *) NULL)
-        break;
-      for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-      {
-        for (i=0; i < (ssize_t) length; i++)
-        {
-          *q=0;
-          StreamLongQuantum(image,quantum_map[i],p,q);
-          q++;
-        }
-        p+=(ptrdiff_t) GetPixelChannels(image);
-      }
+      StreamLongMapPixels(image,quantum_map,length,q);
       break;
     }
     case LongLongPixel:
