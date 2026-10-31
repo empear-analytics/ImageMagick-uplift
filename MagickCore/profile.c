@@ -1967,6 +1967,14 @@ static const unsigned char *ReadResolutionResourceBlock(Image *image,
   return(p);
 }
 
+static const unsigned char *SkipResourcePadding(const ssize_t count,
+  const unsigned char *p)
+{
+  if ((count & 0x01) != 0)
+    p++;
+  return(p);
+}
+
 static void GetProfilesFromResourceBlock(Image *image,
   const StringInfo *resource_block,ExceptionInfo *exception)
 {
@@ -2029,8 +2037,7 @@ static void GetProfilesFromResourceBlock(Image *image,
         break;
       }
     }
-    if ((count & 0x01) != 0)
-      p++;
+    p=SkipResourcePadding(count,p);
   }
 }
 
