@@ -3354,6 +3354,69 @@ static void LogSelectiveKernel(MagickRealType *kernel,const size_t width)
   message=DestroyString(message);
 }
 
+typedef struct _SelectiveRow
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  const Image
+    *luminance_image;
+
+  MagickRealType
+    *kernel;
+
+  ssize_t
+    center;
+
+  double
+    threshold;
+
+  size_t
+    width;
+} SelectiveRow;
+
+static void BlurSelectiveRow(const SelectiveRow *row,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict l,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->image->columns; x++)
+  {
+    double
+      intensity;
+
+    ssize_t
+      i;
+
+    intensity=GetPixelIntensity(row->image,p+row->center);
+    for (i=0; i < (ssize_t) GetPixelChannels(row->image); i++)
+    {
+      SelectiveChannel
+        selective;
+
+      selective.image=row->image;
+      selective.blur_image=row->blur_image;
+      selective.luminance_image=row->luminance_image;
+      selective.kernel=row->kernel;
+      selective.p=p;
+      selective.l=l;
+      selective.center=row->center;
+      selective.intensity=intensity;
+      selective.threshold=row->threshold;
+      selective.width=row->width;
+      BlurSelectiveChannel(&selective,i,q);
+    }
+    p+=(ptrdiff_t) GetPixelChannels(row->image);
+    l+=(ptrdiff_t) GetPixelChannels(row->luminance_image);
+    q+=(ptrdiff_t) GetPixelChannels(row->blur_image);
+  }
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -3451,8 +3514,8 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    SelectiveRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -3467,36 +3530,14 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        intensity;
-
-      ssize_t
-        i;
-
-      intensity=GetPixelIntensity(image,p+center);
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        SelectiveChannel
-          selective;
-
-        selective.image=image;
-        selective.blur_image=blur_image;
-        selective.luminance_image=luminance_image;
-        selective.kernel=kernel;
-        selective.p=p;
-        selective.l=l;
-        selective.center=center;
-        selective.intensity=intensity;
-        selective.threshold=threshold;
-        selective.width=width;
-        BlurSelectiveChannel(&selective,i,q);
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      l+=(ptrdiff_t) GetPixelChannels(luminance_image);
-      q+=(ptrdiff_t) GetPixelChannels(blur_image);
-    }
+    row.image=image;
+    row.blur_image=blur_image;
+    row.luminance_image=luminance_image;
+    row.kernel=kernel;
+    row.center=center;
+    row.threshold=threshold;
+    row.width=width;
+    BlurSelectiveRow(&row,p,l,q);
     sync=SyncCacheViewAuthenticPixels(blur_view,exception);
     if (sync == MagickFalse)
       status=MagickFalse;
