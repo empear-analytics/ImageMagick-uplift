@@ -1363,6 +1363,15 @@ static void DecodeEntityReference(char **entities,char *q,char **p,
       }
 }
 
+static char *SkipEntityTextChar(char *xml,int state)
+{
+  if (IsCollapsibleSpace(xml,state) != MagickFalse)
+    *(xml++)=' ';
+  else
+    xml++;
+  return(xml);
+}
+
 static char *ParseEntities(char *xml,char **entities,int state)
 {
   char
@@ -1395,10 +1404,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
       if (IsEntityReference(xml,state) != MagickFalse)
         DecodeEntityReference(entities,q,&p,&xml);
       else
-        if (IsCollapsibleSpace(xml,state) != MagickFalse)
-          *(xml++)=' ';
-        else
-          xml++;
+        xml=SkipEntityTextChar(xml,state);
   }
   if (state == '*')
     {
