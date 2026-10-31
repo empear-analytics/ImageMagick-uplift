@@ -1048,6 +1048,18 @@ static MagickBooleanType CheckFourierExtent(const FourierInfo *fourier_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType CheckFourierMemory(const MemoryInfo *source_info,
+  const Image *image,ExceptionInfo *exception)
+{
+  if (source_info == (MemoryInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
   const Image *image,double *magnitude_pixels,double *phase_pixels,
   ExceptionInfo *exception)
@@ -1080,12 +1092,8 @@ static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
     return(MagickFalse);
   source_info=AcquireVirtualMemory(fourier_info->width,fourier_info->height*
     sizeof(*source_pixels));
-  if (source_info == (MemoryInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(MagickFalse);
-    }
+  if (CheckFourierMemory(source_info,image,exception) == MagickFalse)
+    return(MagickFalse);
   source_pixels=(double *) GetVirtualMemoryBlob(source_info);
   memset(source_pixels,0,fourier_info->width*fourier_info->height*
     sizeof(*source_pixels));
