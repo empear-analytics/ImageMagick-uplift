@@ -1871,6 +1871,90 @@ static const unsigned char *ReadResolutionResource(Image *image,
   return(p);
 }
 
+typedef struct _ResourceBlockEntry
+{
+  Image
+    *image;
+
+  ssize_t
+    count;
+
+  unsigned short
+    id;
+
+  ExceptionInfo
+    *exception;
+} ResourceBlockEntry;
+
+static void SetResourceBlockProfile(const ResourceBlockEntry *entry,
+  const unsigned char **p)
+{
+  Image
+    *const image = entry->image;
+
+  const ssize_t
+    count = entry->count;
+
+  const unsigned short
+    id = entry->id;
+
+  ExceptionInfo
+    *const exception = entry->exception;
+
+  switch (id)
+  {
+    case 0x0404:
+    {
+      /*
+        IPTC profile.
+      */
+      SetProfileFromResource(image,"iptc",(*p),count,exception);
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    case 0x040c:
+    {
+      /*
+        Thumbnail.
+      */
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    case 0x040f:
+    {
+      /*
+        ICC Profile.
+      */
+      SetProfileFromResource(image,"icc",(*p),count,exception);
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    case 0x0422:
+    {
+      /*
+        EXIF Profile.
+      */
+      SetProfileFromResource(image,"exif",(*p),count,exception);
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    case 0x0424:
+    {
+      /*
+        XMP Profile.
+      */
+      SetProfileFromResource(image,"xmp",(*p),count,exception);
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    default:
+    {
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+  }
+}
+
 static void GetProfilesFromResourceBlock(Image *image,
   const StringInfo *resource_block,ExceptionInfo *exception)
 {
@@ -1925,53 +2009,16 @@ static void GetProfilesFromResourceBlock(Image *image,
         p=ReadResolutionResource(image,p);
         break;
       }
-      case 0x0404:
-      {
-        /*
-          IPTC profile.
-        */
-        SetProfileFromResource(image,"iptc",p,count,exception);
-        p+=(ptrdiff_t) count;
-        break;
-      }
-      case 0x040c:
-      {
-        /*
-          Thumbnail.
-        */
-        p+=(ptrdiff_t) count;
-        break;
-      }
-      case 0x040f:
-      {
-        /*
-          ICC Profile.
-        */
-        SetProfileFromResource(image,"icc",p,count,exception);
-        p+=(ptrdiff_t) count;
-        break;
-      }
-      case 0x0422:
-      {
-        /*
-          EXIF Profile.
-        */
-        SetProfileFromResource(image,"exif",p,count,exception);
-        p+=(ptrdiff_t) count;
-        break;
-      }
-      case 0x0424:
-      {
-        /*
-          XMP Profile.
-        */
-        SetProfileFromResource(image,"xmp",p,count,exception);
-        p+=(ptrdiff_t) count;
-        break;
-      }
       default:
       {
-        p+=(ptrdiff_t) count;
+        ResourceBlockEntry
+          entry;
+
+        entry.image=image;
+        entry.count=count;
+        entry.id=id;
+        entry.exception=exception;
+        SetResourceBlockProfile(&entry,&p);
         break;
       }
     }
