@@ -2149,6 +2149,17 @@ static inline MagickBooleanType IsExifInApp1(const size_t length,
     0)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType DiscardOversizedProfile(StringInfo *profile,
+  const size_t length,ExceptionInfo *exception)
+{
+  if (length != 0)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitWarning,"ProfileSizeExceedsLimit","`%llu'",
+      (unsigned long long) length);
+  profile=DestroyStringInfo(profile);
+  return(MagickTrue);
+}
+
 static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
   StringInfo *profile,const MagickBooleanType recursive,
   ExceptionInfo *exception)
@@ -2170,14 +2181,7 @@ static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   length=GetStringInfoLength(profile);
   if ((length == 0) || (length > GetMaxProfileSize()))
-    {
-      if (length != 0)
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          ResourceLimitWarning,"ProfileSizeExceedsLimit","`%llu'",
-          (unsigned long long) length);
-      profile=DestroyStringInfo(profile);
-      return(MagickTrue);
-    }
+    return(DiscardOversizedProfile(profile,length,exception));
   PatchCorruptProfile(name,profile);
   if ((LocaleCompare(name,"xmp") == 0) &&
       (ValidateXMPProfile(image,profile,exception) == MagickFalse))
