@@ -996,6 +996,24 @@ static MagickBooleanType CompareLayerFrames(
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireCompareCanvas(const Image *next,
+  Image **image_a,ExceptionInfo *exception)
+{
+  *image_a=CloneImage(next,next->page.width,next->page.height,
+    MagickTrue,exception);
+  if (*image_a == (Image *) NULL)
+    return(MagickFalse);
+  (*image_a)->background_color.alpha_trait=BlendPixelTrait;
+  (*image_a)->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(*image_a,exception);
+  (*image_a)->page=next->page;
+  (*image_a)->page.x=0;
+  (*image_a)->page.y=0;
+  (void) CompositeImage(*image_a,next,CopyCompositeOp,MagickTrue,next->page.x,
+    next->page.y,exception);
+  return(MagickTrue);
+}
+
 MagickExport Image *CompareImagesLayers(const Image *image,
   const LayerMethod method,ExceptionInfo *exception)
 {
@@ -1036,21 +1054,11 @@ MagickExport Image *CompareImagesLayers(const Image *image,
   /*
     Set up first comparison images.
   */
-  image_a=CloneImage(next,next->page.width,next->page.height,
-    MagickTrue,exception);
-  if (image_a == (Image *) NULL)
+  if (AcquireCompareCanvas(next,&image_a,exception) == MagickFalse)
     {
       bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
       return((Image *) NULL);
     }
-  image_a->background_color.alpha_trait=BlendPixelTrait;
-  image_a->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(image_a,exception);
-  image_a->page=next->page;
-  image_a->page.x=0;
-  image_a->page.y=0;
-  (void) CompositeImage(image_a,next,CopyCompositeOp,MagickTrue,next->page.x,
-    next->page.y,exception);
   /*
     Compute the bounding box of changes for the later images
   */
