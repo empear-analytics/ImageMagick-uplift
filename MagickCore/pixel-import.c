@@ -3406,6 +3406,54 @@ static MagickBooleanType ImportMapQuantumCK(const ImportMapRequest *request,
   return(MagickTrue);
 }
 
+static MagickBooleanType ImportMapQuantumMY(const ImportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'm':
+    case 'M':
+    {
+      quantum_map[i]=MagentaQuantum;
+      (void) SetImageColorspace(image,CMYKColorspace,exception);
+      break;
+    }
+    case 'Y':
+    case 'y':
+    {
+      quantum_map[i]=YellowQuantum;
+      (void) SetImageColorspace(image,CMYKColorspace,exception);
+      break;
+    }
+    default:
+    {
+      ImportMapRequest
+        request;
+
+      request.image=image;
+      request.map=map;
+      request.i=i;
+      request.exception=exception;
+      if (ImportMapQuantumCK(&request,quantum_map) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   const ssize_t y,const size_t width,const size_t height,const char *map,
   const StorageType type,const void *pixels,ExceptionInfo *exception)
@@ -3443,20 +3491,6 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   {
     switch (map[i])
     {
-      case 'm':
-      case 'M':
-      {
-        quantum_map[i]=MagentaQuantum;
-        (void) SetImageColorspace(image,CMYKColorspace,exception);
-        break;
-      }
-      case 'Y':
-      case 'y':
-      {
-        quantum_map[i]=YellowQuantum;
-        (void) SetImageColorspace(image,CMYKColorspace,exception);
-        break;
-      }
       default:
       {
         ImportMapRequest
@@ -3466,7 +3500,7 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
         request.map=map;
         request.i=i;
         request.exception=exception;
-        if (ImportMapQuantumCK(&request,quantum_map) == MagickFalse)
+        if (ImportMapQuantumMY(&request,quantum_map) == MagickFalse)
           return(MagickFalse);
         break;
       }
