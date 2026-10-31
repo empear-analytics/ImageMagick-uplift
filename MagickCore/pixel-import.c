@@ -3358,6 +3358,54 @@ static MagickBooleanType ImportMapQuantumBI(const ImportMapRequest *request,
   return(MagickTrue);
 }
 
+static MagickBooleanType ImportMapQuantumCK(const ImportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'C':
+    case 'c':
+    {
+      quantum_map[i]=CyanQuantum;
+      (void) SetImageColorspace(image,CMYKColorspace,exception);
+      break;
+    }
+    case 'K':
+    case 'k':
+    {
+      quantum_map[i]=BlackQuantum;
+      (void) SetImageColorspace(image,CMYKColorspace,exception);
+      break;
+    }
+    default:
+    {
+      ImportMapRequest
+        request;
+
+      request.image=image;
+      request.map=map;
+      request.i=i;
+      request.exception=exception;
+      if (ImportMapQuantumBI(&request,quantum_map) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   const ssize_t y,const size_t width,const size_t height,const char *map,
   const StorageType type,const void *pixels,ExceptionInfo *exception)
@@ -3395,20 +3443,6 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   {
     switch (map[i])
     {
-      case 'C':
-      case 'c':
-      {
-        quantum_map[i]=CyanQuantum;
-        (void) SetImageColorspace(image,CMYKColorspace,exception);
-        break;
-      }
-      case 'K':
-      case 'k':
-      {
-        quantum_map[i]=BlackQuantum;
-        (void) SetImageColorspace(image,CMYKColorspace,exception);
-        break;
-      }
       case 'm':
       case 'M':
       {
@@ -3432,7 +3466,7 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
         request.map=map;
         request.i=i;
         request.exception=exception;
-        if (ImportMapQuantumBI(&request,quantum_map) == MagickFalse)
+        if (ImportMapQuantumCK(&request,quantum_map) == MagickFalse)
           return(MagickFalse);
         break;
       }
