@@ -1363,6 +1363,661 @@ static void StreamCharBGRPixels(const Image *image,unsigned char *q)
   }
 }
 
+static void StreamCharBGRAPixels(const Image *image,unsigned char *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+    *q++=ScaleQuantumToChar(GetPixelAlpha(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamCharBGRPPixels(const Image *image,unsigned char *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+    *q++=ScaleQuantumToChar((Quantum) 0);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamCharIPixels(const Image *image,unsigned char *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamCharRGBPixels(const Image *image,unsigned char *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+    *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamCharRGBAPixels(const Image *image,unsigned char *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+    *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToChar(GetPixelAlpha(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamCharRGBPPixels(const Image *image,unsigned char *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+    *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToChar((Quantum) 0);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongBGRPixels(const Image *image,unsigned int *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongBGRAPixels(const Image *image,unsigned int *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+    *q++=ScaleQuantumToLong(GetPixelAlpha(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongBGRPPixels(const Image *image,unsigned int *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongIPixels(const Image *image,unsigned int *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLong(ClampToQuantum(GetPixelIntensity(image,p)));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongRGBPixels(const Image *image,unsigned int *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+    *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongRGBAPixels(const Image *image,unsigned int *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+    *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToLong(GetPixelAlpha(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongRGBPPixels(const Image *image,unsigned int *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLong(GetPixelRed(image,p));
+    *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongLongBGRPixels(const Image *image,MagickSizeType *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongLongBGRAPixels(const Image *image,MagickSizeType *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongLongBGRPPixels(const Image *image,MagickSizeType *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+    *q++=0U;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongLongRGBPixels(const Image *image,MagickSizeType *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongLongRGBAPixels(const Image *image,MagickSizeType *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamLongLongRGBPPixels(const Image *image,MagickSizeType *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+    *q++=0U;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamQuantumBGRPixels(const Image *image,Quantum *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=GetPixelBlue(image,p);
+    *q++=GetPixelGreen(image,p);
+    *q++=GetPixelRed(image,p);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamQuantumBGRAPixels(const Image *image,Quantum *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=GetPixelBlue(image,p);
+    *q++=GetPixelGreen(image,p);
+    *q++=GetPixelRed(image,p);
+    *q++=GetPixelAlpha(image,p);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamQuantumBGRPPixels(const Image *image,Quantum *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=GetPixelBlue(image,p);
+    *q++=GetPixelGreen(image,p);
+    *q++=GetPixelRed(image,p);
+    *q++=(Quantum) 0;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamQuantumRGBPixels(const Image *image,Quantum *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=GetPixelRed(image,p);
+    *q++=GetPixelGreen(image,p);
+    *q++=GetPixelBlue(image,p);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamQuantumRGBAPixels(const Image *image,Quantum *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=GetPixelRed(image,p);
+    *q++=GetPixelGreen(image,p);
+    *q++=GetPixelBlue(image,p);
+    *q++=GetPixelAlpha(image,p);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamQuantumRGBPPixels(const Image *image,Quantum *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=GetPixelRed(image,p);
+    *q++=GetPixelGreen(image,p);
+    *q++=GetPixelBlue(image,p);
+    *q++=(Quantum) 0;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamShortBGRPixels(const Image *image,unsigned short *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamShortBGRAPixels(const Image *image,unsigned short *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+    *q++=ScaleQuantumToShort(GetPixelAlpha(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamShortBGRPPixels(const Image *image,unsigned short *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamShortIPixels(const Image *image,unsigned short *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToShort(ClampToQuantum(
+      GetPixelIntensity(image,p)));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamShortRGBPixels(const Image *image,unsigned short *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+    *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamShortRGBAPixels(const Image *image,unsigned short *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+    *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToShort(GetPixelAlpha(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
+static void StreamShortRGBPPixels(const Image *image,unsigned short *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToShort(GetPixelRed(image,p));
+    *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
+    *q++=0;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1541,88 +2196,32 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         }
       if (LocaleCompare(stream_info->map,"BGRA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-            *q++=ScaleQuantumToChar(GetPixelAlpha(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamCharBGRAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-            *q++=ScaleQuantumToChar((Quantum) 0);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamCharBGRPPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"I") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamCharIPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGB") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-            *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamCharRGBPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-            *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToChar(GetPixelAlpha(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamCharRGBAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-            *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToChar((Quantum) 0);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamCharRGBPPixels(image,q);
           break;
         }
       p=GetAuthenticPixelQueue(image);
@@ -2075,102 +2674,37 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
       q=(unsigned int *) stream_info->pixels;
       if (LocaleCompare(stream_info->map,"BGR") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongBGRPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-            *q++=ScaleQuantumToLong(GetPixelAlpha(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongBGRAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-            *q++=0;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongBGRPPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"I") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLong(ClampToQuantum(GetPixelIntensity(image,p)));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongIPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGB") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-            *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongRGBPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-            *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToLong(GetPixelAlpha(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongRGBAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLong(GetPixelRed(image,p));
-            *q++=ScaleQuantumToLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLong(GetPixelBlue(image,p));
-            *q++=0;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongRGBPPixels(image,q);
           break;
         }
       p=GetAuthenticPixelQueue(image);
@@ -2239,46 +2773,17 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
       q=(MagickSizeType *) stream_info->pixels;
       if (LocaleCompare(stream_info->map,"BGR") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongLongBGRPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongLongBGRAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-            *q++=0U;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongLongBGRPPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"I") == 0)
@@ -2296,46 +2801,17 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         }
       if (LocaleCompare(stream_info->map,"RGB") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongLongRGBPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongLongRGBAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLongLong(GetPixelRed(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-            *q++=0U;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongLongRGBPPixels(image,q);
           break;
         }
       p=GetAuthenticPixelQueue(image);
@@ -2405,46 +2881,17 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
       q=(Quantum *) stream_info->pixels;
       if (LocaleCompare(stream_info->map,"BGR") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=GetPixelBlue(image,p);
-            *q++=GetPixelGreen(image,p);
-            *q++=GetPixelRed(image,p);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamQuantumBGRPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=GetPixelBlue(image,p);
-            *q++=GetPixelGreen(image,p);
-            *q++=GetPixelRed(image,p);
-            *q++=GetPixelAlpha(image,p);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamQuantumBGRAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=GetPixelBlue(image,p);
-            *q++=GetPixelGreen(image,p);
-            *q++=GetPixelRed(image,p);
-            *q++=(Quantum) 0;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamQuantumBGRPPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"I") == 0)
@@ -2461,46 +2908,17 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         }
       if (LocaleCompare(stream_info->map,"RGB") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=GetPixelRed(image,p);
-            *q++=GetPixelGreen(image,p);
-            *q++=GetPixelBlue(image,p);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamQuantumRGBPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=GetPixelRed(image,p);
-            *q++=GetPixelGreen(image,p);
-            *q++=GetPixelBlue(image,p);
-            *q++=GetPixelAlpha(image,p);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamQuantumRGBAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=GetPixelRed(image,p);
-            *q++=GetPixelGreen(image,p);
-            *q++=GetPixelBlue(image,p);
-            *q++=(Quantum) 0;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamQuantumRGBPPixels(image,q);
           break;
         }
       p=GetAuthenticPixelQueue(image);
@@ -2569,103 +2987,37 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
       q=(unsigned short *) stream_info->pixels;
       if (LocaleCompare(stream_info->map,"BGR") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamShortBGRPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-            *q++=ScaleQuantumToShort(GetPixelAlpha(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamShortBGRAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-            if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-            *q++=0;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamShortBGRPPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"I") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToShort(ClampToQuantum(
-              GetPixelIntensity(image,p)));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamShortIPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGB") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-            *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamShortRGBPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBA") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-            *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToShort(GetPixelAlpha(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamShortRGBAPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGBP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToShort(GetPixelRed(image,p));
-            *q++=ScaleQuantumToShort(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToShort(GetPixelBlue(image,p));
-            *q++=0;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamShortRGBPPixels(image,q);
           break;
         }
       p=GetAuthenticPixelQueue(image);
