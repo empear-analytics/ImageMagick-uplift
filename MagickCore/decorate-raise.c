@@ -205,6 +205,13 @@ static void DrawRaiseTopRow(const RaiseTop *raise_top,const ssize_t y,
   }
 }
 
+static inline MagickBooleanType IsBevelTooWide(const Image *image,
+  const RectangleInfo *raise_info)
+{
+  return(((image->columns <= (raise_info->width << 1)) ||
+    (image->rows <= (raise_info->height << 1))) ? MagickTrue : MagickFalse);
+}
+
 MagickExport MagickBooleanType RaiseImage(Image *image,
   const RectangleInfo *raise_info,const MagickBooleanType raise,
   ExceptionInfo *exception)
@@ -230,8 +237,7 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
   assert(raise_info != (RectangleInfo *) NULL);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((image->columns <= (raise_info->width << 1)) ||
-      (image->rows <= (raise_info->height << 1)))
+  if (IsBevelTooWide(image,raise_info) != MagickFalse)
     ThrowBinaryException(OptionError,"ImageSizeMustExceedBevelWidth",
       image->filename);
   foreground=QuantumRange;
