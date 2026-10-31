@@ -2484,6 +2484,52 @@ static void SetRandomPixelChannels(const Image *image,
   }
 }
 
+static Image *BlendSketchImage(const Image *image,Image *blur_image,
+  const double radius,ExceptionInfo *exception)
+{
+  Image
+    *blend_image,
+    *dodge_image,
+    *sketch_image;
+
+  MagickBooleanType
+    status;
+
+  dodge_image=EdgeImage(blur_image,radius,exception);
+  blur_image=DestroyImage(blur_image);
+  if (dodge_image == (Image *) NULL)
+    return((Image *) NULL);
+  status=ClampImage(dodge_image,exception);
+  if (status != MagickFalse)
+    status=NormalizeImage(dodge_image,exception);
+  if (status != MagickFalse)
+    status=NegateImage(dodge_image,MagickFalse,exception);
+  if (status != MagickFalse)
+    status=TransformImage(&dodge_image,(char *) NULL,"50%",exception);
+  sketch_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (sketch_image == (Image *) NULL)
+    {
+      dodge_image=DestroyImage(dodge_image);
+      return((Image *) NULL);
+    }
+  (void) CompositeImage(sketch_image,dodge_image,ColorDodgeCompositeOp,
+    MagickTrue,0,0,exception);
+  dodge_image=DestroyImage(dodge_image);
+  blend_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (blend_image == (Image *) NULL)
+    {
+      sketch_image=DestroyImage(sketch_image);
+      return((Image *) NULL);
+    }
+  if (blend_image->alpha_trait != BlendPixelTrait)
+    (void) SetImageAlpha(blend_image,TransparentAlpha,exception);
+  (void) SetImageArtifact(blend_image,"compose:args","20x80");
+  (void) CompositeImage(sketch_image,blend_image,BlendCompositeOp,MagickTrue,
+    0,0,exception);
+  blend_image=DestroyImage(blend_image);
+  return(sketch_image);
+}
+
 MagickExport Image *SketchImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2491,11 +2537,8 @@ MagickExport Image *SketchImage(const Image *image,const double radius,
     *random_view;
 
   Image
-    *blend_image,
     *blur_image,
-    *dodge_image,
-    *random_image,
-    *sketch_image;
+    *random_image;
 
   MagickBooleanType
     status;
@@ -2569,39 +2612,7 @@ MagickExport Image *SketchImage(const Image *image,const double radius,
   random_image=DestroyImage(random_image);
   if (blur_image == (Image *) NULL)
     return((Image *) NULL);
-  dodge_image=EdgeImage(blur_image,radius,exception);
-  blur_image=DestroyImage(blur_image);
-  if (dodge_image == (Image *) NULL)
-    return((Image *) NULL);
-  status=ClampImage(dodge_image,exception);
-  if (status != MagickFalse)
-    status=NormalizeImage(dodge_image,exception);
-  if (status != MagickFalse)
-    status=NegateImage(dodge_image,MagickFalse,exception);
-  if (status != MagickFalse)
-    status=TransformImage(&dodge_image,(char *) NULL,"50%",exception);
-  sketch_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (sketch_image == (Image *) NULL)
-    {
-      dodge_image=DestroyImage(dodge_image);
-      return((Image *) NULL);
-    }
-  (void) CompositeImage(sketch_image,dodge_image,ColorDodgeCompositeOp,
-    MagickTrue,0,0,exception);
-  dodge_image=DestroyImage(dodge_image);
-  blend_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (blend_image == (Image *) NULL)
-    {
-      sketch_image=DestroyImage(sketch_image);
-      return((Image *) NULL);
-    }
-  if (blend_image->alpha_trait != BlendPixelTrait)
-    (void) SetImageAlpha(blend_image,TransparentAlpha,exception);
-  (void) SetImageArtifact(blend_image,"compose:args","20x80");
-  (void) CompositeImage(sketch_image,blend_image,BlendCompositeOp,MagickTrue,
-    0,0,exception);
-  blend_image=DestroyImage(blend_image);
-  return(sketch_image);
+  return(BlendSketchImage(image,blur_image,radius,exception));
 }
 
 /*
