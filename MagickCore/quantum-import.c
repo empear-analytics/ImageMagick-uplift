@@ -3842,6 +3842,42 @@ static void ImportAnyDepthGrayQuantum(const Image *image,
   }
 }
 
+static void ImportOtherDepthGrayQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 32:
+    {
+      Import32BitGrayQuantum(image,quantum_info,span);
+      break;
+    }
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import24BitFloatGrayQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import64BitFloatGrayQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ImportAnyDepthGrayQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ImportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -3879,32 +3915,9 @@ static void ImportGrayQuantum(const Image *image,QuantumInfo *quantum_info,
       Import16BitGrayQuantum(image,quantum_info,span);
       break;
     }
-    case 32:
-    {
-      Import32BitGrayQuantum(image,quantum_info,span);
-      break;
-    }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import24BitFloatGrayQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import64BitFloatGrayQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ImportAnyDepthGrayQuantum(image,quantum_info,span);
+      ImportOtherDepthGrayQuantum(image,quantum_info,span);
       break;
     }
   }
