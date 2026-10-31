@@ -2060,6 +2060,90 @@ static MagickBooleanType BlurMotionPixel(const MotionChannel *pixel_motion,
   return(status);
 }
 
+typedef struct _MotionRow
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  MagickRealType
+    *kernel;
+
+  CacheView
+    *motion_view;
+
+  OffsetInfo
+    *offset;
+
+  size_t
+    width;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} MotionRow;
+
+static MagickBooleanType BlurMotionRow(const MotionRow *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = row->image;
+
+  Image
+    *const blur_image = row->blur_image;
+
+  MagickRealType
+    *const kernel = row->kernel;
+
+  CacheView
+    *const motion_view = row->motion_view;
+
+  OffsetInfo
+    *const offset = row->offset;
+
+  const size_t
+    width = row->width;
+
+  const ssize_t
+    y = row->y;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    MotionChannel
+      pixel_motion;
+
+    pixel_motion.image=image;
+    pixel_motion.blur_image=blur_image;
+    pixel_motion.p=p;
+    pixel_motion.kernel=kernel;
+    pixel_motion.motion_view=motion_view;
+    pixel_motion.offset=offset;
+    pixel_motion.width=width;
+    pixel_motion.x=x;
+    pixel_motion.y=y;
+    pixel_motion.exception=exception;
+    if (BlurMotionPixel(&pixel_motion,q) == MagickFalse)
+      status=MagickFalse;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(blur_image);
+  }
+  return(status);
+}
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2163,8 +2247,8 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    MotionRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -2176,26 +2260,16 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      MotionChannel
-        pixel_motion;
-
-      pixel_motion.image=image;
-      pixel_motion.blur_image=blur_image;
-      pixel_motion.p=p;
-      pixel_motion.kernel=kernel;
-      pixel_motion.motion_view=motion_view;
-      pixel_motion.offset=offset;
-      pixel_motion.width=width;
-      pixel_motion.x=x;
-      pixel_motion.y=y;
-      pixel_motion.exception=exception;
-      if (BlurMotionPixel(&pixel_motion,q) == MagickFalse)
-        status=MagickFalse;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(blur_image);
-    }
+    row.image=image;
+    row.blur_image=blur_image;
+    row.kernel=kernel;
+    row.motion_view=motion_view;
+    row.offset=offset;
+    row.width=width;
+    row.y=y;
+    row.exception=exception;
+    if (BlurMotionRow(&row,p,q) == MagickFalse)
+      status=MagickFalse;
     if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
