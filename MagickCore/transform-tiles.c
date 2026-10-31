@@ -341,6 +341,11 @@ static void ShrinkAreaTileExtent(size_t *width,const ssize_t offset)
   *width=(size_t) ((ssize_t) *width-(offset < 0 ? -1 : 1)*offset);
 }
 
+static void GrowAreaTileExtent(size_t *width,const ssize_t offset)
+{
+  *width=(size_t) ((ssize_t) *width+(offset < 0 ? -1 : 1)*offset);
+}
+
 static void SelectAreaTileExtent(const MagickStatusType flags,
   const RectangleInfo geometry,size_t *width,size_t *height)
 {
@@ -351,9 +356,8 @@ static void SelectAreaTileExtent(const MagickStatusType flags,
     }
   else
     {
-      *width=(size_t) ((ssize_t) *width+(geometry.x < 0 ? -1 : 1)*geometry.x);
-      *height=(size_t) ((ssize_t) *height+(geometry.y < 0 ? -1 : 1)*
-        geometry.y);
+      GrowAreaTileExtent(width,geometry.x);
+      GrowAreaTileExtent(height,geometry.y);
     }
 }
 
