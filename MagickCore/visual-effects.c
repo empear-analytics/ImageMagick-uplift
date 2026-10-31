@@ -3314,6 +3314,77 @@ static void SetStereoRowPixels(const StereoPixels *stereo_pixels,
 
 #define StereoImageTag  "Stereo/Image"
 
+typedef struct _StereoRow
+{
+  const Image
+    *left_image,
+    *right_image,
+    *image;
+
+  Image
+    *stereo_image;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} StereoRow;
+
+static MagickBooleanType SetStereoRow(const StereoRow *stereo_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const left_image = stereo_row->left_image,
+    *const right_image = stereo_row->right_image,
+    *const image = stereo_row->image;
+
+  Image
+    *const stereo_image = stereo_row->stereo_image;
+
+  const ssize_t
+    x_offset = stereo_row->x_offset,
+    y_offset = stereo_row->y_offset;
+
+  ExceptionInfo
+    *const exception = stereo_row->exception;
+
+  const Quantum
+    *magick_restrict p,
+    *magick_restrict q;
+
+  Quantum
+    *magick_restrict r;
+
+  StereoPixels
+    stereo_pixels;
+
+  p=GetVirtualPixels(left_image,-x_offset,y-y_offset,image->columns,1,
+    exception);
+  q=GetVirtualPixels(right_image,0,y,right_image->columns,1,exception);
+  r=QueueAuthenticPixels(stereo_image,0,y,stereo_image->columns,1,exception);
+  if (IsStereoRowMissing(p,q,r) != MagickFalse)
+    return(MagickFalse);
+  stereo_pixels.left_image=left_image;
+  stereo_pixels.right_image=right_image;
+  stereo_pixels.stereo_image=stereo_image;
+  SetStereoRowPixels(&stereo_pixels,p,q,r);
+  if (SyncAuthenticPixels(stereo_image,exception) == MagickFalse)
+    return(MagickFalse);
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,StereoImageTag,(MagickOffsetType) y,
+        stereo_image->rows);
+      if (proceed == MagickFalse)
+        *status=MagickFalse;
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   const Image *right_image,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -3362,38 +3433,18 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   status=MagickTrue;
   for (y=0; y < (ssize_t) stereo_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
+    StereoRow
+      stereo_row;
 
-    Quantum
-      *magick_restrict r;
-
-    StereoPixels
-      stereo_pixels;
-
-    p=GetVirtualPixels(left_image,-x_offset,y-y_offset,image->columns,1,
-      exception);
-    q=GetVirtualPixels(right_image,0,y,right_image->columns,1,exception);
-    r=QueueAuthenticPixels(stereo_image,0,y,stereo_image->columns,1,exception);
-    if (IsStereoRowMissing(p,q,r) != MagickFalse)
+    stereo_row.left_image=left_image;
+    stereo_row.right_image=right_image;
+    stereo_row.image=image;
+    stereo_row.stereo_image=stereo_image;
+    stereo_row.x_offset=x_offset;
+    stereo_row.y_offset=y_offset;
+    stereo_row.exception=exception;
+    if (SetStereoRow(&stereo_row,y,&status) == MagickFalse)
       break;
-    stereo_pixels.left_image=left_image;
-    stereo_pixels.right_image=right_image;
-    stereo_pixels.stereo_image=stereo_image;
-    SetStereoRowPixels(&stereo_pixels,p,q,r);
-    if (SyncAuthenticPixels(stereo_image,exception) == MagickFalse)
-      break;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,StereoImageTag,(MagickOffsetType) y,
-          stereo_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
   }
   if (status == MagickFalse)
     stereo_image=DestroyImage(stereo_image);
