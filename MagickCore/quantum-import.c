@@ -5612,6 +5612,37 @@ static void ImportAnyDepthMultispectralQuantum(const Image *image,
   }
 }
 
+static void ImportOtherDepthMultispectralQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import24BitFloatMultispectralQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import64BitFloatMultispectralQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ImportAnyDepthMultispectralQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
@@ -5644,27 +5675,9 @@ static void ImportMultispectralQuantum(const Image *image,QuantumInfo *quantum_i
       Import32BitMultispectralQuantum(image,quantum_info,span);
       break;
     }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import24BitFloatMultispectralQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import64BitFloatMultispectralQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ImportAnyDepthMultispectralQuantum(image,quantum_info,span);
+      ImportOtherDepthMultispectralQuantum(image,quantum_info,span);
       break;
     }
   }
