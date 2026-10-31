@@ -1934,6 +1934,18 @@ static void SetHaldPixel(const Image *image,const PixelInfo pixel,
     SetPixelAlpha(image,ClampToQuantum(pixel.alpha),q);
 }
 
+static MagickBooleanType PrepareHaldClutImage(Image *image,
+  const Image *hald_image,ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+  if (image->colorspace != hald_image->colorspace)
+    (void) SetImageColorspace(image,hald_image->colorspace,exception);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType HaldClutImage(Image *image,
   const Image *hald_image,ExceptionInfo *exception)
 {
@@ -1969,12 +1981,8 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   assert(hald_image != (Image *) NULL);
   assert(hald_image->signature == MagickCoreSignature);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (PrepareHaldClutImage(image,hald_image,exception) == MagickFalse)
     return(MagickFalse);
-  if ((image->alpha_trait & BlendPixelTrait) == 0)
-    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
-  if (image->colorspace != hald_image->colorspace)
-    (void) SetImageColorspace(image,hald_image->colorspace,exception);
   /*
     Hald clut image.
   */
