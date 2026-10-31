@@ -2636,6 +2636,59 @@ static void SyncExifIfd0Tag(const unsigned short tag_value,
   }
 }
 
+typedef struct _ExifEntryInfo
+{
+  EndianType
+    endian;
+
+  unsigned char
+    *exif;
+
+  size_t
+    length,
+    number_bytes;
+
+  unsigned char
+    *q;
+} ExifEntryInfo;
+
+static MagickBooleanType LocateExifEntryValue(const ExifEntryInfo *exif_entry,
+  unsigned char **p)
+{
+  const EndianType
+    endian = exif_entry->endian;
+
+  unsigned char
+    *const exif = exif_entry->exif;
+
+  const size_t
+    length = exif_entry->length,
+    number_bytes = exif_entry->number_bytes;
+
+  unsigned char
+    *const q = exif_entry->q;
+
+  ssize_t
+    offset;
+
+  if (number_bytes <= 4)
+    *p=q+8;
+  else
+    {
+      /*
+        The directory entry contains an offset.
+      */
+      offset=(ssize_t) ReadProfileLong(endian,q+8);
+      if ((offset < 0) ||
+          ((size_t) (offset+(ssize_t) number_bytes) > length))
+        return(MagickFalse);
+      if (~length < number_bytes)
+        return(MagickFalse);  /* prevent overflow */
+      *p=(unsigned char *) (exif+offset);
+    }
+  return(MagickTrue);
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
@@ -2745,6 +2798,9 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
       continue;
     for ( ; entry < number_entries; entry++)
     {
+      ExifEntryInfo
+        exif_entry;
+
       ExifTagInfo
         exif_tag;
 
@@ -2780,21 +2836,13 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
       number_bytes=(size_t) components*(size_t) format_bytes[format];
       if ((ssize_t) number_bytes < components)
         break;  /* prevent overflow */
-      if (number_bytes <= 4)
-        p=q+8;
-      else
-        {
-          /*
-            The directory entry contains an offset.
-          */
-          offset=(ssize_t) ReadProfileLong(endian,q+8);
-          if ((offset < 0) ||
-              ((size_t) (offset+(ssize_t) number_bytes) > length))
-            continue;
-          if (~length < number_bytes)
-            continue;  /* prevent overflow */
-          p=(unsigned char *) (exif+offset);
-        }
+      exif_entry.endian=endian;
+      exif_entry.exif=exif;
+      exif_entry.length=length;
+      exif_entry.number_bytes=number_bytes;
+      exif_entry.q=q;
+      if (LocateExifEntryValue(&exif_entry,&p) == MagickFalse)
+        continue;
       exif_tag.image=image;
       exif_tag.endian=endian;
       exif_tag.directory=directory;
