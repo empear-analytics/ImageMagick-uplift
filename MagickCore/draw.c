@@ -2536,14 +2536,12 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
           end=p-strlen(token)-1;
           n--;
         }
-      if (LocaleCompare(token,"push") == 0)
+      if ((LocaleCompare(token,"push") == 0) &&
+          (n++ >= MagickMaxRecursionDepth))
         {
-          if (n++ >= MagickMaxRecursionDepth)
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
-              break;
-            }
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
+          break;
         }
       if ((n == 0) && (end >= start))
         {
