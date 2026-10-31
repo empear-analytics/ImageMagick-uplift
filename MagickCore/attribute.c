@@ -1185,12 +1185,25 @@ static MagickBooleanType TransformImageToCMYK(Image *image,
   return(status);
 }
 
-MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
-  ExceptionInfo *exception)
+static ImageInfo *AcquireImageTypeInfo(const Image *image)
 {
   const char
     *artifact;
 
+  ImageInfo
+    *image_info;
+
+  image_info=AcquireImageInfo();
+  image_info->dither=image->dither;
+  artifact=GetImageArtifact(image,"dither");
+  if (artifact != (const char *) NULL)
+    (void) SetImageOption(image_info,"dither",artifact);
+  return(image_info);
+}
+
+MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
+  ExceptionInfo *exception)
+{
   ImageInfo
     *image_info;
 
@@ -1205,11 +1218,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"...");
   assert(image->signature == MagickCoreSignature);
   status=MagickTrue;
-  image_info=AcquireImageInfo();
-  image_info->dither=image->dither;
-  artifact=GetImageArtifact(image,"dither");
-  if (artifact != (const char *) NULL)
-    (void) SetImageOption(image_info,"dither",artifact);
+  image_info=AcquireImageTypeInfo(image);
   switch (type)
   {
     case BilevelType:
