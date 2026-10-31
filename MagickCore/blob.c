@@ -3521,6 +3521,22 @@ static void OpenBZipBlob(BlobInfo *magick_restrict blob_info,
 }
 #endif
 
+static void OpenCompressedBlob(const ImageInfo *image_info,
+  BlobInfo *magick_restrict blob_info,const char *filename,
+  unsigned char *magick)
+{
+#if defined(MAGICKCORE_ZLIB_DELEGATE)
+  if (IsGzipMagick(magick) != MagickFalse)
+    OpenGzipBlob(blob_info,filename);
+#endif
+#if defined(MAGICKCORE_BZLIB_DELEGATE)
+  if (strncmp((char *) magick,"BZh",3) == 0)
+    OpenBZipBlob(blob_info,filename);
+#endif
+  if (blob_info->type == FileStream)
+    MapBlobFile(image_info,blob_info);
+}
+
 static void FormSharedListFilename(const Image *image,const char *extension,
   char *filename)
 {
@@ -3737,16 +3753,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
 #endif
             (void) LogMagickEvent(BlobEvent,GetMagickModule(),
                "  read %.17g magic header bytes",(double) count);
-#if defined(MAGICKCORE_ZLIB_DELEGATE)
-            if (IsGzipMagick(magick) != MagickFalse)
-              OpenGzipBlob(blob_info,filename);
-#endif
-#if defined(MAGICKCORE_BZLIB_DELEGATE)
-            if (strncmp((char *) magick,"BZh",3) == 0)
-              OpenBZipBlob(blob_info,filename);
-#endif
-            if (blob_info->type == FileStream)
-              MapBlobFile(image_info,blob_info);
+            OpenCompressedBlob(image_info,blob_info,filename,magick);
           }
       }
     else
