@@ -3274,6 +3274,44 @@ static inline MagickBooleanType IsStereoRowMissing(const Quantum *p,
     (r == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _StereoPixels
+{
+  const Image
+    *left_image,
+    *right_image;
+
+  Image
+    *stereo_image;
+} StereoPixels;
+
+static void SetStereoRowPixels(const StereoPixels *stereo_pixels,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q,
+  Quantum *magick_restrict r)
+{
+  const Image
+    *const left_image = stereo_pixels->left_image,
+    *const right_image = stereo_pixels->right_image;
+
+  Image
+    *const stereo_image = stereo_pixels->stereo_image;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) stereo_image->columns; x++)
+  {
+    SetPixelRed(stereo_image,GetPixelRed(left_image,p),r);
+    SetPixelGreen(stereo_image,GetPixelGreen(right_image,q),r);
+    SetPixelBlue(stereo_image,GetPixelBlue(right_image,q),r);
+    if ((GetPixelAlphaTraits(stereo_image) & CopyPixelTrait) != 0)
+      SetPixelAlpha(stereo_image,(GetPixelAlpha(left_image,p)+
+        GetPixelAlpha(right_image,q))/2,r);
+    p+=(ptrdiff_t) GetPixelChannels(left_image);
+    q+=(ptrdiff_t) GetPixelChannels(right_image);
+    r+=(ptrdiff_t) GetPixelChannels(stereo_image);
+  }
+}
+
 MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   const Image *right_image,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
@@ -3328,11 +3366,11 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
       *magick_restrict p,
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict r;
+
+    StereoPixels
+      stereo_pixels;
 
     p=GetVirtualPixels(left_image,-x_offset,y-y_offset,image->columns,1,
       exception);
@@ -3340,18 +3378,10 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
     r=QueueAuthenticPixels(stereo_image,0,y,stereo_image->columns,1,exception);
     if (IsStereoRowMissing(p,q,r) != MagickFalse)
       break;
-    for (x=0; x < (ssize_t) stereo_image->columns; x++)
-    {
-      SetPixelRed(stereo_image,GetPixelRed(left_image,p),r);
-      SetPixelGreen(stereo_image,GetPixelGreen(right_image,q),r);
-      SetPixelBlue(stereo_image,GetPixelBlue(right_image,q),r);
-      if ((GetPixelAlphaTraits(stereo_image) & CopyPixelTrait) != 0)
-        SetPixelAlpha(stereo_image,(GetPixelAlpha(left_image,p)+
-          GetPixelAlpha(right_image,q))/2,r);
-      p+=(ptrdiff_t) GetPixelChannels(left_image);
-      q+=(ptrdiff_t) GetPixelChannels(right_image);
-      r+=(ptrdiff_t) GetPixelChannels(stereo_image);
-    }
+    stereo_pixels.left_image=left_image;
+    stereo_pixels.right_image=right_image;
+    stereo_pixels.stereo_image=stereo_image;
+    SetStereoRowPixels(&stereo_pixels,p,q,r);
     if (SyncAuthenticPixels(stereo_image,exception) == MagickFalse)
       break;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
