@@ -122,6 +122,49 @@ static void BlendPixelChannels(const Image *image,const Quantum factor,
 #define RaiseImageTag  "Raise/Image"
 #define TroughFactor  ScaleCharToQuantum(135)
 
+typedef struct _RaiseSide
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *raise_info;
+
+  Quantum
+    foreground,
+    background;
+} RaiseSide;
+
+static void DrawRaiseSideRow(const RaiseSide *raise_side,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const image = raise_side->image;
+
+  const RectangleInfo
+    *const raise_info = raise_side->raise_info;
+
+  const Quantum
+    foreground = raise_side->foreground,
+    background = raise_side->background;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) raise_info->width; x++)
+  {
+    BlendPixelChannels(image,HighlightFactor,foreground,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  for ( ; x < (ssize_t) (image->columns-raise_info->width); x++)
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  for ( ; x < (ssize_t) image->columns; x++)
+  {
+    BlendPixelChannels(image,ShadowFactor,background,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType RaiseImage(Image *image,
   const RectangleInfo *raise_info,const MagickBooleanType raise,
   ExceptionInfo *exception)
@@ -223,11 +266,11 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
 #endif
   for (y=(ssize_t) raise_info->height; y < (ssize_t) (image->rows-raise_info->height); y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
+
+    RaiseSide
+      raise_side;
 
     if (status == MagickFalse)
       continue;
@@ -237,18 +280,11 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) raise_info->width; x++)
-    {
-      BlendPixelChannels(image,HighlightFactor,foreground,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    for ( ; x < (ssize_t) (image->columns-raise_info->width); x++)
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    for ( ; x < (ssize_t) image->columns; x++)
-    {
-      BlendPixelChannels(image,ShadowFactor,background,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    raise_side.image=image;
+    raise_side.raise_info=raise_info;
+    raise_side.foreground=foreground;
+    raise_side.background=background;
+    DrawRaiseSideRow(&raise_side,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
