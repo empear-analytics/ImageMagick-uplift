@@ -538,6 +538,38 @@ static void ImportAnyDepthPixelChannel(const Image *image,
   }
 }
 
+static void ImportOtherDepthPixelChannel(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  Quantum *magick_restrict q)
+{
+  switch (quantum_info->depth)
+  {
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import24BitFloatPixelChannel(image,quantum_info,span,q);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import64BitFloatPixelChannel(image,quantum_info,span,q);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ImportAnyDepthPixelChannel(image,quantum_info,span,q);
+      break;
+    }
+  }
+}
+
 static void ImportPixelChannel(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,PixelChannel channel)
 {
@@ -562,27 +594,9 @@ static void ImportPixelChannel(const Image *image,QuantumInfo *quantum_info,
       Import32BitPixelChannel(image,quantum_info,span,q);
       break;
     }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import24BitFloatPixelChannel(image,quantum_info,span,q);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import64BitFloatPixelChannel(image,quantum_info,span,q);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ImportAnyDepthPixelChannel(image,quantum_info,span,q);
+      ImportOtherDepthPixelChannel(image,quantum_info,span,q);
       break;
     }
   }
