@@ -1790,6 +1790,18 @@ static MagickBooleanType InverseFourierTransformChannel(
 }
 #endif
 
+static MagickBooleanType CheckFourierPhaseImage(const Image *magnitude_image,
+  const Image *phase_image,ExceptionInfo *exception)
+{
+  if (phase_image == (Image *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ImageSequenceRequired","`%s'",magnitude_image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
   const Image *phase_image,const MagickBooleanType modulus,
   ExceptionInfo *exception)
@@ -1802,12 +1814,9 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       magnitude_image->filename);
-  if (phase_image == (Image *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "ImageSequenceRequired","`%s'",magnitude_image->filename);
-      return((Image *) NULL);
-    }
+  if (CheckFourierPhaseImage(magnitude_image,phase_image,exception) ==
+      MagickFalse)
+    return((Image *) NULL);
 #if !defined(ENABLE_FFTW_DELEGATE)
   fourier_image=(Image *) NULL;
   (void) modulus;
