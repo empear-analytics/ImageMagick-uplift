@@ -1885,6 +1885,26 @@ static MagickBooleanType InterpolateQuadChannels(
   return(status);
 }
 
+static void InterpolateGridChannels(const ChannelsInterpolation grid,
+  const PixelInterpolateMethod interpolate,Quantum *pixel,
+  MagickBooleanType *status)
+{
+  switch (interpolate)
+  {
+    case BilinearInterpolatePixel:
+    default:
+    {
+      (*status)=InterpolateBilinearChannels(&grid,pixel,(*status));
+      break;
+    }
+    case IntegerInterpolatePixel:
+    {
+      (*status)=InterpolateIntegerChannels(&grid,pixel,(*status));
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannels(
   const Image *magick_restrict source,const CacheView_ *source_view,
   const Image *magick_restrict destination,const PixelInterpolateMethod method,
@@ -1960,10 +1980,9 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
       AverageInterpolateChannels(&grid,p,count,pixel);
       break;
     }
-    case BilinearInterpolatePixel:
     default:
     {
-      status=InterpolateBilinearChannels(&grid,pixel,status);
+      InterpolateGridChannels(grid,interpolate,pixel,&status);
       break;
     }
     case BlendInterpolatePixel:
@@ -1975,11 +1994,6 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     case CatromInterpolatePixel:
     {
       status=InterpolateCubicChannels(&grid,CatromWeights,pixel,status);
-      break;
-    }
-    case IntegerInterpolatePixel:
-    {
-      status=InterpolateIntegerChannels(&grid,pixel,status);
       break;
     }
     case NearestInterpolatePixel:
