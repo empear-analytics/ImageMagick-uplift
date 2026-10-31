@@ -562,8 +562,9 @@ over the pair.
 
 **Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*,
 and the block that would fix it is a self-contained selection (a `switch` or an `if`
-chain) that sets several of the caller's local variables together, such as a method
-pointer with its magnification and window width.
+chain) or loop that sets several of the caller's local variables together, such as a
+method pointer with its magnification and window width, or a scan that leaves its
+cursor and the pixel it found. Steps 1 to 6 do not depend on the block's kind.
 
 **Not covered by:** Recipe E, whose step 4 refuses a block that writes more than one
 outer variable; Recipe P, which moves an expression, not statements; Recipe D, which
@@ -593,6 +594,13 @@ needs two copies of the block.
    written `(*p)` at every use, so `*xml++=c` becomes `*(*xml)++=c` and `xml[i]` becomes
    `(*xml)[i]`. Writes through it stay writes through it, to the memory the caller's
    caller owns, as before. Recipes V, W, LB, I and OC read "plain local" the same way.
+   A variable the block writes before it reads it may still pass as a pointer instead
+   of being declared in the new function (Recipe E step 4) when the caller stores to it
+   before the block and nothing reads that store but the block: declared in the new
+   function, the caller's store would be left with no use (`-Wunused-but-set-variable`,
+   an error in the macOS CI job). Passing it keeps that store, which no recipe deletes
+   (dead code stays, see *Absolutely forbidden*), and its final value, as before
+   (`IdentifyImage`'s `x=0;` before the transparent-pixel scan).
 3. The block must contain no `return`, `goto`, `continue`, or `break` that leaves the
    block; a `break` that ends a `switch` or loop inside the block is fine.
 4. Cut the block into a new `static void` function directly above the caller. Pass each
@@ -3981,3 +3989,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | OC | Step 1: a block that is the tail of `Lp`'s body counts as followed by `continue;` (the end of the body is where `continue;` jumps); the call is then the body's last statement. *Careful* gives the argument | `image.c`'s `AppendImages` (campaign B, task M116): its scan loop ends in the stacked/side-by-side extent update, which `continue`s on one branch and falls off the end on the other, writing `width` and `height`; O refuses its `continue`, E step 7's tail form its two outputs | mandate (2026-10-24) |
 | 2026-10-31 | NEW | VC | Extract Loop-Tail Block Returning Success for a Cleanup Exit: a block at the tail of a loop body (or followed by its `continue;`) whose exits are `continue;` of that loop and one cleanup return of the function in a form Recipe V step 6 or 7 or Recipe I step 8 admits moves to a `static MagickBooleanType` function: each `continue;` becomes `return(MagickTrue);`, each exit `return(MagickFalse);`, the caller keeps the exit's text | `xml-tree.c`'s `ParseInternalDoctype` (campaign B, task M116): its `<!ATTLIST` branch and the attribute loop's body mix `continue;` with `predefined_entities=...RelinquishMagickMemory(...); return(MagickFalse);`, which V, Y, I and W (no `continue`) and OC (no `return`) refuse; they hold the function's nesting of 5; a probe: 4.05 to 4.21 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | SD | Step 1: the `switch`'s last group may end at its closing brace instead of `break;`, when it moves and stays last in the new `switch`; *Careful* gives the argument | `stream.c`'s `StreamLongLongQuantum`, `StreamQuantumQuantum`, `StreamDoubleQuantum` and `StreamFloatQuantum` (campaign B, task M117): channel `switch`es of cc 13 whose `default: *q=0;` (or `*q=(Quantum) 0;`) has no `break;`; their three siblings without that quirk went from 4.63 to 5.10 by SD | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | O | *Use when*: the block may be a loop as well as a selection (steps 1 to 6 never depended on it); step 2: a variable written before read passes as a pointer, not declared in the new function, when the caller's store before the block would otherwise be left with no use; no recipe deletes that store | `identify.c`'s `IdentifyImage` (campaign B, task M117, a574c1d63): the transparent-pixel scan writes `p`, `y`, `found` and `x`; declaring `x` in the helper leaves the caller's `x=0;` set but unused, which fails the macOS CI build. The owner left both questions to the session (2026-10-31) | owner |
