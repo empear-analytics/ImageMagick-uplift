@@ -2467,6 +2467,111 @@ static char *ParseCDataContent(XMLTreeRoot *root,char *tag,char *p,
   return(p);
 }
 
+typedef struct _DeclarationInfo
+{
+  XMLTreeRoot
+    *root;
+
+  size_t
+    ignore_depth;
+
+  int
+    terminal;
+
+  ExceptionInfo
+    *exception;
+} DeclarationInfo;
+
+typedef struct _DeclarationTargets
+{
+  char
+    **p,
+    **tag;
+
+  ssize_t
+    *l;
+} DeclarationTargets;
+
+static MagickBooleanType ParseDeclaration(const DeclarationInfo *declaration,
+  const DeclarationTargets *declaration_targets)
+{
+  XMLTreeRoot
+    *const root = declaration->root;
+
+  const size_t
+    ignore_depth = declaration->ignore_depth;
+
+  const int
+    terminal = declaration->terminal;
+
+  ExceptionInfo
+    *const exception = declaration->exception;
+
+  char
+    **const p = declaration_targets->p;
+
+  char
+    **const tag = declaration_targets->tag;
+
+  ssize_t
+    *const l = declaration_targets->l;
+
+  if (strncmp(*p,"![CDATA[",8) == 0)
+    {
+      /*
+        Cdata.
+      */
+      *p=strstr(*p,"]]>");
+      if (*p != (char *) NULL)
+        {
+          *p=ParseCDataContent(root,*tag,*p,ignore_depth);
+        }
+      else
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            OptionWarning,"ParseError","unclosed <![CDATA[");
+          return(MagickFalse);
+        }
+    }
+  else
+    if (strncmp(*p,"!DOCTYPE",8) == 0)
+      {
+        DoctypeTargets
+          targets;
+
+        targets.p=p;
+        targets.tag=tag;
+        targets.l=l;
+        if (ParseDoctype(root,terminal,exception,&targets) ==
+            MagickFalse)
+          {
+            return(MagickFalse);
+          }
+      }
+    else
+      if (**p == '?')
+        {
+          /*
+            Processing instructions.
+          */
+          *p=SkipProcessingInstruction(*p);
+          if (IsUnterminatedSection(*p,terminal) != MagickFalse)
+            {
+              (void) ThrowMagickException(exception,GetMagickModule(),
+                OptionWarning,"ParseError","unclosed <?");
+              return(MagickFalse);
+            }
+          ParseProcessingInstructions(root,*tag+1,(size_t) (*p-*tag-2));
+        }
+      else
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            OptionWarning,"ParseError","unexpected <");
+          return(MagickFalse);
+        }
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2613,63 +2718,27 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
               }
           }
         else
-          if (strncmp(p,"![CDATA[",8) == 0)
-            {
-              /*
-                Cdata.
-              */
-              p=strstr(p,"]]>");
-              if (p != (char *) NULL)
-                {
-                  p=ParseCDataContent(root,tag,p,ignore_depth);
-                }
-              else
-                {
-                  (void) ThrowMagickException(exception,GetMagickModule(),
-                    OptionWarning,"ParseError","unclosed <![CDATA[");
-                  utf8=DestroyString(utf8);
-                  return(&root->root);
-                }
-            }
-          else
-            if (strncmp(p,"!DOCTYPE",8) == 0)
-              {
-                DoctypeTargets
-                  targets;
+          {
+            DeclarationInfo
+              declaration;
 
-                targets.p=(&p);
-                targets.tag=(&tag);
-                targets.l=(&l);
-                if (ParseDoctype(root,terminal,exception,&targets) ==
-                    MagickFalse)
-                  {
-                    utf8=DestroyString(utf8);
-                    return(&root->root);
-                  }
+            DeclarationTargets
+              declaration_targets;
+
+            declaration.root=root;
+            declaration.ignore_depth=ignore_depth;
+            declaration.terminal=terminal;
+            declaration.exception=exception;
+            declaration_targets.p=(&p);
+            declaration_targets.tag=(&tag);
+            declaration_targets.l=(&l);
+            if (ParseDeclaration(&declaration,&declaration_targets) ==
+                MagickFalse)
+              {
+                utf8=DestroyString(utf8);
+                return(&root->root);
               }
-            else
-              if (*p == '?')
-                {
-                  /*
-                    Processing instructions.
-                  */
-                  p=SkipProcessingInstruction(p);
-                  if (IsUnterminatedSection(p,terminal) != MagickFalse)
-                    {
-                      (void) ThrowMagickException(exception,GetMagickModule(),
-                        OptionWarning,"ParseError","unclosed <?");
-                      utf8=DestroyString(utf8);
-                      return(&root->root);
-                    }
-                  ParseProcessingInstructions(root,tag+1,(size_t) (p-tag-2));
-                }
-              else
-                {
-                  (void) ThrowMagickException(exception,GetMagickModule(),
-                    OptionWarning,"ParseError","unexpected <");
-                  utf8=DestroyString(utf8);
-                  return(&root->root);
-                }
+          }
      if ((p == (char *) NULL) || (*p == '\0'))
        break;
      *p++='\0';
