@@ -2018,6 +2018,25 @@ static void StreamShortRGBPPixels(const Image *image,unsigned short *q)
   }
 }
 
+static void StreamLongLongIPixels(const Image *image,MagickSizeType *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToLongLong(ClampToQuantum(
+      GetPixelIntensity(image,p)));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2788,15 +2807,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         }
       if (LocaleCompare(stream_info->map,"I") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToLongLong(ClampToQuantum(
-              GetPixelIntensity(image,p)));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamLongLongIPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGB") == 0)
