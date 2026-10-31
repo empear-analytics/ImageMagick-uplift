@@ -2978,6 +2978,15 @@ static void WriteResolutionResource(const Image *image,unsigned char *p)
   WriteProfileShort(MSBEndian,(unsigned short) image->units,p+12);
 }
 
+static void Sync8BimResource(const Image *image,const unsigned short id,
+  const ssize_t count,unsigned char *p)
+{
+  if ((id == 0x3ED) && (count == 16))
+    WriteResolutionResource(image,p);
+  if (id == 0x0422)
+    SyncExifProfile(image,p,(size_t) count);
+}
+
 static void Sync8BimProfile(const Image *image,const StringInfo *profile)
 {
   size_t
@@ -3017,10 +3026,7 @@ static void Sync8BimProfile(const Image *image,const StringInfo *profile)
     count=(ssize_t) ReadProfileMSBLong(&p,&length);
     if ((count > (ssize_t) length) || (count < 0))
       return;
-    if ((id == 0x3ED) && (count == 16))
-      WriteResolutionResource(image,p);
-    if (id == 0x0422)
-      SyncExifProfile(image,p,(size_t) count);
+    Sync8BimResource(image,id,count,p);
     p+=(ptrdiff_t) count;
     length-=(size_t) count;
   }
