@@ -277,10 +277,7 @@ MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
     }
     case MosaicLayer:
     {
-      if (page.width > 0)
-        width=page.width;
-      if (page.height > 0)
-        height=page.height;
+      SelectPageExtent(page,&width,&height);
       ExtendToMosaicBounds(image,&width,&height);
       page.width=width;
       page.height=height;
