@@ -409,6 +409,21 @@ static void PosterizeColormapEntry(Image *image,const ssize_t i,
       PosterizePixel((const Quantum) image->colormap[i].alpha,levels);
 }
 
+static MagickBooleanType QuantizePosterizeImage(Image *image,
+  const size_t levels,const DitherMethod dither_method,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  QuantizeInfo *quantize_info=AcquireQuantizeInfo((ImageInfo *) NULL);
+  quantize_info->number_colors=(size_t) MagickMin(levels*levels*levels,
+    MaxColormapSize);
+  quantize_info->dither_method=dither_method;
+  status=QuantizeImage(quantize_info,image,exception);
+  quantize_info=DestroyQuantizeInfo(quantize_info);
+  return(status);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -539,13 +554,6 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
       }
   }
   image_view=DestroyCacheView(image_view);
-  {
-    QuantizeInfo *quantize_info=AcquireQuantizeInfo((ImageInfo *) NULL);
-    quantize_info->number_colors=(size_t) MagickMin(levels*levels*levels,
-      MaxColormapSize);
-    quantize_info->dither_method=dither_method;
-    status=QuantizeImage(quantize_info,image,exception);
-    quantize_info=DestroyQuantizeInfo(quantize_info);
-  }
+  status=QuantizePosterizeImage(image,levels,dither_method,exception);
   return(status);
 }
