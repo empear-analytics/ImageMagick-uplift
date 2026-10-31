@@ -1950,6 +1950,48 @@ static void ModulateImageRow(const ModulateRow *modulate_row,Quantum *q)
   }
 }
 
+static void ModulateImageColormap(const ModulateRow *modulate_row)
+{
+  Image
+    *const image = modulate_row->image;
+
+  const ColorspaceType
+    colorspace = modulate_row->colorspace;
+
+  const double
+    percent_hue = modulate_row->percent_hue,
+    percent_saturation = modulate_row->percent_saturation,
+    percent_brightness = modulate_row->percent_brightness;
+
+  const IlluminantType
+    illuminant = modulate_row->illuminant;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    const ModulateInfo modulate_info = { colorspace, percent_hue,
+      percent_saturation, percent_brightness, illuminant };
+
+    double
+      blue,
+      green,
+      red;
+
+    /*
+      Modulate image colormap.
+    */
+    red=(double) image->colormap[i].red;
+    green=(double) image->colormap[i].green;
+    blue=(double) image->colormap[i].blue;
+    ModulateColor(&modulate_info,&red,&green,&blue);
+    image->colormap[i].red=red;
+    image->colormap[i].green=green;
+    image->colormap[i].blue=blue;
+  }
+}
+
 MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
   ExceptionInfo *exception)
 {
@@ -1976,9 +2018,6 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
     progress;
 
   ssize_t
-    i;
-
-  ssize_t
     y;
 
   /*
@@ -1996,26 +2035,17 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
     &percent_hue);
   GetModulateColorspace(image,&colorspace,&illuminant);
   if (image->storage_class == PseudoClass)
-    for (i=0; i < (ssize_t) image->colors; i++)
     {
-      const ModulateInfo modulate_info = { colorspace, percent_hue,
-        percent_saturation, percent_brightness, illuminant };
+      ModulateRow
+        modulate_row;
 
-      double
-        blue,
-        green,
-        red;
-
-      /*
-        Modulate image colormap.
-      */
-      red=(double) image->colormap[i].red;
-      green=(double) image->colormap[i].green;
-      blue=(double) image->colormap[i].blue;
-      ModulateColor(&modulate_info,&red,&green,&blue);
-      image->colormap[i].red=red;
-      image->colormap[i].green=green;
-      image->colormap[i].blue=blue;
+      modulate_row.image=image;
+      modulate_row.colorspace=colorspace;
+      modulate_row.percent_hue=percent_hue;
+      modulate_row.percent_saturation=percent_saturation;
+      modulate_row.percent_brightness=percent_brightness;
+      modulate_row.illuminant=illuminant;
+      ModulateImageColormap(&modulate_row);
     }
   /*
     Modulate image.
