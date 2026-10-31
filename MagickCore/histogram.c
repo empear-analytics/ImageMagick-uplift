@@ -1061,11 +1061,6 @@ static MagickBooleanType CheckImageColors(const Image *image,
     pixel,
     target;
 
-  size_t
-    id,
-    index,
-    level;
-
   ssize_t
     i,
     y;
@@ -1095,33 +1090,25 @@ static MagickBooleanType CheckImageColors(const Image *image,
       break;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
+      HCubeDescent
+        descent;
+
+      HCubeLeaf
+        targets;
+
       HColorEntry
         entry;
 
       /*
         Start at the root and proceed level by level.
       */
-      node_info=cube_info->root;
-      index=MaxTreeDepth-1;
-      for (level=1; level < MaxTreeDepth; level++)
-      {
-        HNodeChild
-          child;
-
-        GetPixelInfoPixel(image,p,&pixel);
-        id=ColorToNodeId(&pixel,index);
-        child.image=image;
-        child.cube_info=cube_info;
-        child.node_info=node_info;
-        child.id=id;
-        child.level=level;
-        child.exception=exception;
-        if (AcquireHNodeChild(&child) == MagickFalse)
-          break;
-        node_info=node_info->child[id];
-        index--;
-      }
-      if (level < MaxTreeDepth)
+      descent.image=image;
+      descent.p=p;
+      descent.cube_info=cube_info;
+      descent.exception=exception;
+      targets.node_info=(&node_info);
+      targets.pixel=(&pixel);
+      if (DescendHCube(&descent,&targets) == MagickFalse)
         break;
       i=FindHNodeColor(node_info,pixel);
       if (i < (ssize_t) node_info->number_unique)
