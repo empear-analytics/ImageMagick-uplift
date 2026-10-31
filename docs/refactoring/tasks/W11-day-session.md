@@ -20,9 +20,10 @@ flagged as a close reading before pushing.
 | `fourier.c` | 5.94 → 6.02 | 7 |
 | `threshold.c` | 5.20 → 5.35 | 6 |
 | `feature.c` | 5.23 → 5.24 | 1 |
+| `visual-effects.c` | 3.27 → 3.50 | 10 |
 
-58 refactor commits (E 23, N 9, W 9, SD 6, D 3, Q 2, T 2, V 2, H 1, I 1, O 1) and one docs
-commit (plateau rows). No new recipe and no amendment. Every refactor commit ran the
+68 refactor commits (E 24, N 12, W 9, SD 6, V 4, D 3, Q 3, H 2, T 2, I 1, LB 1, O 1, U 1)
+and two docs commits (plateau rows, this report). No new recipe and no amendment. Every refactor commit ran the
 oracle on its function's cases (0 diverged) and passed the pre-commit gate; the whole
 catalogue ran after each file: 15,900 cases, 0 diverged. None of the steps adds
 *Overall Code Complexity* or *Code Duplication* to a file, except as noted for
@@ -48,6 +49,15 @@ catalogue ran after each file: 15,900 cases, 0 diverged. None of the steps adds
 Plateau rows for `feature.c`, `statistic.c`, `segment.c`, `transform.c`, `quantize.c`,
 `fourier.c` (replacing the Mac row, written without FFTW) and `threshold.c` are in the
 playbook.
+
+- **`visual-effects.c` is a red file that moves only in sets.** Single steps and
+  Recipe B on all seven static helpers were flat; the score moved once `SketchImage`,
+  `PolaroidImage` and `SteganoImage` left *Complex Method* and *Large Method* together
+  (3.27 to 3.38, five flat steps first, under rule 2), then `StereoAnaglyphImage` (to
+  3.50). The pass stopped at its commit budget, not a plateau: `PlasmaImageProxy` (cc 21,
+  103 lines, 4 bumps; 3.68 in a stub probe) is next, its four pixel blocks each
+  returning one constant (V or Y). The other functions are held by the parallel-loop
+  skeleton or by Deep Nesting under a shared `status`.
 
 ### For the owner
 
@@ -79,6 +89,12 @@ playbook.
   *Large Method*; the later W step took the function to 79 lines, still a *Large Method*.
 
 ### Noticed, not changed (possible upstream bugs)
+
+- `visual-effects.c`: `PlasmaImageProxy` returns `MagickFalse` from its right-pixel
+  block when pixels are missing, `MagickTrue` from the left, bottom and top blocks;
+  `MorphImages`' single-image branch writes `status` uninitialised and never reads it;
+  `StereoAnaglyphImage`'s cancelled progress report sets `status` but the row loop
+  carries on.
 
 - `vision.c`: `IntegralImage` tests `p` twice and never `q`; in
   `SetEllipseAngleMetric`, `fabs(M11) < 0.0` is never true.
