@@ -366,21 +366,56 @@ static void ApplyThresholdEvaluateOperator(const Quantum pixel,
   }
 }
 
+static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
+  ssize_t
+    i;
+
+  switch (op)
+  {
+    default:
+    {
+      ApplyThresholdEvaluateOperator(pixel,op,value,result);
+      break;
+    }
+    case LeftShiftEvaluateOperator:
+    {
+      (*result)=EvaluateLeftShift(pixel,value);
+      break;
+    }
+    case OrEvaluateOperator:
+    {
+      (*result)=(double) ((ssize_t) pixel | (ssize_t) (value+0.5));
+      break;
+    }
+    case RightShiftEvaluateOperator:
+    {
+      (*result)=(double) pixel;
+      for (i=0; i < (ssize_t) value; i++)
+        (*result)/=2.0;
+      break;
+    }
+    case XorEvaluateOperator:
+    {
+      (*result)=(double) ((ssize_t) pixel ^ (ssize_t) (value+0.5));
+      break;
+    }
+  }
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
   double
     result;
 
-  ssize_t
-    i;
-
   result=0.0;
   switch (op)
   {
     default:
     {
-      ApplyThresholdEvaluateOperator(pixel,op,value,&result);
+      ApplyBitwiseEvaluateOperator(pixel,op,value,&result);
       break;
     }
     case DivideEvaluateOperator:
@@ -415,11 +450,6 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     {
       result=(double) GenerateDifferentialNoise(random_info,pixel,
         LaplacianNoise,value);
-      break;
-    }
-    case LeftShiftEvaluateOperator:
-    {
-      result=EvaluateLeftShift(pixel,value);
       break;
     }
     case LogEvaluateOperator:
@@ -458,11 +488,6 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
       result=(double) pixel*value;
       break;
     }
-    case OrEvaluateOperator:
-    {
-      result=(double) ((ssize_t) pixel | (ssize_t) (value+0.5));
-      break;
-    }
     case PoissonNoiseEvaluateOperator:
     {
       result=(double) GenerateDifferentialNoise(random_info,pixel,PoissonNoise,
@@ -472,13 +497,6 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     case PowEvaluateOperator:
     {
       result=EvaluatePow(pixel,value,result);
-      break;
-    }
-    case RightShiftEvaluateOperator:
-    {
-      result=(double) pixel;
-      for (i=0; i < (ssize_t) value; i++)
-        result/=2.0;
       break;
     }
     case RootMeanSquareEvaluateOperator:
@@ -511,11 +529,6 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     {
       result=(double) GenerateDifferentialNoise(random_info,pixel,UniformNoise,
         value);
-      break;
-    }
-    case XorEvaluateOperator:
-    {
-      result=(double) ((ssize_t) pixel ^ (ssize_t) (value+0.5));
       break;
     }
   }
