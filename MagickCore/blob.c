@@ -6008,6 +6008,29 @@ static ssize_t WriteBlobGzip(BlobInfo *magick_restrict blob_info,
 }
 #endif
 
+#if defined(MAGICKCORE_BZLIB_DELEGATE)
+static ssize_t WriteBlobBZip(BlobInfo *magick_restrict blob_info,
+  const size_t length,unsigned char *q,ssize_t count)
+{
+  size_t
+    i;
+
+  for (i=0; i < length; i+=(size_t) count)
+  {
+    count=(ssize_t) BZ2_bzwrite(blob_info->file_info.bzfile,q+i,
+      (int) MagickMin(length-i,MagickMaxBufferExtent));
+    if (count <= 0)
+      {
+        count=0;
+        if (errno != EINTR)
+          break;
+      }
+  }
+  count=(ssize_t) i;
+  return(count);
+}
+#endif
+
 MagickExport ssize_t WriteBlob(Image *image,const size_t length,
   const void *data)
 {
@@ -6154,21 +6177,7 @@ MagickExport ssize_t WriteBlob(Image *image,const size_t length,
       int
         status;
 
-      size_t
-        i;
-
-      for (i=0; i < length; i+=(size_t) count)
-      {
-        count=(ssize_t) BZ2_bzwrite(blob_info->file_info.bzfile,q+i,
-          (int) MagickMin(length-i,MagickMaxBufferExtent));
-        if (count <= 0)
-          {
-            count=0;
-            if (errno != EINTR)
-              break;
-          }
-      }
-      count=(ssize_t) i;
+      count=WriteBlobBZip(blob_info,length,q,count);
       status=BZ_OK;
       (void) BZ2_bzerror(blob_info->file_info.bzfile,&status);
       if ((count != (ssize_t) length) && (status != BZ_OK))
