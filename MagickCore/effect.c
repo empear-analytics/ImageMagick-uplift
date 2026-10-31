@@ -1228,6 +1228,71 @@ static void LoadLocalContrastLuma(const Image *image,const Quantum *p,
   }
 }
 
+typedef struct _LocalContrastRow
+{
+  const Image
+    *image;
+
+  float
+    *pixels;
+
+  ssize_t
+    width;
+
+  double
+    totalWeight,
+    strength;
+
+  Image
+    *contrast_image;
+} LocalContrastRow;
+
+static void ApplyLocalContrastRow(const LocalContrastRow *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = row->image;
+
+  float
+    *const pixels = row->pixels;
+
+  const ssize_t
+    width = row->width;
+
+  const double
+    totalWeight = row->totalWeight,
+    strength = row->strength;
+
+  Image
+    *const contrast_image = row->contrast_image;
+
+  LocalContrastPixel
+    contrast;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      sum;
+
+    sum=GetTriangleWeightedSum(pixels,x,width);
+    /*
+      Apply and write.
+    */
+    contrast.image=image;
+    contrast.p=p;
+    contrast.sum=sum;
+    contrast.totalWeight=totalWeight;
+    contrast.strength=strength;
+    contrast.contrast_image=contrast_image;
+    ApplyLocalContrastPixel(&contrast,q);
+    p+=(ptrdiff_t) image->number_channels;
+    q+=(ptrdiff_t) contrast_image->number_channels;
+  }
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1388,14 +1453,11 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
       float
         *pixels;
 
-      LocalContrastPixel
-        contrast;
+      LocalContrastRow
+        row;
 
       Quantum
         *magick_restrict q;
-
-      ssize_t
-        x;
 
       if (status == MagickFalse)
         continue;
@@ -1411,25 +1473,13 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
         }
       memcpy(pixels,interImage+((size_t) y*(image->columns+(size_t) (2*width))),
         (image->columns+(size_t) (2*width))*sizeof(float));
-      for (x=0; x < (ssize_t) image->columns; x++)
-      {
-        double
-          sum;
-
-        sum=GetTriangleWeightedSum(pixels,x,width);
-        /*
-          Apply and write.
-        */
-        contrast.image=image;
-        contrast.p=p;
-        contrast.sum=sum;
-        contrast.totalWeight=totalWeight;
-        contrast.strength=strength;
-        contrast.contrast_image=contrast_image;
-        ApplyLocalContrastPixel(&contrast,q);
-        p+=(ptrdiff_t) image->number_channels;
-        q+=(ptrdiff_t) contrast_image->number_channels;
-      }
+      row.image=image;
+      row.pixels=pixels;
+      row.width=width;
+      row.totalWeight=totalWeight;
+      row.strength=strength;
+      row.contrast_image=contrast_image;
+      ApplyLocalContrastRow(&row,p,q);
       if (SyncCacheViewAuthenticPixels(contrast_view,exception) == MagickFalse)
         status=MagickFalse;
     }
