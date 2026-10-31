@@ -257,6 +257,108 @@ static Image *CropFixedSizeTiles(const Image *image,RectangleInfo geometry,
   return(crop_image);
 }
 
+static PointInfo GetAreaTileDelta(const size_t width,const size_t height,
+  const RectangleInfo geometry)
+{
+  PointInfo
+    delta;
+
+  delta.x=(double) width/geometry.width;
+  delta.y=(double) height/geometry.height;
+  if (delta.x < 1.0)
+    delta.x=1.0;
+  if (delta.y < 1.0)
+    delta.y=1.0;
+  return(delta);
+}
+
+static RectangleInfo GetAreaTileGrid(RectangleInfo geometry)
+{
+  if (geometry.width == 0)
+    geometry.width=1;
+  if (geometry.height == 0)
+    geometry.height=1;
+  return(geometry);
+}
+
+static void SelectAreaTileExtent(const MagickStatusType flags,
+  const RectangleInfo geometry,size_t *width,size_t *height)
+{
+  if ((flags & AspectValue) == 0)
+    {
+      *width=(size_t) ((ssize_t) *width-(geometry.x < 0 ? -1 : 1)*geometry.x);
+      *height=(size_t) ((ssize_t) *height-(geometry.y < 0 ? -1 : 1)*
+        geometry.y);
+    }
+  else
+    {
+      *width=(size_t) ((ssize_t) *width+(geometry.x < 0 ? -1 : 1)*geometry.x);
+      *height=(size_t) ((ssize_t) *height+(geometry.y < 0 ? -1 : 1)*
+        geometry.y);
+    }
+}
+
+static Image *CropAreaTiles(const Image *image,RectangleInfo geometry,
+  const MagickStatusType flags,ExceptionInfo *exception)
+{
+  Image
+    *crop_image;
+
+  PointInfo
+    delta,
+    offset;
+
+  RectangleInfo
+    crop;
+
+  size_t
+    height,
+    width;
+
+  /*
+    Crop into NxM tiles (@ flag).
+  */
+  crop_image=NewImageList();
+  width=image->columns;
+  height=image->rows;
+  geometry=GetAreaTileGrid(geometry);
+  SelectAreaTileExtent(flags,geometry,&width,&height);
+  delta=GetAreaTileDelta(width,height,geometry);
+  for (offset.y=0; offset.y < (double) height; )
+  {
+    AreaTileRow
+      row;
+
+    if ((flags & AspectValue) == 0)
+      {
+        crop.y=PixelRoundOffset((double) (offset.y-
+          (geometry.y > 0 ? 0 : geometry.y)));
+        offset.y+=delta.y;   /* increment now to find width */
+        crop.height=(size_t) PixelRoundOffset((double) (offset.y+
+          (geometry.y < 0 ? 0 : geometry.y)));
+      }
+    else
+      {
+        crop.y=PixelRoundOffset((double) (offset.y-
+          (geometry.y > 0 ? geometry.y : 0)));
+        offset.y+=delta.y;  /* increment now to find width */
+        crop.height=(size_t) PixelRoundOffset((double)
+          (offset.y+(geometry.y < -1 ? geometry.y : 0)));
+      }
+    crop.height=(size_t) ((ssize_t) crop.height-crop.y);
+    crop.y+=image->page.y;
+    row.image=image;
+    row.width=width;
+    row.flags=flags;
+    row.geometry=geometry;
+    row.delta=delta;
+    row.exception=exception;
+    CropAreaTileRow(&row,&offset,&crop,&crop_image);
+  }
+  ClearMagickException(exception);
+  return(crop_image);
+}
+
 MagickExport Image *CropImageToTiles(const Image *image,
   const char *crop_geometry,ExceptionInfo *exception)
 {
@@ -275,80 +377,7 @@ MagickExport Image *CropImageToTiles(const Image *image,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   flags=ParseGravityGeometry(image,crop_geometry,&geometry,exception);
   if ((flags & AreaValue) != 0)
-    {
-      PointInfo
-        delta,
-        offset;
-
-      RectangleInfo
-        crop;
-
-      size_t
-        height,
-        width;
-
-      /*
-        Crop into NxM tiles (@ flag).
-      */
-      crop_image=NewImageList();
-      width=image->columns;
-      height=image->rows;
-      if (geometry.width == 0)
-        geometry.width=1;
-      if (geometry.height == 0)
-        geometry.height=1;
-      if ((flags & AspectValue) == 0)
-        {
-          width=(size_t) ((ssize_t) width-(geometry.x < 0 ? -1 : 1)*geometry.x);
-          height=(size_t) ((ssize_t) height-(geometry.y < 0 ? -1 : 1)*
-            geometry.y);
-        }
-      else
-        {
-          width=(size_t) ((ssize_t) width+(geometry.x < 0 ? -1 : 1)*geometry.x);
-          height=(size_t) ((ssize_t) height+(geometry.y < 0 ? -1 : 1)*
-            geometry.y);
-        }
-      delta.x=(double) width/geometry.width;
-      delta.y=(double) height/geometry.height;
-      if (delta.x < 1.0)
-        delta.x=1.0;
-      if (delta.y < 1.0)
-        delta.y=1.0;
-      for (offset.y=0; offset.y < (double) height; )
-      {
-        AreaTileRow
-          row;
-
-        if ((flags & AspectValue) == 0)
-          {
-            crop.y=PixelRoundOffset((double) (offset.y-
-              (geometry.y > 0 ? 0 : geometry.y)));
-            offset.y+=delta.y;   /* increment now to find width */
-            crop.height=(size_t) PixelRoundOffset((double) (offset.y+
-              (geometry.y < 0 ? 0 : geometry.y)));
-          }
-        else
-          {
-            crop.y=PixelRoundOffset((double) (offset.y-
-              (geometry.y > 0 ? geometry.y : 0)));
-            offset.y+=delta.y;  /* increment now to find width */
-            crop.height=(size_t) PixelRoundOffset((double)
-              (offset.y+(geometry.y < -1 ? geometry.y : 0)));
-          }
-        crop.height=(size_t) ((ssize_t) crop.height-crop.y);
-        crop.y+=image->page.y;
-        row.image=image;
-        row.width=width;
-        row.flags=flags;
-        row.geometry=geometry;
-        row.delta=delta;
-        row.exception=exception;
-        CropAreaTileRow(&row,&offset,&crop,&crop_image);
-      }
-      ClearMagickException(exception);
-      return(crop_image);
-    }
+    return(CropAreaTiles(image,geometry,flags,exception));
   if (IsSingleRegionCrop(geometry,flags) != MagickFalse)
     {
       /*
