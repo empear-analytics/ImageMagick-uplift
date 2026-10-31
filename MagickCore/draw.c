@@ -5635,19 +5635,19 @@ static SegmentInfo ClampPolygonBounds(const Image *image,SegmentInfo bounds)
   return(bounds);
 }
 
+typedef struct _ExtentInfo
+{
+  ssize_t
+    x1,
+    y1,
+    x2,
+    y2;
+} ExtentInfo;
+
 static MagickBooleanType DrawPolygonPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
 {
-  typedef struct _ExtentInfo
-  {
-    ssize_t
-      x1,
-      y1,
-      x2,
-      y2;
-  } ExtentInfo;
-
   CacheView
     *image_view;
 
