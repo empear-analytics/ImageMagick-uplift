@@ -2548,10 +2548,20 @@ typedef struct _ExifTagInfo
     *directory,
     *ifd0;
 
+  unsigned short
+    tag_value;
+
+  ssize_t
+    format;
+
+  int
+    components;
+
   size_t
     number_bytes;
 
   unsigned char
+    *q,
     *p;
 } ExifTagInfo;
 
@@ -2697,6 +2707,40 @@ typedef struct _DirectoryInfo
   size_t
     entry;
 } DirectoryInfo;
+
+static void SyncExifImageDimension(const ExifTagInfo *exif_tag)
+{
+  const Image
+    *const image = exif_tag->image;
+
+  const EndianType
+    endian = exif_tag->endian;
+
+  unsigned char
+    *const directory = exif_tag->directory;
+
+  unsigned char
+    *const ifd0 = exif_tag->ifd0;
+
+  const unsigned short
+    tag_value = exif_tag->tag_value;
+
+  const ssize_t
+    format = exif_tag->format;
+
+  const int
+    components = exif_tag->components;
+
+  unsigned char
+    *const q = exif_tag->q;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  if (directory == ifd0)
+    WriteProfileDimension(endian,tag_value == TAG_IMAGE_WIDTH ?
+      image->columns : image->rows,format,components,q,p);
+}
 
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
@@ -2847,16 +2891,18 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
       exif_tag.endian=endian;
       exif_tag.directory=directory;
       exif_tag.ifd0=ifd0;
+      exif_tag.tag_value=tag_value;
+      exif_tag.format=format;
+      exif_tag.components=components;
       exif_tag.number_bytes=number_bytes;
+      exif_tag.q=q;
       exif_tag.p=p;
       switch (tag_value)
       {
         case TAG_IMAGE_WIDTH:
         case TAG_IMAGE_LENGTH:
         {
-          if (directory == ifd0)
-            WriteProfileDimension(endian,tag_value == TAG_IMAGE_WIDTH ?
-              image->columns : image->rows,format,components,q,p);
+          SyncExifImageDimension(&exif_tag);
           break;
         }
         case TAG_PIXEL_X_DIMENSION:
