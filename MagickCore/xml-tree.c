@@ -1708,6 +1708,33 @@ static MagickBooleanType ParseAttributeType(char *n,ExceptionInfo *exception,
   return(MagickTrue);
 }
 
+static MagickBooleanType SkipDoctypeMarkup(XMLTreeRoot *root,char **xml)
+{
+  char
+    *c;
+
+  if (strncmp(*xml, "<!--", 4) == 0)
+    *xml=strstr(*xml+4,"-->");
+  else
+    if (strncmp(*xml,"<?", 2) == 0)
+      {
+        c=*xml+2;
+        *xml=strstr(c,"?>");
+        if (*xml != (char *) NULL)
+          {
+            ParseProcessingInstructions(root,c,(size_t) (*xml-c));
+            (*xml)++;
+          }
+      }
+     else
+       if (**xml == '<')
+         *xml=strchr(*xml,'>');
+       else
+         if ((*((*xml)++) == '%') && (root->standalone == MagickFalse))
+           return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -1863,25 +1890,8 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
             }
         }
       else
-        if (strncmp(xml, "<!--", 4) == 0)
-          xml=strstr(xml+4,"-->");
-        else
-          if (strncmp(xml,"<?", 2) == 0)
-            {
-              c=xml+2;
-              xml=strstr(c,"?>");
-              if (xml != (char *) NULL)
-                {
-                  ParseProcessingInstructions(root,c,(size_t) (xml-c));
-                  xml++;
-                }
-            }
-           else
-             if (*xml == '<')
-               xml=strchr(xml,'>');
-             else
-               if ((*(xml++) == '%') && (root->standalone == MagickFalse))
-                 break;
+        if (SkipDoctypeMarkup(root,&xml) == MagickFalse)
+          break;
     }
   predefined_entities=(char **) RelinquishMagickMemory(predefined_entities);
   return(MagickTrue);
