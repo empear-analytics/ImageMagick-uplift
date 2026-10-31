@@ -700,7 +700,11 @@ inside an OpenMP region; Recipe G, which removes one level of nesting, not the b
    constant `c` (`opaque=MagickFalse;`, `type=UndefinedType;`), and that the loop body
    reads only in its leading `if (v == c) continue;`, is the loop's status. The new
    function is step 5's, `status=MagickFalse;` standing where the block wrote `v=c;`,
-   and the caller writes `if (Helper(...) == MagickFalse) v=c;` (step 7).
+   and the caller writes `if (Helper(...) == MagickFalse) v=c;` (step 7). The body may
+   also read `v` after the block, in the same iteration, as the test that ends an inner
+   loop the block sits in (`IsHighDynamicRangeImage`'s `if (hdri != MagickFalse)
+   break;` after its channel loop): the caller's write lands as the call returns,
+   before that read.
 3. Every variable of the loop body that the block writes is declared inside the block,
    or is not read after it (a row pointer `q` advanced along the row, say).
 4. The block contains no `return`, `goto`, or a `continue` or `break` of the parallel
@@ -788,7 +792,13 @@ static MagickBooleanType MagnifyImageRow(...,Quantum *q,
   to the end of the block as everywhere in this recipe. The block does not read `v`,
   and the only read inside the loop is the guard at the top of the next iteration, as
   with `status`. A variable the loop also writes another value (`IdentifyImageGray`'s
-  `type=GrayscaleType;`) or reads elsewhere in the body is not a status: skip it.
+  `type=GrayscaleType;`) or reads elsewhere in the body is not a status: skip it. The
+  one exception is step 2's read after the block: in the block, `v=c;` is followed
+  only by statements that write nothing outside the block (the `break` of the block's
+  own loop, the block's end), so the caller's `v=c;` when the call returns comes
+  before any later statement of the iteration, the read included, and that read sees
+  the same value it saw before. Other threads get no ordering for this unsynchronised
+  flag either way, as for `status`.
 - Under step 4's exception a `continue;` of the parallel loop ends the iteration
   where it stands; `return(status);` ends the helper there, and the caller's
   `if (...) status=MagickFalse;` is the last statement of the body, so the iteration
@@ -811,7 +821,10 @@ task W09): `paint.c`'s `FloodfillPaintImage`, whose tiling loop ends in a fetch 
 sets `status=MagickFalse;` and `continue`s on failure, a fill and a sync. Step 2's
 other name (2026-10-30, task W09): `attribute.c`'s `IsImageOpaque` (`opaque=MagickFalse;`)
 and `IdentifyImageMonochrome` (`type=UndefinedType;`), whose row loops are T's shape with
-the flag the function returns in place of `status`.
+the flag the function returns in place of `status`. Step 2's read after the block
+(2026-10-31, campaign B, task M116): `image.c`'s `IsHighDynamicRangeImage`, whose
+channel loop sets `hdri=MagickTrue;` and breaks, and whose column loop then breaks on
+`hdri`; it holds the file's only *Deep, Nested Complexity* (a probe: 2.77 to 2.90).
 
 ---
 
@@ -3800,3 +3813,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | O | Step 2: a parameter of pointer type (declared `T *p`) whose own value the block assigns counts as a plain local, passed as `T **p` and written `(*p)`; writes through it stay writes through it. Recipes V, W, LB, I and OC read "plain local" the same way (V step 2 says so). *Careful* gives the argument | `xml-tree.c`'s `ParseEntities` and `ParseInternalDoctype` (campaign B, task M115; the owner left the ruling to the session, 2026-10-30): their blocks advance the `xml` parameter itself, which step 2 refused although the pointer object is the function's own (C11 6.9.1p9) | owner |
 | 2026-10-30 | NEW | NS | Name a Constant Selection: a recurring `(c ? k1 : k2)` that picks one of two literals of one type, with a side-effect-free `c`, becomes a call of a `static inline` function returning that type; all sites in one function per commit; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `annotate.c`'s `AnnotateImage` (campaign B, task M115): eighteen gravity signs such as `(geometry.width == 0 ? -1.0 : 1.0)` in one `switch`, cc 56 to 38 in a probe with identical object code; P names only boolean conditions, and SD's helpers would inherit the decisions (a three-case gravity helper would be a *Complex Method*) | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | N | Step 8, *Sibling blocks*: the cases of one `switch`, each moved under this recipe in its own commit, may share one `Name` (the union of their groups; each function reads only its own members) and one local filled once, where nothing on any path from the fill to a call writes a member's variable (Recipe B step 5's condition) | `pixel.c`'s `InterpolatePixelChannels` (campaign B, task M116): eight cases read the same eight inputs; a fill before each call adds nine lines per case to a function the step is meant to shrink | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | T | Step 2: with the other name, the body may also read `v` after the block in the same iteration (the test that ends an inner loop the block sits in); *Careful* gives the argument: the caller's `v=c;` lands as the call returns, before that read | `image.c`'s `IsHighDynamicRangeImage` (campaign B, task M116): its channel loop sets `hdri=MagickTrue;` and breaks, then the column loop breaks on `hdri`, which step 2 refused; it holds the file's only *Deep, Nested Complexity*, 2.77 to 2.90 in a probe | mandate (2026-10-24) |
