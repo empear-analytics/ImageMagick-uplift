@@ -2644,6 +2644,22 @@ static MagickBooleanType ParseMarkup(XMLTreeRoot *root,const int terminal,
   return(MagickTrue);
 }
 
+static XMLTreeInfo *CheckXMLTreeClosed(XMLTreeRoot *root,
+  ExceptionInfo *exception)
+{
+  if (root->node == (XMLTreeInfo *) NULL)
+    return(&root->root);
+  if (root->node->tag == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "ParseError","root tag missing");
+      return(&root->root);
+    }
+  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+    "ParseError","unclosed tag: '%s'",root->node->tag);
+  return(&root->root);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2789,17 +2805,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
        break;
   }
   utf8=DestroyString(utf8);
-  if (root->node == (XMLTreeInfo *) NULL)
-    return(&root->root);
-  if (root->node->tag == (char *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "ParseError","root tag missing");
-      return(&root->root);
-    }
-  (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-    "ParseError","unclosed tag: '%s'",root->node->tag);
-  return(&root->root);
+  return(CheckXMLTreeClosed(root,exception));
 }
 
 /*
