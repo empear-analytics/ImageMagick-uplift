@@ -7587,6 +7587,38 @@ static void DisassociateQuantumAlpha(const Image *image,CacheView *image_view,
   }
 }
 
+static void ImportRGBFamilyQuantum(const Image *image,QuantumInfo *quantum_info,
+  const QuantumType quantum_type,QuantumPixelSpan span)
+{
+  switch (quantum_type)
+  {
+    case BGRQuantum:
+    {
+      ImportBGRQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RGBQuantum:
+    case CbYCrQuantum:
+    {
+      ImportRGBQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RGBAQuantum:
+    case CbYCrAQuantum:
+    {
+      ImportRGBAQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RGBOQuantum:
+    {
+      ImportRGBOQuantum(image,quantum_info,&span);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 MagickExport size_t ImportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,const unsigned char *magick_restrict pixels,
@@ -7644,11 +7676,6 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     case AlphaQuantum:
     {
       ImportAlphaQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case BGRQuantum:
-    {
-      ImportBGRQuantum(image,quantum_info,&span);
       break;
     }
     case BGRAQuantum:
@@ -7734,25 +7761,11 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       ImportPixelChannel(image,quantum_info,&span,RedPixelChannel);
       break;
     }
-    case RGBQuantum:
-    case CbYCrQuantum:
-    {
-      ImportRGBQuantum(image,quantum_info,&span);
-      break;
-    }
-    case RGBAQuantum:
-    case CbYCrAQuantum:
-    {
-      ImportRGBAQuantum(image,quantum_info,&span);
-      break;
-    }
-    case RGBOQuantum:
-    {
-      ImportRGBOQuantum(image,quantum_info,&span);
-      break;
-    }
     default:
+    {
+      ImportRGBFamilyQuantum(image,quantum_info,quantum_type,span);
       break;
+    }
   }
   if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
     {
