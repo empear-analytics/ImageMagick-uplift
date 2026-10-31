@@ -1679,6 +1679,40 @@ MagickExport VirtualPixelMethod GetImageVirtualPixelMethod(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+#if defined(MAGICKCORE_HDRI_SUPPORT)
+static MagickBooleanType IsIntegralQuantumPixel(const Image *image,
+  const Quantum *p)
+{
+  MagickBooleanType
+    status;
+
+  ssize_t
+    i;
+
+  status=MagickTrue;
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    double
+      pixel;
+
+    PixelTrait
+      traits;
+
+    traits=GetPixelChannelTraits(image,(PixelChannel) i);
+    if (traits == UndefinedPixelTrait)
+      continue;
+    pixel=(double) p[i];
+    if ((pixel < 0.0) || (pixel > (double) QuantumRange) ||
+        (pixel != (double) ((QuantumAny) pixel)))
+      {
+        status=MagickFalse;
+        break;
+      }
+  }
+  return(status);
+}
+#endif
+
 MagickExport MagickBooleanType IsHighDynamicRangeImage(const Image *image,
   ExceptionInfo *exception)
 {
@@ -1720,28 +1754,8 @@ MagickExport MagickBooleanType IsHighDynamicRangeImage(const Image *image,
       continue;
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        double
-          pixel;
-
-        PixelTrait
-          traits;
-
-        traits=GetPixelChannelTraits(image,(PixelChannel) i);
-        if (traits == UndefinedPixelTrait)
-          continue;
-        pixel=(double) p[i];
-        if ((pixel < 0.0) || (pixel > (double) QuantumRange) ||
-            (pixel != (double) ((QuantumAny) pixel)))
-          {
-            hdri=MagickTrue;
-            break;
-          }
-      }
+      if (IsIntegralQuantumPixel(image,p) == MagickFalse)
+        hdri=MagickTrue;
       if (hdri != MagickFalse)
         break;
       p+=(ptrdiff_t) GetPixelChannels(image);
