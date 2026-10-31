@@ -406,6 +406,37 @@ static MagickBooleanType ImportCharRGBPPixels(Image *image,const RectangleInfo *
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ImportCharAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const unsigned char *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case AlphaQuantum:
+    {
+      SetPixelAlpha(image,ScaleCharToQuantum(*p),q);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      SetPixelAlpha(image,ScaleCharToQuantum(*p),q);
+      break;
+    }
+    case BlackQuantum:
+    {
+      SetPixelBlack(image,ScaleCharToQuantum(*p),q);
+      break;
+    }
+    case IndexQuantum:
+    {
+      SetPixelGray(image,ScaleCharToQuantum(*p),q);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static void ImportCharQuantum(const Image *image,const QuantumType quantum,
   const unsigned char *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -429,28 +460,11 @@ static void ImportCharQuantum(const Image *image,const QuantumType quantum,
       SetPixelBlue(image,ScaleCharToQuantum(*p),q);
       break;
     }
-    case AlphaQuantum:
-    {
-      SetPixelAlpha(image,ScaleCharToQuantum(*p),q);
-      break;
-    }
-    case OpacityQuantum:
-    {
-      SetPixelAlpha(image,ScaleCharToQuantum(*p),q);
-      break;
-    }
-    case BlackQuantum:
-    {
-      SetPixelBlack(image,ScaleCharToQuantum(*p),q);
-      break;
-    }
-    case IndexQuantum:
-    {
-      SetPixelGray(image,ScaleCharToQuantum(*p),q);
-      break;
-    }
     default:
+    {
+      ImportCharAlphaIndexQuantum(image,quantum,p,q);
       break;
+    }
   }
 }
 
