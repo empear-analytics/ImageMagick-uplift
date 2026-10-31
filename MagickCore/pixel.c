@@ -1447,6 +1447,280 @@ static void AverageInterpolateChannel(const ChannelAverage *average,
   SetPixelChannel(destination,channel,ClampToQuantum(sum),pixel);
 }
 
+static void InterpolateCatromChannel(const ChannelsInterpolation *grid,
+  const Quantum *magick_restrict p,const ssize_t i,Quantum *pixel)
+{
+  double
+    alpha[16],
+    cx[4],
+    cy[4],
+    gamma,
+    pixels[16];
+
+  ssize_t
+    j;
+
+  PixelChannel channel = GetPixelChannelChannel(grid->source,i);
+  PixelTrait traits = GetPixelChannelTraits(grid->source,channel);
+  PixelTrait destination_traits=GetPixelChannelTraits(grid->destination,
+    channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (destination_traits == UndefinedPixelTrait))
+    return;
+  if ((traits & BlendPixelTrait) == 0)
+    for (j=0; j < 16; j++)
+    {
+      alpha[j]=1.0;
+      pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(grid->source)+i];
+    }
+  else
+    for (j=0; j < 16; j++)
+    {
+      alpha[j]=QuantumScale*(double) GetPixelAlpha(grid->source,p+j*
+        (ssize_t) GetPixelChannels(grid->source));
+      pixels[j]=alpha[j]*(double)
+        p[j*(ssize_t) GetPixelChannels(grid->source)+i];
+    }
+  CatromWeights((double) (grid->x-grid->x_offset),&cx);
+  CatromWeights((double) (grid->y-grid->y_offset),&cy);
+  gamma=((traits & BlendPixelTrait) ? (double) (1.0) :
+    MagickSafeReciprocal(cy[0]*(cx[0]*alpha[0]+cx[1]*alpha[1]+cx[2]*
+    alpha[2]+cx[3]*alpha[3])+cy[1]*(cx[0]*alpha[4]+cx[1]*alpha[5]+cx[2]*
+    alpha[6]+cx[3]*alpha[7])+cy[2]*(cx[0]*alpha[8]+cx[1]*alpha[9]+cx[2]*
+    alpha[10]+cx[3]*alpha[11])+cy[3]*(cx[0]*alpha[12]+cx[1]*alpha[13]+
+    cx[2]*alpha[14]+cx[3]*alpha[15])));
+  SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*(cy[0]*(cx[0]*
+    pixels[0]+cx[1]*pixels[1]+cx[2]*pixels[2]+cx[3]*pixels[3])+cy[1]*
+    (cx[0]*pixels[4]+cx[1]*pixels[5]+cx[2]*pixels[6]+cx[3]*pixels[7])+
+    cy[2]*(cx[0]*pixels[8]+cx[1]*pixels[9]+cx[2]*pixels[10]+cx[3]*
+    pixels[11])+cy[3]*(cx[0]*pixels[12]+cx[1]*pixels[13]+cx[2]*
+    pixels[14]+cx[3]*pixels[15]))),pixel);
+}
+
+static void InterpolateSplineChannel(const ChannelsInterpolation *grid,
+  const Quantum *magick_restrict p,const ssize_t i,Quantum *pixel)
+{
+  double
+    alpha[16],
+    cx[4],
+    cy[4],
+    gamma,
+    pixels[16];
+
+  ssize_t
+    j;
+
+  PixelChannel channel = GetPixelChannelChannel(grid->source,i);
+  PixelTrait traits = GetPixelChannelTraits(grid->source,channel);
+  PixelTrait destination_traits=GetPixelChannelTraits(grid->destination,
+    channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (destination_traits == UndefinedPixelTrait))
+    return;
+  if ((traits & BlendPixelTrait) == 0)
+    for (j=0; j < 16; j++)
+    {
+      alpha[j]=1.0;
+      pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(grid->source)+i];
+    }
+  else
+    for (j=0; j < 16; j++)
+    {
+      alpha[j]=QuantumScale*(double) GetPixelAlpha(grid->source,p+j*
+        (ssize_t) GetPixelChannels(grid->source));
+      pixels[j]=alpha[j]*(double) p[j*(ssize_t) GetPixelChannels(grid->source)+
+        i];
+    }
+  SplineWeights((double) (grid->x-grid->x_offset),&cx);
+  SplineWeights((double) (grid->y-grid->y_offset),&cy);
+  gamma=((traits & BlendPixelTrait) ? (double) (1.0) :
+    MagickSafeReciprocal(cy[0]*(cx[0]*alpha[0]+cx[1]*alpha[1]+cx[2]*
+    alpha[2]+cx[3]*alpha[3])+cy[1]*(cx[0]*alpha[4]+cx[1]*alpha[5]+cx[2]*
+    alpha[6]+cx[3]*alpha[7])+cy[2]*(cx[0]*alpha[8]+cx[1]*alpha[9]+cx[2]*
+    alpha[10]+cx[3]*alpha[11])+cy[3]*(cx[0]*alpha[12]+cx[1]*alpha[13]+
+    cx[2]*alpha[14]+cx[3]*alpha[15])));
+  SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*(cy[0]*(cx[0]*
+    pixels[0]+cx[1]*pixels[1]+cx[2]*pixels[2]+cx[3]*pixels[3])+cy[1]*
+    (cx[0]*pixels[4]+cx[1]*pixels[5]+cx[2]*pixels[6]+cx[3]*pixels[7])+
+    cy[2]*(cx[0]*pixels[8]+cx[1]*pixels[9]+cx[2]*pixels[10]+cx[3]*
+    pixels[11])+cy[3]*(cx[0]*pixels[12]+cx[1]*pixels[13]+cx[2]*
+    pixels[14]+cx[3]*pixels[15]))),pixel);
+}
+
+static void InterpolateBlendChannel(const ChannelsInterpolation *grid,
+  const Quantum *magick_restrict p,const ssize_t i,Quantum *pixel)
+{
+  double
+    alpha[16],
+    gamma,
+    pixels[16];
+
+  ssize_t
+    j;
+
+  PixelChannel channel = GetPixelChannelChannel(grid->source,i);
+  PixelTrait traits = GetPixelChannelTraits(grid->source,channel);
+  PixelTrait destination_traits=GetPixelChannelTraits(grid->destination,
+    channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (destination_traits == UndefinedPixelTrait))
+    return;
+  if (grid->source->alpha_trait != BlendPixelTrait)
+    for (j=0; j < 4; j++)
+    {
+      alpha[j]=1.0;
+      pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(grid->source)+i];
+    }
+  else
+    for (j=0; j < 4; j++)
+    {
+      alpha[j]=QuantumScale*(double) GetPixelAlpha(grid->source,p+j*
+        (ssize_t) GetPixelChannels(grid->source));
+      pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(grid->source)+i];
+      if (channel != AlphaPixelChannel)
+        pixels[j]*=alpha[j];
+    }
+  gamma=1.0;  /* number of pixels blended together (its variable) */
+  for (j=0; j <= 1L; j++)
+  {
+    if ((grid->y-grid->y_offset) >= 0.75)
+      {
+        alpha[j]=alpha[j+2];  /* take right pixels */
+        pixels[j]=pixels[j+2];
+      }
+    else
+      if ((grid->y-grid->y_offset) > 0.25)
+        {
+          gamma=2.0;  /* blend both pixels in row */
+          alpha[j]+=alpha[j+2];  /* add up alpha weights */
+          pixels[j]+=pixels[j+2];
+        }
+  }
+  if ((grid->x-grid->x_offset) >= 0.75)
+    {
+      alpha[0]=alpha[1];  /* take bottom row blend */
+      pixels[0]=pixels[1];
+    }
+  else
+     if ((grid->x-grid->x_offset) > 0.25)
+       {
+         gamma*=2.0;  /* blend both rows */
+         alpha[0]+=alpha[1];  /* add up alpha weights */
+         pixels[0]+=pixels[1];
+       }
+  if (channel != AlphaPixelChannel)
+    gamma=MagickSafeReciprocal(alpha[0]);  /* (color) 1/alpha_weights */
+  else
+    gamma=MagickSafeReciprocal(gamma);  /* (alpha) 1/number_of_pixels */
+  SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*pixels[0]),
+    pixel);
+}
+
+static void InterpolateMeshChannel(const ChannelsInterpolation *grid,
+  const Quantum *magick_restrict p,const ssize_t i,Quantum *pixel)
+{
+  double
+    alpha[16],
+    gamma,
+    pixels[16];
+
+  PointInfo
+    delta,
+    luminance;
+
+  PixelChannel channel = GetPixelChannelChannel(grid->source,i);
+  PixelTrait traits = GetPixelChannelTraits(grid->source,channel);
+  PixelTrait destination_traits=GetPixelChannelTraits(grid->destination,
+    channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (destination_traits == UndefinedPixelTrait))
+    return;
+  pixels[0]=(double) p[i];
+  pixels[1]=(double) p[(ssize_t) GetPixelChannels(grid->source)+i];
+  pixels[2]=(double) p[2*(ssize_t) GetPixelChannels(grid->source)+i];
+  pixels[3]=(double) p[3*(ssize_t) GetPixelChannels(grid->source)+i];
+  if ((traits & BlendPixelTrait) == 0)
+    {
+      alpha[0]=1.0;
+      alpha[1]=1.0;
+      alpha[2]=1.0;
+      alpha[3]=1.0;
+    }
+  else
+    {
+      alpha[0]=QuantumScale*(double) GetPixelAlpha(grid->source,p);
+      alpha[1]=QuantumScale*(double) GetPixelAlpha(grid->source,p+
+        GetPixelChannels(grid->source));
+      alpha[2]=QuantumScale*(double) GetPixelAlpha(grid->source,p+2*
+        GetPixelChannels(grid->source));
+      alpha[3]=QuantumScale*(double) GetPixelAlpha(grid->source,p+3*
+        GetPixelChannels(grid->source));
+    }
+  delta.x=grid->x-grid->x_offset;
+  delta.y=grid->y-grid->y_offset;
+  luminance.x=fabs((double) (GetPixelLuma(grid->source,p)-
+    GetPixelLuma(grid->source,p+3*GetPixelChannels(grid->source))));
+  luminance.y=fabs((double) (GetPixelLuma(grid->source,p+
+    GetPixelChannels(grid->source))-GetPixelLuma(grid->source,p+2*
+    GetPixelChannels(grid->source))));
+  if (luminance.x < luminance.y)
+    {
+      /*
+        Diagonal 0-3 NW-SE.
+      */
+      if (delta.x <= delta.y)
+        {
+          /*
+            Bottom-left triangle (pixel: 2, diagonal: 0-3).
+          */
+          delta.y=1.0-delta.y;
+          gamma=MeshInterpolate(&delta,alpha[2],alpha[3],alpha[0]);
+          gamma=MagickSafeReciprocal(gamma);
+          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
+            MeshInterpolate(&delta,pixels[2],pixels[3],pixels[0])),pixel);
+        }
+      else
+        {
+          /*
+            Top-right triangle (pixel: 1, diagonal: 0-3).
+          */
+          delta.x=1.0-delta.x;
+          gamma=MeshInterpolate(&delta,alpha[1],alpha[0],alpha[3]);
+          gamma=MagickSafeReciprocal(gamma);
+          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
+            MeshInterpolate(&delta,pixels[1],pixels[0],pixels[3])),pixel);
+        }
+    }
+  else
+    {
+      /*
+        Diagonal 1-2 NE-SW.
+      */
+      if (delta.x <= (1.0-delta.y))
+        {
+          /*
+            Top-left triangle (pixel: 0, diagonal: 1-2).
+          */
+          gamma=MeshInterpolate(&delta,alpha[0],alpha[1],alpha[2]);
+          gamma=MagickSafeReciprocal(gamma);
+          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
+            MeshInterpolate(&delta,pixels[0],pixels[1],pixels[2])),pixel);
+        }
+      else
+        {
+          /*
+            Bottom-right triangle (pixel: 3, diagonal: 1-2).
+          */
+          delta.x=1.0-delta.x;
+          delta.y=1.0-delta.y;
+          gamma=MeshInterpolate(&delta,alpha[3],alpha[2],alpha[1]);
+          gamma=MagickSafeReciprocal(gamma);
+          SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*
+            MeshInterpolate(&delta,pixels[3],pixels[2],pixels[1])),pixel);
+        }
+    }
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannels(
   const Image *magick_restrict source,const CacheView_ *source_view,
   const Image *magick_restrict destination,const PixelInterpolateMethod method,
@@ -1457,11 +1731,6 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
 
   MagickBooleanType
     status;
-
-  double
-    alpha[16],
-    gamma,
-    pixels[16];
 
   const Quantum
     *magick_restrict p;
@@ -1552,75 +1821,11 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           break;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-      {
-        ssize_t
-          j;
-
-        PixelChannel channel = GetPixelChannelChannel(source,i);
-        PixelTrait traits = GetPixelChannelTraits(source,channel);
-        PixelTrait destination_traits=GetPixelChannelTraits(destination,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (destination_traits == UndefinedPixelTrait))
-          continue;
-        if (source->alpha_trait != BlendPixelTrait)
-          for (j=0; j < 4; j++)
-          {
-            alpha[j]=1.0;
-            pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(source)+i];
-          }
-        else
-          for (j=0; j < 4; j++)
-          {
-            alpha[j]=QuantumScale*(double) GetPixelAlpha(source,p+j*
-              (ssize_t) GetPixelChannels(source));
-            pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(source)+i];
-            if (channel != AlphaPixelChannel)
-              pixels[j]*=alpha[j];
-          }
-        gamma=1.0;  /* number of pixels blended together (its variable) */
-        for (j=0; j <= 1L; j++)
-        {
-          if ((y-y_offset) >= 0.75)
-            {
-              alpha[j]=alpha[j+2];  /* take right pixels */
-              pixels[j]=pixels[j+2];
-            }
-          else
-            if ((y-y_offset) > 0.25)
-              {
-                gamma=2.0;  /* blend both pixels in row */
-                alpha[j]+=alpha[j+2];  /* add up alpha weights */
-                pixels[j]+=pixels[j+2];
-              }
-        }
-        if ((x-x_offset) >= 0.75)
-          {
-            alpha[0]=alpha[1];  /* take bottom row blend */
-            pixels[0]=pixels[1];
-          }
-        else
-           if ((x-x_offset) > 0.25)
-             {
-               gamma*=2.0;  /* blend both rows */
-               alpha[0]+=alpha[1];  /* add up alpha weights */
-               pixels[0]+=pixels[1];
-             }
-        if (channel != AlphaPixelChannel)
-          gamma=MagickSafeReciprocal(alpha[0]);  /* (color) 1/alpha_weights */
-        else
-          gamma=MagickSafeReciprocal(gamma);  /* (alpha) 1/number_of_pixels */
-        SetPixelChannel(destination,channel,ClampToQuantum(gamma*pixels[0]),
-          pixel);
-      }
+        InterpolateBlendChannel(&grid,p,i,pixel);
       break;
     }
     case CatromInterpolatePixel:
     {
-      double
-        cx[4],
-        cy[4];
-
       p=GetCacheViewVirtualPixels(source_view,x_offset-1,y_offset-1,4,4,
         exception);
       if (p == (const Quantum *) NULL)
@@ -1629,46 +1834,7 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           break;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-      {
-        ssize_t
-          j;
-
-        PixelChannel channel = GetPixelChannelChannel(source,i);
-        PixelTrait traits = GetPixelChannelTraits(source,channel);
-        PixelTrait destination_traits=GetPixelChannelTraits(destination,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (destination_traits == UndefinedPixelTrait))
-          continue;
-        if ((traits & BlendPixelTrait) == 0)
-          for (j=0; j < 16; j++)
-          {
-            alpha[j]=1.0;
-            pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(source)+i];
-          }
-        else
-          for (j=0; j < 16; j++)
-          {
-            alpha[j]=QuantumScale*(double) GetPixelAlpha(source,p+j*
-              (ssize_t) GetPixelChannels(source));
-            pixels[j]=alpha[j]*(double)
-              p[j*(ssize_t) GetPixelChannels(source)+i];
-          }
-        CatromWeights((double) (x-x_offset),&cx);
-        CatromWeights((double) (y-y_offset),&cy);
-        gamma=((traits & BlendPixelTrait) ? (double) (1.0) :
-          MagickSafeReciprocal(cy[0]*(cx[0]*alpha[0]+cx[1]*alpha[1]+cx[2]*
-          alpha[2]+cx[3]*alpha[3])+cy[1]*(cx[0]*alpha[4]+cx[1]*alpha[5]+cx[2]*
-          alpha[6]+cx[3]*alpha[7])+cy[2]*(cx[0]*alpha[8]+cx[1]*alpha[9]+cx[2]*
-          alpha[10]+cx[3]*alpha[11])+cy[3]*(cx[0]*alpha[12]+cx[1]*alpha[13]+
-          cx[2]*alpha[14]+cx[3]*alpha[15])));
-        SetPixelChannel(destination,channel,ClampToQuantum(gamma*(cy[0]*(cx[0]*
-          pixels[0]+cx[1]*pixels[1]+cx[2]*pixels[2]+cx[3]*pixels[3])+cy[1]*
-          (cx[0]*pixels[4]+cx[1]*pixels[5]+cx[2]*pixels[6]+cx[3]*pixels[7])+
-          cy[2]*(cx[0]*pixels[8]+cx[1]*pixels[9]+cx[2]*pixels[10]+cx[3]*
-          pixels[11])+cy[3]*(cx[0]*pixels[12]+cx[1]*pixels[13]+cx[2]*
-          pixels[14]+cx[3]*pixels[15]))),pixel);
-      }
+        InterpolateCatromChannel(&grid,p,i,pixel);
       break;
     }
     case IntegerInterpolatePixel:
@@ -1708,111 +1874,11 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           break;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-      {
-        PointInfo
-          delta,
-          luminance;
-
-        PixelChannel channel = GetPixelChannelChannel(source,i);
-        PixelTrait traits = GetPixelChannelTraits(source,channel);
-        PixelTrait destination_traits=GetPixelChannelTraits(destination,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (destination_traits == UndefinedPixelTrait))
-          continue;
-        pixels[0]=(double) p[i];
-        pixels[1]=(double) p[(ssize_t) GetPixelChannels(source)+i];
-        pixels[2]=(double) p[2*(ssize_t) GetPixelChannels(source)+i];
-        pixels[3]=(double) p[3*(ssize_t) GetPixelChannels(source)+i];
-        if ((traits & BlendPixelTrait) == 0)
-          {
-            alpha[0]=1.0;
-            alpha[1]=1.0;
-            alpha[2]=1.0;
-            alpha[3]=1.0;
-          }
-        else
-          {
-            alpha[0]=QuantumScale*(double) GetPixelAlpha(source,p);
-            alpha[1]=QuantumScale*(double) GetPixelAlpha(source,p+
-              GetPixelChannels(source));
-            alpha[2]=QuantumScale*(double) GetPixelAlpha(source,p+2*
-              GetPixelChannels(source));
-            alpha[3]=QuantumScale*(double) GetPixelAlpha(source,p+3*
-              GetPixelChannels(source));
-          }
-        delta.x=x-x_offset;
-        delta.y=y-y_offset;
-        luminance.x=fabs((double) (GetPixelLuma(source,p)-
-          GetPixelLuma(source,p+3*GetPixelChannels(source))));
-        luminance.y=fabs((double) (GetPixelLuma(source,p+
-          GetPixelChannels(source))-GetPixelLuma(source,p+2*
-          GetPixelChannels(source))));
-        if (luminance.x < luminance.y)
-          {
-            /*
-              Diagonal 0-3 NW-SE.
-            */
-            if (delta.x <= delta.y)
-              {
-                /*
-                  Bottom-left triangle (pixel: 2, diagonal: 0-3).
-                */
-                delta.y=1.0-delta.y;
-                gamma=MeshInterpolate(&delta,alpha[2],alpha[3],alpha[0]);
-                gamma=MagickSafeReciprocal(gamma);
-                SetPixelChannel(destination,channel,ClampToQuantum(gamma*
-                  MeshInterpolate(&delta,pixels[2],pixels[3],pixels[0])),pixel);
-              }
-            else
-              {
-                /*
-                  Top-right triangle (pixel: 1, diagonal: 0-3).
-                */
-                delta.x=1.0-delta.x;
-                gamma=MeshInterpolate(&delta,alpha[1],alpha[0],alpha[3]);
-                gamma=MagickSafeReciprocal(gamma);
-                SetPixelChannel(destination,channel,ClampToQuantum(gamma*
-                  MeshInterpolate(&delta,pixels[1],pixels[0],pixels[3])),pixel);
-              }
-          }
-        else
-          {
-            /*
-              Diagonal 1-2 NE-SW.
-            */
-            if (delta.x <= (1.0-delta.y))
-              {
-                /*
-                  Top-left triangle (pixel: 0, diagonal: 1-2).
-                */
-                gamma=MeshInterpolate(&delta,alpha[0],alpha[1],alpha[2]);
-                gamma=MagickSafeReciprocal(gamma);
-                SetPixelChannel(destination,channel,ClampToQuantum(gamma*
-                  MeshInterpolate(&delta,pixels[0],pixels[1],pixels[2])),pixel);
-              }
-            else
-              {
-                /*
-                  Bottom-right triangle (pixel: 3, diagonal: 1-2).
-                */
-                delta.x=1.0-delta.x;
-                delta.y=1.0-delta.y;
-                gamma=MeshInterpolate(&delta,alpha[3],alpha[2],alpha[1]);
-                gamma=MagickSafeReciprocal(gamma);
-                SetPixelChannel(destination,channel,ClampToQuantum(gamma*
-                  MeshInterpolate(&delta,pixels[3],pixels[2],pixels[1])),pixel);
-              }
-          }
-      }
+        InterpolateMeshChannel(&grid,p,i,pixel);
       break;
     }
     case SplineInterpolatePixel:
     {
-      double
-        cx[4],
-        cy[4];
-
       p=GetCacheViewVirtualPixels(source_view,x_offset-1,y_offset-1,4,4,
         exception);
       if (p == (const Quantum *) NULL)
@@ -1821,46 +1887,7 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           break;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-      {
-        ssize_t
-          j;
-
-        PixelChannel channel = GetPixelChannelChannel(source,i);
-        PixelTrait traits = GetPixelChannelTraits(source,channel);
-        PixelTrait destination_traits=GetPixelChannelTraits(destination,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (destination_traits == UndefinedPixelTrait))
-          continue;
-        if ((traits & BlendPixelTrait) == 0)
-          for (j=0; j < 16; j++)
-          {
-            alpha[j]=1.0;
-            pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(source)+i];
-          }
-        else
-          for (j=0; j < 16; j++)
-          {
-            alpha[j]=QuantumScale*(double) GetPixelAlpha(source,p+j*
-              (ssize_t) GetPixelChannels(source));
-            pixels[j]=alpha[j]*(double) p[j*(ssize_t) GetPixelChannels(source)+
-              i];
-          }
-        SplineWeights((double) (x-x_offset),&cx);
-        SplineWeights((double) (y-y_offset),&cy);
-        gamma=((traits & BlendPixelTrait) ? (double) (1.0) :
-          MagickSafeReciprocal(cy[0]*(cx[0]*alpha[0]+cx[1]*alpha[1]+cx[2]*
-          alpha[2]+cx[3]*alpha[3])+cy[1]*(cx[0]*alpha[4]+cx[1]*alpha[5]+cx[2]*
-          alpha[6]+cx[3]*alpha[7])+cy[2]*(cx[0]*alpha[8]+cx[1]*alpha[9]+cx[2]*
-          alpha[10]+cx[3]*alpha[11])+cy[3]*(cx[0]*alpha[12]+cx[1]*alpha[13]+
-          cx[2]*alpha[14]+cx[3]*alpha[15])));
-        SetPixelChannel(destination,channel,ClampToQuantum(gamma*(cy[0]*(cx[0]*
-          pixels[0]+cx[1]*pixels[1]+cx[2]*pixels[2]+cx[3]*pixels[3])+cy[1]*
-          (cx[0]*pixels[4]+cx[1]*pixels[5]+cx[2]*pixels[6]+cx[3]*pixels[7])+
-          cy[2]*(cx[0]*pixels[8]+cx[1]*pixels[9]+cx[2]*pixels[10]+cx[3]*
-          pixels[11])+cy[3]*(cx[0]*pixels[12]+cx[1]*pixels[13]+cx[2]*
-          pixels[14]+cx[3]*pixels[15]))),pixel);
-      }
+        InterpolateSplineChannel(&grid,p,i,pixel);
       break;
     }
   }
