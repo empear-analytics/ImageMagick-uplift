@@ -1685,6 +1685,22 @@ static void SelectNoiseFactor(const ssize_t i,Image *thumbnail,char *factor)
   }
 }
 
+static void RelinquishMontageDirectory(const Image *image,
+  Image *montage_image)
+{
+  if (montage_image->montage != (char *) NULL)
+    {
+      /*
+        Free image directory.
+      */
+      montage_image->montage=(char *) RelinquishMagickMemory(
+        montage_image->montage);
+      if (image->directory != (char *) NULL)
+        montage_image->directory=(char *) RelinquishMagickMemory(
+          montage_image->directory);
+    }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -2098,17 +2114,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   images=DestroyImageList(images);
   if (montage_image == (Image *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  if (montage_image->montage != (char *) NULL)
-    {
-      /*
-        Free image directory.
-      */
-      montage_image->montage=(char *) RelinquishMagickMemory(
-        montage_image->montage);
-      if (image->directory != (char *) NULL)
-        montage_image->directory=(char *) RelinquishMagickMemory(
-          montage_image->directory);
-    }
+  RelinquishMontageDirectory(image,montage_image);
   preview_info=DestroyImageInfo(preview_info);
   return(montage_image);
 }
