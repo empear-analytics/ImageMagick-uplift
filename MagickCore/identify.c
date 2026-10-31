@@ -1688,6 +1688,18 @@ static double GetStatisticsScale(const Image *image)
   return(scale);
 }
 
+static void PrintOverallStatistics(FILE *file,
+  const ColorspaceType colorspace,ChannelStatisticsReport report)
+{
+  if ((colorspace != LinearGRAYColorspace) &&
+      (colorspace != GRAYColorspace))
+    {
+      (void) FormatLocaleFile(file,"  Image statistics:\n");
+      (void) PrintChannelStatistics(&report,CompositePixelChannel,
+        "Overall");
+    }
+}
+
 static void PrintImageChannelStatistics(FILE *file,const Image *image,
   const ColorspaceType colorspace,ChannelStatistics *channel_statistics)
 {
@@ -1728,13 +1740,7 @@ static void PrintImageChannelStatistics(FILE *file,const Image *image,
     }
   }
   PrintAuxiliaryChannelStatistics(image,report);
-  if ((colorspace != LinearGRAYColorspace) &&
-      (colorspace != GRAYColorspace))
-    {
-      (void) FormatLocaleFile(file,"  Image statistics:\n");
-      (void) PrintChannelStatistics(&report,CompositePixelChannel,
-        "Overall");
-    }
+  PrintOverallStatistics(file,colorspace,report);
   channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
     channel_statistics);
 }
