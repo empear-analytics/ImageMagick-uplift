@@ -247,6 +247,16 @@ static void SetCombineCMYKChannels(Image *combine_image,
   }
 }
 
+static Image *FinishCombineImage(Image *combine_image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    combine_image=DestroyImage(combine_image);
+  else
+    combine_image->type=UndefinedType;
+  return(combine_image);
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -366,9 +376,6 @@ MagickExport Image *CombineImages(const Image *image,
       }
   }
   combine_view=DestroyCacheView(combine_view);
-  if (status == MagickFalse)
-    combine_image=DestroyImage(combine_image);
-  else
-    combine_image->type=UndefinedType;
+  combine_image=FinishCombineImage(combine_image,status);
   return(combine_image);
 }
