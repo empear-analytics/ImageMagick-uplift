@@ -1867,6 +1867,25 @@ static void PrintImageColors(FILE *file,const Image *image,
   (void) FormatLocaleFile(file,"  Transparent color: %s\n",color);
 }
 
+static void PrintImageLayout(FILE *file,const Image *image)
+{
+  (void) FormatLocaleFile(file,"  Interlace: %s\n",CommandOptionToMnemonic(
+    MagickInterlaceOptions,(ssize_t) image->interlace));
+  (void) FormatLocaleFile(file,"  Intensity: %s\n",CommandOptionToMnemonic(
+    MagickPixelIntensityOptions,(ssize_t) image->intensity));
+  (void) FormatLocaleFile(file,"  Compose: %s\n",CommandOptionToMnemonic(
+    MagickComposeOptions,(ssize_t) image->compose));
+  if (HasPageGeometry(image) != MagickFalse)
+    (void) FormatLocaleFile(file,"  Page geometry: %.17gx%.17g%+.20g%+.20g\n",
+      (double) image->page.width,(double) image->page.height,(double)
+      image->page.x,(double) image->page.y);
+  if ((image->page.x != 0) || (image->page.y != 0))
+    (void) FormatLocaleFile(file,"  Origin geometry: %+.20g%+.20g\n",(double)
+      image->page.x,(double) image->page.y);
+  (void) FormatLocaleFile(file,"  Dispose: %s\n",CommandOptionToMnemonic(
+    MagickDisposeOptions,(ssize_t) image->dispose));
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2052,21 +2071,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   PrintImageColormapEntries(file,image,exception);
   PrintImageErrorAndRendering(file,image);
   PrintImageColors(file,image,exception);
-  (void) FormatLocaleFile(file,"  Interlace: %s\n",CommandOptionToMnemonic(
-    MagickInterlaceOptions,(ssize_t) image->interlace));
-  (void) FormatLocaleFile(file,"  Intensity: %s\n",CommandOptionToMnemonic(
-    MagickPixelIntensityOptions,(ssize_t) image->intensity));
-  (void) FormatLocaleFile(file,"  Compose: %s\n",CommandOptionToMnemonic(
-    MagickComposeOptions,(ssize_t) image->compose));
-  if (HasPageGeometry(image) != MagickFalse)
-    (void) FormatLocaleFile(file,"  Page geometry: %.17gx%.17g%+.20g%+.20g\n",
-      (double) image->page.width,(double) image->page.height,(double)
-      image->page.x,(double) image->page.y);
-  if ((image->page.x != 0) || (image->page.y != 0))
-    (void) FormatLocaleFile(file,"  Origin geometry: %+.20g%+.20g\n",(double)
-      image->page.x,(double) image->page.y);
-  (void) FormatLocaleFile(file,"  Dispose: %s\n",CommandOptionToMnemonic(
-    MagickDisposeOptions,(ssize_t) image->dispose));
+  PrintImageLayout(file,image);
   if (image->delay != 0)
     (void) FormatLocaleFile(file,"  Delay: %.17gx%.17g\n",(double) image->delay,
       (double) image->ticks_per_second);
