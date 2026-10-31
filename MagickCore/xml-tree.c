@@ -2252,6 +2252,108 @@ static MagickBooleanType SkipComment(char **p,const int terminal,
   return(MagickTrue);
 }
 
+typedef struct _StartTagInfo
+{
+  XMLTreeRoot
+    *root;
+
+  char
+    *tag,
+    **attributes;
+
+  ssize_t
+    l;
+
+  int
+    terminal;
+
+  ExceptionInfo
+    *exception;
+} StartTagInfo;
+
+typedef struct _StartTagTargets
+{
+  char
+    **p;
+
+  size_t
+    *ignore_depth;
+} StartTagTargets;
+
+static MagickBooleanType EndStartTag(const StartTagInfo *start_tag,
+  const StartTagTargets *targets)
+{
+  XMLTreeRoot
+    *const root = start_tag->root;
+
+  char
+    *const tag = start_tag->tag;
+
+  char
+    **const attributes = start_tag->attributes;
+
+  const ssize_t
+    l = start_tag->l;
+
+  const int
+    terminal = start_tag->terminal;
+
+  ExceptionInfo
+    *const exception = start_tag->exception;
+
+  char
+    **const p = targets->p;
+
+  size_t
+    *const ignore_depth = targets->ignore_depth;
+
+  int
+    c;
+
+  if (**p == '/')
+    {
+      /*
+        Self closing tag.
+      */
+      *(*p)++='\0';
+      if (IsTagNotClosed(*p,terminal) != MagickFalse)
+        {
+          if (l != 0)
+            (void) DestroyXMLTreeAttributes(attributes);
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            OptionWarning,"ParseError","missing >");
+          return(MagickFalse);
+        }
+      if ((*ignore_depth != 0) || (IsSkipTag(tag) != MagickFalse))
+        (void) DestroyXMLTreeAttributes(attributes);
+      else
+        {
+          ParseOpenTag(root,tag,attributes);
+          (void) ParseCloseTag(root,tag,exception);
+        }
+    }
+  else
+    {
+      c=(**p);
+      if (IsTagClosed(*p,terminal) != MagickFalse)
+        {
+          **p='\0';
+          *ignore_depth=OpenOrIgnoreXMLTag(root,tag,attributes,
+            *ignore_depth);
+          **p=(char) c;
+        }
+      else
+        {
+          if (l != 0)
+            (void) DestroyXMLTreeAttributes(attributes);
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            OptionWarning,"ParseError","missing >");
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2322,6 +2424,12 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
     c=(*p);
     if (IsXMLNameStart(p,c) != MagickFalse)
       {
+        StartTagInfo
+          start_tag;
+
+        StartTagTargets
+          start_tag_targets;
+
         /*
           Tag.
         */
@@ -2362,48 +2470,18 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
             while (IsInsideXMLTag(p) != MagickFalse)
               p++;
           }
-        if (*p == '/')
+        start_tag.root=root;
+        start_tag.tag=tag;
+        start_tag.attributes=attributes;
+        start_tag.l=l;
+        start_tag.terminal=terminal;
+        start_tag.exception=exception;
+        start_tag_targets.p=(&p);
+        start_tag_targets.ignore_depth=(&ignore_depth);
+        if (EndStartTag(&start_tag,&start_tag_targets) == MagickFalse)
           {
-            /*
-              Self closing tag.
-            */
-            *p++='\0';
-            if (IsTagNotClosed(p,terminal) != MagickFalse)
-              {
-                if (l != 0)
-                  (void) DestroyXMLTreeAttributes(attributes);
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  OptionWarning,"ParseError","missing >");
-                utf8=DestroyString(utf8);
-                return(&root->root);
-              }
-            if ((ignore_depth != 0) || (IsSkipTag(tag) != MagickFalse))
-              (void) DestroyXMLTreeAttributes(attributes);
-            else
-              {
-                ParseOpenTag(root,tag,attributes);
-                (void) ParseCloseTag(root,tag,exception);
-              }
-          }
-        else
-          {
-            c=(*p);
-            if (IsTagClosed(p,terminal) != MagickFalse)
-              {
-                *p='\0';
-                ignore_depth=OpenOrIgnoreXMLTag(root,tag,attributes,
-                  ignore_depth);
-                *p=(char) c;
-              }
-            else
-              {
-                if (l != 0)
-                  (void) DestroyXMLTreeAttributes(attributes);
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  OptionWarning,"ParseError","missing >");
-                utf8=DestroyString(utf8);
-                return(&root->root);
-              }
+            utf8=DestroyString(utf8);
+            return(&root->root);
           }
       }
     else
