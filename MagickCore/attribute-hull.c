@@ -255,49 +255,18 @@ static void SetMinimumBoundingBoxProperties(Image *image,
     GetMagickPrecision(),vertices[caliper_info.v].y);
 }
 
-MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
-  size_t *number_vertices,ExceptionInfo *exception)
+static CaliperInfo GetMinimumAreaCaliper(const Image *image,
+  PointInfo *vertices,const size_t number_hull_vertices)
 {
   CaliperInfo
     caliper_info;
 
-  const char
-    *artifact;
-
   double
-    angle,
-    diameter,
-    distance;
-
-  PointInfo
-    *bounding_box,
-    *vertices;
-
-  size_t
-    number_hull_vertices;
+    diameter;
 
   ssize_t
     i;
 
-  /*
-    Generate the minimum bounding box with the "Rotating Calipers" algorithm.
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  *number_vertices=0;
-  vertices=GetImageConvexHull(image,&number_hull_vertices,exception);
-  if (vertices == (PointInfo *) NULL)
-    return((PointInfo *) NULL);
-  *number_vertices=4;
-  bounding_box=(PointInfo *) AcquireQuantumMemory(*number_vertices,
-    sizeof(*bounding_box));
-  if (bounding_box == (PointInfo *) NULL)
-    {
-      vertices=(PointInfo *) RelinquishMagickMemory(vertices);
-      return((PointInfo *) NULL);
-    }
   caliper_info.area=2.0*image->columns*image->rows;
   caliper_info.width=(double) image->columns+image->rows;
   caliper_info.height=0.0;
@@ -358,6 +327,53 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
         caliper_info.v=v;
       }
   }
+  return(caliper_info);
+}
+
+MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
+  size_t *number_vertices,ExceptionInfo *exception)
+{
+  CaliperInfo
+    caliper_info;
+
+  const char
+    *artifact;
+
+  double
+    angle,
+    diameter,
+    distance;
+
+  PointInfo
+    *bounding_box,
+    *vertices;
+
+  size_t
+    number_hull_vertices;
+
+  ssize_t
+    i;
+
+  /*
+    Generate the minimum bounding box with the "Rotating Calipers" algorithm.
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  *number_vertices=0;
+  vertices=GetImageConvexHull(image,&number_hull_vertices,exception);
+  if (vertices == (PointInfo *) NULL)
+    return((PointInfo *) NULL);
+  *number_vertices=4;
+  bounding_box=(PointInfo *) AcquireQuantumMemory(*number_vertices,
+    sizeof(*bounding_box));
+  if (bounding_box == (PointInfo *) NULL)
+    {
+      vertices=(PointInfo *) RelinquishMagickMemory(vertices);
+      return((PointInfo *) NULL);
+    }
+  caliper_info=GetMinimumAreaCaliper(image,vertices,number_hull_vertices);
   /*
     Initialize minimum bounding box.
   */
