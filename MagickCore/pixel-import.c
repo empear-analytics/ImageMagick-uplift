@@ -406,29 +406,12 @@ static MagickBooleanType ImportCharRGBPPixels(Image *image,const RectangleInfo *
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ImportCharQuantum(const Image *image,const QuantumType quantum,
-  const unsigned char *magick_restrict p,Quantum *magick_restrict q)
+static void ImportCharAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const unsigned char *magick_restrict p,
+  Quantum *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      SetPixelRed(image,ScaleCharToQuantum(*p),q);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      SetPixelGreen(image,ScaleCharToQuantum(*p),q);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      SetPixelBlue(image,ScaleCharToQuantum(*p),q);
-      break;
-    }
     case AlphaQuantum:
     {
       SetPixelAlpha(image,ScaleCharToQuantum(*p),q);
@@ -454,6 +437,150 @@ static void ImportCharQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ImportCharQuantum(const Image *image,const QuantumType quantum,
+  const unsigned char *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,ScaleCharToQuantum(*p),q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,ScaleCharToQuantum(*p),q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,ScaleCharToQuantum(*p),q);
+      break;
+    }
+    default:
+    {
+      ImportCharAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ImportCharRowInfo
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ImportCharRowInfo;
+
+static const unsigned char *ImportCharMapRow(const ImportCharRowInfo *row,
+  const unsigned char *magick_restrict p,Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      ImportCharQuantum(image,quantum_map[i],p,q);
+      p++;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(p);
+}
+
+typedef struct _ImportCharMapLoop
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ImportCharMapLoop;
+
+static MagickBooleanType ImportCharMapPixels(const ImportCharMapLoop *loop,
+  const unsigned char *magick_restrict p)
+{
+  Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ImportCharRowInfo
+      row;
+
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    p=ImportCharMapRow(&row,p,q);
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportCharPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -470,17 +597,8 @@ static MagickBooleanType ImportCharPixel(Image *image,
   const unsigned char
     *magick_restrict p;
 
-  Quantum
-    *magick_restrict q;
-
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ImportCharMapLoop
+    loop;
 
   p=(const unsigned char *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -501,28 +619,12 @@ static MagickBooleanType ImportCharPixel(Image *image,
     return(ImportCharRGBOPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ImportCharRGBPPixels(image,roi,p,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        ImportCharQuantum(image,quantum_map[i],p,q);
-        p++;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ImportCharMapPixels(&loop,p));
 }
 
 static MagickBooleanType ImportDoubleBGRPixels(Image *image,const RectangleInfo *roi,
@@ -743,29 +845,12 @@ static MagickBooleanType ImportDoubleRGBPPixels(Image *image,const RectangleInfo
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ImportDoubleQuantum(const Image *image,const QuantumType quantum,
-  const double *magick_restrict p,Quantum *magick_restrict q)
+static void ImportDoubleAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const double *magick_restrict p,
+  Quantum *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      break;
-    }
     case AlphaQuantum:
     {
       SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
@@ -791,6 +876,150 @@ static void ImportDoubleQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ImportDoubleQuantum(const Image *image,const QuantumType quantum,
+  const double *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      break;
+    }
+    default:
+    {
+      ImportDoubleAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ImportDoubleRowInfo
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ImportDoubleRowInfo;
+
+static const double *ImportDoubleMapRow(const ImportDoubleRowInfo *row,
+  const double *magick_restrict p,Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      ImportDoubleQuantum(image,quantum_map[i],p,q);
+      p++;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(p);
+}
+
+typedef struct _ImportDoubleMapLoop
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ImportDoubleMapLoop;
+
+static MagickBooleanType ImportDoubleMapPixels(const ImportDoubleMapLoop *loop,
+  const double *magick_restrict p)
+{
+  Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+   length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ImportDoubleRowInfo
+      row;
+
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    p=ImportDoubleMapRow(&row,p,q);
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportDoublePixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -807,17 +1036,8 @@ static MagickBooleanType ImportDoublePixel(Image *image,
   const double
     *magick_restrict p;
 
-  Quantum
-    *magick_restrict q;
-
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ImportDoubleMapLoop
+    loop;
 
   p=(const double *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -834,28 +1054,12 @@ static MagickBooleanType ImportDoublePixel(Image *image,
     return(ImportDoubleRGBAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ImportDoubleRGBPPixels(image,roi,p,exception));
-   length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        ImportDoubleQuantum(image,quantum_map[i],p,q);
-        p++;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ImportDoubleMapPixels(&loop,p));
 }
 
 static MagickBooleanType ImportFloatBGRPixels(Image *image,
@@ -1104,32 +1308,12 @@ static MagickBooleanType ImportFloatRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ImportFloatQuantum(const Image *image,const QuantumType quantum,
-  const float *magick_restrict p,Quantum *magick_restrict q)
+static void ImportFloatAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const float *magick_restrict p,
+  Quantum *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
-      (*p)),q);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
-      (*p)),q);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
-      (*p)),q);
-      break;
-    }
     case AlphaQuantum:
     {
       SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(double)
@@ -1159,6 +1343,153 @@ static void ImportFloatQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ImportFloatQuantum(const Image *image,const QuantumType quantum,
+  const float *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(double)
+      (*p)),q);
+      break;
+    }
+    default:
+    {
+      ImportFloatAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ImportFloatRowInfo
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ImportFloatRowInfo;
+
+static const float *ImportFloatMapRow(const ImportFloatRowInfo *row,
+  const float *magick_restrict p,Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      ImportFloatQuantum(image,quantum_map[i],p,q);
+      p++;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(p);
+}
+
+typedef struct _ImportFloatMapLoop
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ImportFloatMapLoop;
+
+static MagickBooleanType ImportFloatMapPixels(const ImportFloatMapLoop *loop,
+  const float *magick_restrict p)
+{
+  Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ImportFloatRowInfo
+      row;
+
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    p=ImportFloatMapRow(&row,p,q);
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportFloatPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1175,17 +1506,8 @@ static MagickBooleanType ImportFloatPixel(Image *image,
   const float
     *magick_restrict p;
 
-  Quantum
-    *magick_restrict q;
-
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ImportFloatMapLoop
+    loop;
 
   p=(const float *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -1202,28 +1524,12 @@ static MagickBooleanType ImportFloatPixel(Image *image,
     return(ImportFloatRGBAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ImportFloatRGBPPixels(image,roi,p,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        ImportFloatQuantum(image,quantum_map[i],p,q);
-        p++;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ImportFloatMapPixels(&loop,p));
 }
 
 static MagickBooleanType ImportLongBGRPixels(Image *image,
@@ -1431,29 +1737,12 @@ static MagickBooleanType ImportLongRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ImportLongQuantum(const Image *image,const QuantumType quantum,
-  const unsigned int *magick_restrict p,Quantum *magick_restrict q)
+static void ImportLongAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const unsigned int *magick_restrict p,
+  Quantum *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      SetPixelRed(image,ScaleLongToQuantum(*p),q);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      SetPixelGreen(image,ScaleLongToQuantum(*p),q);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      SetPixelBlue(image,ScaleLongToQuantum(*p),q);
-      break;
-    }
     case AlphaQuantum:
     {
       SetPixelAlpha(image,ScaleLongToQuantum(*p),q);
@@ -1479,6 +1768,150 @@ static void ImportLongQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ImportLongQuantum(const Image *image,const QuantumType quantum,
+  const unsigned int *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,ScaleLongToQuantum(*p),q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,ScaleLongToQuantum(*p),q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,ScaleLongToQuantum(*p),q);
+      break;
+    }
+    default:
+    {
+      ImportLongAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ImportLongRowInfo
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ImportLongRowInfo;
+
+static const unsigned int *ImportLongMapRow(const ImportLongRowInfo *row,
+  const unsigned int *magick_restrict p,Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      ImportLongQuantum(image,quantum_map[i],p,q);
+      p++;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(p);
+}
+
+typedef struct _ImportLongMapLoop
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ImportLongMapLoop;
+
+static MagickBooleanType ImportLongMapPixels(const ImportLongMapLoop *loop,
+  const unsigned int *magick_restrict p)
+{
+  Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ImportLongRowInfo
+      row;
+
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    p=ImportLongMapRow(&row,p,q);
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportLongPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1495,17 +1928,8 @@ static MagickBooleanType ImportLongPixel(Image *image,
   const unsigned int
     *magick_restrict p;
 
-  Quantum
-    *magick_restrict q;
-
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ImportLongMapLoop
+    loop;
 
   p=(const unsigned int *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -1522,28 +1946,12 @@ static MagickBooleanType ImportLongPixel(Image *image,
     return(ImportLongRGBAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ImportLongRGBPPixels(image,roi,p,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        ImportLongQuantum(image,quantum_map[i],p,q);
-        p++;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ImportLongMapPixels(&loop,p));
 }
 
 static MagickBooleanType ImportLongLongBGRPixels(Image *image,
@@ -1751,29 +2159,12 @@ static MagickBooleanType ImportLongLongRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ImportLongLongQuantum(const Image *image,const QuantumType quantum,
-  const MagickSizeType *magick_restrict p,Quantum *magick_restrict q)
+static void ImportLongLongAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const MagickSizeType *magick_restrict p,
+  Quantum *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      SetPixelRed(image,ScaleLongLongToQuantum(*p),q);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      SetPixelGreen(image,ScaleLongLongToQuantum(*p),q);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      SetPixelBlue(image,ScaleLongLongToQuantum(*p),q);
-      break;
-    }
     case AlphaQuantum:
     {
       SetPixelAlpha(image,ScaleLongLongToQuantum(*p),q);
@@ -1799,6 +2190,151 @@ static void ImportLongLongQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ImportLongLongQuantum(const Image *image,const QuantumType quantum,
+  const MagickSizeType *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,ScaleLongLongToQuantum(*p),q);
+      break;
+    }
+    default:
+    {
+      ImportLongLongAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ImportLongLongRowInfo
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ImportLongLongRowInfo;
+
+static const MagickSizeType *ImportLongLongMapRow(
+  const ImportLongLongRowInfo *row,const MagickSizeType *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      ImportLongLongQuantum(image,quantum_map[i],p,q);
+      p++;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(p);
+}
+
+typedef struct _ImportLongLongMapLoop
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ImportLongLongMapLoop;
+
+static MagickBooleanType ImportLongLongMapPixels(
+  const ImportLongLongMapLoop *loop,const MagickSizeType *magick_restrict p)
+{
+  Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ImportLongLongRowInfo
+      row;
+
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    p=ImportLongLongMapRow(&row,p,q);
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportLongLongPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1815,17 +2351,8 @@ static MagickBooleanType ImportLongLongPixel(Image *image,
   const MagickSizeType
     *magick_restrict p;
 
-  Quantum
-    *magick_restrict q;
-
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ImportLongLongMapLoop
+    loop;
 
   p=(const MagickSizeType *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -1842,28 +2369,12 @@ static MagickBooleanType ImportLongLongPixel(Image *image,
     return(ImportLongLongRGBAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ImportLongLongRGBPPixels(image,roi,p,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        ImportLongLongQuantum(image,quantum_map[i],p,q);
-        p++;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ImportLongLongMapPixels(&loop,p));
 }
 
 static MagickBooleanType ImportQuantumBGRPixels(Image *image,
@@ -2071,29 +2582,12 @@ static MagickBooleanType ImportQuantumRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ImportQuantumQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+static void ImportQuantumAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      SetPixelRed(image,*p,q);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      SetPixelGreen(image,*p,q);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      SetPixelBlue(image,*p,q);
-      break;
-    }
     case AlphaQuantum:
     {
       SetPixelAlpha(image,*p,q);
@@ -2119,6 +2613,150 @@ static void ImportQuantumQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ImportQuantumQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,*p,q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,*p,q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,*p,q);
+      break;
+    }
+    default:
+    {
+      ImportQuantumAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ImportQuantumRowInfo
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ImportQuantumRowInfo;
+
+static const Quantum *ImportQuantumMapRow(const ImportQuantumRowInfo *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      ImportQuantumQuantum(image,quantum_map[i],p,q);
+      p++;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(p);
+}
+
+typedef struct _ImportQuantumMapLoop
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ImportQuantumMapLoop;
+
+static MagickBooleanType ImportQuantumMapPixels(
+  const ImportQuantumMapLoop *loop,const Quantum *magick_restrict p)
+{
+  Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ImportQuantumRowInfo
+      row;
+
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    p=ImportQuantumMapRow(&row,p,q);
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportQuantumPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -2135,17 +2773,8 @@ static MagickBooleanType ImportQuantumPixel(Image *image,
   const Quantum
     *magick_restrict p;
 
-  Quantum
-    *magick_restrict q;
-
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ImportQuantumMapLoop
+    loop;
 
   p=(const Quantum *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -2162,28 +2791,12 @@ static MagickBooleanType ImportQuantumPixel(Image *image,
     return(ImportQuantumRGBAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ImportQuantumRGBPPixels(image,roi,p,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        ImportQuantumQuantum(image,quantum_map[i],p,q);
-        p++;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ImportQuantumMapPixels(&loop,p));
 }
 
 static MagickBooleanType ImportShortBGRPixels(Image *image,
@@ -2391,29 +3004,12 @@ static MagickBooleanType ImportShortRGBPPixels(Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ImportShortQuantum(const Image *image,const QuantumType quantum,
-  const unsigned short *magick_restrict p,Quantum *magick_restrict q)
+static void ImportShortAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const unsigned short *magick_restrict p,
+  Quantum *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      SetPixelRed(image,ScaleShortToQuantum(*p),q);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      SetPixelGreen(image,ScaleShortToQuantum(*p),q);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      SetPixelBlue(image,ScaleShortToQuantum(*p),q);
-      break;
-    }
     case AlphaQuantum:
     {
       SetPixelAlpha(image,ScaleShortToQuantum(*p),q);
@@ -2439,6 +3035,150 @@ static void ImportShortQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ImportShortQuantum(const Image *image,const QuantumType quantum,
+  const unsigned short *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      SetPixelRed(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      SetPixelGreen(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      SetPixelBlue(image,ScaleShortToQuantum(*p),q);
+      break;
+    }
+    default:
+    {
+      ImportShortAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ImportShortRowInfo
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ImportShortRowInfo;
+
+static const unsigned short *ImportShortMapRow(const ImportShortRowInfo *row,
+  const unsigned short *magick_restrict p,Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      ImportShortQuantum(image,quantum_map[i],p,q);
+      p++;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(p);
+}
+
+typedef struct _ImportShortMapLoop
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ImportShortMapLoop;
+
+static MagickBooleanType ImportShortMapPixels(const ImportShortMapLoop *loop,
+  const unsigned short *magick_restrict p)
+{
+  Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ImportShortRowInfo
+      row;
+
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    p=ImportShortMapRow(&row,p,q);
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportShortPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -2455,17 +3195,8 @@ static MagickBooleanType ImportShortPixel(Image *image,
   const unsigned short
     *magick_restrict p;
 
-  Quantum
-    *magick_restrict q;
-
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ImportShortMapLoop
+    loop;
 
   p=(const unsigned short *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -2482,28 +3213,382 @@ static MagickBooleanType ImportShortPixel(Image *image,
     return(ImportShortRGBAPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ImportShortRGBPPixels(image,roi,p,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ImportShortMapPixels(&loop,p));
+}
 
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        ImportShortQuantum(image,quantum_map[i],p,q);
-        p++;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+static MagickBooleanType ImportMapQuantumGPR(const char *map,const ssize_t i,
+  QuantumType *quantum_map,ExceptionInfo *exception)
+{
+  switch (map[i])
+  {
+    case 'g':
+    case 'G':
+    {
+      quantum_map[i]=GreenQuantum;
       break;
+    }
+    case 'P':
+    case 'p':
+    {
+      quantum_map[i]=UndefinedQuantum;
+      break;
+    }
+    case 'R':
+    case 'r':
+    {
+      quantum_map[i]=RedQuantum;
+      break;
+    }
+    default:
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",map);
+      return(MagickFalse);
+    }
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(MagickTrue);
+}
+
+typedef struct _ImportMapRequest
+{
+  Image
+    *image;
+
+  const char
+    *map;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} ImportMapRequest;
+
+static MagickBooleanType ImportMapQuantumAO(const ImportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'a':
+    case 'A':
+    {
+      quantum_map[i]=AlphaQuantum;
+      image->alpha_trait=BlendPixelTrait;
+      break;
+    }
+    case 'O':
+    case 'o':
+    {
+      quantum_map[i]=OpacityQuantum;
+      image->alpha_trait=BlendPixelTrait;
+      break;
+    }
+    default:
+    {
+      if (ImportMapQuantumGPR(map,i,quantum_map,exception) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ImportMapQuantumBI(const ImportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'B':
+    case 'b':
+    {
+      quantum_map[i]=BlueQuantum;
+      break;
+    }
+    case 'I':
+    case 'i':
+    {
+      quantum_map[i]=IndexQuantum;
+      (void) SetImageColorspace(image,GRAYColorspace,exception);
+      break;
+    }
+    default:
+    {
+      ImportMapRequest
+        request;
+
+      request.image=image;
+      request.map=map;
+      request.i=i;
+      request.exception=exception;
+      if (ImportMapQuantumAO(&request,quantum_map) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ImportMapQuantumCK(const ImportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'C':
+    case 'c':
+    {
+      quantum_map[i]=CyanQuantum;
+      (void) SetImageColorspace(image,CMYKColorspace,exception);
+      break;
+    }
+    case 'K':
+    case 'k':
+    {
+      quantum_map[i]=BlackQuantum;
+      (void) SetImageColorspace(image,CMYKColorspace,exception);
+      break;
+    }
+    default:
+    {
+      ImportMapRequest
+        request;
+
+      request.image=image;
+      request.map=map;
+      request.i=i;
+      request.exception=exception;
+      if (ImportMapQuantumBI(&request,quantum_map) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ImportMapQuantumMY(const ImportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'm':
+    case 'M':
+    {
+      quantum_map[i]=MagentaQuantum;
+      (void) SetImageColorspace(image,CMYKColorspace,exception);
+      break;
+    }
+    case 'Y':
+    case 'y':
+    {
+      quantum_map[i]=YellowQuantum;
+      (void) SetImageColorspace(image,CMYKColorspace,exception);
+      break;
+    }
+    default:
+    {
+      ImportMapRequest
+        request;
+
+      request.image=image;
+      request.map=map;
+      request.i=i;
+      request.exception=exception;
+      if (ImportMapQuantumCK(&request,quantum_map) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+typedef struct _ImportTypeRequest
+{
+  Image
+    *image;
+
+  RectangleInfo
+    roi;
+
+  ImportPixelBuffer
+    buffer;
+
+  StorageType
+    type;
+
+  ExceptionInfo
+    *exception;
+} ImportTypeRequest;
+
+static void ImportPixelsOfType(const ImportTypeRequest *request,
+  MagickBooleanType *status)
+{
+  Image
+    *image = request->image;
+
+  const RectangleInfo
+    roi = request->roi;
+
+  const ImportPixelBuffer
+    buffer = request->buffer;
+
+  const StorageType
+    type = request->type;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (type)
+  {
+    case DoublePixel:
+    {
+      (*status)=ImportDoublePixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case FloatPixel:
+    {
+      (*status)=ImportFloatPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case LongPixel:
+    {
+      (*status)=ImportLongPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case LongLongPixel:
+    {
+      (*status)=ImportLongLongPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case QuantumPixel:
+    {
+      (*status)=ImportQuantumPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case ShortPixel:
+    {
+      (*status)=ImportShortPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    default:
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedStorageType","`%d'",type);
+      (*status)=MagickFalse;
+    }
+  }
+}
+
+typedef struct _ImportMapParse
+{
+  Image
+    *image;
+
+  const char
+    *map;
+
+  size_t
+    length;
+
+  QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ImportMapParse;
+
+static MagickBooleanType ImportMapQuantums(const ImportMapParse *parse)
+{
+  Image
+    *image = parse->image;
+
+  const char
+    *map = parse->map;
+
+  const size_t
+    length = parse->length;
+
+  QuantumType
+    *quantum_map = parse->quantum_map;
+
+  ExceptionInfo
+    *exception = parse->exception;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    switch (map[i])
+    {
+      default:
+      {
+        ImportMapRequest
+          request;
+
+        request.image=image;
+        request.map=map;
+        request.i=i;
+        request.exception=exception;
+        if (ImportMapQuantumMY(&request,quantum_map) == MagickFalse)
+          return(MagickFalse);
+        break;
+      }
+    }
+  }
+  return(MagickTrue);
 }
 
 MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
@@ -2519,8 +3604,8 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   RectangleInfo
     roi;
 
-  ssize_t
-    i;
+  ImportMapParse
+    parse;
 
   size_t
     length;
@@ -2539,92 +3624,13 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   if (quantum_map == (QuantumType *) NULL)
     ThrowBinaryException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  for (i=0; i < (ssize_t) length; i++)
-  {
-    switch (map[i])
-    {
-      case 'a':
-      case 'A':
-      {
-        quantum_map[i]=AlphaQuantum;
-        image->alpha_trait=BlendPixelTrait;
-        break;
-      }
-      case 'B':
-      case 'b':
-      {
-        quantum_map[i]=BlueQuantum;
-        break;
-      }
-      case 'C':
-      case 'c':
-      {
-        quantum_map[i]=CyanQuantum;
-        (void) SetImageColorspace(image,CMYKColorspace,exception);
-        break;
-      }
-      case 'g':
-      case 'G':
-      {
-        quantum_map[i]=GreenQuantum;
-        break;
-      }
-      case 'K':
-      case 'k':
-      {
-        quantum_map[i]=BlackQuantum;
-        (void) SetImageColorspace(image,CMYKColorspace,exception);
-        break;
-      }
-      case 'I':
-      case 'i':
-      {
-        quantum_map[i]=IndexQuantum;
-        (void) SetImageColorspace(image,GRAYColorspace,exception);
-        break;
-      }
-      case 'm':
-      case 'M':
-      {
-        quantum_map[i]=MagentaQuantum;
-        (void) SetImageColorspace(image,CMYKColorspace,exception);
-        break;
-      }
-      case 'O':
-      case 'o':
-      {
-        quantum_map[i]=OpacityQuantum;
-        image->alpha_trait=BlendPixelTrait;
-        break;
-      }
-      case 'P':
-      case 'p':
-      {
-        quantum_map[i]=UndefinedQuantum;
-        break;
-      }
-      case 'R':
-      case 'r':
-      {
-        quantum_map[i]=RedQuantum;
-        break;
-      }
-      case 'Y':
-      case 'y':
-      {
-        quantum_map[i]=YellowQuantum;
-        (void) SetImageColorspace(image,CMYKColorspace,exception);
-        break;
-      }
-      default:
-      {
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "UnrecognizedPixelMap","`%s'",map);
-        return(MagickFalse);
-      }
-    }
-  }
+  parse.image=image;
+  parse.map=map;
+  parse.length=length;
+  parse.quantum_map=quantum_map;
+  parse.exception=exception;
+  if (ImportMapQuantums(&parse) == MagickFalse)
+    return(MagickFalse);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
   /*
@@ -2644,41 +3650,18 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
       status=ImportCharPixel(image,&roi,&buffer,exception);
       break;
     }
-    case DoublePixel:
-    {
-      status=ImportDoublePixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case FloatPixel:
-    {
-      status=ImportFloatPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case LongPixel:
-    {
-      status=ImportLongPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case LongLongPixel:
-    {
-      status=ImportLongLongPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case QuantumPixel:
-    {
-      status=ImportQuantumPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case ShortPixel:
-    {
-      status=ImportShortPixel(image,&roi,&buffer,exception);
-      break;
-    }
     default:
     {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "UnrecognizedStorageType","`%d'",type);
-      status=MagickFalse;
+      ImportTypeRequest
+        request;
+
+      request.image=image;
+      request.roi=roi;
+      request.buffer=buffer;
+      request.type=type;
+      request.exception=exception;
+      ImportPixelsOfType(&request,&status);
+      break;
     }
   }
   quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);

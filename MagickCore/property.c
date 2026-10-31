@@ -629,23 +629,27 @@ static char *Trace8BIMClippath(const Image *image,const char *format,
   return(path);
 }
 
-static void Read8BIMResourceName(char **resource,const unsigned char **info,
+static void Read8BIMResourceBytes(char **resource,const unsigned char **info,
   size_t *length,const ssize_t count)
 {
   ssize_t
     i;
 
+  for (i=0; i < (ssize_t) count; i++)
+    (*resource)[i]=(char) ReadPropertyByte(&(*info),&(*length));
+  (*resource)[count]='\0';
+}
+
+static void Read8BIMResourceName(char **resource,const unsigned char **info,
+  size_t *length,const ssize_t count)
+{
   if ((count != 0) && ((size_t) count <= (*length)))
     {
       if (~((size_t) count) >= (MagickPathExtent-1))
         *resource=(char *) AcquireQuantumMemory((size_t) count+
           MagickPathExtent,sizeof(*(*resource)));
       if (*resource != (char *) NULL)
-        {
-          for (i=0; i < (ssize_t) count; i++)
-            (*resource)[i]=(char) ReadPropertyByte(&(*info),&(*length));
-          (*resource)[count]='\0';
-        }
+        Read8BIMResourceBytes(resource,info,length,count);
     }
 }
 
@@ -1975,6 +1979,21 @@ static void AddXMPPropertyValue(const Image *image,XMLTreeInfo *node,
   xmp_namespace=DestroyString(xmp_namespace);
 }
 
+static void AddXMPChildValues(const Image *image,XMLTreeInfo *node,
+  XMLTreeInfo *child)
+{
+  const char
+    *content;
+
+  while (child != (XMLTreeInfo *) NULL)
+  {
+    content=GetXMLTreeContent(child);
+    if (SkipXMPValue(content) == MagickFalse)
+      AddXMPPropertyValue(image,node,content);
+    child=GetXMLTreeSibling(child);
+  }
+}
+
 static void AddXMPDescriptionValues(const Image *image,
   XMLTreeInfo *description)
 {
@@ -1993,13 +2012,7 @@ static void AddXMPDescriptionValues(const Image *image,
     if ((child == (XMLTreeInfo *) NULL) &&
         (SkipXMPValue(content) == MagickFalse))
       AddXMPPropertyValue(image,node,content);
-    while (child != (XMLTreeInfo *) NULL)
-    {
-      content=GetXMLTreeContent(child);
-      if (SkipXMPValue(content) == MagickFalse)
-        AddXMPPropertyValue(image,node,content);
-      child=GetXMLTreeSibling(child);
-    }
+    AddXMPChildValues(image,node,child);
     node=GetXMLTreeSibling(node);
   }
 }
@@ -4608,6 +4621,12 @@ static inline MagickBooleanType IsReadOnlySProperty(const char *property)
     MagickFalse);
 }
 
+static void LowerImageDelay(Image *image,const GeometryInfo geometry_info)
+{
+  if (image->delay > (size_t) floor(geometry_info.rho+0.5))
+    image->delay=(size_t) floor(geometry_info.rho+0.5);
+}
+
 static MagickBooleanType SetImageDelayProperty(Image *image,
   const char *value)
 {
@@ -4619,10 +4638,7 @@ static MagickBooleanType SetImageDelayProperty(Image *image,
 
   flags=ParseGeometry(value,&geometry_info);
   if ((flags & GreaterValue) != 0)
-    {
-      if (image->delay > (size_t) floor(geometry_info.rho+0.5))
-        image->delay=(size_t) floor(geometry_info.rho+0.5);
-    }
+    LowerImageDelay(image,geometry_info);
   else
     if ((flags & LessValue) != 0)
       {

@@ -110,14 +110,3 @@ in M115 (V step 7's `return(&root->root)`, O step 2's `xml` cursor). `pixel.c` l
   `<!ENTITY` branch (`break`, `continue` and cleanup return mixed), `NewXMLTree`'s tag
   branch (five written variables, I takes four), `FileToXML`; Recipe B on the
   existing helpers with Excess Arguments is next.
-
-### Noticed, not changed (possible upstream bugs)
-
-- `blob.c`: a gzip case lacks its fall-through marker (harmless).
-- `pixel.c`: the Blend method's alpha tests are inconsistent between paths.
-- `image.c`: the "clear mask" switches disagree - in `SetImageMask` `WritePixelMask`
-  falls through and also clears `CompositeMaskChannel`; in `SetImageRegionMask` it breaks
-  and clears only `WriteMaskChannel`.
-- `xml-tree.c` `NewXMLTree`: `root` leaks (returned NULL without being destroyed) when
-  the UTF-16 conversion fails, when the length is 0 and when there is no `<`. The two
-  from M115 stand.

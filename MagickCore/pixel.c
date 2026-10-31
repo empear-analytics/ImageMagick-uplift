@@ -1151,14 +1151,10 @@ static MagickBooleanType InterpolateBilinearPixelChannel(
   return(status);
 }
 
-MagickExport MagickBooleanType InterpolatePixelChannel(
-  const Image *magick_restrict image,const CacheView_ *image_view,
-  const PixelChannel channel,const PixelInterpolateMethod method,const double x,
-  const double y,double *pixel,ExceptionInfo *exception)
+static MagickBooleanType InterpolateAveragePixelChannel(
+  const ChannelInterpolation *grid,const PixelInterpolateMethod interpolate,
+  double *pixel,MagickBooleanType status)
 {
-  ChannelInterpolation
-    grid;
-
   const Quantum
     *magick_restrict p;
 
@@ -1166,6 +1162,153 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     alpha[16],
     gamma,
     pixels[16];
+
+  ssize_t
+    count,
+    i,
+    x_offset = grid->x_offset,
+    y_offset = grid->y_offset;
+
+  count=2;  /* size of the area to average - default nearest 4 */
+  if (interpolate == Average9InterpolatePixel)
+    {
+      count=3;
+      x_offset=CastDoubleToSsizeT(floor(grid->x+0.5)-1.0);
+      y_offset=CastDoubleToSsizeT(floor(grid->y+0.5)-1.0);
+    }
+  else
+    if (interpolate == Average16InterpolatePixel)
+      {
+        count=4;
+        x_offset--;
+        y_offset--;
+      }
+  p=GetCacheViewVirtualPixels(grid->image_view,x_offset,y_offset,
+    (size_t) count,(size_t) count,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  count*=count;  /* Number of pixels to average */
+  LoadInterpolatePixels(grid->image,grid->channel,grid->traits,p,count,alpha,
+    pixels);
+  for (i=0; i < (ssize_t) count; i++)
+  {
+    gamma=MagickSafeReciprocal(alpha[i])/count;
+    *pixel+=gamma*pixels[i];
+  }
+  return(status);
+}
+
+static void InterpolateGridPixelChannel(const ChannelInterpolation grid,
+  const PixelInterpolateMethod interpolate,double *pixel,
+  MagickBooleanType *status)
+{
+  switch (interpolate)
+  {
+    case BilinearInterpolatePixel:
+    default:
+    {
+      (*status)=InterpolateBilinearPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+    case BlendInterpolatePixel:
+    {
+      (*status)=InterpolateBlendPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+    case CatromInterpolatePixel:
+    {
+      (*status)=InterpolateCubicPixelChannel(&grid,CatromWeights,pixel,
+        (*status));
+      break;
+    }
+    case MeshInterpolatePixel:
+    {
+      (*status)=InterpolateMeshPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+    case SplineInterpolatePixel:
+    {
+      (*status)=InterpolateCubicPixelChannel(&grid,SplineWeights,pixel,
+        (*status));
+      break;
+    }
+  }
+}
+
+static MagickBooleanType InterpolateNearestPixelChannel(
+  const ChannelInterpolation *grid,double *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  x_offset=CastDoubleToSsizeT(floor(grid->x+0.5));
+  y_offset=CastDoubleToSsizeT(floor(grid->y+0.5));
+  p=GetCacheViewVirtualPixels(grid->image_view,x_offset,y_offset,1,1,
+    grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  *pixel=(double) GetPixelChannel(grid->image,grid->channel,p);
+  return(status);
+}
+
+static MagickBooleanType InterpolateIntegerPixelChannel(
+  const ChannelInterpolation *grid,double *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
+    1,1,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  *pixel=(double) GetPixelChannel(grid->image,grid->channel,p);
+  return(status);
+}
+
+static void InterpolatePointPixelChannel(const ChannelInterpolation grid,
+  const PixelInterpolateMethod interpolate,double *pixel,
+  MagickBooleanType *status)
+{
+  switch (interpolate)
+  {
+    default:
+    {
+      InterpolateGridPixelChannel(grid,interpolate,pixel,status);
+      break;
+    }
+    case IntegerInterpolatePixel:
+    {
+      (*status)=InterpolateIntegerPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+    case NearestInterpolatePixel:
+    {
+      (*status)=InterpolateNearestPixelChannel(&grid,pixel,(*status));
+      break;
+    }
+  }
+}
+
+MagickExport MagickBooleanType InterpolatePixelChannel(
+  const Image *magick_restrict image,const CacheView_ *image_view,
+  const PixelChannel channel,const PixelInterpolateMethod method,const double x,
+  const double y,double *pixel,ExceptionInfo *exception)
+{
+  ChannelInterpolation
+    grid;
 
   MagickBooleanType
     status;
@@ -1177,7 +1320,6 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     traits;
 
   ssize_t
-    i,
     x_offset,
     y_offset;
 
@@ -1209,87 +1351,12 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     case Average9InterpolatePixel:  /* nearest 9 neighbours */
     case Average16InterpolatePixel:  /* nearest 16 neighbours */
     {
-      ssize_t
-        count;
-
-      count=2;  /* size of the area to average - default nearest 4 */
-      if (interpolate == Average9InterpolatePixel)
-        {
-          count=3;
-          x_offset=CastDoubleToSsizeT(floor(x+0.5)-1.0);
-          y_offset=CastDoubleToSsizeT(floor(y+0.5)-1.0);
-        }
-      else
-        if (interpolate == Average16InterpolatePixel)
-          {
-            count=4;
-            x_offset--;
-            y_offset--;
-          }
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,(size_t) count,
-        (size_t) count,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      count*=count;  /* Number of pixels to average */
-      LoadInterpolatePixels(image,channel,traits,p,count,alpha,pixels);
-      for (i=0; i < (ssize_t) count; i++)
-      {
-        gamma=MagickSafeReciprocal(alpha[i])/count;
-        *pixel+=gamma*pixels[i];
-      }
+      status=InterpolateAveragePixelChannel(&grid,interpolate,pixel,status);
       break;
     }
-    case BilinearInterpolatePixel:
     default:
     {
-      status=InterpolateBilinearPixelChannel(&grid,pixel,status);
-      break;
-    }
-    case BlendInterpolatePixel:
-    {
-      status=InterpolateBlendPixelChannel(&grid,pixel,status);
-      break;
-    }
-    case CatromInterpolatePixel:
-    {
-      status=InterpolateCubicPixelChannel(&grid,CatromWeights,pixel,status);
-      break;
-    }
-    case IntegerInterpolatePixel:
-    {
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,1,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      *pixel=(double) GetPixelChannel(image,channel,p);
-      break;
-    }
-    case NearestInterpolatePixel:
-    {
-      x_offset=CastDoubleToSsizeT(floor(x+0.5));
-      y_offset=CastDoubleToSsizeT(floor(y+0.5));
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,1,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      *pixel=(double) GetPixelChannel(image,channel,p);
-      break;
-    }
-    case MeshInterpolatePixel:
-    {
-      status=InterpolateMeshPixelChannel(&grid,pixel,status);
-      break;
-    }
-    case SplineInterpolatePixel:
-    {
-      status=InterpolateCubicPixelChannel(&grid,SplineWeights,pixel,status);
+      InterpolatePointPixelChannel(grid,interpolate,pixel,&status);
       break;
     }
   }
@@ -1529,6 +1596,25 @@ static void AverageInterpolateChannel(const ChannelAverage *average,
   SetPixelChannel(destination,channel,ClampToQuantum(sum),pixel);
 }
 
+static void AverageInterpolateChannels(const ChannelsInterpolation *grid,
+  const Quantum *magick_restrict p,const ssize_t count,Quantum *pixel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(grid->source); i++)
+  {
+    ChannelAverage
+      average;
+
+    average.source=grid->source;
+    average.destination=grid->destination;
+    average.p=p;
+    average.count=count;
+    AverageInterpolateChannel(&average,i,pixel);
+  }
+}
+
 static void InterpolateCubicChannel(const ChannelsInterpolation *grid,
   void (*weights)(const double,double (*)[4]),const Quantum *magick_restrict p,
   const ssize_t i,Quantum *pixel)
@@ -1754,6 +1840,101 @@ static void InterpolateMeshChannel(const ChannelsInterpolation *grid,
     }
 }
 
+static MagickBooleanType InterpolateCubicChannels(
+  const ChannelsInterpolation *grid,void (*weights)(const double,double (*)[4]),
+  Quantum *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    i;
+
+  p=GetCacheViewVirtualPixels(grid->source_view,grid->x_offset-1,
+    grid->y_offset-1,4,4,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (i=0; i < (ssize_t) GetPixelChannels(grid->source); i++)
+    InterpolateCubicChannel(grid,weights,p,i,pixel);
+  return(status);
+}
+
+static MagickBooleanType InterpolateQuadChannels(
+  const ChannelsInterpolation *grid,void (*interpolate_channel)(
+  const ChannelsInterpolation *,const Quantum *magick_restrict,const ssize_t,
+  Quantum *),Quantum *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    i;
+
+  p=GetCacheViewVirtualPixels(grid->source_view,grid->x_offset,grid->y_offset,
+    2,2,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (i=0; i < (ssize_t) GetPixelChannels(grid->source); i++)
+    interpolate_channel(grid,p,i,pixel);
+  return(status);
+}
+
+static void InterpolateGridChannels(const ChannelsInterpolation grid,
+  const PixelInterpolateMethod interpolate,Quantum *pixel,
+  MagickBooleanType *status)
+{
+  switch (interpolate)
+  {
+    case BilinearInterpolatePixel:
+    default:
+    {
+      (*status)=InterpolateBilinearChannels(&grid,pixel,(*status));
+      break;
+    }
+    case IntegerInterpolatePixel:
+    {
+      (*status)=InterpolateIntegerChannels(&grid,pixel,(*status));
+      break;
+    }
+  }
+}
+
+static void InterpolateKernelChannels(const ChannelsInterpolation grid,
+  const PixelInterpolateMethod interpolate,Quantum *pixel,
+  MagickBooleanType *status)
+{
+  switch (interpolate)
+  {
+    default:
+    {
+      InterpolateGridChannels(grid,interpolate,pixel,status);
+      break;
+    }
+    case CatromInterpolatePixel:
+    {
+      (*status)=InterpolateCubicChannels(&grid,CatromWeights,pixel,(*status));
+      break;
+    }
+    case MeshInterpolatePixel:
+    {
+      (*status)=InterpolateQuadChannels(&grid,InterpolateMeshChannel,pixel,
+        (*status));
+      break;
+    }
+    case SplineInterpolatePixel:
+    {
+      (*status)=InterpolateCubicChannels(&grid,SplineWeights,pixel,(*status));
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannels(
   const Image *magick_restrict source,const CacheView_ *source_view,
   const Image *magick_restrict destination,const PixelInterpolateMethod method,
@@ -1826,53 +2007,18 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           break;
         }
       count*=count;  /* Number of pixels to average */
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-      {
-        ChannelAverage
-          average;
-
-        average.source=source;
-        average.destination=destination;
-        average.p=p;
-        average.count=count;
-        AverageInterpolateChannel(&average,i,pixel);
-      }
+      AverageInterpolateChannels(&grid,p,count,pixel);
       break;
     }
-    case BilinearInterpolatePixel:
     default:
     {
-      status=InterpolateBilinearChannels(&grid,pixel,status);
+      InterpolateKernelChannels(grid,interpolate,pixel,&status);
       break;
     }
     case BlendInterpolatePixel:
     {
-      p=GetCacheViewVirtualPixels(source_view,x_offset,y_offset,2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-        InterpolateBlendChannel(&grid,p,i,pixel);
-      break;
-    }
-    case CatromInterpolatePixel:
-    {
-      p=GetCacheViewVirtualPixels(source_view,x_offset-1,y_offset-1,4,4,
-        exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-        InterpolateCubicChannel(&grid,CatromWeights,p,i,pixel);
-      break;
-    }
-    case IntegerInterpolatePixel:
-    {
-      status=InterpolateIntegerChannels(&grid,pixel,status);
+      status=InterpolateQuadChannels(&grid,InterpolateBlendChannel,pixel,
+        status);
       break;
     }
     case NearestInterpolatePixel:
@@ -1896,31 +2042,6 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           continue;
         SetPixelChannel(destination,channel,p[i],pixel);
       }
-      break;
-    }
-    case MeshInterpolatePixel:
-    {
-      p=GetCacheViewVirtualPixels(source_view,x_offset,y_offset,2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-        InterpolateMeshChannel(&grid,p,i,pixel);
-      break;
-    }
-    case SplineInterpolatePixel:
-    {
-      p=GetCacheViewVirtualPixels(source_view,x_offset-1,y_offset-1,4,4,
-        exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-        InterpolateCubicChannel(&grid,SplineWeights,p,i,pixel);
       break;
     }
   }
@@ -2265,6 +2386,234 @@ static MagickBooleanType InterpolateBilinearPixelInfo(
   return(status);
 }
 
+static MagickBooleanType InterpolateAveragePixelInfo(
+  const PixelInfoInterpolation *grid,const PixelInterpolateMethod interpolate,
+  PixelInfo *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *p;
+
+  double
+    alpha[16],
+    gamma;
+
+  PixelInfo
+    pixels[16];
+
+  ssize_t
+    count,
+    i,
+    x_offset = grid->x_offset,
+    y_offset = grid->y_offset;
+
+  count=2;  /* size of the area to average - default nearest 4 */
+  if (interpolate == Average9InterpolatePixel)
+    {
+      count=3;
+      x_offset=CastDoubleToSsizeT(floor(grid->x+0.5)-1.0);
+      y_offset=CastDoubleToSsizeT(floor(grid->y+0.5)-1.0);
+    }
+  else
+    if (interpolate == Average16InterpolatePixel)
+      {
+        count=4;
+        x_offset--;
+        y_offset--;
+      }
+  p=GetCacheViewVirtualPixels(grid->image_view,x_offset,y_offset,
+    (size_t) count,(size_t) count,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  pixel->red=0.0;
+  pixel->green=0.0;
+  pixel->blue=0.0;
+  pixel->black=0.0;
+  pixel->alpha=0.0;
+  count*=count;  /* number of pixels - square of size */
+  for (i=0; i < (ssize_t) count; i++)
+  {
+    AlphaBlendPixelInfo(grid->image,p,pixels,alpha);
+    gamma=MagickSafeReciprocal(alpha[0]);
+    pixel->red+=gamma*pixels[0].red;
+    pixel->green+=gamma*pixels[0].green;
+    pixel->blue+=gamma*pixels[0].blue;
+    pixel->black+=gamma*pixels[0].black;
+    pixel->alpha+=pixels[0].alpha;
+    p+=(ptrdiff_t) GetPixelChannels(grid->image);
+  }
+  gamma=1.0/count;   /* average weighting of each pixel in area */
+  pixel->red*=gamma;
+  pixel->green*=gamma;
+  pixel->blue*=gamma;
+  pixel->black*=gamma;
+  pixel->alpha*=gamma;
+  return(status);
+}
+
+static void SetBlendedPixelInfo(double *alpha,const PixelInfo *pixels,
+  double gamma,PixelInfo *pixel)
+{
+  gamma=1.0/gamma;
+  alpha[0]=MagickSafeReciprocal(alpha[0]);
+  pixel->red=alpha[0]*pixels[0].red;
+  pixel->green=alpha[0]*pixels[0].green;  /* divide by sum of alpha */
+  pixel->blue=alpha[0]*pixels[0].blue;
+  pixel->black=alpha[0]*pixels[0].black;
+  pixel->alpha=gamma*pixels[0].alpha;   /* divide by number of pixels */
+}
+
+static MagickBooleanType InterpolateBlendPixelInfo(
+  const PixelInfoInterpolation *grid,PixelInfo *pixels,PixelInfo *pixel,
+  MagickBooleanType status)
+{
+  const Quantum
+    *p;
+
+  double
+    alpha[16],
+    gamma;
+
+  ssize_t
+    i;
+
+  p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
+    2,2,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (i=0; i < 4L; i++)
+  {
+    GetPixelInfoPixel(grid->image,p+i*(ssize_t) GetPixelChannels(grid->image),
+      pixels+i);
+    AlphaBlendPixelInfo(grid->image,p+i*(ssize_t) GetPixelChannels(grid->image),
+      pixels+i,alpha+i);
+  }
+  gamma=1.0;  /* number of pixels blended together (its variable) */
+  for (i=0; i <= 1L; i++)
+  {
+    if ((grid->y-grid->y_offset) >= 0.75)
+      {
+        alpha[i]=alpha[i+2];  /* take right pixels */
+        pixels[i]=pixels[i+2];
+      }
+    else
+      if ((grid->y-grid->y_offset) > 0.25)
+        {
+          gamma=2.0;  /* blend both pixels in row */
+          alpha[i]+=alpha[i+2];  /* add up alpha weights */
+          pixels[i].red+=pixels[i+2].red;
+          pixels[i].green+=pixels[i+2].green;
+          pixels[i].blue+=pixels[i+2].blue;
+          pixels[i].black+=pixels[i+2].black;
+          pixels[i].alpha+=pixels[i+2].alpha;
+        }
+  }
+  if ((grid->x-grid->x_offset) >= 0.75)
+    {
+      alpha[0]=alpha[1];
+      pixels[0]=pixels[1];
+    }
+  else
+    if ((grid->x-grid->x_offset) > 0.25)
+      {
+        gamma*=2.0;  /* blend both rows */
+        alpha[0]+= alpha[1];  /* add up alpha weights */
+        pixels[0].red+=pixels[1].red;
+        pixels[0].green+=pixels[1].green;
+        pixels[0].blue+=pixels[1].blue;
+        pixels[0].black+=pixels[1].black;
+        pixels[0].alpha+=pixels[1].alpha;
+      }
+  SetBlendedPixelInfo(alpha,pixels,gamma,pixel);
+  return(status);
+}
+
+static void InterpolateAreaPixelInfo(const PixelInfoInterpolation grid,
+  const PixelInterpolateMethod interpolate,PixelInfo *pixel,
+  MagickBooleanType *status)
+{
+  PixelInfo
+    pixels[16];
+
+  switch (interpolate)
+  {
+    case AverageInterpolatePixel:  /* nearest 4 neighbours */
+    case Average9InterpolatePixel:  /* nearest 9 neighbours */
+    case Average16InterpolatePixel:  /* nearest 16 neighbours */
+    {
+      (*status)=InterpolateAveragePixelInfo(&grid,interpolate,pixel,(*status));
+      break;
+    }
+    case BilinearInterpolatePixel:
+    default:
+    {
+      (*status)=InterpolateBilinearPixelInfo(&grid,pixels,pixel,(*status));
+      break;
+    }
+    case BlendInterpolatePixel:
+    {
+      (*status)=InterpolateBlendPixelInfo(&grid,pixels,pixel,(*status));
+      break;
+    }
+    case MeshInterpolatePixel:
+    {
+      (*status)=InterpolateMeshPixelInfo(&grid,pixels,pixel,(*status));
+      break;
+    }
+  }
+}
+
+static void InterpolateGridPixelInfo(const PixelInfoInterpolation grid,
+  const PixelInterpolateMethod interpolate,PixelInfo *pixel,
+  MagickBooleanType *status)
+{
+  PixelInfo
+    pixels[16];
+
+  switch (interpolate)
+  {
+    default:
+    {
+      InterpolateAreaPixelInfo(grid,interpolate,pixel,status);
+      break;
+    }
+    case CatromInterpolatePixel:
+    {
+      (*status)=InterpolateCubicPixelInfo(&grid,CatromWeights,pixels,pixel,
+        (*status));
+      break;
+    }
+    case SplineInterpolatePixel:
+    {
+      (*status)=InterpolateCubicPixelInfo(&grid,SplineWeights,pixels,pixel,
+        (*status));
+      break;
+    }
+  }
+}
+
+static MagickBooleanType InterpolateIntegerPixelInfo(
+  const PixelInfoInterpolation *grid,PixelInfo *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *p;
+
+  p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
+    1,1,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  GetPixelInfoPixel(grid->image,p,pixel);
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
   const CacheView_ *image_view,const PixelInterpolateMethod method,
   const double x,const double y,PixelInfo *pixel,ExceptionInfo *exception)
@@ -2274,10 +2623,6 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
 
   const Quantum
     *p;
-
-  double
-    alpha[16],
-    gamma;
 
   MagickBooleanType
     status;
@@ -2289,7 +2634,6 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
     interpolate;
 
   ssize_t
-    i,
     x_offset,
     y_offset;
 
@@ -2313,149 +2657,19 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
   grid.exception=exception;
   switch (interpolate)
   {
-    case AverageInterpolatePixel:  /* nearest 4 neighbours */
-    case Average9InterpolatePixel:  /* nearest 9 neighbours */
-    case Average16InterpolatePixel:  /* nearest 16 neighbours */
-    {
-      ssize_t
-        count;
-
-      count=2;  /* size of the area to average - default nearest 4 */
-      if (interpolate == Average9InterpolatePixel)
-        {
-          count=3;
-          x_offset=CastDoubleToSsizeT(floor(x+0.5)-1.0);
-          y_offset=CastDoubleToSsizeT(floor(y+0.5)-1.0);
-        }
-      else
-        if (interpolate == Average16InterpolatePixel)
-          {
-            count=4;
-            x_offset--;
-            y_offset--;
-          }
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,(size_t) count,
-        (size_t) count,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      pixel->red=0.0;
-      pixel->green=0.0;
-      pixel->blue=0.0;
-      pixel->black=0.0;
-      pixel->alpha=0.0;
-      count*=count;  /* number of pixels - square of size */
-      for (i=0; i < (ssize_t) count; i++)
-      {
-        AlphaBlendPixelInfo(image,p,pixels,alpha);
-        gamma=MagickSafeReciprocal(alpha[0]);
-        pixel->red+=gamma*pixels[0].red;
-        pixel->green+=gamma*pixels[0].green;
-        pixel->blue+=gamma*pixels[0].blue;
-        pixel->black+=gamma*pixels[0].black;
-        pixel->alpha+=pixels[0].alpha;
-        p+=(ptrdiff_t) GetPixelChannels(image);
-      }
-      gamma=1.0/count;   /* average weighting of each pixel in area */
-      pixel->red*=gamma;
-      pixel->green*=gamma;
-      pixel->blue*=gamma;
-      pixel->black*=gamma;
-      pixel->alpha*=gamma;
-      break;
-    }
     case BackgroundInterpolatePixel:
     {
       *pixel=image->background_color;  /* Copy PixelInfo Structure  */
       break;
     }
-    case BilinearInterpolatePixel:
     default:
     {
-      status=InterpolateBilinearPixelInfo(&grid,pixels,pixel,status);
-      break;
-    }
-    case BlendInterpolatePixel:
-    {
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < 4L; i++)
-      {
-        GetPixelInfoPixel(image,p+i*(ssize_t) GetPixelChannels(image),pixels+i);
-        AlphaBlendPixelInfo(image,p+i*(ssize_t) GetPixelChannels(image),
-          pixels+i,alpha+i);
-      }
-      gamma=1.0;  /* number of pixels blended together (its variable) */
-      for (i=0; i <= 1L; i++)
-      {
-        if ((y-y_offset) >= 0.75)
-          {
-            alpha[i]=alpha[i+2];  /* take right pixels */
-            pixels[i]=pixels[i+2];
-          }
-        else
-          if ((y-y_offset) > 0.25)
-            {
-              gamma=2.0;  /* blend both pixels in row */
-              alpha[i]+=alpha[i+2];  /* add up alpha weights */
-              pixels[i].red+=pixels[i+2].red;
-              pixels[i].green+=pixels[i+2].green;
-              pixels[i].blue+=pixels[i+2].blue;
-              pixels[i].black+=pixels[i+2].black;
-              pixels[i].alpha+=pixels[i+2].alpha;
-            }
-      }
-      if ((x-x_offset) >= 0.75)
-        {
-          alpha[0]=alpha[1];
-          pixels[0]=pixels[1];
-        }
-      else
-        if ((x-x_offset) > 0.25)
-          {
-            gamma*=2.0;  /* blend both rows */
-            alpha[0]+= alpha[1];  /* add up alpha weights */
-            pixels[0].red+=pixels[1].red;
-            pixels[0].green+=pixels[1].green;
-            pixels[0].blue+=pixels[1].blue;
-            pixels[0].black+=pixels[1].black;
-            pixels[0].alpha+=pixels[1].alpha;
-          }
-      gamma=1.0/gamma;
-      alpha[0]=MagickSafeReciprocal(alpha[0]);
-      pixel->red=alpha[0]*pixels[0].red;
-      pixel->green=alpha[0]*pixels[0].green;  /* divide by sum of alpha */
-      pixel->blue=alpha[0]*pixels[0].blue;
-      pixel->black=alpha[0]*pixels[0].black;
-      pixel->alpha=gamma*pixels[0].alpha;   /* divide by number of pixels */
-      break;
-    }
-    case CatromInterpolatePixel:
-    {
-      status=InterpolateCubicPixelInfo(&grid,CatromWeights,pixels,pixel,
-        status);
+      InterpolateGridPixelInfo(grid,interpolate,pixel,&status);
       break;
     }
     case IntegerInterpolatePixel:
     {
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,1,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      GetPixelInfoPixel(image,p,pixel);
-      break;
-    }
-    case MeshInterpolatePixel:
-    {
-      status=InterpolateMeshPixelInfo(&grid,pixels,pixel,status);
+      status=InterpolateIntegerPixelInfo(&grid,pixel,status);
       break;
     }
     case NearestInterpolatePixel:
@@ -2469,12 +2683,6 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
           break;
         }
       GetPixelInfoPixel(image,p,pixel);
-      break;
-    }
-    case SplineInterpolatePixel:
-    {
-      status=InterpolateCubicPixelInfo(&grid,SplineWeights,pixels,pixel,
-        status);
       break;
     }
   }

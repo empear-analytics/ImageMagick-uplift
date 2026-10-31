@@ -618,8 +618,9 @@ over the pair.
 
 **Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*,
 and the block that would fix it is a self-contained selection (a `switch` or an `if`
-chain) that sets several of the caller's local variables together, such as a method
-pointer with its magnification and window width.
+chain) or loop that sets several of the caller's local variables together, such as a
+method pointer with its magnification and window width, or a scan that leaves its
+cursor and the pixel it found. Steps 1 to 6 do not depend on the block's kind.
 
 **Not covered by:** Recipe E, whose step 4 refuses a block that writes more than one
 outer variable; Recipe P, which moves an expression, not statements; Recipe D, which
@@ -657,6 +658,12 @@ needs two copies of the block.
    block reads (a discarded out-argument, `MontageImageList`'s `sans` in
    `GetMontageGeometry(...,&sans,&sans)`), is not one of them: the new function
    declares it, as Recipe E step 4 does, and it is no parameter.
+   Such a variable may still pass as a pointer when the caller stores to it before the
+   block and nothing reads that store but the block: declared in the new function, it
+   would leave the caller's store with no use (`-Wunused-but-set-variable`, an error in
+   the macOS CI job). Passing it keeps that store, which no recipe deletes
+   (dead code stays, see *Absolutely forbidden*), and its final value, as before
+   (`IdentifyImage`'s `x=0;` before the transparent-pixel scan).
 3. The block must contain no `return`, `goto`, `continue`, or `break` that leaves the
    block; a `break` that ends a `switch` or loop inside the block is fine.
 4. Cut the block into a new `static void` function directly above the caller. Pass each
@@ -1371,7 +1378,10 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    takes `&v` or `&v.m` only as an argument to a pointer-to-`const` parameter of a
    callee that only reads through it, neither storing nor comparing the address; (c) no
    pointer to `v` or to a member of it is held anywhere the block can write through; and
-   (d) the block writes through none of its pointer members. Steps 3 to 6 then treat it
+   (d) the block writes through none of its pointer members, except through a callee
+   that received `&v` as (b) allows and writes only into what a pointer member points
+   to, an object other than `v` and its members (`ExportPixelBuffer`'s `pixels`, the
+   caller's output buffer). Steps 3 to 6 then treat it
    as a scalar: a member of the struct's type, `const PixelInfo v = name->v;` or
    `name->v.m`, and `name.v=v;`, a copy taken directly before the call.
    A plain struct local that meets (b) to (d) but not (a), some member of it never set
@@ -1392,6 +1402,14 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    new function binds the members its block reads as step 4 does, and steps 3, 5 and
    6 do not apply (no typedef, no local, no assignment). A member the block does not
    read is not bound; the other parameters are as above, at most four in all.
+   A variable the block reads on entry and then writes, and that nothing after the
+   block reads (Recipe E step 4's input that goes by value: `InterpolatePixelChannel`'s
+   `x_offset`, decremented for the 16-neighbour average before the fetch), may be one
+   of the group as well: at the top of the new function's body declare a local of the
+   member's type and name, without `const`, initialised from the member
+   (`x_offset = grid->x_offset`), and leave the block's text unchanged; the other
+   members keep step 4's form. Its writes land in that local, as they would in a
+   by-value parameter.
 3. Declare `typedef struct _Name { ... } Name;` directly above the new function, one
    member per variable in the group, with the variable's exact type and name: no `size_t`
    for a `ssize_t`, no `const` added or dropped on what a pointer points to. Only a
@@ -1502,7 +1520,12 @@ static void ThresholdWaveletLevel(float *pixels,
   unseen: `&v` passed to a callee that writes through it (`GetPixelInfoPixel(image,p,&v)`
   inside the block refuses `v`), or a pointer to `v` kept elsewhere and written in the
   block. Reads through a pointer member reach the same object from the copy as from
-  `v`, since only the pointer is copied; (d) keeps writes through it out.
+  `v`, since only the pointer is copied; (d) keeps writes through it out, save one
+  kind: a write into the object a pointer member points to, made by a callee that
+  received `&v` (`ExportLongPixel(image,&roi,&buffer,exception)` filling
+  `buffer->pixels`). The copy's member holds the same address, so the write lands in
+  the same object, which is neither `v` nor part of it, and the copy itself is not
+  written: the callee's parameter is a pointer to `const`.
 - A callee that received `&v` through a pointer-to-`const` parameter now receives the
   copy's address: the same values at another address. That is the same behaviour only
   while the callee uses the pointer to read: one that stores it, compares it with
@@ -1526,6 +1549,12 @@ static void ThresholdWaveletLevel(float *pixels,
   last call. A pointer member the block writes through (`channel_sum`, under Recipe
   Q's read-only pointers) is read, not written: the new function reaches the same
   array through the same address the caller's `const` local held.
+- A member bound to a non-`const` local (step 2's read-then-written variable) is
+  Recipe E step 4's by-value input in another form: the local holds the value the
+  variable held at the fill, which is its value at the call (nothing between them
+  writes it, step 8), the block's writes land in the local, and nothing after the
+  block reads the caller's variable, which the block no longer writes. The struct
+  itself is not written: the local is a copy.
 - Recipe E's limit on what the block writes stands: one value returned, or writes
   through a pointer the block already used for pixel data. A block writing more is
   skipped, as in Recipe E.
@@ -1560,6 +1589,10 @@ Added by Claude Code (Claude Opus 5.5) during task W07, under the mandate of 202
 Step 2's pass-through form (2026-10-31, task W10): `quantize-posterize.c`'s
 `PopulatePosterizeMap`, a Recipe LB helper taking a `PosterizeMapInfo`, whose column loop
 (depth 3) reads four of its five members and two locals of its own.
+Step 2's read-then-written member (2026-10-31, campaign B, task M118): the average
+groups of `pixel.c`'s `InterpolatePixelChannel`, `InterpolatePixelChannels` and
+`InterpolatePixelInfo`, which move the fetch origin (`x_offset--`) before reading it;
+by value they would give the helper six parameters. A probe: 3.73 to 3.78.
 
 ---
 
@@ -3099,7 +3132,14 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    variable, or an expression of variables with no call, assignment or increment, that
    no statement inside the `switch` writes. Every *group* (a run of labels and the body
    after them) ends with a `break;` of this `switch` and contains no other `break` of
-   it, no `continue`, `return` or `goto`: no group falls through into another.
+   it, no `continue`, `return` or `goto`: no group falls through into another. The
+   last group of the `switch` may instead end at its closing brace, without `break;`,
+   when it moves and stays the last group of the new `switch` (`default: *q=0;`).
+   A *chain*, a run of groups each of which but the last ends in `magick_fallthrough;`
+   and runs into the next, counts as one group when all of it moves, its groups in
+   their order and adjacent; its groups may then also hold a `break;` of this `switch`
+   inside a selection (`if (...) { ...; break; }`). The usual chain is
+   quantum-import.c's `case 24:`, `case 64:`, `default:`.
 2. Choose the groups that move: the group carrying `default:`, and others beside it.
    Together their bodies meet Recipe O steps 1 to 3 (OpenMP, written variables, exits),
    as one selection does.
@@ -3230,11 +3270,21 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   would reach it instead of their own groups. A shared run of labels
   (`case ConjugateComplexOperator: default:`) moves whole.
 - Fall-through would break the argument: a group that runs into the next one would,
-  after the split, run into a different group or into none. Step 1 refuses it.
+  after the split, run into a different group or into none. Step 1 refuses it. A last
+  group without `break;` runs off the end of its `switch`, which is where a `break;`
+  would have taken it; kept last in the new `switch`, it runs off that one's end, the
+  function returns, and the outer `default`'s `break;` ends the outer `switch`.
 - Both `switch` statements have a `default`, so `-Wswitch` warns about neither; the
   controlling expression's type and promotions are those of the same text.
 - The order of groups within each `switch` is the original order; C selects by label,
   not by position, once no group falls through.
+- A chain (step 1) moves whole and in order, so each of its groups still runs into the
+  same next group, and the last into nothing, as before; `magick_fallthrough;` stays
+  before the next label, so `-Wimplicit-fallthrough` sees what it saw. A `break;`
+  inside one of its groups ends the new `switch`; the function returns at once, and
+  the outer `default`'s `break;` ends the outer `switch`, where the original `break;`
+  ended the original. A kept group may not be part of a chain: it would run into a
+  moved group, which is no longer there.
 - Choose the split along what the groups read when you can (the unary operators read
   `ar` and `ai` only): the new function then takes fewer inputs.
 - Under step 6 the new function evaluates each initialiser again on entry, where the
@@ -3282,6 +3332,170 @@ virtual-pixel `hit` switch names all seventeen `VirtualPixelMethod` constants an
 `default` (cc 22 of the function's 34). Its six-label image group alone with a `default`
 is a function of cc 9, so it stays; the vertical-tile and dither groups, then the corner
 and horizontal-tile groups, as two chained functions: 7.30 to 7.34 to 7.37 in probes.
+
+---
+
+## Recipe SR - Split a Selection at its Default, Returning Success
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*,
+and much of the complexity is a `switch` whose `default` group (and perhaps others)
+leaves the function through `return(R);`, as `ExportImagePixels`' map parser does: each
+of its twelve letter groups stores a `QuantumType` and breaks, four of them return after
+a colourspace test, and `default:` releases the map, throws and returns `MagickFalse`.
+
+**Not covered by:** Recipe SD, whose step 1 refuses a `return` in any group, and whose
+new function is `void`; Recipe W, which moves one block whole, so the new function keeps
+every label of the `switch` (cc 25 here, a *Complex Method* the gate refuses); Recipes
+O, Z and E, which refuse a `return` in the block (E step 7 only at the end of the
+function).
+
+**How:**
+
+1. The `switch` has a `default:` label; its controlling expression `e` is a variable, or
+   an expression of variables with no call, assignment or increment, that no statement
+   inside the `switch` writes (checked by reading, aliasing included). It lies outside
+   every OpenMP region and contains no `#pragma` line.
+2. Choose the groups that move: the group carrying `default:`, and others beside it.
+   Each moved group ends with a `break;` of this `switch` or with `return(R);`, holds no
+   other exit (no `continue`, `goto`, other `return`, or `break` of an enclosing loop),
+   and every `return` in them is `return(R);` with one expression `R` that meets Recipe
+   W step 2. No group of the `switch`, kept or moved, falls through into the next: each
+   ends with `break;`, `return`, `continue` or `goto`.
+3. The moved groups meet Recipe W step 3 (written variables): they write through
+   pointers they already use, and plain locals of the caller only on paths that end in
+   `return(R);`, which go by value. Their inputs are at most four parameters (W step 5),
+   or, when they would number five or more, the variables they only read (none written
+   anywhere in the groups) go in an input struct built as Recipe N steps 2 and 3 build
+   one: the new function takes `const Name *name` first, then the variables that go by
+   value, and declares one `const` local per member at the top (N step 4); the call
+   group of step 5 declares the `Name` local at the top of its block and assigns every
+   member from its variable, in declaration order, directly before the call (N steps 5
+   and 6). Splits of one `switch` may share one `Name` (N step 8, *Sibling blocks*).
+4. Cut the moved groups, labels and bodies, in their order, into a new `static
+   MagickBooleanType` function directly above the caller, whose body is `switch (e)
+   { ... }` with the same text of `e`, followed by `return(MagickTrue);`. Each
+   `return(R);` becomes `return(MagickFalse);`; nothing else in the text changes.
+5. Where the `default` group stood, write the group `default:` alone, whose body is a
+   compound block holding `if (Helper(...) == MagickFalse)` `return(R);` with the
+   original `R`, then `break;`.
+6. The kept groups stay where they were, unchanged. Check by reading that every label
+   of the original `switch` is in exactly one of the two, `default` in the new one, and
+   every argument fills the parameter it names.
+7. Applied again to the new function (its `switch` split at its own `default`), the
+   moved `default` group is the call group of step 5, whose `return(MagickFalse);` is
+   its `R`: a chain of functions, each a step of its own.
+
+**Before:**
+
+```c
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    switch (map[i])
+    {
+      case 'A':
+      case 'a':
+      {
+        quantum_map[i]=AlphaQuantum;
+        break;
+      }
+      ...
+      case 'C':
+      case 'c':
+      {
+        quantum_map[i]=CyanQuantum;
+        if (image->colorspace == CMYKColorspace)
+          break;
+        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+          "ColorSeparatedImageRequired","`%s'",map);
+        return(MagickFalse);
+      }
+      ...
+      case 'R':
+      case 'r':
+      {
+        quantum_map[i]=RedQuantum;
+        break;
+      }
+      ...
+      default:
+      {
+        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "UnrecognizedPixelMap","`%s'",map);
+        return(MagickFalse);
+      }
+    }
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType ExportMapQuantumOPR(const char *map,const ssize_t i,
+  QuantumType *quantum_map,ExceptionInfo *exception)
+{
+  switch (map[i])
+  {
+    ...
+    case 'R':
+    case 'r':
+    {
+      quantum_map[i]=RedQuantum;
+      break;
+    }
+    default:
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",map);
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+...
+      default:
+      {
+        if (ExportMapQuantumOPR(map,i,quantum_map,exception) == MagickFalse)
+          return(MagickFalse);
+        break;
+      }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, value by value. A value of `e` that matches a kept
+  label selects the same group as before, unchanged, whatever exits it holds. One that
+  matches a moved label (or none) now selects the outer `default`, whose first act is
+  the call; nothing writes what `e` reads before the inner `switch` evaluates it, so it
+  selects the same group. A group that ended in `break;` ends the inner `switch`, the
+  function returns `MagickTrue`, the `if` does not fire and the outer `break;` ends the
+  outer `switch`, where the original `break;` ended it, after the same writes through
+  the same pointers. A group that ended in `return(R);` returns `MagickFalse` after the
+  same statements, and the caller returns `R` at once, as before; `R` meets W step 2,
+  so the caller's `R` is the value the block's would have been.
+- A plain local the moved groups write (`quantum_map=...RelinquishMagickMemory(...)`)
+  is written only on paths that return: the caller's copy keeps the old value, which
+  nothing reads on the way out (W step 3).
+- `default` must move, for the reason SD gives; no group may fall through, kept groups
+  included, since after the split a kept group falling through would run into whatever
+  now follows it.
+- `ThrowMagickException`'s location (`GetMagickModule()`) now names the new function;
+  the oracle normalises it, as for every extraction of a throw.
+- The new function must not itself be a *Complex Method* (cc 9 or more counts one per
+  label): split along the labels, as many functions as that takes (step 7).
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), a case for each moved label where one exists, the `return` path
+included, and steps 1, 2 and 6 checked by reading.
+
+**Provenance:** 2026-10-31, from `pixel-export.c`'s `ExportImagePixels` (campaign B,
+task M117): its map parser (twelve letter groups, four returning after the colourspace
+test, a returning `default`) holds about half of its cc 39; SD refuses it for the
+`return`s, W for the cc of a single helper. A probe of three functions (`O`/`P`/`R`,
+`G`/`I`, `A`/`B`, each with the `default` chain): 6.20 to 6.40, no finding on any new
+function. Added by Claude Code (Claude Opus 5.5), under the mandate of 2026-10-24.
 
 ---
 
@@ -4962,6 +5176,9 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | AMEND | G | Careful: a comparison with a floating-point operand is inverted as `!(a < b)`, not `a >= b`, which differs for NaN | `ClipCLAHEHistogram`'s `(double) *p < clip_limit`, where the written-out inverse would have run the block for a NaN limit | mandate (2026-10-24) |
 | 2026-10-24 | WORDING | rule | *Two levels of evidence*: at the guard-verified level, E and P pass on the exact extract fingerprint (`+2` per new helper, nothing else moved), which `--calls` prints as a `WARN`; any other movement stops the commit | The literal reading would forbid every extraction at the guard level, contradicting the same paragraph's list of E and P; found before the first guard-verified step (M04) | mandate (2026-10-24) |
 | 2026-10-25 | AMEND | E | Step 7: a block of a value-returning function whose every path ends in `return(<expr>);` moves to a function of the caller's return type; the block becomes `return(<call>);` | `QueryColorCompliance`'s fallback to a colour name when `ParseCSSColor` finds no values (probe: 2.89 to 2.91, bumps 6 to 5), refused by step 7's `void`-only wording | mandate (2026-10-24) |
+| 2026-10-31 | NEW | SR | Split a Selection at its Default, Returning Success: Recipe SD for a `switch` whose moved groups may leave through `return(R);` (`R` as Recipe W step 2 allows) and whose kept groups may hold any exit, none falling through; the new function is `static MagickBooleanType`, each `return(R);` becomes `return(MagickFalse);`, it ends with `return(MagickTrue);`, and the caller's `default:` writes `if (Helper(...) == MagickFalse) return(R); break;` | `pixel-export.c`'s `ExportImagePixels` (campaign B, task M117): the map parser's `switch` (twelve letter groups, four returning after the colourspace test, a returning `default`) holds about half of the cc 39; SD refuses its `return`s, W the cc 25 of a single helper. A probe of three chained functions: 6.20 to 6.40, no finding on a new function | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | SR | Step 3: moved groups whose inputs would number five or more take them in an input struct as Recipe N builds one (`const Name *name` first, then the variables that go by value; the call group declares, fills and passes the local), as SD step 3 allows Recipe Z's struct | `ExportImagePixels` (campaign B, task M117): its four colourspace-checked groups (C, K, M, Y) read `image`, `map`, `i` and `exception` and pass `quantum_map` by value, five inputs; a probe of four single-letter splits sharing one struct: 6.40 to 6.53, `ExportImagePixels` cc 26 to 14 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | N | Step 2 (d): a struct value may also be a member when the only writes through its pointer members are a callee's, made through the `&v` that (b) allows, into an object other than `v` (the copy holds the same address, so the write lands in the same object); *Careful* gives the argument | `ExportImagePixels` (campaign B, task M117): its storage-type `switch` passes `&roi` and `&buffer` (an `ExportPixelBuffer` whose `pixels` the `Export*Pixel` callees fill) to every group; SD with Recipe Z's struct needs `buffer` as a member. A probe: the `switch` split after `CharPixel`, 6.53 to 6.61, `ExportImagePixels` leaves *Complex Method* | mandate (2026-10-24) |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
@@ -5087,3 +5304,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | T | Step 2: with the other name, the body may also read `v` after the block in the same iteration (the test that ends an inner loop the block sits in); *Careful* gives the argument: the caller's `v=c;` lands as the call returns, before that read | `image.c`'s `IsHighDynamicRangeImage` (campaign B, task M116): its channel loop sets `hdri=MagickTrue;` and breaks, then the column loop breaks on `hdri`, which step 2 refused; it holds the file's only *Deep, Nested Complexity*, 2.77 to 2.90 in a probe | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | OC | Step 1: a block that is the tail of `Lp`'s body counts as followed by `continue;` (the end of the body is where `continue;` jumps); the call is then the body's last statement. *Careful* gives the argument | `image.c`'s `AppendImages` (campaign B, task M116): its scan loop ends in the stacked/side-by-side extent update, which `continue`s on one branch and falls off the end on the other, writing `width` and `height`; O refuses its `continue`, E step 7's tail form its two outputs | mandate (2026-10-24) |
 | 2026-10-31 | NEW | VC | Extract Loop-Tail Block Returning Success for a Cleanup Exit: a block at the tail of a loop body (or followed by its `continue;`) whose exits are `continue;` of that loop and one cleanup return of the function in a form Recipe V step 6 or 7 or Recipe I step 8 admits moves to a `static MagickBooleanType` function: each `continue;` becomes `return(MagickTrue);`, each exit `return(MagickFalse);`, the caller keeps the exit's text | `xml-tree.c`'s `ParseInternalDoctype` (campaign B, task M116): its `<!ATTLIST` branch and the attribute loop's body mix `continue;` with `predefined_entities=...RelinquishMagickMemory(...); return(MagickFalse);`, which V, Y, I and W (no `continue`) and OC (no `return`) refuse; they hold the function's nesting of 5; a probe: 4.05 to 4.21 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | SD | Step 1: the `switch`'s last group may end at its closing brace instead of `break;`, when it moves and stays last in the new `switch`; *Careful* gives the argument | `stream.c`'s `StreamLongLongQuantum`, `StreamQuantumQuantum`, `StreamDoubleQuantum` and `StreamFloatQuantum` (campaign B, task M117): channel `switch`es of cc 13 whose `default: *q=0;` (or `*q=(Quantum) 0;`) has no `break;`; their three siblings without that quirk went from 4.63 to 5.10 by SD | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | O | *Use when*: the block may be a loop as well as a selection (steps 1 to 6 never depended on it); step 2: a variable written before read passes as a pointer, not declared in the new function, when the caller's store before the block would otherwise be left with no use; no recipe deletes that store | `identify.c`'s `IdentifyImage` (campaign B, task M117, a574c1d63): the transparent-pixel scan writes `p`, `y`, `found` and `x`; declaring `x` in the helper leaves the caller's `x=0;` set but unused, which fails the macOS CI build. The owner left both questions to the session (2026-10-31) | owner |
+| 2026-10-31 | AMEND | SD | Step 1: a chain of groups linked by `magick_fallthrough;` counts as one group when all of it moves, in order; its groups may hold a `break;` inside a selection. *Careful* gives the argument | `quantum-import.c`'s depth dispatchers (campaign B, task M118), sixteen `switch (quantum_info->depth)` of cc 9 to 13 whose `case 24:` and `case 64:` test the floating-point format, `break;` inside the `if`, and fall through to `default:`; step 1 refused every one. SD with the chain moved (and `case 32:` beside it where cc 13 needs it) on fourteen of them in a probe: 3.83 to 5.54 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | N | Step 2: a variable the block reads on entry and then writes, and that nothing after the block reads, may be a member; the new function binds it to a non-`const` local initialised from the member, the block's text unchanged. *Careful* gives the argument | `pixel.c`'s interpolation average groups (campaign B, task M118): they shift `x_offset`/`y_offset` before the fetch; as by-value parameters (E step 4) the helper would take six. A probe of `InterpolatePixelChannel`'s: 3.73 to 3.78 | mandate (2026-10-24) |
