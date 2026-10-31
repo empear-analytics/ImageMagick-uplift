@@ -1088,6 +1088,20 @@ static ssize_t WriteUTF8Bytes(char *utf8,ssize_t j,const int c)
   return(j);
 }
 
+static void AppendUTF8Character(char *utf8,const int c,ssize_t *j)
+{
+  if (c < 0x80)
+    {
+      utf8[*j]=(char) c;
+      (*j)++;
+      return;
+    }
+  /*
+    Multi-byte UTF-8 sequence.
+  */
+  *j=WriteUTF8Bytes(utf8,*j,c);
+}
+
 static int CombineUTF16Surrogates(const char *content,const ssize_t i,
   const int encoding,int c)
 {
@@ -1147,16 +1161,7 @@ static char *ConvertUTF16ToUTF8(const char *content,size_t *length)
         if (utf8 == (char *) NULL)
           return(utf8);
       }
-    if (c < 0x80)
-      {
-        utf8[j]=(char) c;
-        j++;
-        continue;
-      }
-    /*
-      Multi-byte UTF-8 sequence.
-    */
-    j=WriteUTF8Bytes(utf8,j,c);
+    AppendUTF8Character(utf8,c,&j);
   }
   *length=(size_t) j;
   utf8=(char *) ResizeQuantumMemory(utf8,(*length+1),sizeof(*utf8));
