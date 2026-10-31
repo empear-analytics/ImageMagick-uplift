@@ -1228,6 +1228,16 @@ static MagickBooleanType FitResampleEllipse(const ResampleEllipse *ellipse,
   return(MagickTrue);
 }
 
+static MagickBooleanType CheckResampleAreaLimit(ResampleFilter *resample_filter)
+{
+  if ( (resample_filter->Uwidth * resample_filter->Vlimit)
+         > (4.0*resample_filter->image_area)) {
+    resample_filter->limit_reached = MagickTrue;
+    return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1435,11 +1445,8 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
    * This limit needs more work, as it is too slow for larger images
    * with tiled views of the horizon.
   */
-  if ( (resample_filter->Uwidth * resample_filter->Vlimit)
-         > (4.0*resample_filter->image_area)) {
-    resample_filter->limit_reached = MagickTrue;
+  if (CheckResampleAreaLimit(resample_filter) == MagickFalse)
     return;
-  }
 
   /* Scale ellipse formula to directly index the Filter Lookup Table */
   { double scale;
