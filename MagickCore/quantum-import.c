@@ -7734,6 +7734,30 @@ static void ImportCMYKFamilyQuantum(const Image *image,
   }
 }
 
+static void ImportIndexFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span,ExceptionInfo *exception)
+{
+  switch (quantum_type)
+  {
+    case IndexQuantum:
+    {
+      ImportIndexQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case IndexAlphaQuantum:
+    {
+      ImportIndexAlphaQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    default:
+    {
+      ImportCMYKFamilyQuantum(image,quantum_info,quantum_type,span,exception);
+      break;
+    }
+  }
+}
+
 MagickExport size_t ImportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,const unsigned char *magick_restrict pixels,
@@ -7793,19 +7817,9 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       ImportAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case IndexQuantum:
-    {
-      ImportIndexQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case IndexAlphaQuantum:
-    {
-      ImportIndexAlphaQuantum(image,quantum_info,&span,exception);
-      break;
-    }
     default:
     {
-      ImportCMYKFamilyQuantum(image,quantum_info,quantum_type,span,exception);
+      ImportIndexFamilyQuantum(image,quantum_info,quantum_type,span,exception);
       break;
     }
   }
