@@ -4785,6 +4785,45 @@ static MagickBooleanType ImportAnyDepthIndexQuantum(const Image *image,
   return(range_exception);
 }
 
+static void ImportOtherDepthIndexQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  MagickBooleanType *range_exception)
+{
+  switch (quantum_info->depth)
+  {
+    case 32:
+    {
+      *range_exception=Import32BitIndexQuantum(image,quantum_info,span);
+      break;
+    }
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          *range_exception=Import24BitFloatIndexQuantum(image,quantum_info,
+            span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          *range_exception=Import64BitFloatIndexQuantum(image,quantum_info,
+            span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      *range_exception=ImportAnyDepthIndexQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ImportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
@@ -4820,32 +4859,9 @@ static void ImportIndexQuantum(const Image *image,QuantumInfo *quantum_info,
       range_exception=Import16BitIndexQuantum(image,quantum_info,span);
       break;
     }
-    case 32:
-    {
-      range_exception=Import32BitIndexQuantum(image,quantum_info,span);
-      break;
-    }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          range_exception=Import24BitFloatIndexQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          range_exception=Import64BitFloatIndexQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      range_exception=ImportAnyDepthIndexQuantum(image,quantum_info,span);
+      ImportOtherDepthIndexQuantum(image,quantum_info,span,&range_exception);
       break;
     }
   }
