@@ -228,6 +228,58 @@ static double GeneratePoissonNoise(RandomInfo *random_info,
   return(noise);
 }
 
+typedef struct _SingleDrawNoiseInfo
+{
+  Quantum
+    pixel;
+
+  NoiseType
+    noise_type;
+
+  double
+    attenuate,
+    alpha;
+} SingleDrawNoiseInfo;
+
+static void GenerateSingleDrawNoise(
+  const SingleDrawNoiseInfo *single_draw_noise_info,double *noise)
+{
+  const Quantum
+    pixel = single_draw_noise_info->pixel;
+
+  const NoiseType
+    noise_type = single_draw_noise_info->noise_type;
+
+  const double
+    attenuate = single_draw_noise_info->attenuate,
+    alpha = single_draw_noise_info->alpha;
+
+  switch (noise_type)
+  {
+    case UniformNoise:
+    default:
+    {
+      (*noise)=(double) pixel+(double) QuantumRange*SigmaUniform*(alpha-0.5);
+      break;
+    }
+    case ImpulseNoise:
+    {
+      (*noise)=GenerateImpulseNoise(pixel,attenuate,alpha);
+      break;
+    }
+    case LaplacianNoise:
+    {
+      (*noise)=GenerateLaplacianNoise(pixel,attenuate,alpha);
+      break;
+    }
+    case RandomNoise:
+    {
+      (*noise)=(double) QuantumRange*SigmaRandom*alpha;
+      break;
+    }
+  }
+}
+
 MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
   const Quantum pixel,const NoiseType noise_type,const double attenuate)
 {
@@ -238,25 +290,21 @@ MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
   alpha=GetPseudoRandomValue(random_info);
   switch (noise_type)
   {
-    case UniformNoise:
     default:
     {
-      noise=(double) pixel+(double) QuantumRange*SigmaUniform*(alpha-0.5);
+      SingleDrawNoiseInfo
+        single_draw_noise_info;
+
+      single_draw_noise_info.pixel=pixel;
+      single_draw_noise_info.noise_type=noise_type;
+      single_draw_noise_info.attenuate=attenuate;
+      single_draw_noise_info.alpha=alpha;
+      GenerateSingleDrawNoise(&single_draw_noise_info,&noise);
       break;
     }
     case GaussianNoise:
     {
       noise=GenerateGaussianNoise(random_info,pixel,attenuate,alpha);
-      break;
-    }
-    case ImpulseNoise:
-    {
-      noise=GenerateImpulseNoise(pixel,attenuate,alpha);
-      break;
-    }
-    case LaplacianNoise:
-    {
-      noise=GenerateLaplacianNoise(pixel,attenuate,alpha);
       break;
     }
     case MultiplicativeGaussianNoise:
@@ -268,11 +316,6 @@ MagickPrivate double GenerateDifferentialNoise(RandomInfo *random_info,
     case PoissonNoise:
     {
       noise=GeneratePoissonNoise(random_info,pixel,attenuate,alpha);
-      break;
-    }
-    case RandomNoise:
-    {
-      noise=(double) QuantumRange*SigmaRandom*alpha;
       break;
     }
   }
