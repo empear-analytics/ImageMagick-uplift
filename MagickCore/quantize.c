@@ -3415,6 +3415,18 @@ static void ReportKmeansProgress(Image *image,const ssize_t n,
     }
 }
 
+static MagickBooleanType FinishKmeansImage(Image *image,
+  const size_t max_iterations,const MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    (void) SetImageProgress(image,KmeansImageTag,(MagickOffsetType)
+      max_iterations-1,max_iterations);
+  if (status == MagickFalse)
+    return(status);
+  return(SyncImage(image,exception));
+}
+
 MagickExport MagickBooleanType KmeansImage(Image *image,
   const size_t number_colors,const size_t max_iterations,const double tolerance,
   ExceptionInfo *exception)
@@ -3537,12 +3549,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     ListKmeansColors(image);
   SetKmeansDominantColor(image,exception);
   kmeans_pixels=DestroyKmeansTLS(kmeans_pixels);
-  if (image->progress_monitor != (MagickProgressMonitor) NULL)
-    (void) SetImageProgress(image,KmeansImageTag,(MagickOffsetType)
-      max_iterations-1,max_iterations);
-  if (status == MagickFalse)
-    return(status);
-  return(SyncImage(image,exception));
+  return(FinishKmeansImage(image,max_iterations,status,exception));
 }
 
 
