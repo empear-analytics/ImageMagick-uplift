@@ -2126,6 +2126,56 @@ static MagickBooleanType ParseTagAttributes(XMLTreeRoot *root,
   return(MagickTrue);
 }
 
+typedef struct _EndTagTargets
+{
+  char
+    **p;
+
+  size_t
+    *ignore_depth;
+} EndTagTargets;
+
+static MagickBooleanType ParseEndTag(XMLTreeRoot *root,const int terminal,
+  ExceptionInfo *exception,const EndTagTargets *targets)
+{
+  char
+    **const p = targets->p;
+
+  size_t
+    *const ignore_depth = targets->ignore_depth;
+
+  char
+    *tag;
+
+  int
+    c;
+
+  /*
+    Close tag.
+  */
+  tag=*p+1;
+  *p+=(ptrdiff_t) strcspn(tag,XMLWhitespace ">")+1;
+  c=(**p);
+  if ((c == '\0') && (terminal != '>'))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","missing >");
+      return(MagickFalse);
+    }
+  **p='\0';
+  if ((*ignore_depth == 0) &&
+      (ParseCloseTag(root,tag,exception) != (XMLTreeInfo *) NULL))
+    {
+      return(MagickFalse);
+    }
+  if (*ignore_depth > 0)
+    (*ignore_depth)--;
+  **p=(char) c;
+  if (isspace((int) ((unsigned char) **p)) != 0)
+    *p+=(ptrdiff_t) strspn(*p,XMLWhitespace);
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2286,31 +2336,16 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
     else
       if (*p == '/')
         {
-          /*
-            Close tag.
-          */
-          tag=p+1;
-          p+=(ptrdiff_t) strcspn(tag,XMLWhitespace ">")+1;
-          c=(*p);
-          if ((c == '\0') && (terminal != '>'))
-            {
-              (void) ThrowMagickException(exception,GetMagickModule(),
-                OptionWarning,"ParseError","missing >");
-              utf8=DestroyString(utf8);
-              return(&root->root);
-            }
-          *p='\0';
-          if ((ignore_depth == 0) &&
-              (ParseCloseTag(root,tag,exception) != (XMLTreeInfo *) NULL))
+          EndTagTargets
+            targets;
+
+          targets.p=(&p);
+          targets.ignore_depth=(&ignore_depth);
+          if (ParseEndTag(root,terminal,exception,&targets) == MagickFalse)
             {
               utf8=DestroyString(utf8);
               return(&root->root);
             }
-          if (ignore_depth > 0)
-            ignore_depth--;
-          *p=(char) c;
-          if (isspace((int) ((unsigned char) *p)) != 0)
-            p+=(ptrdiff_t) strspn(p,XMLWhitespace);
         }
       else
         if (strncmp(p,"!--",3) == 0)
