@@ -4258,6 +4258,33 @@ static MagickBooleanType OpenPixelCache(Image *image,const MapMode mode,
   return(MagickTrue);
 }
 
+static CacheInfo *AcquirePersistentPixelCache(
+  CacheInfo *magick_restrict cache_info,const char *filename,
+  const MagickOffsetType *offset)
+{
+  CacheInfo
+    *magick_restrict clone_info;
+
+  clone_info=(CacheInfo *) ClonePixelCache(cache_info);
+  clone_info->type=DiskCache;
+  (void) CopyMagickString(clone_info->cache_filename,filename,MagickPathExtent);
+  clone_info->file=(-1);
+  clone_info->storage_class=cache_info->storage_class;
+  clone_info->colorspace=cache_info->colorspace;
+  clone_info->alpha_trait=cache_info->alpha_trait;
+  clone_info->channels=cache_info->channels;
+  clone_info->columns=cache_info->columns;
+  clone_info->rows=cache_info->rows;
+  clone_info->number_channels=cache_info->number_channels;
+  clone_info->metacontent_extent=cache_info->metacontent_extent;
+  clone_info->mode=PersistMode;
+  clone_info->length=cache_info->length;
+  (void) memcpy(clone_info->channel_map,cache_info->channel_map,
+    MaxPixelChannels*sizeof(*cache_info->channel_map));
+  clone_info->offset=(*offset);
+  return(clone_info);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -4353,23 +4380,7 @@ MagickExport MagickBooleanType PersistPixelCache(Image *image,
         "CacheResourcesExhausted","`%s'",image->filename);
       return(MagickFalse);
     }
-  clone_info=(CacheInfo *) ClonePixelCache(cache_info);
-  clone_info->type=DiskCache;
-  (void) CopyMagickString(clone_info->cache_filename,filename,MagickPathExtent);
-  clone_info->file=(-1);
-  clone_info->storage_class=cache_info->storage_class;
-  clone_info->colorspace=cache_info->colorspace;
-  clone_info->alpha_trait=cache_info->alpha_trait;
-  clone_info->channels=cache_info->channels;
-  clone_info->columns=cache_info->columns;
-  clone_info->rows=cache_info->rows;
-  clone_info->number_channels=cache_info->number_channels;
-  clone_info->metacontent_extent=cache_info->metacontent_extent;
-  clone_info->mode=PersistMode;
-  clone_info->length=cache_info->length;
-  (void) memcpy(clone_info->channel_map,cache_info->channel_map,
-    MaxPixelChannels*sizeof(*cache_info->channel_map));
-  clone_info->offset=(*offset);
+  clone_info=AcquirePersistentPixelCache(cache_info,filename,offset);
   status=OpenPixelCacheOnDisk(clone_info,WriteMode);
   if (status != MagickFalse)
     status=ClonePixelCacheRepository(clone_info,cache_info,exception);
