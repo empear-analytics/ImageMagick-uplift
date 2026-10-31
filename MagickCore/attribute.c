@@ -706,6 +706,16 @@ MagickExport ImageType GetImageType(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static ImageType GetIdentifiedGrayType(const Image *image,
+  MagickBooleanType status,ImageType type)
+{
+  if ((type == GrayscaleType) && (image->alpha_trait != UndefinedPixelTrait))
+    type=GrayscaleAlphaType;
+  if (status == MagickFalse)
+    return(UndefinedType);
+  return(type);
+}
+
 MagickExport ImageType IdentifyImageGray(const Image *image,
   ExceptionInfo *exception)
 {
@@ -763,11 +773,7 @@ MagickExport ImageType IdentifyImageGray(const Image *image,
     }
   }
   image_view=DestroyCacheView(image_view);
-  if ((type == GrayscaleType) && (image->alpha_trait != UndefinedPixelTrait))
-    type=GrayscaleAlphaType;
-  if (status == MagickFalse)
-    return(UndefinedType);
-  return(type);
+  return(GetIdentifiedGrayType(image,status,type));
 }
 
 /*
