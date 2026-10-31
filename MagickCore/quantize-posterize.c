@@ -424,6 +424,18 @@ static MagickBooleanType QuantizePosterizeImage(Image *image,
   return(status);
 }
 
+static void RemapPosterizeImage(Image *image,Image *map_image,
+  const DitherMethod dither_method,ExceptionInfo *exception)
+{
+  /*
+    Remap to the map image.
+  */
+  QuantizeInfo *quantize_info = AcquireQuantizeInfo((ImageInfo *) NULL);
+  quantize_info->dither_method=dither_method;
+  (void) RemapImage(quantize_info,image,map_image,exception);
+  quantize_info=DestroyQuantizeInfo(quantize_info);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -483,13 +495,7 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
           break;
         if (status != MagickFalse)
           {
-            /*
-              Remap to the map image.
-            */
-            QuantizeInfo *quantize_info = AcquireQuantizeInfo((ImageInfo *) NULL);
-            quantize_info->dither_method=dither_method;
-            (void) RemapImage(quantize_info,image,map_image,exception);
-            quantize_info=DestroyQuantizeInfo(quantize_info);
+            RemapPosterizeImage(image,map_image,dither_method,exception);
         }
         map_image=DestroyImage(map_image);
       }
