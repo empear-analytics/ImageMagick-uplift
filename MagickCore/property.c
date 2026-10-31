@@ -629,23 +629,27 @@ static char *Trace8BIMClippath(const Image *image,const char *format,
   return(path);
 }
 
-static void Read8BIMResourceName(char **resource,const unsigned char **info,
+static void Read8BIMResourceBytes(char **resource,const unsigned char **info,
   size_t *length,const ssize_t count)
 {
   ssize_t
     i;
 
+  for (i=0; i < (ssize_t) count; i++)
+    (*resource)[i]=(char) ReadPropertyByte(&(*info),&(*length));
+  (*resource)[count]='\0';
+}
+
+static void Read8BIMResourceName(char **resource,const unsigned char **info,
+  size_t *length,const ssize_t count)
+{
   if ((count != 0) && ((size_t) count <= (*length)))
     {
       if (~((size_t) count) >= (MagickPathExtent-1))
         *resource=(char *) AcquireQuantumMemory((size_t) count+
           MagickPathExtent,sizeof(*(*resource)));
       if (*resource != (char *) NULL)
-        {
-          for (i=0; i < (ssize_t) count; i++)
-            (*resource)[i]=(char) ReadPropertyByte(&(*info),&(*length));
-          (*resource)[count]='\0';
-        }
+        Read8BIMResourceBytes(resource,info,length,count);
     }
 }
 
