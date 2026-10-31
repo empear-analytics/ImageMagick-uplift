@@ -757,12 +757,12 @@ static RectangleInfo GetCLAHETileInfo(const Image *image,const size_t width,
   return(tile_info);
 }
 
+#define CLAHEImageTag  "CLAHE/Image"
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
 {
-#define CLAHEImageTag  "CLAHE/Image"
-
   CacheView
     *image_view;
 
