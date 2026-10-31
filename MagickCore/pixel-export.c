@@ -1676,24 +1676,44 @@ static unsigned int *ExportLongMapRow(const ExportLongRowInfo *row,
   return(q);
 }
 
-static MagickBooleanType ExportLongPixel(const Image *image,
-  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
-  ExceptionInfo *exception)
+typedef struct _ExportLongMapLoop
 {
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
   const char
-    *magick_restrict map = buffer->map;
+    *map;
 
   const QuantumType
-    *quantum_map = buffer->quantum_map;
+    *quantum_map;
 
-  void
-    *pixels = buffer->pixels;
+  ExceptionInfo
+    *exception;
+} ExportLongMapLoop;
+
+static MagickBooleanType ExportLongMapPixels(const ExportLongMapLoop *loop,
+  unsigned int *magick_restrict q)
+{
+  const Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
 
   const Quantum
     *magick_restrict p;
-
-  unsigned int
-    *magick_restrict q;
 
   size_t
     length;
@@ -1701,21 +1721,6 @@ static MagickBooleanType ExportLongPixel(const Image *image,
   ssize_t
     y;
 
-  q=(unsigned int *) pixels;
-  if (LocaleCompare(map,"BGR") == 0)
-    return(ExportLongBGRPixels(image,roi,q,exception));
-  if (LocaleCompare(map,"BGRA") == 0)
-    return(ExportLongBGRAPixels(image,roi,q,exception));
-  if (LocaleCompare(map,"BGRP") == 0)
-    return(ExportLongBGRPPixels(image,roi,q,exception));
-  if (LocaleCompare(map,"I") == 0)
-    return(ExportLongIPixels(image,roi,q,exception));
-  if (LocaleCompare(map,"RGB") == 0)
-    return(ExportLongRGBPixels(image,roi,q,exception));
-  if (LocaleCompare(map,"RGBA") == 0)
-    return(ExportLongRGBAPixels(image,roi,q,exception));
-  if (LocaleCompare(map,"RGBP") == 0)
-    return(ExportLongRGBPPixels(image,roi,q,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -1732,6 +1737,48 @@ static MagickBooleanType ExportLongPixel(const Image *image,
     q=ExportLongMapRow(&row,p,q);
   }
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ExportLongPixel(const Image *image,
+  const RectangleInfo *roi,const ExportPixelBuffer *buffer,
+  ExceptionInfo *exception)
+{
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  void
+    *pixels = buffer->pixels;
+
+  unsigned int
+    *magick_restrict q;
+
+  ExportLongMapLoop
+    loop;
+
+  q=(unsigned int *) pixels;
+  if (LocaleCompare(map,"BGR") == 0)
+    return(ExportLongBGRPixels(image,roi,q,exception));
+  if (LocaleCompare(map,"BGRA") == 0)
+    return(ExportLongBGRAPixels(image,roi,q,exception));
+  if (LocaleCompare(map,"BGRP") == 0)
+    return(ExportLongBGRPPixels(image,roi,q,exception));
+  if (LocaleCompare(map,"I") == 0)
+    return(ExportLongIPixels(image,roi,q,exception));
+  if (LocaleCompare(map,"RGB") == 0)
+    return(ExportLongRGBPixels(image,roi,q,exception));
+  if (LocaleCompare(map,"RGBA") == 0)
+    return(ExportLongRGBAPixels(image,roi,q,exception));
+  if (LocaleCompare(map,"RGBP") == 0)
+    return(ExportLongRGBPPixels(image,roi,q,exception));
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ExportLongMapPixels(&loop,q));
 }
 
 static MagickBooleanType ExportLongLongBGRPixels(const Image *image,
