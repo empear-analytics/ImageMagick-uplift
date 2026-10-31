@@ -2246,6 +2246,20 @@ static void TransversePixelRow(const Image *image,
   }
 }
 
+static Image *FinishTransverseImage(const Image *image,
+  Image *transverse_image,const MagickBooleanType status,
+  ExceptionInfo *exception)
+{
+  transverse_image->type=image->type;
+  SetTransversePage(transverse_image);
+  if (status != MagickFalse)
+    AppendTransformProperty(image,transverse_image,"transverse %.17gx%.17g",
+      exception);
+  if (status == MagickFalse)
+    transverse_image=DestroyImage(transverse_image);
+  return(transverse_image);
+}
+
 MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 {
 #define TransverseImageTag  "Transverse/Image"
@@ -2328,14 +2342,7 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
   }
   transverse_view=DestroyCacheView(transverse_view);
   image_view=DestroyCacheView(image_view);
-  transverse_image->type=image->type;
-  SetTransversePage(transverse_image);
-  if (status != MagickFalse)
-    AppendTransformProperty(image,transverse_image,"transverse %.17gx%.17g",
-      exception);
-  if (status == MagickFalse)
-    transverse_image=DestroyImage(transverse_image);
-  return(transverse_image);
+  return(FinishTransverseImage(image,transverse_image,status,exception));
 }
 
 /*
