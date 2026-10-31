@@ -1359,6 +1359,37 @@ static void PrintImageSummaryHeader(FILE *file,const Image *image)
     (double) image->rows);
 }
 
+static void PrintImageSummaryAttributes(FILE *file,const Image *image,
+  const ColorspaceType colorspace)
+{
+  char
+    buffer[MagickPathExtent];
+
+  if (HasPageGeometry(image) != MagickFalse)
+    (void) FormatLocaleFile(file,"%.17gx%.17g%+.20g%+.20g ",(double)
+      image->page.width,(double) image->page.height,(double) image->page.x,
+      (double) image->page.y);
+  (void) FormatLocaleFile(file,"%.17g-bit ",(double) image->depth);
+  if (image->type != UndefinedType)
+    (void) FormatLocaleFile(file,"%s ",CommandOptionToMnemonic(
+      MagickTypeOptions,(ssize_t) image->type));
+  if (colorspace != UndefinedColorspace)
+    (void) FormatLocaleFile(file,"%s ",CommandOptionToMnemonic(
+      MagickColorspaceOptions,(ssize_t) colorspace));
+  PrintImageColorsSummary(file,image);
+  if (image->error.mean_error_per_pixel != 0.0)
+    (void) FormatLocaleFile(file,"%.17g/%f/%fdb ",(double)
+      (image->error.mean_error_per_pixel+0.5),
+      image->error.normalized_mean_error,
+      image->error.normalized_maximum_error);
+  if (image->extent != 0)
+    {
+      (void) FormatMagickSize(image->extent,MagickTrue,"B",
+        MagickPathExtent,buffer);
+      (void) FormatLocaleFile(file,"%s ",buffer);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1470,29 +1501,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         Display summary info about the image.
       */
       PrintImageSummaryHeader(file,image);
-      if (HasPageGeometry(image) != MagickFalse)
-        (void) FormatLocaleFile(file,"%.17gx%.17g%+.20g%+.20g ",(double)
-          image->page.width,(double) image->page.height,(double) image->page.x,
-          (double) image->page.y);
-      (void) FormatLocaleFile(file,"%.17g-bit ",(double) image->depth);
-      if (image->type != UndefinedType)
-        (void) FormatLocaleFile(file,"%s ",CommandOptionToMnemonic(
-          MagickTypeOptions,(ssize_t) image->type));
-      if (colorspace != UndefinedColorspace)
-        (void) FormatLocaleFile(file,"%s ",CommandOptionToMnemonic(
-          MagickColorspaceOptions,(ssize_t) colorspace));
-      PrintImageColorsSummary(file,image);
-      if (image->error.mean_error_per_pixel != 0.0)
-        (void) FormatLocaleFile(file,"%.17g/%f/%fdb ",(double)
-          (image->error.mean_error_per_pixel+0.5),
-          image->error.normalized_mean_error,
-          image->error.normalized_maximum_error);
-      if (image->extent != 0)
-        {
-          (void) FormatMagickSize(image->extent,MagickTrue,"B",
-            MagickPathExtent,buffer);
-          (void) FormatLocaleFile(file,"%s ",buffer);
-        }
+      PrintImageSummaryAttributes(file,image,colorspace);
       (void) FormatLocaleFile(file,"%0.3fu %lu:%02lu.%03lu",user_time,
         (unsigned long) (elapsed_time/60.0),(unsigned long) floor(fmod(
         elapsed_time,60.0)),(unsigned long) (1000.0*(elapsed_time-
