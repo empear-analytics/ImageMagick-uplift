@@ -4621,6 +4621,12 @@ static inline MagickBooleanType IsReadOnlySProperty(const char *property)
     MagickFalse);
 }
 
+static void LowerImageDelay(Image *image,const GeometryInfo geometry_info)
+{
+  if (image->delay > (size_t) floor(geometry_info.rho+0.5))
+    image->delay=(size_t) floor(geometry_info.rho+0.5);
+}
+
 static MagickBooleanType SetImageDelayProperty(Image *image,
   const char *value)
 {
@@ -4632,10 +4638,7 @@ static MagickBooleanType SetImageDelayProperty(Image *image,
 
   flags=ParseGeometry(value,&geometry_info);
   if ((flags & GreaterValue) != 0)
-    {
-      if (image->delay > (size_t) floor(geometry_info.rho+0.5))
-        image->delay=(size_t) floor(geometry_info.rho+0.5);
-    }
+    LowerImageDelay(image,geometry_info);
   else
     if ((flags & LessValue) != 0)
       {
