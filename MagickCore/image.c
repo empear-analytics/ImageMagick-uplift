@@ -1320,13 +1320,8 @@ MagickExport Image *DestroyImage(Image *image)
 %    o image_info: the image info.
 %
 */
-MagickExport ImageInfo *DestroyImageInfo(ImageInfo *image_info)
+static void DestroyImageInfoStrings(ImageInfo *image_info)
 {
-  assert(image_info != (ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
-      image_info->filename);
   if (image_info->size != (char *) NULL)
     image_info->size=DestroyString(image_info->size);
   if (image_info->extract != (char *) NULL)
@@ -1343,6 +1338,16 @@ MagickExport ImageInfo *DestroyImageInfo(ImageInfo *image_info)
       image_info->server_name);
   if (image_info->font != (char *) NULL)
     image_info->font=DestroyString(image_info->font);
+}
+
+MagickExport ImageInfo *DestroyImageInfo(ImageInfo *image_info)
+{
+  assert(image_info != (ImageInfo *) NULL);
+  assert(image_info->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
+      image_info->filename);
+  DestroyImageInfoStrings(image_info);
   if (image_info->texture != (char *) NULL)
     image_info->texture=DestroyString(image_info->texture);
   if (image_info->density != (char *) NULL)
