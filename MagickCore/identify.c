@@ -1823,6 +1823,30 @@ static void PrintImagePixelSummary(FILE *file,Image *image,
   PrintImageHistogram(file,image,exception);
 }
 
+static void PrintImageErrorAndRendering(FILE *file,const Image *image)
+{
+  if (image->error.mean_error_per_pixel != 0.0)
+    (void) FormatLocaleFile(file,"  Mean error per pixel: %g\n",
+      image->error.mean_error_per_pixel);
+  if (image->error.normalized_mean_error != 0.0)
+    (void) FormatLocaleFile(file,"  Normalized mean error: %g\n",
+      image->error.normalized_mean_error);
+  if (image->error.normalized_maximum_error != 0.0)
+    (void) FormatLocaleFile(file,"  Normalized maximum error: %g\n",
+      image->error.normalized_maximum_error);
+  (void) FormatLocaleFile(file,"  Rendering intent: %s\n",
+    CommandOptionToMnemonic(MagickIntentOptions,(ssize_t)
+    image->rendering_intent));
+  if (image->gamma != 0.0)
+    (void) FormatLocaleFile(file,"  Gamma: %g\n",image->gamma);
+  if (HasChromaticity(image) != MagickFalse)
+    PrintImageChromaticity(file,image);
+  if ((image->extract_info.width*image->extract_info.height) != 0)
+    (void) FormatLocaleFile(file,"  Tile geometry: %.17gx%.17g%+.20g%+.20g\n",
+      (double) image->extract_info.width,(double) image->extract_info.height,
+      (double) image->extract_info.x,(double) image->extract_info.y);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2007,26 +2031,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       PrintImagePixelSummary(file,image,colorspace,exception);
     }
   PrintImageColormapEntries(file,image,exception);
-  if (image->error.mean_error_per_pixel != 0.0)
-    (void) FormatLocaleFile(file,"  Mean error per pixel: %g\n",
-      image->error.mean_error_per_pixel);
-  if (image->error.normalized_mean_error != 0.0)
-    (void) FormatLocaleFile(file,"  Normalized mean error: %g\n",
-      image->error.normalized_mean_error);
-  if (image->error.normalized_maximum_error != 0.0)
-    (void) FormatLocaleFile(file,"  Normalized maximum error: %g\n",
-      image->error.normalized_maximum_error);
-  (void) FormatLocaleFile(file,"  Rendering intent: %s\n",
-    CommandOptionToMnemonic(MagickIntentOptions,(ssize_t)
-    image->rendering_intent));
-  if (image->gamma != 0.0)
-    (void) FormatLocaleFile(file,"  Gamma: %g\n",image->gamma);
-  if (HasChromaticity(image) != MagickFalse)
-    PrintImageChromaticity(file,image);
-  if ((image->extract_info.width*image->extract_info.height) != 0)
-    (void) FormatLocaleFile(file,"  Tile geometry: %.17gx%.17g%+.20g%+.20g\n",
-      (double) image->extract_info.width,(double) image->extract_info.height,
-      (double) image->extract_info.x,(double) image->extract_info.y);
+  PrintImageErrorAndRendering(file,image);
   (void) QueryColorname(image,&image->matte_color,SVGCompliance,color,
     exception);
   (void) FormatLocaleFile(file,"  Matte color: %s\n",color);
