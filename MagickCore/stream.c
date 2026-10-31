@@ -3007,6 +3007,51 @@ static void StreamCharPixels(const StreamInfo *stream_info,const Image *image,
   StreamCharMapPixels(image,quantum_map,length,q);
 }
 
+static void StreamDoublePixels(const StreamInfo *stream_info,const Image *image,
+  QuantumInfo *quantum_info,QuantumType *quantum_map,size_t length)
+{
+  double
+    *q;
+
+  q=(double *) stream_info->pixels;
+  if (LocaleCompare(stream_info->map,"BGR") == 0)
+    {
+      StreamDoubleBGRPixels(image,quantum_info,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"BGRA") == 0)
+    {
+      StreamDoubleBGRAPixels(image,quantum_info,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"BGRP") == 0)
+    {
+      StreamDoubleBGRPPixels(image,quantum_info,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"I") == 0)
+    {
+      StreamDoubleIPixels(image,quantum_info,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"RGB") == 0)
+    {
+      StreamDoubleRGBPixels(image,quantum_info,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"RGBA") == 0)
+    {
+      StreamDoubleRGBAPixels(image,quantum_info,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"RGBP") == 0)
+    {
+      StreamDoubleRGBPPixels(image,quantum_info,q);
+      return;
+    }
+  StreamDoubleMapPixels(image,quantum_info,quantum_map,length,q);
+}
+
 static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -3146,46 +3191,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
     }
     case DoublePixel:
     {
-      double
-        *q;
-
-      q=(double *) stream_info->pixels;
-      if (LocaleCompare(stream_info->map,"BGR") == 0)
-        {
-          StreamDoubleBGRPixels(image,quantum_info,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"BGRA") == 0)
-        {
-          StreamDoubleBGRAPixels(image,quantum_info,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"BGRP") == 0)
-        {
-          StreamDoubleBGRPPixels(image,quantum_info,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"I") == 0)
-        {
-          StreamDoubleIPixels(image,quantum_info,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"RGB") == 0)
-        {
-          StreamDoubleRGBPixels(image,quantum_info,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"RGBA") == 0)
-        {
-          StreamDoubleRGBAPixels(image,quantum_info,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"RGBP") == 0)
-        {
-          StreamDoubleRGBPPixels(image,quantum_info,q);
-          break;
-        }
-      StreamDoubleMapPixels(image,quantum_info,quantum_map,length,q);
+      StreamDoublePixels(stream_info,image,quantum_info,quantum_map,length);
       break;
     }
     case FloatPixel:
