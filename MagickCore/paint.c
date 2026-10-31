@@ -1417,6 +1417,58 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _TransparentPaintRow
+{
+  Image
+    *image;
+
+  const PixelInfo
+    *target;
+
+  Quantum
+    opacity;
+
+  MagickBooleanType
+    invert;
+
+  PixelInfo
+    zero;
+} TransparentPaintRow;
+
+static void TransparentPaintRowPixels(const TransparentPaintRow *row,
+  Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const PixelInfo
+    *target = row->target;
+
+  const Quantum
+    opacity = row->opacity;
+
+  const MagickBooleanType
+    invert = row->invert;
+
+  const PixelInfo
+    zero = row->zero;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  pixel=zero;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    GetPixelInfoPixel(image,q,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,target) != invert)
+      SetPixelAlpha(image,opacity,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType TransparentPaintImage(Image *image,
   const PixelInfo *target,const Quantum opacity,const MagickBooleanType invert,
   ExceptionInfo *exception)
@@ -1460,14 +1512,11 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    PixelInfo
-      pixel;
-
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
+
+    TransparentPaintRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -1477,14 +1526,12 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    pixel=zero;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      GetPixelInfoPixel(image,q,&pixel);
-      if (IsFuzzyEquivalencePixelInfo(&pixel,target) != invert)
-        SetPixelAlpha(image,opacity,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.target=target;
+    row.opacity=opacity;
+    row.invert=invert;
+    row.zero=zero;
+    TransparentPaintRowPixels(&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
