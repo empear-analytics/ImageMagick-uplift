@@ -7587,6 +7587,13 @@ static void DisassociateQuantumAlpha(const Image *image,CacheView *image_view,
   }
 }
 
+static inline MagickBooleanType IsCbYCrQuantumType(
+  const QuantumType quantum_type)
+{
+  return(((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum)) ?
+    MagickTrue : MagickFalse);
+}
+
 static void ImportRGBFamilyQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumType quantum_type,QuantumPixelSpan span)
 {
@@ -7823,7 +7830,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       break;
     }
   }
-  if ((quantum_type == CbYCrQuantum) || (quantum_type == CbYCrAQuantum))
+  if (IsCbYCrQuantumType(quantum_type) != MagickFalse)
     {
       Quantum
         quantum;
