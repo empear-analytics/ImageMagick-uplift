@@ -2395,6 +2395,367 @@ static void StreamFloatRGBPPixels(const Image *image,
   }
 }
 
+static void StreamCharQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *p,unsigned char *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelOpacity(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToChar(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void StreamDoubleQuantum(const Image *image,
+  const QuantumInfo *quantum_info,const QuantumType quantum,const Quantum *p,
+  double *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=(double) ((QuantumScale*(double) GetPixelRed(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=(double) ((QuantumScale*(double) GetPixelGreen(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=(double) ((QuantumScale*(double) GetPixelBlue(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=(double) ((QuantumScale*(double) GetPixelAlpha(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=(double) ((QuantumScale*(double) GetPixelOpacity(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=(double) ((QuantumScale*(double) GetPixelBlack(image,p))*
+          quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=(double) ((QuantumScale*(double) GetPixelIntensity(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    default:
+      *q=0;
+  }
+}
+
+static void StreamFloatQuantum(const Image *image,
+  const QuantumInfo *quantum_info,const QuantumType quantum,const Quantum *p,
+  float *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=(float) ((QuantumScale*(double) GetPixelRed(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=(float) ((QuantumScale*(double) GetPixelGreen(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=(float) ((QuantumScale*(double) GetPixelBlue(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=(float) ((QuantumScale*(double) GetPixelAlpha(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=(float) ((QuantumScale*(double) GetPixelOpacity(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=(float) ((QuantumScale*(double) GetPixelBlack(image,p))*
+          quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=(float) ((QuantumScale*(double) GetPixelIntensity(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    default:
+      *q=0;
+  }
+}
+
+static void StreamLongQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *p,unsigned int *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelOpacity(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToLong(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToLong(ClampToQuantum(GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void StreamLongLongQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *p,MagickSizeType *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelOpacity(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToLongLong(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToLongLong(ClampToQuantum(
+        GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      *q=0;
+  }
+}
+
+static void StreamQuantumQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *p,Quantum *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=GetPixelRed(image,p);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=GetPixelGreen(image,p);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=GetPixelBlue(image,p);
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=GetPixelAlpha(image,p);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=GetPixelOpacity(image,p);
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=GetPixelBlack(image,p);
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ClampToQuantum(GetPixelIntensity(image,p));
+      break;
+    }
+    default:
+      *q=(Quantum) 0;
+  }
+}
+
+static void StreamShortQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *p,unsigned short *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelBlue(image,p));
+      break;
+    }
+    case AlphaQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
+      break;
+    }
+    case OpacityQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelOpacity(image,p));
+      break;
+    }
+    case BlackQuantum:
+    {
+      if (image->colorspace == CMYKColorspace)
+        *q=ScaleQuantumToShort(GetPixelBlack(image,p));
+      break;
+    }
+    case IndexQuantum:
+    {
+      *q=ScaleQuantumToShort(ClampToQuantum(
+        GetPixelIntensity(image,p)));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2609,50 +2970,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         for (i=0; i < (ssize_t) length; i++)
         {
           *q=0;
-          switch (quantum_map[i])
-          {
-            case RedQuantum:
-            case CyanQuantum:
-            {
-              *q=ScaleQuantumToChar(GetPixelRed(image,p));
-              break;
-            }
-            case GreenQuantum:
-            case MagentaQuantum:
-            {
-              *q=ScaleQuantumToChar(GetPixelGreen(image,p));
-              break;
-            }
-            case BlueQuantum:
-            case YellowQuantum:
-            {
-              *q=ScaleQuantumToChar(GetPixelBlue(image,p));
-              break;
-            }
-            case AlphaQuantum:
-            {
-              *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
-              break;
-            }
-            case OpacityQuantum:
-            {
-              *q=ScaleQuantumToChar(GetPixelOpacity(image,p));
-              break;
-            }
-            case BlackQuantum:
-            {
-              if (image->colorspace == CMYKColorspace)
-                *q=ScaleQuantumToChar(GetPixelBlack(image,p));
-              break;
-            }
-            case IndexQuantum:
-            {
-              *q=ScaleQuantumToChar(ClampToQuantum(GetPixelIntensity(image,p)));
-              break;
-            }
-            default:
-              break;
-          }
+          StreamCharQuantum(image,quantum_map[i],p,q);
           q++;
         }
         p+=(ptrdiff_t) GetPixelChannels(image);
@@ -2708,57 +3026,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         for (i=0; i < (ssize_t) length; i++)
         {
           *q=0;
-          switch (quantum_map[i])
-          {
-            case RedQuantum:
-            case CyanQuantum:
-            {
-              *q=(double) ((QuantumScale*(double) GetPixelRed(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case GreenQuantum:
-            case MagentaQuantum:
-            {
-              *q=(double) ((QuantumScale*(double) GetPixelGreen(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case BlueQuantum:
-            case YellowQuantum:
-            {
-              *q=(double) ((QuantumScale*(double) GetPixelBlue(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case AlphaQuantum:
-            {
-              *q=(double) ((QuantumScale*(double) GetPixelAlpha(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case OpacityQuantum:
-            {
-              *q=(double) ((QuantumScale*(double) GetPixelOpacity(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case BlackQuantum:
-            {
-              if (image->colorspace == CMYKColorspace)
-                *q=(double) ((QuantumScale*(double) GetPixelBlack(image,p))*
-                  quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case IndexQuantum:
-            {
-              *q=(double) ((QuantumScale*(double) GetPixelIntensity(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            default:
-              *q=0;
-          }
+          StreamDoubleQuantum(image,quantum_info,quantum_map[i],p,q);
           q++;
         }
         p+=(ptrdiff_t) GetPixelChannels(image);
@@ -2814,57 +3082,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         for (i=0; i < (ssize_t) length; i++)
         {
           *q=0;
-          switch (quantum_map[i])
-          {
-            case RedQuantum:
-            case CyanQuantum:
-            {
-              *q=(float) ((QuantumScale*(double) GetPixelRed(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case GreenQuantum:
-            case MagentaQuantum:
-            {
-              *q=(float) ((QuantumScale*(double) GetPixelGreen(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case BlueQuantum:
-            case YellowQuantum:
-            {
-              *q=(float) ((QuantumScale*(double) GetPixelBlue(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case AlphaQuantum:
-            {
-              *q=(float) ((QuantumScale*(double) GetPixelAlpha(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case OpacityQuantum:
-            {
-              *q=(float) ((QuantumScale*(double) GetPixelOpacity(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case BlackQuantum:
-            {
-              if (image->colorspace == CMYKColorspace)
-                *q=(float) ((QuantumScale*(double) GetPixelBlack(image,p))*
-                  quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            case IndexQuantum:
-            {
-              *q=(float) ((QuantumScale*(double) GetPixelIntensity(image,p))*
-                quantum_info->scale+quantum_info->minimum);
-              break;
-            }
-            default:
-              *q=0;
-          }
+          StreamFloatQuantum(image,quantum_info,quantum_map[i],p,q);
           q++;
         }
         p+=(ptrdiff_t) GetPixelChannels(image);
@@ -2920,50 +3138,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         for (i=0; i < (ssize_t) length; i++)
         {
           *q=0;
-          switch (quantum_map[i])
-          {
-            case RedQuantum:
-            case CyanQuantum:
-            {
-              *q=ScaleQuantumToLong(GetPixelRed(image,p));
-              break;
-            }
-            case GreenQuantum:
-            case MagentaQuantum:
-            {
-              *q=ScaleQuantumToLong(GetPixelGreen(image,p));
-              break;
-            }
-            case BlueQuantum:
-            case YellowQuantum:
-            {
-              *q=ScaleQuantumToLong(GetPixelBlue(image,p));
-              break;
-            }
-            case AlphaQuantum:
-            {
-              *q=ScaleQuantumToLong(GetPixelAlpha(image,p));
-              break;
-            }
-            case OpacityQuantum:
-            {
-              *q=ScaleQuantumToLong(GetPixelOpacity(image,p));
-              break;
-            }
-            case BlackQuantum:
-            {
-              if (image->colorspace == CMYKColorspace)
-                *q=ScaleQuantumToLong(GetPixelBlack(image,p));
-              break;
-            }
-            case IndexQuantum:
-            {
-              *q=ScaleQuantumToLong(ClampToQuantum(GetPixelIntensity(image,p)));
-              break;
-            }
-            default:
-              break;
-          }
+          StreamLongQuantum(image,quantum_map[i],p,q);
           q++;
         }
         p+=(ptrdiff_t) GetPixelChannels(image);
@@ -3019,51 +3194,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         for (i=0; i < (ssize_t) length; i++)
         {
           *q=0;
-          switch (quantum_map[i])
-          {
-            case RedQuantum:
-            case CyanQuantum:
-            {
-              *q=ScaleQuantumToLongLong(GetPixelRed(image,p));
-              break;
-            }
-            case GreenQuantum:
-            case MagentaQuantum:
-            {
-              *q=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-              break;
-            }
-            case BlueQuantum:
-            case YellowQuantum:
-            {
-              *q=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-              break;
-            }
-            case AlphaQuantum:
-            {
-              *q=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
-              break;
-            }
-            case OpacityQuantum:
-            {
-              *q=ScaleQuantumToLongLong(GetPixelOpacity(image,p));
-              break;
-            }
-            case BlackQuantum:
-            {
-              if (image->colorspace == CMYKColorspace)
-                *q=ScaleQuantumToLongLong(GetPixelBlack(image,p));
-              break;
-            }
-            case IndexQuantum:
-            {
-              *q=ScaleQuantumToLongLong(ClampToQuantum(
-                GetPixelIntensity(image,p)));
-              break;
-            }
-            default:
-              *q=0;
-          }
+          StreamLongLongQuantum(image,quantum_map[i],p,q);
           q++;
         }
         p+=(ptrdiff_t) GetPixelChannels(image);
@@ -3119,50 +3250,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         for (i=0; i < (ssize_t) length; i++)
         {
           *q=(Quantum) 0;
-          switch (quantum_map[i])
-          {
-            case RedQuantum:
-            case CyanQuantum:
-            {
-              *q=GetPixelRed(image,p);
-              break;
-            }
-            case GreenQuantum:
-            case MagentaQuantum:
-            {
-              *q=GetPixelGreen(image,p);
-              break;
-            }
-            case BlueQuantum:
-            case YellowQuantum:
-            {
-              *q=GetPixelBlue(image,p);
-              break;
-            }
-            case AlphaQuantum:
-            {
-              *q=GetPixelAlpha(image,p);
-              break;
-            }
-            case OpacityQuantum:
-            {
-              *q=GetPixelOpacity(image,p);
-              break;
-            }
-            case BlackQuantum:
-            {
-              if (image->colorspace == CMYKColorspace)
-                *q=GetPixelBlack(image,p);
-              break;
-            }
-            case IndexQuantum:
-            {
-              *q=ClampToQuantum(GetPixelIntensity(image,p));
-              break;
-            }
-            default:
-              *q=(Quantum) 0;
-          }
+          StreamQuantumQuantum(image,quantum_map[i],p,q);
           q++;
         }
         p+=(ptrdiff_t) GetPixelChannels(image);
@@ -3218,51 +3306,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         for (i=0; i < (ssize_t) length; i++)
         {
           *q=0;
-          switch (quantum_map[i])
-          {
-            case RedQuantum:
-            case CyanQuantum:
-            {
-              *q=ScaleQuantumToShort(GetPixelRed(image,p));
-              break;
-            }
-            case GreenQuantum:
-            case MagentaQuantum:
-            {
-              *q=ScaleQuantumToShort(GetPixelGreen(image,p));
-              break;
-            }
-            case BlueQuantum:
-            case YellowQuantum:
-            {
-              *q=ScaleQuantumToShort(GetPixelBlue(image,p));
-              break;
-            }
-            case AlphaQuantum:
-            {
-              *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
-              break;
-            }
-            case OpacityQuantum:
-            {
-              *q=ScaleQuantumToShort(GetPixelOpacity(image,p));
-              break;
-            }
-            case BlackQuantum:
-            {
-              if (image->colorspace == CMYKColorspace)
-                *q=ScaleQuantumToShort(GetPixelBlack(image,p));
-              break;
-            }
-            case IndexQuantum:
-            {
-              *q=ScaleQuantumToShort(ClampToQuantum(
-                GetPixelIntensity(image,p)));
-              break;
-            }
-            default:
-              break;
-          }
+          StreamShortQuantum(image,quantum_map[i],p,q);
           q++;
         }
         p+=(ptrdiff_t) GetPixelChannels(image);
