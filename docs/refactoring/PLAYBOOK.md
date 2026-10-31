@@ -3938,6 +3938,130 @@ Opus 5.5) during task W10, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe LT - Extract Loop Whose Early Exit Is Tested After It
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it is a `for` loop that leaves
+itself through `break;`, followed directly by a test of the loop's own condition,
+`if (<cond>) X;`, which runs `X` exactly when the loop ended through a `break`:
+`histogram.c`'s `CheckImageColors`, whose tree descent is `for (level=1; level <
+MaxTreeDepth; level++) { ... break; ... }` followed by `if (level < MaxTreeDepth)
+break;`, and whose column loop is followed by `if (x < (ssize_t) image->columns)
+break;`.
+
+**Not covered by:** Recipe LB, whose step 3 turns into `return(MagickFalse);` only a
+`break;` that ends the enclosing loop `Lp`, so the loop's own `break;`, its counter and
+the test would move unchanged (for the descent, a near-copy of `DescendHCube`, which
+returns at that point instead); LB step 6 and Recipe I step 7, which reuse a function
+only when the texts are equal under renaming; Recipes E, N, V, Y, I and W, whose block
+contains no `break` that leaves it; Recipe G, which adds guard clauses and moves no
+code.
+
+**How:**
+
+1. The run is a `for` loop whose condition `<cond>` has no side effect and calls no
+   function, followed directly, with nothing between, by `if (<cond>) X;`, the same
+   condition token for token (checked by script). `X` is `break;` or `continue;` of a
+   loop `Lp` enclosing both, `return(k);` of a constant `k`, or `goto L;`. The run lies
+   outside every OpenMP region and contains no `#pragma` line.
+2. The loop's counter `c` is written only by the `for`'s initialisation and increment,
+   and nothing in the body writes `c` or a variable `<cond>` reads, or the object a
+   pointer in `<cond>` reaches (`image->columns`: the body passes `image`, a `const
+   Image *`, only to callees that do not change it). Check by reading every statement,
+   expanded macro and callee of the body.
+3. The body leaves the loop only through `break;` statements of the loop itself; it
+   contains no `return` and no `goto`. A `continue;` of the loop, and a `break` or
+   `continue` of a loop or `switch` nested inside the body, stay as they are.
+4. Nothing after the test reads `c` before writing it again, on every path, `Lp`'s exit
+   included: `c` is a temporary of the run, declared in the new function (Recipe Y
+   step 2).
+5. Cut the run into a new `static MagickBooleanType` function directly above the
+   caller: the loop's text, each `break;` of the loop becoming `return(MagickFalse);`,
+   one for one; the test is dropped; `return(MagickTrue);` follows the loop. Nothing
+   else in the text changes. The variables the run reads, writes and uses as
+   temporaries are passed and declared as Recipe LB steps 2, 4 and 8 say (a cursor the
+   run reads on entry and advances, dead after it, goes by value: Recipe E step 4); a
+   struct type the file already declares whose members are exactly the variables the
+   run reads (types and names) is reused, not declared twice (Recipe AR step 3).
+6. Where the run stood, write `if (Helper(...) == MagickFalse) X;`, `X` unchanged.
+   Check every argument and member by reading.
+7. A run whose step-5 text would equal, under Recipe D's renaming (checked by script),
+   the body of a function of the file that Recipe I, LB, W or Y made, calls that
+   function instead of a second copy, filling its struct locals directly before the
+   call (Recipe I step 6), as Recipe LB step 6 allows; a declaration of the caller that
+   only the run used goes with it.
+
+**Before:**
+
+```c
+      node_info=cube_info->root;
+      index=MaxTreeDepth-1;
+      for (level=1; level < MaxTreeDepth; level++)
+      {
+        ...
+        if (AcquireHNodeChild(&child) == MagickFalse)
+          break;
+        node_info=node_info->child[id];
+        index--;
+      }
+      if (level < MaxTreeDepth)
+        break;
+```
+
+**After:**
+
+```c
+      descent.image=image;
+      descent.p=p;
+      descent.cube_info=cube_info;
+      descent.exception=exception;
+      targets.node_info=(&node_info);
+      targets.pixel=(&pixel);
+      if (DescendHCube(&descent,&targets) == MagickFalse)
+        break;
+```
+
+where `DescendHCube` (made from `ClassifyImageColors` by Recipe I) is the loop with
+`return(MagickFalse);` at its `break;`.
+
+**Careful:**
+
+- The argument is the loop's own semantics. The condition held when the iteration
+  began, and step 2 keeps every operand of it unchanged up to a `break;` of the loop,
+  which skips the increment: after that `break`, `<cond>` is true and the caller runs
+  `X` next, having run nothing in between. The helper returns `MagickFalse` at the
+  same point, after the same statements, and the caller runs `X` next. When the loop
+  ends because `<cond>` is false, the test is false and the caller goes on; the helper
+  returns `MagickTrue` and the caller goes on. A `continue;` of the loop runs the
+  increment and the condition, as before. Step 1's side-effect-free condition makes
+  evaluating it once fewer change nothing.
+- The counter's final value is the only thing the test conveyed; step 4 makes sure
+  nothing else reads it. An unsigned counter that would wrap changes nothing: the
+  argument uses only what the condition evaluates to.
+- The other variables follow Recipe LB's argument: their writes land through the same
+  pointers, and a temporary is written before it is read on every path.
+- Under step 7 the existing function's body is the text step 5 would cut, so calling it
+  is calling the function step 5 would have made.
+- The failure paths are mostly allocation failures no case reaches: the oracle checks
+  the fall-through path, and each `break` is checked by reading against its
+  `return(MagickFalse);`, with `refactor_guard.py --calls`.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for a new function,
+or under step 7 the calls the run made moving to the reused function's count), and
+steps 1 to 4 checked by reading.
+
+**Provenance:** 2026-10-31, from `histogram.c`'s `CheckImageColors` (W10): its tree
+descent ends the level loop through `break;` and tests `level < MaxTreeDepth` after it,
+where `ClassifyImageColors`' identical descent returned `0` and is now `DescendHCube`;
+LB would write a second, near-identical descent. Its column loop ends through `break;`
+and is tested `x < (ssize_t) image->columns` after it. Probes: the descent calling
+`DescendHCube`, 8.58 to 8.64; with the column body as a Recipe LB helper and the
+column loop as this recipe's helper, 9.68, `CheckImageColors` with no finding left.
+Added by Claude Code (Claude Opus 5.5) during task W10, under the mandate of
+2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -4404,3 +4528,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | E | Step 3: a `const` struct local of the caller, initialised at its declaration, which the block neither assigns nor writes a member of and whose address it takes only as `&s` passed to a pointer-to-`const` parameter of a callee (which reads the members and may write through its pointer members), goes by value as a parameter of its exact type, the block's `&s` unchanged: Recipe TW step 2's form, for one block | `layer.c`'s `CompareImagesBounds` (W10): after Recipe B bundled `FindDifferingPixel`'s arguments into the `const DifferingPixelScan scan` (with `&alpha_pixel` and `&beta_pixel` as members), the first column scan passes `&scan`; a probe moving that scan loop to a function taking `scan` by value, 6.57 to 6.62, `CompareImagesBounds` leaving Large Method (75 lines), bumps 4 to 3, cc 15 to 12 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | Y | Step 4: a variable the block reads on entry and then writes, and that the caller does not read after the block before writing it again, goes by value right after the struct, its text unchanged (Recipe E step 4's by-value input, as Recipe TW step 2 has it); it is neither a member nor `v` | `layer.c`'s `CompareImagesLayers` (W10): its first frame loop, `i=0; next=GetNextImageInList(next); for ( ; next != ...; ...) { ... }`, advances `next`, which the caller sets again (`next=GetFirstImageInList(image);`) before any later read, and leaves through V step 7's `image_a=DestroyImage(image_a); bounds=... RelinquishMagickMemory(bounds); return((Image *) NULL);`. A probe with `next` by value: 6.62 to 6.70, `CompareImagesLayers` leaving Bumpy Road Ahead | mandate (2026-10-24) |
 | 2026-10-31 | NEW | RF | Reuse a Struct Fill Across Calls: a fill of a struct local that repeats an earlier fill of the same members from the same side-effect-free expressions, with nothing in between that writes the local or what the expressions read, is deleted; the later calls read the earlier fill | `paint.c`'s `FloodfillPaintImage` (W10): three LB steps left `FloodfillRow row` filled with the same eight assignments before each of `FillFloodplaneLeft`, `FillFloodplaneRun` and `SkipFloodplaneRun` in one iteration; a probe deleting the second and third fills, 6.19 to 6.24 (172 to 156 lines), object code `IDENTICAL` | mandate (2026-10-24) |
+| 2026-10-31 | NEW | LT | Extract Loop Whose Early Exit Is Tested After It: a `for` loop leaving itself through `break;`, followed directly by `if (<cond>) X;` testing its own condition, moves to a `static MagickBooleanType` function whose `break;`s become `return(MagickFalse);` and which drops the test; the caller writes `if (Helper(...) == MagickFalse) X;`. A run equal to an existing I/LB/W/Y function calls it | `histogram.c`'s `CheckImageColors` (W10): its tree descent (`if (level < MaxTreeDepth) break;`) is `ClassifyImageColors`' `DescendHCube` with a `break` for the `return`, and its column loop is tested `x < (ssize_t) image->columns` after it; probes 8.58 to 8.64 (descent), 9.68 with the column loop, the function leaving every finding | mandate (2026-10-24) |
