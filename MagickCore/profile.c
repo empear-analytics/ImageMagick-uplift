@@ -2141,6 +2141,14 @@ static MagickBooleanType ValidateXMPProfile(Image *image,
 #endif
 }
 
+static inline MagickBooleanType IsInvalidXMPProfile(Image *image,
+  const char *name,const StringInfo *profile,ExceptionInfo *exception)
+{
+  return(((LocaleCompare(name,"xmp") == 0) &&
+    (ValidateXMPProfile(image,profile,exception) == MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsExifInApp1(const size_t length,
   const char *key,const StringInfo *profile)
 {
@@ -2220,8 +2228,7 @@ static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
   if ((length == 0) || (length > GetMaxProfileSize()))
     return(DiscardOversizedProfile(profile,length,exception));
   PatchCorruptProfile(name,profile);
-  if ((LocaleCompare(name,"xmp") == 0) &&
-      (ValidateXMPProfile(image,profile,exception) == MagickFalse))
+  if (IsInvalidXMPProfile(image,name,profile,exception) != MagickFalse)
     {
       profile=DestroyStringInfo(profile);
       return(MagickTrue);
