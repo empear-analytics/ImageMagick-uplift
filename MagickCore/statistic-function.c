@@ -158,6 +158,37 @@ static double ApplySinusoidFunction(Quantum pixel,
   return(result);
 }
 
+static double ApplyArcsinFunction(Quantum pixel,
+  const size_t number_parameters,const double *parameters)
+{
+  double
+    bias,
+    center,
+    range,
+    result,
+    width;
+
+  /*
+    Arcsin (pegged at range limits for invalid results): width, center,
+    range, and bias.
+  */
+  width=(number_parameters >= 1) ? parameters[0] : 1.0;
+  center=(number_parameters >= 2) ? parameters[1] : 0.5;
+  range=(number_parameters >= 3) ? parameters[2] : 1.0;
+  bias=(number_parameters >= 4) ? parameters[3] : 0.5;
+  result=2.0*MagickSafeReciprocal(width)*(QuantumScale*(double) pixel-
+    center);
+  if (result <= -1.0)
+    result=bias-range/2.0;
+  else
+    if (result >= 1.0)
+      result=bias+range/2.0;
+    else
+      result=(double) (range/MagickPI*asin((double) result)+bias);
+  result*=(double) QuantumRange;
+  return(result);
+}
+
 static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
   const size_t number_parameters,const double *parameters,
   ExceptionInfo *exception)
@@ -191,30 +222,7 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
     }
     case ArcsinFunction:
     {
-      double
-        bias,
-        center,
-        range,
-        width;
-
-      /*
-        Arcsin (pegged at range limits for invalid results): width, center,
-        range, and bias.
-      */
-      width=(number_parameters >= 1) ? parameters[0] : 1.0;
-      center=(number_parameters >= 2) ? parameters[1] : 0.5;
-      range=(number_parameters >= 3) ? parameters[2] : 1.0;
-      bias=(number_parameters >= 4) ? parameters[3] : 0.5;
-      result=2.0*MagickSafeReciprocal(width)*(QuantumScale*(double) pixel-
-        center);
-      if (result <= -1.0)
-        result=bias-range/2.0;
-      else
-        if (result >= 1.0)
-          result=bias+range/2.0;
-        else
-          result=(double) (range/MagickPI*asin((double) result)+bias);
-      result*=(double) QuantumRange;
+      result=ApplyArcsinFunction(pixel,number_parameters,parameters);
       break;
     }
     case ArctanFunction:
