@@ -2235,6 +2235,58 @@ static double GetScaledStopOffset(const GradientInfo *gradient,
   return(offset);
 }
 
+typedef struct _GradientOffsetInfo
+{
+  const GradientInfo
+    *gradient;
+
+  const SegmentInfo
+    *gradient_vector;
+
+  double
+    length;
+
+  ssize_t
+    x,
+    y;
+} GradientOffsetInfo;
+
+static void GetRepeatSpreadOffset(const GradientOffsetInfo *offset_info,
+  double *offset,double *repeat,MagickBooleanType *antialias)
+{
+  const GradientInfo
+    *gradient = offset_info->gradient;
+
+  const SegmentInfo
+    *gradient_vector = offset_info->gradient_vector;
+
+  const double
+    length = offset_info->length;
+
+  const ssize_t
+    x = offset_info->x,
+    y = offset_info->y;
+
+  if (IsOffGradientOrigin(gradient_vector,x,y) != MagickFalse)
+    {
+      (*offset)=GetStopColorOffset(gradient,x,y);
+      if (gradient->type == LinearGradient)
+        {
+          (*repeat)=GetRepeatOffset((*offset),length);
+          (*antialias)=((*repeat) < length) && (((*repeat)+1.0) > length) ?
+            MagickTrue : MagickFalse;
+          (*offset)=MagickSafeReciprocal(length)*(*repeat);
+        }
+      else
+        {
+          (*repeat)=GetRepeatOffset((*offset),gradient->radius);
+          (*antialias)=(*repeat)+1.0 > gradient->radius ? MagickTrue :
+            MagickFalse;
+          (*offset)=(*repeat)*MagickSafeReciprocal(gradient->radius);
+        }
+    }
+}
+
 MagickExport MagickBooleanType DrawGradientImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -2364,26 +2416,17 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
           RepeatGradientInfo
             repeat_info;
 
+          GradientOffsetInfo
+            offset_info;
+
           antialias=MagickFalse;
           repeat=0.0;
-          if (IsOffGradientOrigin(gradient_vector,x,y) != MagickFalse)
-            {
-              offset=GetStopColorOffset(gradient,x,y);
-              if (gradient->type == LinearGradient)
-                {
-                  repeat=GetRepeatOffset(offset,length);
-                  antialias=(repeat < length) && ((repeat+1.0) > length) ?
-                    MagickTrue : MagickFalse;
-                  offset=MagickSafeReciprocal(length)*repeat;
-                }
-              else
-                {
-                  repeat=GetRepeatOffset(offset,gradient->radius);
-                  antialias=repeat+1.0 > gradient->radius ? MagickTrue :
-                    MagickFalse;
-                  offset=repeat*MagickSafeReciprocal(gradient->radius);
-                }
-            }
+          offset_info.gradient=gradient;
+          offset_info.gradient_vector=gradient_vector;
+          offset_info.length=length;
+          offset_info.x=x;
+          offset_info.y=y;
+          GetRepeatSpreadOffset(&offset_info,&offset,&repeat,&antialias);
           repeat_info.gradient=gradient;
           repeat_info.length=length;
           repeat_info.offset=offset;
