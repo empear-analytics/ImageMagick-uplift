@@ -340,29 +340,12 @@ static MagickBooleanType ExportCharRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportCharQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,unsigned char *magick_restrict q)
+static void ExportCharAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  unsigned char *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=ScaleQuantumToChar(GetPixelRed(image,p));
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=ScaleQuantumToChar(GetPixelGreen(image,p));
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=ScaleQuantumToChar(GetPixelBlue(image,p));
-      break;
-    }
     case AlphaQuantum:
     {
       *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
@@ -389,6 +372,149 @@ static void ExportCharQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ExportCharQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned char *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelBlue(image,p));
+      break;
+    }
+    default:
+    {
+      ExportCharAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ExportCharRowInfo
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ExportCharRowInfo;
+
+static unsigned char *ExportCharMapRow(const ExportCharRowInfo *row,
+  const Quantum *magick_restrict p,unsigned char *magick_restrict q)
+{
+  const Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      *q=0;
+      ExportCharQuantum(image,quantum_map[i],p,q);
+      q++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
+typedef struct _ExportCharMapLoop
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ExportCharMapLoop;
+
+static MagickBooleanType ExportCharMapPixels(const ExportCharMapLoop *loop,
+  unsigned char *magick_restrict q)
+{
+  const Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ExportCharRowInfo
+      row;
+
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    q=ExportCharMapRow(&row,p,q);
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportCharPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -402,20 +528,11 @@ static MagickBooleanType ExportCharPixel(const Image *image,
   void
     *pixels = buffer->pixels;
 
-  const Quantum
-    *magick_restrict p;
-
-  ssize_t
-    x;
-
   unsigned char
     *magick_restrict q;
 
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ExportCharMapLoop
+    loop;
 
   q=(unsigned char *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -432,27 +549,12 @@ static MagickBooleanType ExportCharPixel(const Image *image,
     return(ExportCharRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ExportCharRGBPPixels(image,roi,q,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        *q=0;
-        ExportCharQuantum(image,quantum_map[i],p,q);
-        q++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ExportCharMapPixels(&loop,q));
 }
 
 static MagickBooleanType ExportDoubleBGRPixels(const Image *image,
@@ -646,29 +748,12 @@ static MagickBooleanType ExportDoubleRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportDoubleQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,double *magick_restrict q)
+static void ExportDoubleAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  double *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=QuantumScale*(double) GetPixelRed(image,p);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=QuantumScale*(double) GetPixelGreen(image,p);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=QuantumScale*(double) GetPixelBlue(image,p);
-      break;
-    }
     case AlphaQuantum:
     {
       *q=QuantumScale*(double) GetPixelAlpha(image,p);
@@ -695,6 +780,149 @@ static void ExportDoubleQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ExportDoubleQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,double *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=QuantumScale*(double) GetPixelRed(image,p);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=QuantumScale*(double) GetPixelGreen(image,p);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=QuantumScale*(double) GetPixelBlue(image,p);
+      break;
+    }
+    default:
+    {
+      ExportDoubleAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ExportDoubleRowInfo
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ExportDoubleRowInfo;
+
+static double *ExportDoubleMapRow(const ExportDoubleRowInfo *row,
+  const Quantum *magick_restrict p,double *magick_restrict q)
+{
+  const Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      *q=0;
+      ExportDoubleQuantum(image,quantum_map[i],p,q);
+      q++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
+typedef struct _ExportDoubleMapLoop
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ExportDoubleMapLoop;
+
+static MagickBooleanType ExportDoubleMapPixels(const ExportDoubleMapLoop *loop,
+  double *magick_restrict q)
+{
+  const Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ExportDoubleRowInfo
+      row;
+
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    q=ExportDoubleMapRow(&row,p,q);
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportDoublePixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -708,20 +936,11 @@ static MagickBooleanType ExportDoublePixel(const Image *image,
   void
     *pixels = buffer->pixels;
 
-  const Quantum
-    *magick_restrict p;
-
   double
     *magick_restrict q;
 
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ExportDoubleMapLoop
+    loop;
 
   q=(double *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -738,27 +957,12 @@ static MagickBooleanType ExportDoublePixel(const Image *image,
     return(ExportDoubleRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ExportDoubleRGBPPixels(image,roi,q,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        *q=0;
-        ExportDoubleQuantum(image,quantum_map[i],p,q);
-        q++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ExportDoubleMapPixels(&loop,q));
 }
 
 static MagickBooleanType ExportFloatBGRPixels(const Image *image,
@@ -952,29 +1156,12 @@ static MagickBooleanType ExportFloatRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportFloatQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,float *magick_restrict q)
+static void ExportFloatAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  float *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=(float) (QuantumScale*(double) GetPixelRed(image,p));
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=(float) (QuantumScale*(double) GetPixelGreen(image,p));
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=(float) (QuantumScale*(double) GetPixelBlue(image,p));
-      break;
-    }
     case AlphaQuantum:
     {
       *q=(float) (QuantumScale*((double) (GetPixelAlpha(image,p))));
@@ -1001,6 +1188,149 @@ static void ExportFloatQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ExportFloatQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,float *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=(float) (QuantumScale*(double) GetPixelBlue(image,p));
+      break;
+    }
+    default:
+    {
+      ExportFloatAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ExportFloatRowInfo
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ExportFloatRowInfo;
+
+static float *ExportFloatMapRow(const ExportFloatRowInfo *row,
+  const Quantum *magick_restrict p,float *magick_restrict q)
+{
+  const Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      *q=0;
+      ExportFloatQuantum(image,quantum_map[i],p,q);
+      q++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
+typedef struct _ExportFloatMapLoop
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ExportFloatMapLoop;
+
+static MagickBooleanType ExportFloatMapPixels(const ExportFloatMapLoop *loop,
+  float *magick_restrict q)
+{
+  const Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ExportFloatRowInfo
+      row;
+
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    q=ExportFloatMapRow(&row,p,q);
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportFloatPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1014,20 +1344,11 @@ static MagickBooleanType ExportFloatPixel(const Image *image,
   void
     *pixels = buffer->pixels;
 
-  const Quantum
-    *magick_restrict p;
-
   float
     *magick_restrict q;
 
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ExportFloatMapLoop
+    loop;
 
   q=(float *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -1044,27 +1365,12 @@ static MagickBooleanType ExportFloatPixel(const Image *image,
     return(ExportFloatRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ExportFloatRGBPPixels(image,roi,q,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        *q=0;
-        ExportFloatQuantum(image,quantum_map[i],p,q);
-        q++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ExportFloatMapPixels(&loop,q));
 }
 
 static MagickBooleanType ExportLongBGRPixels(const Image *image,
@@ -1258,29 +1564,12 @@ static MagickBooleanType ExportLongRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportLongQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,unsigned int *magick_restrict q)
+static void ExportLongAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  unsigned int *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=ScaleQuantumToLong(GetPixelRed(image,p));
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=ScaleQuantumToLong(GetPixelGreen(image,p));
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=ScaleQuantumToLong(GetPixelBlue(image,p));
-      break;
-    }
     case AlphaQuantum:
     {
       *q=ScaleQuantumToLong(GetPixelAlpha(image,p));
@@ -1307,6 +1596,149 @@ static void ExportLongQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ExportLongQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned int *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelBlue(image,p));
+      break;
+    }
+    default:
+    {
+      ExportLongAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ExportLongRowInfo
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ExportLongRowInfo;
+
+static unsigned int *ExportLongMapRow(const ExportLongRowInfo *row,
+  const Quantum *magick_restrict p,unsigned int *magick_restrict q)
+{
+  const Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      *q=0;
+      ExportLongQuantum(image,quantum_map[i],p,q);
+      q++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
+typedef struct _ExportLongMapLoop
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ExportLongMapLoop;
+
+static MagickBooleanType ExportLongMapPixels(const ExportLongMapLoop *loop,
+  unsigned int *magick_restrict q)
+{
+  const Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ExportLongRowInfo
+      row;
+
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    q=ExportLongMapRow(&row,p,q);
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportLongPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1320,20 +1752,11 @@ static MagickBooleanType ExportLongPixel(const Image *image,
   void
     *pixels = buffer->pixels;
 
-  const Quantum
-    *magick_restrict p;
-
-  ssize_t
-    x;
-
   unsigned int
     *magick_restrict q;
 
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ExportLongMapLoop
+    loop;
 
   q=(unsigned int *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -1350,27 +1773,12 @@ static MagickBooleanType ExportLongPixel(const Image *image,
     return(ExportLongRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ExportLongRGBPPixels(image,roi,q,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        *q=0;
-        ExportLongQuantum(image,quantum_map[i],p,q);
-        q++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ExportLongMapPixels(&loop,q));
 }
 
 static MagickBooleanType ExportLongLongBGRPixels(const Image *image,
@@ -1565,29 +1973,12 @@ static MagickBooleanType ExportLongLongRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportLongLongQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,MagickSizeType *magick_restrict q)
+static void ExportLongLongAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  MagickSizeType *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=ScaleQuantumToLongLong(GetPixelRed(image,p));
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=ScaleQuantumToLongLong(GetPixelGreen(image,p));
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=ScaleQuantumToLongLong(GetPixelBlue(image,p));
-      break;
-    }
     case AlphaQuantum:
     {
       *q=ScaleQuantumToLongLong(GetPixelAlpha(image,p));
@@ -1615,6 +2006,149 @@ static void ExportLongLongQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ExportLongLongQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,MagickSizeType *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToLongLong(GetPixelBlue(image,p));
+      break;
+    }
+    default:
+    {
+      ExportLongLongAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ExportLongLongRowInfo
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ExportLongLongRowInfo;
+
+static MagickSizeType *ExportLongLongMapRow(const ExportLongLongRowInfo *row,
+  const Quantum *magick_restrict p,MagickSizeType *magick_restrict q)
+{
+  const Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      *q=0;
+      ExportLongLongQuantum(image,quantum_map[i],p,q);
+      q++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
+typedef struct _ExportLongLongMapLoop
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ExportLongLongMapLoop;
+
+static MagickBooleanType ExportLongLongMapPixels(
+  const ExportLongLongMapLoop *loop,MagickSizeType *magick_restrict q)
+{
+  const Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ExportLongLongRowInfo
+      row;
+
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    q=ExportLongLongMapRow(&row,p,q);
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportLongLongPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1628,20 +2162,11 @@ static MagickBooleanType ExportLongLongPixel(const Image *image,
   void
     *pixels = buffer->pixels;
 
-  const Quantum
-    *magick_restrict p;
-
-  ssize_t
-    x;
-
   MagickSizeType
     *magick_restrict q;
 
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ExportLongLongMapLoop
+    loop;
 
   q=(MagickSizeType *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -1658,27 +2183,12 @@ static MagickBooleanType ExportLongLongPixel(const Image *image,
     return(ExportLongLongRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ExportLongLongRGBPPixels(image,roi,q,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        *q=0;
-        ExportLongLongQuantum(image,quantum_map[i],p,q);
-        q++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ExportLongLongMapPixels(&loop,q));
 }
 
 static MagickBooleanType ExportQuantumBGRPixels(const Image *image,
@@ -1872,29 +2382,12 @@ static MagickBooleanType ExportQuantumRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportQuantumQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+static void ExportQuantumAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=GetPixelRed(image,p);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=GetPixelGreen(image,p);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=GetPixelBlue(image,p);
-      break;
-    }
     case AlphaQuantum:
     {
       *q=GetPixelAlpha(image,p);
@@ -1924,6 +2417,149 @@ static void ExportQuantumQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ExportQuantumQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=GetPixelRed(image,p);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=GetPixelGreen(image,p);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=GetPixelBlue(image,p);
+      break;
+    }
+    default:
+    {
+      ExportQuantumAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ExportQuantumRowInfo
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ExportQuantumRowInfo;
+
+static Quantum *ExportQuantumMapRow(const ExportQuantumRowInfo *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      *q=(Quantum) 0;
+      ExportQuantumQuantum(image,quantum_map[i],p,q);
+      q++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
+typedef struct _ExportQuantumMapLoop
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ExportQuantumMapLoop;
+
+static MagickBooleanType ExportQuantumMapPixels(
+  const ExportQuantumMapLoop *loop,Quantum *magick_restrict q)
+{
+  const Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ExportQuantumRowInfo
+      row;
+
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    q=ExportQuantumMapRow(&row,p,q);
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportQuantumPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1937,20 +2573,11 @@ static MagickBooleanType ExportQuantumPixel(const Image *image,
   void
     *pixels = buffer->pixels;
 
-  const Quantum
-    *magick_restrict p;
-
   Quantum
     *magick_restrict q;
 
-  ssize_t
-    x;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ExportQuantumMapLoop
+    loop;
 
   q=(Quantum *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -1967,27 +2594,12 @@ static MagickBooleanType ExportQuantumPixel(const Image *image,
     return(ExportQuantumRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ExportQuantumRGBPPixels(image,roi,q,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        *q=(Quantum) 0;
-        ExportQuantumQuantum(image,quantum_map[i],p,q);
-        q++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ExportQuantumMapPixels(&loop,q));
 }
 
 static MagickBooleanType ExportShortBGRPixels(const Image *image,
@@ -2181,29 +2793,12 @@ static MagickBooleanType ExportShortRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportShortQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,unsigned short *magick_restrict q)
+static void ExportShortAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  unsigned short *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=ScaleQuantumToShort(GetPixelRed(image,p));
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=ScaleQuantumToShort(GetPixelGreen(image,p));
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=ScaleQuantumToShort(GetPixelBlue(image,p));
-      break;
-    }
     case AlphaQuantum:
     {
       *q=ScaleQuantumToShort(GetPixelAlpha(image,p));
@@ -2230,6 +2825,149 @@ static void ExportShortQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+static void ExportShortQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned short *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToShort(GetPixelBlue(image,p));
+      break;
+    }
+    default:
+    {
+      ExportShortAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
+  }
+}
+
+typedef struct _ExportShortRowInfo
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ExportShortRowInfo;
+
+static unsigned short *ExportShortMapRow(const ExportShortRowInfo *row,
+  const Quantum *magick_restrict p,unsigned short *magick_restrict q)
+{
+  const Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      *q=0;
+      ExportShortQuantum(image,quantum_map[i],p,q);
+      q++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
+typedef struct _ExportShortMapLoop
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ExportShortMapLoop;
+
+static MagickBooleanType ExportShortMapPixels(const ExportShortMapLoop *loop,
+  unsigned short *magick_restrict q)
+{
+  const Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ExportShortRowInfo
+      row;
+
+    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    q=ExportShortMapRow(&row,p,q);
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ExportShortPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -2243,20 +2981,11 @@ static MagickBooleanType ExportShortPixel(const Image *image,
   void
     *pixels = buffer->pixels;
 
-  const Quantum
-    *magick_restrict p;
-
-  ssize_t
-    x;
-
   unsigned short
     *magick_restrict q;
 
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ExportShortMapLoop
+    loop;
 
   q=(unsigned short *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -2273,27 +3002,431 @@ static MagickBooleanType ExportShortPixel(const Image *image,
     return(ExportShortRGBAPixels(image,roi,q,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ExportShortRGBPPixels(image,roi,q,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ExportShortMapPixels(&loop,q));
+}
 
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        *q=0;
-        ExportShortQuantum(image,quantum_map[i],p,q);
-        q++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
+static MagickBooleanType ExportMapQuantumOPR(const char *map,const ssize_t i,
+  QuantumType *quantum_map,ExceptionInfo *exception)
+{
+  switch (map[i])
+  {
+    case 'o':
+    case 'O':
+    {
+      quantum_map[i]=OpacityQuantum;
+      break;
+    }
+    case 'P':
+    case 'p':
+    {
+      quantum_map[i]=UndefinedQuantum;
+      break;
+    }
+    case 'R':
+    case 'r':
+    {
+      quantum_map[i]=RedQuantum;
+      break;
+    }
+    default:
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",map);
+      return(MagickFalse);
     }
   }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExportMapQuantumGI(const char *map,const ssize_t i,
+  QuantumType *quantum_map,ExceptionInfo *exception)
+{
+  switch (map[i])
+  {
+    case 'g':
+    case 'G':
+    {
+      quantum_map[i]=GreenQuantum;
+      break;
+    }
+    case 'I':
+    case 'i':
+    {
+      quantum_map[i]=IndexQuantum;
+      break;
+    }
+    default:
+    {
+      if (ExportMapQuantumOPR(map,i,quantum_map,exception) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExportMapQuantumAB(const char *map,const ssize_t i,
+  QuantumType *quantum_map,ExceptionInfo *exception)
+{
+  switch (map[i])
+  {
+    case 'A':
+    case 'a':
+    {
+      quantum_map[i]=AlphaQuantum;
+      break;
+    }
+    case 'B':
+    case 'b':
+    {
+      quantum_map[i]=BlueQuantum;
+      break;
+    }
+    default:
+    {
+      if (ExportMapQuantumGI(map,i,quantum_map,exception) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+typedef struct _ExportMapRequest
+{
+  const Image
+    *image;
+
+  const char
+    *map;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} ExportMapRequest;
+
+static MagickBooleanType ExportMapQuantumY(const ExportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  const Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'Y':
+    case 'y':
+    {
+      quantum_map[i]=YellowQuantum;
+      if (image->colorspace == CMYKColorspace)
+        break;
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ColorSeparatedImageRequired","`%s'",map);
+      return(MagickFalse);
+    }
+    default:
+    {
+      if (ExportMapQuantumAB(map,i,quantum_map,exception) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExportMapQuantumM(const ExportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  const Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'M':
+    case 'm':
+    {
+      quantum_map[i]=MagentaQuantum;
+      if (image->colorspace == CMYKColorspace)
+        break;
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ColorSeparatedImageRequired","`%s'",map);
+      return(MagickFalse);
+    }
+    default:
+    {
+      ExportMapRequest
+        request;
+
+      request.image=image;
+      request.map=map;
+      request.i=i;
+      request.exception=exception;
+      if (ExportMapQuantumY(&request,quantum_map) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExportMapQuantumK(const ExportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  const Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'K':
+    case 'k':
+    {
+      quantum_map[i]=BlackQuantum;
+      if (image->colorspace == CMYKColorspace)
+        break;
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ColorSeparatedImageRequired","`%s'",map);
+      return(MagickFalse);
+    }
+    default:
+    {
+      ExportMapRequest
+        request;
+
+      request.image=image;
+      request.map=map;
+      request.i=i;
+      request.exception=exception;
+      if (ExportMapQuantumM(&request,quantum_map) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ExportMapQuantumC(const ExportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  const Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'C':
+    case 'c':
+    {
+      quantum_map[i]=CyanQuantum;
+      if (image->colorspace == CMYKColorspace)
+        break;
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ColorSeparatedImageRequired","`%s'",map);
+      return(MagickFalse);
+    }
+    default:
+    {
+      ExportMapRequest
+        request;
+
+      request.image=image;
+      request.map=map;
+      request.i=i;
+      request.exception=exception;
+      if (ExportMapQuantumK(&request,quantum_map) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
+typedef struct _ExportTypeRequest
+{
+  const Image
+    *image;
+
+  RectangleInfo
+    roi;
+
+  ExportPixelBuffer
+    buffer;
+
+  StorageType
+    type;
+
+  const char
+    *map;
+
+  ExceptionInfo
+    *exception;
+} ExportTypeRequest;
+
+static void ExportPixelsOfType(const ExportTypeRequest *request,
+  MagickBooleanType *status)
+{
+  const Image
+    *image = request->image;
+
+  const RectangleInfo
+    roi = request->roi;
+
+  const ExportPixelBuffer
+    buffer = request->buffer;
+
+  const StorageType
+    type = request->type;
+
+  const char
+    *map = request->map;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (type)
+  {
+    case DoublePixel:
+    {
+      (*status)=ExportDoublePixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case FloatPixel:
+    {
+      (*status)=ExportFloatPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case LongPixel:
+    {
+      (*status)=ExportLongPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case LongLongPixel:
+    {
+      (*status)=ExportLongLongPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case QuantumPixel:
+    {
+      (*status)=ExportQuantumPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case ShortPixel:
+    {
+      (*status)=ExportShortPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    default:
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",map);
+      (*status)=MagickFalse;
+    }
+  }
+}
+
+typedef struct _ExportMapParse
+{
+  const Image
+    *image;
+
+  const char
+    *map;
+
+  size_t
+    length;
+
+  QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ExportMapParse;
+
+static MagickBooleanType ExportMapQuantums(const ExportMapParse *parse)
+{
+  const Image
+    *image = parse->image;
+
+  const char
+    *map = parse->map;
+
+  const size_t
+    length = parse->length;
+
+  QuantumType
+    *quantum_map = parse->quantum_map;
+
+  ExceptionInfo
+    *exception = parse->exception;
+
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    switch (map[i])
+    {
+      default:
+      {
+        ExportMapRequest
+          request;
+
+        request.image=image;
+        request.map=map;
+        request.i=i;
+        request.exception=exception;
+        if (ExportMapQuantumC(&request,quantum_map) == MagickFalse)
+          return(MagickFalse);
+        break;
+      }
+    }
+  }
+  return(MagickTrue);
 }
 
 MagickExport MagickBooleanType ExportImagePixels(const Image *image,
@@ -2309,8 +3442,8 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
   RectangleInfo
     roi;
 
-  ssize_t
-    i;
+  ExportMapParse
+    parse;
 
   size_t
     length;
@@ -2329,105 +3462,13 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
         ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
       return(MagickFalse);
     }
-  for (i=0; i < (ssize_t) length; i++)
-  {
-    switch (map[i])
-    {
-      case 'A':
-      case 'a':
-      {
-        quantum_map[i]=AlphaQuantum;
-        break;
-      }
-      case 'B':
-      case 'b':
-      {
-        quantum_map[i]=BlueQuantum;
-        break;
-      }
-      case 'C':
-      case 'c':
-      {
-        quantum_map[i]=CyanQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",map);
-        return(MagickFalse);
-      }
-      case 'g':
-      case 'G':
-      {
-        quantum_map[i]=GreenQuantum;
-        break;
-      }
-      case 'I':
-      case 'i':
-      {
-        quantum_map[i]=IndexQuantum;
-        break;
-      }
-      case 'K':
-      case 'k':
-      {
-        quantum_map[i]=BlackQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",map);
-        return(MagickFalse);
-      }
-      case 'M':
-      case 'm':
-      {
-        quantum_map[i]=MagentaQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",map);
-        return(MagickFalse);
-      }
-      case 'o':
-      case 'O':
-      {
-        quantum_map[i]=OpacityQuantum;
-        break;
-      }
-      case 'P':
-      case 'p':
-      {
-        quantum_map[i]=UndefinedQuantum;
-        break;
-      }
-      case 'R':
-      case 'r':
-      {
-        quantum_map[i]=RedQuantum;
-        break;
-      }
-      case 'Y':
-      case 'y':
-      {
-        quantum_map[i]=YellowQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",map);
-        return(MagickFalse);
-      }
-      default:
-      {
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "UnrecognizedPixelMap","`%s'",map);
-        return(MagickFalse);
-      }
-    }
-  }
+  parse.image=image;
+  parse.map=map;
+  parse.length=length;
+  parse.quantum_map=quantum_map;
+  parse.exception=exception;
+  if (ExportMapQuantums(&parse) == MagickFalse)
+    return(MagickFalse);
   roi.width=width;
   roi.height=height;
   roi.x=x;
@@ -2442,41 +3483,19 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
       status=ExportCharPixel(image,&roi,&buffer,exception);
       break;
     }
-    case DoublePixel:
-    {
-      status=ExportDoublePixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case FloatPixel:
-    {
-      status=ExportFloatPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case LongPixel:
-    {
-      status=ExportLongPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case LongLongPixel:
-    {
-      status=ExportLongLongPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case QuantumPixel:
-    {
-      status=ExportQuantumPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case ShortPixel:
-    {
-      status=ExportShortPixel(image,&roi,&buffer,exception);
-      break;
-    }
     default:
     {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "UnrecognizedPixelMap","`%s'",map);
-      status=MagickFalse;
+      ExportTypeRequest
+        request;
+
+      request.image=image;
+      request.roi=roi;
+      request.buffer=buffer;
+      request.type=type;
+      request.map=map;
+      request.exception=exception;
+      ExportPixelsOfType(&request,&status);
+      break;
     }
   }
   quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);

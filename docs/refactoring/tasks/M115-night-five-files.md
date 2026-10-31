@@ -98,17 +98,3 @@ and two runs of the known write-mask flake `resize/6ee45e9cfa` (at 5fa6b1140 and
 - `utility.c` 5.55: `GetPathComponent`'s switch (no default, a fall-through);
   `ExpandFilenames`' blocks read arrays N/Q do not take as members; VMS, Windows and
   POSIX-only branches.
-
-### Noticed, not changed (possible upstream bugs)
-
-- `property.c` `SetImageProperty` "delay" with `<` compares with `rho`, assigns `sigma`;
-  `%[property:glob]` matches keys against `pattern`, not `pattern+9`.
-- `xml-tree.c` `ParseInternalDoctype`: `<!ATTLIST` looks up the tag by a stale `n`
-  (ezxml uses `t`); `NewXMLTree`: `l` carries over in ignored sections, so the "missing
-  >" paths act on a stale count.
-- `delegate.c` `CopyDelegateFile`: the first policy refusal reports `source` while
-  checking `destination`; `AppendKeyValue2Text` is never used.
-- `annotate.c` `RenderFreetype`: `FT_Outline_Decompose`'s status is overwritten unread.
-- `utility.c` `ExpandFilenames`: `files` leaks when `StringToArgv` returns NULL;
-  `ShredFile` reads `st_size` after a failed `fstat`; OS/2 branch compares
-  `path[1] != ":"`.
