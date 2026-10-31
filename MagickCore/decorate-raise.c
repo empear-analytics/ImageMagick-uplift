@@ -116,16 +116,16 @@ static void BlendPixelChannels(const Image *image,const Quantum factor,
   }
 }
 
-MagickExport MagickBooleanType RaiseImage(Image *image,
-  const RectangleInfo *raise_info,const MagickBooleanType raise,
-  ExceptionInfo *exception)
-{
 #define AccentuateFactor  ScaleCharToQuantum(135)
 #define HighlightFactor  ScaleCharToQuantum(190)
 #define ShadowFactor  ScaleCharToQuantum(190)
 #define RaiseImageTag  "Raise/Image"
 #define TroughFactor  ScaleCharToQuantum(135)
 
+MagickExport MagickBooleanType RaiseImage(Image *image,
+  const RectangleInfo *raise_info,const MagickBooleanType raise,
+  ExceptionInfo *exception)
+{
   CacheView
     *image_view;
 
