@@ -1058,6 +1058,28 @@ static void SetsRGBImageProfile(Image *image,ExceptionInfo *exception)
   (void) SetImageProfilePrivate(image,profile,exception);
 }
 
+static MagickBooleanType DeleteMatchingImageProfiles(Image *image,
+  const char *name)
+{
+  char
+    *next;
+
+  /*
+    Delete image profile(s).
+  */
+  ResetImageProfileIterator(image);
+  for (next=GetNextImageProfile(image); next != (const char *) NULL; )
+  {
+    if (IsOptionMember(next,name) != MagickFalse)
+      {
+        (void) DeleteImageProfile(image,next);
+        ResetImageProfileIterator(image);
+      }
+    next=GetNextImageProfile(image);
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
   const void *datum,const size_t length,ExceptionInfo *exception)
 {
@@ -1090,25 +1112,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if ((datum == (const void *) NULL) || (length == 0))
-    {
-      char
-        *next;
-
-      /*
-        Delete image profile(s).
-      */
-      ResetImageProfileIterator(image);
-      for (next=GetNextImageProfile(image); next != (const char *) NULL; )
-      {
-        if (IsOptionMember(next,name) != MagickFalse)
-          {
-            (void) DeleteImageProfile(image,next);
-            ResetImageProfileIterator(image);
-          }
-        next=GetNextImageProfile(image);
-      }
-      return(MagickTrue);
-    }
+    return(DeleteMatchingImageProfiles(image,name));
   /*
     Add a ICC, IPTC, or generic profile to the image.
   */
