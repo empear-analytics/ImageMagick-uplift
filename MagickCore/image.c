@@ -448,6 +448,21 @@ static MagickBooleanType SetAppendImageClass(Image *append_image,
   return(MagickTrue);
 }
 
+static void AdvanceAppendOffset(const Image *next,const MagickBooleanType stack,
+  ssize_t *x_offset,ssize_t *y_offset)
+{
+  if (stack == MagickFalse)
+    {
+      *x_offset+=(ssize_t) next->columns;
+      *y_offset=0;
+    }
+  else
+    {
+      *x_offset=0;
+      *y_offset+=(ssize_t) next->rows;
+    }
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -605,16 +620,7 @@ MagickExport Image *AppendImages(const Image *images,
         status=MagickFalse;
     }
     image_view=DestroyCacheView(image_view);
-    if (stack == MagickFalse)
-      {
-        x_offset+=(ssize_t) next->columns;
-        y_offset=0;
-      }
-    else
-      {
-        x_offset=0;
-        y_offset+=(ssize_t) next->rows;
-      }
+    AdvanceAppendOffset(next,stack,&x_offset,&y_offset);
     proceed=SetImageProgress(append_image,AppendImageTag,n,number_images);
     if (proceed == MagickFalse)
       break;
