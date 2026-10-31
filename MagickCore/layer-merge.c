@@ -168,6 +168,36 @@ static void ExtendToMosaicBounds(const Image *image,size_t *width,
 
 #define MergeLayersTag  "Merge/Layers"
 
+static Image *TrimLayerBounds(Image *image,const RectangleInfo page,
+  const size_t width,const size_t height)
+{
+  MagickBooleanType
+    proceed;
+
+  size_t
+    number_images;
+
+  ssize_t
+    scene;
+
+  number_images=GetImageListLength(image);
+  for (scene=0; scene < (ssize_t) number_images; scene++)
+  {
+    image->page.x-=page.x;
+    image->page.y-=page.y;
+    image->page.width=width;
+    image->page.height=height;
+    proceed=SetImageProgress(image,MergeLayersTag,(MagickOffsetType) scene,
+      number_images);
+    if (proceed == MagickFalse)
+      break;
+    image=GetNextImageInList(image);
+    if (image == (Image *) NULL)
+      break;
+  }
+  return((Image *) NULL);
+}
+
 MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -244,24 +274,7 @@ MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
     Handle "TrimBoundsLayer" method separately to normal 'layer merge'.
   */
   if (method == TrimBoundsLayer)
-    {
-      number_images=GetImageListLength(image);
-      for (scene=0; scene < (ssize_t) number_images; scene++)
-      {
-        image->page.x-=page.x;
-        image->page.y-=page.y;
-        image->page.width=width;
-        image->page.height=height;
-        proceed=SetImageProgress(image,MergeLayersTag,(MagickOffsetType) scene,
-          number_images);
-        if (proceed == MagickFalse)
-          break;
-        image=GetNextImageInList(image);
-        if (image == (Image *) NULL)
-          break;
-      }
-      return((Image *) NULL);
-    }
+    return(TrimLayerBounds(image,page,width,height));
   /*
     Create canvas size of width and height, and background color.
   */
