@@ -2099,6 +2099,26 @@ MagickExport StreamHandler GetBlobStreamHandler(const Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void *DetachImageBlob(ImageInfo *blob_info,Image *image,
+  const MagickBooleanType status,size_t *length)
+{
+  void
+    *blob;
+
+  blob=DetachBlob(image->blob);
+  if (blob != (void *) NULL)
+    {
+      if (status == MagickFalse)
+        blob=RelinquishMagickMemory(blob);
+      else
+        blob=ResizeQuantumMemory(blob,*length+1,sizeof(unsigned char));
+    }
+  else
+    if ((status == MagickFalse) && (image->blob->extent == 0))
+      blob_info->blob=RelinquishMagickMemory(blob_info->blob);
+  return(blob);
+}
+
 MagickExport void *ImageToBlob(const ImageInfo *image_info,
   Image *image,size_t *length,ExceptionInfo *exception)
 {
@@ -2160,17 +2180,7 @@ MagickExport void *ImageToBlob(const ImageInfo *image_info,
           status=WriteImage(blob_info,image,exception);
           SyncBlobStream(blob_info,image,image);
           *length=image->blob->length;
-          blob=DetachBlob(image->blob);
-          if (blob != (void *) NULL)
-            {
-              if (status == MagickFalse)
-                blob=RelinquishMagickMemory(blob);
-              else
-                blob=ResizeQuantumMemory(blob,*length+1,sizeof(unsigned char));
-            }
-          else
-            if ((status == MagickFalse) && (image->blob->extent == 0))
-              blob_info->blob=RelinquishMagickMemory(blob_info->blob);
+          blob=DetachImageBlob(blob_info,image,status,length);
         }
     }
   else
@@ -2580,16 +2590,7 @@ MagickExport void *ImagesToBlob(const ImageInfo *image_info,Image *images,
           status=WriteImages(blob_info,images,images->filename,exception);
           SyncBlobStream(blob_info,images,images);
           *length=images->blob->length;
-          blob=DetachBlob(images->blob);
-          if (blob != (void *) NULL)
-            {
-              if (status == MagickFalse)
-                blob=RelinquishMagickMemory(blob);
-              else
-                blob=ResizeQuantumMemory(blob,*length+1,sizeof(unsigned char));
-            }
-          else if ((status == MagickFalse) && (images->blob->extent == 0))
-            blob_info->blob=RelinquishMagickMemory(blob_info->blob);
+          blob=DetachImageBlob(blob_info,images,status,length);
         }
     }
   else
