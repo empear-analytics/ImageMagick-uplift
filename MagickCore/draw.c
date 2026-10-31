@@ -5181,6 +5181,22 @@ static ssize_t GetWindingNumber(PolygonInfo *polygon_info,const ssize_t x,
   return(winding_number);
 }
 
+static double GetStrokeEdgeBeta(const double distance,const double mid,
+  double *stroke_alpha)
+{
+  double
+    alpha,
+    beta;
+
+  beta=1.0;
+  if (fabs(distance-1.0) >= MagickEpsilon)
+    beta=sqrt((double) distance);
+  alpha=beta-mid-0.5;
+  if (*stroke_alpha < ((alpha-0.25)*(alpha-0.25)))
+    *stroke_alpha=(alpha-0.25)*(alpha-0.25);
+  return(beta);
+}
+
 static double GetFillAlpha(PolygonInfo *polygon_info,
   const FillAlphaSample *sample,const FillRule fill_rule,double *stroke_alpha)
 {
@@ -5254,14 +5270,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
               if (distance <= ((alpha+0.25)*(alpha+0.25)))
                 *stroke_alpha=1.0;
               else
-                {
-                  beta=1.0;
-                  if (fabs(distance-1.0) >= MagickEpsilon)
-                    beta=sqrt((double) distance);
-                  alpha=beta-mid-0.5;
-                  if (*stroke_alpha < ((alpha-0.25)*(alpha-0.25)))
-                    *stroke_alpha=(alpha-0.25)*(alpha-0.25);
-                }
+                beta=GetStrokeEdgeBeta(distance,mid,stroke_alpha);
             }
         }
       if (IsFillAlphaSkipped(fill,distance,subpath_alpha) != MagickFalse)
