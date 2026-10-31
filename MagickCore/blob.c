@@ -3980,6 +3980,29 @@ static ssize_t ReadBlobFile(BlobInfo *magick_restrict blob_info,
   return(count);
 }
 
+#if defined(MAGICKCORE_ZLIB_DELEGATE)
+static ssize_t ReadBlobGzip(BlobInfo *magick_restrict blob_info,
+  const size_t length,unsigned char *q,ssize_t count)
+{
+  size_t
+    i;
+
+  for (i=0; i < length; i+=(size_t) count)
+  {
+    count=(ssize_t) gzread(blob_info->file_info.gzfile,q+i,
+      (unsigned int) MagickMin(length-i,MagickMaxBufferExtent));
+    if (count <= 0)
+      {
+        count=0;
+        if (errno != EINTR)
+          break;
+      }
+  }
+  count=(ssize_t) i;
+  return(count);
+}
+#endif
+
 MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
 {
   BlobInfo
@@ -4025,21 +4048,7 @@ MagickExport ssize_t ReadBlob(Image *image,const size_t length,void *data)
       {
         default:
         {
-          size_t
-            i;
-
-          for (i=0; i < length; i+=(size_t) count)
-          {
-            count=(ssize_t) gzread(blob_info->file_info.gzfile,q+i,
-              (unsigned int) MagickMin(length-i,MagickMaxBufferExtent));
-            if (count <= 0)
-              {
-                count=0;
-                if (errno != EINTR)
-                  break;
-              }
-          }
-          count=(ssize_t) i;
+          count=ReadBlobGzip(blob_info,length,q,count);
           break;
         }
         case 4:
