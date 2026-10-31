@@ -1843,6 +1843,29 @@ static MagickBooleanType InterpolateCubicChannels(
   return(status);
 }
 
+static MagickBooleanType InterpolateQuadChannels(
+  const ChannelsInterpolation *grid,void (*interpolate_channel)(
+  const ChannelsInterpolation *,const Quantum *magick_restrict,const ssize_t,
+  Quantum *),Quantum *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    i;
+
+  p=GetCacheViewVirtualPixels(grid->source_view,grid->x_offset,grid->y_offset,
+    2,2,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (i=0; i < (ssize_t) GetPixelChannels(grid->source); i++)
+    interpolate_channel(grid,p,i,pixel);
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannels(
   const Image *magick_restrict source,const CacheView_ *source_view,
   const Image *magick_restrict destination,const PixelInterpolateMethod method,
@@ -1936,14 +1959,8 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     }
     case BlendInterpolatePixel:
     {
-      p=GetCacheViewVirtualPixels(source_view,x_offset,y_offset,2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-        InterpolateBlendChannel(&grid,p,i,pixel);
+      status=InterpolateQuadChannels(&grid,InterpolateBlendChannel,pixel,
+        status);
       break;
     }
     case CatromInterpolatePixel:
@@ -1981,14 +1998,8 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     }
     case MeshInterpolatePixel:
     {
-      p=GetCacheViewVirtualPixels(source_view,x_offset,y_offset,2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-        InterpolateMeshChannel(&grid,p,i,pixel);
+      status=InterpolateQuadChannels(&grid,InterpolateMeshChannel,pixel,
+        status);
       break;
     }
     case SplineInterpolatePixel:
