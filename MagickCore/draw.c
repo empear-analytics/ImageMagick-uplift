@@ -2497,76 +2497,72 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
   extent=strlen(token)+MagickPathExtent;
   for (q=primitive; *q != '\0'; )
   {
+    char
+      name[MagickPathExtent];
+
+    const char
+      *end,
+      *p,
+      *start;
+
+    ssize_t
+      n;
+
     if (GetNextToken(q,&q,extent,token) < 1)
       break;
     if (*token == '\0')
       break;
-    if (LocaleCompare("push",token) == 0)
-      {
-        const char
-          *end,
-          *start;
-
-        (void) GetNextToken(q,&q,extent,token);
-        if (*q == '"')
-          {
-            char
-              name[MagickPathExtent];
-
-            const char
-              *p;
-
-            ssize_t
-              n;
-
-            /*
-              Named macro (e.g. push graphic-context "wheel").
-            */
-            (void) GetNextToken(q,&q,extent,token);
-            start=q;
-            end=q;
-            (void) CopyMagickString(name,token,MagickPathExtent);
-            n=1;
-            for (p=q; *p != '\0'; )
+    if (LocaleCompare("push",token) != 0)
+      continue;
+    (void) GetNextToken(q,&q,extent,token);
+    if (*q != '"')
+      continue;
+    /*
+      Named macro (e.g. push graphic-context "wheel").
+    */
+    (void) GetNextToken(q,&q,extent,token);
+    start=q;
+    end=q;
+    (void) CopyMagickString(name,token,MagickPathExtent);
+    n=1;
+    for (p=q; *p != '\0'; )
+    {
+      if (GetNextToken(p,&p,extent,token) < 1)
+        break;
+      if (*token == '\0')
+        break;
+      if (LocaleCompare(token,"pop") == 0)
+        {
+          end=p-strlen(token)-1;
+          n--;
+        }
+      if (LocaleCompare(token,"push") == 0)
+        {
+          if (n++ >= MagickMaxRecursionDepth)
             {
-              if (GetNextToken(p,&p,extent,token) < 1)
-                break;
-              if (*token == '\0')
-                break;
-              if (LocaleCompare(token,"pop") == 0)
-                {
-                  end=p-strlen(token)-1;
-                  n--;
-                }
-              if (LocaleCompare(token,"push") == 0)
-                {
-                  if (n++ >= MagickMaxRecursionDepth)
-                    {
-                      (void) ThrowMagickException(exception,GetMagickModule(),
-                        DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
-                      break;
-                    }
-                }
-              if ((n == 0) && (end >= start))
-                {
-                  size_t
-                    length=(size_t) (end-start);
-
-                  /*
-                    Extract macro.
-                  */
-                  (void) GetNextToken(p,&p,extent,token);
-                  if (length > 0)
-                    {
-                      (void) CopyMagickString(macro,start,length);
-                      (void) AddValueToSplayTree(macros,ConstantString(name),
-                        ConstantString(macro));
-                    }
-                  break;
-                }
+              (void) ThrowMagickException(exception,GetMagickModule(),
+                DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
+              break;
             }
-          }
-      }
+        }
+      if ((n == 0) && (end >= start))
+        {
+          size_t
+            length=(size_t) (end-start);
+
+          /*
+            Extract macro.
+          */
+          (void) GetNextToken(p,&p,extent,token);
+          if (length > 0)
+            {
+              (void) CopyMagickString(macro,start,length);
+              (void) AddValueToSplayTree(macros,ConstantString(name),
+                ConstantString(macro));
+            }
+          break;
+        }
+    }
   }
   token=DestroyString(token);
   macro=DestroyString(macro);
