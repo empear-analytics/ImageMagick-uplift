@@ -1776,6 +1776,37 @@ static void PrintRGBFeatures(FILE *file,const Image *image,
       channel_features);
 }
 
+static void PrintImageChannelFeatures(FILE *file,const Image *image,
+  const ColorspaceType colorspace,ChannelFeatures *channel_features)
+{
+  (void) FormatLocaleFile(file,"  Channel features (horizontal, vertical, "
+    "left and right diagonals, average):\n");
+  switch (colorspace)
+  {
+    case RGBColorspace:
+    case sRGBColorspace:
+    {
+      PrintRGBFeatures(file,image,channel_features);
+      break;
+    }
+    case CMYKColorspace:
+    {
+      PrintCMYKFeatures(file,image,channel_features);
+      break;
+    }
+    default:
+    {
+      PrintGrayOrChannelsFeatures(file,image,colorspace,channel_features);
+      break;
+    }
+  }
+  if (image->alpha_trait != UndefinedPixelTrait)
+    (void) PrintChannelFeatures(file,AlphaPixelChannel,"Alpha",
+      channel_features);
+  channel_features=(ChannelFeatures *) RelinquishMagickMemory(
+    channel_features);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1956,32 +1987,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     }
   if (channel_features != (ChannelFeatures *) NULL)
     {
-      (void) FormatLocaleFile(file,"  Channel features (horizontal, vertical, "
-        "left and right diagonals, average):\n");
-      switch (colorspace)
-      {
-        case RGBColorspace:
-        case sRGBColorspace:
-        {
-          PrintRGBFeatures(file,image,channel_features);
-          break;
-        }
-        case CMYKColorspace:
-        {
-          PrintCMYKFeatures(file,image,channel_features);
-          break;
-        }
-        default:
-        {
-          PrintGrayOrChannelsFeatures(file,image,colorspace,channel_features);
-          break;
-        }
-      }
-      if (image->alpha_trait != UndefinedPixelTrait)
-        (void) PrintChannelFeatures(file,AlphaPixelChannel,"Alpha",
-          channel_features);
-      channel_features=(ChannelFeatures *) RelinquishMagickMemory(
-        channel_features);
+      PrintImageChannelFeatures(file,image,colorspace,channel_features);
     }
   if (ping == MagickFalse)
     {
