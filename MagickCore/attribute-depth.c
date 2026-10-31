@@ -281,6 +281,13 @@ static MagickBooleanType RaiseImageRowDepth(const DepthScan *scan)
   return(status);
 }
 
+static inline MagickBooleanType IsOpaqueColormapImage(const Image *image)
+{
+  return(((image->storage_class == PseudoClass) &&
+    ((image->alpha_trait & BlendPixelTrait) == 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -315,8 +322,7 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
   status=MagickTrue;
   for (i=0; i < (ssize_t) number_threads; i++)
     current_depth[i]=1;
-  if ((image->storage_class == PseudoClass) &&
-      ((image->alpha_trait & BlendPixelTrait) == 0))
+  if (IsOpaqueColormapImage(image) != MagickFalse)
     {
       return(GetColormapDepth(image,current_depth,number_threads));
     }
