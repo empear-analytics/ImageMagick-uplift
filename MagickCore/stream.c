@@ -2300,6 +2300,26 @@ static void StreamFloatBGRPPixels(const Image *image,
   }
 }
 
+static void StreamFloatIPixels(const Image *image,
+  const QuantumInfo *quantum_info,float *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=(float) ((QuantumScale*(double) GetPixelIntensity(image,p))*
+      quantum_info->scale+quantum_info->minimum);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2693,15 +2713,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         }
       if (LocaleCompare(stream_info->map,"I") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=(float) ((QuantumScale*(double) GetPixelIntensity(image,p))*
-              quantum_info->scale+quantum_info->minimum);
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamFloatIPixels(image,quantum_info,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"RGB") == 0)
