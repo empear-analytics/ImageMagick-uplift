@@ -1540,6 +1540,22 @@ static MagickBooleanType FinaliseDisposeChoice(const DisposeChoice *choice,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireTransparentFrame(const Image *curr,
+  Image **prev_image,ExceptionInfo *exception)
+{
+  *prev_image=CloneImage(curr,curr->columns,curr->rows,MagickTrue,exception);
+  if (*prev_image == (Image *) NULL)
+    return(MagickFalse);
+  (*prev_image)->page=curr->page;  /* ERROR: <-- should not be need, but is! */
+  (*prev_image)->page.x=0;
+  (*prev_image)->page.y=0;
+  (*prev_image)->dispose=NoneDispose;
+  (*prev_image)->background_color.alpha_trait=BlendPixelTrait;
+  (*prev_image)->background_color.alpha=(MagickRealType) TransparentAlpha;
+  (void) SetImageBackgroundColor(*prev_image,exception);
+  return(MagickTrue);
+}
+
 static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -1625,20 +1641,12 @@ static Image *OptimizeLayerFrames(const Image *image,const LayerMethod method,
   /*
     Initialise Previous Image as fully transparent
   */
-  prev_image=CloneImage(curr,curr->columns,curr->rows,MagickTrue,exception);
-  if (prev_image == (Image *) NULL)
+  if (AcquireTransparentFrame(curr,&prev_image,exception) == MagickFalse)
     {
       bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
       disposals=(DisposeType *) RelinquishMagickMemory(disposals);
       return((Image *) NULL);
     }
-  prev_image->page=curr->page;  /* ERROR: <-- should not be need, but is! */
-  prev_image->page.x=0;
-  prev_image->page.y=0;
-  prev_image->dispose=NoneDispose;
-  prev_image->background_color.alpha_trait=BlendPixelTrait;
-  prev_image->background_color.alpha=(MagickRealType) TransparentAlpha;
-  (void) SetImageBackgroundColor(prev_image,exception);
   /*
     Figure out the area of overlay of the first frame
     No pixel could be cleared as all pixels are already cleared.
