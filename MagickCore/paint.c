@@ -1469,6 +1469,16 @@ static void TransparentPaintRowPixels(const TransparentPaintRow *row,
   }
 }
 
+static MagickBooleanType PrepareTransparentImage(Image *image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+    return(MagickFalse);
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType TransparentPaintImage(Image *image,
   const PixelInfo *target,const Quantum opacity,const MagickBooleanType invert,
   ExceptionInfo *exception)
@@ -1495,10 +1505,8 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
   assert(target != (PixelInfo *) NULL);
   if (IsEventLogging() != MagickFalse) 
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
+  if (PrepareTransparentImage(image,exception) == MagickFalse)
     return(MagickFalse);
-  if ((image->alpha_trait & BlendPixelTrait) == 0)
-    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
   /*
     Make image color transparent.
   */
