@@ -1265,6 +1265,55 @@ static void NormalizeLineEndings(char *xml)
     }
 }
 
+static void DecodeEntityReference(char **entities,char *q,char **p,
+  char **xml)
+{
+  char
+    *entity;
+
+  size_t
+    extent,
+    length;
+
+  ssize_t
+    i,
+    offset;
+
+  /*
+    Find entity in the list.
+  */
+  i=0;
+  while ((entities[i] != (char *) NULL) &&
+         (strncmp(*xml+1,entities[i],strlen(entities[i])) != 0))
+    i+=2;
+  if (entities[i++] == (char *) NULL)
+    (*xml)++;
+  else
+    if (entities[i] != (char *) NULL)
+      {
+        /*
+          Found a match.
+        */
+        length=strlen(entities[i]);
+        entity=strchr(*xml,';');
+        if ((entity != (char *) NULL) &&
+            ((length-1L) >= (size_t) (entity-*xml)))
+          {
+            offset=(ssize_t) (*xml-*p);
+            extent=((size_t) offset+length+strlen(entity));
+            *p=ResizeEntityBuffer(*p,q,extent);
+            if (*p == (char *) NULL)
+              ThrowFatalException(ResourceLimitFatalError,
+                "MemoryAllocationFailed");
+            *xml=*p+offset;
+            entity=strchr(*xml,';');
+          }
+        if (entity != (char *) NULL)
+          (void) memmove(*xml+length,entity+1,strlen(entity));
+        (void) memcpy(*xml,entities[i],length);
+      }
+}
+
 static char *ParseEntities(char *xml,char **entities,int state)
 {
   char
@@ -1274,14 +1323,6 @@ static char *ParseEntities(char *xml,char **entities,int state)
 
   int
     c;
-
-  size_t
-    extent,
-    length;
-
-  ssize_t
-    i,
-    offset;
 
   /*
     Normalize line endings.
@@ -1333,41 +1374,7 @@ static char *ParseEntities(char *xml,char **entities,int state)
       }
     else
       if (IsEntityReference(xml,state) != MagickFalse)
-        {
-          /*
-            Find entity in the list.
-          */
-          i=0;
-          while ((entities[i] != (char *) NULL) &&
-                 (strncmp(xml+1,entities[i],strlen(entities[i])) != 0))
-            i+=2;
-          if (entities[i++] == (char *) NULL)
-            xml++;
-          else
-            if (entities[i] != (char *) NULL)
-              {
-                /*
-                  Found a match.
-                */
-                length=strlen(entities[i]);
-                entity=strchr(xml,';');
-                if ((entity != (char *) NULL) &&
-                    ((length-1L) >= (size_t) (entity-xml)))
-                  {
-                    offset=(ssize_t) (xml-p);
-                    extent=((size_t) offset+length+strlen(entity));
-                    p=ResizeEntityBuffer(p,q,extent);
-                    if (p == (char *) NULL)
-                      ThrowFatalException(ResourceLimitFatalError,
-                        "MemoryAllocationFailed");
-                    xml=p+offset;
-                    entity=strchr(xml,';');
-                  }
-                if (entity != (char *) NULL)
-                  (void) memmove(xml+length,entity+1,strlen(entity));
-                (void) memcpy(xml,entities[i],length);
-              }
-        }
+        DecodeEntityReference(entities,q,&p,&xml);
       else
         if (IsCollapsibleSpace(xml,state) != MagickFalse)
           *(xml++)=' ';
