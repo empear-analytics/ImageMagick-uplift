@@ -2128,6 +2128,61 @@ static MagickBooleanType InterpolateCubicPixelInfo(
   return(status);
 }
 
+static MagickBooleanType InterpolateBilinearPixelInfo(
+  const PixelInfoInterpolation *grid,PixelInfo *pixels,PixelInfo *pixel,
+  MagickBooleanType status)
+{
+  const Quantum
+    *p;
+
+  double
+    alpha[16],
+    gamma;
+
+  ssize_t
+    i;
+
+  PointInfo
+    delta,
+    epsilon;
+
+  p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
+    2,2,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (i=0; i < 4L; i++)
+    AlphaBlendPixelInfo(grid->image,p+i*(ssize_t) GetPixelChannels(grid->image),
+      pixels+i,alpha+i);
+  delta.x=grid->x-grid->x_offset;
+  delta.y=grid->y-grid->y_offset;
+  epsilon.x=1.0-delta.x;
+  epsilon.y=1.0-delta.y;
+  gamma=((epsilon.y*(epsilon.x*alpha[0]+delta.x*alpha[1])+delta.y*
+    (epsilon.x*alpha[2]+delta.x*alpha[3])));
+  gamma=MagickSafeReciprocal(gamma);
+  pixel->red=gamma*(epsilon.y*(epsilon.x*pixels[0].red+delta.x*
+    pixels[1].red)+delta.y*(epsilon.x*pixels[2].red+delta.x*pixels[3].red));
+  pixel->green=gamma*(epsilon.y*(epsilon.x*pixels[0].green+delta.x*
+    pixels[1].green)+delta.y*(epsilon.x*pixels[2].green+delta.x*
+    pixels[3].green));
+  pixel->blue=gamma*(epsilon.y*(epsilon.x*pixels[0].blue+delta.x*
+    pixels[1].blue)+delta.y*(epsilon.x*pixels[2].blue+delta.x*
+    pixels[3].blue));
+  if (grid->image->colorspace == CMYKColorspace)
+    pixel->black=gamma*(epsilon.y*(epsilon.x*pixels[0].black+delta.x*
+      pixels[1].black)+delta.y*(epsilon.x*pixels[2].black+delta.x*
+      pixels[3].black));
+  gamma=((epsilon.y*(epsilon.x+delta.x)+delta.y*(epsilon.x+delta.x)));
+  gamma=MagickSafeReciprocal(gamma);
+  pixel->alpha=gamma*(epsilon.y*(epsilon.x*pixels[0].alpha+delta.x*
+    pixels[1].alpha)+delta.y*(epsilon.x*pixels[2].alpha+delta.x*
+    pixels[3].alpha));
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
   const CacheView_ *image_view,const PixelInterpolateMethod method,
   const double x,const double y,PixelInfo *pixel,ExceptionInfo *exception)
@@ -2237,43 +2292,7 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
     case BilinearInterpolatePixel:
     default:
     {
-      PointInfo
-        delta,
-        epsilon;
-
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,2,2,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < 4L; i++)
-        AlphaBlendPixelInfo(image,p+i*(ssize_t) GetPixelChannels(image),
-          pixels+i,alpha+i);
-      delta.x=x-x_offset;
-      delta.y=y-y_offset;
-      epsilon.x=1.0-delta.x;
-      epsilon.y=1.0-delta.y;
-      gamma=((epsilon.y*(epsilon.x*alpha[0]+delta.x*alpha[1])+delta.y*
-        (epsilon.x*alpha[2]+delta.x*alpha[3])));
-      gamma=MagickSafeReciprocal(gamma);
-      pixel->red=gamma*(epsilon.y*(epsilon.x*pixels[0].red+delta.x*
-        pixels[1].red)+delta.y*(epsilon.x*pixels[2].red+delta.x*pixels[3].red));
-      pixel->green=gamma*(epsilon.y*(epsilon.x*pixels[0].green+delta.x*
-        pixels[1].green)+delta.y*(epsilon.x*pixels[2].green+delta.x*
-        pixels[3].green));
-      pixel->blue=gamma*(epsilon.y*(epsilon.x*pixels[0].blue+delta.x*
-        pixels[1].blue)+delta.y*(epsilon.x*pixels[2].blue+delta.x*
-        pixels[3].blue));
-      if (image->colorspace == CMYKColorspace)
-        pixel->black=gamma*(epsilon.y*(epsilon.x*pixels[0].black+delta.x*
-          pixels[1].black)+delta.y*(epsilon.x*pixels[2].black+delta.x*
-          pixels[3].black));
-      gamma=((epsilon.y*(epsilon.x+delta.x)+delta.y*(epsilon.x+delta.x)));
-      gamma=MagickSafeReciprocal(gamma);
-      pixel->alpha=gamma*(epsilon.y*(epsilon.x*pixels[0].alpha+delta.x*
-        pixels[1].alpha)+delta.y*(epsilon.x*pixels[2].alpha+delta.x*
-        pixels[3].alpha));
+      status=InterpolateBilinearPixelInfo(&grid,pixels,pixel,status);
       break;
     }
     case BlendInterpolatePixel:
