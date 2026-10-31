@@ -1927,6 +1927,26 @@ static void PrintImageStorageDetails(FILE *file,Image *image,
     PrintConvexHullAndBoundingBox(file,image,exception);
 }
 
+static void PrintImageSizes(FILE *file,const Image *image)
+{
+  char
+    buffer[MagickPathExtent];
+
+  (void) FormatLocaleFile(file,"  Tainted: %s\n",CommandOptionToMnemonic(
+    MagickBooleanOptions,(ssize_t) image->taint));
+  (void) FormatMagickSize(image->extent,MagickTrue,"B",MagickPathExtent,buffer);
+  (void) FormatLocaleFile(file,"  Filesize: %s\n",buffer);
+  (void) FormatMagickSize((MagickSizeType) image->columns*image->rows,
+    MagickFalse,"P",MagickPathExtent,buffer);
+  if (strlen(buffer) > 1)
+    buffer[strlen(buffer)-1]='\0';
+  (void) FormatLocaleFile(file,"  Number pixels: %s\n",buffer);
+  (void) FormatLocaleString(buffer,MagickPathExtent,"%s",
+    CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
+    GetImagePixelCacheType(image)));
+  (void) FormatLocaleFile(file,"  Pixel cache type: %s\n",buffer);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2119,19 +2139,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   PrintImageProperties(file,image,exception);
   PrintImageArtifacts(file,image);
   PrintImageRegistry(file,exception);
-  (void) FormatLocaleFile(file,"  Tainted: %s\n",CommandOptionToMnemonic(
-    MagickBooleanOptions,(ssize_t) image->taint));
-  (void) FormatMagickSize(image->extent,MagickTrue,"B",MagickPathExtent,buffer);
-  (void) FormatLocaleFile(file,"  Filesize: %s\n",buffer);
-  (void) FormatMagickSize((MagickSizeType) image->columns*image->rows,
-    MagickFalse,"P",MagickPathExtent,buffer);
-  if (strlen(buffer) > 1)
-    buffer[strlen(buffer)-1]='\0';
-  (void) FormatLocaleFile(file,"  Number pixels: %s\n",buffer);
-  (void) FormatLocaleString(buffer,MagickPathExtent,"%s",
-    CommandOptionToMnemonic(MagickCacheOptions,(ssize_t)
-    GetImagePixelCacheType(image)));
-  (void) FormatLocaleFile(file,"  Pixel cache type: %s\n",buffer);
+  PrintImageSizes(file,image);
   if (elapsed_time > MagickEpsilon)
     {
       (void) FormatMagickSize((MagickSizeType) ((double) image->columns*
