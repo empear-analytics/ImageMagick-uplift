@@ -5197,6 +5197,30 @@ static double GetStrokeEdgeBeta(const double distance,const double mid,
   return(beta);
 }
 
+static double GetStrokeBeta(const EdgeInfo *p,const double distance,
+  const double mid,double *stroke_alpha)
+{
+  double
+    alpha,
+    beta;
+
+  beta=0.0;
+  if (p->ghostline == MagickFalse)
+    {
+      alpha=mid+0.5;
+      if ((*stroke_alpha < 1.0) &&
+          (distance <= ((alpha+0.25)*(alpha+0.25))))
+        {
+          alpha=mid-0.5;
+          if (distance <= ((alpha+0.25)*(alpha+0.25)))
+            *stroke_alpha=1.0;
+          else
+            beta=GetStrokeEdgeBeta(distance,mid,stroke_alpha);
+        }
+    }
+  return(beta);
+}
+
 static double GetFillAlpha(PolygonInfo *polygon_info,
   const FillAlphaSample *sample,const FillRule fill_rule,double *stroke_alpha)
 {
@@ -5259,20 +5283,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
       /*
         Compute stroke & subpath opacity.
       */
-      beta=0.0;
-      if (p->ghostline == MagickFalse)
-        {
-          alpha=mid+0.5;
-          if ((*stroke_alpha < 1.0) &&
-              (distance <= ((alpha+0.25)*(alpha+0.25))))
-            {
-              alpha=mid-0.5;
-              if (distance <= ((alpha+0.25)*(alpha+0.25)))
-                *stroke_alpha=1.0;
-              else
-                beta=GetStrokeEdgeBeta(distance,mid,stroke_alpha);
-            }
-        }
+      beta=GetStrokeBeta(p,distance,mid,stroke_alpha);
       if (IsFillAlphaSkipped(fill,distance,subpath_alpha) != MagickFalse)
         continue;
       if (distance <= 0.0)
