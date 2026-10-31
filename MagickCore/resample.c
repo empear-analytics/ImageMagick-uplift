@@ -577,6 +577,27 @@ static void CountTileHits(const ResampleFilter *resample_filter,
   }
 }
 
+static void CountEdgeHits(const ResampleFilter *resample_filter,
+  const double u0,const double v0,ssize_t *hit)
+{
+  switch ( resample_filter->virtual_pixel ) {
+    case UndefinedVirtualPixelMethod:
+    case EdgeVirtualPixelMethod:
+      if (IsAreaOutsideCorner(resample_filter,u0,v0) != MagickFalse)
+        (*hit)++;
+      break;
+    case HorizontalTileVirtualPixelMethod:
+      if (IsAreaOutsideRows(resample_filter,v0) != MagickFalse)
+        (*hit)++;  /* outside the horizontally tiled images. */
+      break;
+    default:
+    {
+      CountTileHits(resample_filter,u0,v0,hit);
+      break;
+    }
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -660,18 +681,9 @@ MagickExport MagickBooleanType ResamplePixelColor(
         hit++;
       break;
 
-    case UndefinedVirtualPixelMethod:
-    case EdgeVirtualPixelMethod:
-      if (IsAreaOutsideCorner(resample_filter,u0,v0) != MagickFalse)
-        hit++;
-      break;
-    case HorizontalTileVirtualPixelMethod:
-      if (IsAreaOutsideRows(resample_filter,v0) != MagickFalse)
-        hit++;  /* outside the horizontally tiled images. */
-      break;
     default:
     {
-      CountTileHits(resample_filter,u0,v0,&hit);
+      CountEdgeHits(resample_filter,u0,v0,&hit);
       break;
     }
     case TileVirtualPixelMethod:
