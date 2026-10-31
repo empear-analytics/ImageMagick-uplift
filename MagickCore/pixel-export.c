@@ -1219,6 +1219,55 @@ static void ExportFloatQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
+typedef struct _ExportFloatRowInfo
+{
+  const Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const QuantumType
+    *quantum_map;
+
+  size_t
+    length;
+} ExportFloatRowInfo;
+
+static float *ExportFloatMapRow(const ExportFloatRowInfo *row,
+  const Quantum *magick_restrict p,float *magick_restrict q)
+{
+  const Image
+    *image = row->image;
+
+  const RectangleInfo
+    *roi = row->roi;
+
+  const QuantumType
+    *quantum_map = row->quantum_map;
+
+  const size_t
+    length = row->length;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) roi->width; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) length; i++)
+    {
+      *q=0;
+      ExportFloatQuantum(image,quantum_map[i],p,q);
+      q++;
+    }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
 static MagickBooleanType ExportFloatPixel(const Image *image,
   const RectangleInfo *roi,const ExportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -1237,9 +1286,6 @@ static MagickBooleanType ExportFloatPixel(const Image *image,
 
   float
     *magick_restrict q;
-
-  ssize_t
-    x;
 
   size_t
     length;
@@ -1265,22 +1311,17 @@ static MagickBooleanType ExportFloatPixel(const Image *image,
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
+    ExportFloatRowInfo
+      row;
+
     p=GetVirtualPixels(image,roi->x,roi->y+y,roi->width,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) roi->width; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) length; i++)
-      {
-        *q=0;
-        ExportFloatQuantum(image,quantum_map[i],p,q);
-        q++;
-      }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    q=ExportFloatMapRow(&row,p,q);
   }
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
