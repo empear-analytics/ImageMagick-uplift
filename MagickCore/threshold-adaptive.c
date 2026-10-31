@@ -97,6 +97,28 @@
 #include "MagickCore/xml-tree-private.h"
 
 /*
+  Typedef declarations.
+*/
+typedef struct _AdaptiveThresholdPixelInfo
+{
+  const Image
+    *image,
+    *threshold_image;
+
+  size_t
+    width,
+    height;
+
+  MagickSizeType
+    number_pixels;
+
+  double
+    bias,
+    *channel_bias,
+    *channel_sum;
+} AdaptiveThresholdPixelInfo;
+
+/*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
 %                                                                             %
@@ -157,12 +179,29 @@ static void SumThresholdWindow(const Image *image,
   }
 }
 
-static void AdaptiveThresholdPixel(const Image *image,
-  const Image *threshold_image,const Quantum *magick_restrict p,
-  Quantum *magick_restrict q,const ssize_t center,const size_t width,
-  const size_t height,const MagickSizeType number_pixels,const double bias,
-  double *channel_bias,double *channel_sum)
+static void AdaptiveThresholdPixel(
+  const AdaptiveThresholdPixelInfo *pixel_info,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q,
+  const ssize_t center)
 {
+  const Image
+    *const image = pixel_info->image,
+    *const threshold_image = pixel_info->threshold_image;
+
+  const size_t
+    width = pixel_info->width,
+    height = pixel_info->height;
+
+  const MagickSizeType
+    number_pixels = pixel_info->number_pixels;
+
+  const double
+    bias = pixel_info->bias;
+
+  double
+    *const channel_bias = pixel_info->channel_bias,
+    *const channel_sum = pixel_info->channel_sum;
+
   const Quantum
     *magick_restrict pixels;
 
@@ -245,6 +284,10 @@ static void AdaptiveThresholdRow(const AdaptiveThresholdInfo *info,
     channel_bias[MaxPixelChannels],
     channel_sum[MaxPixelChannels];
 
+  const AdaptiveThresholdPixelInfo
+    pixel_info = { image, threshold_image, width, height, number_pixels,
+      bias, channel_bias, channel_sum };
+
   ssize_t
     center,
     i,
@@ -272,8 +315,7 @@ static void AdaptiveThresholdRow(const AdaptiveThresholdInfo *info,
   }
   for (x=0; x < (ssize_t) image->columns; x++)
   {
-    AdaptiveThresholdPixel(image,threshold_image,p,q,center,width,height,
-      number_pixels,bias,channel_bias,channel_sum);
+    AdaptiveThresholdPixel(&pixel_info,p,q,center);
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(threshold_image);
   }
