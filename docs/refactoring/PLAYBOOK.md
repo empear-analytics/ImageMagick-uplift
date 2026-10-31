@@ -2892,7 +2892,9 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    variable, or an expression of variables with no call, assignment or increment, that
    no statement inside the `switch` writes. Every *group* (a run of labels and the body
    after them) ends with a `break;` of this `switch` and contains no other `break` of
-   it, no `continue`, `return` or `goto`: no group falls through into another.
+   it, no `continue`, `return` or `goto`: no group falls through into another. The
+   last group of the `switch` may instead end at its closing brace, without `break;`,
+   when it moves and stays the last group of the new `switch` (`default: *q=0;`).
 2. Choose the groups that move: the group carrying `default:`, and others beside it.
    Together their bodies meet Recipe O steps 1 to 3 (OpenMP, written variables, exits),
    as one selection does.
@@ -3005,7 +3007,10 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   would reach it instead of their own groups. A shared run of labels
   (`case ConjugateComplexOperator: default:`) moves whole.
 - Fall-through would break the argument: a group that runs into the next one would,
-  after the split, run into a different group or into none. Step 1 refuses it.
+  after the split, run into a different group or into none. Step 1 refuses it. A last
+  group without `break;` runs off the end of its `switch`, which is where a `break;`
+  would have taken it; kept last in the new `switch`, it runs off that one's end, the
+  function returns, and the outer `default`'s `break;` ends the outer `switch`.
 - Both `switch` statements have a `default`, so `-Wswitch` warns about neither; the
   controlling expression's type and promotions are those of the same text.
 - The order of groups within each `switch` is the original order; C selects by label,
@@ -3975,3 +3980,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | T | Step 2: with the other name, the body may also read `v` after the block in the same iteration (the test that ends an inner loop the block sits in); *Careful* gives the argument: the caller's `v=c;` lands as the call returns, before that read | `image.c`'s `IsHighDynamicRangeImage` (campaign B, task M116): its channel loop sets `hdri=MagickTrue;` and breaks, then the column loop breaks on `hdri`, which step 2 refused; it holds the file's only *Deep, Nested Complexity*, 2.77 to 2.90 in a probe | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | OC | Step 1: a block that is the tail of `Lp`'s body counts as followed by `continue;` (the end of the body is where `continue;` jumps); the call is then the body's last statement. *Careful* gives the argument | `image.c`'s `AppendImages` (campaign B, task M116): its scan loop ends in the stacked/side-by-side extent update, which `continue`s on one branch and falls off the end on the other, writing `width` and `height`; O refuses its `continue`, E step 7's tail form its two outputs | mandate (2026-10-24) |
 | 2026-10-31 | NEW | VC | Extract Loop-Tail Block Returning Success for a Cleanup Exit: a block at the tail of a loop body (or followed by its `continue;`) whose exits are `continue;` of that loop and one cleanup return of the function in a form Recipe V step 6 or 7 or Recipe I step 8 admits moves to a `static MagickBooleanType` function: each `continue;` becomes `return(MagickTrue);`, each exit `return(MagickFalse);`, the caller keeps the exit's text | `xml-tree.c`'s `ParseInternalDoctype` (campaign B, task M116): its `<!ATTLIST` branch and the attribute loop's body mix `continue;` with `predefined_entities=...RelinquishMagickMemory(...); return(MagickFalse);`, which V, Y, I and W (no `continue`) and OC (no `return`) refuse; they hold the function's nesting of 5; a probe: 4.05 to 4.21 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | SD | Step 1: the `switch`'s last group may end at its closing brace instead of `break;`, when it moves and stays last in the new `switch`; *Careful* gives the argument | `stream.c`'s `StreamLongLongQuantum`, `StreamQuantumQuantum`, `StreamDoubleQuantum` and `StreamFloatQuantum` (campaign B, task M117): channel `switch`es of cc 13 whose `default: *q=0;` (or `*q=(Quantum) 0;`) has no `break;`; their three siblings without that quirk went from 4.63 to 5.10 by SD | mandate (2026-10-24) |
