@@ -1900,6 +1900,26 @@ static void SortObjects(const Image *image,const Image *component_image,
     CCObjectInfoCompare);
 }
 
+static MagickBooleanType ComputeObjectStatistics(Image *component_image,
+  CCObjectInfo *object,MagickBooleanType status,ExceptionInfo *exception)
+{
+  CacheView
+    *component_view;
+
+  CCObjectStatistics
+    object_statistics;
+
+  ResetObjectStatistics(component_image,object);
+  component_view=AcquireVirtualCacheView(component_image,exception);
+  object_statistics.component_image=component_image;
+  object_statistics.component_view=component_view;
+  object_statistics.exception=exception;
+  status=AccumulateObjectStatistics(object,&object_statistics,status);
+  NormalizeObjectStatistics(component_image,object);
+  component_view=DestroyCacheView(component_view);
+  return(status);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2442,20 +2462,10 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   if ((IsStringTrue(artifact) != MagickFalse) ||
       (objects != (CCObjectInfo **) NULL))
     {
-      CCObjectStatistics
-        object_statistics;
-
       /*
         Report statistics on each unique object.
       */
-      ResetObjectStatistics(component_image,object);
-      component_view=AcquireVirtualCacheView(component_image,exception);
-      object_statistics.component_image=component_image;
-      object_statistics.component_view=component_view;
-      object_statistics.exception=exception;
-      status=AccumulateObjectStatistics(object,&object_statistics,status);
-      NormalizeObjectStatistics(component_image,object);
-      component_view=DestroyCacheView(component_view);
+      status=ComputeObjectStatistics(component_image,object,status,exception);
       SortObjects(image,component_image,object);
       if (objects == (CCObjectInfo **) NULL)
         {
