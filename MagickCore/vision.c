@@ -1920,6 +1920,19 @@ static MagickBooleanType ComputeObjectStatistics(Image *component_image,
   return(status);
 }
 
+static CCThresholdRange GetThresholdRange(const char *artifact,
+  double *min_threshold,double *max_threshold,const ssize_t background_id)
+{
+  CCThresholdRange
+    range;
+
+  (void) MagickSscanf(artifact,"%lf%*[ -]%lf",min_threshold,max_threshold);
+  range.min_threshold=(*min_threshold);
+  range.max_threshold=(*max_threshold);
+  range.background_id=background_id;
+  return(range);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2147,10 +2160,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Merge any object not within the min and max area threshold.
       */
-      (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
-      range.min_threshold=min_threshold;
-      range.max_threshold=max_threshold;
-      range.background_id=background_id;
+      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
+        background_id);
       AreaThreshold(component_image,object,range);
     }
   artifact=GetImageArtifact(image,"connected-components:keep-colors");
@@ -2247,10 +2258,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Merge any object not within the min and max perimeter threshold.
       */
-      (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
-      range.min_threshold=min_threshold;
-      range.max_threshold=max_threshold;
-      range.background_id=background_id;
+      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
+        background_id);
       metrics[++n]="perimeter";
       PerimeterThreshold(component_image,object,n,exception);
       MergeObjectsOutsideRange(object,component_image->colors,n,&range);
@@ -2263,10 +2272,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Merge any object not within the min and max circularity threshold.
       */
-      (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
-      range.min_threshold=min_threshold;
-      range.max_threshold=max_threshold;
-      range.background_id=background_id;
+      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
+        background_id);
       metrics[++n]="circularity";
       CircularityThreshold(component_image,object,n,exception);
       MergeObjectsOutsideRange(object,component_image->colors,n,&range);
@@ -2279,10 +2286,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Merge any object not within the min and max diameter threshold.
       */
-      (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
-      range.min_threshold=min_threshold;
-      range.max_threshold=max_threshold;
-      range.background_id=background_id;
+      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
+        background_id);
       metrics[++n]="diameter";
       DiameterThreshold(component_image,object,n,range);
     }
@@ -2294,10 +2299,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Merge any object not within the min and max ellipse major threshold.
       */
-      (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
-      range.min_threshold=min_threshold;
-      range.max_threshold=max_threshold;
-      range.background_id=background_id;
+      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
+        background_id);
       metrics[++n]="major-axis";
       MajorAxisThreshold(component_image,object,n,exception);
       MergeObjectsOutsideRange(object,component_image->colors,n,&range);
@@ -2310,10 +2313,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Merge any object not within the min and max ellipse minor threshold.
       */
-      (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
-      range.min_threshold=min_threshold;
-      range.max_threshold=max_threshold;
-      range.background_id=background_id;
+      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
+        background_id);
       metrics[++n]="minor-axis";
       MinorAxisThreshold(component_image,object,n,exception);
       MergeObjectsOutsideRange(object,component_image->colors,n,&range);
@@ -2326,10 +2327,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Merge any object not within the min and max eccentricity threshold.
       */
-      (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
-      range.min_threshold=min_threshold;
-      range.max_threshold=max_threshold;
-      range.background_id=background_id;
+      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
+        background_id);
       metrics[++n]="eccentricity";
       EccentricityThreshold(component_image,object,n,exception);
       MergeObjectsOutsideRange(object,component_image->colors,n,&range);
@@ -2342,10 +2341,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       /*
         Merge any object not within the min and max ellipse angle threshold.
       */
-      (void) MagickSscanf(artifact,"%lf%*[ -]%lf",&min_threshold,&max_threshold);
-      range.min_threshold=min_threshold;
-      range.max_threshold=max_threshold;
-      range.background_id=background_id;
+      range=GetThresholdRange(artifact,&min_threshold,&max_threshold,
+        background_id);
       metrics[++n]="angle";
       AngleThreshold(component_image,object,n,exception);
       MergeObjectsOutsideRange(object,component_image->colors,n,&range);
