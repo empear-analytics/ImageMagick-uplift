@@ -3312,12 +3312,12 @@ static void SetStereoRowPixels(const StereoPixels *stereo_pixels,
   }
 }
 
+#define StereoImageTag  "Stereo/Image"
+
 MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   const Image *right_image,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
 {
-#define StereoImageTag  "Stereo/Image"
-
   const Image
     *image;
 
