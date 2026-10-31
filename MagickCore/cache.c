@@ -612,6 +612,26 @@ MagickPrivate void ClonePixelCacheMethods(Cache clone,const Cache cache)
 %
 */
 
+static MagickBooleanType WritePixelCacheCloneBuffer(
+  CacheInfo *magick_restrict clone_info,unsigned char *buffer,
+  const ssize_t count,MagickSizeType *extent)
+{
+  ssize_t
+    number_bytes,
+    offset = 0;
+
+  while (offset < count)
+  {
+    number_bytes=MagickWrite(clone_info->file,buffer+offset,(size_t) (count-
+      offset));
+    if (number_bytes <= 0)
+      return(MagickFalse);
+    offset+=number_bytes;
+  }
+  *extent+=(MagickSizeType) offset;
+  return(MagickTrue);
+}
+
 static MagickBooleanType ClonePixelCacheOnDisk(
   CacheInfo *magick_restrict cache_info,CacheInfo *magick_restrict clone_info)
 {
@@ -678,24 +698,12 @@ static MagickBooleanType ClonePixelCacheOnDisk(
         buffer=(unsigned char *) RelinquishMagickMemory(buffer);
         return(MagickFalse);
       }
-    {
-      ssize_t
-        number_bytes,
-        offset = 0;
-
-      while (offset < count)
+    if (WritePixelCacheCloneBuffer(clone_info,buffer,count,&extent) ==
+        MagickFalse)
       {
-        number_bytes=MagickWrite(clone_info->file,buffer+offset,(size_t) (count-
-          offset));
-        if (number_bytes <= 0)
-          {
-            buffer=(unsigned char *) RelinquishMagickMemory(buffer);
-            return(MagickFalse);
-          }
-        offset+=number_bytes;
+        buffer=(unsigned char *) RelinquishMagickMemory(buffer);
+        return(MagickFalse);
       }
-      extent+=(MagickSizeType) offset;
-    }
   }
   buffer=(unsigned char *) RelinquishMagickMemory(buffer);
   return(extent == cache_info->length ? MagickTrue : MagickFalse);
