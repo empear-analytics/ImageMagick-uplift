@@ -2237,6 +2237,23 @@ MagickExport void *ImageToBlob(const ImageInfo *image_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType GetCustomStreamBlobSupport(
+  const ImageInfo *clone_info,const MagickInfo *magick_info)
+{
+  MagickBooleanType
+    blob_support;
+
+  blob_support=GetMagickBlobSupport(magick_info);
+  if ((blob_support != MagickFalse) &&
+      (GetMagickEncoderSeekableStream(magick_info) != MagickFalse))
+    {
+      if ((clone_info->custom_stream->seeker == (CustomStreamSeeker) NULL) ||
+          (clone_info->custom_stream->teller == (CustomStreamTeller) NULL))
+        blob_support=MagickFalse;
+    }
+  return(blob_support);
+}
+
 static void WriteFileToCustomStream(const ImageInfo *image_info,
   ImageInfo *clone_info,unsigned char *blob)
 {
@@ -2293,14 +2310,7 @@ MagickExport void ImageToCustomStream(const ImageInfo *image_info,Image *image,
       return;
     }
   (void) CopyMagickString(clone_info->magick,image->magick,MagickPathExtent);
-  blob_support=GetMagickBlobSupport(magick_info);
-  if ((blob_support != MagickFalse) &&
-      (GetMagickEncoderSeekableStream(magick_info) != MagickFalse))
-    {
-      if ((clone_info->custom_stream->seeker == (CustomStreamSeeker) NULL) ||
-          (clone_info->custom_stream->teller == (CustomStreamTeller) NULL))
-        blob_support=MagickFalse;
-    }
+  blob_support=GetCustomStreamBlobSupport(clone_info,magick_info);
   if (blob_support != MagickFalse)
     {
       /*
@@ -2686,14 +2696,7 @@ MagickExport void ImagesToCustomStream(const ImageInfo *image_info,
       return;
     }
   (void) CopyMagickString(clone_info->magick,images->magick,MagickPathExtent);
-  blob_support=GetMagickBlobSupport(magick_info);
-  if ((blob_support != MagickFalse) &&
-      (GetMagickEncoderSeekableStream(magick_info) != MagickFalse))
-    {
-      if ((clone_info->custom_stream->seeker == (CustomStreamSeeker) NULL) ||
-          (clone_info->custom_stream->teller == (CustomStreamTeller) NULL))
-        blob_support=MagickFalse;
-    }
+  blob_support=GetCustomStreamBlobSupport(clone_info,magick_info);
   if (blob_support != MagickFalse)
     {
       /*
