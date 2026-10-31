@@ -2962,6 +2962,51 @@ static void StreamShortMapPixels(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void StreamCharPixels(const StreamInfo *stream_info,const Image *image,
+  QuantumType *quantum_map,size_t length)
+{
+  unsigned char
+    *q;
+
+  q=(unsigned char *) stream_info->pixels;
+  if (LocaleCompare(stream_info->map,"BGR") == 0)
+    {
+      StreamCharBGRPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"BGRA") == 0)
+    {
+      StreamCharBGRAPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"BGRP") == 0)
+    {
+      StreamCharBGRPPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"I") == 0)
+    {
+      StreamCharIPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"RGB") == 0)
+    {
+      StreamCharRGBPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"RGBA") == 0)
+    {
+      StreamCharRGBAPixels(image,q);
+      return;
+    }
+  if (LocaleCompare(stream_info->map,"RGBP") == 0)
+    {
+      StreamCharRGBPPixels(image,q);
+      return;
+    }
+  StreamCharMapPixels(image,quantum_map,length,q);
+}
+
 static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   const Image *image,ExceptionInfo *exception)
 {
@@ -3096,46 +3141,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
   {
     case CharPixel:
     {
-      unsigned char
-        *q;
-
-      q=(unsigned char *) stream_info->pixels;
-      if (LocaleCompare(stream_info->map,"BGR") == 0)
-        {
-          StreamCharBGRPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"BGRA") == 0)
-        {
-          StreamCharBGRAPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"BGRP") == 0)
-        {
-          StreamCharBGRPPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"I") == 0)
-        {
-          StreamCharIPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"RGB") == 0)
-        {
-          StreamCharRGBPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"RGBA") == 0)
-        {
-          StreamCharRGBAPixels(image,q);
-          break;
-        }
-      if (LocaleCompare(stream_info->map,"RGBP") == 0)
-        {
-          StreamCharRGBPPixels(image,q);
-          break;
-        }
-      StreamCharMapPixels(image,quantum_map,length,q);
+      StreamCharPixels(stream_info,image,quantum_map,length);
       break;
     }
     case DoublePixel:
