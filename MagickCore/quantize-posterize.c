@@ -436,6 +436,80 @@ static void RemapPosterizeImage(Image *image,Image *map_image,
   quantize_info=DestroyQuantizeInfo(quantize_info);
 }
 
+typedef struct _PosterizeDitherInfo
+{
+  Image
+    *image;
+
+  size_t
+    levels;
+
+  DitherMethod
+    dither_method;
+
+  ExceptionInfo
+    *exception;
+} PosterizeDitherInfo;
+
+static MagickBooleanType PosterizeThroughMap(
+  const PosterizeDitherInfo *dither_info,MagickBooleanType status)
+{
+  Image
+    *const image = dither_info->image;
+
+  const size_t
+    levels = dither_info->levels;
+
+  const DitherMethod
+    dither_method = dither_info->dither_method;
+
+  ExceptionInfo
+    *const exception = dither_info->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; y < 1; y++)
+  {
+    Image 
+      *map_image;
+
+    PosterizeMapInfo
+      map_info;
+
+    size_t
+      channels,
+      number_columns;
+
+    channels=CountPosterizeChannels(image);
+    number_columns=(size_t) pow((double) levels,(double) channels);
+    map_image=CloneImage(image,number_columns,1,MagickTrue,exception);
+    if (map_image == (Image *) NULL)
+      {
+        status=MagickFalse;
+        break;
+      }
+    if (SetImageStorageClass(map_image,DirectClass,exception) == MagickFalse)
+      {
+        status=MagickFalse;
+        break;
+      }
+    map_info.image=image;
+    map_info.map_image=map_image;
+    map_info.levels=levels;
+    map_info.number_columns=number_columns;
+    map_info.exception=exception;
+    if (PopulatePosterizeMap(&map_info,&status) == MagickFalse)
+      break;
+    if (status != MagickFalse)
+      {
+        RemapPosterizeImage(image,map_image,dither_method,exception);
+    }
+    map_image=DestroyImage(map_image);
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -461,45 +535,14 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (IsPosterizeDitherMap(dither_method,levels) != MagickFalse)
     {
-      for (y=0; y < 1; y++)
-      {
-        Image 
-          *map_image;
+      PosterizeDitherInfo
+        dither_info;
 
-        PosterizeMapInfo
-          map_info;
-
-        size_t
-          channels,
-          number_columns;
-
-        channels=CountPosterizeChannels(image);
-        number_columns=(size_t) pow((double) levels,(double) channels);
-        map_image=CloneImage(image,number_columns,1,MagickTrue,exception);
-        if (map_image == (Image *) NULL)
-          {
-            status=MagickFalse;
-            break;
-          }
-        if (SetImageStorageClass(map_image,DirectClass,exception) == MagickFalse)
-          {
-            status=MagickFalse;
-            break;
-          }
-        map_info.image=image;
-        map_info.map_image=map_image;
-        map_info.levels=levels;
-        map_info.number_columns=number_columns;
-        map_info.exception=exception;
-        if (PopulatePosterizeMap(&map_info,&status) == MagickFalse)
-          break;
-        if (status != MagickFalse)
-          {
-            RemapPosterizeImage(image,map_image,dither_method,exception);
-        }
-        map_image=DestroyImage(map_image);
-      }
-      return(status);
+      dither_info.image=image;
+      dither_info.levels=levels;
+      dither_info.dither_method=dither_method;
+      dither_info.exception=exception;
+      return(PosterizeThroughMap(&dither_info,status));
     }
   /*
     No dither or too many levels.
