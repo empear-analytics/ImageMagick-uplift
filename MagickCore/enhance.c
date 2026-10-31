@@ -511,71 +511,42 @@ static void MapCLAHEHistogram(const RangeInfo *range_info,
   }
 }
 
-static MagickBooleanType CLAHE(const RectangleInfo *clahe_info,
-  const RectangleInfo *tile_info,const RangeInfo *range_info,
-  const size_t number_bins,const double clip_limit,unsigned short *pixels)
+typedef struct _CLAHEInterpolation
 {
-  MemoryInfo
-    *tile_cache;
+  const RectangleInfo
+    *clahe_info,
+    *tile_info;
 
   size_t
-    limit,
+    number_bins;
+
+  size_t
     *tiles;
+
+  unsigned short
+    *lut;
+} CLAHEInterpolation;
+
+static void InterpolateCLAHETiles(const CLAHEInterpolation *interpolation,
+  unsigned short *pixels)
+{
+  const RectangleInfo
+    *const clahe_info = interpolation->clahe_info,
+    *const tile_info = interpolation->tile_info;
+
+  const size_t
+    number_bins = interpolation->number_bins;
+
+  size_t
+    *const tiles = interpolation->tiles;
 
   ssize_t
     y;
 
   unsigned short
-    *lut,
+    *const lut = interpolation->lut,
     *p;
 
-  /*
-    Contrast limited adapted histogram equalization.
-  */
-  if (clip_limit == 1.0)
-    return(MagickTrue);
-  tile_cache=AcquireVirtualMemory((size_t) clahe_info->x*number_bins,(size_t)
-    clahe_info->y*sizeof(*tiles));
-  if (tile_cache == (MemoryInfo *) NULL)
-    return(MagickFalse);
-  lut=(unsigned short *) AcquireQuantumMemory(NumberCLAHEGrays,sizeof(*lut));
-  if (lut == (unsigned short *) NULL)
-    {
-      tile_cache=RelinquishVirtualMemory(tile_cache);
-      return(MagickFalse);
-    }
-  tiles=(size_t *) GetVirtualMemoryBlob(tile_cache);
-  limit=(size_t) (clip_limit*((double) tile_info->width*tile_info->height)/
-    number_bins);
-  if (limit < 1UL)
-    limit=1UL;
-  /*
-    Generate greylevel mappings for each tile.
-  */
-  GenerateCLAHELut(range_info,number_bins,lut);
-  p=pixels;
-  for (y=0; y < (ssize_t) clahe_info->y; y++)
-  {
-    ssize_t
-      x;
-
-    for (x=0; x < (ssize_t) clahe_info->x; x++)
-    {
-      size_t
-        *histogram;
-
-      histogram=tiles+((ssize_t) number_bins*(y*clahe_info->x+x));
-      GenerateCLAHEHistogram(clahe_info,tile_info,number_bins,lut,p,histogram);
-      ClipCLAHEHistogram((double) limit,number_bins,histogram);
-      MapCLAHEHistogram(range_info,number_bins,tile_info->width*
-        tile_info->height,histogram);
-      p+=(ptrdiff_t) tile_info->width;
-    }
-    p+=CastDoubleToPtrdiffT((double) clahe_info->width*(tile_info->height-1));
-  }
-  /*
-    Interpolate greylevel mappings to get CLAHE image.
-  */
   p=pixels;
   for (y=0; y <= (ssize_t) clahe_info->y; y++)
   {
@@ -651,6 +622,82 @@ static MagickBooleanType CLAHE(const RectangleInfo *clahe_info,
     }
     p+=CastDoubleToPtrdiffT((double) clahe_info->width*(tile.height-1));
   }
+}
+
+static MagickBooleanType CLAHE(const RectangleInfo *clahe_info,
+  const RectangleInfo *tile_info,const RangeInfo *range_info,
+  const size_t number_bins,const double clip_limit,unsigned short *pixels)
+{
+  CLAHEInterpolation
+    interpolation;
+
+  MemoryInfo
+    *tile_cache;
+
+  size_t
+    limit,
+    *tiles;
+
+  ssize_t
+    y;
+
+  unsigned short
+    *lut,
+    *p;
+
+  /*
+    Contrast limited adapted histogram equalization.
+  */
+  if (clip_limit == 1.0)
+    return(MagickTrue);
+  tile_cache=AcquireVirtualMemory((size_t) clahe_info->x*number_bins,(size_t)
+    clahe_info->y*sizeof(*tiles));
+  if (tile_cache == (MemoryInfo *) NULL)
+    return(MagickFalse);
+  lut=(unsigned short *) AcquireQuantumMemory(NumberCLAHEGrays,sizeof(*lut));
+  if (lut == (unsigned short *) NULL)
+    {
+      tile_cache=RelinquishVirtualMemory(tile_cache);
+      return(MagickFalse);
+    }
+  tiles=(size_t *) GetVirtualMemoryBlob(tile_cache);
+  limit=(size_t) (clip_limit*((double) tile_info->width*tile_info->height)/
+    number_bins);
+  if (limit < 1UL)
+    limit=1UL;
+  /*
+    Generate greylevel mappings for each tile.
+  */
+  GenerateCLAHELut(range_info,number_bins,lut);
+  p=pixels;
+  for (y=0; y < (ssize_t) clahe_info->y; y++)
+  {
+    ssize_t
+      x;
+
+    for (x=0; x < (ssize_t) clahe_info->x; x++)
+    {
+      size_t
+        *histogram;
+
+      histogram=tiles+((ssize_t) number_bins*(y*clahe_info->x+x));
+      GenerateCLAHEHistogram(clahe_info,tile_info,number_bins,lut,p,histogram);
+      ClipCLAHEHistogram((double) limit,number_bins,histogram);
+      MapCLAHEHistogram(range_info,number_bins,tile_info->width*
+        tile_info->height,histogram);
+      p+=(ptrdiff_t) tile_info->width;
+    }
+    p+=CastDoubleToPtrdiffT((double) clahe_info->width*(tile_info->height-1));
+  }
+  /*
+    Interpolate greylevel mappings to get CLAHE image.
+  */
+  interpolation.clahe_info=clahe_info;
+  interpolation.tile_info=tile_info;
+  interpolation.number_bins=number_bins;
+  interpolation.tiles=tiles;
+  interpolation.lut=lut;
+  InterpolateCLAHETiles(&interpolation,pixels);
   lut=(unsigned short *) RelinquishMagickMemory(lut);
   tile_cache=RelinquishVirtualMemory(tile_cache);
   return(MagickTrue);
