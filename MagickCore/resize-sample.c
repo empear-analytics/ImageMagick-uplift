@@ -189,6 +189,36 @@ static MagickBooleanType SampleImageRow(const Image *image,
   return(status);
 }
 
+static PointInfo GetSampleOffset(const Image *image)
+{
+  PointInfo
+    sample_offset;
+
+  sample_offset.x=0.5-MagickEpsilon;
+  sample_offset.y=sample_offset.x;
+  {
+    const char
+      *value;
+
+    value=GetImageArtifact(image,"sample:offset");
+    if (value != (char *) NULL)
+      {
+        GeometryInfo
+          geometry_info;
+
+        MagickStatusType
+          flags;
+
+        (void) ParseGeometry(value,&geometry_info);
+        flags=ParseGeometry(value,&geometry_info);
+        sample_offset.x=sample_offset.y=geometry_info.rho/100.0-MagickEpsilon;
+        if ((flags & SigmaValue) != 0)
+          sample_offset.y=geometry_info.sigma/100.0-MagickEpsilon;
+      }
+  }
+  return(sample_offset);
+}
+
 MagickExport Image *SampleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -232,28 +262,7 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
   /*
     Set the sampling offset, default is in the mid-point of sample regions.
   */
-  sample_offset.x=0.5-MagickEpsilon;
-  sample_offset.y=sample_offset.x;
-  {
-    const char
-      *value;
-
-    value=GetImageArtifact(image,"sample:offset");
-    if (value != (char *) NULL)
-      {
-        GeometryInfo
-          geometry_info;
-
-        MagickStatusType
-          flags;
-
-        (void) ParseGeometry(value,&geometry_info);
-        flags=ParseGeometry(value,&geometry_info);
-        sample_offset.x=sample_offset.y=geometry_info.rho/100.0-MagickEpsilon;
-        if ((flags & SigmaValue) != 0)
-          sample_offset.y=geometry_info.sigma/100.0-MagickEpsilon;
-      }
-  }
+  sample_offset=GetSampleOffset(image);
   /*
     Sample each row.
   */
