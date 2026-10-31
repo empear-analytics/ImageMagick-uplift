@@ -1280,6 +1280,28 @@ static void SetDynamicThresholdPixel(const Cluster *background,
     }
 }
 
+static void RelinquishDynamicThresholdResources(Cluster *head,
+  ssize_t **histogram,short **extrema)
+{
+  Cluster
+    *cluster,
+    *next_cluster;
+
+  ssize_t
+    i;
+
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
+  {
+    next_cluster=cluster->next;
+    cluster=(Cluster *) RelinquishMagickMemory(cluster);
+  }
+  for (i=0; i < MaxDimension; i++)
+  {
+    extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
+    histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
+  }
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1461,16 +1483,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   /*
     Relinquish resources.
   */
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
-  {
-    next_cluster=cluster->next;
-    cluster=(Cluster *) RelinquishMagickMemory(cluster);
-  }
-  for (i=0; i < MaxDimension; i++)
-  {
-    extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
-    histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
-  }
+  RelinquishDynamicThresholdResources(head,histogram,extrema);
   return(MagickTrue);
 }
 
