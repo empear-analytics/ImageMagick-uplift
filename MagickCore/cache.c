@@ -415,6 +415,39 @@ MagickPrivate void CacheComponentTerminus(void)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ClipPixelChannels(const Image *image,const double mask,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  double
+    mask_alpha,
+    dst_alpha;
+
+  Quantum
+    src_alpha;
+
+  ssize_t
+    i;
+
+  src_alpha=GetPixelAlpha(image,p);
+  mask_alpha=QuantumScale*mask*(double) src_alpha;
+  dst_alpha=(double) GetPixelAlpha(image,q);
+  for (i=0; i < (ssize_t) image->number_channels; i++)
+  {
+    PixelTrait
+      traits;
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    if (channel == AlphaPixelChannel)
+      continue;
+    traits=GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) == 0)
+      continue;
+    q[i]=ClampToQuantum(MagickOver_((double) p[i],mask_alpha,
+      (double) q[i],dst_alpha));
+  }
+  SetPixelAlpha(image,src_alpha,q);
+}
+
 static MagickBooleanType ClipPixelCacheNexus(Image *image,
   NexusInfo *nexus_info,ExceptionInfo *exception)
 {
@@ -456,38 +489,9 @@ static MagickBooleanType ClipPixelCacheNexus(Image *image,
       double
         mask;
 
-      ssize_t
-        i;
-
       mask=(double) GetPixelWriteMask(image,p);
       if (fabs(mask) >= MagickEpsilon)
-        {
-          double
-            mask_alpha,
-            dst_alpha;
-
-          Quantum
-            src_alpha;
-
-          src_alpha=GetPixelAlpha(image,p);
-          mask_alpha=QuantumScale*mask*(double) src_alpha;
-          dst_alpha=(double) GetPixelAlpha(image,q);
-          for (i=0; i < (ssize_t) image->number_channels; i++)
-          {
-            PixelTrait
-              traits;
-
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            if (channel == AlphaPixelChannel)
-              continue;
-            traits=GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) == 0)
-              continue;
-            q[i]=ClampToQuantum(MagickOver_((double) p[i],mask_alpha,
-              (double) q[i],dst_alpha));
-          }
-          SetPixelAlpha(image,src_alpha,q);
-        }
+        ClipPixelChannels(image,mask,p,q);
       p+=(ptrdiff_t) GetPixelChannels(image);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
