@@ -6185,6 +6185,52 @@ static MagickStatusType ResetAlphaPixels(const PrimitiveScanInfo *scan,
   return(status);
 }
 
+static MagickStatusType ResetColorPixels(const PrimitiveScanInfo *scan,
+  MagickStatusType status)
+{
+  Image
+    *const image = scan->image;
+
+  CacheView
+    *const image_view = scan->image_view;
+
+  const DrawInfo
+    *const draw_info = scan->draw_info;
+
+  ExceptionInfo
+    *const exception = scan->exception;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x,
+    y;
+
+  GetPixelInfo(image,&pixel);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+      exception);
+    if (q == (Quantum *) NULL)
+      break;
+    for (x=0; x < (ssize_t) image->columns; x++)
+    {
+      GetFillColor(draw_info,x,y,&pixel,exception);
+      SetPixelViaPixelInfo(image,&pixel,q);
+      q+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
+      exception);
+    if (status == MagickFalse)
+      break;
+  }
+  return(status);
+}
+
 MagickExport MagickBooleanType DrawPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -6369,30 +6415,14 @@ MagickExport MagickBooleanType DrawPrimitive(Image *image,
         }
         case ResetMethod:
         {
-          PixelInfo
-            pixel;
+          PrimitiveScanInfo
+            scan;
 
-          GetPixelInfo(image,&pixel);
-          for (y=0; y < (ssize_t) image->rows; y++)
-          {
-            Quantum
-              *magick_restrict q;
-
-            q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-              exception);
-            if (q == (Quantum *) NULL)
-              break;
-            for (x=0; x < (ssize_t) image->columns; x++)
-            {
-              GetFillColor(draw_info,x,y,&pixel,exception);
-              SetPixelViaPixelInfo(image,&pixel,q);
-              q+=(ptrdiff_t) GetPixelChannels(image);
-            }
-            status&=(MagickStatusType) SyncCacheViewAuthenticPixels(image_view,
-              exception);
-            if (status == MagickFalse)
-              break;
-          }
+          scan.image=image;
+          scan.image_view=image_view;
+          scan.draw_info=draw_info;
+          scan.exception=exception;
+          status=ResetColorPixels(&scan,status);
           break;
         }
       }
