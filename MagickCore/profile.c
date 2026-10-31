@@ -2978,6 +2978,13 @@ static void WriteResolutionResource(const Image *image,unsigned char *p)
   WriteProfileShort(MSBEndian,(unsigned short) image->units,p+12);
 }
 
+static inline MagickBooleanType IsInvalid8BimResourceCount(const ssize_t count,
+  const size_t length)
+{
+  return(((count > (ssize_t) length) || (count < 0)) ? MagickTrue :
+    MagickFalse);
+}
+
 typedef struct _ProfileCursorTargets
 {
   unsigned char
@@ -3052,7 +3059,7 @@ static void Sync8BimProfile(const Image *image,const StringInfo *profile)
     if ((*p & 0x01) == 0)
       (void) ReadProfileByte(&p,&length);
     count=(ssize_t) ReadProfileMSBLong(&p,&length);
-    if ((count > (ssize_t) length) || (count < 0))
+    if (IsInvalid8BimResourceCount(count,length) != MagickFalse)
       return;
     Sync8BimResource(image,id,count,p);
     p+=(ptrdiff_t) count;
