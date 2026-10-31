@@ -1343,6 +1343,26 @@ MagickExport Image *StreamImage(const ImageInfo *image_info,
   return(image);
 }
 
+static void StreamCharBGRPixels(const Image *image,unsigned char *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
+    *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
+    *q++=ScaleQuantumToChar(GetPixelRed(image,p));
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1516,16 +1536,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
       q=(unsigned char *) stream_info->pixels;
       if (LocaleCompare(stream_info->map,"BGR") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=ScaleQuantumToChar(GetPixelBlue(image,p));
-            *q++=ScaleQuantumToChar(GetPixelGreen(image,p));
-            *q++=ScaleQuantumToChar(GetPixelRed(image,p));
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamCharBGRPixels(image,q);
           break;
         }
       if (LocaleCompare(stream_info->map,"BGRA") == 0)
