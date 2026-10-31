@@ -389,6 +389,26 @@ static MagickBooleanType PopulatePosterizeMap(const PosterizeMapInfo *map_info,
   return(MagickTrue);
 }
 
+static void PosterizeColormapEntry(Image *image,const ssize_t i,
+  const size_t levels)
+{
+  /*
+    Posterize colormap.
+  */
+  if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].red=(MagickRealType)
+      PosterizePixel((const Quantum) image->colormap[i].red,levels);
+  if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].green=(MagickRealType)
+      PosterizePixel((const Quantum) image->colormap[i].green,levels);
+  if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].blue=(MagickRealType)
+      PosterizePixel((const Quantum) image->colormap[i].blue,levels);
+  if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
+    image->colormap[i].alpha=(MagickRealType)
+      PosterizePixel((const Quantum) image->colormap[i].alpha,levels);
+}
+
 MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
   const DitherMethod dither_method,ExceptionInfo *exception)
 {
@@ -474,21 +494,7 @@ MagickExport MagickBooleanType PosterizeImage(Image *image,const size_t levels,
 #endif
       for (i=0; i < (ssize_t) image->colors; i++)
       {
-        /*
-          Posterize colormap.
-        */
-        if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].red=(MagickRealType)
-            PosterizePixel((const Quantum) image->colormap[i].red,levels);
-        if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].green=(MagickRealType)
-            PosterizePixel((const Quantum) image->colormap[i].green,levels);
-        if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].blue=(MagickRealType)
-            PosterizePixel((const Quantum) image->colormap[i].blue,levels);
-        if ((GetPixelAlphaTraits(image) & UpdatePixelTrait) != 0)
-          image->colormap[i].alpha=(MagickRealType)
-            PosterizePixel((const Quantum) image->colormap[i].alpha,levels);
+        PosterizeColormapEntry(image,i,levels);
       }
     }
   /*
