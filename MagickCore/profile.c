@@ -2978,6 +2978,35 @@ static void WriteResolutionResource(const Image *image,unsigned char *p)
   WriteProfileShort(MSBEndian,(unsigned short) image->units,p+12);
 }
 
+typedef struct _ProfileCursorTargets
+{
+  unsigned char
+    **p;
+
+  size_t
+    *length;
+} ProfileCursorTargets;
+
+static MagickBooleanType Read8BimSignature(
+  const ProfileCursorTargets *targets)
+{
+  unsigned char
+    **const p = targets->p;
+
+  size_t
+    *const length = targets->length;
+
+  if (ReadProfileByte(p,length) != 0x38)
+    return(MagickFalse);
+  if (ReadProfileByte(p,length) != 0x42)
+    return(MagickFalse);
+  if (ReadProfileByte(p,length) != 0x49)
+    return(MagickFalse);
+  if (ReadProfileByte(p,length) != 0x4D)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static void Sync8BimResource(const Image *image,const unsigned short id,
   const ssize_t count,unsigned char *p)
 {
@@ -3005,13 +3034,12 @@ static void Sync8BimProfile(const Image *image,const StringInfo *profile)
   p=GetStringInfoDatum(profile);
   while (length != 0)
   {
-    if (ReadProfileByte(&p,&length) != 0x38)
-      continue;
-    if (ReadProfileByte(&p,&length) != 0x42)
-      continue;
-    if (ReadProfileByte(&p,&length) != 0x49)
-      continue;
-    if (ReadProfileByte(&p,&length) != 0x4D)
+    ProfileCursorTargets
+      targets;
+
+    targets.p=(&p);
+    targets.length=(&length);
+    if (Read8BimSignature(&targets) == MagickFalse)
       continue;
     if (length < 7)
       return;
