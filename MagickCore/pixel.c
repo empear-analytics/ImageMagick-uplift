@@ -1076,6 +1076,44 @@ static MagickBooleanType InterpolateBlendPixelChannel(
   return(status);
 }
 
+static MagickBooleanType InterpolateCatromPixelChannel(
+  const ChannelInterpolation *grid,double *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  double
+    alpha[16],
+    cx[4],
+    cy[4],
+    gamma,
+    pixels[16];
+
+  p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset-1,
+    grid->y_offset-1,4,4,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  LoadInterpolatePixels(grid->image,grid->channel,grid->traits,p,16,alpha,
+    pixels);
+  CatromWeights((double) (grid->x-grid->x_offset),&cx);
+  CatromWeights((double) (grid->y-grid->y_offset),&cy);
+  gamma=(grid->channel == AlphaPixelChannel ? (double) 1.0 :
+    MagickSafeReciprocal(cy[0]*(cx[0]*alpha[0]+cx[1]*alpha[1]+cx[2]*
+    alpha[2]+cx[3]*alpha[3])+cy[1]*(cx[0]*alpha[4]+cx[1]*alpha[5]+cx[2]*
+    alpha[6]+cx[3]*alpha[7])+cy[2]*(cx[0]*alpha[8]+cx[1]*alpha[9]+cx[2]*
+    alpha[10]+cx[3]*alpha[11])+cy[3]*(cx[0]*alpha[12]+cx[1]*alpha[13]+
+    cx[2]*alpha[14]+cx[3]*alpha[15])));
+  *pixel=gamma*(cy[0]*(cx[0]*pixels[0]+cx[1]*pixels[1]+cx[2]*pixels[2]+
+    cx[3]*pixels[3])+cy[1]*(cx[0]*pixels[4]+cx[1]*pixels[5]+cx[2]*
+    pixels[6]+cx[3]*pixels[7])+cy[2]*(cx[0]*pixels[8]+cx[1]*pixels[9]+
+    cx[2]*pixels[10]+cx[3]*pixels[11])+cy[3]*(cx[0]*pixels[12]+cx[1]*
+    pixels[13]+cx[2]*pixels[14]+cx[3]*pixels[15]));
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannel(
   const Image *magick_restrict image,const CacheView_ *image_view,
   const PixelChannel channel,const PixelInterpolateMethod method,const double x,
@@ -1199,31 +1237,7 @@ MagickExport MagickBooleanType InterpolatePixelChannel(
     }
     case CatromInterpolatePixel:
     {
-      double
-        cx[4],
-        cy[4];
-
-      p=GetCacheViewVirtualPixels(image_view,x_offset-1,y_offset-1,4,4,
-        exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      LoadInterpolatePixels(image,channel,traits,p,16,alpha,pixels);
-      CatromWeights((double) (x-x_offset),&cx);
-      CatromWeights((double) (y-y_offset),&cy);
-      gamma=(channel == AlphaPixelChannel ? (double) 1.0 :
-        MagickSafeReciprocal(cy[0]*(cx[0]*alpha[0]+cx[1]*alpha[1]+cx[2]*
-        alpha[2]+cx[3]*alpha[3])+cy[1]*(cx[0]*alpha[4]+cx[1]*alpha[5]+cx[2]*
-        alpha[6]+cx[3]*alpha[7])+cy[2]*(cx[0]*alpha[8]+cx[1]*alpha[9]+cx[2]*
-        alpha[10]+cx[3]*alpha[11])+cy[3]*(cx[0]*alpha[12]+cx[1]*alpha[13]+
-        cx[2]*alpha[14]+cx[3]*alpha[15])));
-      *pixel=gamma*(cy[0]*(cx[0]*pixels[0]+cx[1]*pixels[1]+cx[2]*pixels[2]+
-        cx[3]*pixels[3])+cy[1]*(cx[0]*pixels[4]+cx[1]*pixels[5]+cx[2]*
-        pixels[6]+cx[3]*pixels[7])+cy[2]*(cx[0]*pixels[8]+cx[1]*pixels[9]+
-        cx[2]*pixels[10]+cx[3]*pixels[11])+cy[3]*(cx[0]*pixels[12]+cx[1]*
-        pixels[13]+cx[2]*pixels[14]+cx[3]*pixels[15]));
+      status=InterpolateCatromPixelChannel(&grid,pixel,status);
       break;
     }
     case IntegerInterpolatePixel:
