@@ -1402,6 +1402,14 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    new function binds the members its block reads as step 4 does, and steps 3, 5 and
    6 do not apply (no typedef, no local, no assignment). A member the block does not
    read is not bound; the other parameters are as above, at most four in all.
+   A variable the block reads on entry and then writes, and that nothing after the
+   block reads (Recipe E step 4's input that goes by value: `InterpolatePixelChannel`'s
+   `x_offset`, decremented for the 16-neighbour average before the fetch), may be one
+   of the group as well: at the top of the new function's body declare a local of the
+   member's type and name, without `const`, initialised from the member
+   (`x_offset = grid->x_offset`), and leave the block's text unchanged; the other
+   members keep step 4's form. Its writes land in that local, as they would in a
+   by-value parameter.
 3. Declare `typedef struct _Name { ... } Name;` directly above the new function, one
    member per variable in the group, with the variable's exact type and name: no `size_t`
    for a `ssize_t`, no `const` added or dropped on what a pointer points to. Only a
@@ -1541,6 +1549,12 @@ static void ThresholdWaveletLevel(float *pixels,
   last call. A pointer member the block writes through (`channel_sum`, under Recipe
   Q's read-only pointers) is read, not written: the new function reaches the same
   array through the same address the caller's `const` local held.
+- A member bound to a non-`const` local (step 2's read-then-written variable) is
+  Recipe E step 4's by-value input in another form: the local holds the value the
+  variable held at the fill, which is its value at the call (nothing between them
+  writes it, step 8), the block's writes land in the local, and nothing after the
+  block reads the caller's variable, which the block no longer writes. The struct
+  itself is not written: the local is a copy.
 - Recipe E's limit on what the block writes stands: one value returned, or writes
   through a pointer the block already used for pixel data. A block writing more is
   skipped, as in Recipe E.
@@ -1575,6 +1589,10 @@ Added by Claude Code (Claude Opus 5.5) during task W07, under the mandate of 202
 Step 2's pass-through form (2026-10-31, task W10): `quantize-posterize.c`'s
 `PopulatePosterizeMap`, a Recipe LB helper taking a `PosterizeMapInfo`, whose column loop
 (depth 3) reads four of its five members and two locals of its own.
+Step 2's read-then-written member (2026-10-31, campaign B, task M118): the average
+groups of `pixel.c`'s `InterpolatePixelChannel`, `InterpolatePixelChannels` and
+`InterpolatePixelInfo`, which move the fetch origin (`x_offset--`) before reading it;
+by value they would give the helper six parameters. A probe: 3.73 to 3.78.
 
 ---
 
@@ -5289,3 +5307,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | SD | Step 1: the `switch`'s last group may end at its closing brace instead of `break;`, when it moves and stays last in the new `switch`; *Careful* gives the argument | `stream.c`'s `StreamLongLongQuantum`, `StreamQuantumQuantum`, `StreamDoubleQuantum` and `StreamFloatQuantum` (campaign B, task M117): channel `switch`es of cc 13 whose `default: *q=0;` (or `*q=(Quantum) 0;`) has no `break;`; their three siblings without that quirk went from 4.63 to 5.10 by SD | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | O | *Use when*: the block may be a loop as well as a selection (steps 1 to 6 never depended on it); step 2: a variable written before read passes as a pointer, not declared in the new function, when the caller's store before the block would otherwise be left with no use; no recipe deletes that store | `identify.c`'s `IdentifyImage` (campaign B, task M117, a574c1d63): the transparent-pixel scan writes `p`, `y`, `found` and `x`; declaring `x` in the helper leaves the caller's `x=0;` set but unused, which fails the macOS CI build. The owner left both questions to the session (2026-10-31) | owner |
 | 2026-10-31 | AMEND | SD | Step 1: a chain of groups linked by `magick_fallthrough;` counts as one group when all of it moves, in order; its groups may hold a `break;` inside a selection. *Careful* gives the argument | `quantum-import.c`'s depth dispatchers (campaign B, task M118), sixteen `switch (quantum_info->depth)` of cc 9 to 13 whose `case 24:` and `case 64:` test the floating-point format, `break;` inside the `if`, and fall through to `default:`; step 1 refused every one. SD with the chain moved (and `case 32:` beside it where cc 13 needs it) on fourteen of them in a probe: 3.83 to 5.54 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | N | Step 2: a variable the block reads on entry and then writes, and that nothing after the block reads, may be a member; the new function binds it to a non-`const` local initialised from the member, the block's text unchanged. *Careful* gives the argument | `pixel.c`'s interpolation average groups (campaign B, task M118): they shift `x_offset`/`y_offset` before the fetch; as by-value parameters (E step 4) the helper would take six. A probe of `InterpolatePixelChannel`'s: 3.73 to 3.78 | mandate (2026-10-24) |
