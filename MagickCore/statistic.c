@@ -404,6 +404,46 @@ static void ApplyBitwiseEvaluateOperator(const Quantum pixel,
   }
 }
 
+static void ApplyTranscendentalEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
+  switch (op)
+  {
+    default:
+    {
+      ApplyBitwiseEvaluateOperator(pixel,op,value,result);
+      break;
+    }
+    case ExponentialEvaluateOperator:
+    {
+      (*result)=(double) QuantumRange*exp(value*QuantumScale*(double) pixel);
+      break;
+    }
+    case InverseLogEvaluateOperator:
+    {
+      (*result)=(double) QuantumRange*pow((value+1.0),QuantumScale*(double)
+        pixel-1.0)*MagickSafeReciprocal(value);
+      break;
+    }
+    case LogEvaluateOperator:
+    {
+      (*result)=EvaluateLog(pixel,value,(*result));
+      break;
+    }
+    case PowEvaluateOperator:
+    {
+      (*result)=EvaluatePow(pixel,value,(*result));
+      break;
+    }
+    case SineEvaluateOperator:
+    {
+      (*result)=(double) QuantumRange*(0.5*sin((double) (2.0*MagickPI*
+        QuantumScale*(double) pixel*value))+0.5);
+      break;
+    }
+  }
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
@@ -415,17 +455,12 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   {
     default:
     {
-      ApplyBitwiseEvaluateOperator(pixel,op,value,&result);
+      ApplyTranscendentalEvaluateOperator(pixel,op,value,&result);
       break;
     }
     case DivideEvaluateOperator:
     {
       result=(double) pixel/(value == 0.0 ? 1.0 : value);
-      break;
-    }
-    case ExponentialEvaluateOperator:
-    {
-      result=(double) QuantumRange*exp(value*QuantumScale*(double) pixel);
       break;
     }
     case GaussianNoiseEvaluateOperator:
@@ -440,21 +475,10 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
         value);
       break;
     }
-    case InverseLogEvaluateOperator:
-    {
-      result=(double) QuantumRange*pow((value+1.0),QuantumScale*(double)
-        pixel-1.0)*MagickSafeReciprocal(value);
-      break;
-    }
     case LaplacianNoiseEvaluateOperator:
     {
       result=(double) GenerateDifferentialNoise(random_info,pixel,
         LaplacianNoise,value);
-      break;
-    }
-    case LogEvaluateOperator:
-    {
-      result=EvaluateLog(pixel,value,result);
       break;
     }
     case MaxEvaluateOperator:
@@ -494,11 +518,6 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
         value);
       break;
     }
-    case PowEvaluateOperator:
-    {
-      result=EvaluatePow(pixel,value,result);
-      break;
-    }
     case RootMeanSquareEvaluateOperator:
     {
       result=((double) pixel*(double) pixel+value);
@@ -507,12 +526,6 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     case SetEvaluateOperator:
     {
       result=value;
-      break;
-    }
-    case SineEvaluateOperator:
-    {
-      result=(double) QuantumRange*(0.5*sin((double) (2.0*MagickPI*
-        QuantumScale*(double) pixel*value))+0.5);
       break;
     }
     case SubtractEvaluateOperator:
