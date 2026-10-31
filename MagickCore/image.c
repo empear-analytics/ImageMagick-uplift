@@ -3197,6 +3197,28 @@ MagickExport void SetImageInfoFile(ImageInfo *image_info,FILE *file)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void AddImageMaskChannel(Image *image,const PixelMask type)
+{
+  switch (type)
+  {
+    case ReadPixelMask:
+    {
+      image->channels=(ChannelType) (image->channels | ReadMaskChannel);
+      break;
+    }
+    case WritePixelMask:
+    {
+      image->channels=(ChannelType) (image->channels | WriteMaskChannel);
+      break;
+    }
+    default:
+    {
+      image->channels=(ChannelType) (image->channels | CompositeMaskChannel);
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
   const Image *mask,ExceptionInfo *exception)
 {
@@ -3243,24 +3265,7 @@ MagickExport MagickBooleanType SetImageMask(Image *image,const PixelMask type,
       }
       return(SyncImagePixelCache(image,exception));
     }
-  switch (type)
-  {
-    case ReadPixelMask:
-    {
-      image->channels=(ChannelType) (image->channels | ReadMaskChannel);
-      break;
-    }
-    case WritePixelMask:
-    {
-      image->channels=(ChannelType) (image->channels | WriteMaskChannel);
-      break;
-    }
-    default:
-    {
-      image->channels=(ChannelType) (image->channels | CompositeMaskChannel);
-      break;
-    }
-  }
+  AddImageMaskChannel(image,type);
   if (SyncImagePixelCache(image,exception) == MagickFalse)
     return(MagickFalse);
   status=MagickTrue;
