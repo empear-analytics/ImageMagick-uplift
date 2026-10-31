@@ -2708,7 +2708,8 @@ typedef struct _DirectoryInfo
     entry;
 } DirectoryInfo;
 
-static void SyncExifImageDimension(const ExifTagInfo *exif_tag)
+static void SyncExifDimension(const ExifTagInfo *exif_tag,unsigned char *ifd,
+  const int width_tag)
 {
   const Image
     *const image = exif_tag->image;
@@ -2718,9 +2719,6 @@ static void SyncExifImageDimension(const ExifTagInfo *exif_tag)
 
   unsigned char
     *const directory = exif_tag->directory;
-
-  unsigned char
-    *const ifd0 = exif_tag->ifd0;
 
   const unsigned short
     tag_value = exif_tag->tag_value;
@@ -2737,8 +2735,8 @@ static void SyncExifImageDimension(const ExifTagInfo *exif_tag)
   unsigned char
     *const p = exif_tag->p;
 
-  if (directory == ifd0)
-    WriteProfileDimension(endian,tag_value == TAG_IMAGE_WIDTH ?
+  if (directory == ifd)
+    WriteProfileDimension(endian,tag_value == width_tag ?
       image->columns : image->rows,format,components,q,p);
 }
 
@@ -2902,15 +2900,13 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
         case TAG_IMAGE_WIDTH:
         case TAG_IMAGE_LENGTH:
         {
-          SyncExifImageDimension(&exif_tag);
+          SyncExifDimension(&exif_tag,ifd0,TAG_IMAGE_WIDTH);
           break;
         }
         case TAG_PIXEL_X_DIMENSION:
         case TAG_PIXEL_Y_DIMENSION:
         {
-          if (directory == exif_directory)
-            WriteProfileDimension(endian,tag_value == TAG_PIXEL_X_DIMENSION ?
-              image->columns : image->rows,format,components,q,p);
+          SyncExifDimension(&exif_tag,exif_directory,TAG_PIXEL_X_DIMENSION);
           break;
         }
         case 0x0128:
