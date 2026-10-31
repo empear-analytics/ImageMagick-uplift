@@ -1242,8 +1242,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     }
     case GrayscaleAlphaType:
     {
-      if (IsGrayImageType(image->type) == MagickFalse)
-        status=TransformImageColorspace(image,GRAYColorspace,exception);
+      status=TransformImageToGray(image,status,exception);
       SetOpaqueAlphaIfMissing(image,exception);
       break;
     }
