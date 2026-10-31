@@ -560,6 +560,45 @@ static void AccumulateBlackChannel(const ResampleFilter *resample_filter,
       GetPixelBlack(resample_filter->image,pixels);
 }
 
+typedef struct _ResamplePixelSource
+{
+  ResampleFilter
+    *resample_filter;
+
+  const Quantum
+    *pixels;
+
+  PixelInfo
+    *pixel;
+} ResamplePixelSource;
+
+static void AccumulateResampledPixel(const ResamplePixelSource *source,
+  double *divisor_m,double *weight,double *divisor_c)
+{
+  ResampleFilter
+    *const resample_filter = source->resample_filter;
+
+  const Quantum
+    *const pixels = source->pixels;
+
+  PixelInfo
+    *const pixel = source->pixel;
+
+  pixel->alpha+=*weight*(double)
+    GetPixelAlpha(resample_filter->image,pixels);
+  *divisor_m += *weight;
+
+  *weight=WeightByPixelAlpha(resample_filter,pixels,pixel,*weight);
+  pixel->red+=*weight*(double)
+    GetPixelRed(resample_filter->image,pixels);
+  pixel->green+=*weight*(double)
+    GetPixelGreen(resample_filter->image,pixels);
+  pixel->blue+=*weight*(double)
+    GetPixelBlue(resample_filter->image,pixels);
+  AccumulateBlackChannel(resample_filter,pixels,*weight,pixel);
+  *divisor_c += *weight;
+}
+
 static void CountTileHits(const ResampleFilter *resample_filter,
   const double u0,const double v0,ssize_t *hit)
 {
@@ -776,6 +815,9 @@ MagickExport MagickBooleanType ResamplePixelColor(
 
     /* count up the weighted pixel colors */
     for( u=0; u<uw; u++ ) {
+      ResamplePixelSource
+        source;
+
       weight = 0.0;
 #if FILTER_LUT
       /* Note that the ellipse has been pre-scaled so F = WLUT_WIDTH */
@@ -788,19 +830,10 @@ MagickExport MagickBooleanType ResamplePixelColor(
              sqrt(Q));    /* a SquareRoot!  Arrggghhhhh... */
 #endif
 
-        pixel->alpha+=weight*(double)
-          GetPixelAlpha(resample_filter->image,pixels);
-        divisor_m += weight;
-
-        weight=WeightByPixelAlpha(resample_filter,pixels,pixel,weight);
-        pixel->red+=weight*(double)
-          GetPixelRed(resample_filter->image,pixels);
-        pixel->green+=weight*(double)
-          GetPixelGreen(resample_filter->image,pixels);
-        pixel->blue+=weight*(double)
-          GetPixelBlue(resample_filter->image,pixels);
-        AccumulateBlackChannel(resample_filter,pixels,weight,pixel);
-        divisor_c += weight;
+        source.resample_filter=resample_filter;
+        source.pixels=pixels;
+        source.pixel=pixel;
+        AccumulateResampledPixel(&source,&divisor_m,&weight,&divisor_c);
 
         hit++;
 #if DEBUG_HIT_MISS
