@@ -2287,6 +2287,35 @@ static void GetRepeatSpreadOffset(const GradientOffsetInfo *offset_info,
     }
 }
 
+static double GetReflectSpreadOffset(const GradientOffsetInfo *offset_info,
+  double offset)
+{
+  const GradientInfo
+    *gradient = offset_info->gradient;
+
+  const SegmentInfo
+    *gradient_vector = offset_info->gradient_vector;
+
+  const double
+    length = offset_info->length;
+
+  const ssize_t
+    x = offset_info->x,
+    y = offset_info->y;
+
+  if (IsOffGradientOrigin(gradient_vector,x,y) != MagickFalse)
+    {
+      offset=GetScaledStopOffset(gradient,length,x,y);
+    }
+  if (offset < 0.0)
+    offset=(-offset);
+  if ((ssize_t) fmod(offset,2.0) == 0)
+    offset=fmod(offset,1.0);
+  else
+    offset=1.0-fmod(offset,1.0);
+  return(offset);
+}
+
 MagickExport MagickBooleanType DrawGradientImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -2392,16 +2421,15 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
         }
         case ReflectSpread:
         {
-          if (IsOffGradientOrigin(gradient_vector,x,y) != MagickFalse)
-            {
-              offset=GetScaledStopOffset(gradient,length,x,y);
-            }
-          if (offset < 0.0)
-            offset=(-offset);
-          if ((ssize_t) fmod(offset,2.0) == 0)
-            offset=fmod(offset,1.0);
-          else
-            offset=1.0-fmod(offset,1.0);
+          GradientOffsetInfo
+            offset_info;
+
+          offset_info.gradient=gradient;
+          offset_info.gradient_vector=gradient_vector;
+          offset_info.length=length;
+          offset_info.x=x;
+          offset_info.y=y;
+          offset=GetReflectSpreadOffset(&offset_info,offset);
           composite=GetReflectGradientColor(gradient,offset,composite);
           break;
         }
