@@ -627,6 +627,21 @@ static inline MagickBooleanType IsWrittenBlobFailure(const int status,
     (blob_info->mode == AppendBinaryBlobMode))) ? MagickTrue : MagickFalse);
 }
 
+static void SynchronizeBlobFile(BlobInfo *blob_info,int status)
+{
+  if (blob_info->synchronize != MagickFalse)
+    {
+      status=fflush(blob_info->file_info.file);
+      if (status != 0)
+        ThrowBlobException(blob_info);
+      status=fsync(fileno(blob_info->file_info.file));
+      if (status != 0)
+        ThrowBlobException(blob_info);
+    }
+  if ((status != 0) && (ferror(blob_info->file_info.file) != 0))
+    ThrowBlobException(blob_info);
+}
+
 MagickExport MagickBooleanType CloseBlob(Image *image)
 {
   BlobInfo
@@ -658,17 +673,7 @@ MagickExport MagickBooleanType CloseBlob(Image *image)
     case FileStream:
     case PipeStream:
     {
-      if (blob_info->synchronize != MagickFalse)
-        {
-          status=fflush(blob_info->file_info.file);
-          if (status != 0)
-            ThrowBlobException(blob_info);
-          status=fsync(fileno(blob_info->file_info.file));
-          if (status != 0)
-            ThrowBlobException(blob_info);
-        }
-      if ((status != 0) && (ferror(blob_info->file_info.file) != 0))
-        ThrowBlobException(blob_info);
+      SynchronizeBlobFile(blob_info,status);
       break;
     }
     case ZipStream:
@@ -696,19 +701,7 @@ MagickExport MagickBooleanType CloseBlob(Image *image)
     case BlobStream:
     {
       if (blob_info->file_info.file != (FILE *) NULL)
-        {
-          if (blob_info->synchronize != MagickFalse)
-            {
-              status=fflush(blob_info->file_info.file);
-              if (status != 0)
-                ThrowBlobException(blob_info);
-              status=fsync(fileno(blob_info->file_info.file));
-              if (status != 0)
-                ThrowBlobException(blob_info);
-            }
-          if ((status != 0) && (ferror(blob_info->file_info.file) != 0))
-            ThrowBlobException(blob_info);
-        }
+        SynchronizeBlobFile(blob_info,status);
       break;
     }
     case CustomStream:
