@@ -672,6 +672,14 @@ static void RelinquishClassifyResources(Cluster *head,double *squares)
   free_squares=(double *) RelinquishMagickMemory(free_squares);
 }
 
+static void InitializeCluster(Cluster *cluster,const ssize_t count)
+{
+  cluster->id=count;
+  cluster->red.center/=cluster->count;
+  cluster->green.center/=cluster->count;
+  cluster->blue.center/=cluster->count;
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -802,10 +810,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
         /*
           Initialize cluster.
         */
-        cluster->id=count;
-        cluster->red.center/=cluster->count;
-        cluster->green.center/=cluster->count;
-        cluster->blue.center/=cluster->count;
+        InitializeCluster(cluster,count);
         count++;
         last_cluster=cluster;
         continue;
