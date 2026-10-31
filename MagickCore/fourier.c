@@ -351,6 +351,20 @@ static double GetComplexSNR(const Image *images)
   return(snr);
 }
 
+static MagickBooleanType SyncComplexViews(CacheView *Ci_view,
+  CacheView *Cr_view,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  if (SyncCacheViewAuthenticPixels(Ci_view,exception) == MagickFalse)
+    status=MagickFalse;
+  if (SyncCacheViewAuthenticPixels(Cr_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -506,9 +520,7 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
       Cr+=(ptrdiff_t) GetPixelChannels(Cr_image);
       Ci+=(ptrdiff_t) GetPixelChannels(Ci_image);
     }
-    if (SyncCacheViewAuthenticPixels(Ci_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (SyncCacheViewAuthenticPixels(Cr_view,exception) == MagickFalse)
+    if (SyncComplexViews(Ci_view,Cr_view,exception) == MagickFalse)
       status=MagickFalse;
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {
