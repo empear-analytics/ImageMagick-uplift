@@ -1676,6 +1676,18 @@ static void PrintAuxiliaryChannelStatistics(const Image *image,
     }
 }
 
+static double GetStatisticsScale(const Image *image)
+{
+  double
+    scale;
+
+  scale=1.0;
+  if (image->depth <= MAGICKCORE_QUANTUM_DEPTH)
+    scale=(double) (QuantumRange/((size_t) QuantumRange >> ((size_t)
+      MAGICKCORE_QUANTUM_DEPTH-image->depth)));
+  return(scale);
+}
+
 static void PrintImageChannelStatistics(FILE *file,const Image *image,
   const ColorspaceType colorspace,ChannelStatistics *channel_statistics)
 {
@@ -1688,10 +1700,7 @@ static void PrintImageChannelStatistics(FILE *file,const Image *image,
     Detail channel depth and extrema.
   */
   PrintChannelDepths(file,image,colorspace,channel_statistics);
-  scale=1.0;
-  if (image->depth <= MAGICKCORE_QUANTUM_DEPTH)
-    scale=(double) (QuantumRange/((size_t) QuantumRange >> ((size_t)
-      MAGICKCORE_QUANTUM_DEPTH-image->depth)));
+  scale=GetStatisticsScale(image);
   report.file=file;
   report.scale=1.0/scale;
   report.channel_statistics=channel_statistics;
