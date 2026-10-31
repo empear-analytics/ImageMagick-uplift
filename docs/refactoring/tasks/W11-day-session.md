@@ -57,9 +57,10 @@ playbook.
   Recipe B on all seven static helpers were flat; the score moved once `SketchImage`,
   `PolaroidImage` and `SteganoImage` left *Complex Method* and *Large Method* together
   (3.27 to 3.38, five flat steps first, under rule 2), then `StereoAnaglyphImage` (to
-  3.50). The pass stopped at its commit budget, not a plateau: `PlasmaImageProxy` (cc 21,
-  103 lines, 4 bumps; 3.68 in a stub probe) is next, its four pixel blocks each
-  returning one constant (V or Y). The other functions are held by the parallel-loop
+  3.50). A second pass stopped at a plateau: `PlasmaImageProxy` (cc 21,
+  103 lines, 4 bumps; 3.68 in a stub probe) stays: Recipe Y takes three of its
+  four pixel blocks, but the clone group that results costs more than it gains (one block
+  3.50, two 3.25, three 3.17) and the left block leaves through two constants. The other functions are held by the parallel-loop
   skeleton or by Deep Nesting under a shared `status`.
 
 - **The other three red files are saturated for a session's budget.** Stub probes found
@@ -116,7 +117,9 @@ playbook.
   `MagickTrue` after a failed row (W07); `morphology.c` `AcquireKernelInfo` leaks
   `kernel_cache` on a parse error (W07).
 
-- `visual-effects.c`: `PlasmaImageProxy` returns `MagickFalse` from its right-pixel
+- `visual-effects.c`: `IsPlasmaSegmentAtMidpoint` returns `MagickFalse`, the failure value,
+  for a degenerate segment, so `DividePlasmaSegment` ANDs it into its status;
+  `PlasmaImageProxy` returns `MagickFalse` from its right-pixel
   block when pixels are missing, `MagickTrue` from the left, bottom and top blocks;
   `MorphImages`' single-image branch writes `status` uninitialised and never reads it;
   `StereoAnaglyphImage`'s cancelled progress report sets `status` but the row loop
