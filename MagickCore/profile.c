@@ -2954,11 +2954,39 @@ MagickPrivate void SyncImageProfiles(Image *image)
     SyncXMPProfile(image,profile);
 }
 
+static void UpdateClipPathKnot(const ClipPathResizeInfo *resize,
+  unsigned char **blob,size_t *length)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < 3; i++)
+  {
+    double
+      x,
+      y;
+
+    signed int
+      xx,
+      yy;
+
+    y=(double) ReadProfileMSBLong(&(*blob),&(*length));
+    y=y*resize->old_rows/4096.0/4096.0;
+    y-=resize->new_geometry->y;
+    yy=(signed int) ((y*4096*4096)/resize->new_geometry->height);
+    WriteProfileLong(MSBEndian,(size_t) yy,(*blob)-4);
+    x=(double) ReadProfileMSBLong(&(*blob),&(*length));
+    x=x*resize->old_columns/4096.0/4096.0;
+    x-=resize->new_geometry->x;
+    xx=(signed int) ((x*4096*4096)/resize->new_geometry->width);
+    WriteProfileLong(MSBEndian,(size_t) xx,(*blob)-4);
+  }
+}
+
 static void UpdateClipPath(unsigned char *blob,size_t length,
   const ClipPathResizeInfo *resize)
 {
   ssize_t
-    i,
     knot_count,
     selector;
 
@@ -3002,27 +3030,7 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
         /*
           Add sub-path knot
         */
-        for (i=0; i < 3; i++)
-        {
-          double
-            x,
-            y;
-
-          signed int
-            xx,
-            yy;
-
-          y=(double) ReadProfileMSBLong(&blob,&length);
-          y=y*resize->old_rows/4096.0/4096.0;
-          y-=resize->new_geometry->y;
-          yy=(signed int) ((y*4096*4096)/resize->new_geometry->height);
-          WriteProfileLong(MSBEndian,(size_t) yy,blob-4);
-          x=(double) ReadProfileMSBLong(&blob,&length);
-          x=x*resize->old_columns/4096.0/4096.0;
-          x-=resize->new_geometry->x;
-          xx=(signed int) ((x*4096*4096)/resize->new_geometry->width);
-          WriteProfileLong(MSBEndian,(size_t) xx,blob-4);
-        }
+        UpdateClipPathKnot(resize,&blob,&length);
         knot_count--;
         break;
       }
