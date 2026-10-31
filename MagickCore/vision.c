@@ -2251,11 +2251,11 @@ static void LabelObjectRow(const CCLabelRow *label_row,
   }
 }
 
+#define ConnectedComponentsImageTag  "ConnectedComponents/Image"
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
-#define ConnectedComponentsImageTag  "ConnectedComponents/Image"
-
   CacheView
     *component_view,
     *image_view,
