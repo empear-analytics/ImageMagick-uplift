@@ -709,6 +709,38 @@ static inline void SetLCMSInfoScale(LCMSInfo *info,const double scale)
   info->scale[2]=scale;
   info->scale[3]=scale;
 }
+
+static void SetLCMSInfoIntent(const Image *image,LCMSInfo *target_info)
+{
+  switch (image->rendering_intent)
+  {
+    case AbsoluteIntent:
+    {
+      (*target_info).intent=INTENT_ABSOLUTE_COLORIMETRIC;
+      break;
+    }
+    case PerceptualIntent:
+    {
+      (*target_info).intent=INTENT_PERCEPTUAL;
+      break;
+    }
+    case RelativeIntent:
+    {
+      (*target_info).intent=INTENT_RELATIVE_COLORIMETRIC;
+      break;
+    }
+    case SaturationIntent:
+    {
+      (*target_info).intent=INTENT_SATURATION;
+      break;
+    }
+    default:
+    {
+      (*target_info).intent=INTENT_PERCEPTUAL;
+      break;
+    }
+  }
+}
 #endif
 
 static unsigned char
@@ -1363,34 +1395,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
                 ThrowProfileException(ImageError,
                   "ColorspaceColorProfileMismatch",name);
             }
-            switch (image->rendering_intent)
-            {
-              case AbsoluteIntent:
-              {
-                target_info.intent=INTENT_ABSOLUTE_COLORIMETRIC;
-                break;
-              }
-              case PerceptualIntent:
-              {
-                target_info.intent=INTENT_PERCEPTUAL;
-                break;
-              }
-              case RelativeIntent:
-              {
-                target_info.intent=INTENT_RELATIVE_COLORIMETRIC;
-                break;
-              }
-              case SaturationIntent:
-              {
-                target_info.intent=INTENT_SATURATION;
-                break;
-              }
-              default:
-              {
-                target_info.intent=INTENT_PERCEPTUAL;
-                break;
-              }
-            }
+            SetLCMSInfoIntent(image,&target_info);
             flags=cmsFLAGS_HIGHRESPRECALC;
 #if defined(cmsFLAGS_BLACKPOINTCOMPENSATION)
             if (image->black_point_compensation != MagickFalse)
