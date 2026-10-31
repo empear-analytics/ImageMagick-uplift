@@ -3221,6 +3221,40 @@ static MagickBooleanType ImportShortPixel(Image *image,
   return(ImportShortMapPixels(&loop,p));
 }
 
+static MagickBooleanType ImportMapQuantumGPR(const char *map,const ssize_t i,
+  QuantumType *quantum_map,ExceptionInfo *exception)
+{
+  switch (map[i])
+  {
+    case 'g':
+    case 'G':
+    {
+      quantum_map[i]=GreenQuantum;
+      break;
+    }
+    case 'P':
+    case 'p':
+    {
+      quantum_map[i]=UndefinedQuantum;
+      break;
+    }
+    case 'R':
+    case 'r':
+    {
+      quantum_map[i]=RedQuantum;
+      break;
+    }
+    default:
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",map);
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   const ssize_t y,const size_t width,const size_t height,const char *map,
   const StorageType type,const void *pixels,ExceptionInfo *exception)
@@ -3278,12 +3312,6 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
         (void) SetImageColorspace(image,CMYKColorspace,exception);
         break;
       }
-      case 'g':
-      case 'G':
-      {
-        quantum_map[i]=GreenQuantum;
-        break;
-      }
       case 'K':
       case 'k':
       {
@@ -3312,18 +3340,6 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
         image->alpha_trait=BlendPixelTrait;
         break;
       }
-      case 'P':
-      case 'p':
-      {
-        quantum_map[i]=UndefinedQuantum;
-        break;
-      }
-      case 'R':
-      case 'r':
-      {
-        quantum_map[i]=RedQuantum;
-        break;
-      }
       case 'Y':
       case 'y':
       {
@@ -3333,10 +3349,9 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
       }
       default:
       {
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-          "UnrecognizedPixelMap","`%s'",map);
-        return(MagickFalse);
+        if (ImportMapQuantumGPR(map,i,quantum_map,exception) == MagickFalse)
+          return(MagickFalse);
+        break;
       }
     }
   }
