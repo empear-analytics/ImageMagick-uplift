@@ -1467,6 +1467,20 @@ static void BlurBilateralRow(const BilateralRow *row,Quantum *magick_restrict q)
   }
 }
 
+static MagickBooleanType CloneDirectImage(const Image *image,
+  Image **blur_image,ExceptionInfo *exception)
+{
+  *blur_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*blur_image == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(*blur_image,DirectClass,exception) == MagickFalse)
+    {
+      *blur_image=DestroyImage(*blur_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1505,14 +1519,8 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  blur_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (blur_image == (Image *) NULL)
+  if (CloneDirectImage(image,&blur_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(blur_image,DirectClass,exception) == MagickFalse)
-    {
-      blur_image=DestroyImage(blur_image);
-      return((Image *) NULL);
-    }
   number_threads=(size_t) GetMagickResourceLimit(ThreadResource);
   weights=AcquireBilateralTLS(number_threads,MagickMax(width,1),
     MagickMax(height,1));
