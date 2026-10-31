@@ -1933,6 +1933,17 @@ static inline MagickBooleanType IsResizeSizeUnchanged(const Image *image,
     MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType SetDirectClassOrDestroy(Image *resize_image,
+  ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(resize_image,DirectClass,exception) == MagickFalse)
+    {
+      resize_image=DestroyImage(resize_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -1974,11 +1985,8 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
   resize_image=CloneImage(image,columns,rows,MagickTrue,exception);
   if (resize_image == (Image *) NULL)
     return((Image *) NULL);
-  if (SetImageStorageClass(resize_image,DirectClass,exception) == MagickFalse)
-    {
-      resize_image=DestroyImage(resize_image);
-      return((Image *) NULL);
-    }
+  if (SetDirectClassOrDestroy(resize_image,exception) == MagickFalse)
+    return((Image *) NULL);
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
