@@ -195,6 +195,19 @@ static void CropAreaTileRow(const AreaTileRow *row,PointInfo *offset,
   }
 }
 
+static RectangleInfo GetTilePage(const Image *image)
+{
+  RectangleInfo
+    page;
+
+  page=image->page;
+  if (page.width == 0)
+    page.width=image->columns;
+  if (page.height == 0)
+    page.height=image->rows;
+  return(page);
+}
+
 MagickExport Image *CropImageToTiles(const Image *image,
   const char *crop_geometry,ExceptionInfo *exception)
 {
@@ -319,11 +332,7 @@ MagickExport Image *CropImageToTiles(const Image *image,
       /*
         Crop into tiles of fixed size WxH.
       */
-      page=image->page;
-      if (page.width == 0)
-        page.width=image->columns;
-      if (page.height == 0)
-        page.height=image->rows;
+      page=GetTilePage(image);
       width=geometry.width;
       if (width == 0)
         width=page.width;
