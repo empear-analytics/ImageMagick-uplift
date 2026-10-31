@@ -16,6 +16,7 @@ every step that read a recipe closely, before pushing.
 | `layer-merge.c` | 9.08 → **10.0** |
 | `gem.c` | 9.21 → **10.0** |
 | `colormap.c` | 9.36 → **10.0** |
+| `histogram.c` | 7.47 → **9.68** (only a public signature's Excess Arguments left) |
 | `prepress.c` | 9.49 → 9.61 |
 | `quantize-posterize.c` | 8.18 → 9.47 |
 | `resize-sample.c` | 9.10 → 9.47 |
@@ -34,17 +35,32 @@ every step that read a recipe closely, before pushing.
 | `shear-rotate.c` | 7.05 → 7.63 |
 | `shear.c` | 6.47 → 7.62 |
 | `montage.c` | 6.61 → 7.36 |
+| `resample.c` | 7.30 → 7.42 |
+| `attribute.c` | 6.58 → 7.11 |
+| `resize.c` | 6.50 → 7.08 |
+| `layer.c` | 6.51 → 7.07 |
+| `resize-image.c` | 6.46 → 6.83 |
+| `paint.c` | 6.10 → 6.24 |
 | `compare.c` | 2.43 → 2.54 |
 | `channel.c` | 6.93 (no legal step; see *For the owner*) |
 | `effect.c` | 3.52 (no legal step; saturated, see below) |
 
-188 commits: 156 refactor steps, 25 playbook commits, 7 docs commits. Six files reached
-10.0. Every refactor commit ran the oracle on its function's cases (0 diverged) and
+256 commits: 208 refactor steps, 33 playbook commits, 15 docs commits (plateau rows and
+this report). 34 file passes; six files reached 10.0 and eight more passed 9. Every refactor commit ran the oracle on its function's cases (0 diverged) and
 passed the pre-commit gate; the whole catalogue ran after each file: 15,900 cases,
 0 diverged.
 
 ### Catalogue changes
 
+- **Later in the night:** **LT** (a `for` loop followed directly by a test of its own
+  condition: the condition is true after the loop exactly when the body broke out, so the
+  loop moves to a function returning success and the caller keeps the exit) and **RF**
+  (see *For the owner*); amendments to B (an address-of-local member; a struct reached
+  only through `const Name *`), V step 7 and Y (a cleanup followed by `return(<expr>)`;
+  Y with V step 7's exits; a cursor read on entry and dead after it), E step 3 (a `const`
+  struct of pointers by value), SD step 7 (a `switch` without `default`: the new
+  function's `switch` ends in `default: break;`; cost: `-Wswitch` no longer flags an enum
+  constant added later), V step 6 (`return;` in a `void` function).
 - **New recipes:** **TW** (twin blocks in two functions to one helper with an input
   struct, one commit), **SV** (sibling blocks differing in one value; later: copies
   reading different variables under consistent renaming, a member-access value, a
@@ -96,6 +112,15 @@ passed the pre-commit gate; the whole catalogue ran after each file: 15,900 case
   image functions scores 7.32.
 - **Recipe B growing a caller that keeps Large Method** by the struct's fill lines would
   give `channel.c` +0.14; the gate refuses it.
+- **Recipe RF deletes code** (af9f429f6, used once in 19a15646e): a struct fill that
+  repeats an earlier identical fill of the same local, with nothing written in between,
+  is removed. The removed fills were added by the campaign's own Recipe N steps in
+  `FloodfillPaintImage` (N fills before each call), the object file is byte-identical, and
+  the oracle agrees; but AGENTS.md forbids deleting code that looks dead, so this is
+  yours to accept or refuse. Later briefs forbade new deleting recipes.
+- **Guard-only steps:** `resize.c`'s `LiquidRescaleImage` (seven E/P steps, +0.38) is
+  compiled but reached by no case, so those steps rest on the guard and reading, as
+  AGENTS.md allows for E and P. A `-liquid-rescale` case would make them oracle-verified.
 - **Readings worth a look:** Recipe Q for building a tile list through
   `AppendImageToList` (`transform-tiles.c`); a one-line `const` struct initialiser used to
   keep `SampleImage` at 70 lines (`resize-sample.c`, a form used 52 times before).
