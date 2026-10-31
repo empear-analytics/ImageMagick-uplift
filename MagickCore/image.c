@@ -4186,26 +4186,12 @@ static void SyncImageDepthAndFilterSettings(const ImageInfo *image_info,
     ParseChromaticityPrimary(option,&image->chromaticity.green_primary);
 }
 
-MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
+static void SyncImageRenderingSettings(const ImageInfo *image_info,
   Image *image,ExceptionInfo *exception)
 {
   const char
     *option;
 
-  ResolutionType
-    units;
-
-  /*
-    Sync image options.
-  */
-  assert(image_info != (const ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  SyncImageColorAndCodecSettings(image_info,image,exception);
-  SyncImageDepthAndFilterSettings(image_info,image);
   option=GetImageOption(image_info,"intent");
   if (option != (const char *) NULL)
     image->rendering_intent=(RenderingIntent) ParseCommandOption(
@@ -4233,6 +4219,29 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
   if (option != (const char *) NULL)
     image->orientation=(OrientationType) ParseCommandOption(
       MagickOrientationOptions,MagickFalse,option);
+}
+
+MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
+  Image *image,ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  ResolutionType
+    units;
+
+  /*
+    Sync image options.
+  */
+  assert(image_info != (const ImageInfo *) NULL);
+  assert(image_info->signature == MagickCoreSignature);
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  SyncImageColorAndCodecSettings(image_info,image,exception);
+  SyncImageDepthAndFilterSettings(image_info,image);
+  SyncImageRenderingSettings(image_info,image,exception);
   option=GetImageOption(image_info,"page");
   if (option != (const char *) NULL)
     (void) ParsePageGeometryOption(option,&image->page);
