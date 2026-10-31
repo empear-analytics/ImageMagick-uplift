@@ -1429,6 +1429,17 @@ static inline MagickBooleanType IsFourierMemoryMissing(
     (inverse_info == (MemoryInfo *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static void RelinquishInverseFourierMemory(MemoryInfo *magnitude_info,
+  MemoryInfo *phase_info,MemoryInfo *inverse_info)
+{
+  if (magnitude_info != (MemoryInfo *) NULL)
+    magnitude_info=RelinquishVirtualMemory(magnitude_info);
+  if (phase_info != (MemoryInfo *) NULL)
+    phase_info=RelinquishVirtualMemory(phase_info);
+  if (inverse_info != (MemoryInfo *) NULL)
+    inverse_info=RelinquishVirtualMemory(inverse_info);
+}
+
 static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   const Image *magnitude_image,const Image *phase_image,
   fftw_complex *fourier_pixels,ExceptionInfo *exception)
@@ -1469,12 +1480,7 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   if (IsFourierMemoryMissing(magnitude_info,phase_info,inverse_info) !=
       MagickFalse)
     {
-      if (magnitude_info != (MemoryInfo *) NULL)
-        magnitude_info=RelinquishVirtualMemory(magnitude_info);
-      if (phase_info != (MemoryInfo *) NULL)
-        phase_info=RelinquishVirtualMemory(phase_info);
-      if (inverse_info != (MemoryInfo *) NULL)
-        inverse_info=RelinquishVirtualMemory(inverse_info);
+      RelinquishInverseFourierMemory(magnitude_info,phase_info,inverse_info);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",
         magnitude_image->filename);
