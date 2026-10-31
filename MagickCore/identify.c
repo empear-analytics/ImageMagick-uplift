@@ -1631,6 +1631,20 @@ static void PrintImageType(FILE *file,const Image *image,
       MagickTypeOptions,(ssize_t) image->type));
 }
 
+static void PrintImageDepth(FILE *file,const Image *image,
+  const size_t depth)
+{
+  if (depth != 0)
+    {
+      if (image->depth == depth)
+        (void) FormatLocaleFile(file,"  Depth: %.17g-bit\n",(double)
+          image->depth);
+      else
+        (void) FormatLocaleFile(file,"  Depth: %.17g/%.17g-bit\n",(double)
+          image->depth,(double) depth);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1792,15 +1806,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   PrintImageType(file,image,exception);
   (void) FormatLocaleFile(file,"  Endianness: %s\n",CommandOptionToMnemonic(
     MagickEndianOptions,(ssize_t) image->endian));
-  if (depth != 0)
-    {
-      if (image->depth == depth)
-        (void) FormatLocaleFile(file,"  Depth: %.17g-bit\n",(double)
-          image->depth);
-      else
-        (void) FormatLocaleFile(file,"  Depth: %.17g/%.17g-bit\n",(double)
-          image->depth,(double) depth);
-    }
+  PrintImageDepth(file,image,depth);
   (void) FormatLocaleFile(file,"  Channels: %g.%g\n",(double)
     image->number_channels,(double) image->number_meta_channels);
   if (channel_statistics != (ChannelStatistics *) NULL)
