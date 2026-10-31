@@ -2525,6 +2525,51 @@ MagickExport MagickBooleanType ImageToFile(Image *image,char *filename,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _TemporaryBlobWrite
+{
+  ImageInfo
+    *blob_info;
+
+  Image
+    *images;
+
+  size_t
+    *length;
+
+  ExceptionInfo
+    *exception;
+} TemporaryBlobWrite;
+
+static void *WriteImagesBlobFile(const TemporaryBlobWrite *temporary,
+  const char *unique,void *blob)
+{
+  ImageInfo
+    *const blob_info = temporary->blob_info;
+
+  Image
+    *const images = temporary->images;
+
+  size_t
+    *const length = temporary->length;
+
+  ExceptionInfo
+    *const exception = temporary->exception;
+
+  char
+    filename[MagickPathExtent];
+
+  MagickBooleanType
+    status;
+
+  (void) FormatLocaleString(filename,MagickPathExtent,"%s:%s",
+    images->magick,unique);
+  status=WriteImages(blob_info,images,filename,exception);
+  (void) fclose(blob_info->file);
+  if (status != MagickFalse)
+    blob=FileToBlob(unique,SIZE_MAX,length,exception);
+  return(blob);
+}
+
 MagickExport void *ImagesToBlob(const ImageInfo *image_info,Image *images,
   size_t *length,ExceptionInfo *exception)
 {
@@ -2596,7 +2641,6 @@ MagickExport void *ImagesToBlob(const ImageInfo *image_info,Image *images,
   else
     {
       char
-        filename[MagickPathExtent],
         unique[MagickPathExtent];
 
       int
@@ -2616,12 +2660,14 @@ MagickExport void *ImagesToBlob(const ImageInfo *image_info,Image *images,
           blob_info->file=fdopen(file,"wb");
           if (blob_info->file != (FILE *) NULL)
             {
-              (void) FormatLocaleString(filename,MagickPathExtent,"%s:%s",
-                images->magick,unique);
-              status=WriteImages(blob_info,images,filename,exception);
-              (void) fclose(blob_info->file);
-              if (status != MagickFalse)
-                blob=FileToBlob(unique,SIZE_MAX,length,exception);
+              TemporaryBlobWrite
+                temporary;
+
+              temporary.blob_info=blob_info;
+              temporary.images=images;
+              temporary.length=length;
+              temporary.exception=exception;
+              blob=WriteImagesBlobFile(&temporary,unique,blob);
             }
           (void) RelinquishUniqueFileResource(unique);
         }
