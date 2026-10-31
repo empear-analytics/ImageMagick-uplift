@@ -771,6 +771,12 @@ static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
   return(MagickTrue);
 }
 
+static inline MagickBooleanType IsResizeSizeZero(const size_t columns,
+  const size_t rows)
+{
+  return(((columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   const size_t rows,const FilterType filter,ExceptionInfo *exception)
 {
@@ -802,7 +808,7 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((columns == 0) || (rows == 0))
+  if (IsResizeSizeZero(columns,rows) != MagickFalse)
     ThrowImageException(ImageError,"NegativeOrZeroImageSize");
   if (IsResizeIdentity(image,columns,rows,filter) != MagickFalse)
     return(CloneImage(image,0,0,MagickTrue,exception));
