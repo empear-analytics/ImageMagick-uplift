@@ -2138,6 +2138,19 @@ static PixelInfo GetReflectGradientColor(const GradientInfo *gradient,
   return(composite);
 }
 
+static double GetRepeatOffset(const double offset,const double extent)
+{
+  double
+    repeat;
+
+  repeat=fmod(offset,extent);
+  if (repeat < 0.0)
+    repeat=extent-fmod(-repeat,extent);
+  else
+    repeat=fmod(offset,extent);
+  return(repeat);
+}
+
 MagickExport MagickBooleanType DrawGradientImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -2283,22 +2296,14 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
               offset=GetStopColorOffset(gradient,x,y);
               if (gradient->type == LinearGradient)
                 {
-                  repeat=fmod(offset,length);
-                  if (repeat < 0.0)
-                    repeat=length-fmod(-repeat,length);
-                  else
-                    repeat=fmod(offset,length);
+                  repeat=GetRepeatOffset(offset,length);
                   antialias=(repeat < length) && ((repeat+1.0) > length) ?
                     MagickTrue : MagickFalse;
                   offset=MagickSafeReciprocal(length)*repeat;
                 }
               else
                 {
-                  repeat=fmod(offset,gradient->radius);
-                  if (repeat < 0.0)
-                    repeat=gradient->radius-fmod(-repeat,gradient->radius);
-                  else
-                    repeat=fmod(offset,gradient->radius);
+                  repeat=GetRepeatOffset(offset,gradient->radius);
                   antialias=repeat+1.0 > gradient->radius ? MagickTrue :
                     MagickFalse;
                   offset=repeat*MagickSafeReciprocal(gradient->radius);
