@@ -5950,6 +5950,37 @@ static void ImportAnyDepthOpacityQuantum(const Image *image,
   }
 }
 
+static void ImportOtherDepthOpacityQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import24BitFloatOpacityQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import64BitFloatOpacityQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ImportAnyDepthOpacityQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ImportOpacityQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo* exception)
 {
@@ -5976,27 +6007,9 @@ static void ImportOpacityQuantum(const Image *image,QuantumInfo *quantum_info,
       Import32BitOpacityQuantum(image,quantum_info,span);
       break;
     }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import24BitFloatOpacityQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import64BitFloatOpacityQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ImportAnyDepthOpacityQuantum(image,quantum_info,span);
+      ImportOtherDepthOpacityQuantum(image,quantum_info,span);
       break;
     }
   }
