@@ -2215,6 +2215,14 @@ static PixelInfo GetRepeatGradientColor(const RepeatGradientInfo *repeat_info,
   return(composite);
 }
 
+static inline MagickBooleanType IsOffGradientOrigin(
+  const SegmentInfo *gradient_vector,const ssize_t x,const ssize_t y)
+{
+  return(((x != CastDoubleToSsizeT(ceil(gradient_vector->x1-0.5))) ||
+    (y != CastDoubleToSsizeT(ceil(gradient_vector->y1-0.5)))) ? MagickTrue :
+    MagickFalse);
+}
+
 static double GetScaledStopOffset(const GradientInfo *gradient,
   const double length,const ssize_t x,const ssize_t y)
 {
@@ -2323,8 +2331,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
         case UndefinedSpread:
         case PadSpread:
         {
-          if ((x != CastDoubleToSsizeT(ceil(gradient_vector->x1-0.5))) ||
-              (y != CastDoubleToSsizeT(ceil(gradient_vector->y1-0.5))))
+          if (IsOffGradientOrigin(gradient_vector,x,y) != MagickFalse)
             {
               offset=GetScaledStopOffset(gradient,length,x,y);
             }
@@ -2333,8 +2340,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
         }
         case ReflectSpread:
         {
-          if ((x != CastDoubleToSsizeT(ceil(gradient_vector->x1-0.5))) ||
-              (y != CastDoubleToSsizeT(ceil(gradient_vector->y1-0.5))))
+          if (IsOffGradientOrigin(gradient_vector,x,y) != MagickFalse)
             {
               offset=GetScaledStopOffset(gradient,length,x,y);
             }
@@ -2360,8 +2366,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
 
           antialias=MagickFalse;
           repeat=0.0;
-          if ((x != CastDoubleToSsizeT(ceil(gradient_vector->x1-0.5))) ||
-              (y != CastDoubleToSsizeT(ceil(gradient_vector->y1-0.5))))
+          if (IsOffGradientOrigin(gradient_vector,x,y) != MagickFalse)
             {
               offset=GetStopColorOffset(gradient,x,y);
               if (gradient->type == LinearGradient)
