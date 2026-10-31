@@ -2983,6 +2983,23 @@ static void UpdateClipPathKnot(const ClipPathResizeInfo *resize,
   }
 }
 
+static void SkipClipPathRecord(const ssize_t selector,unsigned char **blob,
+  size_t *length)
+{
+  switch (selector)
+  {
+    case 6:
+    case 7:
+    case 8:
+    default:
+    {
+      (*blob)+=24;
+      (*length)-=(size_t) MagickMin((*length),24);
+      break;
+    }
+  }
+}
+
 static void UpdateClipPath(unsigned char *blob,size_t length,
   const ClipPathResizeInfo *resize)
 {
@@ -3034,13 +3051,9 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
         knot_count--;
         break;
       }
-      case 6:
-      case 7:
-      case 8:
       default:
       {
-        blob+=24;
-        length-=(size_t) MagickMin(length,24);
+        SkipClipPathRecord(selector,&blob,&length);
         break;
       }
     }
