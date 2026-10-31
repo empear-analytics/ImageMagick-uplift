@@ -929,6 +929,16 @@ static void RelinquishStretchMemory(double *histogram,Quantum *stretch_map,
     black=(Quantum *) RelinquishMagickMemory(black);
 }
 
+static void SetStretchGrayColorspace(Image *image,ExceptionInfo *exception)
+{
+  ImageType
+    type;
+
+  type=IdentifyImageType(image,exception);
+  if (IsGrayImageType(type) != MagickFalse)
+    (void) SetImageColorspace(image,GRAYColorspace,exception);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -942,9 +952,6 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
 
   double
     *histogram;
-
-  ImageType
-    type;
 
   MagickBooleanType
     status;
@@ -970,9 +977,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   assert(image->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  type=IdentifyImageType(image,exception);
-  if (IsGrayImageType(type) != MagickFalse)
-    (void) SetImageColorspace(image,GRAYColorspace,exception);
+  SetStretchGrayColorspace(image,exception);
   black=(Quantum *) AcquireQuantumMemory(MaxPixelChannels,sizeof(*black));
   white=(Quantum *) AcquireQuantumMemory(MaxPixelChannels,sizeof(*white));
   stretch_map=(Quantum *) AcquireQuantumMemory(MaxMap+1UL,MaxPixelChannels*
