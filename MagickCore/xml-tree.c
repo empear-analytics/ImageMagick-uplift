@@ -2660,6 +2660,19 @@ static XMLTreeInfo *CheckXMLTreeClosed(XMLTreeRoot *root,
   return(&root->root);
 }
 
+static MagickBooleanType SkipToRootTag(char **p,ExceptionInfo *exception)
+{
+  while ((**p != '\0') && (**p != '<'))
+    (*p)++;
+  if (**p == '\0')
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "ParseError","root tag missing");
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2711,12 +2724,8 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
   terminal=utf8[length-1];
   utf8[length-1]='\0';
   p=utf8;
-  while ((*p != '\0') && (*p != '<'))
-    p++;
-  if (*p == '\0')
+  if (SkipToRootTag(&p,exception) == MagickFalse)
     {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "ParseError","root tag missing");
       utf8=DestroyString(utf8);
       return((XMLTreeInfo *) NULL);
     }
