@@ -1809,6 +1809,69 @@ static inline MagickBooleanType ValidatePixelCacheMorphology(
   return(MagickTrue);
 }
 
+typedef struct _ImagePixelCacheClone
+{
+  Image
+    *image;
+
+  MagickBooleanType
+    clone;
+
+  CacheInfo
+    *cache_info;
+
+  ExceptionInfo
+    *exception;
+} ImagePixelCacheClone;
+
+static void CloneImagePixelCache(const ImagePixelCacheClone *pixel_cache_clone,
+  MagickBooleanType *status,MagickBooleanType *destroy)
+{
+  Image
+    *const image = pixel_cache_clone->image;
+
+  const MagickBooleanType
+    clone = pixel_cache_clone->clone;
+
+  CacheInfo
+    *const cache_info = pixel_cache_clone->cache_info;
+
+  ExceptionInfo
+    *const exception = pixel_cache_clone->exception;
+
+  CacheInfo
+    *clone_info;
+
+  Image
+    clone_image;
+
+  /*
+    Clone pixel cache.
+  */
+  clone_image=(*image);
+  clone_image.semaphore=AcquireSemaphoreInfo();
+  clone_image.reference_count=1;
+  clone_image.cache=ClonePixelCache(cache_info);
+  clone_info=(CacheInfo *) clone_image.cache;
+  *status=OpenPixelCache(&clone_image,IOMode,exception);
+  if (*status == MagickFalse)
+    clone_info=(CacheInfo *) DestroyPixelCache(clone_info);
+  else
+    {
+      if (clone != MagickFalse)
+        *status=ClonePixelCacheRepository(clone_info,cache_info,
+          exception);
+      if (*status == MagickFalse)
+        clone_info=(CacheInfo *) DestroyPixelCache(clone_info);
+      else
+        {
+          *destroy=MagickTrue;
+          image->cache=clone_info;
+        }
+    }
+  RelinquishSemaphoreInfo(&clone_image.semaphore);
+}
+
 static Cache GetImagePixelCache(Image *image,const MagickBooleanType clone,
   ExceptionInfo *exception)
 {
@@ -1869,37 +1932,14 @@ static Cache GetImagePixelCache(Image *image,const MagickBooleanType clone,
       LockSemaphoreInfo(cache_info->semaphore);
       if ((cache_info->reference_count > 1) || (cache_info->mode == ReadMode))
         {
-          CacheInfo
-            *clone_info;
+          ImagePixelCacheClone
+            pixel_cache_clone;
 
-          Image
-            clone_image;
-
-          /*
-            Clone pixel cache.
-          */
-          clone_image=(*image);
-          clone_image.semaphore=AcquireSemaphoreInfo();
-          clone_image.reference_count=1;
-          clone_image.cache=ClonePixelCache(cache_info);
-          clone_info=(CacheInfo *) clone_image.cache;
-          status=OpenPixelCache(&clone_image,IOMode,exception);
-          if (status == MagickFalse)
-            clone_info=(CacheInfo *) DestroyPixelCache(clone_info);
-          else
-            {
-              if (clone != MagickFalse)
-                status=ClonePixelCacheRepository(clone_info,cache_info,
-                  exception);
-              if (status == MagickFalse)
-                clone_info=(CacheInfo *) DestroyPixelCache(clone_info);
-              else
-                {
-                  destroy=MagickTrue;
-                  image->cache=clone_info;
-                }
-            }
-          RelinquishSemaphoreInfo(&clone_image.semaphore);
+          pixel_cache_clone.image=image;
+          pixel_cache_clone.clone=clone;
+          pixel_cache_clone.cache_info=cache_info;
+          pixel_cache_clone.exception=exception;
+          CloneImagePixelCache(&pixel_cache_clone,&status,&destroy);
         }
       UnlockSemaphoreInfo(cache_info->semaphore);
     }
