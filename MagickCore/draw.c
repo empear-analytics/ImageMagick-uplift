@@ -5644,6 +5644,65 @@ typedef struct _ExtentInfo
     y2;
 } ExtentInfo;
 
+typedef struct _PolygonPointRow
+{
+  Image
+    *image;
+
+  const DrawInfo
+    *draw_info;
+
+  const PrimitiveInfo
+    *primitive_info;
+
+  ExtentInfo
+    poly_extent;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} PolygonPointRow;
+
+static void DrawPolygonPointRow(const PolygonPointRow *row,ssize_t x,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const image = row->image;
+
+  const DrawInfo
+    *const draw_info = row->draw_info;
+
+  const PrimitiveInfo
+    *const primitive_info = row->primitive_info;
+
+  const ExtentInfo
+    poly_extent = row->poly_extent;
+
+  const ssize_t
+    y = row->y;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  PixelInfo
+    pixel;
+
+  GetPixelInfo(image,&pixel);
+  for ( ; x <= poly_extent.x2; x++)
+  {
+    if ((x == CastDoubleToSsizeT(ceil(primitive_info->point.x-0.5))) &&
+        (y == CastDoubleToSsizeT(ceil(primitive_info->point.y-0.5))))
+      {
+        GetFillColor(draw_info,x-poly_extent.x1,y-poly_extent.y1,&pixel,
+          exception);
+        SetPixelViaPixelInfo(image,&pixel,q);
+      }
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 static MagickBooleanType DrawPolygonPrimitive(Image *image,
   const DrawInfo *draw_info,const PrimitiveInfo *primitive_info,
   ExceptionInfo *exception)
@@ -5736,8 +5795,8 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
 #endif
       for (y=poly_extent.y1; y <= poly_extent.y2; y++)
       {
-        PixelInfo
-          pixel;
+        PolygonPointRow
+          row;
 
         ssize_t
           x;
@@ -5755,18 +5814,13 @@ static MagickBooleanType DrawPolygonPrimitive(Image *image,
             status=MagickFalse;
             continue;
           }
-        GetPixelInfo(image,&pixel);
-        for ( ; x <= poly_extent.x2; x++)
-        {
-          if ((x == CastDoubleToSsizeT(ceil(primitive_info->point.x-0.5))) &&
-              (y == CastDoubleToSsizeT(ceil(primitive_info->point.y-0.5))))
-            {
-              GetFillColor(draw_info,x-poly_extent.x1,y-poly_extent.y1,&pixel,
-                exception);
-              SetPixelViaPixelInfo(image,&pixel,q);
-            }
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
+        row.image=image;
+        row.draw_info=draw_info;
+        row.primitive_info=primitive_info;
+        row.poly_extent=poly_extent;
+        row.y=y;
+        row.exception=exception;
+        DrawPolygonPointRow(&row,x,q);
         if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
           status=MagickFalse;
       }
