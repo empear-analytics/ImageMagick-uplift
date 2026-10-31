@@ -3069,6 +3069,77 @@ static MagickBooleanType CloneSteganoImage(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _SteganoPlane
+{
+  const Image
+    *watermark;
+
+  CacheView
+    *watermark_view;
+
+  Image
+    *stegano_image;
+
+  CacheView
+    *stegano_view;
+
+  size_t
+    depth,
+    one;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} SteganoPlane;
+
+static void HideSteganoPlane(const SteganoPlane *stegano_plane,int *c,
+  ssize_t *k,ssize_t *j)
+{
+  const Image
+    *const watermark = stegano_plane->watermark;
+
+  CacheView
+    *const watermark_view = stegano_plane->watermark_view;
+
+  Image
+    *const stegano_image = stegano_plane->stegano_image;
+
+  CacheView
+    *const stegano_view = stegano_plane->stegano_view;
+
+  const size_t
+    depth = stegano_plane->depth,
+    one = stegano_plane->one;
+
+  const ssize_t
+    i = stegano_plane->i;
+
+  ExceptionInfo
+    *const exception = stegano_plane->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; (y < (ssize_t) watermark->rows) && ((*j) < (ssize_t) depth); y++)
+  {
+    SteganoRow
+      stegano_row;
+
+    stegano_row.watermark=watermark;
+    stegano_row.watermark_view=watermark_view;
+    stegano_row.stegano_image=stegano_image;
+    stegano_row.stegano_view=stegano_view;
+    stegano_row.depth=depth;
+    stegano_row.one=one;
+    stegano_row.i=i;
+    stegano_row.y=y;
+    stegano_row.exception=exception;
+    HideSteganoRow(&stegano_row,c,k,j);
+  }
+}
+
 MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   ExceptionInfo *exception)
 {
@@ -3092,8 +3163,7 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   ssize_t
     i,
     j,
-    k,
-    y;
+    k;
 
   /*
     Initialize steganographic image attributes.
@@ -3122,22 +3192,18 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   stegano_view=AcquireAuthenticCacheView(stegano_image,exception);
   for (i=(ssize_t) depth-1; (i >= 0) && (j < (ssize_t) depth); i--)
   {
-    for (y=0; (y < (ssize_t) watermark->rows) && (j < (ssize_t) depth); y++)
-    {
-      SteganoRow
-        stegano_row;
+    SteganoPlane
+      stegano_plane;
 
-      stegano_row.watermark=watermark;
-      stegano_row.watermark_view=watermark_view;
-      stegano_row.stegano_image=stegano_image;
-      stegano_row.stegano_view=stegano_view;
-      stegano_row.depth=depth;
-      stegano_row.one=one;
-      stegano_row.i=i;
-      stegano_row.y=y;
-      stegano_row.exception=exception;
-      HideSteganoRow(&stegano_row,&c,&k,&j);
-    }
+    stegano_plane.watermark=watermark;
+    stegano_plane.watermark_view=watermark_view;
+    stegano_plane.stegano_image=stegano_image;
+    stegano_plane.stegano_view=stegano_view;
+    stegano_plane.depth=depth;
+    stegano_plane.one=one;
+    stegano_plane.i=i;
+    stegano_plane.exception=exception;
+    HideSteganoPlane(&stegano_plane,&c,&k,&j);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
