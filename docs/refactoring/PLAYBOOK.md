@@ -1274,7 +1274,10 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    takes `&v` or `&v.m` only as an argument to a pointer-to-`const` parameter of a
    callee that only reads through it, neither storing nor comparing the address; (c) no
    pointer to `v` or to a member of it is held anywhere the block can write through; and
-   (d) the block writes through none of its pointer members. Steps 3 to 6 then treat it
+   (d) the block writes through none of its pointer members, except through a callee
+   that received `&v` as (b) allows and writes only into what a pointer member points
+   to, an object other than `v` and its members (`ExportPixelBuffer`'s `pixels`, the
+   caller's output buffer). Steps 3 to 6 then treat it
    as a scalar: a member of the struct's type, `const PixelInfo v = name->v;` or
    `name->v.m`, and `name.v=v;`, a copy taken directly before the call.
 3. Declare `typedef struct _Name { ... } Name;` directly above the new function, one
@@ -1380,7 +1383,12 @@ static void ThresholdWaveletLevel(float *pixels,
   unseen: `&v` passed to a callee that writes through it (`GetPixelInfoPixel(image,p,&v)`
   inside the block refuses `v`), or a pointer to `v` kept elsewhere and written in the
   block. Reads through a pointer member reach the same object from the copy as from
-  `v`, since only the pointer is copied; (d) keeps writes through it out.
+  `v`, since only the pointer is copied; (d) keeps writes through it out, save one
+  kind: a write into the object a pointer member points to, made by a callee that
+  received `&v` (`ExportLongPixel(image,&roi,&buffer,exception)` filling
+  `buffer->pixels`). The copy's member holds the same address, so the write lands in
+  the same object, which is neither `v` nor part of it, and the copy itself is not
+  written: the callee's parameter is a pointer to `const`.
 - A callee that received `&v` through a pointer-to-`const` parameter now receives the
   copy's address: the same values at another address. That is the same behaviour only
   while the callee uses the pointer to read: one that stores it, compares it with
@@ -4064,6 +4072,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-25 | AMEND | E | Step 7: a block of a value-returning function whose every path ends in `return(<expr>);` moves to a function of the caller's return type; the block becomes `return(<call>);` | `QueryColorCompliance`'s fallback to a colour name when `ParseCSSColor` finds no values (probe: 2.89 to 2.91, bumps 6 to 5), refused by step 7's `void`-only wording | mandate (2026-10-24) |
 | 2026-10-31 | NEW | SR | Split a Selection at its Default, Returning Success: Recipe SD for a `switch` whose moved groups may leave through `return(R);` (`R` as Recipe W step 2 allows) and whose kept groups may hold any exit, none falling through; the new function is `static MagickBooleanType`, each `return(R);` becomes `return(MagickFalse);`, it ends with `return(MagickTrue);`, and the caller's `default:` writes `if (Helper(...) == MagickFalse) return(R); break;` | `pixel-export.c`'s `ExportImagePixels` (campaign B, task M117): the map parser's `switch` (twelve letter groups, four returning after the colourspace test, a returning `default`) holds about half of the cc 39; SD refuses its `return`s, W the cc 25 of a single helper. A probe of three chained functions: 6.20 to 6.40, no finding on a new function | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | SR | Step 3: moved groups whose inputs would number five or more take them in an input struct as Recipe N builds one (`const Name *name` first, then the variables that go by value; the call group declares, fills and passes the local), as SD step 3 allows Recipe Z's struct | `ExportImagePixels` (campaign B, task M117): its four colourspace-checked groups (C, K, M, Y) read `image`, `map`, `i` and `exception` and pass `quantum_map` by value, five inputs; a probe of four single-letter splits sharing one struct: 6.40 to 6.53, `ExportImagePixels` cc 26 to 14 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | N | Step 2 (d): a struct value may also be a member when the only writes through its pointer members are a callee's, made through the `&v` that (b) allows, into an object other than `v` (the copy holds the same address, so the write lands in the same object); *Careful* gives the argument | `ExportImagePixels` (campaign B, task M117): its storage-type `switch` passes `&roi` and `&buffer` (an `ExportPixelBuffer` whose `pixels` the `Export*Pixel` callees fill) to every group; SD with Recipe Z's struct needs `buffer` as a member. A probe: the `switch` split after `CharPixel`, 6.53 to 6.61, `ExportImagePixels` leaves *Complex Method* | mandate (2026-10-24) |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
