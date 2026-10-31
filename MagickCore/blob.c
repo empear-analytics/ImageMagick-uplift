@@ -3444,6 +3444,21 @@ static void GetBlobModeFlags(const BlobMode mode,int *flags,
   }
 }
 
+static void FormSharedListFilename(const Image *image,const char *extension,
+  char *filename)
+{
+  char
+    path[MagickPathExtent];
+
+  GetPathComponent(image->filename,RootPath,path);
+  if (*extension == '\0')
+    (void) FormatLocaleString(filename,MagickPathExtent,"%s-%.17g",
+      path,(double) image->scene);
+  else
+    (void) FormatLocaleString(filename,MagickPathExtent,
+      "%s-%.17g.%s",path,(double) image->scene,extension);
+}
+
 MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   Image *image,const BlobMode mode,ExceptionInfo *exception)
 {
@@ -3605,18 +3620,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
           (void) InterpretImageFilename(image_info,image,image->filename,(int)
             image->scene,filename,exception);
           if (IsSharedListFilename(filename,image) != MagickFalse)
-            {
-              char
-                path[MagickPathExtent];
-
-              GetPathComponent(image->filename,RootPath,path);
-              if (*extension == '\0')
-                (void) FormatLocaleString(filename,MagickPathExtent,"%s-%.17g",
-                  path,(double) image->scene);
-              else
-                (void) FormatLocaleString(filename,MagickPathExtent,
-                  "%s-%.17g.%s",path,(double) image->scene,extension);
-            }
+            FormSharedListFilename(image,extension,filename);
           (void) CopyMagickString(image->filename,filename,MagickPathExtent);
         }
       if (IsPathAuthorized(rights,filename) == MagickFalse)
