@@ -1101,6 +1101,18 @@ static void OilPaintRow(const OilPaintRowInfo *row,
   }
 }
 
+static MagickBooleanType PrepareOilPaintImage(Image *linear_image,
+  Image *paint_image,ExceptionInfo *exception)
+{
+  if (SetImageStorageClass(paint_image,DirectClass,exception) == MagickFalse)
+    {
+      linear_image=DestroyImage(linear_image);
+      paint_image=DestroyImage(paint_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *OilPaintImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1140,12 +1152,8 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
   paint_image=CloneImage(image,0,0,MagickTrue,exception);
   if ((linear_image == (Image *) NULL) || (paint_image == (Image *) NULL))
     return(DestroyOilPaintClones(linear_image,paint_image));
-  if (SetImageStorageClass(paint_image,DirectClass,exception) == MagickFalse)
-    {
-      linear_image=DestroyImage(linear_image);
-      paint_image=DestroyImage(paint_image);
-      return((Image *) NULL);
-    }
+  if (PrepareOilPaintImage(linear_image,paint_image,exception) == MagickFalse)
+    return((Image *) NULL);
   histograms=AcquireHistogramTLS(NumberPaintBins);
   if (histograms == (size_t **) NULL)
     {
