@@ -3890,16 +3890,7 @@ MagickExport Image *SmushImages(const Image *images,
     proceed=SetImageProgress(image,SmushImageTag,n,number_images);
     if (proceed == MagickFalse)
       break;
-    if (stack == MagickFalse)
-      {
-        x_offset+=(ssize_t) image->columns;
-        y_offset=0;
-      }
-    else
-      {
-        x_offset=0;
-        y_offset+=(ssize_t) image->rows;
-      }
+    AdvanceAppendOffset(image,stack,&x_offset,&y_offset);
     image=GetNextImageInList(image);
   }
   if (stack == MagickFalse)
