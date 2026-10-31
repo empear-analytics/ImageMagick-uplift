@@ -387,11 +387,8 @@ static inline MagickBooleanType IsDotRelativePath(const char *token)
     MagickTrue : MagickFalse);
 }
 
-static inline MagickBooleanType IsExecutableToken(const char *token)
+static inline MagickBooleanType HasExecutableLead(const char *token)
 {
-  size_t
-    length = 0;
-
   if ((token == (const char *) NULL) || (*token == '\0'))
     return(MagickFalse);
   if (*token == '-')
@@ -400,36 +397,31 @@ static inline MagickBooleanType IsExecutableToken(const char *token)
     return(MagickFalse);
   if ((*token == '\'') || (*token == '"'))
     return(MagickFalse);
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType IsExecutableToken(const char *token)
+{
+  size_t
+    length = 0;
+
+  if (HasExecutableLead(token) == MagickFalse)
+    return(MagickFalse);
   length=strlen(token);
-  if (length >= 3)
-    {
-      if (IsWindowsDrivePath(token) != MagickFalse)
-        return(MagickTrue);
-    }
+  if ((length >= 3) && (IsWindowsDrivePath(token) != MagickFalse))
+    return(MagickTrue);
   if (*token == '/')
     return(MagickTrue);
-  if (length >= 2)
-    {
-      if (IsDotRelativePath(token) != MagickFalse)
-        return(MagickTrue);
-    }
+  if ((length >= 2) && (IsDotRelativePath(token) != MagickFalse))
+    return(MagickTrue);
   if (isalnum((int) *token))
     return(MagickTrue);
   return(MagickFalse);
 }
 
-MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
-  const MagickBooleanType verbose,const char *command,char *message,
-  ExceptionInfo *exception)
+static MagickBooleanType AuthorizeDelegateArguments(char **arguments,
+  const int number_arguments,ExceptionInfo *exception)
 {
-  char
-    **arguments,
-    *sanitize_command;
-
-  int
-    number_arguments,
-    status;
-
   PolicyDomain
     domain;
 
@@ -439,17 +431,6 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
   ssize_t
     i;
 
-  status=(-1);
-  arguments=StringToArgv(command,&number_arguments);
-  if (arguments == (char **) NULL)
-    return(status);
-  if (*arguments[1] == '\0')
-    {
-      for (i=0; i < (ssize_t) number_arguments; i++)
-        arguments[i]=DestroyString(arguments[i]);
-      arguments=(char **) RelinquishMagickMemory(arguments);
-      return(-1);
-    }
   rights=ExecutePolicyRights;
   domain=DelegatePolicyDomain;
   for (i=1; i < (ssize_t) number_arguments; i++)
@@ -467,9 +448,41 @@ MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
         for (j=0; j < (ssize_t) number_arguments; j++)
           arguments[j]=DestroyString(arguments[j]);
         arguments=(char **) RelinquishMagickMemory(arguments);
-        return(-1);
+        return(MagickFalse);
       }
   }
+  return(MagickTrue);
+}
+
+MagickExport int ExternalDelegateCommand(const MagickBooleanType asynchronous,
+  const MagickBooleanType verbose,const char *command,char *message,
+  ExceptionInfo *exception)
+{
+  char
+    **arguments,
+    *sanitize_command;
+
+  int
+    number_arguments,
+    status;
+
+  ssize_t
+    i;
+
+  status=(-1);
+  arguments=StringToArgv(command,&number_arguments);
+  if (arguments == (char **) NULL)
+    return(status);
+  if (*arguments[1] == '\0')
+    {
+      for (i=0; i < (ssize_t) number_arguments; i++)
+        arguments[i]=DestroyString(arguments[i]);
+      arguments=(char **) RelinquishMagickMemory(arguments);
+      return(-1);
+    }
+  if (AuthorizeDelegateArguments(arguments,number_arguments,exception) ==
+      MagickFalse)
+    return(-1);
   if (verbose != MagickFalse)
     {
       (void) FormatLocaleFile(stderr,"%s\n",command);
@@ -987,9 +1000,67 @@ static inline MagickBooleanType IsPropertyEnd(const char *p)
     MagickFalse);
 }
 
-static char *InterpretDelegateProperties(ImageInfo *image_info,
-  Image *image,const char *embed_text,ExceptionInfo *exception)
+static void DecodeDelegateEscape(const char **p,char **q)
 {
+  switch (*(*p+1))
+  {
+    case '\0':
+      return;
+    case 'r':  /* convert to RETURN */
+    {
+      *(*q)++='\r';
+      (*p)++;
+      return;
+    }
+    case 'n':  /* convert to NEWLINE */
+    {
+      *(*q)++='\n';
+      (*p)++;
+      return;
+    }
+    case '\n':  /* EOL removal UNIX,MacOSX */
+    {
+      (*p)++;
+      return;
+    }
+    case '\r':  /* EOL removal DOS,Windows */
+    {
+      (*p)++;
+      if (**p == '\n') /* return-newline EOL */
+        (*p)++;
+      return;
+    }
+    default:
+    {
+      (*p)++;
+      *(*q)++=(**p);
+    }
+  }
+}
+
+static void DecodeDelegateEntity(const char **p,char **q)
+{
+  if (LocaleNCompare("&lt;",*p,4) == 0)
+    {
+      *(*q)++='<';
+      *p+=(ptrdiff_t) 3;
+    }
+  else
+    if (LocaleNCompare("&gt;",*p,4) == 0)
+      {
+        *(*q)++='>';
+        *p+=(ptrdiff_t) 3;
+      }
+    else
+      if (LocaleNCompare("&amp;",*p,5) == 0)
+        {
+          *(*q)++='&';
+          *p+=(ptrdiff_t) 4;
+        }
+      else
+        *(*q)++=(**p);
+}
+
 #define ExtendInterpretText(string_length) \
 { \
   size_t length=(string_length); \
@@ -1035,6 +1106,9 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
   q+=(ptrdiff_t) length; \
 }
 
+static char *InterpretDelegateProperties(ImageInfo *image_info,
+  Image *image,const char *embed_text,ExceptionInfo *exception)
+{
   char
     *interpret_text,
     *string;
@@ -1083,63 +1157,12 @@ static char *InterpretDelegateProperties(ImageInfo *image_info,
     {
       case '\\':
       {
-        switch (*(p+1))
-        {
-          case '\0':
-            continue;
-          case 'r':  /* convert to RETURN */
-          {
-            *q++='\r';
-            p++;
-            continue;
-          }
-          case 'n':  /* convert to NEWLINE */
-          {
-            *q++='\n';
-            p++;
-            continue;
-          }
-          case '\n':  /* EOL removal UNIX,MacOSX */
-          {
-            p++;
-            continue;
-          }
-          case '\r':  /* EOL removal DOS,Windows */
-          {
-            p++;
-            if (*p == '\n') /* return-newline EOL */
-              p++;
-            continue;
-          }
-          default:
-          {
-            p++;
-            *q++=(*p);
-          }
-        }
+        DecodeDelegateEscape(&p,&q);
         continue;
       }
       case '&':
       {
-        if (LocaleNCompare("&lt;",p,4) == 0)
-          {
-            *q++='<';
-            p+=(ptrdiff_t) 3;
-          }
-        else
-          if (LocaleNCompare("&gt;",p,4) == 0)
-            {
-              *q++='>';
-              p+=(ptrdiff_t) 3;
-            }
-          else
-            if (LocaleNCompare("&amp;",p,5) == 0)
-              {
-                *q++='&';
-                p+=(ptrdiff_t) 4;
-              }
-            else
-              *q++=(*p);
+        DecodeDelegateEntity(&p,&q);
         continue;
       }
       case '%':
@@ -1295,6 +1318,47 @@ MagickExport const char *GetDelegateCommands(const DelegateInfo *delegate_info)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType IsBidirectionalMismatch(
+  const DelegateInfo *delegate_info,const char *decode,const char *encode)
+{
+  if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
+      (LocaleCompare(encode,delegate_info->encode) == 0))
+    return(MagickFalse);
+  if ((LocaleCompare(decode,"*") == 0) &&
+      (LocaleCompare(encode,delegate_info->encode) == 0))
+    return(MagickFalse);
+  if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
+      (LocaleCompare(encode,"*") == 0))
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static void FindDelegateElement(const char *decode,const char *encode,
+  ElementInfo **p,const DelegateInfo **delegate_info)
+{
+  while (*p != (ElementInfo *) NULL)
+  {
+    *delegate_info=(const DelegateInfo* ) (*p)->value;
+    if ((*delegate_info)->mode > 0)
+      {
+        if (LocaleCompare((*delegate_info)->decode,decode) == 0)
+          break;
+        *p=(*p)->next;
+        continue;
+      }
+    if ((*delegate_info)->mode < 0)
+      {
+        if (LocaleCompare((*delegate_info)->encode,encode) == 0)
+          break;
+        *p=(*p)->next;
+        continue;
+      }
+    if (IsBidirectionalMismatch(*delegate_info,decode,encode) == MagickFalse)
+      break;
+    *p=(*p)->next;
+  }
+}
+
 MagickExport const DelegateInfo *GetDelegateInfo(const char *decode,
   const char *encode,ExceptionInfo *exception)
 {
@@ -1320,34 +1384,7 @@ MagickExport const DelegateInfo *GetDelegateInfo(const char *decode,
         delegate_info=(const DelegateInfo* ) p->value;
       return(delegate_info);
     }
-  while (p != (ElementInfo *) NULL)
-  {
-    delegate_info=(const DelegateInfo* ) p->value;
-    if (delegate_info->mode > 0)
-      {
-        if (LocaleCompare(delegate_info->decode,decode) == 0)
-          break;
-        p=p->next;
-        continue;
-      }
-    if (delegate_info->mode < 0)
-      {
-        if (LocaleCompare(delegate_info->encode,encode) == 0)
-          break;
-        p=p->next;
-        continue;
-      }
-    if (LocaleCompare(decode,delegate_info->decode) == 0)
-      if (LocaleCompare(encode,delegate_info->encode) == 0)
-        break;
-    if (LocaleCompare(decode,"*") == 0)
-      if (LocaleCompare(encode,delegate_info->encode) == 0)
-        break;
-    if (LocaleCompare(decode,delegate_info->decode) == 0)
-      if (LocaleCompare(encode,"*") == 0)
-        break;
-    p=p->next;
-  }
+  FindDelegateElement(decode,encode,&p,&delegate_info);
   if (p == (ElementInfo *) NULL)
     delegate_info=(const DelegateInfo *) NULL;
   else
@@ -1714,19 +1751,97 @@ static MagickBooleanType IsDelegateCacheInstantiated(ExceptionInfo *exception)
 %
 */
 
+static MagickBooleanType AuthorizeDelegateCopy(const char *source,
+  const char *destination,const int destination_file,ExceptionInfo *exception)
+{
+  if (IsPathAuthorized(WritePolicyRights,destination) == MagickFalse)
+    ThrowPolicyException(destination,MagickFalse);
+  if (IsPathAuthorized(ReadPolicyRights,source) == MagickFalse)
+    {
+      (void) close_utf8(destination_file);
+      ThrowPolicyException(source,MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static inline MagickBooleanType IsKeptDestination(
+  const MagickBooleanType overwrite,const char *destination,
+  struct stat *attributes)
+{
+  return(((overwrite == MagickFalse) &&
+    (GetPathAttributes(destination,attributes) != MagickFalse)) ? MagickTrue :
+    MagickFalse);
+}
+
+static size_t GetDelegateCopyQuantum(const int source_file)
+{
+  size_t
+    quantum;
+
+  struct stat
+    attributes = { 0 };
+
+  quantum=(size_t) MagickMaxBufferExtent;
+  if ((fstat(source_file,&attributes) == 0) && (attributes.st_size > 0))
+    quantum=MagickMin((size_t) attributes.st_size,MagickMaxBufferExtent);
+  return(quantum);
+}
+
+typedef struct _DelegateFileCopy
+{
+  int
+    source_file,
+    destination_file;
+
+  unsigned char
+    *buffer;
+
+  size_t
+    quantum;
+} DelegateFileCopy;
+
+static void CopyDelegateFileData(const DelegateFileCopy *copy,
+  MagickBooleanType *status)
+{
+  const int
+    source_file = copy->source_file,
+    destination_file = copy->destination_file;
+
+  unsigned char
+    *const buffer = copy->buffer;
+
+  const size_t
+    quantum = copy->quantum;
+
+  ssize_t
+    count = 0;
+
+  while ((count=read(source_file,buffer,quantum)) > 0)
+  {
+    ssize_t written = write(destination_file,buffer,(size_t) count);
+    if (written != count)
+      {
+        *status=MagickFalse;
+        break;
+      }
+  }
+  if (count < 0)
+    *status=MagickFalse;
+}
+
 static MagickBooleanType CopyDelegateFile(const char *source,
   const char *destination,const MagickBooleanType overwrite,
   ExceptionInfo *exception)
 {
+  DelegateFileCopy
+    copy;
+
   int
     destination_file = -1,
     source_file = -1;
 
   MagickBooleanType
     status = MagickTrue;
-
-  ssize_t
-    count = 0;
 
   size_t
     quantum = 0;
@@ -1742,8 +1857,7 @@ static MagickBooleanType CopyDelegateFile(const char *source,
   */
   assert(source != (const char *) NULL);
   assert(destination != (char *) NULL);
-  if ((overwrite == MagickFalse) &&
-      (GetPathAttributes(destination,&attributes) != MagickFalse))
+  if (IsKeptDestination(overwrite,destination,&attributes) != MagickFalse)
     return(MagickTrue);
   if (IsPathAuthorized(WritePolicyRights,destination) == MagickFalse)
     ThrowPolicyException(source,MagickFalse);
@@ -1751,22 +1865,16 @@ static MagickBooleanType CopyDelegateFile(const char *source,
     O_NOFOLLOW,S_MODE);
   if (destination_file == -1)
     return(MagickFalse);
-  if (IsPathAuthorized(WritePolicyRights,destination) == MagickFalse)
-    ThrowPolicyException(destination,MagickFalse);
-  if (IsPathAuthorized(ReadPolicyRights,source) == MagickFalse)
-    {
-      (void) close_utf8(destination_file);
-      ThrowPolicyException(source,MagickFalse);
-    }
+  if (AuthorizeDelegateCopy(source,destination,destination_file,exception) ==
+      MagickFalse)
+    return(MagickFalse);
   source_file=open_utf8(source,O_RDONLY | O_CLOEXEC | O_BINARY,0);
   if (source_file == -1)
     {
       (void) close_utf8(destination_file);
       return(MagickFalse);
     }
-  quantum=(size_t) MagickMaxBufferExtent;
-  if ((fstat(source_file,&attributes) == 0) && (attributes.st_size > 0))
-    quantum=MagickMin((size_t) attributes.st_size,MagickMaxBufferExtent);
+  quantum=GetDelegateCopyQuantum(source_file);
   buffer=(unsigned char *) AcquireQuantumMemory(quantum,sizeof(*buffer));
   if (buffer == (unsigned char *) NULL)
     {
@@ -1774,17 +1882,11 @@ static MagickBooleanType CopyDelegateFile(const char *source,
       (void) close_utf8(destination_file);
       return(MagickFalse);
     }
-  while ((count=read(source_file,buffer,quantum)) > 0)
-  {
-    ssize_t written = write(destination_file,buffer,(size_t) count);
-    if (written != count)
-      {
-        status=MagickFalse;
-        break;
-      }
-  }
-  if (count < 0)
-    status=MagickFalse;
+  copy.source_file=source_file;
+  copy.destination_file=destination_file;
+  copy.buffer=buffer;
+  copy.quantum=quantum;
+  CopyDelegateFileData(&copy,&status);
   (void) close_utf8(destination_file);
   (void) close_utf8(source_file);
   buffer=(unsigned char *) RelinquishMagickMemory(buffer);
@@ -1811,6 +1913,231 @@ static void WaitForDelegateInput(const Image *image)
   count=20;
   while ((count-- > 0) && (access_utf8(image->filename,F_OK) == 0))
     (void) MagickDelay(100);  /* sleep 0.1 seconds */
+}
+
+typedef struct _DelegateInvocation
+{
+  ImageInfo
+    *image_info;
+
+  Image
+    *image;
+
+  const char
+    *decode,
+    *encode;
+
+  ExceptionInfo
+    *exception;
+
+  const DelegateInfo
+    *delegate_info;
+
+  MagickBooleanType
+    temporary;
+} DelegateInvocation;
+
+static MagickBooleanType WriteDelegateImages(
+  const DelegateInvocation *invocation,ImageInfo **clone_info)
+{
+  ImageInfo
+    *const image_info = invocation->image_info;
+
+  Image
+    *const image = invocation->image;
+
+  const char
+    *const decode = invocation->decode,
+    *const encode = invocation->encode;
+
+  ExceptionInfo
+    *const exception = invocation->exception;
+
+  const DelegateInfo
+    *const delegate_info = invocation->delegate_info;
+
+  const MagickBooleanType
+    temporary = invocation->temporary;
+
+  Image
+    *p;
+
+  MagickBooleanType
+    status;
+
+  for (p=image; p != (Image *) NULL; p=GetNextImageInList(p))
+  {
+    (void) FormatLocaleString(p->filename,MagickPathExtent,"%s:%s",
+      delegate_info->decode,(*clone_info)->filename);
+    status=WriteImage(*clone_info,p,exception);
+    if (status == MagickFalse)
+      {
+        (void) RelinquishUniqueFileResource(image_info->unique);
+        if (temporary != MagickFalse)
+          (void) RelinquishUniqueFileResource(image->filename);
+        *clone_info=DestroyImageInfo(*clone_info);
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
+        return(MagickFalse);
+      }
+    if ((*clone_info)->adjoin != MagickFalse)
+      break;
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType ConvertDelegateInput(
+  const DelegateInvocation *request)
+{
+  ImageInfo
+    *const image_info = request->image_info;
+
+  Image
+    *const image = request->image;
+
+  const char
+    *const decode = request->decode,
+    *const encode = request->encode;
+
+  ExceptionInfo
+    *const exception = request->exception;
+
+  const DelegateInfo
+    *const delegate_info = request->delegate_info;
+
+  const MagickBooleanType
+    temporary = request->temporary;
+
+  char
+    *magick;
+
+  DelegateInvocation
+    invocation;
+
+  ImageInfo
+    *clone_info;
+
+  /*
+    Delegate requires a particular image format.
+  */
+  if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
+    {
+      ThrowFileException(exception,FileOpenError,
+        "UnableToCreateTemporaryFile",image_info->unique);
+      return(MagickFalse);
+    }
+  magick=InterpretImageProperties(image_info,image,decode != (char *) NULL ?
+    delegate_info->encode : delegate_info->decode,exception);
+  if (magick == (char *) NULL)
+    {
+      (void) RelinquishUniqueFileResource(image_info->unique);
+      if (temporary != MagickFalse)
+        (void) RelinquishUniqueFileResource(image->filename);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
+      return(MagickFalse);
+    }
+  LocaleUpper(magick);
+  clone_info=CloneImageInfo(image_info);
+  (void) CopyMagickString((char *) clone_info->magick,magick,
+    MagickPathExtent);
+  if (LocaleCompare(magick,"NULL") != 0)
+    (void) CopyMagickString(image->magick,magick,MagickPathExtent);
+  magick=DestroyString(magick);
+  (void) FormatLocaleString(clone_info->filename,MagickPathExtent,"%s:",
+    delegate_info->decode);
+  (void) SetImageInfo(clone_info,(unsigned int) GetImageListLength(image),
+    exception);
+  (void) CopyMagickString(clone_info->filename,image_info->filename,
+    MagickPathExtent);
+  (void) CopyMagickString(image_info->filename,image->filename,
+    MagickPathExtent);
+  invocation.image_info=image_info;
+  invocation.image=image;
+  invocation.decode=decode;
+  invocation.encode=encode;
+  invocation.exception=exception;
+  invocation.delegate_info=delegate_info;
+  invocation.temporary=temporary;
+  if (WriteDelegateImages(&invocation,&clone_info) == MagickFalse)
+    return(MagickFalse);
+  (void) RelinquishUniqueFileResource(image_info->unique);
+  clone_info=DestroyImageInfo(clone_info);
+  return(MagickTrue);
+}
+
+static void RestoreDelegateInput(const Image *image,
+  const char *input_filename,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (IsPathAccessible(input_filename) != MagickFalse)
+    {
+      if (CopyDelegateFile(image->filename,input_filename,MagickFalse,exception) == MagickFalse)
+        {
+          (void) RelinquishUniqueFileResource(input_filename);
+          *status=MagickFalse;
+        }
+    }
+}
+
+static MagickBooleanType LinkDelegateInput(Image *image,
+  const char *input_filename,ExceptionInfo *exception,
+  MagickBooleanType *status)
+{
+  if (IsPathAccessible(input_filename) != MagickFalse)
+    {
+      *status=AcquireUniqueSymbolicLink(input_filename,image->filename);
+      if (*status == MagickFalse)
+        {
+          ThrowFileException(exception,FileOpenError,
+            "UnableToCreateTemporaryFile",input_filename);
+          return(MagickFalse);
+        }
+    }
+  return(MagickTrue);
+}
+
+typedef struct _DelegateExecution
+{
+  const DelegateInfo
+    *delegate_info;
+
+  ImageInfo
+    *image_info;
+
+  Image
+    *image;
+
+  ExceptionInfo
+    *exception;
+} DelegateExecution;
+
+static void ExecuteDelegateCommand(const DelegateExecution *execution,
+  MagickBooleanType *status,char **command)
+{
+  const DelegateInfo
+    *const delegate_info = execution->delegate_info;
+
+  ImageInfo
+    *const image_info = execution->image_info;
+
+  Image
+    *const image = execution->image;
+
+  ExceptionInfo
+    *const exception = execution->exception;
+
+  if (*command != (char *) NULL)
+    {
+      /*
+        Execute delegate.
+      */
+      if (ExternalDelegateCommand(delegate_info->spawn,image_info->verbose,*command,(char *) NULL,exception) != 0)
+        *status=MagickFalse;
+      if (delegate_info->spawn != MagickFalse)
+        WaitForDelegateInput(image);
+      *command=DestroyString(*command);
+    }
 }
 
 MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
@@ -1882,70 +2209,18 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
     }
   if (IsTwoStepDelegate(delegate_info,decode,encode) != MagickFalse)
     {
-      char
-        *magick;
+      DelegateInvocation
+        request;
 
-      ImageInfo
-        *clone_info;
-
-      Image
-        *p;
-
-      /*
-        Delegate requires a particular image format.
-      */
-      if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
-        {
-          ThrowFileException(exception,FileOpenError,
-            "UnableToCreateTemporaryFile",image_info->unique);
-          return(MagickFalse);
-        }
-      magick=InterpretImageProperties(image_info,image,decode != (char *) NULL ?
-        delegate_info->encode : delegate_info->decode,exception);
-      if (magick == (char *) NULL)
-        {
-          (void) RelinquishUniqueFileResource(image_info->unique);
-          if (temporary != MagickFalse)
-            (void) RelinquishUniqueFileResource(image->filename);
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
-          return(MagickFalse);
-        }
-      LocaleUpper(magick);
-      clone_info=CloneImageInfo(image_info);
-      (void) CopyMagickString((char *) clone_info->magick,magick,
-        MagickPathExtent);
-      if (LocaleCompare(magick,"NULL") != 0)
-        (void) CopyMagickString(image->magick,magick,MagickPathExtent);
-      magick=DestroyString(magick);
-      (void) FormatLocaleString(clone_info->filename,MagickPathExtent,"%s:",
-        delegate_info->decode);
-      (void) SetImageInfo(clone_info,(unsigned int) GetImageListLength(image),
-        exception);
-      (void) CopyMagickString(clone_info->filename,image_info->filename,
-        MagickPathExtent);
-      (void) CopyMagickString(image_info->filename,image->filename,
-        MagickPathExtent);
-      for (p=image; p != (Image *) NULL; p=GetNextImageInList(p))
-      {
-        (void) FormatLocaleString(p->filename,MagickPathExtent,"%s:%s",
-          delegate_info->decode,clone_info->filename);
-        status=WriteImage(clone_info,p,exception);
-        if (status == MagickFalse)
-          {
-            (void) RelinquishUniqueFileResource(image_info->unique);
-            if (temporary != MagickFalse)
-              (void) RelinquishUniqueFileResource(image->filename);
-            clone_info=DestroyImageInfo(clone_info);
-            (void) ThrowMagickException(exception,GetMagickModule(),
-              DelegateError,"DelegateFailed","`%s'",decode ? decode : encode);
-            return(MagickFalse);
-          }
-        if (clone_info->adjoin != MagickFalse)
-          break;
-      }
-      (void) RelinquishUniqueFileResource(image_info->unique);
-      clone_info=DestroyImageInfo(clone_info);
+      request.image_info=image_info;
+      request.image=image;
+      request.decode=decode;
+      request.encode=encode;
+      request.exception=exception;
+      request.delegate_info=delegate_info;
+      request.temporary=temporary;
+      if (ConvertDelegateInput(&request) == MagickFalse)
+        return(MagickFalse);
     }
   /*
     Invoke delegate.
@@ -1967,6 +2242,9 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
   (void) CopyMagickString(input_filename,image->filename,MagickPathExtent);
   for (i=0; commands[i] != (char *) NULL; i++)
   {
+    DelegateExecution
+      execution;
+
     (void) AcquireUniqueSymbolicLink(output_filename,image_info->filename);
     if (AcquireUniqueFilename(image_info->unique) == MagickFalse)
       {
@@ -1974,37 +2252,17 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
           "UnableToCreateTemporaryFile",image_info->unique);
         break;
       }
-    if (IsPathAccessible(input_filename) != MagickFalse)
-      {
-        status=AcquireUniqueSymbolicLink(input_filename,image->filename);
-        if (status == MagickFalse)
-          {
-            ThrowFileException(exception,FileOpenError,
-              "UnableToCreateTemporaryFile",input_filename);
-            break;
-          }
-      }
+    if (LinkDelegateInput(image,input_filename,exception,&status) ==
+        MagickFalse)
+      break;
     status=MagickTrue;
     command=InterpretDelegateProperties(image_info,image,commands[i],exception);
-    if (command != (char *) NULL)
-      {
-        /*
-          Execute delegate.
-        */
-        if (ExternalDelegateCommand(delegate_info->spawn,image_info->verbose,command,(char *) NULL,exception) != 0)
-          status=MagickFalse;
-        if (delegate_info->spawn != MagickFalse)
-          WaitForDelegateInput(image);
-        command=DestroyString(command);
-      }
-    if (IsPathAccessible(input_filename) != MagickFalse)
-      {
-        if (CopyDelegateFile(image->filename,input_filename,MagickFalse,exception) == MagickFalse)
-          {
-            (void) RelinquishUniqueFileResource(input_filename);
-            status=MagickFalse;
-          }
-      }
+    execution.delegate_info=delegate_info;
+    execution.image_info=image_info;
+    execution.image=image;
+    execution.exception=exception;
+    ExecuteDelegateCommand(&execution,&status,&command);
+    RestoreDelegateInput(image,input_filename,exception,&status);
     if ((strcmp(input_filename,output_filename) != 0) &&
         (CopyDelegateFile(image_info->filename,output_filename,MagickTrue,exception) == MagickFalse))
       {
@@ -2062,6 +2320,44 @@ MagickExport MagickBooleanType InvokeDelegate(ImageInfo *image_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ListDelegatePath(FILE *file,const char *path,
+  const DelegateInfo **delegate_info,const ssize_t i)
+{
+  if ((path == (const char *) NULL) ||
+      (LocaleCompare(path,delegate_info[i]->path) != 0))
+    {
+      if (delegate_info[i]->path != (char *) NULL)
+        (void) FormatLocaleFile(file,"\nPath: %s\n\n",delegate_info[i]->path);
+      (void) FormatLocaleFile(file,"Delegate                Command\n");
+      (void) FormatLocaleFile(file,
+        "-------------------------------------------------"
+        "------------------------------\n");
+    }
+}
+
+static void ListDelegateCommands(FILE *file,
+  const DelegateInfo **delegate_info,const ssize_t i,const char *delegate)
+{
+  char
+    **commands;
+
+  ssize_t
+    j;
+
+  commands=StringToList(delegate_info[i]->commands);
+  if (commands == (char **) NULL)
+    return;
+  (void) FormatLocaleFile(file,"%11s%c=%c%s  ",delegate_info[i]->decode ?
+    delegate_info[i]->decode : "",delegate_info[i]->mode <= 0 ? '<' : ' ',
+    delegate_info[i]->mode >= 0 ? '>' : ' ',delegate);
+  (void) FormatLocaleFile(file,"\"%s\"\n",commands[0]);
+  for (j=1; commands[j] != (char *) NULL; j++)
+    (void) FormatLocaleFile(file,"                     \"%s\"\n",commands[j]);
+  for (j=0; commands[j] != (char *) NULL; j++)
+    commands[j]=DestroyString(commands[j]);
+  commands=(char **) RelinquishMagickMemory(commands);
+}
+
 MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
   ExceptionInfo *exception)
 {
@@ -2069,7 +2365,6 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
     **delegate_info;
 
   char
-    **commands,
     delegate[MagickPathExtent];
 
   const char
@@ -2081,9 +2376,6 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
   size_t
     number_delegates;
 
-  ssize_t
-    j;
-
   if (file == (const FILE *) NULL)
     file=stdout;
   delegate_info=GetDelegateInfoList("*",&number_delegates,exception);
@@ -2094,16 +2386,7 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
   {
     if (delegate_info[i]->stealth != MagickFalse)
       continue;
-    if ((path == (const char *) NULL) ||
-        (LocaleCompare(path,delegate_info[i]->path) != 0))
-      {
-        if (delegate_info[i]->path != (char *) NULL)
-          (void) FormatLocaleFile(file,"\nPath: %s\n\n",delegate_info[i]->path);
-        (void) FormatLocaleFile(file,"Delegate                Command\n");
-        (void) FormatLocaleFile(file,
-          "-------------------------------------------------"
-          "------------------------------\n");
-      }
+    ListDelegatePath(file,path,delegate_info,i);
     path=delegate_info[i]->path;
     *delegate='\0';
     if (delegate_info[i]->encode != (char *) NULL)
@@ -2111,18 +2394,7 @@ MagickExport MagickBooleanType ListDelegateInfo(FILE *file,
         MagickPathExtent);
     (void) ConcatenateMagickString(delegate,"        ",MagickPathExtent);
     delegate[9]='\0';
-    commands=StringToList(delegate_info[i]->commands);
-    if (commands == (char **) NULL)
-      continue;
-    (void) FormatLocaleFile(file,"%11s%c=%c%s  ",delegate_info[i]->decode ?
-      delegate_info[i]->decode : "",delegate_info[i]->mode <= 0 ? '<' : ' ',
-      delegate_info[i]->mode >= 0 ? '>' : ' ',delegate);
-    (void) FormatLocaleFile(file,"\"%s\"\n",commands[0]);
-    for (j=1; commands[j] != (char *) NULL; j++)
-      (void) FormatLocaleFile(file,"                     \"%s\"\n",commands[j]);
-    for (j=0; commands[j] != (char *) NULL; j++)
-      commands[j]=DestroyString(commands[j]);
-    commands=(char **) RelinquishMagickMemory(commands);
+    ListDelegateCommands(file,delegate_info,i,delegate);
   }
   (void) fflush(file);
   delegate_info=(const DelegateInfo **)
@@ -2179,6 +2451,178 @@ static void GetIncludePath(const char *filename,const char *token,
     (void) CopyMagickString(path,token,MagickPathExtent);
   else
     (void) ConcatenateMagickString(path,token,MagickPathExtent);
+}
+
+typedef struct _DelegateInclude
+{
+  LinkedListInfo
+    *cache;
+
+  ExceptionInfo
+    *exception;
+
+  const char
+    *filename;
+
+  char
+    *token;
+
+  size_t
+    depth;
+} DelegateInclude;
+
+static void LoadDelegateInclude(const DelegateInclude *include,
+  MagickStatusType *status)
+{
+  LinkedListInfo
+    *const cache = include->cache;
+
+  ExceptionInfo
+    *const exception = include->exception;
+
+  const char
+    *const filename = include->filename;
+
+  char
+    *const token = include->token;
+
+  const size_t
+    depth = include->depth;
+
+  if (depth >= MagickMaxRecursionDepth)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
+  else
+    {
+      const DelegateLoadTarget include_target = { cache,
+        exception };
+
+      char
+        path[MagickPathExtent],
+        *file_xml;
+
+      GetIncludePath(filename,token,path);
+      file_xml=FileToXML(path,~0UL);
+      if (file_xml != (char *) NULL)
+        {
+          *status&=(MagickStatusType) LoadDelegateCache(
+            &include_target,file_xml,path,depth+1);
+          file_xml=DestroyString(file_xml);
+        }
+    }
+}
+
+static void SetDelegateThreadSupport(DelegateInfo *delegate_info,
+  const char *keyword,const char *token)
+{
+  switch (*keyword)
+  {
+    case 'T':
+    case 't':
+    {
+      if (LocaleCompare((char *) keyword,"thread-support") == 0)
+        {
+          delegate_info->thread_support=IsStringTrue(token);
+          if (delegate_info->thread_support == MagickFalse)
+            delegate_info->semaphore=AcquireSemaphoreInfo();
+          break;
+        }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+static void SetDelegateFormatAttribute(DelegateInfo *delegate_info,
+  const char *keyword,const char *token)
+{
+  switch (*keyword)
+  {
+    case 'D':
+    case 'd':
+    {
+      if (LocaleCompare((char *) keyword,"decode") == 0)
+        {
+          delegate_info->decode=ConstantString(token);
+          delegate_info->mode=1;
+          break;
+        }
+      break;
+    }
+    case 'E':
+    case 'e':
+    {
+      if (LocaleCompare((char *) keyword,"encode") == 0)
+        {
+          delegate_info->encode=ConstantString(token);
+          delegate_info->mode=(-1);
+          break;
+        }
+      break;
+    }
+    default:
+    {
+      SetDelegateThreadSupport(delegate_info,keyword,token);
+      break;
+    }
+  }
+}
+
+static void SetDelegateModeAttribute(DelegateInfo *delegate_info,
+  const char *keyword,const char *token)
+{
+  switch (*keyword)
+  {
+    case 'M':
+    case 'm':
+    {
+      if (LocaleCompare((char *) keyword,"mode") == 0)
+        {
+          delegate_info->mode=1;
+          if (LocaleCompare(token,"bi") == 0)
+            delegate_info->mode=0;
+          else
+            if (LocaleCompare(token,"encode") == 0)
+              delegate_info->mode=(-1);
+          break;
+        }
+      break;
+    }
+    default:
+    {
+      SetDelegateFormatAttribute(delegate_info,keyword,token);
+      break;
+    }
+  }
+}
+
+static void SetDelegateSpawnAttribute(DelegateInfo *delegate_info,
+  const char *keyword,const char *token)
+{
+  switch (*keyword)
+  {
+    case 'S':
+    case 's':
+    {
+      if (LocaleCompare((char *) keyword,"spawn") == 0)
+        {
+          delegate_info->spawn=IsStringTrue(token);
+          break;
+        }
+      if (LocaleCompare((char *) keyword,"stealth") == 0)
+        {
+          delegate_info->stealth=IsStringTrue(token);
+          break;
+        }
+      break;
+    }
+    default:
+    {
+      SetDelegateModeAttribute(delegate_info,keyword,token);
+      break;
+    }
+  }
 }
 
 static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
@@ -2288,27 +2732,15 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
           (void) GetNextToken(q,&q,extent,token);
           if (LocaleCompare(keyword,"file") == 0)
             {
-              if (depth >= MagickMaxRecursionDepth)
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  ConfigureError,"IncludeElementNestedTooDeeply","`%s'",token);
-              else
-                {
-                  const DelegateLoadTarget include_target = { cache,
-                    exception };
+              DelegateInclude
+                include;
 
-                  char
-                    path[MagickPathExtent],
-                    *file_xml;
-
-                  GetIncludePath(filename,token,path);
-                  file_xml=FileToXML(path,~0UL);
-                  if (file_xml != (char *) NULL)
-                    {
-                      status&=(MagickStatusType) LoadDelegateCache(
-                        &include_target,file_xml,path,depth+1);
-                      file_xml=DestroyString(file_xml);
-                    }
-                }
+              include.cache=cache;
+              include.exception=exception;
+              include.filename=filename;
+              include.token=token;
+              include.depth=depth;
+              LoadDelegateInclude(&include,&status);
             }
         }
         continue;
@@ -2379,72 +2811,11 @@ static MagickBooleanType LoadDelegateCache(const DelegateLoadTarget *target,
           }
         break;
       }
-      case 'D':
-      case 'd':
-      {
-        if (LocaleCompare((char *) keyword,"decode") == 0)
-          {
-            delegate_info->decode=ConstantString(token);
-            delegate_info->mode=1;
-            break;
-          }
-        break;
-      }
-      case 'E':
-      case 'e':
-      {
-        if (LocaleCompare((char *) keyword,"encode") == 0)
-          {
-            delegate_info->encode=ConstantString(token);
-            delegate_info->mode=(-1);
-            break;
-          }
-        break;
-      }
-      case 'M':
-      case 'm':
-      {
-        if (LocaleCompare((char *) keyword,"mode") == 0)
-          {
-            delegate_info->mode=1;
-            if (LocaleCompare(token,"bi") == 0)
-              delegate_info->mode=0;
-            else
-              if (LocaleCompare(token,"encode") == 0)
-                delegate_info->mode=(-1);
-            break;
-          }
-        break;
-      }
-      case 'S':
-      case 's':
-      {
-        if (LocaleCompare((char *) keyword,"spawn") == 0)
-          {
-            delegate_info->spawn=IsStringTrue(token);
-            break;
-          }
-        if (LocaleCompare((char *) keyword,"stealth") == 0)
-          {
-            delegate_info->stealth=IsStringTrue(token);
-            break;
-          }
-        break;
-      }
-      case 'T':
-      case 't':
-      {
-        if (LocaleCompare((char *) keyword,"thread-support") == 0)
-          {
-            delegate_info->thread_support=IsStringTrue(token);
-            if (delegate_info->thread_support == MagickFalse)
-              delegate_info->semaphore=AcquireSemaphoreInfo();
-            break;
-          }
-        break;
-      }
       default:
+      {
+        SetDelegateSpawnAttribute(delegate_info,keyword,token);
         break;
+      }
     }
   }
   token=(char *) RelinquishMagickMemory(token);
