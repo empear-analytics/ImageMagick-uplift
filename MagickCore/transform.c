@@ -753,6 +753,18 @@ static RectangleInfo GetCropPage(const RectangleInfo *geometry,
   return(page);
 }
 
+static MagickBooleanType CheckCropExtent(const Image *image,
+  const RectangleInfo page,ExceptionInfo *exception)
+{
+  if ((page.width == 0) || (page.height == 0))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
+        "GeometryDoesNotContainImage","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   ExceptionInfo *exception)
 {
@@ -806,12 +818,8 @@ MagickExport Image *CropImage(const Image *image,const RectangleInfo *geometry,
   page=ClampCropExtent(image,geometry,page);
   bounding_box.x+=page.x;
   bounding_box.y+=page.y;
-  if ((page.width == 0) || (page.height == 0))
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionWarning,
-        "GeometryDoesNotContainImage","`%s'",image->filename);
-      return((Image *) NULL);
-    }
+  if (CheckCropExtent(image,page,exception) == MagickFalse)
+    return((Image *) NULL);
   /*
     Initialize crop image attributes.
   */
