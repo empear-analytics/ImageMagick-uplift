@@ -2788,6 +2788,22 @@ static inline MagickBooleanType IsExtensionMagickMatch(
     magic_info)) == 0)) ? MagickTrue : MagickFalse);
 }
 
+static void AffirmUserSpecifiedFormat(ImageInfo *image_info,
+  const char *magic,char *component,ExceptionInfo *exception)
+{
+  char *literal = (char *) GetImageRegistry(StringRegistryType,
+    "filename:literal",exception);
+  image_info->affirm=MagickTrue;
+  (void) CopyMagickString(image_info->magick,magic,MagickPathExtent);
+  GetPathComponent(image_info->filename,CanonicalPath,component);
+  if (IsStringTrue(literal) != MagickFalse)
+    GetPathComponent(image_info->filename,SubcanonicalPath,component);
+  (void) CopyMagickString(image_info->filename,component,
+    MagickPathExtent);
+  if (literal != (char *) NULL)
+    literal=DestroyString(literal);
+}
+
 static const MagickInfo *SetUserSpecifiedFormat(ImageInfo *image_info,
   char *magic,char *component,ExceptionInfo *sans_exception,
   ExceptionInfo *exception)
@@ -2819,19 +2835,7 @@ static const MagickInfo *SetUserSpecifiedFormat(ImageInfo *image_info,
         }
     }
   if (IsUsableMagick(magick_info,delegate_info,magic) != MagickFalse)
-    {
-      char *literal = (char *) GetImageRegistry(StringRegistryType,
-        "filename:literal",exception);
-      image_info->affirm=MagickTrue;
-      (void) CopyMagickString(image_info->magick,magic,MagickPathExtent);
-      GetPathComponent(image_info->filename,CanonicalPath,component);
-      if (IsStringTrue(literal) != MagickFalse)
-        GetPathComponent(image_info->filename,SubcanonicalPath,component);
-      (void) CopyMagickString(image_info->filename,component,
-        MagickPathExtent);
-      if (literal != (char *) NULL)
-        literal=DestroyString(literal);
-    }
+    AffirmUserSpecifiedFormat(image_info,magic,component,exception);
   return(magick_info);
 }
 
