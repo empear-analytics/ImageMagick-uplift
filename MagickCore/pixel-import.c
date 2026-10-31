@@ -3311,6 +3311,53 @@ static MagickBooleanType ImportMapQuantumAO(const ImportMapRequest *request,
   return(MagickTrue);
 }
 
+static MagickBooleanType ImportMapQuantumBI(const ImportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'B':
+    case 'b':
+    {
+      quantum_map[i]=BlueQuantum;
+      break;
+    }
+    case 'I':
+    case 'i':
+    {
+      quantum_map[i]=IndexQuantum;
+      (void) SetImageColorspace(image,GRAYColorspace,exception);
+      break;
+    }
+    default:
+    {
+      ImportMapRequest
+        request;
+
+      request.image=image;
+      request.map=map;
+      request.i=i;
+      request.exception=exception;
+      if (ImportMapQuantumAO(&request,quantum_map) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   const ssize_t y,const size_t width,const size_t height,const char *map,
   const StorageType type,const void *pixels,ExceptionInfo *exception)
@@ -3348,12 +3395,6 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   {
     switch (map[i])
     {
-      case 'B':
-      case 'b':
-      {
-        quantum_map[i]=BlueQuantum;
-        break;
-      }
       case 'C':
       case 'c':
       {
@@ -3366,13 +3407,6 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
       {
         quantum_map[i]=BlackQuantum;
         (void) SetImageColorspace(image,CMYKColorspace,exception);
-        break;
-      }
-      case 'I':
-      case 'i':
-      {
-        quantum_map[i]=IndexQuantum;
-        (void) SetImageColorspace(image,GRAYColorspace,exception);
         break;
       }
       case 'm':
@@ -3398,7 +3432,7 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
         request.map=map;
         request.i=i;
         request.exception=exception;
-        if (ImportMapQuantumAO(&request,quantum_map) == MagickFalse)
+        if (ImportMapQuantumBI(&request,quantum_map) == MagickFalse)
           return(MagickFalse);
         break;
       }
