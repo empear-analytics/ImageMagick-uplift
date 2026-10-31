@@ -6431,6 +6431,37 @@ static void ImportAnyDepthRGBQuantum(const Image *image,
   }
 }
 
+static void ImportOtherDepthRGBQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span)
+{
+  switch (quantum_info->depth)
+  {
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import24BitFloatRGBQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          Import64BitFloatRGBQuantum(image,quantum_info,span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      ImportAnyDepthRGBQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ImportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span)
 {
@@ -6463,27 +6494,9 @@ static void ImportRGBQuantum(const Image *image,QuantumInfo *quantum_info,
       Import32BitRGBQuantum(image,quantum_info,span);
       break;
     }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import24BitFloatRGBQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          Import64BitFloatRGBQuantum(image,quantum_info,span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      ImportAnyDepthRGBQuantum(image,quantum_info,span);
+      ImportOtherDepthRGBQuantum(image,quantum_info,span);
       break;
     }
   }
