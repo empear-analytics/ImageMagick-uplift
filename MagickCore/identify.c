@@ -1807,6 +1807,22 @@ static void PrintImageChannelFeatures(FILE *file,const Image *image,
     channel_features);
 }
 
+static void PrintImagePixelSummary(FILE *file,Image *image,
+  const ColorspaceType colorspace,ExceptionInfo *exception)
+{
+  ssize_t
+    x;
+
+  if (colorspace == CMYKColorspace)
+    (void) FormatLocaleFile(file,"  Total ink density: %.*g%%\n",
+      GetMagickPrecision(),100.0*GetImageTotalInkDensity(image,exception)/
+      (double) QuantumRange);
+  x=0;
+  if (image->alpha_trait != UndefinedPixelTrait)
+    PrintTransparentPixel(file,image,&x,exception);
+  PrintImageHistogram(file,image,exception);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1846,9 +1862,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   size_t
     depth,
     distance;
-
-  ssize_t
-    x;
 
   struct stat
     properties;
@@ -1991,14 +2004,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     }
   if (ping == MagickFalse)
     {
-      if (colorspace == CMYKColorspace)
-        (void) FormatLocaleFile(file,"  Total ink density: %.*g%%\n",
-          GetMagickPrecision(),100.0*GetImageTotalInkDensity(image,exception)/
-          (double) QuantumRange);
-      x=0;
-      if (image->alpha_trait != UndefinedPixelTrait)
-        PrintTransparentPixel(file,image,&x,exception);
-      PrintImageHistogram(file,image,exception);
+      PrintImagePixelSummary(file,image,colorspace,exception);
     }
   PrintImageColormapEntries(file,image,exception);
   if (image->error.mean_error_per_pixel != 0.0)
