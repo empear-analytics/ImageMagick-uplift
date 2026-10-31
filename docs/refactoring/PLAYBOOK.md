@@ -1309,6 +1309,15 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    `const T *const v = name->v;`, and each use `v.m` in the block written `(*v).m`, the
    form Recipe E step 3 gives a struct the block updates. Nothing is copied, so no
    member is read that the block did not read.
+   When the caller is itself a function that binds `const` locals from the members of
+   its own `const Name *name` parameter (a helper of this recipe, of Recipe Y or of
+   Recipe LB's struct form), and every variable of the group is one of those locals,
+   bound from the member of its own name and type and not written since, the new
+   function may take that `name` in place of a new struct (`PopulatePosterizeMap`'s
+   `map_info`, passed on to its column loop): the caller passes `name` unchanged, the
+   new function binds the members its block reads as step 4 does, and steps 3, 5 and
+   6 do not apply (no typedef, no local, no assignment). A member the block does not
+   read is not bound; the other parameters are as above, at most four in all.
 3. Declare `typedef struct _Name { ... } Name;` directly above the new function, one
    member per variable in the group, with the variable's exact type and name: no `size_t`
    for a `ssize_t`, no `const` added or dropped on what a pointer points to. Only a
@@ -1423,6 +1432,13 @@ static void ThresholdWaveletLevel(float *pixels,
   of the pointer kind, and a copy of an array of structs is not a value C assigns.
 - Every member is assigned before the call: an unassigned member is read uninitialised,
   and nothing checks it but reading (step 8). Count them against the typedef.
+- Under step 2's pass-through form the new function reads, through `name`, the
+  members its caller's `const` locals were initialised from. The struct is a local of
+  the caller's caller, filled directly before that call and written by nothing while
+  the call runs (it reaches the caller only through a pointer to `const`, and its
+  address goes nowhere else), so each member still holds the value the caller's
+  `const` local holds at the call, which is the value the block read. Nothing is
+  copied, so no member is read that was not set.
 - Recipe E's limit on what the block writes stands: one value returned, or writes
   through a pointer the block already used for pixel data. A block writing more is
   skipped, as in Recipe E.
@@ -1447,6 +1463,9 @@ pixel count, the magnitude and the softness). The Mac campaign tried it with Rec
 bit switch for the same reason; `MotionBlurImage`'s kernel loops (9 to 11 inputs, M101)
 are the same shape. A probe of the struct form: the depth-4 finding leaves, 2.84 to 2.90.
 Added by Claude Code (Claude Opus 5.5) during task W07, under the mandate of 2026-10-24.
+Step 2's pass-through form (2026-10-31, task W10): `quantize-posterize.c`'s
+`PopulatePosterizeMap`, a Recipe LB helper taking a `PosterizeMapInfo`, whose column loop
+(depth 3) reads four of its five members and two locals of its own.
 
 ---
 
@@ -4150,3 +4169,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | SV | Step 2: the value may also be an object-like macro of the file expanding to a call, with constant arguments, of a `static inline` function that reads and writes nothing but its parameters (`AccentuateModulate`, `ScaleCharToQuantum(80)`), its parameter of the function's return type; and a copy's one written variable, assigned whole before it is read and read by the caller afterwards, becomes the new function's local and return value (`v=Helper(...);`, Recipe E steps 3 and 4). *Careful* gives the argument | `decorate.c`'s `FrameImage` (W10): its four 3-D colours are two pairs of copies, five statements each on `matte`, differing only in the modulate macro (`AccentuateModulate`/`HighlightModulate`, `ShadowModulate`/`TroughModulate`), each copy writing its own colour. The macro is not a literal, an enumeration constant or a member access, so step 2 refused it. The lighter pair as one helper: 8.08 to 8.20; both pairs: 8.24 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | TW | Step 2: a `const` struct local of pointers that the block passes only as `&s` to a pointer-to-`const` parameter of a callee writing through its members, and neither assigns nor writes a member of, goes by value as a parameter of its exact type, its text unchanged (N step 2 (d) keeps it out of the struct). *Careful* gives the argument | `compare.c`'s `GetDPCSimilarity` and `GetNCCSimilarity` (W10): their column loops are the same text (eight inputs, depth 3, a bump each), passing the row's `CorrelationSums` as `&sums`; both as one helper, then their identical statistics blocks (Recipe I and I step 7), 2.43 to 2.54 in a probe | mandate (2026-10-24) |
 | 2026-10-31 | NEW | AR | Extract Block Through a Struct of Array Pointers: a block outside OpenMP that reads or updates, element by element, several local arrays of the caller (each used only as `v[e]` or passed whole to a pointer parameter) moves to a `static` function taking one `const` struct of pointers to the arrays' first elements, initialised once in the caller (`const Name name = { v1, ... };`) and bound `T *const v = name->v;`, the block's text unchanged; other inputs and at most one returned variable as in Recipe E, or an input struct as in Recipe N | `statistic-moments.c`'s `GetImageMoments` (W10): the second pixel pass writes eight moment arrays per pixel (Q step 8 admits six), the composite average and the normalisation write eleven, the ellipse and Hu loops read four and seven; E, N, K and Q refuse them. A probe with this recipe, E and Q: 8.05 to 10.0 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | N | Step 2: when the caller binds `const` locals from its own `const Name *name` parameter (a helper of N, Y or LB's struct form) and the whole group is such locals, the new function may take that `name` unchanged instead of a new struct: no typedef, no local, no assignment; it binds the members its block reads. *Careful* gives the argument | `quantize-posterize.c`'s `PopulatePosterizeMap` (W10): its column loop reads `image`, `map_image`, `levels` and `number_columns`, all bound from its `PosterizeMapInfo`, plus `scale` and `q`. Step 3's letter would add a second struct of the same four members and refill it from the locals just bound from the first. With the column loop as a helper the file has twelve functions and its mean cyclomatic complexity falls under 4: *Overall Code Complexity* leaves, 8.89 to 9.47 in a probe | mandate (2026-10-24) |
