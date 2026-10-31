@@ -2251,6 +2251,53 @@ static void LabelObjectRow(const CCLabelRow *label_row,
   }
 }
 
+typedef struct _CCLabeledObjects
+{
+  const Image
+    *image;
+
+  CCObjectInfo
+    *object;
+
+  Image
+    *component_image;
+
+  ssize_t
+    n;
+} CCLabeledObjects;
+
+static void NormalizeLabeledObjects(const CCLabeledObjects *labeled_objects,
+  ssize_t *background_id,double *min_threshold,double *max_threshold)
+{
+  const Image
+    *const image = labeled_objects->image;
+
+  CCObjectInfo
+    *const object = labeled_objects->object;
+
+  Image
+    *const component_image = labeled_objects->component_image;
+
+  const ssize_t
+    n = labeled_objects->n;
+
+  ssize_t
+    i;
+
+  *background_id=0;
+  *min_threshold=0.0;
+  *max_threshold=0.0;
+  component_image->colors=(size_t) n;
+  for (i=0; i < (ssize_t) component_image->colors; i++)
+  {
+    NormalizeLabeledObject(image,object,i);
+    *max_threshold+=object[i].area;
+    if (object[i].area > object[*background_id].area)
+      *background_id=i;
+  }
+  *max_threshold+=MagickEpsilon;
+}
+
 #define ConnectedComponentsImageTag  "ConnectedComponents/Image"
 
 static void UpdateComponentsProgress(const Image *image,
@@ -2276,6 +2323,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     *component_view,
     *image_view,
     *object_view;
+
+  CCLabeledObjects
+    labeled_objects;
 
   CCObjectInfo
     *object;
@@ -2431,18 +2481,12 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       component_image=DestroyImage(component_image);
       ThrowImageException(ResourceLimitError,"TooManyObjects");
     }
-  background_id=0;
-  min_threshold=0.0;
-  max_threshold=0.0;
-  component_image->colors=(size_t) n;
-  for (i=0; i < (ssize_t) component_image->colors; i++)
-  {
-    NormalizeLabeledObject(image,object,i);
-    max_threshold+=object[i].area;
-    if (object[i].area > object[background_id].area)
-      background_id=i;
-  }
-  max_threshold+=MagickEpsilon;
+  labeled_objects.image=image;
+  labeled_objects.object=object;
+  labeled_objects.component_image=component_image;
+  labeled_objects.n=n;
+  NormalizeLabeledObjects(&labeled_objects,&background_id,&min_threshold,
+    &max_threshold);
   n=(-1);
   artifact=GetImageArtifact(image,"connected-components:background-id");
   if (artifact != (const char *) NULL)
