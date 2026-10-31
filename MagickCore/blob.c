@@ -6299,6 +6299,18 @@ MagickExport ssize_t WriteBlobFloat(Image *image,const float value)
   return(WriteBlobLong(image,quantum.unsigned_value));
 }
 
+static ssize_t WriteBlobLSBLongBytes(Image *image,const unsigned int value)
+{
+  unsigned char
+    buffer[4];
+
+  buffer[0]=(unsigned char) value;
+  buffer[1]=(unsigned char) (value >> 8);
+  buffer[2]=(unsigned char) (value >> 16);
+  buffer[3]=(unsigned char) (value >> 24);
+  return(WriteBlobStream(image,4,buffer));
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -6333,11 +6345,7 @@ MagickExport ssize_t WriteBlobLong(Image *image,const unsigned int value)
   assert(image->signature == MagickCoreSignature);
   if (image->endian == LSBEndian)
     {
-      buffer[0]=(unsigned char) value;
-      buffer[1]=(unsigned char) (value >> 8);
-      buffer[2]=(unsigned char) (value >> 16);
-      buffer[3]=(unsigned char) (value >> 24);
-      return(WriteBlobStream(image,4,buffer));
+      return(WriteBlobLSBLongBytes(image,value));
     }
   buffer[0]=(unsigned char) (value >> 24);
   buffer[1]=(unsigned char) (value >> 16);
@@ -6488,11 +6496,7 @@ MagickExport ssize_t WriteBlobSignedLong(Image *image,const signed int value)
   quantum.signed_value=value;
   if (image->endian == LSBEndian)
     {
-      buffer[0]=(unsigned char) quantum.unsigned_value;
-      buffer[1]=(unsigned char) (quantum.unsigned_value >> 8);
-      buffer[2]=(unsigned char) (quantum.unsigned_value >> 16);
-      buffer[3]=(unsigned char) (quantum.unsigned_value >> 24);
-      return(WriteBlobStream(image,4,buffer));
+      return(WriteBlobLSBLongBytes(image,quantum.unsigned_value));
     }
   buffer[0]=(unsigned char) (quantum.unsigned_value >> 24);
   buffer[1]=(unsigned char) (quantum.unsigned_value >> 16);
@@ -6528,16 +6532,9 @@ MagickExport ssize_t WriteBlobSignedLong(Image *image,const signed int value)
 */
 MagickExport ssize_t WriteBlobLSBLong(Image *image,const unsigned int value)
 {
-  unsigned char
-    buffer[4];
-
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
-  buffer[0]=(unsigned char) value;
-  buffer[1]=(unsigned char) (value >> 8);
-  buffer[2]=(unsigned char) (value >> 16);
-  buffer[3]=(unsigned char) (value >> 24);
-  return(WriteBlobStream(image,4,buffer));
+  return(WriteBlobLSBLongBytes(image,value));
 }
 
 /*
@@ -6613,17 +6610,10 @@ MagickExport ssize_t WriteBlobLSBSignedLong(Image *image,const signed int value)
       signed_value;
   } quantum;
 
-  unsigned char
-    buffer[4];
-
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
   quantum.signed_value=value;
-  buffer[0]=(unsigned char) quantum.unsigned_value;
-  buffer[1]=(unsigned char) (quantum.unsigned_value >> 8);
-  buffer[2]=(unsigned char) (quantum.unsigned_value >> 16);
-  buffer[3]=(unsigned char) (quantum.unsigned_value >> 24);
-  return(WriteBlobStream(image,4,buffer));
+  return(WriteBlobLSBLongBytes(image,quantum.unsigned_value));
 }
 
 /*
