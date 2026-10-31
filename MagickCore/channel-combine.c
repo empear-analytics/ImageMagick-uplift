@@ -96,6 +96,54 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _CombineChannelRowInfo
+{
+  Image
+    *combine_image;
+
+  const Image
+    *next;
+
+  Quantum
+    *pixels;
+
+  ssize_t
+    i;
+} CombineChannelRowInfo;
+
+static void CombineChannelRow(const CombineChannelRowInfo *channel_row,
+  const Quantum *magick_restrict p)
+{
+  Image
+    *const combine_image = channel_row->combine_image;
+
+  const Image
+    *const next = channel_row->next;
+
+  Quantum
+    *const pixels = channel_row->pixels;
+
+  const ssize_t
+    i = channel_row->i;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  q=pixels;
+  for (x=0; x < (ssize_t) combine_image->columns; x++)
+  {
+    if (x < (ssize_t) next->columns)
+      {
+        q[i]=(Quantum) GetPixelIntensity(next,p);
+        p+=(ptrdiff_t) GetPixelChannels(next);
+      }
+    q+=(ptrdiff_t) GetPixelChannels(combine_image);
+  }
+}
+
 MagickExport Image *CombineImages(const Image *image,
   const ColorspaceType colorspace,ExceptionInfo *exception)
 {
@@ -197,8 +245,7 @@ MagickExport Image *CombineImages(const Image *image,
       *magick_restrict p;
 
     Quantum
-      *pixels,
-      *magick_restrict q;
+      *pixels;
 
     ssize_t
       i;
@@ -215,8 +262,8 @@ MagickExport Image *CombineImages(const Image *image,
     next=image;
     for (i=0; i < (ssize_t) GetPixelChannels(combine_image); i++)
     {
-      ssize_t
-        x;
+      CombineChannelRowInfo
+        channel_row;
 
       PixelChannel channel = GetPixelChannelChannel(combine_image,i);
       PixelTrait traits = GetPixelChannelTraits(combine_image,channel);
@@ -228,16 +275,11 @@ MagickExport Image *CombineImages(const Image *image,
       p=GetCacheViewVirtualPixels(image_view,0,y,next->columns,1,exception);
       if (p == (const Quantum *) NULL)
         continue;
-      q=pixels;
-      for (x=0; x < (ssize_t) combine_image->columns; x++)
-      {
-        if (x < (ssize_t) next->columns)
-          {
-            q[i]=(Quantum) GetPixelIntensity(next,p);
-            p+=(ptrdiff_t) GetPixelChannels(next);
-          }
-        q+=(ptrdiff_t) GetPixelChannels(combine_image);
-      }
+      channel_row.combine_image=combine_image;
+      channel_row.next=next;
+      channel_row.pixels=pixels;
+      channel_row.i=i;
+      CombineChannelRow(&channel_row,p);
       image_view=DestroyCacheView(image_view);
       next=GetNextImageInList(next);
     }
