@@ -231,6 +231,31 @@ static void RaiseHullRow(const HullFirstPass *pass,ssize_t i)
   }
 }
 
+static void LowerHullRow(const HullFirstPass *pass,ssize_t i)
+{
+  const size_t
+    columns = pass->columns;
+
+  Quantum
+    *const p = pass->p,
+    *const q = pass->q,
+    *const r = pass->r;
+
+  MagickRealType
+    v;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    v=(MagickRealType) p[i];
+    v=LowerHullValue(r,i,v);
+    q[i]=(Quantum) v;
+    i++;
+  }
+}
+
 static void Hull(const HullBuffers *hull,const ssize_t x_offset,
   const ssize_t y_offset,const int polarity)
 {
@@ -273,12 +298,8 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
     HullFirstPass
       pass;
 
-    MagickRealType
-      v;
-
     ssize_t
-      i,
-      x;
+      i;
 
     pass.columns=columns;
     pass.p=p;
@@ -288,13 +309,7 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
     if (polarity > 0)
       RaiseHullRow(&pass,i);
     else
-      for (x=0; x < (ssize_t) columns; x++)
-      {
-        v=(MagickRealType) p[i];
-        v=LowerHullValue(r,i,v);
-        q[i]=(Quantum) v;
-        i++;
-      }
+      LowerHullRow(&pass,i);
   }
   p=f+(ptrdiff_t) (columns+2);
   q=g+(ptrdiff_t) (columns+2);
