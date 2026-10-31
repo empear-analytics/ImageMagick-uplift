@@ -97,6 +97,21 @@ for run in runs:
             outside = "\n".join(L[:t] + L[last[2] + 1:])
             if not re.search(r"\b%s\b" % m.group(1), outside):
                 a = t; typedefs.append(m.group(1)); continue
+        t = L[c - 1].strip()
+        if t.startswith("#endif"):
+            d = 0; u = c - 1
+            while u >= 0:
+                w = L[u].strip()
+                if w.startswith("#endif"): d += 1
+                elif re.match(r"#\s*(if|ifdef|ifndef)\b", w): d -= 1
+                if d == 0: break
+                u -= 1
+            if u >= 0 and "#define" in "\n".join(L[u:c]) and not re.search(r"^\s*#\s*include", "\n".join(L[u:c]), re.M):
+                a = u; continue
+        u = c - 1
+        while u > 0 and L[u - 1].rstrip().endswith("\\"): u -= 1
+        if L[u].lstrip().startswith("#define"):
+            a = u; continue
         break
     b = last[2] + 1
     incomment = False; intype = False; bad = []; depth = 0; inner = []
