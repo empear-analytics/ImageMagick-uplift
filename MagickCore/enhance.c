@@ -1773,6 +1773,34 @@ static inline void ModulateLCHuv(const ModulateInfo *modulate_info,
   ConvertLCHuvToRGB(luma,chroma,hue,illuminant,red,green,blue);
 }
 
+static void ModulateDefaultColorspaces(const ModulateInfo *modulate_info,double *red,
+  double *green,double *blue)
+{
+  const ColorspaceType
+    colorspace = modulate_info->colorspace;
+
+  switch (colorspace)
+  {
+    case HSLColorspace:
+    default:
+    {
+      ModulateHSL(modulate_info,red,green,blue);
+      break;
+    }
+    case HSVColorspace:
+    {
+      ModulateHSV(modulate_info,red,green,blue);
+      break;
+    }
+    case LCHColorspace:
+    case LCHabColorspace:
+    {
+      ModulateLCHab(modulate_info,red,green,blue);
+      break;
+    }
+  }
+}
+
 static void ModulateColor(const ModulateInfo *modulate_info,double *red,
   double *green,double *blue)
 {
@@ -1801,26 +1829,14 @@ static void ModulateColor(const ModulateInfo *modulate_info,double *red,
       ModulateHSI(modulate_info,red,green,blue);
       break;
     }
-    case HSLColorspace:
     default:
     {
-      ModulateHSL(modulate_info,red,green,blue);
-      break;
-    }
-    case HSVColorspace:
-    {
-      ModulateHSV(modulate_info,red,green,blue);
+      ModulateDefaultColorspaces(modulate_info,red,green,blue);
       break;
     }
     case HWBColorspace:
     {
       ModulateHWB(modulate_info,red,green,blue);
-      break;
-    }
-    case LCHColorspace:
-    case LCHabColorspace:
-    {
-      ModulateLCHab(modulate_info,red,green,blue);
       break;
     }
     case LCHuvColorspace:
