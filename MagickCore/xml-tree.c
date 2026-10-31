@@ -1665,6 +1665,49 @@ static void AppendDefaultAttribute(XMLTreeRoot *root,
   root->attributes[i][j]=ConstantString(n);
 }
 
+typedef struct _AttributeTypeTargets
+{
+  char
+    **xml,
+    **c;
+} AttributeTypeTargets;
+
+static MagickBooleanType ParseAttributeType(char *n,ExceptionInfo *exception,
+  const AttributeTypeTargets *targets)
+{
+  char
+    **const xml = targets->xml;
+
+  char
+    **const c = targets->c;
+
+  *xml=n+strcspn(n,XMLWhitespace);
+  if (**xml != '\0')
+    **xml='\0';
+  else
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","malformed <!ATTLIST");
+      return(MagickFalse);
+    }
+  *xml+=strspn(*xml+1,XMLWhitespace)+1;
+  *c=(char *) (strncmp(*xml,"CDATA",5) != 0 ? "*" : " ");
+  if (strncmp(*xml,"NOTATION",8) == 0)
+    *xml+=strspn(*xml+8,XMLWhitespace)+8;
+  *xml=(**xml == '(') ? strchr(*xml,')') : *xml+
+    strcspn(*xml,XMLWhitespace);
+  if (*xml == (char *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","malformed <!ATTLIST");
+      return(MagickFalse);
+    }
+  *xml+=strspn(*xml,XMLWhitespace ")");
+  if (strncmp(*xml,"#FIXED",6) == 0)
+    *xml+=strspn(*xml+6,XMLWhitespace)+6;
+  return(MagickTrue);
+}
+
 static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
   size_t length,ExceptionInfo *exception)
 {
@@ -1777,37 +1820,21 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
             while ((*(n=xml+strspn(xml+1,XMLWhitespace)+1) != '\0') &&
                    (*n != '>'))
             {
+              AttributeTypeTargets
+                attribute_targets;
+
               DefaultAttributeInfo
                 attribute;
 
-              xml=n+strcspn(n,XMLWhitespace);
-              if (*xml != '\0')
-                *xml='\0';
-              else
+              attribute_targets.xml=(&xml);
+              attribute_targets.c=(&c);
+              if (ParseAttributeType(n,exception,&attribute_targets) ==
+                  MagickFalse)
                 {
-                  (void) ThrowMagickException(exception,GetMagickModule(),
-                    OptionWarning,"ParseError","malformed <!ATTLIST");
                   predefined_entities=(char **) RelinquishMagickMemory(
                     predefined_entities);
                   return(MagickFalse);
                 }
-              xml+=strspn(xml+1,XMLWhitespace)+1;
-              c=(char *) (strncmp(xml,"CDATA",5) != 0 ? "*" : " ");
-              if (strncmp(xml,"NOTATION",8) == 0)
-                xml+=strspn(xml+8,XMLWhitespace)+8;
-              xml=(*xml == '(') ? strchr(xml,')') : xml+
-                strcspn(xml,XMLWhitespace);
-              if (xml == (char *) NULL)
-                {
-                  (void) ThrowMagickException(exception,GetMagickModule(),
-                    OptionWarning,"ParseError","malformed <!ATTLIST");
-                  predefined_entities=(char **) RelinquishMagickMemory(
-                    predefined_entities);
-                  return(MagickFalse);
-                }
-              xml+=strspn(xml,XMLWhitespace ")");
-              if (strncmp(xml,"#FIXED",6) == 0)
-                xml+=strspn(xml+6,XMLWhitespace)+6;
               if (*xml == '#')
                 {
                   xml+=strcspn(xml,XMLWhitespace ">")-1;
