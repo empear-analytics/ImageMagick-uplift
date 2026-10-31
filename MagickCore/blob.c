@@ -3537,6 +3537,18 @@ static void OpenCompressedBlob(const ImageInfo *image_info,
     MapBlobFile(image_info,blob_info);
 }
 
+static void OpenReadBlobFile(BlobInfo *magick_restrict blob_info,
+  const char *filename,const int flags,const char *type)
+{
+  int
+    file;
+
+  blob_info->file_info.file=(FILE *) NULL;
+  file=open_utf8(filename,flags,0);
+  if (file >= 0)
+    blob_info->file_info.file=fdopen(file,type);
+}
+
 static void FormSharedListFilename(const Image *image,const char *extension,
   char *filename)
 {
@@ -3728,13 +3740,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
   else
     if (*type == 'r')
       {
-        int
-          file;
-
-        blob_info->file_info.file=(FILE *) NULL;
-        file=open_utf8(filename,flags,0);
-        if (file >= 0)
-          blob_info->file_info.file=fdopen(file,type);
+        OpenReadBlobFile(blob_info,filename,flags,type);
         if (blob_info->file_info.file != (FILE *) NULL)
           {
             size_t
