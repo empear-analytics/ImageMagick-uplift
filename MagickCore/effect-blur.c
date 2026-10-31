@@ -1481,6 +1481,36 @@ static MagickBooleanType CloneDirectImage(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _BilateralSpatial
+{
+  size_t
+    width,
+    height;
+
+  OffsetInfo
+    mid;
+
+  double
+    *spatial_gaussian,
+    spatial_sigma;
+} BilateralSpatial;
+
+static void SetBilateralSpatial(const BilateralSpatial *spatial,ssize_t n)
+{
+  ssize_t
+    v;
+
+  for (v=0; v < (ssize_t) MagickMax(spatial->height,1); v++)
+  {
+    ssize_t
+      u;
+
+    for (u=0; u < (ssize_t) MagickMax(spatial->width,1); u++)
+      spatial->spatial_gaussian[n++]=BlurGaussian(BlurDistance(0,0,
+        u-spatial->mid.x,v-spatial->mid.y),spatial->spatial_sigma);
+  }
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1533,22 +1563,21 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     intensity_gaussian[w+MaxIntensity]=BlurGaussian((double) w,intensity_sigma);
   spatial_gaussian=weights[number_threads];
   {
+    BilateralSpatial
+      spatial;
+
     ssize_t
-      n,
-      v;
+      n;
 
     n=0;
     mid.x=(ssize_t) (MagickMax(width,1)/2L);
     mid.y=(ssize_t) (MagickMax(height,1)/2L);
-    for (v=0; v < (ssize_t) MagickMax(height,1); v++)
-    {
-      ssize_t
-        u;
-
-      for (u=0; u < (ssize_t) MagickMax(width,1); u++)
-        spatial_gaussian[n++]=BlurGaussian(BlurDistance(0,0,u-mid.x,v-mid.y),
-          spatial_sigma);
-    }
+    spatial.width=width;
+    spatial.height=height;
+    spatial.mid=mid;
+    spatial.spatial_gaussian=spatial_gaussian;
+    spatial.spatial_sigma=spatial_sigma;
+    SetBilateralSpatial(&spatial,n);
   }
   /*
     Bilateral blur image.
