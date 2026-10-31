@@ -1293,6 +1293,60 @@ static void ApplyLocalContrastRow(const LocalContrastRow *row,
   }
 }
 
+typedef struct _LocalContrastColumn
+{
+  const Image
+    *image;
+
+  float
+    *interImage,
+    *pixels;
+
+  ssize_t
+    width,
+    x;
+
+  double
+    totalWeight;
+} LocalContrastColumn;
+
+static void StoreLocalContrastColumn(const LocalContrastColumn *column)
+{
+  const Image
+    *const image = column->image;
+
+  float
+    *const interImage = column->interImage,
+    *const pixels = column->pixels;
+
+  const ssize_t
+    width = column->width,
+    x = column->x;
+
+  const double
+    totalWeight = column->totalWeight;
+
+  float
+    *out;
+
+  ssize_t
+    y;
+
+  out=interImage+x+width;
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    double
+      sum;
+
+    sum=GetTriangleWeightedSum(pixels,y,width);
+    /* write to output */
+    *out=(float) (sum/totalWeight);
+    /* mirror into padding */
+    MirrorIntoPadding(image,out,x,width);
+    out+=image->columns+(size_t) (width*2);
+  }
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1396,12 +1450,11 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
         *magick_restrict p;
 
       float
-        *out,
         *pix,
         *pixels;
 
-      ssize_t
-        y;
+      LocalContrastColumn
+        column;
 
       if (status == MagickFalse)
         continue;
@@ -1416,19 +1469,13 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
           continue;
         }
       LoadLocalContrastLuma(image,p,pix,width);
-      out=interImage+x+width;
-      for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        double
-          sum;
-
-        sum=GetTriangleWeightedSum(pixels,y,width);
-        /* write to output */
-        *out=(float) (sum/totalWeight);
-        /* mirror into padding */
-        MirrorIntoPadding(image,out,x,width);
-        out+=image->columns+(size_t) (width*2);
-      }
+      column.image=image;
+      column.interImage=interImage;
+      column.pixels=pixels;
+      column.width=width;
+      column.x=x;
+      column.totalWeight=totalWeight;
+      StoreLocalContrastColumn(&column);
     }
   }
   /*
