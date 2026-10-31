@@ -2237,6 +2237,23 @@ MagickExport void *ImageToBlob(const ImageInfo *image_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void WriteFileToCustomStream(const ImageInfo *image_info,
+  ImageInfo *clone_info,unsigned char *blob)
+{
+  ssize_t
+    count;
+
+  (void) fseek(clone_info->file,0,SEEK_SET);
+  count=(ssize_t) MagickMaxBufferExtent;
+  while (count == (ssize_t) MagickMaxBufferExtent)
+  {
+    count=(ssize_t) fread(blob,sizeof(*blob),MagickMaxBufferExtent,
+      clone_info->file);
+    (void) image_info->custom_stream->writer(blob,(size_t) count,
+      image_info->custom_stream->data);
+  }
+}
+
 MagickExport void ImageToCustomStream(const ImageInfo *image_info,Image *image,
   ExceptionInfo *exception)
 {
@@ -2329,24 +2346,11 @@ MagickExport void ImageToCustomStream(const ImageInfo *image_info,Image *image,
       clone_info->file=fdopen(file,"wb+");
       if (clone_info->file != (FILE *) NULL)
         {
-          ssize_t
-            count;
-
           (void) FormatLocaleString(image->filename,MagickPathExtent,"%s:%s",
             image->magick,unique);
           status=WriteImage(clone_info,image,exception);
           if (status != MagickFalse)
-            {
-              (void) fseek(clone_info->file,0,SEEK_SET);
-              count=(ssize_t) MagickMaxBufferExtent;
-              while (count == (ssize_t) MagickMaxBufferExtent)
-              {
-                count=(ssize_t) fread(blob,sizeof(*blob),MagickMaxBufferExtent,
-                  clone_info->file);
-                (void) image_info->custom_stream->writer(blob,(size_t) count,
-                  image_info->custom_stream->data);
-              }
-            }
+            WriteFileToCustomStream(image_info,clone_info,blob);
           (void) fclose(clone_info->file);
         }
       blob=(unsigned char *) RelinquishMagickMemory(blob);
@@ -2736,24 +2740,11 @@ MagickExport void ImagesToCustomStream(const ImageInfo *image_info,
       clone_info->file=fdopen(file,"wb+");
       if (clone_info->file != (FILE *) NULL)
         {
-          ssize_t
-            count;
-
           (void) FormatLocaleString(filename,MagickPathExtent,"%s:%s",
             images->magick,unique);
           status=WriteImages(clone_info,images,filename,exception);
           if (status != MagickFalse)
-            {
-              (void) fseek(clone_info->file,0,SEEK_SET);
-              count=(ssize_t) MagickMaxBufferExtent;
-              while (count == (ssize_t) MagickMaxBufferExtent)
-              {
-                count=(ssize_t) fread(blob,sizeof(*blob),MagickMaxBufferExtent,
-                  clone_info->file);
-                (void) image_info->custom_stream->writer(blob,(size_t) count,
-                  image_info->custom_stream->data);
-              }
-            }
+            WriteFileToCustomStream(image_info,clone_info,blob);
           (void) fclose(clone_info->file);
         }
       blob=(unsigned char *) RelinquishMagickMemory(blob);
