@@ -2479,6 +2479,41 @@ static MagickBooleanType InterpolateBlendPixelInfo(
   return(status);
 }
 
+static void InterpolateAreaPixelInfo(const PixelInfoInterpolation grid,
+  const PixelInterpolateMethod interpolate,PixelInfo *pixel,
+  MagickBooleanType *status)
+{
+  PixelInfo
+    pixels[16];
+
+  switch (interpolate)
+  {
+    case AverageInterpolatePixel:  /* nearest 4 neighbours */
+    case Average9InterpolatePixel:  /* nearest 9 neighbours */
+    case Average16InterpolatePixel:  /* nearest 16 neighbours */
+    {
+      (*status)=InterpolateAveragePixelInfo(&grid,interpolate,pixel,(*status));
+      break;
+    }
+    case BilinearInterpolatePixel:
+    default:
+    {
+      (*status)=InterpolateBilinearPixelInfo(&grid,pixels,pixel,(*status));
+      break;
+    }
+    case BlendInterpolatePixel:
+    {
+      (*status)=InterpolateBlendPixelInfo(&grid,pixels,pixel,(*status));
+      break;
+    }
+    case MeshInterpolatePixel:
+    {
+      (*status)=InterpolateMeshPixelInfo(&grid,pixels,pixel,(*status));
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
   const CacheView_ *image_view,const PixelInterpolateMethod method,
   const double x,const double y,PixelInfo *pixel,ExceptionInfo *exception)
@@ -2522,27 +2557,14 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
   grid.exception=exception;
   switch (interpolate)
   {
-    case AverageInterpolatePixel:  /* nearest 4 neighbours */
-    case Average9InterpolatePixel:  /* nearest 9 neighbours */
-    case Average16InterpolatePixel:  /* nearest 16 neighbours */
-    {
-      status=InterpolateAveragePixelInfo(&grid,interpolate,pixel,status);
-      break;
-    }
     case BackgroundInterpolatePixel:
     {
       *pixel=image->background_color;  /* Copy PixelInfo Structure  */
       break;
     }
-    case BilinearInterpolatePixel:
     default:
     {
-      status=InterpolateBilinearPixelInfo(&grid,pixels,pixel,status);
-      break;
-    }
-    case BlendInterpolatePixel:
-    {
-      status=InterpolateBlendPixelInfo(&grid,pixels,pixel,status);
+      InterpolateAreaPixelInfo(grid,interpolate,pixel,&status);
       break;
     }
     case CatromInterpolatePixel:
@@ -2560,11 +2582,6 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
           break;
         }
       GetPixelInfoPixel(image,p,pixel);
-      break;
-    }
-    case MeshInterpolatePixel:
-    {
-      status=InterpolateMeshPixelInfo(&grid,pixels,pixel,status);
       break;
     }
     case NearestInterpolatePixel:
