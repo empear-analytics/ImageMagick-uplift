@@ -775,12 +775,86 @@ static void UpdateCLAHEProgress(const Image *image,MagickOffsetType *progress,
     }
 }
 
+typedef struct _CLAHEPixelLoad
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  RectangleInfo
+    clahe_info,
+    tile_info;
+
+  unsigned short
+    *pixels;
+
+  ExceptionInfo
+    *exception;
+} CLAHEPixelLoad;
+
+static void LoadCLAHEPixels(const CLAHEPixelLoad *pixel_load,
+  MagickBooleanType *status,MagickOffsetType *progress)
+{
+  Image
+    *const image = pixel_load->image;
+
+  CacheView
+    *const image_view = pixel_load->image_view;
+
+  const RectangleInfo
+    clahe_info = pixel_load->clahe_info,
+    tile_info = pixel_load->tile_info;
+
+  unsigned short
+    *const pixels = pixel_load->pixels;
+
+  ExceptionInfo
+    *const exception = pixel_load->exception;
+
+  size_t
+    n;
+
+  ssize_t
+    y;
+
+  n=0;
+  for (y=0; y < (ssize_t) clahe_info.height; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      x;
+
+    if ((*status) == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,-(tile_info.x >> 1),y-
+      (tile_info.y >> 1),clahe_info.width,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        (*status)=MagickFalse;
+        continue;
+      }
+    for (x=0; x < (ssize_t) clahe_info.width; x++)
+    {
+      pixels[n++]=ScaleQuantumToShort(p[0]);
+      p+=(ptrdiff_t) GetPixelChannels(image);
+    }
+    UpdateCLAHEProgress(image,progress,status);
+  }
+}
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
 {
   CacheView
     *image_view;
+
+  CLAHEPixelLoad
+    pixel_load;
 
   ColorspaceType
     colorspace;
@@ -842,31 +916,13 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   image_view=AcquireVirtualCacheView(image,exception);
   progress=0;
   status=MagickTrue;
-  n=0;
-  for (y=0; y < (ssize_t) clahe_info.height; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,-(tile_info.x >> 1),y-
-      (tile_info.y >> 1),clahe_info.width,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) clahe_info.width; x++)
-    {
-      pixels[n++]=ScaleQuantumToShort(p[0]);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    UpdateCLAHEProgress(image,&progress,&status);
-  }
+  pixel_load.image=image;
+  pixel_load.image_view=image_view;
+  pixel_load.clahe_info=clahe_info;
+  pixel_load.tile_info=tile_info;
+  pixel_load.pixels=pixels;
+  pixel_load.exception=exception;
+  LoadCLAHEPixels(&pixel_load,&status,&progress);
   image_view=DestroyCacheView(image_view);
   status=CLAHE(&clahe_info,&tile_info,&range_info,number_bins == 0 ?
     (size_t) 128 : MagickMin(number_bins,256),clip_limit,pixels);
