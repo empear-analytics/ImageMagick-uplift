@@ -2457,33 +2457,43 @@ static void StreamCharQuantum(const Image *image,const QuantumType quantum,
   }
 }
 
-static void StreamDoubleQuantum(const Image *image,
-  const QuantumInfo *quantum_info,const QuantumType quantum,const Quantum *p,
-  double *q)
+typedef struct _StreamDoubleChannel
 {
+  const Image
+    *image;
+
+  const QuantumInfo
+    *quantum_info;
+
+  QuantumType
+    quantum;
+
+  const Quantum
+    *p;
+
+  double
+    *q;
+} StreamDoubleChannel;
+
+static void StreamDoubleAlphaIndexQuantum(const StreamDoubleChannel *channel)
+{
+  const Image
+    *image = channel->image;
+
+  const QuantumInfo
+    *quantum_info = channel->quantum_info;
+
+  const QuantumType
+    quantum = channel->quantum;
+
+  const Quantum
+    *p = channel->p;
+
+  double
+    *q = channel->q;
+
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=(double) ((QuantumScale*(double) GetPixelRed(image,p))*
-        quantum_info->scale+quantum_info->minimum);
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=(double) ((QuantumScale*(double) GetPixelGreen(image,p))*
-        quantum_info->scale+quantum_info->minimum);
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=(double) ((QuantumScale*(double) GetPixelBlue(image,p))*
-        quantum_info->scale+quantum_info->minimum);
-      break;
-    }
     case AlphaQuantum:
     {
       *q=(double) ((QuantumScale*(double) GetPixelAlpha(image,p))*
@@ -2511,6 +2521,49 @@ static void StreamDoubleQuantum(const Image *image,
     }
     default:
       *q=0;
+  }
+}
+
+static void StreamDoubleQuantum(const Image *image,
+  const QuantumInfo *quantum_info,const QuantumType quantum,const Quantum *p,
+  double *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=(double) ((QuantumScale*(double) GetPixelRed(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=(double) ((QuantumScale*(double) GetPixelGreen(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=(double) ((QuantumScale*(double) GetPixelBlue(image,p))*
+        quantum_info->scale+quantum_info->minimum);
+      break;
+    }
+    default:
+    {
+      StreamDoubleChannel
+        channel;
+
+      channel.image=image;
+      channel.quantum_info=quantum_info;
+      channel.quantum=quantum;
+      channel.p=p;
+      channel.q=q;
+      StreamDoubleAlphaIndexQuantum(&channel);
+      break;
+    }
   }
 }
 
