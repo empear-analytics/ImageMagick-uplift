@@ -2527,6 +2527,9 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
     n=1;
     for (p=q; *p != '\0'; )
     {
+      size_t
+        length;
+
       if (GetNextToken(p,&p,extent,token) < 1)
         break;
       if (*token == '\0')
@@ -2543,23 +2546,20 @@ static SplayTreeInfo *GetMVGMacros(const char *primitive,
             DrawError,"VectorGraphicsNestedTooDeeply","`%s'",token);
           break;
         }
-      if ((n == 0) && (end >= start))
+      if ((n != 0) || (end < start))
+        continue;
+      /*
+        Extract macro.
+      */
+      length=(size_t) (end-start);
+      (void) GetNextToken(p,&p,extent,token);
+      if (length > 0)
         {
-          size_t
-            length=(size_t) (end-start);
-
-          /*
-            Extract macro.
-          */
-          (void) GetNextToken(p,&p,extent,token);
-          if (length > 0)
-            {
-              (void) CopyMagickString(macro,start,length);
-              (void) AddValueToSplayTree(macros,ConstantString(name),
-                ConstantString(macro));
-            }
-          break;
+          (void) CopyMagickString(macro,start,length);
+          (void) AddValueToSplayTree(macros,ConstantString(name),
+            ConstantString(macro));
         }
+      break;
     }
   }
   token=DestroyString(token);
