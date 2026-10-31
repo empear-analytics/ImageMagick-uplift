@@ -370,6 +370,41 @@ static double GetLandscapeAngle(double angle,const double p_length,
   return(angle);
 }
 
+static double GetOrientedBoxAngle(const char *artifact,
+  PointInfo *bounding_box,const CaliperInfo caliper_info,const double distance)
+{
+  double
+    angle,
+    length,
+    q_length,
+    p_length;
+
+  PointInfo
+    point;
+
+  /*
+    Find smallest perpendicular distance from edge to origin.
+  */
+  point=FindNearestEdge(bounding_box,distance);
+  angle=RadiansToDegrees(atan(point.y*MagickSafeReciprocal(point.x)));
+  length=hypot(point.x,point.y);
+  p_length=fabs((double) MagickMax(caliper_info.width,caliper_info.height)-
+    length);
+  q_length=fabs(length-(double) MagickMin(caliper_info.width,
+    caliper_info.height));
+  if (LocaleCompare(artifact,"landscape") == 0)
+    {
+      angle=GetLandscapeAngle(angle,p_length,q_length);
+    }
+  else
+    if (LocaleCompare(artifact,"portrait") == 0)
+      {
+        if (p_length < q_length)
+          angle+=(angle >= 0.0) ? 90.0 : -90.0;
+      }
+  return(angle);
+}
+
 MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   size_t *number_vertices,ExceptionInfo *exception)
 {
@@ -444,36 +479,7 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   GetMinimumBoxAngle(bounding_box,&angle,&distance);
   artifact=GetImageArtifact(image,"minimum-bounding-box:orientation");
   if (artifact != (const char *) NULL)
-    {
-      double
-        length,
-        q_length,
-        p_length;
-
-      PointInfo
-        point;
-
-      /*
-        Find smallest perpendicular distance from edge to origin.
-      */
-      point=FindNearestEdge(bounding_box,distance);
-      angle=RadiansToDegrees(atan(point.y*MagickSafeReciprocal(point.x)));
-      length=hypot(point.x,point.y);
-      p_length=fabs((double) MagickMax(caliper_info.width,caliper_info.height)-
-        length);
-      q_length=fabs(length-(double) MagickMin(caliper_info.width,
-        caliper_info.height));
-      if (LocaleCompare(artifact,"landscape") == 0)
-        {
-          angle=GetLandscapeAngle(angle,p_length,q_length);
-        }
-      else
-        if (LocaleCompare(artifact,"portrait") == 0)
-          {
-            if (p_length < q_length)
-              angle+=(angle >= 0.0) ? 90.0 : -90.0;
-          }
-    }
+    angle=GetOrientedBoxAngle(artifact,bounding_box,caliper_info,distance);
   (void) FormatImageProperty(image,"minimum-bounding-box:angle","%.*g",
     GetMagickPrecision(),angle);
   (void) FormatImageProperty(image,"minimum-bounding-box:unrotate","%.*g",
