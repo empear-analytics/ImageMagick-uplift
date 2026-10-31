@@ -3549,6 +3549,15 @@ static void OpenReadBlobFile(BlobInfo *magick_restrict blob_info,
     blob_info->file_info.file=fdopen(file,type);
 }
 
+static MagickBooleanType AttachImageInfoBlob(const ImageInfo *image_info,
+  BlobInfo *magick_restrict blob_info)
+{
+  if (image_info->stream != (StreamHandler) NULL)
+    blob_info->stream=(StreamHandler) image_info->stream;
+  AttachBlob(blob_info,image_info->blob,image_info->length);
+  return(MagickTrue);
+}
+
 static void FormSharedListFilename(const Image *image,const char *extension,
   char *filename)
 {
@@ -3595,12 +3604,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
       image_info->filename);
   blob_info=image->blob;
   if (image_info->blob != (void *) NULL)
-    {
-      if (image_info->stream != (StreamHandler) NULL)
-        blob_info->stream=(StreamHandler) image_info->stream;
-      AttachBlob(blob_info,image_info->blob,image_info->length);
-      return(MagickTrue);
-    }
+    return(AttachImageInfoBlob(image_info,blob_info));
   if ((image_info->custom_stream != (CustomStreamInfo *) NULL) &&
       (*image->filename == '\0'))
     {
