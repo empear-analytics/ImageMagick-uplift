@@ -7786,6 +7786,21 @@ static void SwapCbYCrPixels(const Image *image,CacheView *image_view,
   }
 }
 
+static void GetImportPixelQueue(const Image *image,CacheView *image_view,
+  MagickSizeType *number_pixels,Quantum *magick_restrict *q)
+{
+  if (image_view == (CacheView *) NULL)
+    {
+      *number_pixels=GetImageExtent(image);
+      *q=GetAuthenticPixelQueue(image);
+    }
+  else
+    {
+      *number_pixels=GetCacheViewExtent(image_view);
+      *q=GetCacheViewAuthenticPixelQueue(image_view);
+    }
+}
+
 MagickExport size_t ImportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,const unsigned char *magick_restrict pixels,
@@ -7820,16 +7835,7 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
     pixels=(const unsigned char *) GetQuantumPixels(quantum_info);
   x=0;
   p=pixels;
-  if (image_view == (CacheView *) NULL)
-    {
-      number_pixels=GetImageExtent(image);
-      q=GetAuthenticPixelQueue(image);
-    }
-  else
-    {
-      number_pixels=GetCacheViewExtent(image_view);
-      q=GetCacheViewAuthenticPixelQueue(image_view);
-    }
+  GetImportPixelQueue(image,image_view,&number_pixels,&q);
   if (q == (Quantum *) NULL)
     return(0);
   ResetQuantumState(quantum_info);
