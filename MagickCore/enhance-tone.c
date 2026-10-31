@@ -939,6 +939,19 @@ static void SetStretchGrayColorspace(Image *image,ExceptionInfo *exception)
     (void) SetImageColorspace(image,GRAYColorspace,exception);
 }
 
+static void SetStretchProperty(Image *image,const Quantum *black,
+  const Quantum *white,ExceptionInfo *exception)
+{
+  char
+    property[MagickPathExtent];
+
+  (void) FormatLocaleString(property,MagickPathExtent,"%gx%g%%",100.0*
+    QuantumScale*GetPixelIntensity(image,black),100.0*QuantumScale*
+    GetPixelIntensity(image,white));
+  (void) SetImageProperty(image,"histogram:contrast-stretch",property,
+    exception);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -946,9 +959,6 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
 
   CacheView
     *image_view;
-
-  char
-    property[MagickPathExtent];
 
   double
     *histogram;
@@ -1085,11 +1095,7 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
       }
   }
   image_view=DestroyCacheView(image_view);
-  (void) FormatLocaleString(property,MagickPathExtent,"%gx%g%%",100.0*
-    QuantumScale*GetPixelIntensity(image,black),100.0*QuantumScale*
-    GetPixelIntensity(image,white));
-  (void) SetImageProperty(image,"histogram:contrast-stretch",property,
-    exception);
+  SetStretchProperty(image,black,white,exception);
   white=(Quantum *) RelinquishMagickMemory(white);
   black=(Quantum *) RelinquishMagickMemory(black);
   stretch_map=(Quantum *) RelinquishMagickMemory(stretch_map);
