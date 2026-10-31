@@ -494,6 +494,53 @@ static MagickBooleanType CountHNodeColor(const HNodeCount *count)
   return(MagickTrue);
 }
 
+static MagickBooleanType ClassifyRowColors(const Image *image,
+  const Quantum *p,HCubeInfo *cube_info,ExceptionInfo *exception)
+{
+  HNodeInfo
+    *node_info;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    HCubeDescent
+      descent;
+
+    HCubeLeaf
+      targets;
+
+    HNodeCount
+      count;
+
+    /*
+      Start at the root and proceed level by level.
+    */
+    descent.image=image;
+    descent.p=p;
+    descent.cube_info=cube_info;
+    descent.exception=exception;
+    targets.node_info=(&node_info);
+    targets.pixel=(&pixel);
+    if (DescendHCube(&descent,&targets) == MagickFalse)
+      return(MagickFalse);
+    count.image=image;
+    count.p=p;
+    count.cube_info=cube_info;
+    count.node_info=node_info;
+    count.pixel=pixel;
+    count.exception=exception;
+    if (CountHNodeColor(&count) == MagickFalse)
+      return(MagickFalse);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(MagickTrue);
+}
+
 static HCubeInfo *ClassifyImageColors(const Image *image,
   ExceptionInfo *exception)
 {
@@ -511,14 +558,8 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
   PixelInfo
     pixel;
 
-  HNodeInfo
-    *node_info;
-
   const Quantum
     *p;
-
-  ssize_t
-    x;
 
   ssize_t
     y;
@@ -544,38 +585,8 @@ static HCubeInfo *ClassifyImageColors(const Image *image,
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      HCubeDescent
-        descent;
-
-      HCubeLeaf
-        targets;
-
-      HNodeCount
-        count;
-
-      /*
-        Start at the root and proceed level by level.
-      */
-      descent.image=image;
-      descent.p=p;
-      descent.cube_info=cube_info;
-      descent.exception=exception;
-      targets.node_info=(&node_info);
-      targets.pixel=(&pixel);
-      if (DescendHCube(&descent,&targets) == MagickFalse)
-        return(0);
-      count.image=image;
-      count.p=p;
-      count.cube_info=cube_info;
-      count.node_info=node_info;
-      count.pixel=pixel;
-      count.exception=exception;
-      if (CountHNodeColor(&count) == MagickFalse)
-        return(0);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    if (ClassifyRowColors(image,p,cube_info,exception) == MagickFalse)
+      return(0);
     proceed=SetImageProgress(image,EvaluateImageTag,(MagickOffsetType) y,
       image->rows);
     if (proceed == MagickFalse)
