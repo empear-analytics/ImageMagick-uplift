@@ -2567,6 +2567,84 @@ static Image *BlurSketchImage(const SketchBlur *sketch_blur,
   return(BlendSketchImage(image,blur_image,radius,exception));
 }
 
+typedef struct _SketchRandomRow
+{
+  const Image
+    *image;
+
+  Image
+    *random_image;
+
+  CacheView
+    *random_view;
+
+  RandomInfo
+    **random_info;
+
+  int
+    id;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} SketchRandomRow;
+
+static MagickBooleanType SetRandomSketchRow(const SketchRandomRow *sketch_row)
+{
+  const Image
+    *const image = sketch_row->image;
+
+  Image
+    *const random_image = sketch_row->random_image;
+
+  CacheView
+    *const random_view = sketch_row->random_view;
+
+  RandomInfo
+    **const random_info = sketch_row->random_info;
+
+  const int
+    id = sketch_row->id;
+
+  const ssize_t
+    y = sketch_row->y;
+
+  ExceptionInfo
+    *const exception = sketch_row->exception;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  q=QueueCacheViewAuthenticPixels(random_view,0,y,random_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (x=0; x < (ssize_t) random_image->columns; x++)
+  {
+    double
+      value;
+
+    value=GetPseudoRandomValue(random_info[id]);
+    SetRandomPixelChannels(image,random_image,value,q);
+    q+=(ptrdiff_t) GetPixelChannels(random_image);
+  }
+  if (SyncCacheViewAuthenticPixels(random_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport Image *SketchImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2613,31 +2691,19 @@ MagickExport Image *SketchImage(const Image *image,const double radius,
     const int
       id = GetOpenMPThreadId();
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
+    SketchRandomRow
+      sketch_row;
 
     if (status == MagickFalse)
       continue;
-    q=QueueCacheViewAuthenticPixels(random_view,0,y,random_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) random_image->columns; x++)
-    {
-      double
-        value;
-
-      value=GetPseudoRandomValue(random_info[id]);
-      SetRandomPixelChannels(image,random_image,value,q);
-      q+=(ptrdiff_t) GetPixelChannels(random_image);
-    }
-    if (SyncCacheViewAuthenticPixels(random_view,exception) == MagickFalse)
+    sketch_row.image=image;
+    sketch_row.random_image=random_image;
+    sketch_row.random_view=random_view;
+    sketch_row.random_info=random_info;
+    sketch_row.id=id;
+    sketch_row.y=y;
+    sketch_row.exception=exception;
+    if (SetRandomSketchRow(&sketch_row) == MagickFalse)
       status=MagickFalse;
   }
   random_view=DestroyCacheView(random_view);
