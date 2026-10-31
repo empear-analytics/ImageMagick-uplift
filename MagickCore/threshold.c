@@ -1550,6 +1550,18 @@ static ThresholdMap *GetNamedThresholdMap(const char *threshold_map,
   return(GetThresholdMap(token,exception));
 }
 
+static MagickBooleanType CheckOrderedDitherMap(const ThresholdMap *map,
+  const char *threshold_map,ExceptionInfo *exception)
+{
+  if (map == (ThresholdMap *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "InvalidArgument","%s : '%s'","ordered-dither",threshold_map);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 typedef struct _OrderedDitherRow
 {
   ThresholdMap
@@ -1623,12 +1635,8 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
     p++;
   threshold_map=p;
   map=GetNamedThresholdMap(threshold_map,p,exception);
-  if (map == (ThresholdMap *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "InvalidArgument","%s : '%s'","ordered-dither",threshold_map);
-      return(MagickFalse);
-    }
+  if (CheckOrderedDitherMap(map,threshold_map,exception) == MagickFalse)
+    return(MagickFalse);
   GetDitherLevels(threshold_map,levels);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
