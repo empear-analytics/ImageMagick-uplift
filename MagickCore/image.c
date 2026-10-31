@@ -431,6 +431,23 @@ MagickExport void AcquireNextImage(const ImageInfo *image_info,Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType SetAppendImageClass(Image *append_image,
+  const ImageType image_type,const MagickBooleanType homogeneous_colorspace,
+  ExceptionInfo *exception)
+{
+  if (image_type != BilevelType)
+    {
+      if (SetImageStorageClass(append_image,DirectClass,exception) == MagickFalse)
+        {
+          append_image=DestroyImage(append_image);
+          return(MagickFalse);
+        }
+      if (homogeneous_colorspace == MagickFalse)
+        (void) SetImageColorspace(append_image,sRGBColorspace,exception);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *AppendImages(const Image *images,
   const MagickBooleanType stack,ExceptionInfo *exception)
 {
@@ -517,16 +534,9 @@ MagickExport Image *AppendImages(const Image *images,
   append_image=CloneImage(images,width,height,MagickTrue,exception);
   if (append_image == (Image *) NULL)
     return((Image *) NULL);
-  if (image_type != BilevelType)
-    {
-      if (SetImageStorageClass(append_image,DirectClass,exception) == MagickFalse)
-        {
-          append_image=DestroyImage(append_image);
-          return((Image *) NULL);
-        }
-      if (homogeneous_colorspace == MagickFalse)
-        (void) SetImageColorspace(append_image,sRGBColorspace,exception);
-    }
+  if (SetAppendImageClass(append_image,image_type,homogeneous_colorspace,
+      exception) == MagickFalse)
+    return((Image *) NULL);
   append_image->depth=depth;
   append_image->alpha_trait=alpha_trait;
   append_image->page=images->page;
