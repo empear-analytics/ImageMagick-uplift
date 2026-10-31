@@ -2061,6 +2061,32 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SetLiquidRescalePixelChannels(const Image *image,
+  Image *rescale_image,gfloat *packet,Quantum *magick_restrict p)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    PixelChannel
+      channel;
+
+    PixelTrait
+      rescale_traits,
+      traits;
+
+    channel=GetPixelChannelChannel(image,i);
+    traits=GetPixelChannelTraits(image,channel);
+    rescale_traits=GetPixelChannelTraits(rescale_image,channel);
+    if ((traits == UndefinedPixelTrait) ||
+        (rescale_traits == UndefinedPixelTrait))
+      continue;
+    SetPixelChannel(rescale_image,channel,ClampToQuantum(QuantumRange*
+      packet[i]),p);
+  }
+}
+
 MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   const size_t rows,const double delta_x,const double rigidity,
   ExceptionInfo *exception)
@@ -2181,31 +2207,11 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
     Quantum
       *magick_restrict p;
 
-    ssize_t
-      i;
-
     p=QueueCacheViewAuthenticPixels(rescale_view,x_offset,y_offset,1,1,
       exception);
     if (p == (Quantum *) NULL)
       break;
-    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-    {
-      PixelChannel
-        channel;
-
-      PixelTrait
-        rescale_traits,
-        traits;
-
-      channel=GetPixelChannelChannel(image,i);
-      traits=GetPixelChannelTraits(image,channel);
-      rescale_traits=GetPixelChannelTraits(rescale_image,channel);
-      if ((traits == UndefinedPixelTrait) ||
-          (rescale_traits == UndefinedPixelTrait))
-        continue;
-      SetPixelChannel(rescale_image,channel,ClampToQuantum(QuantumRange*
-        packet[i]),p);
-    }
+    SetLiquidRescalePixelChannels(image,rescale_image,packet,p);
     if (SyncCacheViewAuthenticPixels(rescale_view,exception) == MagickFalse)
       break;
   }
