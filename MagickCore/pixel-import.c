@@ -3454,6 +3454,83 @@ static MagickBooleanType ImportMapQuantumMY(const ImportMapRequest *request,
   return(MagickTrue);
 }
 
+typedef struct _ImportTypeRequest
+{
+  Image
+    *image;
+
+  RectangleInfo
+    roi;
+
+  ImportPixelBuffer
+    buffer;
+
+  StorageType
+    type;
+
+  ExceptionInfo
+    *exception;
+} ImportTypeRequest;
+
+static void ImportPixelsOfType(const ImportTypeRequest *request,
+  MagickBooleanType *status)
+{
+  Image
+    *image = request->image;
+
+  const RectangleInfo
+    roi = request->roi;
+
+  const ImportPixelBuffer
+    buffer = request->buffer;
+
+  const StorageType
+    type = request->type;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (type)
+  {
+    case DoublePixel:
+    {
+      (*status)=ImportDoublePixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case FloatPixel:
+    {
+      (*status)=ImportFloatPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case LongPixel:
+    {
+      (*status)=ImportLongPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case LongLongPixel:
+    {
+      (*status)=ImportLongLongPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case QuantumPixel:
+    {
+      (*status)=ImportQuantumPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case ShortPixel:
+    {
+      (*status)=ImportShortPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    default:
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedStorageType","`%d'",type);
+      (*status)=MagickFalse;
+    }
+  }
+}
+
 MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   const ssize_t y,const size_t width,const size_t height,const char *map,
   const StorageType type,const void *pixels,ExceptionInfo *exception)
@@ -3525,41 +3602,18 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
       status=ImportCharPixel(image,&roi,&buffer,exception);
       break;
     }
-    case DoublePixel:
-    {
-      status=ImportDoublePixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case FloatPixel:
-    {
-      status=ImportFloatPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case LongPixel:
-    {
-      status=ImportLongPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case LongLongPixel:
-    {
-      status=ImportLongLongPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case QuantumPixel:
-    {
-      status=ImportQuantumPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case ShortPixel:
-    {
-      status=ImportShortPixel(image,&roi,&buffer,exception);
-      break;
-    }
     default:
     {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "UnrecognizedStorageType","`%d'",type);
-      status=MagickFalse;
+      ImportTypeRequest
+        request;
+
+      request.image=image;
+      request.roi=roi;
+      request.buffer=buffer;
+      request.type=type;
+      request.exception=exception;
+      ImportPixelsOfType(&request,&status);
+      break;
     }
   }
   quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
