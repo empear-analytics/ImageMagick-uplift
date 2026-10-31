@@ -1390,6 +1390,21 @@ static void PrintImageSummaryAttributes(FILE *file,const Image *image,
     }
 }
 
+static size_t GetLocationsLimit(const Image *image)
+{
+  const char
+    *limit;
+
+  size_t
+    locations;
+
+  limit=GetImageArtifact(image,"identify:limit");
+  locations=0;
+  if (limit != (const char *) NULL)
+    locations=StringToUnsignedLong(limit);
+  return(locations);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1455,9 +1470,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   locate=GetImageArtifact(image,"identify:locate");
   if (locate != (const char *) NULL)
     {
-      const char
-        *limit;
-
       size_t
         locations;
 
@@ -1471,10 +1483,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       */
       statistic_type=(StatisticType) ParseCommandOption(MagickStatisticOptions,
         MagickFalse,locate);
-      limit=GetImageArtifact(image,"identify:limit");
-      locations=0;
-      if (limit != (const char *) NULL)
-        locations=StringToUnsignedLong(limit);
+      locations=GetLocationsLimit(image);
       channel_statistics=GetLocationStatistics(image,statistic_type,exception);
       if (channel_statistics == (ChannelStatistics *) NULL)
         return(MagickFalse);
