@@ -1821,8 +1821,9 @@ static void InterpolateMeshChannel(const ChannelsInterpolation *grid,
     }
 }
 
-static MagickBooleanType InterpolateCatromChannels(
-  const ChannelsInterpolation *grid,Quantum *pixel,MagickBooleanType status)
+static MagickBooleanType InterpolateCubicChannels(
+  const ChannelsInterpolation *grid,void (*weights)(const double,double (*)[4]),
+  Quantum *pixel,MagickBooleanType status)
 {
   const Quantum
     *magick_restrict p;
@@ -1838,7 +1839,7 @@ static MagickBooleanType InterpolateCatromChannels(
       return(status);
     }
   for (i=0; i < (ssize_t) GetPixelChannels(grid->source); i++)
-    InterpolateCubicChannel(grid,CatromWeights,p,i,pixel);
+    InterpolateCubicChannel(grid,weights,p,i,pixel);
   return(status);
 }
 
@@ -1947,7 +1948,7 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     }
     case CatromInterpolatePixel:
     {
-      status=InterpolateCatromChannels(&grid,pixel,status);
+      status=InterpolateCubicChannels(&grid,CatromWeights,pixel,status);
       break;
     }
     case IntegerInterpolatePixel:
@@ -1992,15 +1993,7 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     }
     case SplineInterpolatePixel:
     {
-      p=GetCacheViewVirtualPixels(source_view,x_offset-1,y_offset-1,4,4,
-        exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-        InterpolateCubicChannel(&grid,SplineWeights,p,i,pixel);
+      status=InterpolateCubicChannels(&grid,SplineWeights,pixel,status);
       break;
     }
   }
