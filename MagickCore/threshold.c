@@ -1705,6 +1705,35 @@ static void PerceptiblePixel(const Image *image,const double epsilon,
   }
 }
 
+static MagickBooleanType PerceptibleImageColormap(Image *image,
+  const double epsilon,ExceptionInfo *exception)
+{
+  ssize_t
+    i;
+
+  PixelInfo
+    *magick_restrict q;
+
+  q=image->colormap;
+  for (i=0; i < (ssize_t) image->colors; i++)
+  {
+    if ((GetPixelChannelTraits(image,RedPixelChannel) & UpdatePixelTrait) != 0)
+      q->red=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->red),
+        epsilon);
+    if ((GetPixelChannelTraits(image,GreenPixelChannel) & UpdatePixelTrait) != 0)
+      q->green=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->green),
+        epsilon);
+    if ((GetPixelChannelTraits(image,BluePixelChannel) & UpdatePixelTrait) != 0)
+      q->blue=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->blue),
+        epsilon);
+    if ((GetPixelChannelTraits(image,AlphaPixelChannel) & UpdatePixelTrait) != 0)
+      q->alpha=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->alpha),
+        epsilon);
+    q++;
+  }
+  return(SyncImage(image,exception));
+}
+
 MagickExport MagickBooleanType PerceptibleImage(Image *image,
   const double epsilon,ExceptionInfo *exception)
 {
@@ -1727,32 +1756,7 @@ MagickExport MagickBooleanType PerceptibleImage(Image *image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if (image->storage_class == PseudoClass)
-    {
-      ssize_t
-        i;
-
-      PixelInfo
-        *magick_restrict q;
-
-      q=image->colormap;
-      for (i=0; i < (ssize_t) image->colors; i++)
-      {
-        if ((GetPixelChannelTraits(image,RedPixelChannel) & UpdatePixelTrait) != 0)
-          q->red=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->red),
-            epsilon);
-        if ((GetPixelChannelTraits(image,GreenPixelChannel) & UpdatePixelTrait) != 0)
-          q->green=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->green),
-            epsilon);
-        if ((GetPixelChannelTraits(image,BluePixelChannel) & UpdatePixelTrait) != 0)
-          q->blue=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->blue),
-            epsilon);
-        if ((GetPixelChannelTraits(image,AlphaPixelChannel) & UpdatePixelTrait) != 0)
-          q->alpha=(MagickRealType) PerceptibleThreshold(ClampToQuantum(q->alpha),
-            epsilon);
-        q++;
-      }
-      return(SyncImage(image,exception));
-    }
+    return(PerceptibleImageColormap(image,epsilon,exception));
   /*
     Perceptible image.
   */
