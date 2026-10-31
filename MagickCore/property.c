@@ -1979,6 +1979,21 @@ static void AddXMPPropertyValue(const Image *image,XMLTreeInfo *node,
   xmp_namespace=DestroyString(xmp_namespace);
 }
 
+static void AddXMPChildValues(const Image *image,XMLTreeInfo *node,
+  XMLTreeInfo *child)
+{
+  const char
+    *content;
+
+  while (child != (XMLTreeInfo *) NULL)
+  {
+    content=GetXMLTreeContent(child);
+    if (SkipXMPValue(content) == MagickFalse)
+      AddXMPPropertyValue(image,node,content);
+    child=GetXMLTreeSibling(child);
+  }
+}
+
 static void AddXMPDescriptionValues(const Image *image,
   XMLTreeInfo *description)
 {
@@ -1997,13 +2012,7 @@ static void AddXMPDescriptionValues(const Image *image,
     if ((child == (XMLTreeInfo *) NULL) &&
         (SkipXMPValue(content) == MagickFalse))
       AddXMPPropertyValue(image,node,content);
-    while (child != (XMLTreeInfo *) NULL)
-    {
-      content=GetXMLTreeContent(child);
-      if (SkipXMPValue(content) == MagickFalse)
-        AddXMPPropertyValue(image,node,content);
-      child=GetXMLTreeSibling(child);
-    }
+    AddXMPChildValues(image,node,child);
     node=GetXMLTreeSibling(node);
   }
 }
