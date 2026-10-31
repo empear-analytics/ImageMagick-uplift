@@ -1267,6 +1267,32 @@ static void PrintImageTimeToLive(FILE *file,const Image *image)
     }
 }
 
+static void PrintImageRegistry(FILE *file,ExceptionInfo *exception)
+{
+  const char
+    *registry,
+    *value;
+
+  ResetImageRegistryIterator();
+  registry=GetNextImageRegistry();
+  if (registry != (const char *) NULL)
+    {
+      /*
+        Display image registry.
+      */
+      (void) FormatLocaleFile(file,"  Registry:\n");
+      while (registry != (const char *) NULL)
+      {
+        (void) FormatLocaleFile(file,"    %s: ",registry);
+        value=(const char *) GetImageRegistry(StringRegistryType,registry,
+          exception);
+        if (value != (const char *) NULL)
+          (void) FormatLocaleFile(file,"%s\n",value);
+        registry=GetNextImageRegistry();
+      }
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1293,7 +1319,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const char
     *artifact,
     *locate,
-    *registry,
     *value;
 
   const MagickInfo
@@ -1867,24 +1892,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   PrintImageProfiles(file,image);
   PrintImageProperties(file,image,exception);
   PrintImageArtifacts(file,image);
-  ResetImageRegistryIterator();
-  registry=GetNextImageRegistry();
-  if (registry != (const char *) NULL)
-    {
-      /*
-        Display image registry.
-      */
-      (void) FormatLocaleFile(file,"  Registry:\n");
-      while (registry != (const char *) NULL)
-      {
-        (void) FormatLocaleFile(file,"    %s: ",registry);
-        value=(const char *) GetImageRegistry(StringRegistryType,registry,
-          exception);
-        if (value != (const char *) NULL)
-          (void) FormatLocaleFile(file,"%s\n",value);
-        registry=GetNextImageRegistry();
-      }
-    }
+  PrintImageRegistry(file,exception);
   (void) FormatLocaleFile(file,"  Tainted: %s\n",CommandOptionToMnemonic(
     MagickBooleanOptions,(ssize_t) image->taint));
   (void) FormatMagickSize(image->extent,MagickTrue,"B",MagickPathExtent,buffer);
