@@ -1260,6 +1260,26 @@ static ssize_t CountImagePixelsByRGB(const Image *image,Cluster *head,
   return(count);
 }
 
+static void SetDynamicThresholdPixel(const Cluster *background,
+  const Cluster *object,PixelInfo *pixel)
+{
+  double
+    threshold;
+
+  if (background != (Cluster *) NULL)
+    {
+      threshold=(background->red.center+object->red.center)/2.0;
+      pixel->red=(double) ScaleCharToQuantum((unsigned char)
+        (threshold+0.5));
+      threshold=(background->green.center+object->green.center)/2.0;
+      pixel->green=(double) ScaleCharToQuantum((unsigned char)
+        (threshold+0.5));
+      threshold=(background->blue.center+object->blue.center)/2.0;
+      pixel->blue=(double) ScaleCharToQuantum((unsigned char)
+        (threshold+0.5));
+    }
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1276,9 +1296,6 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     blue,
     green,
     red;
-
-  double
-    threshold;
 
   ssize_t
     i;
@@ -1440,18 +1457,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
         cluster=cluster->next;
       }
     }
-  if (background != (Cluster *) NULL)
-    {
-      threshold=(background->red.center+object->red.center)/2.0;
-      pixel->red=(double) ScaleCharToQuantum((unsigned char)
-        (threshold+0.5));
-      threshold=(background->green.center+object->green.center)/2.0;
-      pixel->green=(double) ScaleCharToQuantum((unsigned char)
-        (threshold+0.5));
-      threshold=(background->blue.center+object->blue.center)/2.0;
-      pixel->blue=(double) ScaleCharToQuantum((unsigned char)
-        (threshold+0.5));
-    }
+  SetDynamicThresholdPixel(background,object,pixel);
   /*
     Relinquish resources.
   */
