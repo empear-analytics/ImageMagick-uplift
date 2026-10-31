@@ -1234,6 +1234,32 @@ static ssize_t CountRowPixelsByRGB(const Image *image,Cluster *head,
   return(count);
 }
 
+static ssize_t CountImagePixelsByRGB(const Image *image,Cluster *head,
+  ssize_t count,ExceptionInfo *exception)
+{
+  const Quantum
+    *p;
+
+  MagickBooleanType
+    proceed;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    p=GetVirtualPixels(image,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    count=CountRowPixelsByRGB(image,head,p,count);
+    proceed=SetImageProgress(image,SegmentImageTag,(MagickOffsetType) y,
+      2*image->rows);
+    if (proceed == MagickFalse)
+      break;
+  }
+  return(count);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1251,14 +1277,8 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     green,
     red;
 
-  MagickBooleanType
-    proceed;
-
   double
     threshold;
-
-  const Quantum
-    *p;
 
   ssize_t
     i;
@@ -1268,8 +1288,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
 
   ssize_t
     count,
-    *histogram[MaxDimension],
-    y;
+    *histogram[MaxDimension];
 
   /*
     Allocate histogram and extrema.
@@ -1379,17 +1398,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     Count the pixels for each cluster.
   */
   count=0;
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    p=GetVirtualPixels(image,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    count=CountRowPixelsByRGB(image,head,p,count);
-    proceed=SetImageProgress(image,SegmentImageTag,(MagickOffsetType) y,
-      2*image->rows);
-    if (proceed == MagickFalse)
-      break;
-  }
+  count=CountImagePixelsByRGB(image,head,count,exception);
   /*
     Remove clusters that do not meet minimum cluster threshold.
   */
