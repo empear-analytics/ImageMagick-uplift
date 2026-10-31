@@ -1286,6 +1286,50 @@ static inline void SetUpdatableFillChannels(const Image *image,
     SetPixelAlpha(image,(Quantum) conform_fill->alpha,q);
 }
 
+typedef struct _OpaquePaintRow
+{
+  Image
+    *image;
+
+  MagickBooleanType
+    invert;
+
+  PixelInfo
+    conform_fill,
+    conform_target,
+    zero;
+} OpaquePaintRow;
+
+static void OpaquePaintRowPixels(const OpaquePaintRow *row,
+  Quantum *magick_restrict q)
+{
+  Image
+    *image = row->image;
+
+  const MagickBooleanType
+    invert = row->invert;
+
+  const PixelInfo
+    conform_fill = row->conform_fill,
+    conform_target = row->conform_target,
+    zero = row->zero;
+
+  PixelInfo
+    pixel;
+
+  ssize_t
+    x;
+
+  pixel=zero;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    GetPixelInfoPixel(image,q,&pixel);
+    if (IsFuzzyEquivalencePixelInfo(&pixel,&conform_target) != invert)
+      SetUpdatableFillChannels(image,&conform_fill,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType OpaquePaintImage(Image *image,
   const PixelInfo *target,const PixelInfo *fill,const MagickBooleanType invert,
   ExceptionInfo *exception)
@@ -1332,14 +1376,11 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    PixelInfo
-      pixel;
+    OpaquePaintRow
+      row;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -1349,14 +1390,12 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    pixel=zero;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      GetPixelInfoPixel(image,q,&pixel);
-      if (IsFuzzyEquivalencePixelInfo(&pixel,&conform_target) != invert)
-        SetUpdatableFillChannels(image,&conform_fill,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.image=image;
+    row.invert=invert;
+    row.conform_fill=conform_fill;
+    row.conform_target=conform_target;
+    row.zero=zero;
+    OpaquePaintRowPixels(&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
