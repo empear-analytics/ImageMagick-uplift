@@ -3558,6 +3558,17 @@ static MagickBooleanType AttachImageInfoBlob(const ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType AttachImageInfoCustomStream(
+  const ImageInfo *image_info,BlobInfo *magick_restrict blob_info)
+{
+  blob_info->type=CustomStream;
+  blob_info->custom_stream=image_info->custom_stream;
+  if (blob_info->custom_stream->seeker != (CustomStreamSeeker) NULL)
+    blob_info->custom_stream->seeker(0,SEEK_SET,
+      blob_info->custom_stream->data);
+  return(MagickTrue);
+}
+
 static void FormSharedListFilename(const Image *image,const char *extension,
   char *filename)
 {
@@ -3607,14 +3618,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
     return(AttachImageInfoBlob(image_info,blob_info));
   if ((image_info->custom_stream != (CustomStreamInfo *) NULL) &&
       (*image->filename == '\0'))
-    {
-      blob_info->type=CustomStream;
-      blob_info->custom_stream=image_info->custom_stream;
-      if (blob_info->custom_stream->seeker != (CustomStreamSeeker) NULL)
-        blob_info->custom_stream->seeker(0,SEEK_SET,
-          blob_info->custom_stream->data);
-      return(MagickTrue);
-    }
+    return(AttachImageInfoCustomStream(image_info,blob_info));
   (void) DetachBlob(blob_info);
   blob_info->mode=mode;
   GetBlobModeFlags(mode,&flags,&type);
