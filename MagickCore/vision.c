@@ -1933,6 +1933,78 @@ static CCThresholdRange GetThresholdRange(const char *artifact,
   return(range);
 }
 
+typedef struct _CCObjectMerge
+{
+  Image
+    *component_image;
+
+  CacheView
+    *component_view;
+
+  RectangleInfo
+    bounding_box;
+
+  ssize_t
+    i;
+
+  size_t
+    id;
+
+  ExceptionInfo
+    *exception;
+} CCObjectMerge;
+
+static MagickBooleanType RelabelMergedObject(const CCObjectMerge *object_merge,
+  MagickBooleanType status)
+{
+  Image
+    *const component_image = object_merge->component_image;
+
+  CacheView
+    *const component_view = object_merge->component_view;
+
+  const RectangleInfo
+    bounding_box = object_merge->bounding_box;
+
+  const ssize_t
+    i = object_merge->i;
+
+  const size_t
+    id = object_merge->id;
+
+  ExceptionInfo
+    *const exception = object_merge->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) bounding_box.height; y++)
+  {
+    CCObjectRelabel
+      object_relabel;
+
+    Quantum
+      *magick_restrict q;
+
+    if (status == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(component_view,bounding_box.x,
+      bounding_box.y+y,bounding_box.width,1,exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    object_relabel.component_image=component_image;
+    object_relabel.i=i;
+    object_relabel.id=id;
+    RelabelObjectRow(&object_relabel,bounding_box,q);
+    if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
+      status=MagickFalse;
+  }
+  return(status);
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2363,6 +2435,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   (void) SetCacheViewVirtualPixelMethod(object_view,TileVirtualPixelMethod);
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
+    CCObjectMerge
+      object_merge;
+
     RectangleInfo
       bounding_box;
 
@@ -2418,30 +2493,13 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     id=GetGreatestAdjacentObject(object,neighbors,count);
     ResetAdjacentCensus(object,neighbors,count);
     object[i].area=0.0;
-    for (y=0; y < (ssize_t) bounding_box.height; y++)
-    {
-      CCObjectRelabel
-        object_relabel;
-
-      Quantum
-        *magick_restrict q;
-
-      if (status == MagickFalse)
-        continue;
-      q=GetCacheViewAuthenticPixels(component_view,bounding_box.x,
-        bounding_box.y+y,bounding_box.width,1,exception);
-      if (q == (Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      object_relabel.component_image=component_image;
-      object_relabel.i=i;
-      object_relabel.id=id;
-      RelabelObjectRow(&object_relabel,bounding_box,q);
-      if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
-        status=MagickFalse;
-    }
+    object_merge.component_image=component_image;
+    object_merge.component_view=component_view;
+    object_merge.bounding_box=bounding_box;
+    object_merge.i=i;
+    object_merge.id=id;
+    object_merge.exception=exception;
+    status=RelabelMergedObject(&object_merge,status);
   }
   object_view=DestroyCacheView(object_view);
   component_view=DestroyCacheView(component_view);
