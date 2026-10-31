@@ -695,6 +695,82 @@ static void RecordResizeTransform(const Image *image,Image *resize_image,
     transform,exception);
 }
 
+typedef struct _ResizeFilterPass
+{
+  ResizeFilter
+    *resize_filter;
+
+  const Image
+    *image;
+
+  size_t
+    columns,
+    rows;
+
+  double
+    x_factor,
+    y_factor;
+} ResizeFilterPass;
+
+static MagickBooleanType ApplyResizeFilterPass(const ResizeFilterPass *pass,
+  MagickStatusType *status,Image *resize_image,ExceptionInfo *exception)
+{
+  ResizeFilter
+    *const resize_filter = pass->resize_filter;
+
+  const Image
+    *const image = pass->image;
+
+  const size_t
+    columns = pass->columns,
+    rows = pass->rows;
+
+  const double
+    x_factor = pass->x_factor,
+    y_factor = pass->y_factor;
+
+  Image
+    *filter_image;
+
+  MagickOffsetType
+    offset;
+
+  MagickSizeType
+    span;
+
+  if (x_factor > y_factor)
+    filter_image=CloneImage(image,columns,image->rows,MagickTrue,exception);
+  else
+    filter_image=CloneImage(image,image->columns,rows,MagickTrue,exception);
+  if (filter_image == (Image *) NULL)
+    return(MagickFalse);
+  /*
+    Resize image.
+  */
+  offset=0;
+  if (x_factor > y_factor)
+    {
+      span=(MagickSizeType) (filter_image->columns+rows);
+      *status=HorizontalFilter(resize_filter,image,filter_image,x_factor,span,
+        &offset,exception);
+      *status&=(MagickStatusType) VerticalFilter(resize_filter,filter_image,
+        resize_image,y_factor,span,&offset,exception);
+    }
+  else
+    {
+      span=(MagickSizeType) (filter_image->rows+columns);
+      *status=VerticalFilter(resize_filter,image,filter_image,y_factor,span,
+        &offset,exception);
+      *status&=(MagickStatusType) HorizontalFilter(resize_filter,filter_image,
+        resize_image,x_factor,span,&offset,exception);
+    }
+  /*
+    Free resources.
+  */
+  filter_image=DestroyImage(filter_image);
+  return(MagickTrue);
+}
+
 MagickExport Image *ResizeImage(const Image *image,const size_t columns,
   const size_t rows,const FilterType filter,ExceptionInfo *exception)
 {
@@ -706,20 +782,16 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
     filter_type;
 
   Image
-    *filter_image,
     *resize_image;
-
-  MagickOffsetType
-    offset;
-
-  MagickSizeType
-    span;
 
   MagickStatusType
     status;
 
   ResizeFilter
     *resize_filter;
+
+  ResizeFilterPass
+    pass;
 
   /*
     Acquire resize image.
@@ -756,39 +828,17 @@ MagickExport Image *ResizeImage(const Image *image,const size_t columns,
       resize_filter=DestroyResizeFilter(resize_filter);
       return(resize_image);
     }
-  if (x_factor > y_factor)
-    filter_image=CloneImage(image,columns,image->rows,MagickTrue,exception);
-  else
-    filter_image=CloneImage(image,image->columns,rows,MagickTrue,exception);
-  if (filter_image == (Image *) NULL)
+  pass.resize_filter=resize_filter;
+  pass.image=image;
+  pass.columns=columns;
+  pass.rows=rows;
+  pass.x_factor=x_factor;
+  pass.y_factor=y_factor;
+  if (ApplyResizeFilterPass(&pass,&status,resize_image,exception) == MagickFalse)
     {
       resize_filter=DestroyResizeFilter(resize_filter);
       return(DestroyImage(resize_image));
     }
-  /*
-    Resize image.
-  */
-  offset=0;
-  if (x_factor > y_factor)
-    {
-      span=(MagickSizeType) (filter_image->columns+rows);
-      status=HorizontalFilter(resize_filter,image,filter_image,x_factor,span,
-        &offset,exception);
-      status&=(MagickStatusType) VerticalFilter(resize_filter,filter_image,
-        resize_image,y_factor,span,&offset,exception);
-    }
-  else
-    {
-      span=(MagickSizeType) (filter_image->rows+columns);
-      status=VerticalFilter(resize_filter,image,filter_image,y_factor,span,
-        &offset,exception);
-      status&=(MagickStatusType) HorizontalFilter(resize_filter,filter_image,
-        resize_image,x_factor,span,&offset,exception);
-    }
-  /*
-    Free resources.
-  */
-  filter_image=DestroyImage(filter_image);
   resize_filter=DestroyResizeFilter(resize_filter);
   if (status == MagickFalse)
     {
