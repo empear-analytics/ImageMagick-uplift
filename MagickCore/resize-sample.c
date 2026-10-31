@@ -219,6 +219,15 @@ static PointInfo GetSampleOffset(const Image *image)
   return(sample_offset);
 }
 
+static Image *FinishSampleImage(const Image *image,Image *sample_image,
+  const MagickBooleanType status)
+{
+  sample_image->type=image->type;
+  if (status == MagickFalse)
+    sample_image=DestroyImage(sample_image);
+  return(sample_image);
+}
+
 MagickExport Image *SampleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -308,8 +317,5 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
   }
   image_view=DestroyCacheView(image_view);
   sample_view=DestroyCacheView(sample_view);
-  sample_image->type=image->type;
-  if (status == MagickFalse)
-    sample_image=DestroyImage(sample_image);
-  return(sample_image);
+  return(FinishSampleImage(image,sample_image,status));
 }
