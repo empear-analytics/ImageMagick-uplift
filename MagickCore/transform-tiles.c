@@ -124,6 +124,77 @@ static inline MagickBooleanType IsSingleRegionCrop(
     MagickTrue : MagickFalse);
 }
 
+typedef struct _AreaTileRow
+{
+  const Image
+    *image;
+
+  size_t
+    width;
+
+  MagickStatusType
+    flags;
+
+  RectangleInfo
+    geometry;
+
+  PointInfo
+    delta;
+
+  ExceptionInfo
+    *exception;
+} AreaTileRow;
+
+static void CropAreaTileRow(const AreaTileRow *row,PointInfo *offset,
+  RectangleInfo *crop,Image **crop_image)
+{
+  const Image
+    *const image = row->image;
+
+  const size_t
+    width = row->width;
+
+  const MagickStatusType
+    flags = row->flags;
+
+  const RectangleInfo
+    geometry = row->geometry;
+
+  const PointInfo
+    delta = row->delta;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  Image
+    *next;
+
+  for ((*offset).x=0; (*offset).x < (double) width; )
+  {
+    if ((flags & AspectValue) == 0)
+      {
+        (*crop).x=PixelRoundOffset((double) ((*offset).x-
+          (geometry.x > 0 ? 0 : geometry.x)));
+        (*offset).x+=delta.x;  /* increment now to find height */
+        (*crop).width=(size_t) PixelRoundOffset((double) ((*offset).x+
+          (geometry.x < 0 ? 0 : geometry.x)));
+      }
+    else
+      {
+        (*crop).x=PixelRoundOffset((double) ((*offset).x-
+          (geometry.x > 0 ? geometry.x : 0)));
+        (*offset).x+=delta.x;  /* increment now to find height */
+        (*crop).width=(size_t) PixelRoundOffset((double) ((*offset).x+
+          (geometry.x < 0 ? geometry.x : 0)));
+      }
+    (*crop).width=(size_t) ((ssize_t) (*crop).width-(*crop).x);
+    (*crop).x+=image->page.x;
+    next=CropImage(image,crop,exception);
+    if (next != (Image *) NULL)
+      AppendImageToList(crop_image,next);
+  }
+}
+
 MagickExport Image *CropImageToTiles(const Image *image,
   const char *crop_geometry,ExceptionInfo *exception)
 {
@@ -185,6 +256,9 @@ MagickExport Image *CropImageToTiles(const Image *image,
         delta.y=1.0;
       for (offset.y=0; offset.y < (double) height; )
       {
+        AreaTileRow
+          row;
+
         if ((flags & AspectValue) == 0)
           {
             crop.y=PixelRoundOffset((double) (offset.y-
@@ -203,30 +277,13 @@ MagickExport Image *CropImageToTiles(const Image *image,
           }
         crop.height=(size_t) ((ssize_t) crop.height-crop.y);
         crop.y+=image->page.y;
-        for (offset.x=0; offset.x < (double) width; )
-        {
-          if ((flags & AspectValue) == 0)
-            {
-              crop.x=PixelRoundOffset((double) (offset.x-
-                (geometry.x > 0 ? 0 : geometry.x)));
-              offset.x+=delta.x;  /* increment now to find height */
-              crop.width=(size_t) PixelRoundOffset((double) (offset.x+
-                (geometry.x < 0 ? 0 : geometry.x)));
-            }
-          else
-            {
-              crop.x=PixelRoundOffset((double) (offset.x-
-                (geometry.x > 0 ? geometry.x : 0)));
-              offset.x+=delta.x;  /* increment now to find height */
-              crop.width=(size_t) PixelRoundOffset((double) (offset.x+
-                (geometry.x < 0 ? geometry.x : 0)));
-            }
-          crop.width=(size_t) ((ssize_t) crop.width-crop.x);
-          crop.x+=image->page.x;
-          next=CropImage(image,&crop,exception);
-          if (next != (Image *) NULL)
-            AppendImageToList(&crop_image,next);
-        }
+        row.image=image;
+        row.width=width;
+        row.flags=flags;
+        row.geometry=geometry;
+        row.delta=delta;
+        row.exception=exception;
+        CropAreaTileRow(&row,&offset,&crop,&crop_image);
       }
       ClearMagickException(exception);
       return(crop_image);
