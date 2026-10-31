@@ -2900,11 +2900,39 @@ static void LogPixelChannels(const Image *image)
   }
 }
 
-MagickExport ChannelType SetPixelChannelMask(Image *image,
-  const ChannelType channel_mask)
+static void SetPixelChannelMaskTrait(Image *image,
+  const ChannelType channel_mask,const ssize_t i)
 {
 #define GetChannelBit(mask,bit)  (((size_t) (mask) >> (size_t) (bit)) & 0x01)
 
+  PixelChannel channel = GetPixelChannelChannel(image,i);
+  if (GetChannelBit(channel_mask,channel) == 0)
+    {
+      SetPixelChannelTraits(image,channel,CopyPixelTrait);
+      return;
+    }
+  if (channel == AlphaPixelChannel)
+    {
+      if ((image->alpha_trait & CopyPixelTrait) != 0)
+        {
+          SetPixelChannelTraits(image,channel,CopyPixelTrait);
+          return;
+        }
+      SetPixelChannelTraits(image,channel,UpdatePixelTrait);
+      return;
+    }
+  if (image->alpha_trait != UndefinedPixelTrait)
+    {
+      SetPixelChannelTraits(image,channel,(PixelTrait) (UpdatePixelTrait |
+        BlendPixelTrait));
+      return;
+    }
+  SetPixelChannelTraits(image,channel,UpdatePixelTrait);
+}
+
+MagickExport ChannelType SetPixelChannelMask(Image *image,
+  const ChannelType channel_mask)
+{
   ChannelType
     mask;
 
@@ -2919,31 +2947,7 @@ MagickExport ChannelType SetPixelChannelMask(Image *image,
   mask=image->channel_mask;
   image->channel_mask=channel_mask;
   for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-  {
-    PixelChannel channel = GetPixelChannelChannel(image,i);
-    if (GetChannelBit(channel_mask,channel) == 0)
-      {
-        SetPixelChannelTraits(image,channel,CopyPixelTrait);
-        continue;
-      }
-    if (channel == AlphaPixelChannel)
-      {
-        if ((image->alpha_trait & CopyPixelTrait) != 0)
-          {
-            SetPixelChannelTraits(image,channel,CopyPixelTrait);
-            continue;
-          }
-        SetPixelChannelTraits(image,channel,UpdatePixelTrait);
-        continue;
-      }
-    if (image->alpha_trait != UndefinedPixelTrait)
-      {
-        SetPixelChannelTraits(image,channel,(PixelTrait) (UpdatePixelTrait |
-          BlendPixelTrait));
-        continue;
-      }
-    SetPixelChannelTraits(image,channel,UpdatePixelTrait);
-  }
+    SetPixelChannelMaskTrait(image,channel_mask,i);
   if (image->storage_class == PseudoClass)
     SetPixelChannelTraits(image,IndexPixelChannel,CopyPixelTrait);
   if ((image->channels & ReadMaskChannel) != 0)
