@@ -1905,6 +1905,36 @@ static void InterpolateGridChannels(const ChannelsInterpolation grid,
   }
 }
 
+static void InterpolateKernelChannels(const ChannelsInterpolation grid,
+  const PixelInterpolateMethod interpolate,Quantum *pixel,
+  MagickBooleanType *status)
+{
+  switch (interpolate)
+  {
+    default:
+    {
+      InterpolateGridChannels(grid,interpolate,pixel,status);
+      break;
+    }
+    case CatromInterpolatePixel:
+    {
+      (*status)=InterpolateCubicChannels(&grid,CatromWeights,pixel,(*status));
+      break;
+    }
+    case MeshInterpolatePixel:
+    {
+      (*status)=InterpolateQuadChannels(&grid,InterpolateMeshChannel,pixel,
+        (*status));
+      break;
+    }
+    case SplineInterpolatePixel:
+    {
+      (*status)=InterpolateCubicChannels(&grid,SplineWeights,pixel,(*status));
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannels(
   const Image *magick_restrict source,const CacheView_ *source_view,
   const Image *magick_restrict destination,const PixelInterpolateMethod method,
@@ -1982,18 +2012,13 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
     }
     default:
     {
-      InterpolateGridChannels(grid,interpolate,pixel,&status);
+      InterpolateKernelChannels(grid,interpolate,pixel,&status);
       break;
     }
     case BlendInterpolatePixel:
     {
       status=InterpolateQuadChannels(&grid,InterpolateBlendChannel,pixel,
         status);
-      break;
-    }
-    case CatromInterpolatePixel:
-    {
-      status=InterpolateCubicChannels(&grid,CatromWeights,pixel,status);
       break;
     }
     case NearestInterpolatePixel:
@@ -2017,17 +2042,6 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           continue;
         SetPixelChannel(destination,channel,p[i],pixel);
       }
-      break;
-    }
-    case MeshInterpolatePixel:
-    {
-      status=InterpolateQuadChannels(&grid,InterpolateMeshChannel,pixel,
-        status);
-      break;
-    }
-    case SplineInterpolatePixel:
-    {
-      status=InterpolateCubicChannels(&grid,SplineWeights,pixel,status);
       break;
     }
   }
