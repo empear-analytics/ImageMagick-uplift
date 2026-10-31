@@ -3251,6 +3251,155 @@ to 3.
 
 ---
 
+## Recipe VC - Extract Loop-Tail Block Returning Success for a Cleanup Exit
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it ends a loop body (or is
+followed directly by that loop's `continue;`) and has two kinds of exit: `continue;` of
+that loop, and a cleanup exit of the function in one of Recipe V's forms (`return(c);`,
+or the same `S return(...)` at every exit, as V step 7 and I step 8 admit). The typical
+case is one branch of a declaration parser at the end of its scan loop, which skips an
+empty declaration with `continue;` and gives up on a malformed one by releasing a buffer
+and returning `MagickFalse`, as `xml-tree.c`'s `<!ATTLIST` branch does.
+
+**Not covered by:** Recipes V, Y, I and W, whose block contains no `continue` or
+`break` that leaves it (V step 1); Recipe OC, whose block contains no `return` (step 1)
+and whose function is `void`; Recipe LB, whose exits are `break;` (or, under step 7,
+`S continue;`), not a return of the function; Recipe E step 7, whose `continue` form
+needs a block with no `return` of its own. Leaving the `continue;` in the caller is not
+an option: it would sit at the block's depth, as LB's *Not covered by* says of `break`.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. It is the
+   tail of the body of the innermost loop around it, `Lp`, or is followed directly by
+   `continue;` of `Lp` (Recipe OC step 1). Every `continue;` in it that leaves it
+   continues `Lp`; it contains no `goto` and no `break` that leaves it; a `break` or
+   `continue` of a loop nested inside it stays as it is.
+2. Every other exit is a return of the function in one form for all exits: `return(c);`
+   of one constant (Recipe V step 6), or one run `S return(...)` that Recipe V step 7 or
+   Recipe I step 8 admits, under the conditions those steps set (checked by script:
+   every copy identical). With `S`, every other exit of the block is that same text.
+3. The written variables meet Recipe V step 2 (one, by pointer) or Recipe I step 2 (two
+   to four, through a `const` struct of out-pointers, Recipe I steps 3, 5 and 6); the
+   variables it only reads go by value or in one `const` input struct (Recipe Y steps 3
+   to 5); at most four parameters. Temporaries are declared in the new function (Recipe
+   Y step 2).
+4. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. Each `continue;` that continued `Lp` becomes `return(MagickTrue);`, one for
+   one; each exit of step 2 (the `return(c);`, or `S` with its return) becomes
+   `return(MagickFalse);`, one for one; the function ends with `return(MagickTrue);`.
+   Write `*v` for every use of a written variable `v` (Recipe O step 5). Nothing else in
+   the text changes.
+5. Where the block stood, write `if (Helper(...) == MagickFalse) return(c);`, or
+   `if (Helper(...) == MagickFalse) { S return(...); }` with `S` and the return copied
+   unchanged; a `continue;` that followed the block stays after it. Check every argument
+   and member by reading.
+
+**Before:**
+
+```c
+      else
+       if (strncmp(xml,"<!ATTLIST",9) == 0)
+         {
+            /*
+              Parse default attributes.
+            */
+            t=xml+strspn(xml+9,XMLWhitespace)+9;
+            if (*t == '\0')
+              {
+                (void) ThrowMagickException(exception,GetMagickModule(),
+                  OptionWarning,"ParseError","unclosed <!ATTLIST");
+                predefined_entities=(char **) RelinquishMagickMemory(
+                  predefined_entities);
+                return(MagickFalse);
+              }
+            xml=t+strcspn(t,XMLWhitespace ">");
+            if (*xml == '>')
+              continue;
+            ...
+        }
+      else
+        if (SkipDoctypeMarkup(root,&xml) == MagickFalse)
+          break;
+    }
+```
+
+**After:**
+
+```c
+static MagickBooleanType ParseAttributeListDeclaration(XMLTreeRoot *root,
+  ExceptionInfo *exception,const AttributeListTargets *targets)
+{
+  char
+    **const xml = targets->xml;
+
+  char
+    **const n = targets->n;
+  ...
+  t=*xml+strspn(*xml+9,XMLWhitespace)+9;
+  if (*t == '\0')
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","unclosed <!ATTLIST");
+      return(MagickFalse);
+    }
+  *xml=t+strcspn(t,XMLWhitespace ">");
+  if (**xml == '>')
+    return(MagickTrue);
+  ...
+  return(MagickTrue);
+}
+...
+         {
+            AttributeListTargets
+              attribute_list_targets;
+
+            attribute_list_targets.xml=(&xml);
+            attribute_list_targets.n=(&n);
+            if (ParseAttributeListDeclaration(root,exception,
+                &attribute_list_targets) == MagickFalse)
+              {
+                predefined_entities=(char **) RelinquishMagickMemory(
+                  predefined_entities);
+                return(MagickFalse);
+              }
+        }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Before, every path out of the block either reached a
+  `continue;` of `Lp` (one inside it, or the end of the body or the `continue;` that
+  follows it, which C treats as the same jump, C11 6.8.6.2), or ran an exit of step 2.
+  After, the first kind returns `MagickTrue` and the caller, the call being the body's
+  last statement or followed by that `continue;`, ends the iteration at the same point;
+  the second returns `MagickFalse` and the caller runs the exit's own text, unchanged,
+  at once. The statements before each exit are the same, in the same order, and every
+  write to a written variable has landed through its pointer when the function returns.
+- The exit's argument is Recipe V's (step 6 or 7) or Recipe I step 8's, whichever form
+  it has, with the same conditions on what `S` and the returned expression may read.
+- `continue;` in a `for` loop runs the loop's increment expression: it still runs, in
+  the caller, after the helper has written the cursors it reads.
+- The result now says "go on with the loop" as well as "fell through": both are
+  `MagickTrue`, because the caller does the same thing after either, end the iteration.
+  A block after which the body goes on (neither the tail nor followed by `continue;`)
+  is not this recipe: there a `continue;` and a fall-through differ.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function;
+under `S`, also `-(k-1)` for each call in `S`, where `k` is the number of exits), and
+steps 1, 2 and 5 checked by reading.
+
+**Provenance:** 2026-10-31, from `xml-tree.c`'s `ParseInternalDoctype`, whose
+`<!ATTLIST` branch, the tail of the scan loop's body, skips an empty list with
+`continue;` and leaves on three malformed forms by releasing `predefined_entities` and
+returning `MagickFalse`; its default-value test holds the function's nesting of 5. A
+probe of the branch: cc 37 to 25, xml-tree.c 4.05 to 4.19; with its attribute loop's
+body moved the same way, 4.21. Added by Claude Code (Claude Opus 5.5) during task M116
+(campaign B), under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -3825,3 +3974,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | N | Step 8, *Sibling blocks*: the cases of one `switch`, each moved under this recipe in its own commit, may share one `Name` (the union of their groups; each function reads only its own members) and one local filled once, where nothing on any path from the fill to a call writes a member's variable (Recipe B step 5's condition) | `pixel.c`'s `InterpolatePixelChannels` (campaign B, task M116): eight cases read the same eight inputs; a fill before each call adds nine lines per case to a function the step is meant to shrink | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | T | Step 2: with the other name, the body may also read `v` after the block in the same iteration (the test that ends an inner loop the block sits in); *Careful* gives the argument: the caller's `v=c;` lands as the call returns, before that read | `image.c`'s `IsHighDynamicRangeImage` (campaign B, task M116): its channel loop sets `hdri=MagickTrue;` and breaks, then the column loop breaks on `hdri`, which step 2 refused; it holds the file's only *Deep, Nested Complexity*, 2.77 to 2.90 in a probe | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | OC | Step 1: a block that is the tail of `Lp`'s body counts as followed by `continue;` (the end of the body is where `continue;` jumps); the call is then the body's last statement. *Careful* gives the argument | `image.c`'s `AppendImages` (campaign B, task M116): its scan loop ends in the stacked/side-by-side extent update, which `continue`s on one branch and falls off the end on the other, writing `width` and `height`; O refuses its `continue`, E step 7's tail form its two outputs | mandate (2026-10-24) |
+| 2026-10-31 | NEW | VC | Extract Loop-Tail Block Returning Success for a Cleanup Exit: a block at the tail of a loop body (or followed by its `continue;`) whose exits are `continue;` of that loop and one cleanup return of the function in a form Recipe V step 6 or 7 or Recipe I step 8 admits moves to a `static MagickBooleanType` function: each `continue;` becomes `return(MagickTrue);`, each exit `return(MagickFalse);`, the caller keeps the exit's text | `xml-tree.c`'s `ParseInternalDoctype` (campaign B, task M116): its `<!ATTLIST` branch and the attribute loop's body mix `continue;` with `predefined_entities=...RelinquishMagickMemory(...); return(MagickFalse);`, which V, Y, I and W (no `continue`) and OC (no `return`) refuse; they hold the function's nesting of 5; a probe: 4.05 to 4.21 | mandate (2026-10-24) |
