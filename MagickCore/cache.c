@@ -765,6 +765,38 @@ static inline MagickBooleanType IsMemoryCachePair(const CacheInfo *cache_info,
     (clone_info->type == MapCache))) ? MagickTrue : MagickFalse);
 }
 
+static void ClonePixelCacheChannels(const CacheInfo *magick_restrict cache_info,
+  const CacheInfo *magick_restrict clone_info,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) cache_info->columns; x++)
+  {
+    ssize_t
+      i;
+
+    if (x == (ssize_t) clone_info->columns)
+      break;
+    for (i=0; i < (ssize_t) clone_info->number_channels; i++)
+    {
+      PixelChannel
+        channel;
+
+      PixelTrait
+        traits;
+
+      channel=clone_info->channel_map[i].channel;
+      traits=cache_info->channel_map[channel].traits;
+      if (traits != UndefinedPixelTrait)
+        *q=*(p+cache_info->channel_map[channel].offset);
+      q++;
+    }
+    p+=(ptrdiff_t) cache_info->number_channels;
+  }
+}
+
 static MagickBooleanType ClonePixelCacheRepository(
   CacheInfo *magick_restrict clone_info,CacheInfo *magick_restrict cache_info,
   ExceptionInfo *exception)
@@ -836,9 +868,6 @@ static MagickBooleanType ClonePixelCacheRepository(
     Quantum
       *pixels;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     if (y >= (ssize_t) clone_info->rows)
@@ -871,29 +900,7 @@ static MagickBooleanType ClonePixelCacheRepository(
         */
         p=cache_nexus[id]->pixels;
         q=clone_nexus[id]->pixels;
-        for (x=0; x < (ssize_t) cache_info->columns; x++)
-        {
-          ssize_t
-            i;
-
-          if (x == (ssize_t) clone_info->columns)
-            break;
-          for (i=0; i < (ssize_t) clone_info->number_channels; i++)
-          {
-            PixelChannel
-              channel;
-
-            PixelTrait
-              traits;
-
-            channel=clone_info->channel_map[i].channel;
-            traits=cache_info->channel_map[channel].traits;
-            if (traits != UndefinedPixelTrait)
-              *q=*(p+cache_info->channel_map[channel].offset);
-            q++;
-          }
-          p+=(ptrdiff_t) cache_info->number_channels;
-        }
+        ClonePixelCacheChannels(cache_info,clone_info,p,q);
       }
     status=WritePixelCachePixels(clone_info,clone_nexus[id],exception);
   }
