@@ -1425,21 +1425,41 @@ static const float *ImportFloatMapRow(const ImportFloatRowInfo *row,
   return(p);
 }
 
-static MagickBooleanType ImportFloatPixel(Image *image,
-  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
-  ExceptionInfo *exception)
+typedef struct _ImportFloatMapLoop
 {
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
   const char
-    *magick_restrict map = buffer->map;
+    *map;
 
   const QuantumType
-    *quantum_map = buffer->quantum_map;
+    *quantum_map;
 
-  const void
-    *pixels = buffer->pixels;
+  ExceptionInfo
+    *exception;
+} ImportFloatMapLoop;
 
-  const float
-    *magick_restrict p;
+static MagickBooleanType ImportFloatMapPixels(const ImportFloatMapLoop *loop,
+  const float *magick_restrict p)
+{
+  Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
 
   Quantum
     *magick_restrict q;
@@ -1450,21 +1470,6 @@ static MagickBooleanType ImportFloatPixel(Image *image,
   ssize_t
     y;
 
-  p=(const float *) pixels;
-  if (LocaleCompare(map,"BGR") == 0)
-    return(ImportFloatBGRPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"BGRA") == 0)
-    return(ImportFloatBGRAPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"BGRP") == 0)
-    return(ImportFloatBGRPPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"I") == 0)
-    return(ImportFloatIPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"RGB") == 0)
-    return(ImportFloatRGBPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"RGBA") == 0)
-    return(ImportFloatRGBAPixels(image,roi,p,exception));
-  if (LocaleCompare(map,"RGBP") == 0)
-    return(ImportFloatRGBPPixels(image,roi,p,exception));
   length=strlen(map);
   for (y=0; y < (ssize_t) roi->height; y++)
   {
@@ -1483,6 +1488,48 @@ static MagickBooleanType ImportFloatPixel(Image *image,
       break;
   }
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
+static MagickBooleanType ImportFloatPixel(Image *image,
+  const RectangleInfo *roi,const ImportPixelBuffer *buffer,
+  ExceptionInfo *exception)
+{
+  const char
+    *magick_restrict map = buffer->map;
+
+  const QuantumType
+    *quantum_map = buffer->quantum_map;
+
+  const void
+    *pixels = buffer->pixels;
+
+  const float
+    *magick_restrict p;
+
+  ImportFloatMapLoop
+    loop;
+
+  p=(const float *) pixels;
+  if (LocaleCompare(map,"BGR") == 0)
+    return(ImportFloatBGRPixels(image,roi,p,exception));
+  if (LocaleCompare(map,"BGRA") == 0)
+    return(ImportFloatBGRAPixels(image,roi,p,exception));
+  if (LocaleCompare(map,"BGRP") == 0)
+    return(ImportFloatBGRPPixels(image,roi,p,exception));
+  if (LocaleCompare(map,"I") == 0)
+    return(ImportFloatIPixels(image,roi,p,exception));
+  if (LocaleCompare(map,"RGB") == 0)
+    return(ImportFloatRGBPixels(image,roi,p,exception));
+  if (LocaleCompare(map,"RGBA") == 0)
+    return(ImportFloatRGBAPixels(image,roi,p,exception));
+  if (LocaleCompare(map,"RGBP") == 0)
+    return(ImportFloatRGBPPixels(image,roi,p,exception));
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ImportFloatMapPixels(&loop,p));
 }
 
 static MagickBooleanType ImportLongBGRPixels(Image *image,
