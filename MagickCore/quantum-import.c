@@ -7690,6 +7690,50 @@ static void ImportChannelFamilyQuantum(const Image *image,
   }
 }
 
+static void ImportCMYKFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span,ExceptionInfo *exception)
+{
+  switch (quantum_type)
+  {
+    case BlackQuantum:
+    {
+      ImportBlackQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case CMYKQuantum:
+    {
+      ImportCMYKQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case CMYKAQuantum:
+    {
+      ImportCMYKAQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case MultispectralQuantum:
+    {
+      ImportMultispectralQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case CMYKOQuantum:
+    {
+      ImportCMYKOQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      ImportOpacityQuantum(image,quantum_info,&span,exception);
+      break;
+    }
+    default:
+    {
+      ImportChannelFamilyQuantum(image,quantum_info,quantum_type,span);
+      break;
+    }
+  }
+}
+
 MagickExport size_t ImportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,const unsigned char *magick_restrict pixels,
@@ -7749,31 +7793,6 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       ImportAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case BlackQuantum:
-    {
-      ImportBlackQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case CMYKQuantum:
-    {
-      ImportCMYKQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case CMYKAQuantum:
-    {
-      ImportCMYKAQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case MultispectralQuantum:
-    {
-      ImportMultispectralQuantum(image,quantum_info,&span,exception);
-      break;
-    }
-    case CMYKOQuantum:
-    {
-      ImportCMYKOQuantum(image,quantum_info,&span,exception);
-      break;
-    }
     case IndexQuantum:
     {
       ImportIndexQuantum(image,quantum_info,&span,exception);
@@ -7784,14 +7803,9 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       ImportIndexAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case OpacityQuantum:
-    {
-      ImportOpacityQuantum(image,quantum_info,&span,exception);
-      break;
-    }
     default:
     {
-      ImportChannelFamilyQuantum(image,quantum_info,quantum_type,span);
+      ImportCMYKFamilyQuantum(image,quantum_info,quantum_type,span,exception);
       break;
     }
   }
