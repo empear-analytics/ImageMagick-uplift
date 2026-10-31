@@ -2412,6 +2412,20 @@ static MagickStatusType LevelVibrance(Image *image,const char *artifact,
   return(status);
 }
 
+static void AccumulateChromaMeans(const Image *image,
+  const Quantum *magick_restrict p,double *a_mean,double *b_mean)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    (*a_mean)+=QuantumScale*(double) GetPixela(image,p)-0.5;
+    (*b_mean)+=QuantumScale*(double) GetPixelb(image,p)-0.5;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2454,9 +2468,6 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -2465,12 +2476,7 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      a_mean+=QuantumScale*(double) GetPixela(image,p)-0.5;
-      b_mean+=QuantumScale*(double) GetPixelb(image,p)-0.5;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    AccumulateChromaMeans(image,p,&a_mean,&b_mean);
   }
   a_mean/=((double) image->columns*image->rows);
   b_mean/=((double) image->columns*image->rows);
