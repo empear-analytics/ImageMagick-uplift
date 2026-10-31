@@ -1330,6 +1330,97 @@ static void BlurBilateralChannel(const BilateralChannel *bilateral_channel,
     MagickSafeReciprocal(gamma)*pixel),q);
 }
 
+typedef struct _BilateralRow
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  CacheView
+    *image_view;
+
+  OffsetInfo
+    mid;
+
+  size_t
+    width,
+    height;
+
+  double
+    *intensity_gaussian,
+    *spatial_gaussian,
+    **weights,
+    intensity_sigma,
+    spatial_sigma;
+
+  int
+    id;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} BilateralRow;
+
+static void BlurBilateralRow(const BilateralRow *row,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) row->blur_image->columns; x++)
+  {
+    BilateralWeights
+      bilateral;
+
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      i;
+
+    /*
+      Tonal weighting preserves edges while smoothing in the flat regions.
+    */
+    p=GetCacheViewVirtualPixels(row->image_view,x-row->mid.x,row->y-row->mid.y,
+      MagickMax(row->width,1),MagickMax(row->height,1),row->exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    p+=(ptrdiff_t) (GetPixelChannels(row->image)*MagickMax(row->width,1)*
+      (size_t) row->mid.y+GetPixelChannels(row->image)*(size_t) row->mid.x);
+    bilateral.image=row->image;
+    bilateral.p=p;
+    bilateral.width=row->width;
+    bilateral.height=row->height;
+    bilateral.mid=row->mid;
+    bilateral.intensity_gaussian=row->intensity_gaussian;
+    bilateral.spatial_gaussian=row->spatial_gaussian;
+    bilateral.intensity_sigma=row->intensity_sigma;
+    bilateral.spatial_sigma=row->spatial_sigma;
+    bilateral.id=row->id;
+    bilateral.x=x;
+    bilateral.y=row->y;
+    SetBilateralWeights(&bilateral,row->weights);
+    for (i=0; i < (ssize_t) GetPixelChannels(row->blur_image); i++)
+    {
+      BilateralChannel
+        bilateral_channel;
+
+      bilateral_channel.image=row->image;
+      bilateral_channel.p=p;
+      bilateral_channel.width=row->width;
+      bilateral_channel.height=row->height;
+      bilateral_channel.mid=row->mid;
+      bilateral_channel.weights=row->weights;
+      bilateral_channel.id=row->id;
+      BlurBilateralChannel(&bilateral_channel,row->blur_image,i,q);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(row->blur_image);
+  }
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1424,8 +1515,8 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    BilateralRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -1436,55 +1527,21 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) blur_image->columns; x++)
-    {
-      BilateralWeights
-        bilateral;
-
-      const Quantum
-        *magick_restrict p;
-
-      ssize_t
-        i;
-
-      /*
-        Tonal weighting preserves edges while smoothing in the flat regions.
-      */
-      p=GetCacheViewVirtualPixels(image_view,x-mid.x,y-mid.y,MagickMax(width,1),
-        MagickMax(height,1),exception);
-      if (p == (const Quantum *) NULL)
-        break;
-      p+=(ptrdiff_t) (GetPixelChannels(image)*MagickMax(width,1)*(size_t) mid.y+
-        GetPixelChannels(image)*(size_t) mid.x);
-      bilateral.image=image;
-      bilateral.p=p;
-      bilateral.width=width;
-      bilateral.height=height;
-      bilateral.mid=mid;
-      bilateral.intensity_gaussian=intensity_gaussian;
-      bilateral.spatial_gaussian=spatial_gaussian;
-      bilateral.intensity_sigma=intensity_sigma;
-      bilateral.spatial_sigma=spatial_sigma;
-      bilateral.id=id;
-      bilateral.x=x;
-      bilateral.y=y;
-      SetBilateralWeights(&bilateral,weights);
-      for (i=0; i < (ssize_t) GetPixelChannels(blur_image); i++)
-      {
-        BilateralChannel
-          bilateral_channel;
-
-        bilateral_channel.image=image;
-        bilateral_channel.p=p;
-        bilateral_channel.width=width;
-        bilateral_channel.height=height;
-        bilateral_channel.mid=mid;
-        bilateral_channel.weights=weights;
-        bilateral_channel.id=id;
-        BlurBilateralChannel(&bilateral_channel,blur_image,i,q);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(blur_image);
-    }
+    row.image=image;
+    row.blur_image=blur_image;
+    row.image_view=image_view;
+    row.mid=mid;
+    row.width=width;
+    row.height=height;
+    row.intensity_gaussian=intensity_gaussian;
+    row.spatial_gaussian=spatial_gaussian;
+    row.weights=weights;
+    row.intensity_sigma=intensity_sigma;
+    row.spatial_sigma=spatial_sigma;
+    row.id=id;
+    row.y=y;
+    row.exception=exception;
+    BlurBilateralRow(&row,q);
     if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
