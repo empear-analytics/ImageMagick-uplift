@@ -1461,6 +1461,29 @@ static void PrintTransparentPixel(FILE *file,const Image *image,ssize_t *x,
     PrintAlphaColor(file,image,p,exception);
 }
 
+static void PrintChannelsFeatures(FILE *file,const Image *image,
+  const ChannelFeatures *channel_features)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+  {
+    char
+      label[MagickPathExtent];
+
+    PixelChannel channel = GetPixelChannelChannel(image,i);
+    PixelTrait traits = GetPixelChannelTraits(image,channel);
+    if ((traits & UpdatePixelTrait) != 0)
+      {
+        (void) FormatLocaleString(label,MagickPathExtent,
+          "Channel %.17g",(double) i);
+        (void) PrintChannelFeatures(file,channel,label,
+          channel_features);
+      }
+  }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1836,21 +1859,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         }
         default:
         {
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            char
-              label[MagickPathExtent];
-
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) != 0)
-              {
-                (void) FormatLocaleString(label,MagickPathExtent,
-                  "Channel %.17g",(double) i);
-                (void) PrintChannelFeatures(file,channel,label,
-                  channel_features);
-              }
-          }
+          PrintChannelsFeatures(file,image,channel_features);
           break;
         }
       }
