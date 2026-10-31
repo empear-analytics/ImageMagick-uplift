@@ -2620,6 +2620,110 @@ static MagickBooleanType BlurRotationalPixel(
   return(status);
 }
 
+typedef struct _RotationalRow
+{
+  const Image
+    *image;
+
+  Image
+    *blur_image;
+
+  CacheView
+    *radial_view;
+
+  PointInfo
+    blur_center;
+
+  double
+    blur_radius,
+    *cos_theta,
+    *sin_theta;
+
+  size_t
+    n;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} RotationalRow;
+
+static MagickBooleanType BlurRotationalRow(const RotationalRow *row,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = row->image;
+
+  Image
+    *const blur_image = row->blur_image;
+
+  CacheView
+    *const radial_view = row->radial_view;
+
+  const PointInfo
+    blur_center = row->blur_center;
+
+  const double
+    blur_radius = row->blur_radius;
+
+  double
+    *const cos_theta = row->cos_theta,
+    *const sin_theta = row->sin_theta;
+
+  const size_t
+    n = row->n;
+
+  const ssize_t
+    y = row->y;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      radius;
+
+    PointInfo
+      center;
+
+    RotationalChannel
+      pixel_rotational;
+
+    size_t
+      step;
+
+    center.x=(double) x-blur_center.x;
+    center.y=(double) y-blur_center.y;
+    radius=hypot((double) center.x,center.y);
+    step=GetRotationalBlurStep(radius,blur_radius,n);
+    pixel_rotational.image=image;
+    pixel_rotational.blur_image=blur_image;
+    pixel_rotational.p=p;
+    pixel_rotational.radial_view=radial_view;
+    pixel_rotational.blur_center=blur_center;
+    pixel_rotational.center=center;
+    pixel_rotational.cos_theta=cos_theta;
+    pixel_rotational.sin_theta=sin_theta;
+    pixel_rotational.n=n;
+    pixel_rotational.step=step;
+    pixel_rotational.exception=exception;
+    if (BlurRotationalPixel(&pixel_rotational,q) == MagickFalse)
+      status=MagickFalse;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(blur_image);
+  }
+  return(status);
+}
+
 MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   ExceptionInfo *exception)
 {
@@ -2718,8 +2822,8 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    RotationalRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -2731,40 +2835,18 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        radius;
-
-      PointInfo
-        center;
-
-      RotationalChannel
-        pixel_rotational;
-
-      size_t
-        step;
-
-      center.x=(double) x-blur_center.x;
-      center.y=(double) y-blur_center.y;
-      radius=hypot((double) center.x,center.y);
-      step=GetRotationalBlurStep(radius,blur_radius,n);
-      pixel_rotational.image=image;
-      pixel_rotational.blur_image=blur_image;
-      pixel_rotational.p=p;
-      pixel_rotational.radial_view=radial_view;
-      pixel_rotational.blur_center=blur_center;
-      pixel_rotational.center=center;
-      pixel_rotational.cos_theta=cos_theta;
-      pixel_rotational.sin_theta=sin_theta;
-      pixel_rotational.n=n;
-      pixel_rotational.step=step;
-      pixel_rotational.exception=exception;
-      if (BlurRotationalPixel(&pixel_rotational,q) == MagickFalse)
-        status=MagickFalse;
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(blur_image);
-    }
+    row.image=image;
+    row.blur_image=blur_image;
+    row.radial_view=radial_view;
+    row.blur_center=blur_center;
+    row.blur_radius=blur_radius;
+    row.cos_theta=cos_theta;
+    row.sin_theta=sin_theta;
+    row.n=n;
+    row.y=y;
+    row.exception=exception;
+    if (BlurRotationalRow(&row,p,q) == MagickFalse)
+      status=MagickFalse;
     if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
