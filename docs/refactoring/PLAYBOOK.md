@@ -2082,6 +2082,11 @@ Q and U, whose first step refuses a block containing `goto`.
    the same text at every exit (checked by script), left unchanged in the caller after
    `if (Helper(...) == MagickFalse)`. The block writes no variable the expression
    reads; it may write through one, a pointer passed by value (`kernel`).
+   `S` may also be followed by such a `return(<expr>);` in place of `return(v);`
+   (`ResizeImage`'s `resize_filter=DestroyResizeFilter(resize_filter);
+   return(DestroyImage(resize_image));`): the caller writes
+   `if (Helper(...) == MagickFalse) { S return(<expr>); }`, both unchanged, and the
+   block writes no variable that `S` or the expression reads or writes.
 
 **Before:**
 
@@ -2256,7 +2261,9 @@ a finding.
 
 1. The block meets Recipe V steps 1 and 2: it lies outside every OpenMP region with no
    `#pragma` line; it leaves the function only through `goto L;` to one label, or only
-   through `return(c);` of one constant `c` (Recipe V step 6); it writes at most one
+   through `return(c);` of one constant `c` (Recipe V step 6), or only through exits of
+   one of Recipe V step 7's forms (a cleanup run and its `return` that stay in the
+   caller, the same text at every exit, checked by script); it writes at most one
    variable `v` of the caller that the caller reads after it, a plain local whose address
    is not taken elsewhere.
 2. Every other variable of the caller that the block writes, it writes before reading it
@@ -2268,7 +2275,9 @@ a finding.
    member per variable, the variable's exact type and name, a top-level `const` or
    `magick_restrict` left off. Neither `v` nor a variable of step 2 is ever a member.
 4. Cut the block into a new `static MagickBooleanType` function directly above the
-   caller, taking `const Name *name` first and then `v` as a pointer. At the top of its
+   caller, taking `const Name *name` first and then `v` as a pointer, then any pointer
+   the block writes through that step 3 leaves out of the struct (an image, `exception`,
+   as Recipe N step 2 allows), at most four parameters in all. At the top of its
    body declare one `const` local per member, as Recipe N step 4 does (or write
    `name->member` at every use, its member form), then the variables of step 2. In the
    text write `*v` for every use of `v`, reads included (Recipe V step 4); each `goto L;`
@@ -2278,7 +2287,8 @@ a finding.
    that holds the call. Directly before the call, assign every member from the variable
    of its name, in declaration order, with nothing between the assignments and the call.
 6. Where the block stood, write `if (Helper(&name,&v) == MagickFalse) goto L;` (or
-   `return(c);`), and check every member and argument by reading.
+   `return(c);`, or Recipe V step 7's `{ S return(v); }` and its other forms, the exit's
+   text unchanged), and check every member and argument by reading.
 
 **Before:**
 
@@ -2349,6 +2359,13 @@ static MagickBooleanType SetPlasmaMiddlePixel(const PlasmaMidpoint *midpoint,
 - The failure paths are mostly cache fetches that no case makes fail: the oracle checks
   the fall-through path; the jumps are checked by reading, each against its
   `return(MagickFalse);`, and `refactor_guard.py --calls` moves only `+2`.
+- Under step 1's Recipe V step 7 exits the argument is V step 7's: the cleanup and the
+  `return` stay the caller's own text, run at the point where the block ran them, after
+  every statement the block ran before that exit and every write to `v` has landed
+  through the pointer, on variables the block does not write. A struct member is read
+  in the caller before the call, so the cleanup may write one (`resize_filter`) after
+  the helper returns; the block itself writes no member (step 3). With one exit,
+  `refactor_guard.py --calls` moves only `+2`.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), and steps 1, 2 and 6 checked by reading.
@@ -4200,3 +4217,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | N | Step 2's pass-through form: the caller may also be a function whose parameters Recipe B bundled into `const Name *name`, binding a `const` local of each old name from its member (B step 3). Through Recipe Q step 3, which builds its struct as N step 2 does, the form serves Q too. *Careful* gives the argument | `threshold-adaptive.c`'s `AdaptiveThresholdPixel` (W10): after Recipe B (11 arguments to 4) its sliding-window update (cc 9) reads `image`, `width`, `height`, `channel_bias` and `channel_sum`, all bound from its `AdaptiveThresholdPixelInfo`, plus `p`, `i` and `channel`. The letter would add a second struct of those five members, filled from the locals just bound from the first. The update as a helper: 8.88 to 9.11 in a probe | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | rule 1 | A set whose blocks lie in several functions of the file may take different recipes when *Overall Code Complexity* is what lowers each block alone and no smaller set rule 1 already admits raises the score; the message names each block with its function, recipe and score alone, and each smaller set's score | `layer-merge.c`'s `MergeImageLayers` (W10), six functions at 9.63 (its one finding Complex Method, cc 13): Recipe Z on the method `switch` alone 9.38, Recipe E on the virtual-canvas block alone 9.09, Recipe E on the loop bodies of `ExtendToLayerBounds` and `ExtendToMosaicBounds` alone 9.04 each; every pair and every set of three 9.04 to 9.38 (the blocks of `MergeImageLayers` together 9.38, the two loop bodies together 9.04); all four 10.00 (mean cc under 4, no finding). The two loop bodies are what bring the mean under the threshold, and they are not blocks of `MergeImageLayers` | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | E | Step 7, `switch` form: when the block writes `v` before it reads it on every path, the new function declares `v` without an initialiser instead of taking it by value (step 4's rule for a variable written before it is read); the block still becomes `v=Helper(...);` and each `break;` `return(v);` | `gem.c`'s `GenerateDifferentialNoise` (W10): its Laplacian case leaves the `switch` through `break;` on its `alpha <= 0.5` branch and sets `noise` on every path, but the caller never sets `noise` before the `switch`, so taking it by value would read an uninitialised variable. With the Laplacian, impulse, multiplicative-Gaussian and Poisson cases as helpers and `GetOptimalKernelWidth2D`'s normalisation loop (rule 1's set), *Overall Code Complexity* leaves and Bumpy Road Ahead and Large Method go: 9.21 to 9.68 in a probe | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | V, Y | V step 7: the cleanup run `S` may be followed by a `return(<expr>);` of the step's last form in place of `return(v);`, both left in the caller. Y step 1: the block may leave only through exits of one of V step 7's forms, written in the caller as V step 7 writes them (step 6); Y step 4: after `v`, the pointers the block writes through that the struct leaves out (Recipe N step 2), at most four parameters. *Careful* gives the argument | `resize-image.c`'s `ResizeImage` (W10, cc 12, 88 lines): the filter-image clone and the two filter passes read eight variables and write `status` and the temporaries `filter_image`, `offset` and `span`; the one exit is `resize_filter=DestroyResizeFilter(resize_filter); return(DestroyImage(resize_image));`, which V step 7 names only as `S return(v);` or a lone `return(<expr>);`, and Recipe Y admits only `goto L;` or `return(c);`. A probe: `ResizeImage` leaves *Large Method* (cc 12 to 10), 6.46 to 6.59 | mandate (2026-10-24) |
