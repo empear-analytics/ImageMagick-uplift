@@ -1339,6 +1339,26 @@ static void PrintImageColorsSummary(FILE *file,const Image *image)
         image->total_colors,(double) image->colors);
 }
 
+static void PrintImageSummaryHeader(FILE *file,const Image *image)
+{
+  if (*image->magick_filename != '\0')
+    if (LocaleCompare(image->magick_filename,image->filename) != 0)
+      (void) FormatLocaleFile(file,"%s=>",image->magick_filename);
+  if (IsSingleUnnumberedImage(image) != MagickFalse)
+    (void) FormatLocaleFile(file,"%s ",image->filename);
+  else
+    (void) FormatLocaleFile(file,"%s[%.17g] ",image->filename,(double)
+      image->scene);
+  (void) FormatLocaleFile(file,"%s ",image->magick);
+  if ((image->magick_columns != 0) || (image->magick_rows != 0))
+    if ((image->magick_columns != image->columns) ||
+        (image->magick_rows != image->rows))
+      (void) FormatLocaleFile(file,"%.17gx%.17g=>",(double)
+        image->magick_columns,(double) image->magick_rows);
+  (void) FormatLocaleFile(file,"%.17gx%.17g ",(double) image->columns,
+    (double) image->rows);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1449,22 +1469,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
       /*
         Display summary info about the image.
       */
-      if (*image->magick_filename != '\0')
-        if (LocaleCompare(image->magick_filename,image->filename) != 0)
-          (void) FormatLocaleFile(file,"%s=>",image->magick_filename);
-       if (IsSingleUnnumberedImage(image) != MagickFalse)
-        (void) FormatLocaleFile(file,"%s ",image->filename);
-      else
-        (void) FormatLocaleFile(file,"%s[%.17g] ",image->filename,(double)
-          image->scene);
-      (void) FormatLocaleFile(file,"%s ",image->magick);
-      if ((image->magick_columns != 0) || (image->magick_rows != 0))
-        if ((image->magick_columns != image->columns) ||
-            (image->magick_rows != image->rows))
-          (void) FormatLocaleFile(file,"%.17gx%.17g=>",(double)
-            image->magick_columns,(double) image->magick_rows);
-      (void) FormatLocaleFile(file,"%.17gx%.17g ",(double) image->columns,
-        (double) image->rows);
+      PrintImageSummaryHeader(file,image);
       if (HasPageGeometry(image) != MagickFalse)
         (void) FormatLocaleFile(file,"%.17gx%.17g%+.20g%+.20g ",(double)
           image->page.width,(double) image->page.height,(double) image->page.x,
