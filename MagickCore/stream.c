@@ -2395,29 +2395,11 @@ static void StreamFloatRGBPPixels(const Image *image,
   }
 }
 
-static void StreamCharQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *p,unsigned char *q)
+static void StreamCharAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *p,unsigned char *q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=ScaleQuantumToChar(GetPixelRed(image,p));
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=ScaleQuantumToChar(GetPixelGreen(image,p));
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=ScaleQuantumToChar(GetPixelBlue(image,p));
-      break;
-    }
     case AlphaQuantum:
     {
       *q=ScaleQuantumToChar(GetPixelAlpha(image,p));
@@ -2441,6 +2423,37 @@ static void StreamCharQuantum(const Image *image,const QuantumType quantum,
     }
     default:
       break;
+  }
+}
+
+static void StreamCharQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *p,unsigned char *q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToChar(GetPixelBlue(image,p));
+      break;
+    }
+    default:
+    {
+      StreamCharAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
   }
 }
 
