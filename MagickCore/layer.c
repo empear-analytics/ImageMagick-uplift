@@ -1014,12 +1014,47 @@ static MagickBooleanType AcquireCompareCanvas(const Image *next,
   return(MagickTrue);
 }
 
+static void DeconstructLayerFrames(RectangleInfo *bounds,
+  ExceptionInfo *exception,const Image **next,Image **layers)
+{
+  Image
+    *image_a,
+    *image_b;
+
+  ssize_t
+    i;
+
+  i=0;
+  *next=GetNextImageInList(*next);
+  for ( ; *next != (const Image *) NULL; *next=GetNextImageInList(*next))
+  {
+    if (IsUnchangedFrameBounds(bounds,i) != MagickFalse)
+      {
+        /*
+          An empty frame is returned from CompareImageBounds(), which means the
+          current frame is identical to the previous frame.
+        */
+        i++;
+        continue;
+      }
+    image_a=CloneImage(*next,0,0,MagickTrue,exception);
+    if (image_a == (Image *) NULL)
+      break;
+    image_a->background_color.alpha_trait=BlendPixelTrait;
+    image_b=CropImage(image_a,&bounds[i],exception);
+    image_a=DestroyImage(image_a);
+    if (image_b == (Image *) NULL)
+      break;
+    AppendImageToList(&(*layers),image_b);
+    i++;
+  }
+}
+
 MagickExport Image *CompareImagesLayers(const Image *image,
   const LayerMethod method,ExceptionInfo *exception)
 {
   Image
     *image_a,
-    *image_b,
     *layers;
 
   LayerFrameComparison
@@ -1030,9 +1065,6 @@ MagickExport Image *CompareImagesLayers(const Image *image,
 
   const Image
     *next;
-
-  ssize_t
-    i;
 
   assert(image != (const Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -1087,30 +1119,7 @@ MagickExport Image *CompareImagesLayers(const Image *image,
   /*
     Deconstruct the image sequence.
   */
-  i=0;
-  next=GetNextImageInList(next);
-  for ( ; next != (const Image *) NULL; next=GetNextImageInList(next))
-  {
-    if (IsUnchangedFrameBounds(bounds,i) != MagickFalse)
-      {
-        /*
-          An empty frame is returned from CompareImageBounds(), which means the
-          current frame is identical to the previous frame.
-        */
-        i++;
-        continue;
-      }
-    image_a=CloneImage(next,0,0,MagickTrue,exception);
-    if (image_a == (Image *) NULL)
-      break;
-    image_a->background_color.alpha_trait=BlendPixelTrait;
-    image_b=CropImage(image_a,&bounds[i],exception);
-    image_a=DestroyImage(image_a);
-    if (image_b == (Image *) NULL)
-      break;
-    AppendImageToList(&layers,image_b);
-    i++;
-  }
+  DeconstructLayerFrames(bounds,exception,&next,&layers);
   bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
   if (next != (Image *) NULL)
     {
