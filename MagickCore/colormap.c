@@ -307,6 +307,95 @@ static int IntensityCompare(const void *x,const void *y)
 }
 #endif
 
+typedef struct _SortColormapRowInputs
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    y;
+
+  unsigned short
+    *pixels;
+
+  ExceptionInfo
+    *exception;
+} SortColormapRowInputs;
+
+static MagickBooleanType RemapColormapRow(const SortColormapRowInputs *row)
+{
+  Image
+    *const image = row->image;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  const ssize_t
+    y = row->y;
+
+  unsigned short
+    *const pixels = row->pixels;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    Quantum
+      index;
+
+    ssize_t
+      i;
+
+    i=ConstrainColormapIndex(image,(ssize_t) GetPixelIndex(image,q),exception);
+    index=(Quantum) pixels[i];
+    SetPixelIndex(image,index,q);
+    SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
+static void AssignColormapIndexes(Image *image)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) image->colors; j++)
+    image->colormap[j].alpha=(double) j;
+}
+
+static void MapSortedColormapIndexes(const Image *image,
+  unsigned short *pixels)
+{
+  ssize_t
+    j;
+
+  for (j=0; j < (ssize_t) image->colors; j++)
+    pixels[(ssize_t) image->colormap[j].alpha]=(unsigned short) j;
+}
+
 MagickExport MagickBooleanType SortColormapByIntensity(Image *image,
   ExceptionInfo *exception)
 {
@@ -315,9 +404,6 @@ MagickExport MagickBooleanType SortColormapByIntensity(Image *image,
 
   MagickBooleanType
     status;
-
-  ssize_t
-    j;
 
   ssize_t
     y;
@@ -342,8 +428,7 @@ MagickExport MagickBooleanType SortColormapByIntensity(Image *image,
   /*
     Assign index values to colormap entries.
   */
-  for (j=0; j < (ssize_t) image->colors; j++)
-    image->colormap[j].alpha=(double) j;
+  AssignColormapIndexes(image);
   /*
     Sort image colormap by decreasing color popularity.
   */
@@ -352,8 +437,7 @@ MagickExport MagickBooleanType SortColormapByIntensity(Image *image,
   /*
     Update image colormap indexes to sorted colormap order.
   */
-  for (j=0; j < (ssize_t) image->colors; j++)
-    pixels[(ssize_t) image->colormap[j].alpha]=(unsigned short) j;
+  MapSortedColormapIndexes(image,pixels);
   status=MagickTrue;
   image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -362,35 +446,17 @@ MagickExport MagickBooleanType SortColormapByIntensity(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
+    SortColormapRowInputs
+      row;
 
     if (status == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      Quantum
-        index;
-
-      ssize_t
-        i;
-
-      i=ConstrainColormapIndex(image,(ssize_t) GetPixelIndex(image,q),exception);
-      index=(Quantum) pixels[i];
-      SetPixelIndex(image,index,q);
-      SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    row.image=image;
+    row.image_view=image_view;
+    row.y=y;
+    row.pixels=pixels;
+    row.exception=exception;
+    if (RemapColormapRow(&row) == MagickFalse)
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
