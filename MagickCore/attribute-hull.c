@@ -330,6 +330,38 @@ static CaliperInfo GetMinimumAreaCaliper(const Image *image,
   return(caliper_info);
 }
 
+static PointInfo FindNearestEdge(PointInfo *bounding_box,double distance)
+{
+  PointInfo
+    delta,
+    point;
+
+  ssize_t
+    i;
+
+  point=MoveBoxToOrigin(bounding_box);
+  for (i=0; i < 4; i++)
+  {
+    double
+      d,
+      intercept,
+      slope;
+
+    delta.x=bounding_box[(i+1) % 4].x-bounding_box[i].x;
+    delta.y=bounding_box[(i+1) % 4].y-bounding_box[i].y;
+    slope=delta.y*MagickSafeReciprocal(delta.x);
+    intercept=bounding_box[(i+1) % 4].y-slope*bounding_box[i].x;
+    d=fabs((slope*bounding_box[i].x-bounding_box[i].y+intercept)*
+      MagickSafeReciprocal(sqrt(slope*slope+1.0)));
+    if ((i == 0) || (d < distance))
+      {
+        distance=d;
+        point=delta;
+      }
+  }
+  return(point);
+}
+
 MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   size_t *number_vertices,ExceptionInfo *exception)
 {
@@ -350,9 +382,6 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
 
   size_t
     number_hull_vertices;
-
-  ssize_t
-    i;
 
   /*
     Generate the minimum bounding box with the "Rotating Calipers" algorithm.
@@ -414,32 +443,12 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
         p_length;
 
       PointInfo
-        delta,
         point;
 
       /*
         Find smallest perpendicular distance from edge to origin.
       */
-      point=MoveBoxToOrigin(bounding_box);
-      for (i=0; i < 4; i++)
-      {
-        double
-          d,
-          intercept,
-          slope;
-
-        delta.x=bounding_box[(i+1) % 4].x-bounding_box[i].x;
-        delta.y=bounding_box[(i+1) % 4].y-bounding_box[i].y;
-        slope=delta.y*MagickSafeReciprocal(delta.x);
-        intercept=bounding_box[(i+1) % 4].y-slope*bounding_box[i].x;
-        d=fabs((slope*bounding_box[i].x-bounding_box[i].y+intercept)*
-          MagickSafeReciprocal(sqrt(slope*slope+1.0)));
-        if ((i == 0) || (d < distance))
-          {
-            distance=d;
-            point=delta;
-          }
-      }
+      point=FindNearestEdge(bounding_box,distance);
       angle=RadiansToDegrees(atan(point.y*MagickSafeReciprocal(point.x)));
       length=hypot(point.x,point.y);
       p_length=fabs((double) MagickMax(caliper_info.width,caliper_info.height)-
