@@ -680,6 +680,19 @@ static MagickBooleanType FinishAssignImageColors(Image *image,
   return(MagickTrue);
 }
 
+static MagickBooleanType AcquireAssignImageColormap(Image *image,
+  QCubeInfo *cube_info,ExceptionInfo *exception)
+{
+  if (cube_info->quantize_info->colorspace != UndefinedColorspace)
+    (void) TransformImageColorspace(image,cube_info->quantize_info->colorspace,
+      exception);
+  cube_info->transparent_pixels=0;
+  cube_info->transparent_index=(-1);
+  if (SetImageColormap(image,cube_info,exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -693,12 +706,7 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
     Allocate image colormap.
   */
   colorspace=image->colorspace;
-  if (cube_info->quantize_info->colorspace != UndefinedColorspace)
-    (void) TransformImageColorspace(image,cube_info->quantize_info->colorspace,
-      exception);
-  cube_info->transparent_pixels=0;
-  cube_info->transparent_index=(-1);
-  if (SetImageColormap(image,cube_info,exception) == MagickFalse)
+  if (AcquireAssignImageColormap(image,cube_info,exception) == MagickFalse)
     return(MagickFalse);
   /*
     Create a reduced color image.
