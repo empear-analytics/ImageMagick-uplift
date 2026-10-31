@@ -3098,6 +3098,59 @@ static MagickBooleanType ExportMapQuantumAB(const char *map,const ssize_t i,
   return(MagickTrue);
 }
 
+typedef struct _ExportMapRequest
+{
+  const Image
+    *image;
+
+  const char
+    *map;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} ExportMapRequest;
+
+static MagickBooleanType ExportMapQuantumY(const ExportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  const Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'Y':
+    case 'y':
+    {
+      quantum_map[i]=YellowQuantum;
+      if (image->colorspace == CMYKColorspace)
+        break;
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ColorSeparatedImageRequired","`%s'",map);
+      return(MagickFalse);
+    }
+    default:
+    {
+      if (ExportMapQuantumAB(map,i,quantum_map,exception) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ExportImagePixels(const Image *image,
   const ssize_t x,const ssize_t y,const size_t width,const size_t height,
   const char *map,const StorageType type,void *pixels,ExceptionInfo *exception)
@@ -3168,20 +3221,16 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
           "ColorSeparatedImageRequired","`%s'",map);
         return(MagickFalse);
       }
-      case 'Y':
-      case 'y':
-      {
-        quantum_map[i]=YellowQuantum;
-        if (image->colorspace == CMYKColorspace)
-          break;
-        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
-        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-          "ColorSeparatedImageRequired","`%s'",map);
-        return(MagickFalse);
-      }
       default:
       {
-        if (ExportMapQuantumAB(map,i,quantum_map,exception) == MagickFalse)
+        ExportMapRequest
+          request;
+
+        request.image=image;
+        request.map=map;
+        request.i=i;
+        request.exception=exception;
+        if (ExportMapQuantumY(&request,quantum_map) == MagickFalse)
           return(MagickFalse);
         break;
       }
