@@ -2375,6 +2375,15 @@ static MagickBooleanType ParseTagCharacterContent(XMLTreeRoot *root,
   return(MagickTrue);
 }
 
+static char *ParseCDataContent(XMLTreeRoot *root,char *tag,char *p,
+  const size_t ignore_depth)
+{
+  p+=(ptrdiff_t) 2;
+  if (ignore_depth == 0)
+    ParseCharacterContent(root,tag+8,(size_t) (p-tag-10),'c');
+  return(p);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2537,9 +2546,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
               p=strstr(p,"]]>");
               if (p != (char *) NULL)
                 {
-                  p+=(ptrdiff_t) 2;
-                  if (ignore_depth == 0)
-                    ParseCharacterContent(root,tag+8,(size_t) (p-tag-10),'c');
+                  p=ParseCDataContent(root,tag,p,ignore_depth);
                 }
               else
                 {
