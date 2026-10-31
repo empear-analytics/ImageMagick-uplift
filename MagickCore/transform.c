@@ -2231,6 +2231,21 @@ static void SetTransversePage(Image *transverse_image)
   transverse_image->page=page;
 }
 
+static void TransversePixelRow(const Image *image,
+  const Image *transverse_image,const Quantum *p,Quantum *q)
+{
+  ssize_t
+    x;
+
+  q+=(ptrdiff_t) GetPixelChannels(transverse_image)*image->columns;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    q-=GetPixelChannels(transverse_image);
+    CopyPixelChannelsTo(image,transverse_image,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
 {
 #define TransverseImageTag  "Transverse/Image"
@@ -2283,9 +2298,6 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -2296,13 +2308,7 @@ MagickExport Image *TransverseImage(const Image *image,ExceptionInfo *exception)
         status=MagickFalse;
         continue;
       }
-    q+=(ptrdiff_t) GetPixelChannels(transverse_image)*image->columns;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      q-=GetPixelChannels(transverse_image);
-      CopyPixelChannelsTo(image,transverse_image,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    TransversePixelRow(image,transverse_image,p,q);
     sync=SyncCacheViewAuthenticPixels(transverse_view,exception);
     if (sync == MagickFalse)
       status=MagickFalse;
