@@ -1036,6 +1036,18 @@ static void GetFourierChannelPixels(const FourierInfo *fourier_info,
   image_view=DestroyCacheView(image_view);
 }
 
+static MagickBooleanType CheckFourierExtent(const FourierInfo *fourier_info,
+  const Image *image,ExceptionInfo *exception)
+{
+  if ((fourier_info->width >= INT_MAX) || (fourier_info->height >= INT_MAX))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "WidthOrHeightExceedsLimit","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
   const Image *image,double *magnitude_pixels,double *phase_pixels,
   ExceptionInfo *exception)
@@ -1064,12 +1076,8 @@ static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
   /*
     Generate the forward Fourier transform.
   */
-  if ((fourier_info->width >= INT_MAX) || (fourier_info->height >= INT_MAX))
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "WidthOrHeightExceedsLimit","`%s'",image->filename);
-      return(MagickFalse);
-    }
+  if (CheckFourierExtent(fourier_info,image,exception) == MagickFalse)
+    return(MagickFalse);
   source_info=AcquireVirtualMemory(fourier_info->width,fourier_info->height*
     sizeof(*source_pixels));
   if (source_info == (MemoryInfo *) NULL)
