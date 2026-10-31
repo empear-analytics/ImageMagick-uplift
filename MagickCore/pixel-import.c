@@ -757,6 +757,37 @@ static MagickBooleanType ImportDoubleRGBPPixels(Image *image,const RectangleInfo
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
+static void ImportDoubleAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const double *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case AlphaQuantum:
+    {
+      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      break;
+    }
+    case OpacityQuantum:
+    {
+      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      break;
+    }
+    case BlackQuantum:
+    {
+      SetPixelBlack(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      break;
+    }
+    case IndexQuantum:
+    {
+      SetPixelGray(image,ClampToQuantum((double) QuantumRange*(*p)),q);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static void ImportDoubleQuantum(const Image *image,const QuantumType quantum,
   const double *magick_restrict p,Quantum *magick_restrict q)
 {
@@ -780,28 +811,11 @@ static void ImportDoubleQuantum(const Image *image,const QuantumType quantum,
       SetPixelBlue(image,ClampToQuantum((double) QuantumRange*(*p)),q);
       break;
     }
-    case AlphaQuantum:
-    {
-      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      break;
-    }
-    case OpacityQuantum:
-    {
-      SetPixelAlpha(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      break;
-    }
-    case BlackQuantum:
-    {
-      SetPixelBlack(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      break;
-    }
-    case IndexQuantum:
-    {
-      SetPixelGray(image,ClampToQuantum((double) QuantumRange*(*p)),q);
-      break;
-    }
     default:
+    {
+      ImportDoubleAlphaIndexQuantum(image,quantum,p,q);
       break;
+    }
   }
 }
 
