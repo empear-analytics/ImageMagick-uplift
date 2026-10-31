@@ -362,6 +362,14 @@ static PointInfo FindNearestEdge(PointInfo *bounding_box,double distance)
   return(point);
 }
 
+static double GetLandscapeAngle(double angle,const double p_length,
+  const double q_length)
+{
+  if (p_length > q_length)
+    angle+=(angle < 0.0) ? 90.0 : -90.0;
+  return(angle);
+}
+
 MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
   size_t *number_vertices,ExceptionInfo *exception)
 {
@@ -457,8 +465,7 @@ MagickExport PointInfo *GetImageMinimumBoundingBox(Image *image,
         caliper_info.height));
       if (LocaleCompare(artifact,"landscape") == 0)
         {
-          if (p_length > q_length)
-            angle+=(angle < 0.0) ? 90.0 : -90.0;
+          angle=GetLandscapeAngle(angle,p_length,q_length);
         }
       else
         if (LocaleCompare(artifact,"portrait") == 0)
