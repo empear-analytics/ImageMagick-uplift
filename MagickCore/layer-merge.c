@@ -151,6 +151,15 @@ static void ExtendToLayerBounds(const Image *image,RectangleInfo *page,
   }
 }
 
+static void SelectPageExtent(const RectangleInfo page,size_t *width,
+  size_t *height)
+{
+  if (page.width > 0)
+    *width=page.width;
+  if (page.height > 0)
+    *height=page.height;
+}
+
 static void ExtendToMosaicBounds(const Image *image,size_t *width,
   size_t *height)
 {
@@ -261,10 +270,7 @@ MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
     }
     case FlattenLayer:
     {
-      if (page.width > 0)
-        width=page.width;
-      if (page.height > 0)
-        height=page.height;
+      SelectPageExtent(page,&width,&height);
       page.x=0;
       page.y=0;
       break;
