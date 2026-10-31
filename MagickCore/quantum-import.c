@@ -1196,6 +1196,18 @@ static void ImportBGRQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void StoreUnpacked10BitBGRASample(const Image *image,const ssize_t i,
+  const size_t quantum,Quantum *magick_restrict q)
+{
+  switch (i)
+  {
+    case 0: SetPixelRed(image,(Quantum) quantum,q); break;
+    case 1: SetPixelGreen(image,(Quantum) quantum,q); break;
+    case 2: SetPixelBlue(image,(Quantum) quantum,q); break;
+    case 3: SetPixelAlpha(image,(Quantum) quantum,q); break;
+  }
+}
+
 static void ImportUnpacked10BitBGRAQuantum(const Image *image,
   QuantumInfo *quantum_info,const QuantumPixelSpan *span,unsigned int pixel)
 {
@@ -1248,13 +1260,7 @@ static void ImportUnpacked10BitBGRAQuantum(const Image *image,
           break;
         }
       }
-      switch (i)
-      {
-        case 0: SetPixelRed(image,(Quantum) quantum,q); break;
-        case 1: SetPixelGreen(image,(Quantum) quantum,q); break;
-        case 2: SetPixelBlue(image,(Quantum) quantum,q); break;
-        case 3: SetPixelAlpha(image,(Quantum) quantum,q); break;
-      }
+      StoreUnpacked10BitBGRASample(image,i,quantum,q);
       n++;
     }
     p+=(ptrdiff_t) quantum_info->pad;
