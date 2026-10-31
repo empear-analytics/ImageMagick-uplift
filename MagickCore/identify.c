@@ -1405,6 +1405,28 @@ static size_t GetLocationsLimit(const Image *image)
   return(locations);
 }
 
+static void PrintImageHistogram(FILE *file,Image *image,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  if (IsHistogramImage(image,exception) != MagickFalse)
+    {
+      (void) FormatLocaleFile(file,"  Colors: %.17g\n",(double)
+        GetNumberColors(image,(FILE *) NULL,exception));
+      (void) FormatLocaleFile(file,"  Histogram:\n");
+      (void) GetNumberColors(image,file,exception);
+    }
+  else
+    {
+      artifact=GetImageArtifact(image,"identify:unique-colors");
+      if (IsStringTrue(artifact) != MagickFalse)
+        (void) FormatLocaleFile(file,"  Colors: %.17g\n",(double)
+          GetNumberColors(image,(FILE *) NULL,exception));
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1838,20 +1860,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
           if (found != MagickFalse)
             PrintAlphaColor(file,image,p,exception);
         }
-      if (IsHistogramImage(image,exception) != MagickFalse)
-        {
-          (void) FormatLocaleFile(file,"  Colors: %.17g\n",(double)
-            GetNumberColors(image,(FILE *) NULL,exception));
-          (void) FormatLocaleFile(file,"  Histogram:\n");
-          (void) GetNumberColors(image,file,exception);
-        }
-      else
-        {
-          artifact=GetImageArtifact(image,"identify:unique-colors");
-          if (IsStringTrue(artifact) != MagickFalse)
-            (void) FormatLocaleFile(file,"  Colors: %.17g\n",(double)
-              GetNumberColors(image,(FILE *) NULL,exception));
-        }
+      PrintImageHistogram(file,image,exception);
     }
   PrintImageColormapEntries(file,image,exception);
   if (image->error.mean_error_per_pixel != 0.0)
