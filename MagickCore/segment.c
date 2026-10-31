@@ -1360,6 +1360,16 @@ static void RelinquishDynamicThresholdResources(Cluster *head,
   }
 }
 
+static void InitializeNewCluster(Cluster *cluster,const ExtentPacket red,
+  const ExtentPacket green,const ExtentPacket blue)
+{
+  cluster->count=0;
+  cluster->red=red;
+  cluster->green=green;
+  cluster->blue=blue;
+  cluster->next=(Cluster *) NULL;
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1461,11 +1471,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
         /*
           Initialize a new class.
         */
-        cluster->count=0;
-        cluster->red=red;
-        cluster->green=green;
-        cluster->blue=blue;
-        cluster->next=(Cluster *) NULL;
+        InitializeNewCluster(cluster,red,green,blue);
       }
     }
   }
