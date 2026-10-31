@@ -3415,6 +3415,15 @@ static void ReportKmeansProgress(Image *image,const ssize_t n,
     }
 }
 
+static void LogKmeansDistortion(const Image *image,const ssize_t n,
+  const double distortion,const double previous_tolerance)
+{
+  if (image->debug != MagickFalse)
+    (void) LogMagickEvent(ImageEvent,GetMagickModule(),
+      "distortion[%.17g]: %*g %*g\n",(double) n,GetMagickPrecision(),
+      distortion,GetMagickPrecision(),fabs(distortion-previous_tolerance));
+}
+
 static MagickBooleanType FinishKmeansImage(Image *image,
   const size_t max_iterations,const MagickBooleanType status,
   ExceptionInfo *exception)
@@ -3535,10 +3544,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
       Calculate the new means (centroids) of the pixels in the new clusters.
     */
     distortion=UpdateKmeansCentroids(image,kmeans_pixels);
-    if (image->debug != MagickFalse)
-      (void) LogMagickEvent(ImageEvent,GetMagickModule(),
-        "distortion[%.17g]: %*g %*g\n",(double) n,GetMagickPrecision(),
-        distortion,GetMagickPrecision(),fabs(distortion-previous_tolerance));
+    LogKmeansDistortion(image,n,distortion,previous_tolerance);
     if (fabs(distortion-previous_tolerance) <= tolerance)
       break;
     previous_tolerance=distortion;
