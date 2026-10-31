@@ -1545,6 +1545,40 @@ static ThresholdMap *GetNamedThresholdMap(const char *threshold_map,
   return(GetThresholdMap(token,exception));
 }
 
+typedef struct _OrderedDitherRow
+{
+  ThresholdMap
+    *map;
+
+  ssize_t
+    y;
+} OrderedDitherRow;
+
+static void OrderedDitherPixels(const Image *image,const double *levels,
+  const OrderedDitherRow *row,Quantum *magick_restrict q)
+{
+  ThresholdMap
+    *const map = row->map;
+
+  const ssize_t
+    y = row->y;
+
+  OrderedDither
+    ordered_dither;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ordered_dither.map=map;
+    ordered_dither.x=x;
+    ordered_dither.y=y;
+    OrderedDitherPixel(image,levels,&ordered_dither,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType OrderedDitherImage(Image *image,
   const char *threshold_map,ExceptionInfo *exception)
 {
@@ -1602,11 +1636,8 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    OrderedDither
-      ordered_dither;
-
-    ssize_t
-      x;
+    OrderedDitherRow
+      row;
 
     Quantum
       *magick_restrict q;
@@ -1619,14 +1650,9 @@ MagickExport MagickBooleanType OrderedDitherImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ordered_dither.map=map;
-      ordered_dither.x=x;
-      ordered_dither.y=y;
-      OrderedDitherPixel(image,levels,&ordered_dither,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.map=map;
+    row.y=y;
+    OrderedDitherPixels(image,levels,&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
