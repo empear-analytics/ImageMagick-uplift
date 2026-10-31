@@ -1579,6 +1579,26 @@ static void PrintImageBaseFilename(FILE *file,const Image *image)
       }
 }
 
+static void PrintImageFormat(FILE *file,const Image *image,
+  ExceptionInfo *exception)
+{
+  const MagickInfo
+    *magick_info;
+
+  magick_info=GetMagickInfo(image->magick,exception);
+  if ((magick_info == (const MagickInfo *) NULL) ||
+      (GetMagickDescription(magick_info) == (const char *) NULL))
+    (void) FormatLocaleFile(file,"  Format: %s\n",image->magick);
+  else
+    {
+      (void) FormatLocaleFile(file,"  Format: %s (%s)\n",image->magick,
+        GetMagickDescription(magick_info));
+      if (GetMagickMimeType(magick_info) != (const char *) NULL)
+        (void) FormatLocaleFile(file,"  Mime type: %s\n",GetMagickMimeType(
+          magick_info));
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1604,9 +1624,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const char
     *artifact,
     *locate;
-
-  const MagickInfo
-    *magick_info;
 
   const Quantum
     *p;
@@ -1732,18 +1749,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         rwx[(properties.st_mode >> 3) & 0x07],
         rwx[(properties.st_mode >> 0) & 0x07]);
     }
-  magick_info=GetMagickInfo(image->magick,exception);
-  if ((magick_info == (const MagickInfo *) NULL) ||
-      (GetMagickDescription(magick_info) == (const char *) NULL))
-    (void) FormatLocaleFile(file,"  Format: %s\n",image->magick);
-  else
-    {
-      (void) FormatLocaleFile(file,"  Format: %s (%s)\n",image->magick,
-        GetMagickDescription(magick_info));
-      if (GetMagickMimeType(magick_info) != (const char *) NULL)
-        (void) FormatLocaleFile(file,"  Mime type: %s\n",GetMagickMimeType(
-          magick_info));
-    }
+  PrintImageFormat(file,image,exception);
   (void) FormatLocaleFile(file,"  Class: %s\n",CommandOptionToMnemonic(
     MagickClassOptions,(ssize_t) image->storage_class));
   (void) FormatLocaleFile(file,"  Geometry: %.17gx%.17g%+.20g%+.20g\n",(double)
