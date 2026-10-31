@@ -1484,6 +1484,42 @@ static void PrintChannelsFeatures(FILE *file,const Image *image,
   }
 }
 
+static void PrintGrayOrChannelStatistics(const Image *image,
+  const ColorspaceType colorspace,ChannelStatisticsReport report)
+{
+  ssize_t
+    i;
+
+  switch (colorspace)
+  {
+    case LinearGRAYColorspace:
+    case GRAYColorspace:
+    {
+      if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelStatistics(&report,GrayPixelChannel,"Gray");
+      break;
+    }
+    default:
+    {
+      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      {
+        char
+          label[MagickPathExtent];
+
+        PixelChannel channel = GetPixelChannelChannel(image,i);
+        PixelTrait traits = GetPixelChannelTraits(image,channel);
+        if ((traits & UpdatePixelTrait) != 0)
+          {
+            (void) FormatLocaleString(label,MagickPathExtent,
+              "Channel %.17g",(double) i);
+            (void) PrintChannelStatistics(&report,channel,label);
+          }
+      }
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1743,29 +1779,9 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
             (void) PrintChannelStatistics(&report,BlackPixelChannel,"Black");
           break;
         }
-        case LinearGRAYColorspace:
-        case GRAYColorspace:
-        {
-          if ((GetPixelGrayTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(&report,GrayPixelChannel,"Gray");
-          break;
-        }
         default:
         {
-          for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-          {
-            char
-              label[MagickPathExtent];
-
-            PixelChannel channel = GetPixelChannelChannel(image,i);
-            PixelTrait traits = GetPixelChannelTraits(image,channel);
-            if ((traits & UpdatePixelTrait) != 0)
-              {
-                (void) FormatLocaleString(label,MagickPathExtent,
-                  "Channel %.17g",(double) i);
-                (void) PrintChannelStatistics(&report,channel,label);
-              }
-          }
+          PrintGrayOrChannelStatistics(image,colorspace,report);
           break;
         }
       }
