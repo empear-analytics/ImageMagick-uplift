@@ -49,6 +49,7 @@ if ( ! GetOptions(
 	 'effect.c',
 	 'effect-blur.c',
 	 'enhance.c',
+	 'enhance-tone.c',
 	 'exception.c',
 	 'fx.c',
 	 'image.c',
