@@ -2914,6 +2914,34 @@ static MagickBooleanType CopyImageToSeekableFile(ImageInfo *image_info,
   return(MagickTrue);
 }
 
+static MagickBooleanType SetImageMagickFromMagic(ImageInfo *image_info,
+  const MagickInfo *magick_info,const MagicInfo *magic_info,
+  ExceptionInfo *sans_exception)
+{
+  if ((magic_info != (const MagicInfo *) NULL) &&
+      (GetMagicName(magic_info) != (char *) NULL))
+    {
+      /*
+        Try to use magick_info that was determined earlier by the extension
+      */
+      if (IsExtensionMagickMatch(magick_info,magic_info) != MagickFalse)
+        (void) CopyMagickString(image_info->magick,magick_info->name,
+          MagickPathExtent);
+      else
+        {
+          (void) CopyMagickString(image_info->magick,GetMagicName(
+            magic_info),MagickPathExtent);
+          magick_info=GetMagickInfo(image_info->magick,sans_exception);
+        }
+      if ((magick_info == (const MagickInfo *) NULL) ||
+          (GetMagickEndianSupport(magick_info) == MagickFalse))
+        image_info->endian=UndefinedEndian;
+      sans_exception=DestroyExceptionInfo(sans_exception);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
   const unsigned int frames,ExceptionInfo *exception)
 {
@@ -3050,27 +3078,9 @@ MagickExport MagickBooleanType SetImageInfo(ImageInfo *image_info,
       sans_exception=AcquireExceptionInfo();
       magic_info=GetMagicInfo(magick,(size_t) count,sans_exception);
       magick=(unsigned char *) RelinquishMagickMemory(magick);
-      if ((magic_info != (const MagicInfo *) NULL) &&
-          (GetMagicName(magic_info) != (char *) NULL))
-        {
-          /*
-            Try to use magick_info that was determined earlier by the extension
-          */
-          if (IsExtensionMagickMatch(magick_info,magic_info) != MagickFalse)
-            (void) CopyMagickString(image_info->magick,magick_info->name,
-              MagickPathExtent);
-          else
-            {
-              (void) CopyMagickString(image_info->magick,GetMagicName(
-                magic_info),MagickPathExtent);
-              magick_info=GetMagickInfo(image_info->magick,sans_exception);
-            }
-          if ((magick_info == (const MagickInfo *) NULL) ||
-              (GetMagickEndianSupport(magick_info) == MagickFalse))
-            image_info->endian=UndefinedEndian;
-          sans_exception=DestroyExceptionInfo(sans_exception);
-          return(MagickTrue);
-        }
+      if (SetImageMagickFromMagic(image_info,magick_info,magic_info,
+          sans_exception) == MagickFalse)
+        return(MagickTrue);
       magick_info=GetMagickInfo(image_info->magick,sans_exception);
       if ((magick_info == (const MagickInfo *) NULL) ||
           (GetMagickEndianSupport(magick_info) == MagickFalse))
