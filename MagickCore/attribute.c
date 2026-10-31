@@ -418,26 +418,43 @@ static void CopyConvexHullVertices(PointInfo *convex_hull,
       convex_hull[n]=(*monotone_chain[n]);
 }
 
-MagickExport PointInfo *GetImageConvexHull(const Image *image,
-  size_t *number_vertices,ExceptionInfo *exception)
+typedef struct _ConvexHullScan
 {
+  const Image
+    *image;
+
   CacheView
     *image_view;
-
-  MagickBooleanType
-    status;
-
-  MemoryInfo
-    *monotone_info,
-    *vertices_info;
 
   PixelInfo
     background;
 
   PointInfo
-    *convex_hull,
-    **monotone_chain,
     *vertices;
+
+  ExceptionInfo
+    *exception;
+} ConvexHullScan;
+
+static size_t ScanConvexHullVertices(const ConvexHullScan *scan)
+{
+  const Image
+    *const image = scan->image;
+
+  CacheView
+    *const image_view = scan->image_view;
+
+  const PixelInfo
+    background = scan->background;
+
+  PointInfo
+    *const vertices = scan->vertices;
+
+  ExceptionInfo
+    *const exception = scan->exception;
+
+  MagickBooleanType
+    status;
 
   size_t
     n;
@@ -445,28 +462,6 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
   ssize_t
     y;
 
-  /*
-    Identify convex hull vertices of image foreground object(s).
-  */
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  *number_vertices=0;
-  vertices_info=AcquireVirtualMemory(image->columns,image->rows*
-    sizeof(*vertices));
-  monotone_info=AcquireVirtualMemory(2*image->columns,2*
-    image->rows*sizeof(*monotone_chain));
-  if ((vertices_info == (MemoryInfo *) NULL) ||
-      (monotone_info == (MemoryInfo *) NULL))
-    {
-      RelinquishConvexHullMemory(monotone_info,vertices_info);
-      return((PointInfo *) NULL);
-    }
-  vertices=(PointInfo *) GetVirtualMemoryBlob(vertices_info);
-  monotone_chain=(PointInfo **) GetVirtualMemoryBlob(monotone_info);
-  image_view=AcquireVirtualCacheView(image,exception);
-  background=GetEdgeBackgroundColor(image,image_view,exception);
   status=MagickTrue;
   n=0;
   for (y=0; y < (ssize_t) image->rows; y++)
@@ -491,6 +486,61 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
     row.y=y;
     AddConvexHullRowVertices(&row,&n,&p);
   }
+  return(n);
+}
+
+MagickExport PointInfo *GetImageConvexHull(const Image *image,
+  size_t *number_vertices,ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  ConvexHullScan
+    scan;
+
+  MemoryInfo
+    *monotone_info,
+    *vertices_info;
+
+  PixelInfo
+    background;
+
+  PointInfo
+    *convex_hull,
+    **monotone_chain,
+    *vertices;
+
+  size_t
+    n;
+
+  /*
+    Identify convex hull vertices of image foreground object(s).
+  */
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  *number_vertices=0;
+  vertices_info=AcquireVirtualMemory(image->columns,image->rows*
+    sizeof(*vertices));
+  monotone_info=AcquireVirtualMemory(2*image->columns,2*
+    image->rows*sizeof(*monotone_chain));
+  if ((vertices_info == (MemoryInfo *) NULL) ||
+      (monotone_info == (MemoryInfo *) NULL))
+    {
+      RelinquishConvexHullMemory(monotone_info,vertices_info);
+      return((PointInfo *) NULL);
+    }
+  vertices=(PointInfo *) GetVirtualMemoryBlob(vertices_info);
+  monotone_chain=(PointInfo **) GetVirtualMemoryBlob(monotone_info);
+  image_view=AcquireVirtualCacheView(image,exception);
+  background=GetEdgeBackgroundColor(image,image_view,exception);
+  scan.image=image;
+  scan.image_view=image_view;
+  scan.background=background;
+  scan.vertices=vertices;
+  scan.exception=exception;
+  n=ScanConvexHullVertices(&scan);
   image_view=DestroyCacheView(image_view);
   /*
     Return the convex hull of the image foreground object(s).
