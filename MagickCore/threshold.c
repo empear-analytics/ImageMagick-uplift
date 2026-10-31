@@ -550,6 +550,18 @@ static MagickBooleanType ClampImageColormap(Image *image,
   return(SyncImage(image,exception));
 }
 
+static void ClampPixelRow(const Image *image,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ClampPixelChannels(image,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
 {
 #define ClampImageTag  "Clamp/Image"
@@ -584,9 +596,6 @@ MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
     Quantum
       *magick_restrict q;
 
@@ -598,11 +607,7 @@ MagickExport MagickBooleanType ClampImage(Image *image,ExceptionInfo *exception)
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ClampPixelChannels(image,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    ClampPixelRow(image,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
