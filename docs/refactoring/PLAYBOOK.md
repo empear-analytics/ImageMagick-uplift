@@ -2080,7 +2080,10 @@ Q and U, whose first step refuses a block containing `goto`.
    another function and identical to it once the variables are renamed consistently
    (Recipe D's test, checked by script), may call the same function the same way, with
    its own variables as arguments and its own `c`, one commit per caller, as Recipe W
-   step 7 allows.
+   step 7 allows. In a function returning `void`, `return;` plays the
+   part of `return(c);`: every `return` in the block is `return;`, each becomes
+   `return(MagickFalse);`, and the caller writes `if (Helper(...) == MagickFalse)
+   return;`.
 7. A block whose every exit is the same run of cleanup statements `S` followed by
    `return(v);`, `v` a local of the caller (`GetThresholdMapFile`'s
    `thresholds=DestroyXMLTree(thresholds); map=DestroyThresholdMap(map); return(map);`),
@@ -2157,6 +2160,10 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
 
 **Careful:**
 
+- Under step 6's `void` form the caller's `return;` returns nothing, as the block's
+  did, from the same point and after the same writes; the helper's `MagickBooleanType`
+  only says whether the block fell through. No value crosses the call that the block
+  did not already leave behind a pointer or in `v`.
 - On a failure path the caller jumps from the same point as before: the block's
   statements after the jump run in neither version, and every write before it has
   landed in `v` through the pointer, so the cleanup code at `L` reads the same values
@@ -2264,6 +2271,9 @@ outside the kernel.
 Step 6's other copy (2026-10-30, task W09): `resize-image.c`'s `HorizontalFilter` and
 `VerticalFilter`, whose contribution-buffer allocation (`return(MagickFalse);` when it
 fails) is the same text in both.
+Step 6's `return;` (2026-10-31, task W10): `resample.c`'s `ScaleResampleFilter`, a
+public `void` function whose ellipse-fitting block (the limit test, the support scaling
+of `F` and the four bounds) leaves through `return;` once the ellipse is too large.
 
 ---
 
@@ -4554,3 +4564,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | NEW | RF | Reuse a Struct Fill Across Calls: a fill of a struct local that repeats an earlier fill of the same members from the same side-effect-free expressions, with nothing in between that writes the local or what the expressions read, is deleted; the later calls read the earlier fill | `paint.c`'s `FloodfillPaintImage` (W10): three LB steps left `FloodfillRow row` filled with the same eight assignments before each of `FillFloodplaneLeft`, `FillFloodplaneRun` and `SkipFloodplaneRun` in one iteration; a probe deleting the second and third fills, 6.19 to 6.24 (172 to 156 lines), object code `IDENTICAL` | mandate (2026-10-24) |
 | 2026-10-31 | NEW | LT | Extract Loop Whose Early Exit Is Tested After It: a `for` loop leaving itself through `break;`, followed directly by `if (<cond>) X;` testing its own condition, moves to a `static MagickBooleanType` function whose `break;`s become `return(MagickFalse);` and which drops the test; the caller writes `if (Helper(...) == MagickFalse) X;`. A run equal to an existing I/LB/W/Y function calls it | `histogram.c`'s `CheckImageColors` (W10): its tree descent (`if (level < MaxTreeDepth) break;`) is `ClassifyImageColors`' `DescendHCube` with a `break` for the `return`, and its column loop is tested `x < (ssize_t) image->columns` after it; probes 8.58 to 8.64 (descent), 9.68 with the column loop, the function leaving every finding | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | SD | Step 7: a `switch` without `default` may be split too; the new function's `switch` ends with `default: break;` and the caller's gains the `default:` group holding the call. *Careful* argues the values that match no label and names the cost (`-Wswitch` no longer sees a constant added later) | `resample.c`'s `ResamplePixelColor` (W10): its `hit` switch over every `VirtualPixelMethod` constant has no `default`, so step 1 refuses it; without the added group the new function's partial `switch` draws `-Wswitch`. Probes: the vertical-tile and dither groups, 7.30 to 7.34; then the corner and horizontal-tile groups, 7.37 (cc 34 to 26) | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | V | Step 6: in a function returning `void`, `return;` plays the part of `return(c);`: each becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) return;`. Applies to Recipe Y through its step 1 | `resample.c`'s `ScaleResampleFilter` (W10, public, `void`, *Large Method* of 100 lines, most of them in uncompiled `#if` branches): its compiled ellipse-fitting block leaves through `return;` once the ellipse is too large and writes `F`, which the caller reads after; Recipe Y (inputs `resample_filter`, `A`, `B`, `C`) refuses it only because `return;` has no constant. A probe: 7.40 to 7.41 | mandate (2026-10-24) |
