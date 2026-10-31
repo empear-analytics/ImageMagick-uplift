@@ -1722,6 +1722,83 @@ static MagickBooleanType ParseAttributeType(char *n,ExceptionInfo *exception,
   return(MagickTrue);
 }
 
+typedef struct _AttributeDefinitionInfo
+{
+  XMLTreeRoot
+    *root;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    **xml,
+    **n,
+    *t;
+
+  ssize_t
+    i;
+} AttributeDefinitionInfo;
+
+static MagickBooleanType ParseAttributeDefinition(
+  const AttributeDefinitionInfo *definition)
+{
+  XMLTreeRoot
+    *const root = definition->root;
+
+  ExceptionInfo
+    *const exception = definition->exception;
+
+  char
+    **const xml = definition->xml,
+    **const n = definition->n,
+    *const t = definition->t;
+
+  const ssize_t
+    i = definition->i;
+
+  AttributeTypeTargets
+    attribute_targets;
+
+  char
+    *c,
+    *v;
+
+  DefaultAttributeInfo
+    attribute;
+
+  attribute_targets.xml=xml;
+  attribute_targets.c=(&c);
+  if (ParseAttributeType(*n,exception,&attribute_targets) ==
+      MagickFalse)
+    {
+      return(MagickFalse);
+    }
+  if (**xml == '#')
+    {
+      *xml+=strcspn(*xml,XMLWhitespace ">")-1;
+      if (*c == ' ')
+        return(MagickTrue);
+      v=(char *) NULL;
+    }
+  else
+    if (((**xml == '"') || (**xml == '\''))  &&
+        ((*xml=strchr(v=*xml+1,**xml)) != (char *) NULL))
+      **xml='\0';
+    else
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          OptionWarning,"ParseError","malformed <!ATTLIST");
+        return(MagickFalse);
+      }
+  attribute.c=c;
+  attribute.n=*n;
+  attribute.t=t;
+  attribute.v=v;
+  attribute.i=i;
+  AppendDefaultAttribute(root,&attribute);
+  return(MagickTrue);
+}
+
 typedef struct _AttributeListTargets
 {
   char
@@ -1739,9 +1816,7 @@ static MagickBooleanType ParseAttributeListDeclaration(XMLTreeRoot *root,
     **const n = targets->n;
 
   char
-    *c,
-    *t,
-    *v;
+    *t;
 
   ssize_t
     i;
@@ -1766,42 +1841,19 @@ static MagickBooleanType ParseAttributeListDeclaration(XMLTreeRoot *root,
   while ((*(*n=*xml+strspn(*xml+1,XMLWhitespace)+1) != '\0') &&
          (**n != '>'))
   {
-    AttributeTypeTargets
-      attribute_targets;
+    AttributeDefinitionInfo
+      definition;
 
-    DefaultAttributeInfo
-      attribute;
-
-    attribute_targets.xml=xml;
-    attribute_targets.c=(&c);
-    if (ParseAttributeType(*n,exception,&attribute_targets) ==
-        MagickFalse)
+    definition.root=root;
+    definition.exception=exception;
+    definition.xml=xml;
+    definition.n=n;
+    definition.t=t;
+    definition.i=i;
+    if (ParseAttributeDefinition(&definition) == MagickFalse)
       {
         return(MagickFalse);
       }
-    if (**xml == '#')
-      {
-        *xml+=strcspn(*xml,XMLWhitespace ">")-1;
-        if (*c == ' ')
-          continue;
-        v=(char *) NULL;
-      }
-    else
-      if (((**xml == '"') || (**xml == '\''))  &&
-          ((*xml=strchr(v=*xml+1,**xml)) != (char *) NULL))
-        **xml='\0';
-      else
-        {
-          (void) ThrowMagickException(exception,GetMagickModule(),
-            OptionWarning,"ParseError","malformed <!ATTLIST");
-          return(MagickFalse);
-        }
-    attribute.c=c;
-    attribute.n=*n;
-    attribute.t=t;
-    attribute.v=v;
-    attribute.i=i;
-    AppendDefaultAttribute(root,&attribute);
   }
   return(MagickTrue);
 }
