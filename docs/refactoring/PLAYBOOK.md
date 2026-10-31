@@ -3040,6 +3040,163 @@ mandate of 2026-10-24.
 
 ---
 
+## Recipe SR - Split a Selection at its Default, Returning Success
+
+**Use when:** CodeScene reports *Complex Method*, *Large Method* or *Bumpy Road Ahead*,
+and much of the complexity is a `switch` whose `default` group (and perhaps others)
+leaves the function through `return(R);`, as `ExportImagePixels`' map parser does: each
+of its twelve letter groups stores a `QuantumType` and breaks, four of them return after
+a colourspace test, and `default:` releases the map, throws and returns `MagickFalse`.
+
+**Not covered by:** Recipe SD, whose step 1 refuses a `return` in any group, and whose
+new function is `void`; Recipe W, which moves one block whole, so the new function keeps
+every label of the `switch` (cc 25 here, a *Complex Method* the gate refuses); Recipes
+O, Z and E, which refuse a `return` in the block (E step 7 only at the end of the
+function).
+
+**How:**
+
+1. The `switch` has a `default:` label; its controlling expression `e` is a variable, or
+   an expression of variables with no call, assignment or increment, that no statement
+   inside the `switch` writes (checked by reading, aliasing included). It lies outside
+   every OpenMP region and contains no `#pragma` line.
+2. Choose the groups that move: the group carrying `default:`, and others beside it.
+   Each moved group ends with a `break;` of this `switch` or with `return(R);`, holds no
+   other exit (no `continue`, `goto`, other `return`, or `break` of an enclosing loop),
+   and every `return` in them is `return(R);` with one expression `R` that meets Recipe
+   W step 2. No group of the `switch`, kept or moved, falls through into the next: each
+   ends with `break;`, `return`, `continue` or `goto`.
+3. The moved groups meet Recipe W step 3 (written variables): they write through
+   pointers they already use, and plain locals of the caller only on paths that end in
+   `return(R);`, which go by value. Their inputs are at most four parameters (W step 5).
+4. Cut the moved groups, labels and bodies, in their order, into a new `static
+   MagickBooleanType` function directly above the caller, whose body is `switch (e)
+   { ... }` with the same text of `e`, followed by `return(MagickTrue);`. Each
+   `return(R);` becomes `return(MagickFalse);`; nothing else in the text changes.
+5. Where the `default` group stood, write the group `default:` alone, whose body is a
+   compound block holding `if (Helper(...) == MagickFalse)` `return(R);` with the
+   original `R`, then `break;`.
+6. The kept groups stay where they were, unchanged. Check by reading that every label
+   of the original `switch` is in exactly one of the two, `default` in the new one, and
+   every argument fills the parameter it names.
+7. Applied again to the new function (its `switch` split at its own `default`), the
+   moved `default` group is the call group of step 5, whose `return(MagickFalse);` is
+   its `R`: a chain of functions, each a step of its own.
+
+**Before:**
+
+```c
+  for (i=0; i < (ssize_t) length; i++)
+  {
+    switch (map[i])
+    {
+      case 'A':
+      case 'a':
+      {
+        quantum_map[i]=AlphaQuantum;
+        break;
+      }
+      ...
+      case 'C':
+      case 'c':
+      {
+        quantum_map[i]=CyanQuantum;
+        if (image->colorspace == CMYKColorspace)
+          break;
+        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+        (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+          "ColorSeparatedImageRequired","`%s'",map);
+        return(MagickFalse);
+      }
+      ...
+      case 'R':
+      case 'r':
+      {
+        quantum_map[i]=RedQuantum;
+        break;
+      }
+      ...
+      default:
+      {
+        quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+        (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+          "UnrecognizedPixelMap","`%s'",map);
+        return(MagickFalse);
+      }
+    }
+  }
+```
+
+**After:**
+
+```c
+static MagickBooleanType ExportMapQuantumOPR(const char *map,const ssize_t i,
+  QuantumType *quantum_map,ExceptionInfo *exception)
+{
+  switch (map[i])
+  {
+    ...
+    case 'R':
+    case 'r':
+    {
+      quantum_map[i]=RedQuantum;
+      break;
+    }
+    default:
+    {
+      quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",map);
+      return(MagickFalse);
+    }
+  }
+  return(MagickTrue);
+}
+...
+      default:
+      {
+        if (ExportMapQuantumOPR(map,i,quantum_map,exception) == MagickFalse)
+          return(MagickFalse);
+        break;
+      }
+```
+
+**Careful:**
+
+- Why the behaviour is the same, value by value. A value of `e` that matches a kept
+  label selects the same group as before, unchanged, whatever exits it holds. One that
+  matches a moved label (or none) now selects the outer `default`, whose first act is
+  the call; nothing writes what `e` reads before the inner `switch` evaluates it, so it
+  selects the same group. A group that ended in `break;` ends the inner `switch`, the
+  function returns `MagickTrue`, the `if` does not fire and the outer `break;` ends the
+  outer `switch`, where the original `break;` ended it, after the same writes through
+  the same pointers. A group that ended in `return(R);` returns `MagickFalse` after the
+  same statements, and the caller returns `R` at once, as before; `R` meets W step 2,
+  so the caller's `R` is the value the block's would have been.
+- A plain local the moved groups write (`quantum_map=...RelinquishMagickMemory(...)`)
+  is written only on paths that return: the caller's copy keeps the old value, which
+  nothing reads on the way out (W step 3).
+- `default` must move, for the reason SD gives; no group may fall through, kept groups
+  included, since after the split a kept group falling through would run into whatever
+  now follows it.
+- `ThrowMagickException`'s location (`GetMagickModule()`) now names the new function;
+  the oracle normalises it, as for every extraction of a throw.
+- The new function must not itself be a *Complex Method* (cc 9 or more counts one per
+  label): split along the labels, as many functions as that takes (step 7).
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), a case for each moved label where one exists, the `return` path
+included, and steps 1, 2 and 6 checked by reading.
+
+**Provenance:** 2026-10-31, from `pixel-export.c`'s `ExportImagePixels` (campaign B,
+task M117): its map parser (twelve letter groups, four returning after the colourspace
+test, a returning `default`) holds about half of its cc 39; SD refuses it for the
+`return`s, W for the cc of a single helper. A probe of three functions (`O`/`P`/`R`,
+`G`/`I`, `A`/`B`, each with the `default` chain): 6.20 to 6.40, no finding on any new
+function. Added by Claude Code (Claude Opus 5.5), under the mandate of 2026-10-24.
+
+---
+
 ## Recipe W - Extract Block Returning Success for an Early Return
 
 **Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method*, *Large Method* or
@@ -3898,6 +4055,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | AMEND | G | Careful: a comparison with a floating-point operand is inverted as `!(a < b)`, not `a >= b`, which differs for NaN | `ClipCLAHEHistogram`'s `(double) *p < clip_limit`, where the written-out inverse would have run the block for a NaN limit | mandate (2026-10-24) |
 | 2026-10-24 | WORDING | rule | *Two levels of evidence*: at the guard-verified level, E and P pass on the exact extract fingerprint (`+2` per new helper, nothing else moved), which `--calls` prints as a `WARN`; any other movement stops the commit | The literal reading would forbid every extraction at the guard level, contradicting the same paragraph's list of E and P; found before the first guard-verified step (M04) | mandate (2026-10-24) |
 | 2026-10-25 | AMEND | E | Step 7: a block of a value-returning function whose every path ends in `return(<expr>);` moves to a function of the caller's return type; the block becomes `return(<call>);` | `QueryColorCompliance`'s fallback to a colour name when `ParseCSSColor` finds no values (probe: 2.89 to 2.91, bumps 6 to 5), refused by step 7's `void`-only wording | mandate (2026-10-24) |
+| 2026-10-31 | NEW | SR | Split a Selection at its Default, Returning Success: Recipe SD for a `switch` whose moved groups may leave through `return(R);` (`R` as Recipe W step 2 allows) and whose kept groups may hold any exit, none falling through; the new function is `static MagickBooleanType`, each `return(R);` becomes `return(MagickFalse);`, it ends with `return(MagickTrue);`, and the caller's `default:` writes `if (Helper(...) == MagickFalse) return(R); break;` | `pixel-export.c`'s `ExportImagePixels` (campaign B, task M117): the map parser's `switch` (twelve letter groups, four returning after the colourspace test, a returning `default`) holds about half of the cc 39; SD refuses its `return`s, W the cc 25 of a single helper. A probe of three chained functions: 6.20 to 6.40, no finding on a new function | mandate (2026-10-24) |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
