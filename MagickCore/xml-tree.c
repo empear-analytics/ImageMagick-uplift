@@ -2176,6 +2176,15 @@ static MagickBooleanType ParseEndTag(XMLTreeRoot *root,const int terminal,
   return(MagickTrue);
 }
 
+static void SkipDoctypeDeclaration(char **p,ssize_t *l)
+{
+  for (*l=0; (**p != '\0') && (((*l == 0) && (**p != '>')) ||
+       ((*l != 0) && ((**p != ']') ||
+       (*(*p+strspn(*p+1,XMLWhitespace)+1) != '>'))));
+    *l=(ssize_t) ((**p == '[') ? 1 : *l))
+  *p+=(ptrdiff_t) strcspn(*p+1,"[]>")+1;
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2390,11 +2399,7 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                 /*
                   DTD.
                 */
-                for (l=0; (*p != '\0') && (((l == 0) && (*p != '>')) ||
-                     ((l != 0) && ((*p != ']') ||
-                     (*(p+strspn(p+1,XMLWhitespace)+1) != '>'))));
-                  l=(ssize_t) ((*p == '[') ? 1 : l))
-                p+=(ptrdiff_t) strcspn(p+1,"[]>")+1;
+                SkipDoctypeDeclaration(&p,&l);
                 if ((*p == '\0') && (terminal != '>'))
                   {
                     (void) ThrowMagickException(exception,GetMagickModule(),
