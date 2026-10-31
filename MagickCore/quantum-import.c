@@ -7619,6 +7619,46 @@ static void ImportRGBFamilyQuantum(const Image *image,QuantumInfo *quantum_info,
   }
 }
 
+static void ImportBGRGrayFamilyQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumType quantum_type,
+  QuantumPixelSpan span)
+{
+  switch (quantum_type)
+  {
+    case BGRAQuantum:
+    {
+      ImportBGRAQuantum(image,quantum_info,&span);
+      break;
+    }
+    case BGROQuantum:
+    {
+      ImportBGROQuantum(image,quantum_info,&span);
+      break;
+    }
+    case GrayQuantum:
+    {
+      ImportGrayQuantum(image,quantum_info,&span);
+      break;
+    }
+    case GrayAlphaQuantum:
+    {
+      ImportGrayAlphaQuantum(image,quantum_info,&span);
+      break;
+    }
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      ImportPixelChannel(image,quantum_info,&span,RedPixelChannel);
+      break;
+    }
+    default:
+    {
+      ImportRGBFamilyQuantum(image,quantum_info,quantum_type,span);
+      break;
+    }
+  }
+}
+
 MagickExport size_t ImportQuantumPixels(const Image *image,
   CacheView *image_view,QuantumInfo *quantum_info,
   const QuantumType quantum_type,const unsigned char *magick_restrict pixels,
@@ -7678,16 +7718,6 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       ImportAlphaQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case BGRAQuantum:
-    {
-      ImportBGRAQuantum(image,quantum_info,&span);
-      break;
-    }
-    case BGROQuantum:
-    {
-      ImportBGROQuantum(image,quantum_info,&span);
-      break;
-    }
     case BlackQuantum:
     {
       ImportBlackQuantum(image,quantum_info,&span,exception);
@@ -7724,16 +7754,6 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       ImportCbYCrYQuantum(image,quantum_info,&span);
       break;
     }
-    case GrayQuantum:
-    {
-      ImportGrayQuantum(image,quantum_info,&span);
-      break;
-    }
-    case GrayAlphaQuantum:
-    {
-      ImportGrayAlphaQuantum(image,quantum_info,&span);
-      break;
-    }
     case GreenQuantum:
     case MagentaQuantum:
     {
@@ -7755,15 +7775,9 @@ MagickExport size_t ImportQuantumPixels(const Image *image,
       ImportOpacityQuantum(image,quantum_info,&span,exception);
       break;
     }
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      ImportPixelChannel(image,quantum_info,&span,RedPixelChannel);
-      break;
-    }
     default:
     {
-      ImportRGBFamilyQuantum(image,quantum_info,quantum_type,span);
+      ImportBGRGrayFamilyQuantum(image,quantum_info,quantum_type,span);
       break;
     }
   }
