@@ -1510,10 +1510,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
         /*
           Initialize cluster.
         */
-        cluster->id=count;
-        cluster->red.center/=cluster->count;
-        cluster->green.center/=cluster->count;
-        cluster->blue.center/=cluster->count;
+        InitializeCluster(cluster,count);
         count++;
         last_cluster=cluster;
         continue;
