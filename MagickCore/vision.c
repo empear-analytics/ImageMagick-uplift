@@ -2253,6 +2253,22 @@ static void LabelObjectRow(const CCLabelRow *label_row,
 
 #define ConnectedComponentsImageTag  "ConnectedComponents/Image"
 
+static void UpdateComponentsProgress(const Image *image,
+  MagickOffsetType *progress,MagickBooleanType *status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      (*progress)++;
+      proceed=SetImageProgress(image,ConnectedComponentsImageTag,*progress,
+        image->rows);
+      if (proceed == MagickFalse)
+        *status=MagickFalse;
+    }
+}
+
 MagickExport Image *ConnectedComponentsImage(const Image *image,
   const size_t connectivity,CCObjectInfo **objects,ExceptionInfo *exception)
 {
@@ -2404,17 +2420,7 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
       break;
     if (SyncCacheViewAuthenticPixels(component_view,exception) == MagickFalse)
       status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        progress++;
-        proceed=SetImageProgress(image,ConnectedComponentsImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    UpdateComponentsProgress(image,&progress,&status);
   }
   component_view=DestroyCacheView(component_view);
   image_view=DestroyCacheView(image_view);
