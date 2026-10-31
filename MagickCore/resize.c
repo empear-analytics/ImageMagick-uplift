@@ -2185,6 +2185,12 @@ static void ImportLiquidRescalePixels(const Image *image,gfloat *pixels,
   image_view=DestroyCacheView(image_view);
 }
 
+static inline MagickBooleanType IsTooSmallToCarve(const size_t columns,
+  const size_t rows)
+{
+  return(((columns <= 2) || (rows <= 2)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   const size_t rows,const double delta_x,const double rigidity,
   ExceptionInfo *exception)
@@ -2219,7 +2225,7 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
     ThrowImageException(ImageError,"NegativeOrZeroImageSize");
   if (IsResizeSizeUnchanged(image,columns,rows) != MagickFalse)
     return(CloneImage(image,0,0,MagickTrue,exception));
-  if ((columns <= 2) || (rows <= 2))
+  if (IsTooSmallToCarve(columns,rows) != MagickFalse)
     return(ResizeImage(image,columns,rows,image->filter,exception));
   pixel_info=AcquireVirtualMemory(image->columns,image->rows*MaxPixelChannels*
     sizeof(*pixels));
