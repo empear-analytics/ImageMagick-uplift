@@ -819,6 +819,32 @@ MagickExport MagickBooleanType ClipImagePath(Image *image,const char *pathname,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static MagickBooleanType CloneImageColormap(Image *clone_image,
+  const Image *image)
+{
+  size_t
+    length;
+
+  if (image->colormap != (PixelInfo *) NULL)
+    {
+      /*
+        Allocate and copy the image colormap.
+      */
+      clone_image->colors=image->colors;
+      length=(size_t) image->colors;
+      clone_image->colormap=(PixelInfo *) AcquireQuantumMemory(length+1,
+        sizeof(*clone_image->colormap));
+      if (clone_image->colormap == (PixelInfo *) NULL)
+        {
+          clone_image=DestroyImage(clone_image);
+          return(MagickFalse);
+        }
+      (void) memcpy(clone_image->colormap,image->colormap,length*
+        sizeof(*clone_image->colormap));
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *CloneImage(const Image *image,const size_t columns,
   const size_t rows,const MagickBooleanType detach,ExceptionInfo *exception)
 {
@@ -828,9 +854,6 @@ MagickExport Image *CloneImage(const Image *image,const size_t columns,
 
   Image
     *clone_image;
-
-  size_t
-    length;
 
   /*
     Clone the image.
@@ -898,23 +921,8 @@ MagickExport Image *CloneImage(const Image *image,const size_t columns,
   clone_image->ttl=image->ttl;
   clone_image->debug=image->debug;
   clone_image->semaphore=AcquireSemaphoreInfo();
-  if (image->colormap != (PixelInfo *) NULL)
-    {
-      /*
-        Allocate and copy the image colormap.
-      */
-      clone_image->colors=image->colors;
-      length=(size_t) image->colors;
-      clone_image->colormap=(PixelInfo *) AcquireQuantumMemory(length+1,
-        sizeof(*clone_image->colormap));
-      if (clone_image->colormap == (PixelInfo *) NULL)
-        {
-          clone_image=DestroyImage(clone_image);
-          ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-        }
-      (void) memcpy(clone_image->colormap,image->colormap,length*
-        sizeof(*clone_image->colormap));
-    }
+  if (CloneImageColormap(clone_image,image) == MagickFalse)
+    ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   if ((columns == 0) || (rows == 0))
     {
       if (image->montage != (char *) NULL)
