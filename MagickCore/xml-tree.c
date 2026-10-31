@@ -1996,6 +1996,85 @@ static size_t OpenOrIgnoreXMLTag(XMLTreeRoot *root,char *tag,
   return(ignore_depth);
 }
 
+typedef struct _TagAttributeTargets
+{
+  char
+    ***attributes,
+    **p;
+
+  ssize_t
+    *l;
+} TagAttributeTargets;
+
+static MagickBooleanType ParseTagAttributes(XMLTreeRoot *root,
+  char **attribute,ExceptionInfo *exception,const TagAttributeTargets *targets)
+{
+  char
+    ***const attributes = targets->attributes;
+
+  char
+    **const p = targets->p;
+
+  ssize_t
+    *const l = targets->l;
+
+  int
+    c;
+
+  for (*l=0; IsInsideXMLTag(*p) != MagickFalse; *l+=2)
+  {
+    /*
+      Attribute.
+    */
+    *attributes=GrowAttributeList(*attributes,*l);
+    if (*attributes == (char **) NULL)
+      {
+        (void) ThrowMagickException(exception,GetMagickModule(),
+          ResourceLimitError,"MemoryAllocationFailed","`%s'","");
+        return(MagickFalse);
+      }
+    (*attributes)[*l+2]=(char *) NULL;
+    (*attributes)[*l+1]=(char *) NULL;
+    (*attributes)[*l]=*p;
+    *p+=(ptrdiff_t) strcspn(*p,XMLWhitespace "=/>");
+    if ((**p != '=') && (isspace((int) ((unsigned char) **p)) == 0))
+      (*attributes)[*l]=ConstantString("");
+    else
+      {
+        *(*p)++='\0';
+        *p+=(ptrdiff_t) strspn(*p,XMLWhitespace "=");
+        c=(**p);
+        if ((c == '"') || (c == '\''))
+          {
+            /*
+              Attributes value.
+            */
+            (*p)++;
+            (*attributes)[*l+1]=*p;
+            while ((**p != '\0') && (**p != c))
+              (*p)++;
+            if (**p != '\0')
+              *(*p)++='\0';
+            else
+              {
+                (*attributes)[*l]=ConstantString("");
+                (*attributes)[*l+1]=ConstantString("");
+                (void) DestroyXMLTreeAttributes(*attributes);
+                (void) ThrowMagickException(exception,
+                  GetMagickModule(),OptionWarning,"ParseError",
+                  "missing %c",c);
+                return(MagickFalse);
+              }
+            DecodeAttributeValue(root,attribute,*attributes,*l);
+          }
+        (*attributes)[*l]=ConstantString((*attributes)[*l]);
+      }
+    while (isspace((int) ((unsigned char) **p)) != 0)
+      (*p)++;
+  }
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2084,6 +2163,9 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
           *p++='\0';
         if (IsNameStartOutsideIgnore(p,ignore_depth) != MagickFalse)
           {
+            TagAttributeTargets
+              targets;
+
             if (IsInsideXMLTag(p) != MagickFalse)
               {
                 /*
@@ -2091,59 +2173,15 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
                 */
                 attribute=FindDefaultAttributes(root,tag);
               }
-            for (l=0; IsInsideXMLTag(p) != MagickFalse; l+=2)
-            {
-              /*
-                Attribute.
-              */
-              attributes=GrowAttributeList(attributes,l);
-              if (attributes == (char **) NULL)
-                {
-                  (void) ThrowMagickException(exception,GetMagickModule(),
-                    ResourceLimitError,"MemoryAllocationFailed","`%s'","");
-                  utf8=DestroyString(utf8);
-                  return(&root->root);
-                }
-              attributes[l+2]=(char *) NULL;
-              attributes[l+1]=(char *) NULL;
-              attributes[l]=p;
-              p+=(ptrdiff_t) strcspn(p,XMLWhitespace "=/>");
-              if ((*p != '=') && (isspace((int) ((unsigned char) *p)) == 0))
-                attributes[l]=ConstantString("");
-              else
-                {
-                  *p++='\0';
-                  p+=(ptrdiff_t) strspn(p,XMLWhitespace "=");
-                  c=(*p);
-                  if ((c == '"') || (c == '\''))
-                    {
-                      /*
-                        Attributes value.
-                      */
-                      p++;
-                      attributes[l+1]=p;
-                      while ((*p != '\0') && (*p != c))
-                        p++;
-                      if (*p != '\0')
-                        *p++='\0';
-                      else
-                        {
-                          attributes[l]=ConstantString("");
-                          attributes[l+1]=ConstantString("");
-                          (void) DestroyXMLTreeAttributes(attributes);
-                          (void) ThrowMagickException(exception,
-                            GetMagickModule(),OptionWarning,"ParseError",
-                            "missing %c",c);
-                          utf8=DestroyString(utf8);
-                          return(&root->root);
-                        }
-                      DecodeAttributeValue(root,attribute,attributes,l);
-                    }
-                  attributes[l]=ConstantString(attributes[l]);
-                }
-              while (isspace((int) ((unsigned char) *p)) != 0)
-                p++;
-            }
+            targets.attributes=(&attributes);
+            targets.p=(&p);
+            targets.l=(&l);
+            if (ParseTagAttributes(root,attribute,exception,&targets) ==
+                MagickFalse)
+              {
+                utf8=DestroyString(utf8);
+                return(&root->root);
+              }
           }
         else
           {
