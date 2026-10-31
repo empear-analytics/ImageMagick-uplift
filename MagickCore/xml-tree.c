@@ -3075,6 +3075,65 @@ static ssize_t FindAttributeTagIndex(char ***attributes,
   return(i);
 }
 
+typedef struct _TagBufferInfo
+{
+  XMLTreeInfo
+    *xml_info;
+
+  char
+    **source;
+
+  size_t
+    *length,
+    *extent;
+
+  char
+    ***attributes;
+} TagBufferInfo;
+
+static MagickBooleanType AppendDefaultTagAttributes(
+  const TagBufferInfo *tag_buffer)
+{
+  XMLTreeInfo
+    *const xml_info = tag_buffer->xml_info;
+
+  char
+    **const source = tag_buffer->source;
+
+  size_t
+    *const length = tag_buffer->length,
+    *const extent = tag_buffer->extent;
+
+  char
+    ***const attributes = tag_buffer->attributes;
+
+  ssize_t
+    i,
+    j;
+
+  i=FindAttributeTagIndex(attributes,xml_info);
+  j=1;
+  while ((attributes[i] != (char **) NULL) &&
+         (attributes[i][j] != (char *) NULL))
+  {
+    if ((attributes[i][j+1] == (char *) NULL) ||
+        (GetXMLTreeAttribute(xml_info,attributes[i][j]) != attributes[i][j+1]))
+      {
+        j+=3;
+        continue;
+      }
+    if (ExtendXMLBuffer(source,length,extent,attributes[i][j]) == MagickFalse)
+      return(MagickFalse);
+    *length+=(size_t) FormatLocaleString(*source+(*length),*extent," %s=\"",
+      attributes[i][j]);
+    (void) EncodePredefinedEntities(attributes[i][j+1],-1,source,length,extent,
+      MagickTrue);
+    *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"\"");
+    j+=3;
+  }
+  return(MagickTrue);
+}
+
 static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   size_t *extent,size_t start,char ***attributes)
 {
@@ -3084,9 +3143,8 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
   size_t
     offset;
 
-  ssize_t
-    i,
-    j;
+  TagBufferInfo
+    tag_buffer;
 
   content=(char *) "";
   if (xml_info->parent != (XMLTreeInfo *) NULL)
@@ -3100,26 +3158,13 @@ static char *XMLTreeTagToXML(XMLTreeInfo *xml_info,char **source,size_t *length,
     "<%s",xml_info->tag);
   if (AppendTagAttributes(xml_info,source,length,extent) == MagickFalse)
     return((char *) NULL);
-  i=FindAttributeTagIndex(attributes,xml_info);
-  j=1;
-  while ((attributes[i] != (char **) NULL) &&
-         (attributes[i][j] != (char *) NULL))
-  {
-    if ((attributes[i][j+1] == (char *) NULL) ||
-        (GetXMLTreeAttribute(xml_info,attributes[i][j]) != attributes[i][j+1]))
-      {
-        j+=3;
-        continue;
-      }
-    if (ExtendXMLBuffer(source,length,extent,attributes[i][j]) == MagickFalse)
-      return((char *) NULL);
-    *length+=(size_t) FormatLocaleString(*source+(*length),*extent," %s=\"",
-      attributes[i][j]);
-    (void) EncodePredefinedEntities(attributes[i][j+1],-1,source,length,extent,
-      MagickTrue);
-    *length+=(size_t) FormatLocaleString(*source+(*length),*extent,"\"");
-    j+=3;
-  }
+  tag_buffer.xml_info=xml_info;
+  tag_buffer.source=source;
+  tag_buffer.length=length;
+  tag_buffer.extent=extent;
+  tag_buffer.attributes=attributes;
+  if (AppendDefaultTagAttributes(&tag_buffer) == MagickFalse)
+    return((char *) NULL);
   *length+=(size_t) FormatLocaleString(*source+(*length),*extent,
     *xml_info->content ? ">" : "/>");
   if (xml_info->child != (XMLTreeInfo *) NULL)
