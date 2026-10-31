@@ -1933,6 +1933,93 @@ static CCThresholdRange GetThresholdRange(const char *artifact,
   return(range);
 }
 
+typedef struct _CCEquivalencePass
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  MatrixInfo
+    *equivalences;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    n;
+
+  ExceptionInfo
+    *exception;
+} CCEquivalencePass;
+
+static MagickBooleanType ResolveDirectionEquivalences(
+  const CCEquivalencePass *equivalence_pass,MagickBooleanType status)
+{
+  const Image
+    *const image = equivalence_pass->image;
+
+  CacheView
+    *const image_view = equivalence_pass->image_view;
+
+  MatrixInfo
+    *const equivalences = equivalence_pass->equivalences;
+
+  const size_t
+    connectivity = equivalence_pass->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = equivalence_pass->connect4,
+    (*const connect8)[2] = equivalence_pass->connect8;
+
+  const ssize_t
+    n = equivalence_pass->n;
+
+  ExceptionInfo
+    *const exception = equivalence_pass->exception;
+
+  CCNeighborDirection direction;
+
+  ssize_t
+    dx,
+    dy,
+    y;
+
+  dx=connectivity > 4 ? connect8[n][1] : connect4[n][1];
+  dy=connectivity > 4 ? connect8[n][0] : connect4[n][0];
+  direction.dx=dx;
+  direction.dy=dy;
+
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    CCEquivalenceRow
+      equivalence_row;
+
+    const Quantum
+      *magick_restrict p;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,0,y-1,image->columns,3,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
+    equivalence_row.image=image;
+    equivalence_row.equivalences=equivalences;
+    equivalence_row.y=y;
+    equivalence_row.dx=dx;
+    equivalence_row.dy=dy;
+    status=ResolveRowEquivalences(&equivalence_row,direction,p,status);
+  }
+  return(status);
+}
+
 typedef struct _CCObjectCensus
 {
   CacheView
@@ -2150,8 +2237,6 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     background_id,
     connect4[2][2] = { { -1,  0 }, {  0, -1 } },
     connect8[4][2] = { { -1, -1 }, { -1,  0 }, { -1,  1 }, {  0, -1 } },
-    dx,
-    dy,
     i,
     n,
     y;
@@ -2210,39 +2295,20 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   image_view=AcquireVirtualCacheView(image,exception);
   for (n=0; n < (ssize_t) (connectivity > 4 ? 4 : 2); n++)
   {
-    CCNeighborDirection direction;
+    CCEquivalencePass
+      equivalence_pass;
 
     if (status == MagickFalse)
       continue;
-    dx=connectivity > 4 ? connect8[n][1] : connect4[n][1];
-    dy=connectivity > 4 ? connect8[n][0] : connect4[n][0];
-    direction.dx=dx;
-    direction.dy=dy;
-
-    for (y=0; y < (ssize_t) image->rows; y++)
-    {
-      CCEquivalenceRow
-        equivalence_row;
-
-      const Quantum
-        *magick_restrict p;
-
-      if (status == MagickFalse)
-        continue;
-      p=GetCacheViewVirtualPixels(image_view,0,y-1,image->columns,3,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image)*image->columns;
-      equivalence_row.image=image;
-      equivalence_row.equivalences=equivalences;
-      equivalence_row.y=y;
-      equivalence_row.dx=dx;
-      equivalence_row.dy=dy;
-      status=ResolveRowEquivalences(&equivalence_row,direction,p,status);
-    }
+    equivalence_pass.image=image;
+    equivalence_pass.image_view=image_view;
+    equivalence_pass.equivalences=equivalences;
+    equivalence_pass.connectivity=connectivity;
+    equivalence_pass.connect4=connect4;
+    equivalence_pass.connect8=connect8;
+    equivalence_pass.n=n;
+    equivalence_pass.exception=exception;
+    status=ResolveDirectionEquivalences(&equivalence_pass,status);
   }
   /*
     Label connected components.
