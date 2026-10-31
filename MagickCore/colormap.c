@@ -204,6 +204,67 @@ static void CyclePixelIndex(const Image *image,const ssize_t displace,
   SetPixelViaPixelInfo(image,image->colormap+(ssize_t) index,q);
 }
 
+typedef struct _CycleColormapRowInputs
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ssize_t
+    displace;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} CycleColormapRowInputs;
+
+static MagickBooleanType CycleColormapRow(const CycleColormapRowInputs *row)
+{
+  Image
+    *const image = row->image;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  const ssize_t
+    displace = row->displace;
+
+  const ssize_t
+    y = row->y;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    CyclePixelIndex(image,displace,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport MagickBooleanType CycleColormapImage(Image *image,
   const ssize_t displace,ExceptionInfo *exception)
 {
@@ -230,26 +291,17 @@ MagickExport MagickBooleanType CycleColormapImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
+    CycleColormapRowInputs
+      row;
 
     if (status == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      CyclePixelIndex(image,displace,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    row.image=image;
+    row.image_view=image_view;
+    row.displace=displace;
+    row.y=y;
+    row.exception=exception;
+    if (CycleColormapRow(&row) == MagickFalse)
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
