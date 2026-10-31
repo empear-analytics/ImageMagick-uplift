@@ -2215,6 +2215,18 @@ static PixelInfo GetRepeatGradientColor(const RepeatGradientInfo *repeat_info,
   return(composite);
 }
 
+static double GetScaledStopOffset(const GradientInfo *gradient,
+  const double length,const ssize_t x,const ssize_t y)
+{
+  double
+    offset;
+
+  offset=GetStopColorOffset(gradient,x,y);
+  if (gradient->type != RadialGradient)
+    offset*=MagickSafeReciprocal(length);
+  return(offset);
+}
+
 MagickExport MagickBooleanType DrawGradientImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -2301,9 +2313,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
       }
     pixel=zero;
     composite=zero;
-    offset=GetStopColorOffset(gradient,0,y);
-    if (gradient->type != RadialGradient)
-      offset*=MagickSafeReciprocal(length);
+    offset=GetScaledStopOffset(gradient,length,0,y);
     width=(size_t) (bounding_box.x+(ssize_t) bounding_box.width);
     for (x=bounding_box.x; x < (ssize_t) width; x++)
     {
@@ -2316,9 +2326,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
           if ((x != CastDoubleToSsizeT(ceil(gradient_vector->x1-0.5))) ||
               (y != CastDoubleToSsizeT(ceil(gradient_vector->y1-0.5))))
             {
-              offset=GetStopColorOffset(gradient,x,y);
-              if (gradient->type != RadialGradient)
-                offset*=MagickSafeReciprocal(length);
+              offset=GetScaledStopOffset(gradient,length,x,y);
             }
           composite=GetPadGradientColor(gradient,offset,composite);
           break;
@@ -2328,9 +2336,7 @@ MagickExport MagickBooleanType DrawGradientImage(Image *image,
           if ((x != CastDoubleToSsizeT(ceil(gradient_vector->x1-0.5))) ||
               (y != CastDoubleToSsizeT(ceil(gradient_vector->y1-0.5))))
             {
-              offset=GetStopColorOffset(gradient,x,y);
-              if (gradient->type != RadialGradient)
-                offset*=MagickSafeReciprocal(length);
+              offset=GetScaledStopOffset(gradient,length,x,y);
             }
           if (offset < 0.0)
             offset=(-offset);
