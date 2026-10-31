@@ -4154,25 +4154,12 @@ static void SyncImageColorAndCodecSettings(const ImageInfo *image_info,
       MagickFalse,option);
 }
 
-MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
-  Image *image,ExceptionInfo *exception)
+static void SyncImageDepthAndFilterSettings(const ImageInfo *image_info,
+  Image *image)
 {
   const char
     *option;
 
-  ResolutionType
-    units;
-
-  /*
-    Sync image options.
-  */
-  assert(image_info != (const ImageInfo *) NULL);
-  assert(image_info->signature == MagickCoreSignature);
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  SyncImageColorAndCodecSettings(image_info,image,exception);
   option=GetImageOption(image_info,"density");
   if (option != (const char *) NULL)
     SetImageResolutionFromDensity(image,option);
@@ -4197,6 +4184,28 @@ MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
   option=GetImageOption(image_info,"green-primary");
   if (option != (const char *) NULL)
     ParseChromaticityPrimary(option,&image->chromaticity.green_primary);
+}
+
+MagickExport MagickBooleanType SyncImageSettings(const ImageInfo *image_info,
+  Image *image,ExceptionInfo *exception)
+{
+  const char
+    *option;
+
+  ResolutionType
+    units;
+
+  /*
+    Sync image options.
+  */
+  assert(image_info != (const ImageInfo *) NULL);
+  assert(image_info->signature == MagickCoreSignature);
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  SyncImageColorAndCodecSettings(image_info,image,exception);
+  SyncImageDepthAndFilterSettings(image_info,image);
   option=GetImageOption(image_info,"intent");
   if (option != (const char *) NULL)
     image->rendering_intent=(RenderingIntent) ParseCommandOption(
