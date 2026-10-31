@@ -2354,6 +2354,27 @@ static MagickBooleanType EndStartTag(const StartTagInfo *start_tag,
   return(MagickTrue);
 }
 
+static MagickBooleanType ParseTagCharacterContent(XMLTreeRoot *root,
+  char *tag,const size_t ignore_depth,char **p)
+{
+  if ((**p != '\0') && (**p != '<'))
+    {
+      /*
+        Tag character content.
+      */
+      while ((**p != '\0') && (**p != '<'))
+        (*p)++;
+      if (**p == '\0')
+        return(MagickFalse);
+      if (ignore_depth == 0)
+        ParseCharacterContent(root,tag,(size_t) (*p-tag),'&');
+    }
+  else
+    if (**p == '\0')
+      return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
 {
   char
@@ -2571,21 +2592,8 @@ MagickExport XMLTreeInfo *NewXMLTree(const char *xml,ExceptionInfo *exception)
        break;
      *p++='\0';
      tag=p;
-     if ((*p != '\0') && (*p != '<'))
-       {
-        /*
-          Tag character content.
-        */
-        while ((*p != '\0') && (*p != '<'))
-          p++;
-        if (*p == '\0')
-          break;
-        if (ignore_depth == 0)
-          ParseCharacterContent(root,tag,(size_t) (p-tag),'&');
-      }
-    else
-      if (*p == '\0')
-        break;
+     if (ParseTagCharacterContent(root,tag,ignore_depth,&p) == MagickFalse)
+       break;
   }
   utf8=DestroyString(utf8);
   if (root->node == (XMLTreeInfo *) NULL)
