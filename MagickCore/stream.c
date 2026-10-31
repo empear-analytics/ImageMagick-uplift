@@ -1227,6 +1227,25 @@ static MagickBooleanType PrepareStreamForWriting(StreamInfo *stream_info,
   return(MagickTrue);
 }
 
+static size_t GetStreamPacketSize(const StreamInfo *stream_info)
+{
+  size_t
+    packet_size;
+
+  switch (stream_info->storage_type)
+  {
+    default: packet_size=sizeof(unsigned char); break;
+    case CharPixel: packet_size=sizeof(unsigned char); break;
+    case DoublePixel: packet_size=sizeof(double); break;
+    case FloatPixel: packet_size=sizeof(float); break;
+    case LongPixel: packet_size=sizeof(unsigned int); break;
+    case LongLongPixel: packet_size=sizeof(MagickSizeType); break;
+    case QuantumPixel: packet_size=sizeof(Quantum); break;
+    case ShortPixel: packet_size=sizeof(unsigned short); break;
+  }
+  return(packet_size);
+}
+
 static size_t WriteStreamImage(const Image *image,const void *pixels,
   const size_t columns)
 {
@@ -1248,17 +1267,7 @@ static size_t WriteStreamImage(const Image *image,const void *pixels,
 
   (void) pixels;
   stream_info=(StreamInfo *) image->client_data;
-  switch (stream_info->storage_type)
-  {
-    default: packet_size=sizeof(unsigned char); break;
-    case CharPixel: packet_size=sizeof(unsigned char); break;
-    case DoublePixel: packet_size=sizeof(double); break;
-    case FloatPixel: packet_size=sizeof(float); break;
-    case LongPixel: packet_size=sizeof(unsigned int); break;
-    case LongLongPixel: packet_size=sizeof(MagickSizeType); break;
-    case QuantumPixel: packet_size=sizeof(Quantum); break;
-    case ShortPixel: packet_size=sizeof(unsigned short); break;
-  }
+  packet_size=GetStreamPacketSize(stream_info);
   cache_info=(CacheInfo *) image->cache;
   assert(cache_info->signature == MagickCoreSignature);
   packet_size*=strlen(stream_info->map);
