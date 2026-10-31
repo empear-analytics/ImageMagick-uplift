@@ -3054,6 +3054,21 @@ static void HideSteganoRow(const SteganoRow *stegano_row,int *c,ssize_t *k,
   }
 }
 
+static MagickBooleanType CloneSteganoImage(const Image *image,
+  Image **stegano_image,ExceptionInfo *exception)
+{
+  *stegano_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*stegano_image == (Image *) NULL)
+    return(MagickFalse);
+  (*stegano_image)->depth=MAGICKCORE_QUANTUM_DEPTH;
+  if (SetImageStorageClass(*stegano_image,DirectClass,exception) == MagickFalse)
+    {
+      *stegano_image=DestroyImage(*stegano_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   ExceptionInfo *exception)
 {
@@ -3092,15 +3107,8 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   one=1UL;
-  stegano_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (stegano_image == (Image *) NULL)
+  if (CloneSteganoImage(image,&stegano_image,exception) == MagickFalse)
     return((Image *) NULL);
-  stegano_image->depth=MAGICKCORE_QUANTUM_DEPTH;
-  if (SetImageStorageClass(stegano_image,DirectClass,exception) == MagickFalse)
-    {
-      stegano_image=DestroyImage(stegano_image);
-      return((Image *) NULL);
-    }
   /*
     Hide watermark in low-order bits of image.
   */
