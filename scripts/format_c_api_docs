@@ -47,6 +47,7 @@ if ( ! GetOptions(
 	 'drawing-wand.c',
 	 'display.c',
 	 'effect.c',
+	 'effect-blur.c',
 	 'enhance.c',
 	 'exception.c',
 	 'fx.c',
