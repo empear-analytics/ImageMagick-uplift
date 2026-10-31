@@ -248,6 +248,136 @@ MagickPrivate void AnnotateComponentTerminus(void)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline double GravityOffsetSign(const size_t extent)
+{
+  return(extent == 0 ? -1.0 : 1.0);
+}
+
+static inline double GravityOffsetFlip(const size_t extent)
+{
+  return(extent == 0 ? 1.0 : -1.0);
+}
+
+static void SplitTextLines(char *text,char **textlist,
+  const size_t number_lines)
+{
+  char
+    *p;
+
+  ssize_t
+    i;
+
+  p=text;
+  for (i=0; i < (ssize_t) number_lines; i++)
+  {
+    char
+      *q;
+
+    textlist[i]=p;
+    for (q=p; *q != '\0'; q++)
+      if ((*q == '\r') || (*q == '\n'))
+        break;
+    if (*q == '\r')
+      {
+        *q='\0';
+        q++;
+      }
+    *q='\0';
+    p=q+1;
+  }
+  textlist[i]=(char *) NULL;
+}
+
+typedef struct _GravityTextInfo
+{
+  DrawInfo
+    *annotate,
+    *annotate_info;
+
+  RectangleInfo
+    geometry;
+
+  size_t
+    height;
+
+  ssize_t
+    i;
+
+  TypeMetric
+    metrics;
+
+  size_t
+    number_lines;
+} GravityTextInfo;
+
+static void GetGravityTextOffset(const GravityTextInfo *gravity,
+  PointInfo *offset)
+{
+  DrawInfo
+    *const annotate = gravity->annotate,
+    *const annotate_info = gravity->annotate_info;
+
+  const RectangleInfo
+    geometry = gravity->geometry;
+
+  const size_t
+    height = gravity->height;
+
+  const ssize_t
+    i = gravity->i;
+
+  const TypeMetric
+    metrics = gravity->metrics;
+
+  const size_t
+    number_lines = gravity->number_lines;
+
+  switch (annotate->gravity)
+  {
+    case UndefinedGravity:
+    default:
+    {
+      (*offset).x=annotate_info->affine.tx+i*annotate_info->affine.ry*height;
+      (*offset).y=annotate_info->affine.ty+i*annotate_info->affine.sy*height;
+      break;
+    }
+    case (GravityType) SouthWestGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
+        annotate_info->affine.ry*height-annotate_info->affine.ry*
+        (number_lines-1.0)*height;
+      (*offset).y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
+        geometry.height+i*annotate_info->affine.sy*height-
+        annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
+      break;
+    }
+    case (GravityType) SouthGravity:
+    {
+      (*offset).x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
+        geometry.width/2.0+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width/2.0-
+        annotate_info->affine.ry*(number_lines-1.0)*height/2.0;
+      (*offset).y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
+        geometry.height+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width/2.0-
+        annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
+      break;
+    }
+    case (GravityType) SouthEastGravity:
+    {
+      (*offset).x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
+        geometry.width+i*annotate_info->affine.ry*height-
+        annotate_info->affine.sx*metrics.width-
+        annotate_info->affine.ry*(number_lines-1.0)*height-1.0;
+      (*offset).y=GravityOffsetFlip(geometry.height)*annotate_info->affine.ty+
+        geometry.height+i*annotate_info->affine.sy*height-
+        annotate_info->affine.rx*metrics.width-
+        annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType AnnotateImage(Image *image,
   const DrawInfo *draw_info,ExceptionInfo *exception)
 {
@@ -313,25 +443,7 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       text=DestroyString(text);
       return(MagickFalse);
     }
-  p=text;
-  for (i=0; i < (ssize_t) number_lines; i++)
-  {
-    char
-      *q;
-
-    textlist[i]=p;
-    for (q=p; *q != '\0'; q++)
-      if ((*q == '\r') || (*q == '\n'))
-        break;
-    if (*q == '\r')
-      {
-        *q='\0';
-        q++;
-      }
-    *q='\0';
-    p=q+1;
-  }
-  textlist[i]=(char *) NULL;
+  SplitTextLines(text,textlist,number_lines);
   SetGeometry(image,&geometry);
   SetGeometryInfo(&geometry_info);
   if (annotate_info->geometry != (char *) NULL)
@@ -356,6 +468,9 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
   {
     const RenderTarget target = { image, annotate };
 
+    GravityTextInfo
+      gravity;
+
     if (*textlist[i] == '\0')
       continue;
     /*
@@ -373,30 +488,35 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       draw_info->interline_spacing+0.5));
     switch (annotate->gravity)
     {
-      case UndefinedGravity:
       default:
       {
-        offset.x=annotate_info->affine.tx+i*annotate_info->affine.ry*height;
-        offset.y=annotate_info->affine.ty+i*annotate_info->affine.sy*height;
+        gravity.annotate=annotate;
+        gravity.annotate_info=annotate_info;
+        gravity.geometry=geometry;
+        gravity.height=height;
+        gravity.i=i;
+        gravity.metrics=metrics;
+        gravity.number_lines=number_lines;
+        GetGravityTextOffset(&gravity,&offset);
         break;
       }
       case (GravityType) NorthWestGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+i*
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
           annotate_info->affine.ry*height+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent);
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
           annotate_info->affine.sy*metrics.ascent;
         break;
       }
       case (GravityType) NorthGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
           geometry.width/2.0+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent);
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
           annotate_info->affine.sy*metrics.ascent-annotate_info->affine.rx*
           metrics.width/2.0;
@@ -404,11 +524,11 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) NorthEastGravity:
       {
-        offset.x=(geometry.width == 0 ? 1.0 : -1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
           geometry.width+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent)-1.0;
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           (metrics.bounds.y2-metrics.ascent)+i*annotate_info->affine.sy*height+
           annotate_info->affine.sy*metrics.ascent-annotate_info->affine.rx*
           metrics.width;
@@ -416,10 +536,10 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) WestGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+i*
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
           annotate_info->affine.ry*height+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           geometry.height/2.0+i*annotate_info->affine.sy*height+
           annotate_info->affine.sy*(metrics.ascent+metrics.descent-
           (number_lines-1.0)*height)/2.0;
@@ -427,11 +547,11 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) CenterGravity:
       {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+
           geometry.width/2.0+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width/2.0+annotate_info->affine.ry*
           (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           geometry.height/2.0+i*annotate_info->affine.sy*height-
           annotate_info->affine.rx*metrics.width/2.0+annotate_info->affine.sy*
           (metrics.ascent+metrics.descent-(number_lines-1.0)*height)/2.0;
@@ -439,50 +559,16 @@ MagickExport MagickBooleanType AnnotateImage(Image *image,
       }
       case (GravityType) EastGravity:
       {
-        offset.x=(geometry.width == 0 ? 1.0 : -1.0)*annotate_info->affine.tx+
+        offset.x=GravityOffsetFlip(geometry.width)*annotate_info->affine.tx+
           geometry.width+i*annotate_info->affine.ry*height-
           annotate_info->affine.sx*metrics.width+
           annotate_info->affine.ry*(metrics.ascent+metrics.descent-
           (number_lines-1.0)*height)/2.0-1.0;
-        offset.y=(geometry.height == 0 ? -1.0 : 1.0)*annotate_info->affine.ty+
+        offset.y=GravityOffsetSign(geometry.height)*annotate_info->affine.ty+
           geometry.height/2.0+i*annotate_info->affine.sy*height-
           annotate_info->affine.rx*metrics.width+
           annotate_info->affine.sy*(metrics.ascent+metrics.descent-
           (number_lines-1.0)*height)/2.0;
-        break;
-      }
-      case (GravityType) SouthWestGravity:
-      {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+i*
-          annotate_info->affine.ry*height-annotate_info->affine.ry*
-          (number_lines-1.0)*height;
-        offset.y=(geometry.height == 0 ? 1.0 : -1.0)*annotate_info->affine.ty+
-          geometry.height+i*annotate_info->affine.sy*height-
-          annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
-        break;
-      }
-      case (GravityType) SouthGravity:
-      {
-        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+
-          geometry.width/2.0+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width/2.0-
-          annotate_info->affine.ry*(number_lines-1.0)*height/2.0;
-        offset.y=(geometry.height == 0 ? 1.0 : -1.0)*annotate_info->affine.ty+
-          geometry.height+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width/2.0-
-          annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
-        break;
-      }
-      case (GravityType) SouthEastGravity:
-      {
-        offset.x=(geometry.width == 0 ? 1.0 : -1.0)*annotate_info->affine.tx+
-          geometry.width+i*annotate_info->affine.ry*height-
-          annotate_info->affine.sx*metrics.width-
-          annotate_info->affine.ry*(number_lines-1.0)*height-1.0;
-        offset.y=(geometry.height == 0 ? 1.0 : -1.0)*annotate_info->affine.ty+
-          geometry.height+i*annotate_info->affine.sy*height-
-          annotate_info->affine.rx*metrics.width-
-          annotate_info->affine.sy*(number_lines-1.0)*height+metrics.descent;
         break;
       }
     }
@@ -1072,6 +1158,27 @@ static const TypeInfo *GetTypeInfoByFamilyList(const DrawInfo *draw_info,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static const TypeInfo *GetFamilyTypeInfo(const DrawInfo *draw_info,
+  const TypeInfo *type_info,ExceptionInfo *exception)
+{
+  if (strpbrk(draw_info->family,",'\"") == (char *) NULL)
+    type_info=GetTypeInfoByFamily(draw_info->family,draw_info->style,
+      draw_info->stretch,draw_info->weight,exception);
+  if (type_info == (const TypeInfo *) NULL)
+    type_info=GetTypeInfoByFamilyList(draw_info,type_info,exception);
+  return(type_info);
+}
+
+static void SetTypeInfoFace(DrawInfo *annotate_info,
+  const TypeInfo *type_info)
+{
+  annotate_info->face=type_info->face;
+  if (type_info->metrics != (char *) NULL)
+    (void) CloneString(&annotate_info->metrics,type_info->metrics);
+  if (type_info->glyphs != (char *) NULL)
+    (void) CloneString(&annotate_info->font,type_info->glyphs);
+}
+
 static MagickBooleanType RenderType(const RenderTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1123,13 +1230,7 @@ static MagickBooleanType RenderType(const RenderTarget *target,
     }
   if ((type_info == (const TypeInfo *) NULL) &&
       (draw_info->family != (const char *) NULL))
-    {
-      if (strpbrk(draw_info->family,",'\"") == (char *) NULL)
-        type_info=GetTypeInfoByFamily(draw_info->family,draw_info->style,
-          draw_info->stretch,draw_info->weight,exception);
-      if (type_info == (const TypeInfo *) NULL)
-        type_info=GetTypeInfoByFamilyList(draw_info,type_info,exception);
-    }
+    type_info=GetFamilyTypeInfo(draw_info,type_info,exception);
   font=GetPolicyValue("system:font");
   if (font != (char *) NULL)
     {
@@ -1158,11 +1259,7 @@ static MagickBooleanType RenderType(const RenderTarget *target,
       return(status);
     }
   annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
-  annotate_info->face=type_info->face;
-  if (type_info->metrics != (char *) NULL)
-    (void) CloneString(&annotate_info->metrics,type_info->metrics);
-  if (type_info->glyphs != (char *) NULL)
-    (void) CloneString(&annotate_info->font,type_info->glyphs);
+  SetTypeInfoFace(annotate_info,type_info);
   freetype.image=image;
   freetype.draw_info=annotate_info;
   freetype.encoding=type_info->encoding;
@@ -1321,6 +1418,12 @@ cleanup:
 }
 #endif
 
+static inline MagickBooleanType IsKernedGrapheme(const ssize_t index,
+  const ssize_t last_glyph)
+{
+  return(((index != 0) && (last_glyph != 0)) ? MagickTrue : MagickFalse);
+}
+
 static size_t ComplexTextLayout(const DrawInfo *draw_info,const char *text,
   const size_t length,const FT_Face face,const FT_Int32 flags,
   GraphemeInfo **grapheme)
@@ -1348,22 +1451,20 @@ static size_t ComplexTextLayout(const DrawInfo *draw_info,const char *text,
       GetUTFCode(p));
     (*grapheme)[i].x_offset=0;
     (*grapheme)[i].y_offset=0;
-    if (((*grapheme)[i].index != 0) && (last_glyph != 0))
+    if ((IsKernedGrapheme((*grapheme)[i].index,last_glyph) != MagickFalse) &&
+        (FT_HAS_KERNING(face)))
       {
-        if (FT_HAS_KERNING(face))
-          {
-            FT_Error
-              ft_status;
+        FT_Error
+          ft_status;
 
-            FT_Vector
-              kerning;
+        FT_Vector
+          kerning;
 
-            ft_status=FT_Get_Kerning(face,(FT_UInt) last_glyph,(FT_UInt)
-              (*grapheme)[i].index,ft_kerning_default,&kerning);
-            if (ft_status == 0)
-              (*grapheme)[i-1].x_advance+=(FT_Pos) ((draw_info->direction ==
-                RightToLeftDirection ? -1.0 : 1.0)*kerning.x);
-          }
+        ft_status=FT_Get_Kerning(face,(FT_UInt) last_glyph,(FT_UInt)
+          (*grapheme)[i].index,ft_kerning_default,&kerning);
+        if (ft_status == 0)
+          (*grapheme)[i-1].x_advance+=(FT_Pos) ((draw_info->direction ==
+            RightToLeftDirection ? -1.0 : 1.0)*kerning.x);
       }
     (void) FT_Load_Glyph(face,(FT_UInt) (*grapheme)[i].index,flags);
     (*grapheme)[i].x_advance=face->glyph->advance.x;
@@ -1606,6 +1707,247 @@ static inline MagickBooleanType IsInterwordSpace(const DrawInfo *draw_info,
     (IsUTFSpace((int) code) == MagickFalse)) ? MagickTrue : MagickFalse);
 }
 
+static PointInfo GetFreetypeResolution(const DrawInfo *draw_info,
+  PointInfo resolution)
+{
+  GeometryInfo
+    geometry_info;
+
+  MagickStatusType
+    geometry_flags;
+
+  geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
+  if ((geometry_flags & RhoValue) != 0)
+    resolution.x=geometry_info.rho;
+  resolution.y=resolution.x;
+  if ((geometry_flags & SigmaValue) != 0)
+    resolution.y=geometry_info.sigma;
+  return(resolution);
+}
+
+static void SetFreetypeMetrics(const FT_Face face,TypeMetric *metrics)
+{
+  metrics->pixels_per_em.x=face->size->metrics.x_ppem;
+  metrics->pixels_per_em.y=face->size->metrics.y_ppem;
+  metrics->ascent=(double) face->size->metrics.ascender/64.0;
+  metrics->descent=(double) face->size->metrics.descender/64.0;
+  if (face->size->metrics.ascender == 0)
+    {
+      /*
+        Sanitize buggy ascender and descender values.
+      */
+      metrics->ascent=face->size->metrics.y_ppem;
+      if (face->size->metrics.descender == 0)
+        metrics->descent=face->size->metrics.y_ppem/-3.5;
+    }
+  metrics->width=0;
+  metrics->origin.x=0;
+  metrics->origin.y=0;
+  metrics->height=(double) face->size->metrics.height/64.0;
+  metrics->max_advance=0.0;
+  if (face->size->metrics.max_advance > MagickEpsilon)
+    metrics->max_advance=(double) face->size->metrics.max_advance/64.0;
+  metrics->bounds.x1=0.0;
+  metrics->bounds.y1=metrics->descent;
+  metrics->bounds.x2=metrics->ascent+metrics->descent;
+  metrics->bounds.y2=metrics->ascent+metrics->descent;
+  metrics->underline_position=face->underline_position*
+    (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
+  metrics->underline_thickness=face->underline_thickness*
+    (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
+}
+
+static void SetFreetypeCanvas(Image *image,ExceptionInfo *exception)
+{
+  if (image->storage_class != DirectClass)
+    (void) SetImageStorageClass(image,DirectClass,exception);
+  if ((image->alpha_trait & BlendPixelTrait) == 0)
+    (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
+}
+
+static void DrawFreetypeStroke(Image *image,DrawInfo *annotate_info,
+  const PointInfo *offset,ExceptionInfo *exception)
+{
+  /*
+    Draw text stroke.
+  */
+  annotate_info->linejoin=RoundJoin;
+  annotate_info->affine.tx=offset->x;
+  annotate_info->affine.ty=offset->y;
+  (void) ConcatenateString(&annotate_info->primitive,"'");
+  if (strlen(annotate_info->primitive) > 7)
+    (void) DrawImage(image,annotate_info,exception);
+  (void) CloneString(&annotate_info->primitive,"path '");
+}
+
+typedef struct _GlyphRasterInfo
+{
+  FT_BitmapGlyph
+    bitmap;
+
+  unsigned char
+    *r;
+} GlyphRasterInfo;
+
+static double GetGlyphFillOpacity(const GlyphRasterInfo *raster,
+  const ssize_t n,const ssize_t x,const ssize_t y)
+{
+  const FT_BitmapGlyph
+    bitmap = raster->bitmap;
+
+  unsigned char
+    *const r = raster->r;
+
+  double
+    fill_opacity;
+
+  fill_opacity=1.0;
+  if (bitmap->bitmap.buffer != (unsigned char *) NULL)
+    {
+      if (bitmap->bitmap.pixel_mode == ft_pixel_mode_grays)
+        fill_opacity=(double) (r[n])/(bitmap->bitmap.num_grays-1);
+      else
+        if (bitmap->bitmap.pixel_mode == ft_pixel_mode_mono)
+          fill_opacity=((r[(x >> 3)+y*bitmap->bitmap.pitch] &
+            (1 << (~x & 0x07)))) == 0 ? 0.0 : 1.0;
+    }
+  return(fill_opacity);
+}
+
+static Quantum *SkipGlyphPixel(const Image *image,Quantum *q)
+{
+  if (q != (Quantum *) NULL)
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  return(q);
+}
+
+static MagickBooleanType SyncGlyphPixel(const MagickBooleanType active,
+  CacheView *image_view,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status,
+    sync;
+
+  status=MagickTrue;
+  if (active == MagickFalse)
+    {
+      sync=SyncCacheViewAuthenticPixels(image_view,exception);
+      if (sync == MagickFalse)
+        status=MagickFalse;
+    }
+  return(status);
+}
+
+static char *FindInvalidUTFCode(const DrawInfo *draw_info)
+{
+  char
+    *p;
+
+  for (p=draw_info->text; GetUTFCode(p) != 0; p+=(ptrdiff_t) GetUTFOctets(p))
+    if (GetUTFCode(p) < 0)
+      break;
+  return(p);
+}
+
+static void SelectFreetypeText(const DrawInfo *draw_info,
+  unsigned char **utf8,char **p)
+{
+  *utf8=(unsigned char *) NULL;
+  if (GetUTFCode(*p) == 0)
+    *p=draw_info->text;
+  else
+    {
+      *utf8=ConvertLatin1ToUTF8((unsigned char *) draw_info->text);
+      if (*utf8 != (unsigned char *) NULL)
+        *p=(char *) *utf8;
+    }
+}
+
+static FT_Matrix GetFreetypeAffine(const DrawInfo *draw_info)
+{
+  FT_Matrix
+    affine;
+
+  affine.xx=65536L;
+  affine.yx=0L;
+  affine.xy=0L;
+  affine.yy=65536L;
+  if (draw_info->render != MagickFalse)
+    {
+      affine.xx=(FT_Fixed) (65536L*draw_info->affine.sx+0.5);
+      affine.yx=(FT_Fixed) (-65536L*draw_info->affine.rx+0.5);
+      affine.xy=(FT_Fixed) (-65536L*draw_info->affine.ry+0.5);
+      affine.yy=(FT_Fixed) (65536L*draw_info->affine.sy+0.5);
+    }
+  return(affine);
+}
+
+static void RelinquishFreetypeText(GraphemeInfo *grapheme,unsigned char *utf8)
+{
+  if (grapheme != (GraphemeInfo *) NULL)
+    grapheme=(GraphemeInfo *) RelinquishMagickMemory(grapheme);
+  if (utf8 != (unsigned char *) NULL)
+    utf8=(unsigned char *) RelinquishMagickMemory(utf8);
+}
+
+static FT_Int32 GetFreetypeHintingFlags(Image *image,FT_Int32 flags,
+  ExceptionInfo *exception)
+{
+  const char
+    *value;
+
+  value=GetImageProperty(image,"type:hinting",exception);
+  if ((value != (const char *) NULL) && (LocaleCompare(value,"off") == 0))
+    flags|=FT_LOAD_NO_HINTING;
+  return(flags);
+}
+
+static inline MagickBooleanType IsTransparentFill(const DrawInfo *draw_info)
+{
+  return(((draw_info->fill.alpha == (MagickRealType) TransparentAlpha) &&
+    (draw_info->fill_pattern == (Image *) NULL) &&
+    (draw_info->stroke.alpha == (MagickRealType) TransparentAlpha) &&
+    (draw_info->stroke_pattern == (Image *) NULL)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsColumnOutside(const Image *image,
+  const ssize_t x_offset)
+{
+  return(((x_offset < 0) || (x_offset >= (ssize_t) image->columns)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsRowOutside(const Image *image,
+  const ssize_t y_offset)
+{
+  return(((y_offset < 0) || (y_offset >= (ssize_t) image->rows)) ?
+    MagickTrue : MagickFalse);
+}
+
+static inline MagickBooleanType IsNonOutlineGlyph(const FT_Glyph glyph_image,
+  FT_Outline outline)
+{
+  return(((glyph_image->format != FT_GLYPH_FORMAT_OUTLINE) &&
+    (IsEmptyOutline(outline) == MagickFalse)) ? MagickTrue : MagickFalse);
+}
+
+static void ExtendGlyphMinBounds(const FT_BBox bounds,TypeMetric *metrics)
+{
+  if ((bounds.xMin < metrics->bounds.x1) && (bounds.xMin != 0))
+    metrics->bounds.x1=(double) bounds.xMin;
+  if ((bounds.yMin < metrics->bounds.y1) && (bounds.yMin != 0))
+    metrics->bounds.y1=(double) bounds.yMin;
+}
+
+static void ExtendGlyphMaxBounds(const FT_BBox bounds,TypeMetric *metrics)
+{
+  if ((bounds.xMax > metrics->bounds.x2) && (bounds.xMax != 0))
+    metrics->bounds.x2=(double) bounds.xMax;
+  if ((bounds.yMax > metrics->bounds.y2) && (bounds.yMax != 0))
+    metrics->bounds.y2=(double) bounds.yMax;
+}
+
 static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   const PointInfo *offset,TypeMetric *metrics,ExceptionInfo *exception)
 {
@@ -1647,9 +1989,6 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
 
   char
     *p;
-
-  const char
-    *value;
 
   DrawInfo
     *annotate_info;
@@ -1865,20 +2204,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
   resolution.x=DefaultResolution;
   resolution.y=DefaultResolution;
   if (draw_info->density != (char *) NULL)
-    {
-      GeometryInfo
-        geometry_info;
-
-      MagickStatusType
-        geometry_flags;
-
-      geometry_flags=ParseGeometry(draw_info->density,&geometry_info);
-      if ((geometry_flags & RhoValue) != 0)
-        resolution.x=geometry_info.rho;
-      resolution.y=resolution.x;
-      if ((geometry_flags & SigmaValue) != 0)
-        resolution.y=geometry_info.sigma;
-    }
+    resolution=GetFreetypeResolution(draw_info,resolution);
   ft_status=FT_Set_Char_Size(face,(FT_F26Dot6) (64.0*draw_info->pointsize),
     (FT_F26Dot6) (64.0*draw_info->pointsize),(FT_UInt) resolution.x,
     (FT_UInt) resolution.y);
@@ -1890,34 +2216,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
         draw_info->font);
       return(MagickFalse);
     }
-  metrics->pixels_per_em.x=face->size->metrics.x_ppem;
-  metrics->pixels_per_em.y=face->size->metrics.y_ppem;
-  metrics->ascent=(double) face->size->metrics.ascender/64.0;
-  metrics->descent=(double) face->size->metrics.descender/64.0;
-  if (face->size->metrics.ascender == 0)
-    {
-      /*
-        Sanitize buggy ascender and descender values.
-      */
-      metrics->ascent=face->size->metrics.y_ppem;
-      if (face->size->metrics.descender == 0)
-        metrics->descent=face->size->metrics.y_ppem/-3.5;
-    }
-  metrics->width=0;
-  metrics->origin.x=0;
-  metrics->origin.y=0;
-  metrics->height=(double) face->size->metrics.height/64.0;
-  metrics->max_advance=0.0;
-  if (face->size->metrics.max_advance > MagickEpsilon)
-    metrics->max_advance=(double) face->size->metrics.max_advance/64.0;
-  metrics->bounds.x1=0.0;
-  metrics->bounds.y1=metrics->descent;
-  metrics->bounds.x2=metrics->ascent+metrics->descent;
-  metrics->bounds.y2=metrics->ascent+metrics->descent;
-  metrics->underline_position=face->underline_position*
-    (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
-  metrics->underline_thickness=face->underline_thickness*
-    (metrics->pixels_per_em.x*MagickSafeReciprocal(face->units_per_EM));
+  SetFreetypeMetrics(face,metrics);
   first_glyph_id=0;
   FT_Get_First_Char(face,&first_glyph_id);
   if (IsTextWithoutGlyphs(draw_info,first_glyph_id) != MagickFalse)
@@ -1949,49 +2248,22 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
       flags|=FT_LOAD_TARGET_LCD;
 #endif
     }
-  value=GetImageProperty(image,"type:hinting",exception);
-  if ((value != (const char *) NULL) && (LocaleCompare(value,"off") == 0))
-    flags|=FT_LOAD_NO_HINTING;
+  flags=GetFreetypeHintingFlags(image,flags,exception);
   glyph.id=0;
   glyph.image=(FT_Glyph) NULL;
   last_glyph_id=0;
   origin.x=0;
   origin.y=0;
-  affine.xx=65536L;
-  affine.yx=0L;
-  affine.xy=0L;
-  affine.yy=65536L;
-  if (draw_info->render != MagickFalse)
-    {
-      affine.xx=(FT_Fixed) (65536L*draw_info->affine.sx+0.5);
-      affine.yx=(FT_Fixed) (-65536L*draw_info->affine.rx+0.5);
-      affine.xy=(FT_Fixed) (-65536L*draw_info->affine.ry+0.5);
-      affine.yy=(FT_Fixed) (65536L*draw_info->affine.sy+0.5);
-    }
+  affine=GetFreetypeAffine(draw_info);
   annotate_info=CloneDrawInfo((ImageInfo *) NULL,draw_info);
   if (annotate_info->dash_pattern != (double *) NULL)
     annotate_info->dash_pattern[0]=0.0;
   (void) CloneString(&annotate_info->primitive,"path '");
   status=MagickTrue;
   if (draw_info->render != MagickFalse)
-    {
-      if (image->storage_class != DirectClass)
-        (void) SetImageStorageClass(image,DirectClass,exception);
-      if ((image->alpha_trait & BlendPixelTrait) == 0)
-        (void) SetImageAlphaChannel(image,OpaqueAlphaChannel,exception);
-    }
-  for (p=draw_info->text; GetUTFCode(p) != 0; p+=(ptrdiff_t) GetUTFOctets(p))
-    if (GetUTFCode(p) < 0)
-      break;
-  utf8=(unsigned char *) NULL;
-  if (GetUTFCode(p) == 0)
-    p=draw_info->text;
-  else
-    {
-      utf8=ConvertLatin1ToUTF8((unsigned char *) draw_info->text);
-      if (utf8 != (unsigned char *) NULL)
-        p=(char *) utf8;
-    }
+    SetFreetypeCanvas(image,exception);
+  p=FindInvalidUTFCode(draw_info);
+  SelectFreetypeText(draw_info,&utf8,&p);
   grapheme=(GraphemeInfo *) NULL;
   length=strlen(p);
 #if defined(MAGICKCORE_RAQM_DELEGATE)
@@ -2032,20 +2304,13 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     if (ft_status != 0)
       continue;
     outline=((FT_OutlineGlyph) glyph.image)->outline;
-    if ((glyph.image->format != FT_GLYPH_FORMAT_OUTLINE) &&
-        (IsEmptyOutline(outline) == MagickFalse))
+    if (IsNonOutlineGlyph(glyph.image,outline) != MagickFalse)
       continue;
     ft_status=FT_Outline_Get_BBox(&outline,&bounds);
     if (ft_status != 0)
       continue;
-    if ((bounds.xMin < metrics->bounds.x1) && (bounds.xMin != 0))
-      metrics->bounds.x1=(double) bounds.xMin;
-    if ((bounds.yMin < metrics->bounds.y1) && (bounds.yMin != 0))
-      metrics->bounds.y1=(double) bounds.yMin;
-    if ((bounds.xMax > metrics->bounds.x2) && (bounds.xMax != 0))
-      metrics->bounds.x2=(double) bounds.xMax;
-    if ((bounds.yMax > metrics->bounds.y2) && (bounds.yMax != 0))
-      metrics->bounds.y2=(double) bounds.yMax;
+    ExtendGlyphMinBounds(bounds,metrics);
+    ExtendGlyphMaxBounds(bounds,metrics);
     if (IsRenderedStroke(draw_info,status) != MagickFalse)
       {
         /*
@@ -2082,11 +2347,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
         /*
           Rasterize the glyph.
         */
-        transparent_fill=((draw_info->fill.alpha == (MagickRealType) TransparentAlpha) &&
-          (draw_info->fill_pattern == (Image *) NULL) &&
-          (draw_info->stroke.alpha == (MagickRealType) TransparentAlpha) &&
-          (draw_info->stroke_pattern == (Image *) NULL)) ? MagickTrue :
-          MagickFalse;
+        transparent_fill=IsTransparentFill(draw_info);
         r=bitmap->bitmap.buffer;
         image_view=AcquireAuthenticCacheView(image,exception);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2120,10 +2381,10 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
             continue;
           x_offset=CastDoubleToSsizeT(ceil(point.x-0.5));
           y_offset=CastDoubleToSsizeT(ceil(point.y+y-0.5));
-          if ((y_offset < 0) || (y_offset >= (ssize_t) image->rows))
+          if (IsRowOutside(image,y_offset) != MagickFalse)
             continue;
           q=(Quantum *) NULL;
-          if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
+          if (IsColumnOutside(image,x_offset) != MagickFalse)
             active=MagickFalse;
           else
             {
@@ -2134,23 +2395,18 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
           n=y*bitmap->bitmap.pitch;
           for (x=0; x < (ssize_t) bitmap->bitmap.width; x++, n++)
           {
+            GlyphRasterInfo
+              raster;
+
             x_offset=CastDoubleToSsizeT(ceil(point.x+x-0.5));
-            if ((x_offset < 0) || (x_offset >= (ssize_t) image->columns))
+            if (IsColumnOutside(image,x_offset) != MagickFalse)
               {
-                if (q != (Quantum *) NULL)
-                  q+=(ptrdiff_t) GetPixelChannels(image);
+                q=SkipGlyphPixel(image,q);
                 continue;
               }
-            fill_opacity=1.0;
-            if (bitmap->bitmap.buffer != (unsigned char *) NULL)
-              {
-                if (bitmap->bitmap.pixel_mode == ft_pixel_mode_grays)
-                  fill_opacity=(double) (r[n])/(bitmap->bitmap.num_grays-1);
-                else
-                  if (bitmap->bitmap.pixel_mode == ft_pixel_mode_mono)
-                    fill_opacity=((r[(x >> 3)+y*bitmap->bitmap.pitch] &
-                      (1 << (~x & 0x07)))) == 0 ? 0.0 : 1.0;
-              }
+            raster.bitmap=bitmap;
+            raster.r=r;
+            fill_opacity=GetGlyphFillOpacity(&raster,n,x,y);
             if (draw_info->text_antialias == MagickFalse)
               fill_opacity=fill_opacity >= 0.5 ? 1.0 : 0.0;
             if (active == MagickFalse)
@@ -2178,12 +2434,8 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
                   QuantumRange;
                 SetPixelAlpha(image,(const Quantum) fill_opacity,q);
               }
-            if (active == MagickFalse)
-              {
-                sync=SyncCacheViewAuthenticPixels(image_view,exception);
-                if (sync == MagickFalse)
-                  status=MagickFalse;
-              }
+            if (SyncGlyphPixel(active,image_view,exception) == MagickFalse)
+              status=MagickFalse;
             q+=(ptrdiff_t) GetPixelChannels(image);
           }
           sync=SyncCacheViewAuthenticPixels(image_view,exception);
@@ -2192,18 +2444,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
         }
         image_view=DestroyCacheView(image_view);
         if (IsVisibleStroke(draw_info,status) != MagickFalse)
-          {
-            /*
-              Draw text stroke.
-            */
-            annotate_info->linejoin=RoundJoin;
-            annotate_info->affine.tx=offset->x;
-            annotate_info->affine.ty=offset->y;
-            (void) ConcatenateString(&annotate_info->primitive,"'");
-            if (strlen(annotate_info->primitive) > 7)
-              (void) DrawImage(image,annotate_info,exception);
-            (void) CloneString(&annotate_info->primitive,"path '");
-          }
+          DrawFreetypeStroke(image,annotate_info,offset,exception);
       }
     if (IsInterwordSpace(draw_info,p+grapheme[i].cluster,code) != MagickFalse)
       origin.x+=(FT_Pos) (64.0*draw_info->interword_spacing);
@@ -2220,10 +2461,7 @@ static MagickBooleanType RenderFreetype(const FreetypeTarget *target,
     last_glyph_id=glyph.id;
     code=GetUTFCode(p+grapheme[i].cluster);
   }
-  if (grapheme != (GraphemeInfo *) NULL)
-    grapheme=(GraphemeInfo *) RelinquishMagickMemory(grapheme);
-  if (utf8 != (unsigned char *) NULL)
-    utf8=(unsigned char *) RelinquishMagickMemory(utf8);
+  RelinquishFreetypeText(grapheme,utf8);
   if (glyph.image != (FT_Glyph) NULL)
     {
       FT_Done_Glyph(glyph.image);

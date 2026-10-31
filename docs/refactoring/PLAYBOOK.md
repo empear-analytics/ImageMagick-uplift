@@ -148,7 +148,8 @@ helper (its definition and its call) before its `PASS` line. Any other count tha
 moves is the `WARN` that stops the commit.
 Recipes D and S fold code together or move it, the guard cannot follow them, and
 they need the oracle. The one exception is Recipe D's *Unreached functions* form,
-whose proof is an identical object file, not the guard.
+whose proof is an identical object file, not the guard. Recipe CN rests on the
+same proof, so it applies at either level.
 
 The guard has two blind spots: reordered statements, which the prohibitions already
 forbid, and **transposed arguments**. For every call the step adds, check by reading
@@ -234,6 +235,12 @@ blocks of nested logic). Each bump is a missing function.
    far, just before the caller throws), is an input like any other: it goes by value,
    its text unchanged, and its writes land in the new function's copy, which nothing
    reads once the function returns. Check by reading every path out of the block.
+   One the block writes before it reads it on every path through the block, and that
+   nothing after the block reads, is declared in the new function with the declaration
+   it had, initialiser included, even when the caller wrote it before the block: the
+   block never reads the caller's value (Recipe Y step 2's temporary). A struct filled
+   by a call (`fstat(fd,&attributes)`) counts as written by it only where the block
+   reads it after the call succeeded (`(fstat(...) == 0) && (attributes.st_size > 0)`).
    One the block writes before it reads it on every path, but only through a test a
    compiler cannot follow (`(i == 0) || (d < distance)`, whose second operand the first
    pass skips), so that declared in the new function without an initialiser it draws a
@@ -640,7 +647,12 @@ needs two copies of the block.
    A parameter the caller receives by value, of a struct or arithmetic type (not a
    pointer, and not an array parameter, which is one), counts as a plain local
    (`ApplySpliceGravity`'s `RectangleInfo splice_geometry`): it is the caller's own
-   copy, and the same rule on its address applies.
+   copy, and the same rule on its address applies. So does a parameter of pointer type
+   (declared `T *p`, not as an array) whose own value the block assigns, a cursor such
+   as `ParseEntities`' `xml` (`xml++`, `xml=strchr(xml,';')`): it passes as `T **p`,
+   written `(*p)` at every use, so `*xml++=c` becomes `*(*xml)++=c` and `xml[i]` becomes
+   `(*xml)[i]`. Writes through it stay writes through it, to the memory the caller's
+   caller owns, as before. Recipes V, W, LB, I and OC read "plain local" the same way.
    A variable the block does not read before writing it, and that nothing after the
    block reads (a discarded out-argument, `MontageImageList`'s `sans` in
    `GetMontageGeometry(...,&sans,&sans)`), is not one of them: the new function
@@ -717,9 +729,13 @@ static void SelectMagnifyMethod(const char *option,
   pointer to `v` in use (Recipe I's *Careful*).
 - A parameter received by value is an object of the function's own, initialised from
   the argument when the call starts and gone when it returns (C11 6.9.1p9); a write to
-  it, directly or through `&v`, reaches no object of its caller. A parameter of
-  pointer type is refused: what it points to is the caller's, and writing through
-  it is not a write to a local. An array parameter is a pointer.
+  it, directly or through `&v`, reaches no object of its caller. That holds for a
+  parameter of pointer type too: the pointer is the function's own object, so
+  assigning it (`xml++`) through `&xml` reaches nothing of the caller's. What it
+  points to is the caller's, so a block whose only writes are through it never counts
+  it as written; those writes stay writes through the same pointer value, now read as
+  `(*p)`, in the same order. An array parameter is a pointer, but its declared form
+  `T p[]` is refused, to keep the helper's `T **` parameter visibly the same type.
 - The function must be oracle-verified, with no unmatched or unreached survivor on the
   block's lines: the guard sees the moved literals but not a write that went missing.
 
@@ -756,7 +772,11 @@ inside an OpenMP region; Recipe G, which removes one level of nesting, not the b
    reads only in its leading `if (v == c) continue;`, or in a leading
    `if ((status == MagickFalse) || (v == c)) continue;` that tests the loop's `status`
    too, is the loop's status. The new function is step 5's, `status=MagickFalse;` standing where the block wrote `v=c;`,
-   and the caller writes `if (Helper(...) == MagickFalse) v=c;` (step 7).
+   and the caller writes `if (Helper(...) == MagickFalse) v=c;` (step 7). The body may
+   also read `v` after the block, in the same iteration, as the test that ends an inner
+   loop the block sits in (`IsHighDynamicRangeImage`'s `if (hdri != MagickFalse)
+   break;` after its channel loop): the caller's write lands as the call returns,
+   before that read.
 3. Every variable of the loop body that the block writes is declared inside the block,
    or is not read after it (a row pointer `q` advanced along the row, say).
 4. The block contains no `return`, `goto`, or a `continue` or `break` of the parallel
@@ -848,7 +868,13 @@ static MagickBooleanType MagnifyImageRow(...,Quantum *q,
   block reads neither, so deferring the block's write of `v` to the end of the block
   changes what that guard sees no more than deferring a write of `status` does. A
   variable the loop also writes another value (`IdentifyImageGray`'s
-  `type=GrayscaleType;`) or reads elsewhere in the body is not a status: skip it.
+  `type=GrayscaleType;`) or reads elsewhere in the body is not a status: skip it. The
+  one exception is step 2's read after the block: in the block, `v=c;` is followed
+  only by statements that write nothing outside the block (the `break` of the block's
+  own loop, the block's end), so the caller's `v=c;` when the call returns comes
+  before any later statement of the iteration, the read included, and that read sees
+  the same value it saw before. Other threads get no ordering for this unsynchronised
+  flag either way, as for `status`.
 - Under step 4's exception a `continue;` of the parallel loop ends the iteration
   where it stands; `return(status);` ends the helper there, and the caller's
   `if (...) status=MagickFalse;` is the last statement of the body, so the iteration
@@ -874,7 +900,10 @@ and `IdentifyImageMonochrome` (`type=UndefinedType;`), whose row loops are T's s
 the flag the function returns in place of `status`. Step 2's combined guard (2026-10-30,
 task W10): `channel-alpha.c`'s `SetImageAlphaChannel`, whose `OffIfOpaqueAlphaChannel`
 row loop skips on `status` or `opaque` and writes `opaque=MagickFalse;` at the first
-pixel that is not opaque, its only depth-4 site.
+pixel that is not opaque, its only depth-4 site. Step 2's read after the block
+(2026-10-31, campaign B, task M116): `image.c`'s `IsHighDynamicRangeImage`, whose
+channel loop sets `hdri=MagickTrue;` and breaks, and whose column loop then breaks on
+`hdri`; it holds the file's only *Deep, Nested Complexity* (a probe: 2.77 to 2.90).
 
 ---
 
@@ -1384,6 +1413,14 @@ which pass the block's *written* variables by pointer and leave its inputs as pa
    each thread fills its own.
 8. Check by reading that every member is assigned, from the variable of its name, and
    that every other argument fills the parameter it names.
+   *Sibling blocks* (the cases of one `switch`, each moved under this recipe in its own
+   commit) may share one `Name` and one local: the typedef holds the union of their
+   groups, and each new function reads only the members its block reads (the member
+   form of step 4, or `const` locals for those members alone). The local is filled
+   once, by step 6's assignments, at a point every call follows, and nothing on any path
+   from the fill to a call writes a member's variable (Recipe B step 5's condition):
+   checked by reading every path, the paths through blocks that stay in the caller
+   included.
 
 **Before:**
 
@@ -1498,6 +1535,13 @@ static void ThresholdWaveletLevel(float *pixels,
   every read gives the value the block's own read of the variable gave. `->` binds
   tighter than a cast or an arithmetic operator, so `(double) name->i-x` groups as
   `(double) i-x` did.
+- Under *Sibling blocks* (step 8), each call reads the values the members took at the
+  fill. Nothing between the fill and the call writes a member's variable, so each holds
+  the value the block's own read would have given, as in the single-call form; the
+  argument is Recipe B's for one struct serving several calls. A block that writes a
+  member's variable itself (a coordinate it computes before reading it) declares its own
+  variable (Recipe E step 4) and does not read that member, and once moved it no longer
+  writes the caller's variable.
 - Two helpers that unpack the same members into `const` locals (the Manhattan and
   Voronoi nearest-point searches of `SparseColorImage`), or that test the same five
   channel traits, are reported as *Code Duplication*; the member form removes the
@@ -2053,7 +2097,8 @@ Q and U, whose first step refuses a block containing `goto`.
    `goto` in it jumps to one label `L` outside the block; it contains no `return`, and no
    `continue` or `break` that leaves it.
 2. The block writes at most one variable of the caller, `v`, a plain local (not a
-   parameter, a global or a `static`) whose address is not taken elsewhere. Writes
+   parameter, a global or a `static`; a parameter Recipe O step 2 counts as a plain
+   local qualifies) whose address is not taken elsewhere. Writes
    through pointers the block already uses stay as they are; variables it declares move
    with it. A temporary it writes before reading, and that the caller does not read
    after the block before writing it again, is declared in the new function and is not
@@ -2112,7 +2157,14 @@ Q and U, whose first step refuses a block containing `goto`.
    the same text at every exit (checked by script), left unchanged in the caller after
    `if (Helper(...) == MagickFalse)`. The block writes no variable the expression
    reads; it may write through one, a pointer passed by value (`kernel`).
-   `S` may also be followed by such a `return(<expr>);` in place of `return(v);`
+   `return(v);` after `S` may also be `return(e);`, where `e` is an expression with no
+   call, assignment, increment or decrement, the same text at every exit (checked by
+   script), and reads no variable the block writes (`NewXMLTree`'s
+   `utf8=DestroyString(utf8); return(&root->root);`, where the block writes neither
+   `utf8` nor `root`): the caller writes `if (Helper(...) == MagickFalse) { S
+   return(e); }`. As with `v`, the block may write through a pointer `e` reads, passed
+   by value.
+   `S` may also be followed by a `return(<expr>);` whose expression makes calls, in place of `return(v);`
    (`ResizeImage`'s `resize_filter=DestroyResizeFilter(resize_filter);
    return(DestroyImage(resize_image));`): the caller writes
    `if (Helper(...) == MagickFalse) { S return(<expr>); }`, both unchanged, and the
@@ -2216,6 +2268,11 @@ static MagickBooleanType AcquireWorkImage(const Image *image,
   functions with the same arguments and returns the same value (`DestroyKernelInfo`
   frees the same kernel, whose members the block wrote through the pointer before the
   exit, as before). On the success path it runs in neither version.
+- Under step 7's `return(e);` form, `e` has no side effect, so evaluating it is only
+  reading: the caller evaluates it at the point where the block returned it, after `S`,
+  as before, on variables the block did not write, and memory the block wrote through a
+  pointer `e` reads has landed before the helper returns. So `e` has the same value, and
+  the caller returns it. `&root->root` reads only `root` and computes an address.
 - Under step 6's other copy the function was cut from the first copy's text, and the
   second copy is that text with its own variables in place of the first copy's: the
   call runs the same statements on them, writes its own `v` through the pointer, and
@@ -2652,7 +2709,8 @@ its own pointer is Recipe O's form plus an exit, but gives five or more paramete
    written variable (step 2).
    So does V step 7's single `return(<expr>);` (`return(DestroyKernelInfo(kernel));`),
    left in the caller as `{ S return(c); }` is; its expression reads no written
-   variable.
+   variable. So does V step 7's side-effect-free `S return(e);`, whose `e` reads no
+   written variable.
 
 **Before:**
 
@@ -4114,6 +4172,284 @@ Added by Claude Code (Claude Opus 5.5) during task W10, under the mandate of
 
 ---
 
+## Recipe OC - Extract Block Ending the Iteration with Out-Parameters
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it sits in a loop body, is
+followed directly by that loop's `continue;` (so every path out of it ends the
+iteration), leaves early through `continue;` itself, and moves the loop's cursors: a
+character decoder's inner `switch` that advances the input and output pointers, as
+`InterpretDelegateProperties`' backslash escapes do.
+
+**Not covered by:** Recipe O, whose step 3 refuses a block containing a `continue` that
+leaves it; Recipe E step 7, whose `continue` forms need the block to be the loop's whole
+body or its tail and to write at most one variable (step 4); Recipe LB step 7, whose
+helper returns a status the caller tests, which here would always lead to the same
+`continue;`, and which needs a struct of out-pointers for two written cursors (step 8).
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. It is
+   followed directly by `continue;` of the innermost loop around it, `Lp`; every
+   `continue;` in it that leaves it continues `Lp`. It contains no `return`, no `goto`,
+   and no `break` that leaves it; a `break` or `continue` of a loop or `switch` nested
+   inside it stays as it is. A block that is the last statements of `Lp`'s body (its
+   tail, after statements that stay) counts as followed by `continue;`: the end of the
+   body ends the iteration as that `continue;` would. Step 5 then writes the call as
+   the body's last statement, with no `continue;` after it.
+2. The variables of the caller it writes meet Recipe O step 2 (plain locals, addresses
+   not taken elsewhere); with those it only reads, at most four parameters.
+3. Cut the block into a new `static void` function directly above the caller. Each
+   `continue;` that continued `Lp` becomes `return;`, one for one. Write `*v` for every
+   use of a written variable `v`, reads included (`(*v)++` for `v++`, `*(*v)++` for
+   `*v++`, `**v` for `*v`, `*(*v+1)` for `*(v+1)`). Nothing else in the text changes.
+4. Pass the variables it only reads by value and each written variable as a pointer,
+   in the order the block first writes them.
+5. Where the block stood, write the call. The `continue;` that followed the block stays,
+   directly after the call. Check every argument against its parameter by reading.
+
+**Before:**
+
+```c
+      case '\\':
+      {
+        switch (*(p+1))
+        {
+          case '\0':
+            continue;
+          case 'r':  /* convert to RETURN */
+          {
+            *q++='\r';
+            p++;
+            continue;
+          }
+          ...
+          default:
+          {
+            p++;
+            *q++=(*p);
+          }
+        }
+        continue;
+      }
+```
+
+**After:**
+
+```c
+static void DecodeDelegateEscape(const char **p,char **q)
+{
+  switch (*(*p+1))
+  {
+    case '\0':
+      return;
+    case 'r':  /* convert to RETURN */
+    {
+      *(*q)++='\r';
+      (*p)++;
+      return;
+    }
+    ...
+    default:
+    {
+      (*p)++;
+      *(*q)++=(**p);
+    }
+  }
+}
+...
+      case '\\':
+      {
+        DecodeDelegateEscape(&p,&q);
+        continue;
+      }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Before, every path out of the block reached a
+  `continue;` of `Lp`: one inside it, or the one that follows it. After, every path out
+  of the function (a `return;` where a `continue;` stood, or the end of the body where
+  the block fell through) returns to the call, and the caller runs the `continue;` that
+  followed the block. The statements before each exit are the same, in the same order,
+  and every write to a written variable has landed through its pointer when the
+  function returns (Recipe O).
+- `continue;` in a `for` loop runs the loop's increment expression; it still runs, in the
+  caller, after the helper has written the cursors it reads.
+- The rewriting of step 3 is mechanical but easy to get wrong in precedence: `*v++` with
+  `v` a pointer parameter is `*(*v)++`, not `**v++`. Check each by reading, and let the
+  oracle cover the reached paths.
+- A block not followed by `continue;` (one after which the loop body goes on) is not this
+  recipe. A block that ends the body is (step 1): in C, `continue;` in a loop body
+  jumps to the end of that body (C11 6.8.6.2), so falling off the end and running
+  `continue;` are the same transfer, and the call, as the body's last statement, is
+  followed by that same end.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
+nothing else moved), and steps 1, 3 and 5 checked by reading.
+
+**Provenance:** 2026-10-30, from `delegate.c`'s `InterpretDelegateProperties`, whose
+backslash case is an inner `switch` on the next character that advances `p` and `q` and
+ends each case with `continue;` of the scan loop, followed by a `continue;` for the
+`default` path; it holds the function's nesting of 4. A probe: nesting 4 gone, cc 45 to
+33, delegate.c 3.83 to 4.05. Added by Claude Code (Claude Opus 5.5) during task M115
+(campaign B), under the mandate of 2026-10-24. Step 1's body tail (2026-10-31, campaign
+B, task M116): `image.c`'s `AppendImages`, whose scan loop ends in the extent update
+(stacked: widen and `continue;`; otherwise add the columns and take the taller height),
+writing `width` and `height`; part of the probe that takes the function from 4 bumps
+to 3.
+
+---
+
+## Recipe VC - Extract Loop-Tail Block Returning Success for a Cleanup Exit
+
+**Use when:** CodeScene reports *Deep, Nested Complexity*, *Bumpy Road Ahead*, *Complex
+Method* or *Large Method*, and the block that would fix it ends a loop body (or is
+followed directly by that loop's `continue;`) and has two kinds of exit: `continue;` of
+that loop, and a cleanup exit of the function in one of Recipe V's forms (`return(c);`,
+or the same `S return(...)` at every exit, as V step 7 and I step 8 admit). The typical
+case is one branch of a declaration parser at the end of its scan loop, which skips an
+empty declaration with `continue;` and gives up on a malformed one by releasing a buffer
+and returning `MagickFalse`, as `xml-tree.c`'s `<!ATTLIST` branch does.
+
+**Not covered by:** Recipes V, Y, I and W, whose block contains no `continue` or
+`break` that leaves it (V step 1); Recipe OC, whose block contains no `return` (step 1)
+and whose function is `void`; Recipe LB, whose exits are `break;` (or, under step 7,
+`S continue;`), not a return of the function; Recipe E step 7, whose `continue` form
+needs a block with no `return` of its own. Leaving the `continue;` in the caller is not
+an option: it would sit at the block's depth, as LB's *Not covered by* says of `break`.
+
+**How:**
+
+1. The block lies outside every OpenMP region and contains no `#pragma` line. It is the
+   tail of the body of the innermost loop around it, `Lp`, or is followed directly by
+   `continue;` of `Lp` (Recipe OC step 1). Every `continue;` in it that leaves it
+   continues `Lp`; it contains no `goto` and no `break` that leaves it; a `break` or
+   `continue` of a loop nested inside it stays as it is.
+2. Every other exit is a return of the function in one form for all exits: `return(c);`
+   of one constant (Recipe V step 6), or one run `S return(...)` that Recipe V step 7 or
+   Recipe I step 8 admits, under the conditions those steps set (checked by script:
+   every copy identical). With `S`, every other exit of the block is that same text.
+3. The written variables meet Recipe V step 2 (one, by pointer) or Recipe I step 2 (two
+   to four, through a `const` struct of out-pointers, Recipe I steps 3, 5 and 6); the
+   variables it only reads go by value or in one `const` input struct (Recipe Y steps 3
+   to 5); at most four parameters. Temporaries are declared in the new function (Recipe
+   Y step 2).
+4. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller. Each `continue;` that continued `Lp` becomes `return(MagickTrue);`, one for
+   one; each exit of step 2 (the `return(c);`, or `S` with its return) becomes
+   `return(MagickFalse);`, one for one; the function ends with `return(MagickTrue);`.
+   Write `*v` for every use of a written variable `v` (Recipe O step 5). Nothing else in
+   the text changes.
+5. Where the block stood, write `if (Helper(...) == MagickFalse) return(c);`, or
+   `if (Helper(...) == MagickFalse) { S return(...); }` with `S` and the return copied
+   unchanged; a `continue;` that followed the block stays after it. Check every argument
+   and member by reading.
+
+**Before:**
+
+```c
+      else
+       if (strncmp(xml,"<!ATTLIST",9) == 0)
+         {
+            /*
+              Parse default attributes.
+            */
+            t=xml+strspn(xml+9,XMLWhitespace)+9;
+            if (*t == '\0')
+              {
+                (void) ThrowMagickException(exception,GetMagickModule(),
+                  OptionWarning,"ParseError","unclosed <!ATTLIST");
+                predefined_entities=(char **) RelinquishMagickMemory(
+                  predefined_entities);
+                return(MagickFalse);
+              }
+            xml=t+strcspn(t,XMLWhitespace ">");
+            if (*xml == '>')
+              continue;
+            ...
+        }
+      else
+        if (SkipDoctypeMarkup(root,&xml) == MagickFalse)
+          break;
+    }
+```
+
+**After:**
+
+```c
+static MagickBooleanType ParseAttributeListDeclaration(XMLTreeRoot *root,
+  ExceptionInfo *exception,const AttributeListTargets *targets)
+{
+  char
+    **const xml = targets->xml;
+
+  char
+    **const n = targets->n;
+  ...
+  t=*xml+strspn(*xml+9,XMLWhitespace)+9;
+  if (*t == '\0')
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","unclosed <!ATTLIST");
+      return(MagickFalse);
+    }
+  *xml=t+strcspn(t,XMLWhitespace ">");
+  if (**xml == '>')
+    return(MagickTrue);
+  ...
+  return(MagickTrue);
+}
+...
+         {
+            AttributeListTargets
+              attribute_list_targets;
+
+            attribute_list_targets.xml=(&xml);
+            attribute_list_targets.n=(&n);
+            if (ParseAttributeListDeclaration(root,exception,
+                &attribute_list_targets) == MagickFalse)
+              {
+                predefined_entities=(char **) RelinquishMagickMemory(
+                  predefined_entities);
+                return(MagickFalse);
+              }
+        }
+```
+
+**Careful:**
+
+- Why the behaviour is the same. Before, every path out of the block either reached a
+  `continue;` of `Lp` (one inside it, or the end of the body or the `continue;` that
+  follows it, which C treats as the same jump, C11 6.8.6.2), or ran an exit of step 2.
+  After, the first kind returns `MagickTrue` and the caller, the call being the body's
+  last statement or followed by that `continue;`, ends the iteration at the same point;
+  the second returns `MagickFalse` and the caller runs the exit's own text, unchanged,
+  at once. The statements before each exit are the same, in the same order, and every
+  write to a written variable has landed through its pointer when the function returns.
+- The exit's argument is Recipe V's (step 6 or 7) or Recipe I step 8's, whichever form
+  it has, with the same conditions on what `S` and the returned expression may read.
+- `continue;` in a `for` loop runs the loop's increment expression: it still runs, in
+  the caller, after the helper has written the cursors it reads.
+- The result now says "go on with the loop" as well as "fell through": both are
+  `MagickTrue`, because the caller does the same thing after either, end the iteration.
+  A block after which the body goes on (neither the tail nor followed by `continue;`)
+  is not this recipe: there a `continue;` and a fall-through differ.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function;
+under `S`, also `-(k-1)` for each call in `S`, where `k` is the number of exits), and
+steps 1, 2 and 5 checked by reading.
+
+**Provenance:** 2026-10-31, from `xml-tree.c`'s `ParseInternalDoctype`, whose
+`<!ATTLIST` branch, the tail of the scan loop's body, skips an empty list with
+`continue;` and leaves on three malformed forms by releasing `predefined_entities` and
+returning `MagickFalse`; its default-value test holds the function's nesting of 5. A
+probe of the branch: cc 37 to 25, xml-tree.c 4.05 to 4.19; with its attribute loop's
+body moved the same way, 4.21. Added by Claude Code (Claude Opus 5.5) during task M116
+(campaign B), under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -4402,6 +4738,160 @@ Claude Code (Claude Opus 5.5) during task M101, under the mandate of 2026-10-24.
 
 ---
 
+## Recipe CN - Combine Nested Conditions
+
+**Use when:** CodeScene reports *Bumpy Road Ahead* (or *Deep, Nested Complexity*), and a
+bump is an `if` whose whole body is a second `if`, neither with an `else`: a nesting
+level that carries no statement of its own, as `GetDelegateInfo`'s three match tests
+(`if (decode matches) if (encode matches) break;`) and `IsExecutableToken`'s
+`if (length >= 3) { if (IsWindowsDrivePath(token) != MagickFalse) return(MagickTrue); }`.
+
+**Not covered by:** Recipe G, which inverts a condition into an early exit and keeps both
+tests as separate statements; Recipe P, which moves one expression into a predicate and
+leaves the statement structure as it is; Recipes E, O, LB and W, which move the block into
+a new function, where the nesting stays (a helper of nested `if`s is itself bumpy).
+
+**How:**
+
+1. Find `if (A) S` where `S` is `if (B) T`, or a compound statement `{ if (B) T }` holding
+   that one statement and no declaration; neither `if` has an `else`. `T` is any
+   statement.
+2. Replace the two by `if ((A) && (B)) T`: `A` and `B` copied character for character,
+   each in its own parentheses, in that order; `T` unchanged, re-indented one level
+   less. Wrap at 80 columns as ImageMagick does, the second operand under the first.
+3. Every such pair in one function may go in one commit (one recipe, one function).
+4. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step (the compiler laid the code out differently, and the proof below does not
+   hold for it).
+
+**Before:**
+
+```c
+    if (LocaleCompare(decode,delegate_info->decode) == 0)
+      if (LocaleCompare(encode,delegate_info->encode) == 0)
+        break;
+```
+
+**After:**
+
+```c
+    if ((LocaleCompare(decode,delegate_info->decode) == 0) &&
+        (LocaleCompare(encode,delegate_info->encode) == 0))
+      break;
+```
+
+**Careful:**
+
+- Why the behaviour is the same. `&&` evaluates `A` first and `B` only when `A` is
+  non-zero, as the nested form does; `T` runs exactly when both are non-zero, in both
+  forms. With no `else` on either `if`, no path runs anything when `A` or `B` is zero.
+- An `else` changes this: on the inner `if` it runs when `A` holds and `B` does not,
+  which the combined form cannot express; on the outer one it would bind differently.
+  Step 1 refuses both.
+- A declaration in the braces, or a second statement there, means the level carries
+  something: step 1 refuses it.
+- The combined condition has two operands; a chain that would reach *Complex Conditional*
+  (three or more) is not this recipe's aim, and rule 2 judges it.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD` (byte-identical object code under the oracle build's pinned flags is the same
+compiled code, so the same behaviour on every input, reached or not), and
+`refactor_guard.py` literal and call counts unchanged.
+
+**Provenance:** 2026-10-30, from `delegate.c`'s `GetDelegateInfo`, whose three match
+tests are each an `if` holding one `if` and a `break`: a probe combining them gave
+bumps 6 to 3 and delegate.c 3.26 to 3.32, with `IDENTICAL` object code. The same shape
+holds in `IsExecutableToken` (twice) and `InvokeDelegate`. Added by Claude Code (Claude
+Opus 5.5) during task M115 (campaign B), under the mandate of 2026-10-24.
+
+---
+
+## Recipe NS - Name a Constant Selection
+
+**Use when:** CodeScene reports *Complex Method* (or a helper Recipe SD, O or Z would add
+is refused as one), and much of the complexity is one conditional expression
+`(c ? k1 : k2)` that picks between two constants and recurs at many sites, as
+`AnnotateImage`'s gravity offsets do: `(geometry.width == 0 ? -1.0 : 1.0)` and three
+variants, eighteen sites in one `switch`, each counted as a decision.
+
+**Not covered by:** Recipe P, which moves a boolean condition and returns
+`MagickBooleanType`; this expression yields a value of another type (a `double` sign),
+and naming only its condition leaves the `?:` and its decision in place. Recipe D,
+which merges copies of statements, not of an expression inside them. Recipes E, O and
+SD, which move statements: the decision moves with them and the helper inherits it.
+
+**How:**
+
+1. The expression is `(c ? k1 : k2)` in its own parentheses: `k1` and `k2` are
+   literals of one arithmetic type (`-1.0` and `1.0`), and `c` reads only identifiers,
+   member accesses and literals, with no call, assignment, increment or decrement.
+2. Write a `static inline` function directly above the first function that uses it,
+   with one parameter per variable expression of `c` (`const size_t extent` for
+   `geometry.width`), of that expression's exact type, returning the type of `k1`:
+   `return(c' ? k1 : k2);`, `c'` being `c` with the parameters substituted, character
+   for character otherwise. A second variant (`k2 : k1`) is a second function.
+3. Replace each site, parentheses included, by the call with the site's expressions as
+   arguments. Check by script that every replaced site equals the function's body with
+   the arguments substituted, character for character, as Recipe P's *Several sites*
+   asks.
+4. All sites of the functions this step adds, in one function of the caller's, go in
+   one commit (one recipe, one function); a site in another function is its own
+   commit.
+5. Run `sh tools/obj_identical.sh <file>`. It must print `IDENTICAL`; otherwise revert
+   the step.
+
+**Before:**
+
+```c
+      case (GravityType) NorthWestGravity:
+      {
+        offset.x=(geometry.width == 0 ? -1.0 : 1.0)*annotate_info->affine.tx+i*
+          annotate_info->affine.ry*height+annotate_info->affine.ry*
+          (metrics.ascent+metrics.descent);
+```
+
+**After:**
+
+```c
+static inline double GravityOffsetSign(const size_t extent)
+{
+  return(extent == 0 ? -1.0 : 1.0);
+}
+...
+      case (GravityType) NorthWestGravity:
+      {
+        offset.x=GravityOffsetSign(geometry.width)*annotate_info->affine.tx+i*
+          annotate_info->affine.ry*height+annotate_info->affine.ry*
+          (metrics.ascent+metrics.descent);
+```
+
+**Careful:**
+
+- Why the behaviour is the same. The argument is evaluated once, as `c` read it once;
+  it has no side effect (step 1), and passing it converts nothing (step 2: the
+  parameter has the expression's own type). The function returns `k1` or `k2` under
+  the same test, of the same type, so the product or sum the site stood in receives the
+  same value; the parentheses kept the site a single operand, so no operator regroups.
+- `static inline` and identical object code under the oracle build's flags (step 5)
+  prove it for this build on every input, reached or not.
+- The variant with the constants swapped is a different function, not a negated
+  argument: `!c` would be a new expression.
+
+**Evidence level:** guard, with `tools/obj_identical.sh` printing `IDENTICAL` against
+`HEAD`; `refactor_guard.py` reports `WARN` (copies removed, every value still
+present), each literal of `c`, `k1` and `k2` dropping by its count per site times the
+sites replaced less one per function, which the step-3 script accounts for; `--calls`
+moves only the new functions, by one plus one per site each.
+
+**Provenance:** 2026-10-30, from `annotate.c`'s `AnnotateImage`, whose gravity `switch`
+carries eighteen `(geometry.width == 0 ? -1.0 : 1.0)`-shaped signs (cc 56 of the
+function; a probe: cc 56 to 38 with `IDENTICAL` object code), and which Recipe SD can
+split only once they are gone (a helper of three gravity cases would otherwise be a
+*Complex Method*). Added by Claude Code (Claude Opus 5.5) during task M115 (campaign B),
+under the mandate of 2026-10-24.
+
+---
+
 ## Known plateaus
 
 None recorded yet. When a file stops improving and no recipe in this catalogue applies,
@@ -4571,6 +5061,12 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-30 | AMEND | P | *Leading operands of a chain*: the predicate may hold the leading operands of a chain of one operator (`a && b` of `a && b && c`, which C groups as `(a && b) && c`) when the whole chain would take five or more parameters; the site becomes `(Pred(...) != MagickFalse) && c` | `attribute-bounds.c`'s `GetImageBoundingBox` (W10): its *Complex Conditional* `(x < (ssize_t) bounding_box.width) && (y > (ssize_t) bounding_box.height) && (IsFuzzyEquivalencePixelInfo(&pixel,&target[3]) == MagickFalse)` reads five variables, so the whole chain as one predicate carries *Excess Number of Function Arguments*; its first two operands as a three-parameter predicate: 7.51 to 7.66, the file's sixth function | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | E | Step 4: a variable declared without an initialiser, which the block writes before it reads it on every path and which nothing after the block reads, is declared in the new function even when the caller writes it before the block (as Recipe TW step 3 and Recipe J step 3 say for their blocks); the 2026-10-28 condition stays for a variable with an initialiser | `decorate.c`'s `FrameImage` (W10): its bevel loops share the function's `y` (and the top band's `width`) with the loops before them; each loop sets `y` in its `for` before any read, and the next loop sets it again. The 2026-10-28 wording ("when no statement between that declaration and the block writes it") is there to keep an initialiser's value, which such a variable does not have | mandate (2026-10-24) |
 | 2026-10-30 | AMEND | SV | Step 2: the value may also be an object-like macro of the file expanding to a call, with constant arguments, of a `static inline` function that reads and writes nothing but its parameters (`AccentuateModulate`, `ScaleCharToQuantum(80)`), its parameter of the function's return type; and a copy's one written variable, assigned whole before it is read and read by the caller afterwards, becomes the new function's local and return value (`v=Helper(...);`, Recipe E steps 3 and 4). *Careful* gives the argument | `decorate.c`'s `FrameImage` (W10): its four 3-D colours are two pairs of copies, five statements each on `matte`, differing only in the modulate macro (`AccentuateModulate`/`HighlightModulate`, `ShadowModulate`/`TroughModulate`), each copy writing its own colour. The macro is not a literal, an enumeration constant or a member access, so step 2 refused it. The lighter pair as one helper: 8.08 to 8.20; both pairs: 8.24 | mandate (2026-10-24) |
+| 2026-10-30 | NEW | CN | Combine Nested Conditions: an `if` whose whole body is a second `if`, neither with an `else`, becomes one `if` whose condition is the two joined by `&&` in their order; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `delegate.c`'s `GetDelegateInfo` (campaign B, task M115): three such match tests, a probe gave bumps 6 to 3 and 3.26 to 3.32 with identical object code; the same shape in `IsExecutableToken` and `InvokeDelegate`. No recipe removes a nesting level that carries no statement: G and P keep both tests, E-family helpers inherit the nesting | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | E | Step 4: a variable the block writes before reading it on every path, and that nothing after the block reads, is declared in the new function with its declaration and initialiser even when the caller wrote it before the block, as Recipe Y step 2, Q step 2 and J step 3 already allow for their blocks; a struct filled by a call counts as written where the block reads it only after the call succeeded | `delegate.c`'s `CopyDelegateFile` (campaign B, task M115): its buffer-size block reads `attributes` only after `fstat(source_file,&attributes) == 0`, but `IsKeptDestination` fills `attributes` earlier, which the founding wording of step 4 refuses although the block never sees that value. The block is one decision short of taking the function out of *Complex Method* (cc 9) | mandate (2026-10-24) |
+| 2026-10-30 | NEW | OC | Extract Block Ending the Iteration with Out-Parameters: a block followed directly by `continue;` of its loop, which leaves early through that `continue;` and writes the loop's cursors, moves to a `static void` function: each `continue;` becomes `return;`, written variables go by pointer as in Recipe O, and the `continue;` after the block stays after the call | `delegate.c`'s `InterpretDelegateProperties` (campaign B, task M115): the backslash case's inner `switch` advances `p` and `q` and continues the scan loop from every case; O refuses its `continue`s, E step 7 its two written cursors and its position, LB would need a struct of out-pointers and a status that always leads to the same `continue;`. Probe: nesting 4 gone, 3.83 to 4.05 | mandate (2026-10-24) |
+| 2026-10-30 | AMEND | V | Step 7: `return(v);` after the shared cleanup `S` may be `return(e);` of a side-effect-free expression (no call, assignment, increment or decrement), the same text at every exit (checked by script), reading no variable the block writes; Recipe I step 8 follows. *Careful* gives the argument | `xml-tree.c`'s `NewXMLTree` (campaign B, task M115; the owner left the ruling to the session, 2026-10-30): about twelve exits end in `utf8=DestroyString(utf8); return(&root->root);`, which is neither a local, a constant nor a call | owner |
+| 2026-10-30 | AMEND | O | Step 2: a parameter of pointer type (declared `T *p`) whose own value the block assigns counts as a plain local, passed as `T **p` and written `(*p)`; writes through it stay writes through it. Recipes V, W, LB, I and OC read "plain local" the same way (V step 2 says so). *Careful* gives the argument | `xml-tree.c`'s `ParseEntities` and `ParseInternalDoctype` (campaign B, task M115; the owner left the ruling to the session, 2026-10-30): their blocks advance the `xml` parameter itself, which step 2 refused although the pointer object is the function's own (C11 6.9.1p9) | owner |
+| 2026-10-30 | NEW | NS | Name a Constant Selection: a recurring `(c ? k1 : k2)` that picks one of two literals of one type, with a side-effect-free `c`, becomes a call of a `static inline` function returning that type; all sites in one function per commit; proven by `tools/obj_identical.sh` printing `IDENTICAL` | `annotate.c`'s `AnnotateImage` (campaign B, task M115): eighteen gravity signs such as `(geometry.width == 0 ? -1.0 : 1.0)` in one `switch`, cc 56 to 38 in a probe with identical object code; P names only boolean conditions, and SD's helpers would inherit the decisions (a three-case gravity helper would be a *Complex Method*) | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | TW | Step 2: a `const` struct local of pointers that the block passes only as `&s` to a pointer-to-`const` parameter of a callee writing through its members, and neither assigns nor writes a member of, goes by value as a parameter of its exact type, its text unchanged (N step 2 (d) keeps it out of the struct). *Careful* gives the argument | `compare.c`'s `GetDPCSimilarity` and `GetNCCSimilarity` (W10): their column loops are the same text (eight inputs, depth 3, a bump each), passing the row's `CorrelationSums` as `&sums`; both as one helper, then their identical statistics blocks (Recipe I and I step 7), 2.43 to 2.54 in a probe | mandate (2026-10-24) |
 | 2026-10-31 | NEW | AR | Extract Block Through a Struct of Array Pointers: a block outside OpenMP that reads or updates, element by element, several local arrays of the caller (each used only as `v[e]` or passed whole to a pointer parameter) moves to a `static` function taking one `const` struct of pointers to the arrays' first elements, initialised once in the caller (`const Name name = { v1, ... };`) and bound `T *const v = name->v;`, the block's text unchanged; other inputs and at most one returned variable as in Recipe E, or an input struct as in Recipe N | `statistic-moments.c`'s `GetImageMoments` (W10): the second pixel pass writes eight moment arrays per pixel (Q step 8 admits six), the composite average and the normalisation write eleven, the ellipse and Hu loops read four and seven; E, N, K and Q refuse them. A probe with this recipe, E and Q: 8.05 to 10.0 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | N | Step 2: when the caller binds `const` locals from its own `const Name *name` parameter (a helper of N, Y or LB's struct form) and the whole group is such locals, the new function may take that `name` unchanged instead of a new struct: no typedef, no local, no assignment; it binds the members its block reads. *Careful* gives the argument | `quantize-posterize.c`'s `PopulatePosterizeMap` (W10): its column loop reads `image`, `map_image`, `levels` and `number_columns`, all bound from its `PosterizeMapInfo`, plus `scale` and `q`. Step 3's letter would add a second struct of the same four members and refill it from the locals just bound from the first. With the column loop as a helper the file has twelve functions and its mean cyclomatic complexity falls under 4: *Overall Code Complexity* leaves, 8.89 to 9.47 in a probe | mandate (2026-10-24) |
@@ -4587,3 +5083,7 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | SD | Step 7: a `switch` without `default` may be split too; the new function's `switch` ends with `default: break;` and the caller's gains the `default:` group holding the call. *Careful* argues the values that match no label and names the cost (`-Wswitch` no longer sees a constant added later) | `resample.c`'s `ResamplePixelColor` (W10): its `hit` switch over every `VirtualPixelMethod` constant has no `default`, so step 1 refuses it; without the added group the new function's partial `switch` draws `-Wswitch`. Probes: the vertical-tile and dither groups, 7.30 to 7.34; then the corner and horizontal-tile groups, 7.37 (cc 34 to 26) | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | V | Step 6: in a function returning `void`, `return;` plays the part of `return(c);`: each becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) return;`. Applies to Recipe Y through its step 1 | `resample.c`'s `ScaleResampleFilter` (W10, public, `void`, *Large Method* of 100 lines, most of them in uncompiled `#if` branches): its compiled ellipse-fitting block leaves through `return;` once the ellipse is too large and writes `F`, which the caller reads after; Recipe Y (inputs `resample_filter`, `A`, `B`, `C`) refuses it only because `return;` has no constant. A probe: 7.40 to 7.41 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | SV | Step 2: a copy whose one write is `v=c;` of one constant under its test (a path leaves `v` alone), `v` set by the caller on every path to the copy and read after it, takes `v` by value as its last parameter and returns it, the copy becoming `v=Helper(...,v);` (Recipe E step 7's `switch` form); a member-access value may reach the member through an element of an array member (`image->colormap[i].red`) that the block does not write. *Careful* gives the argument | `attribute-depth.c`'s `RaiseColormapEntryDepth` (W10, cc 11, Bumpy Road 3): its red, green and blue tests differ in two values (the trait accessor and the colormap member), and the first lacks the `atDepth != MagickFalse` operand, so SV refuses them whole; their inner `if`s differ only in the member (`.red`, `.green`, `.blue`), but each writes `atDepth=MagickFalse;` only when its test holds, which step 2's returned-variable form (assigned whole first) refuses. Recipe E on the red copy alone: 7.03 to 7.05; the three as one helper: 7.03 to 7.30, the function leaving *Complex Method* (cc 8) and *Bumpy Road Ahead* | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | N | Step 8, *Sibling blocks*: the cases of one `switch`, each moved under this recipe in its own commit, may share one `Name` (the union of their groups; each function reads only its own members) and one local filled once, where nothing on any path from the fill to a call writes a member's variable (Recipe B step 5's condition) | `pixel.c`'s `InterpolatePixelChannels` (campaign B, task M116): eight cases read the same eight inputs; a fill before each call adds nine lines per case to a function the step is meant to shrink | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | T | Step 2: with the other name, the body may also read `v` after the block in the same iteration (the test that ends an inner loop the block sits in); *Careful* gives the argument: the caller's `v=c;` lands as the call returns, before that read | `image.c`'s `IsHighDynamicRangeImage` (campaign B, task M116): its channel loop sets `hdri=MagickTrue;` and breaks, then the column loop breaks on `hdri`, which step 2 refused; it holds the file's only *Deep, Nested Complexity*, 2.77 to 2.90 in a probe | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | OC | Step 1: a block that is the tail of `Lp`'s body counts as followed by `continue;` (the end of the body is where `continue;` jumps); the call is then the body's last statement. *Careful* gives the argument | `image.c`'s `AppendImages` (campaign B, task M116): its scan loop ends in the stacked/side-by-side extent update, which `continue`s on one branch and falls off the end on the other, writing `width` and `height`; O refuses its `continue`, E step 7's tail form its two outputs | mandate (2026-10-24) |
+| 2026-10-31 | NEW | VC | Extract Loop-Tail Block Returning Success for a Cleanup Exit: a block at the tail of a loop body (or followed by its `continue;`) whose exits are `continue;` of that loop and one cleanup return of the function in a form Recipe V step 6 or 7 or Recipe I step 8 admits moves to a `static MagickBooleanType` function: each `continue;` becomes `return(MagickTrue);`, each exit `return(MagickFalse);`, the caller keeps the exit's text | `xml-tree.c`'s `ParseInternalDoctype` (campaign B, task M116): its `<!ATTLIST` branch and the attribute loop's body mix `continue;` with `predefined_entities=...RelinquishMagickMemory(...); return(MagickFalse);`, which V, Y, I and W (no `continue`) and OC (no `return`) refuse; they hold the function's nesting of 5; a probe: 4.05 to 4.21 | mandate (2026-10-24) |
