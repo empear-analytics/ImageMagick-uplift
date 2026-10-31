@@ -3424,6 +3424,16 @@ static void LogKmeansDistortion(const Image *image,const ssize_t n,
       distortion,GetMagickPrecision(),fabs(distortion-previous_tolerance));
 }
 
+static void ReleaseKmeansClusters(Image *image,
+  const MagickBooleanType verbose,KmeansInfo **kmeans_pixels,
+  ExceptionInfo *exception)
+{
+  if (verbose != MagickFalse)
+    ListKmeansColors(image);
+  SetKmeansDominantColor(image,exception);
+  kmeans_pixels=DestroyKmeansTLS(kmeans_pixels);
+}
+
 static MagickBooleanType FinishKmeansImage(Image *image,
   const size_t max_iterations,const MagickBooleanType status,
   ExceptionInfo *exception)
@@ -3551,10 +3561,7 @@ MagickExport MagickBooleanType KmeansImage(Image *image,
     ReportKmeansProgress(image,n,max_iterations,&status);
   }
   image_view=DestroyCacheView(image_view);
-  if (verbose != MagickFalse)
-    ListKmeansColors(image);
-  SetKmeansDominantColor(image,exception);
-  kmeans_pixels=DestroyKmeansTLS(kmeans_pixels);
+  ReleaseKmeansClusters(image,verbose,kmeans_pixels,exception);
   return(FinishKmeansImage(image,max_iterations,status,exception));
 }
 
