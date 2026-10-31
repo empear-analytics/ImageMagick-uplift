@@ -3286,6 +3286,89 @@ static MagickBooleanType ExportMapQuantumC(const ExportMapRequest *request,
   return(MagickTrue);
 }
 
+typedef struct _ExportTypeRequest
+{
+  const Image
+    *image;
+
+  RectangleInfo
+    roi;
+
+  ExportPixelBuffer
+    buffer;
+
+  StorageType
+    type;
+
+  const char
+    *map;
+
+  ExceptionInfo
+    *exception;
+} ExportTypeRequest;
+
+static void ExportPixelsOfType(const ExportTypeRequest *request,
+  MagickBooleanType *status)
+{
+  const Image
+    *image = request->image;
+
+  const RectangleInfo
+    roi = request->roi;
+
+  const ExportPixelBuffer
+    buffer = request->buffer;
+
+  const StorageType
+    type = request->type;
+
+  const char
+    *map = request->map;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (type)
+  {
+    case DoublePixel:
+    {
+      (*status)=ExportDoublePixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case FloatPixel:
+    {
+      (*status)=ExportFloatPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case LongPixel:
+    {
+      (*status)=ExportLongPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case LongLongPixel:
+    {
+      (*status)=ExportLongLongPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case QuantumPixel:
+    {
+      (*status)=ExportQuantumPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    case ShortPixel:
+    {
+      (*status)=ExportShortPixel(image,&roi,&buffer,exception);
+      break;
+    }
+    default:
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
+        "UnrecognizedPixelMap","`%s'",map);
+      (*status)=MagickFalse;
+    }
+  }
+}
+
 MagickExport MagickBooleanType ExportImagePixels(const Image *image,
   const ssize_t x,const ssize_t y,const size_t width,const size_t height,
   const char *map,const StorageType type,void *pixels,ExceptionInfo *exception)
@@ -3352,41 +3435,19 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
       status=ExportCharPixel(image,&roi,&buffer,exception);
       break;
     }
-    case DoublePixel:
-    {
-      status=ExportDoublePixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case FloatPixel:
-    {
-      status=ExportFloatPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case LongPixel:
-    {
-      status=ExportLongPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case LongLongPixel:
-    {
-      status=ExportLongLongPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case QuantumPixel:
-    {
-      status=ExportQuantumPixel(image,&roi,&buffer,exception);
-      break;
-    }
-    case ShortPixel:
-    {
-      status=ExportShortPixel(image,&roi,&buffer,exception);
-      break;
-    }
     default:
     {
-      (void) ThrowMagickException(exception,GetMagickModule(),OptionError,
-        "UnrecognizedPixelMap","`%s'",map);
-      status=MagickFalse;
+      ExportTypeRequest
+        request;
+
+      request.image=image;
+      request.roi=roi;
+      request.buffer=buffer;
+      request.type=type;
+      request.map=map;
+      request.exception=exception;
+      ExportPixelsOfType(&request,&status);
+      break;
     }
   }
   quantum_map=(QuantumType *) RelinquishMagickMemory(quantum_map);
