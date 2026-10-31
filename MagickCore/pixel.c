@@ -1447,8 +1447,9 @@ static void AverageInterpolateChannel(const ChannelAverage *average,
   SetPixelChannel(destination,channel,ClampToQuantum(sum),pixel);
 }
 
-static void InterpolateCatromChannel(const ChannelsInterpolation *grid,
-  const Quantum *magick_restrict p,const ssize_t i,Quantum *pixel)
+static void InterpolateCubicChannel(const ChannelsInterpolation *grid,
+  void (*weights)(const double,double (*)[4]),const Quantum *magick_restrict p,
+  const ssize_t i,Quantum *pixel)
 {
   double
     alpha[16],
@@ -1481,58 +1482,8 @@ static void InterpolateCatromChannel(const ChannelsInterpolation *grid,
       pixels[j]=alpha[j]*(double)
         p[j*(ssize_t) GetPixelChannels(grid->source)+i];
     }
-  CatromWeights((double) (grid->x-grid->x_offset),&cx);
-  CatromWeights((double) (grid->y-grid->y_offset),&cy);
-  gamma=((traits & BlendPixelTrait) ? (double) (1.0) :
-    MagickSafeReciprocal(cy[0]*(cx[0]*alpha[0]+cx[1]*alpha[1]+cx[2]*
-    alpha[2]+cx[3]*alpha[3])+cy[1]*(cx[0]*alpha[4]+cx[1]*alpha[5]+cx[2]*
-    alpha[6]+cx[3]*alpha[7])+cy[2]*(cx[0]*alpha[8]+cx[1]*alpha[9]+cx[2]*
-    alpha[10]+cx[3]*alpha[11])+cy[3]*(cx[0]*alpha[12]+cx[1]*alpha[13]+
-    cx[2]*alpha[14]+cx[3]*alpha[15])));
-  SetPixelChannel(grid->destination,channel,ClampToQuantum(gamma*(cy[0]*(cx[0]*
-    pixels[0]+cx[1]*pixels[1]+cx[2]*pixels[2]+cx[3]*pixels[3])+cy[1]*
-    (cx[0]*pixels[4]+cx[1]*pixels[5]+cx[2]*pixels[6]+cx[3]*pixels[7])+
-    cy[2]*(cx[0]*pixels[8]+cx[1]*pixels[9]+cx[2]*pixels[10]+cx[3]*
-    pixels[11])+cy[3]*(cx[0]*pixels[12]+cx[1]*pixels[13]+cx[2]*
-    pixels[14]+cx[3]*pixels[15]))),pixel);
-}
-
-static void InterpolateSplineChannel(const ChannelsInterpolation *grid,
-  const Quantum *magick_restrict p,const ssize_t i,Quantum *pixel)
-{
-  double
-    alpha[16],
-    cx[4],
-    cy[4],
-    gamma,
-    pixels[16];
-
-  ssize_t
-    j;
-
-  PixelChannel channel = GetPixelChannelChannel(grid->source,i);
-  PixelTrait traits = GetPixelChannelTraits(grid->source,channel);
-  PixelTrait destination_traits=GetPixelChannelTraits(grid->destination,
-    channel);
-  if ((traits == UndefinedPixelTrait) ||
-      (destination_traits == UndefinedPixelTrait))
-    return;
-  if ((traits & BlendPixelTrait) == 0)
-    for (j=0; j < 16; j++)
-    {
-      alpha[j]=1.0;
-      pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(grid->source)+i];
-    }
-  else
-    for (j=0; j < 16; j++)
-    {
-      alpha[j]=QuantumScale*(double) GetPixelAlpha(grid->source,p+j*
-        (ssize_t) GetPixelChannels(grid->source));
-      pixels[j]=alpha[j]*(double) p[j*(ssize_t) GetPixelChannels(grid->source)+
-        i];
-    }
-  SplineWeights((double) (grid->x-grid->x_offset),&cx);
-  SplineWeights((double) (grid->y-grid->y_offset),&cy);
+  weights((double) (grid->x-grid->x_offset),&cx);
+  weights((double) (grid->y-grid->y_offset),&cy);
   gamma=((traits & BlendPixelTrait) ? (double) (1.0) :
     MagickSafeReciprocal(cy[0]*(cx[0]*alpha[0]+cx[1]*alpha[1]+cx[2]*
     alpha[2]+cx[3]*alpha[3])+cy[1]*(cx[0]*alpha[4]+cx[1]*alpha[5]+cx[2]*
@@ -1834,7 +1785,7 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           break;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-        InterpolateCatromChannel(&grid,p,i,pixel);
+        InterpolateCubicChannel(&grid,CatromWeights,p,i,pixel);
       break;
     }
     case IntegerInterpolatePixel:
@@ -1887,7 +1838,7 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           break;
         }
       for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-        InterpolateSplineChannel(&grid,p,i,pixel);
+        InterpolateCubicChannel(&grid,SplineWeights,p,i,pixel);
       break;
     }
   }
