@@ -1300,29 +1300,12 @@ static MagickBooleanType ExportLongRGBPPixels(const Image *image,
   return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
 }
 
-static void ExportLongQuantum(const Image *image,const QuantumType quantum,
-  const Quantum *magick_restrict p,unsigned int *magick_restrict q)
+static void ExportLongAlphaIndexQuantum(const Image *image,
+  const QuantumType quantum,const Quantum *magick_restrict p,
+  unsigned int *magick_restrict q)
 {
   switch (quantum)
   {
-    case RedQuantum:
-    case CyanQuantum:
-    {
-      *q=ScaleQuantumToLong(GetPixelRed(image,p));
-      break;
-    }
-    case GreenQuantum:
-    case MagentaQuantum:
-    {
-      *q=ScaleQuantumToLong(GetPixelGreen(image,p));
-      break;
-    }
-    case BlueQuantum:
-    case YellowQuantum:
-    {
-      *q=ScaleQuantumToLong(GetPixelBlue(image,p));
-      break;
-    }
     case AlphaQuantum:
     {
       *q=ScaleQuantumToLong(GetPixelAlpha(image,p));
@@ -1346,6 +1329,37 @@ static void ExportLongQuantum(const Image *image,const QuantumType quantum,
     }
     default:
       break;
+  }
+}
+
+static void ExportLongQuantum(const Image *image,const QuantumType quantum,
+  const Quantum *magick_restrict p,unsigned int *magick_restrict q)
+{
+  switch (quantum)
+  {
+    case RedQuantum:
+    case CyanQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelRed(image,p));
+      break;
+    }
+    case GreenQuantum:
+    case MagentaQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelGreen(image,p));
+      break;
+    }
+    case BlueQuantum:
+    case YellowQuantum:
+    {
+      *q=ScaleQuantumToLong(GetPixelBlue(image,p));
+      break;
+    }
+    default:
+    {
+      ExportLongAlphaIndexQuantum(image,quantum,p,q);
+      break;
+    }
   }
 }
 
