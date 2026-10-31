@@ -2370,6 +2370,31 @@ static void StreamFloatRGBAPixels(const Image *image,
   }
 }
 
+static void StreamFloatRGBPPixels(const Image *image,
+  const QuantumInfo *quantum_info,float *q)
+{
+  const Quantum
+    *p;
+
+  ssize_t
+    x;
+
+  p=GetAuthenticPixelQueue(image);
+  if (p == (const Quantum *) NULL)
+    return;
+  for (x=0; x < (ssize_t) GetImageExtent(image); x++)
+  {
+    *q++=(float) ((QuantumScale*(double) GetPixelRed(image,p))*
+      quantum_info->scale+quantum_info->minimum);
+    *q++=(float) ((QuantumScale*(double) GetPixelGreen(image,p))*
+      quantum_info->scale+quantum_info->minimum);
+    *q++=(float) ((QuantumScale*(double) GetPixelBlue(image,p))*
+      quantum_info->scale+quantum_info->minimum);
+    *q++=0.0;
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -2778,20 +2803,7 @@ static MagickBooleanType StreamImagePixels(const StreamInfo *stream_info,
         }
       if (LocaleCompare(stream_info->map,"RGBP") == 0)
         {
-          p=GetAuthenticPixelQueue(image);
-          if (p == (const Quantum *) NULL)
-            break;
-          for (x=0; x < (ssize_t) GetImageExtent(image); x++)
-          {
-            *q++=(float) ((QuantumScale*(double) GetPixelRed(image,p))*
-              quantum_info->scale+quantum_info->minimum);
-            *q++=(float) ((QuantumScale*(double) GetPixelGreen(image,p))*
-              quantum_info->scale+quantum_info->minimum);
-            *q++=(float) ((QuantumScale*(double) GetPixelBlue(image,p))*
-              quantum_info->scale+quantum_info->minimum);
-            *q++=0.0;
-            p+=(ptrdiff_t) GetPixelChannels(image);
-          }
+          StreamFloatRGBPPixels(image,quantum_info,q);
           break;
         }
       p=GetAuthenticPixelQueue(image);
