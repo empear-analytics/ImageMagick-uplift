@@ -1722,6 +1722,90 @@ static MagickBooleanType ParseAttributeType(char *n,ExceptionInfo *exception,
   return(MagickTrue);
 }
 
+typedef struct _AttributeListTargets
+{
+  char
+    **xml,
+    **n;
+} AttributeListTargets;
+
+static MagickBooleanType ParseAttributeListDeclaration(XMLTreeRoot *root,
+  ExceptionInfo *exception,const AttributeListTargets *targets)
+{
+  char
+    **const xml = targets->xml;
+
+  char
+    **const n = targets->n;
+
+  char
+    *c,
+    *t,
+    *v;
+
+  ssize_t
+    i;
+
+  /*
+    Parse default attributes.
+  */
+  t=*xml+strspn(*xml+9,XMLWhitespace)+9;
+  if (*t == '\0')
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        OptionWarning,"ParseError","unclosed <!ATTLIST");
+      return(MagickFalse);
+    }
+  *xml=t+strcspn(t,XMLWhitespace ">");
+  if (**xml == '>')
+    return(MagickTrue);
+  **xml='\0';
+  i=0;
+  while (IsOtherAttributeList(root,i,*n) != MagickFalse)
+    i++;
+  while ((*(*n=*xml+strspn(*xml+1,XMLWhitespace)+1) != '\0') &&
+         (**n != '>'))
+  {
+    AttributeTypeTargets
+      attribute_targets;
+
+    DefaultAttributeInfo
+      attribute;
+
+    attribute_targets.xml=xml;
+    attribute_targets.c=(&c);
+    if (ParseAttributeType(*n,exception,&attribute_targets) ==
+        MagickFalse)
+      {
+        return(MagickFalse);
+      }
+    if (**xml == '#')
+      {
+        *xml+=strcspn(*xml,XMLWhitespace ">")-1;
+        if (*c == ' ')
+          continue;
+        v=(char *) NULL;
+      }
+    else
+      if (((**xml == '"') || (**xml == '\''))  &&
+          ((*xml=strchr(v=*xml+1,**xml)) != (char *) NULL))
+        **xml='\0';
+      else
+        {
+          (void) ThrowMagickException(exception,GetMagickModule(),
+            OptionWarning,"ParseError","malformed <!ATTLIST");
+          return(MagickFalse);
+        }
+    attribute.c=c;
+    attribute.n=*n;
+    attribute.t=t;
+    attribute.v=v;
+    attribute.i=i;
+    AppendDefaultAttribute(root,&attribute);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType SkipDoctypeMarkup(XMLTreeRoot *root,char **xml)
 {
   char
@@ -1758,7 +1842,6 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
     *n,
     **predefined_entities,
     q,
-    *t,
     *v;
 
   ssize_t
@@ -1839,69 +1922,18 @@ static MagickBooleanType ParseInternalDoctype(XMLTreeRoot *root,char *xml,
       else
        if (strncmp(xml,"<!ATTLIST",9) == 0)
          {
-            /*
-              Parse default attributes.
-            */
-            t=xml+strspn(xml+9,XMLWhitespace)+9;
-            if (*t == '\0')
+            AttributeListTargets
+              attribute_list_targets;
+
+            attribute_list_targets.xml=(&xml);
+            attribute_list_targets.n=(&n);
+            if (ParseAttributeListDeclaration(root,exception,
+                &attribute_list_targets) == MagickFalse)
               {
-                (void) ThrowMagickException(exception,GetMagickModule(),
-                  OptionWarning,"ParseError","unclosed <!ATTLIST");
                 predefined_entities=(char **) RelinquishMagickMemory(
                   predefined_entities);
                 return(MagickFalse);
               }
-            xml=t+strcspn(t,XMLWhitespace ">");
-            if (*xml == '>')
-              continue;
-            *xml='\0';
-            i=0;
-            while (IsOtherAttributeList(root,i,n) != MagickFalse)
-              i++;
-            while ((*(n=xml+strspn(xml+1,XMLWhitespace)+1) != '\0') &&
-                   (*n != '>'))
-            {
-              AttributeTypeTargets
-                attribute_targets;
-
-              DefaultAttributeInfo
-                attribute;
-
-              attribute_targets.xml=(&xml);
-              attribute_targets.c=(&c);
-              if (ParseAttributeType(n,exception,&attribute_targets) ==
-                  MagickFalse)
-                {
-                  predefined_entities=(char **) RelinquishMagickMemory(
-                    predefined_entities);
-                  return(MagickFalse);
-                }
-              if (*xml == '#')
-                {
-                  xml+=strcspn(xml,XMLWhitespace ">")-1;
-                  if (*c == ' ')
-                    continue;
-                  v=(char *) NULL;
-                }
-              else
-                if (((*xml == '"') || (*xml == '\''))  &&
-                    ((xml=strchr(v=xml+1,*xml)) != (char *) NULL))
-                  *xml='\0';
-                else
-                  {
-                    (void) ThrowMagickException(exception,GetMagickModule(),
-                      OptionWarning,"ParseError","malformed <!ATTLIST");
-                    predefined_entities=(char **) RelinquishMagickMemory(
-                      predefined_entities);
-                    return(MagickFalse);
-                  }
-              attribute.c=c;
-              attribute.n=n;
-              attribute.t=t;
-              attribute.v=v;
-              attribute.i=i;
-              AppendDefaultAttribute(root,&attribute);
-            }
         }
       else
         if (SkipDoctypeMarkup(root,&xml) == MagickFalse)
