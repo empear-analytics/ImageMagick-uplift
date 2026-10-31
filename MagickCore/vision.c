@@ -2298,6 +2298,25 @@ static void NormalizeLabeledObjects(const CCLabeledObjects *labeled_objects,
   *max_threshold+=MagickEpsilon;
 }
 
+static MagickBooleanType KeepTopObjects(const Image *component_image,
+  CCObjectInfo *object,const char *artifact)
+{
+  CCObjectInfo
+    *top_objects;
+
+  ssize_t
+    top_ids;
+
+  top_ids=GetTopObjectIds(component_image,artifact);
+  top_objects=(CCObjectInfo *) AcquireQuantumMemory(component_image->colors,
+    sizeof(*top_objects));
+  if (top_objects == (CCObjectInfo *) NULL)
+    return(MagickFalse);
+  MergeObjectsBelowTop(component_image,object,top_objects,top_ids);
+  top_objects=(CCObjectInfo *) RelinquishMagickMemory(top_objects);
+  return(MagickTrue);
+}
+
 #define ConnectedComponentsImageTag  "ConnectedComponents/Image"
 
 static void UpdateComponentsProgress(const Image *image,
@@ -2550,26 +2569,15 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   artifact=GetImageArtifact(image,"connected-components:keep-top");
   if (artifact != (const char *) NULL)
     {
-      CCObjectInfo
-        *top_objects;
-
-      ssize_t
-        top_ids;
-
       /*
         Keep top objects.
       */
-      top_ids=GetTopObjectIds(component_image,artifact);
-      top_objects=(CCObjectInfo *) AcquireQuantumMemory(component_image->colors,
-        sizeof(*top_objects));
-      if (top_objects == (CCObjectInfo *) NULL)
+      if (KeepTopObjects(component_image,object,artifact) == MagickFalse)
         {
           object=(CCObjectInfo *) RelinquishMagickMemory(object);
           component_image=DestroyImage(component_image);
           ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
         }
-      MergeObjectsBelowTop(component_image,object,top_objects,top_ids);
-      top_objects=(CCObjectInfo *) RelinquishMagickMemory(top_objects);
     }
   artifact=GetImageArtifact(image,"connected-components:remove-colors");
   if (artifact != (const char *) NULL)
