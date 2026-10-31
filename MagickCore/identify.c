@@ -1645,6 +1645,37 @@ static void PrintImageDepth(FILE *file,const Image *image,
     }
 }
 
+static void PrintAuxiliaryChannelStatistics(const Image *image,
+  ChannelStatisticsReport report)
+{
+  ssize_t
+    i;
+
+  if (image->alpha_trait != UndefinedPixelTrait)
+    (void) PrintChannelStatistics(&report,AlphaPixelChannel,"Alpha");
+  if ((image->channels & ReadMaskChannel) != 0)
+    (void) PrintChannelStatistics(&report,ReadMaskPixelChannel,"Read mask");
+  if ((image->channels & WriteMaskChannel) != 0)
+    (void) PrintChannelStatistics(&report,WriteMaskPixelChannel,
+      "Write mask");
+  if ((image->channels & CompositeMaskChannel) != 0)
+    (void) PrintChannelStatistics(&report,WriteMaskPixelChannel,
+      "Composite mask");
+  if (image->number_meta_channels != 0)
+    for (i=0; i < (ssize_t) image->number_meta_channels; i++)
+    {
+      char
+        label[MagickPathExtent];
+
+      PixelChannel
+        channel = (PixelChannel) (MetaPixelChannels+i);
+
+      (void) FormatLocaleString(label,MagickPathExtent,
+        "Meta channel[%.17g]",(double) i);
+      (void) PrintChannelStatistics(&report,channel,label);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1687,7 +1718,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     distance;
 
   ssize_t
-    i,
     x;
 
   struct stat
@@ -1847,29 +1877,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
           break;
         }
       }
-      if (image->alpha_trait != UndefinedPixelTrait)
-        (void) PrintChannelStatistics(&report,AlphaPixelChannel,"Alpha");
-      if ((image->channels & ReadMaskChannel) != 0)
-        (void) PrintChannelStatistics(&report,ReadMaskPixelChannel,"Read mask");
-      if ((image->channels & WriteMaskChannel) != 0)
-        (void) PrintChannelStatistics(&report,WriteMaskPixelChannel,
-          "Write mask");
-      if ((image->channels & CompositeMaskChannel) != 0)
-        (void) PrintChannelStatistics(&report,WriteMaskPixelChannel,
-          "Composite mask");
-      if (image->number_meta_channels != 0)
-        for (i=0; i < (ssize_t) image->number_meta_channels; i++)
-        {
-          char
-            label[MagickPathExtent];
-
-          PixelChannel
-            channel = (PixelChannel) (MetaPixelChannels+i);
-
-          (void) FormatLocaleString(label,MagickPathExtent,
-            "Meta channel[%.17g]",(double) i);
-          (void) PrintChannelStatistics(&report,channel,label);
-        }
+      PrintAuxiliaryChannelStatistics(image,report);
       if ((colorspace != LinearGRAYColorspace) &&
           (colorspace != GRAYColorspace))
         {
