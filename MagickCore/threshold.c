@@ -1905,6 +1905,49 @@ static void RandomThresholdPixel(const Image *image,
   }
 }
 
+typedef struct _RandomThresholdRow
+{
+  double
+    min_threshold,
+    max_threshold;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  int
+    id;
+} RandomThresholdRow;
+
+static void RandomThresholdPixels(const Image *image,
+  const RandomThresholdRow *row,Quantum *magick_restrict q)
+{
+  const double
+    min_threshold = row->min_threshold,
+    max_threshold = row->max_threshold;
+
+  RandomInfo
+    **magick_restrict const random_info = row->random_info;
+
+  const int
+    id = row->id;
+
+  RandomThreshold
+    random_threshold;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    random_threshold.min_threshold=min_threshold;
+    random_threshold.max_threshold=max_threshold;
+    random_threshold.random_info=random_info;
+    random_threshold.id=id;
+    RandomThresholdPixel(image,&random_threshold,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType RandomThresholdImage(Image *image,
   const double min_threshold, const double max_threshold,ExceptionInfo *exception)
 {
@@ -1958,11 +2001,8 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    RandomThreshold
-      random_threshold;
-
-    ssize_t
-      x;
+    RandomThresholdRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -1972,15 +2012,11 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      random_threshold.min_threshold=min_threshold;
-      random_threshold.max_threshold=max_threshold;
-      random_threshold.random_info=random_info;
-      random_threshold.id=id;
-      RandomThresholdPixel(image,&random_threshold,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    row.min_threshold=min_threshold;
+    row.max_threshold=max_threshold;
+    row.random_info=random_info;
+    row.id=id;
+    RandomThresholdPixels(image,&row,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
