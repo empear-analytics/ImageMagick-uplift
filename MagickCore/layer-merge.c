@@ -198,25 +198,45 @@ static Image *TrimLayerBounds(Image *image,const RectangleInfo page,
   return((Image *) NULL);
 }
 
+static void ComposeLayersOntoCanvas(Image *canvas,Image *image,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    proceed;
+
+  size_t
+    number_images;
+
+  ssize_t
+    scene;
+
+  number_images=GetImageListLength(image);
+  for (scene=0; scene < (ssize_t) number_images; scene++)
+  {
+    (void) CompositeImage(canvas,image,image->compose,MagickTrue,image->page.x-
+      canvas->page.x,image->page.y-canvas->page.y,exception);
+    proceed=SetImageProgress(image,MergeLayersTag,(MagickOffsetType) scene,
+      number_images);
+    if (proceed == MagickFalse)
+      break;
+    image=GetNextImageInList(image);
+    if (image == (Image *) NULL)
+      break;
+  }
+}
+
 MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
   Image
     *canvas;
 
-  MagickBooleanType
-    proceed;
-
   RectangleInfo
     page;
 
   size_t
-    number_images,
     height,
     width;
-
-  ssize_t
-    scene;
 
   assert(image != (Image *) NULL);
   assert(image->signature == MagickCoreSignature);
@@ -288,18 +308,6 @@ MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
   /*
     Compose images onto canvas, with progress monitor
   */
-  number_images=GetImageListLength(image);
-  for (scene=0; scene < (ssize_t) number_images; scene++)
-  {
-    (void) CompositeImage(canvas,image,image->compose,MagickTrue,image->page.x-
-      canvas->page.x,image->page.y-canvas->page.y,exception);
-    proceed=SetImageProgress(image,MergeLayersTag,(MagickOffsetType) scene,
-      number_images);
-    if (proceed == MagickFalse)
-      break;
-    image=GetNextImageInList(image);
-    if (image == (Image *) NULL)
-      break;
-  }
+  ComposeLayersOntoCanvas(canvas,image,exception);
   return(canvas);
 }
