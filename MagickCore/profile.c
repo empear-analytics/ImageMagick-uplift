@@ -2689,18 +2689,18 @@ static MagickBooleanType LocateExifEntryValue(const ExifEntryInfo *exif_entry,
   return(MagickTrue);
 }
 
+typedef struct _DirectoryInfo
+{
+  unsigned char
+    *directory;
+
+  size_t
+    entry;
+} DirectoryInfo;
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
-  typedef struct _DirectoryInfo
-  {
-    unsigned char
-      *directory;
-
-    size_t
-      entry;
-  } DirectoryInfo;
-
   DirectoryInfo
     directory_stack[MaxDirectoryStack] = { { 0, 0 } };
 
