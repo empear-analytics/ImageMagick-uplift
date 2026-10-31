@@ -601,6 +601,44 @@ static MagickBooleanType AcquireDefaultCluster(const ExtentPacket red,
   return(MagickTrue);
 }
 
+typedef struct _GreenClusterTargets
+{
+  Cluster
+    **cluster,
+    **head;
+
+  ExtentPacket
+    *green,
+    *blue;
+} GreenClusterTargets;
+
+static MagickBooleanType FormGreenClusters(short **extrema,
+  const ExtentPacket red,const GreenClusterTargets *green_targets)
+{
+  Cluster
+    **const cluster = green_targets->cluster,
+    **const head = green_targets->head;
+
+  ExtentPacket
+    *const green = green_targets->green,
+    *const blue = green_targets->blue;
+
+  (*green).index=0;
+  while (DefineRegion(extrema[Green],green) != 0)
+  {
+    ClusterTargets
+      targets;
+
+    (*blue).index=0;
+    targets.cluster=(cluster);
+    targets.head=(head);
+    targets.blue=(blue);
+    if (FormBlueClusters(extrema,red,*green,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -675,20 +713,16 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   (void) memset(&blue,0,sizeof(blue));
   while (DefineRegion(extrema[Red],&red) != 0)
   {
-    green.index=0;
-    while (DefineRegion(extrema[Green],&green) != 0)
-    {
-      ClusterTargets
-        targets;
+    GreenClusterTargets
+      green_targets;
 
-      blue.index=0;
-      targets.cluster=(&cluster);
-      targets.head=(&head);
-      targets.blue=(&blue);
-      if (FormBlueClusters(extrema,red,green,&targets) == MagickFalse)
-        ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-          image->filename);
-    }
+    green_targets.cluster=(&cluster);
+    green_targets.head=(&head);
+    green_targets.green=(&green);
+    green_targets.blue=(&blue);
+    if (FormGreenClusters(extrema,red,&green_targets) == MagickFalse)
+      ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
   }
   if (AcquireDefaultCluster(red,green,blue,&head) == MagickFalse)
     ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
