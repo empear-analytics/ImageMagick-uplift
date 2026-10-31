@@ -1886,6 +1886,25 @@ static void PrintImageLayout(FILE *file,const Image *image)
     MagickDisposeOptions,(ssize_t) image->dispose));
 }
 
+static void PrintImageAnimation(FILE *file,const Image *image)
+{
+  if (image->delay != 0)
+    (void) FormatLocaleFile(file,"  Delay: %.17gx%.17g\n",(double) image->delay,
+      (double) image->ticks_per_second);
+  if (image->iterations != 1)
+    (void) FormatLocaleFile(file,"  Iterations: %.17g\n",(double)
+      image->iterations);
+  if (image->duration != 0)
+    (void) FormatLocaleFile(file,"  Duration: %.17g\n",(double)
+      image->duration);
+  if ((image->next != (Image *) NULL) || (image->previous != (Image *) NULL))
+    (void) FormatLocaleFile(file,"  Scene: %.17g of %.17g\n",(double)
+      image->scene,(double) GetImageListLength(image));
+  else
+    if (image->scene != 0)
+      (void) FormatLocaleFile(file,"  Scene: %.17g\n",(double) image->scene);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2072,21 +2091,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   PrintImageErrorAndRendering(file,image);
   PrintImageColors(file,image,exception);
   PrintImageLayout(file,image);
-  if (image->delay != 0)
-    (void) FormatLocaleFile(file,"  Delay: %.17gx%.17g\n",(double) image->delay,
-      (double) image->ticks_per_second);
-  if (image->iterations != 1)
-    (void) FormatLocaleFile(file,"  Iterations: %.17g\n",(double)
-      image->iterations);
-  if (image->duration != 0)
-    (void) FormatLocaleFile(file,"  Duration: %.17g\n",(double)
-      image->duration);
-  if ((image->next != (Image *) NULL) || (image->previous != (Image *) NULL))
-    (void) FormatLocaleFile(file,"  Scene: %.17g of %.17g\n",(double)
-      image->scene,(double) GetImageListLength(image));
-  else
-    if (image->scene != 0)
-      (void) FormatLocaleFile(file,"  Scene: %.17g\n",(double) image->scene);
+  PrintImageAnimation(file,image);
   (void) FormatLocaleFile(file,"  Compression: %s\n",CommandOptionToMnemonic(
     MagickCompressOptions,(ssize_t) image->compression));
   if (image->quality != UndefinedCompressionQuality)
