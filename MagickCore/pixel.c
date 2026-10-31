@@ -3025,6 +3025,47 @@ MagickExport MagickBooleanType SetPixelMetaChannels(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void SortRowPixels(const Image *image,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns-1; x++)
+  {
+    MagickRealType
+      current,
+      previous;
+
+    ssize_t
+      j;
+
+    previous=GetPixelIntensity(image,q);
+    for (j=0; j < ((ssize_t) image->columns-x-1); j++)
+    {
+      current=GetPixelIntensity(image,q+(j+1)*(ssize_t)
+        GetPixelChannels(image));
+      if (previous > current)
+        {
+          Quantum
+            pixel[MaxPixelChannels];
+
+          /*
+            Swap adjacent pixels.
+          */
+          (void) memcpy(pixel,q+j*(ssize_t) GetPixelChannels(image),
+            GetPixelChannels(image)*sizeof(Quantum));
+          (void) memcpy(q+j*(ssize_t) GetPixelChannels(image),q+(j+1)*
+            (ssize_t) GetPixelChannels(image),GetPixelChannels(image)*
+            sizeof(Quantum));
+          (void) memcpy(q+(j+1)*(ssize_t) GetPixelChannels(image),pixel,
+            GetPixelChannels(image)*sizeof(Quantum));
+        }
+      else
+        previous=current;
+    }
+  }
+}
+
 MagickExport MagickBooleanType SortImagePixels(Image *image,
   ExceptionInfo *exception)
 {
@@ -3061,9 +3102,6 @@ MagickExport MagickBooleanType SortImagePixels(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -3072,40 +3110,7 @@ MagickExport MagickBooleanType SortImagePixels(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns-1; x++)
-    {
-      MagickRealType
-        current,
-        previous;
-
-      ssize_t
-        j;
-
-      previous=GetPixelIntensity(image,q);
-      for (j=0; j < ((ssize_t) image->columns-x-1); j++)
-      {
-        current=GetPixelIntensity(image,q+(j+1)*(ssize_t)
-          GetPixelChannels(image));
-        if (previous > current)
-          {
-            Quantum
-              pixel[MaxPixelChannels];
-
-            /*
-              Swap adjacent pixels.
-            */
-            (void) memcpy(pixel,q+j*(ssize_t) GetPixelChannels(image),
-              GetPixelChannels(image)*sizeof(Quantum));
-            (void) memcpy(q+j*(ssize_t) GetPixelChannels(image),q+(j+1)*
-              (ssize_t) GetPixelChannels(image),GetPixelChannels(image)*
-              sizeof(Quantum));
-            (void) memcpy(q+(j+1)*(ssize_t) GetPixelChannels(image),pixel,
-              GetPixelChannels(image)*sizeof(Quantum));
-          }
-        else
-          previous=current;
-      }
-    }
+    SortRowPixels(image,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
