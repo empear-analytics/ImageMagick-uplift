@@ -3549,6 +3549,13 @@ go in a struct; Recipe SD, which moves a group of different cases, not copies of
    (`accentuate=matte;`) and the caller reads after it, is the new function's local of
    `v`'s type and its return value; the copy becomes `v=Helper(...);` (Recipe E steps 3
    and 4).
+   A copy whose one write is `v=c;` of one constant under its test, so that a path
+   leaves `v` alone, and whose `v` the caller sets on every path to the copy and reads
+   after it, takes `v` by value as its last parameter and returns it, as Recipe E
+   step 7's `switch` form does: the function ends with `return(v);` and the copy
+   becomes `v=Helper(...,v);`. A member-access value may reach the member through an
+   element of an array member (`image->colormap[i].red`) when the block writes neither
+   the pointer, the index nor the element.
 3. The new function's parameters are the variables a copy reads (Recipe E step 3) and
    the value, at most four in all. The value's parameter is `const` and has the type of
    every object it is assigned to or parameter it is passed to in the block (an
@@ -3642,6 +3649,14 @@ static MagickBooleanType SetOpaqueAlphaTrait(Image *image,
   writes, and the caller's `v=Helper(...);` copies every member back, as the copy left
   them. Nothing in the copy may read `v` before that whole assignment or take its
   address.
+- A `v` taken by value (step 2's conditional form) enters the function holding the
+  caller's value, which the caller set on every path to the copy. The path that
+  writes it returns the constant the copy assigned; the path that does not returns
+  the value it took. Either way the caller's `v` holds after the call what it held
+  after the copy. The copy did not read `v`, and reading it as an argument has no
+  side effect. An array-element member value is read once at the call, where the copy
+  read it once inside the test; nothing in the block writes the array, the index or
+  the element, so it is the same value.
 - `refactor_guard.py` reports the removed copies as deduplication (`WARN`, every value
   still present) and `--calls` moves only the callees of the copies (down by the copies
   removed) and the helper (its definition and one call per copy); anything else stops
@@ -3664,6 +3679,10 @@ Step 2's macro value and returned variable (2026-10-30, task W10): `decorate.c`'
 `FrameImage`, whose `accentuate` and `highlight` colours are the same five statements on
 `matte` with `AccentuateModulate` or `HighlightModulate`, and whose `shadow` and `trough`
 colours the same with `ShadowModulate` or `TroughModulate`.
+Step 2's conditional `v` and array-element member value (2026-10-31, task W10):
+`attribute-depth.c`'s `RaiseColormapEntryDepth`, whose red, green and blue tests each
+end in `if (IsPixelAtDepth(ClampToQuantum(image->colormap[i].<c>),range) ==
+MagickFalse) atDepth=MagickFalse;`.
 
 ---
 
@@ -4566,3 +4585,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | NEW | LT | Extract Loop Whose Early Exit Is Tested After It: a `for` loop leaving itself through `break;`, followed directly by `if (<cond>) X;` testing its own condition, moves to a `static MagickBooleanType` function whose `break;`s become `return(MagickFalse);` and which drops the test; the caller writes `if (Helper(...) == MagickFalse) X;`. A run equal to an existing I/LB/W/Y function calls it | `histogram.c`'s `CheckImageColors` (W10): its tree descent (`if (level < MaxTreeDepth) break;`) is `ClassifyImageColors`' `DescendHCube` with a `break` for the `return`, and its column loop is tested `x < (ssize_t) image->columns` after it; probes 8.58 to 8.64 (descent), 9.68 with the column loop, the function leaving every finding | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | SD | Step 7: a `switch` without `default` may be split too; the new function's `switch` ends with `default: break;` and the caller's gains the `default:` group holding the call. *Careful* argues the values that match no label and names the cost (`-Wswitch` no longer sees a constant added later) | `resample.c`'s `ResamplePixelColor` (W10): its `hit` switch over every `VirtualPixelMethod` constant has no `default`, so step 1 refuses it; without the added group the new function's partial `switch` draws `-Wswitch`. Probes: the vertical-tile and dither groups, 7.30 to 7.34; then the corner and horizontal-tile groups, 7.37 (cc 34 to 26) | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | V | Step 6: in a function returning `void`, `return;` plays the part of `return(c);`: each becomes `return(MagickFalse);` and the caller writes `if (Helper(...) == MagickFalse) return;`. Applies to Recipe Y through its step 1 | `resample.c`'s `ScaleResampleFilter` (W10, public, `void`, *Large Method* of 100 lines, most of them in uncompiled `#if` branches): its compiled ellipse-fitting block leaves through `return;` once the ellipse is too large and writes `F`, which the caller reads after; Recipe Y (inputs `resample_filter`, `A`, `B`, `C`) refuses it only because `return;` has no constant. A probe: 7.40 to 7.41 | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | SV | Step 2: a copy whose one write is `v=c;` of one constant under its test (a path leaves `v` alone), `v` set by the caller on every path to the copy and read after it, takes `v` by value as its last parameter and returns it, the copy becoming `v=Helper(...,v);` (Recipe E step 7's `switch` form); a member-access value may reach the member through an element of an array member (`image->colormap[i].red`) that the block does not write. *Careful* gives the argument | `attribute-depth.c`'s `RaiseColormapEntryDepth` (W10, cc 11, Bumpy Road 3): its red, green and blue tests differ in two values (the trait accessor and the colormap member), and the first lacks the `atDepth != MagickFalse` operand, so SV refuses them whole; their inner `if`s differ only in the member (`.red`, `.green`, `.blue`), but each writes `atDepth=MagickFalse;` only when its test holds, which step 2's returned-variable form (assigned whole first) refuses. Recipe E on the red copy alone: 7.03 to 7.05; the three as one helper: 7.03 to 7.30, the function leaving *Complex Method* (cc 8) and *Bumpy Road Ahead* | mandate (2026-10-24) |
