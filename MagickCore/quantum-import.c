@@ -5242,6 +5242,45 @@ static MagickBooleanType ImportAnyDepthIndexAlphaQuantum(const Image *image,
   return(range_exception);
 }
 
+static void ImportOtherDepthIndexAlphaQuantum(const Image *image,
+  QuantumInfo *quantum_info,const QuantumPixelSpan *span,
+  MagickBooleanType *range_exception)
+{
+  switch (quantum_info->depth)
+  {
+    case 32:
+    {
+      *range_exception=Import32BitIndexAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+    case 24:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          *range_exception=Import24BitFloatIndexAlphaQuantum(image,quantum_info,
+            span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    case 64:
+    {
+      if (quantum_info->format == FloatingPointQuantumFormat)
+        {
+          *range_exception=Import64BitFloatIndexAlphaQuantum(image,quantum_info,
+            span);
+          break;
+        }
+      magick_fallthrough;
+    }
+    default:
+    {
+      *range_exception=ImportAnyDepthIndexAlphaQuantum(image,quantum_info,span);
+      break;
+    }
+  }
+}
+
 static void ImportIndexAlphaQuantum(const Image *image,QuantumInfo *quantum_info,
   const QuantumPixelSpan *span,ExceptionInfo *exception)
 {
@@ -5277,34 +5316,10 @@ static void ImportIndexAlphaQuantum(const Image *image,QuantumInfo *quantum_info
       range_exception=Import16BitIndexAlphaQuantum(image,quantum_info,span);
       break;
     }
-    case 32:
-    {
-      range_exception=Import32BitIndexAlphaQuantum(image,quantum_info,span);
-      break;
-    }
-    case 24:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          range_exception=Import24BitFloatIndexAlphaQuantum(image,quantum_info,
-            span);
-          break;
-        }
-      magick_fallthrough;
-    }
-    case 64:
-    {
-      if (quantum_info->format == FloatingPointQuantumFormat)
-        {
-          range_exception=Import64BitFloatIndexAlphaQuantum(image,quantum_info,
-            span);
-          break;
-        }
-      magick_fallthrough;
-    }
     default:
     {
-      range_exception=ImportAnyDepthIndexAlphaQuantum(image,quantum_info,span);
+      ImportOtherDepthIndexAlphaQuantum(image,quantum_info,span,
+        &range_exception);
       break;
     }
   }
