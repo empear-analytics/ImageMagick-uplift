@@ -3255,6 +3255,62 @@ static MagickBooleanType ImportMapQuantumGPR(const char *map,const ssize_t i,
   return(MagickTrue);
 }
 
+typedef struct _ImportMapRequest
+{
+  Image
+    *image;
+
+  const char
+    *map;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} ImportMapRequest;
+
+static MagickBooleanType ImportMapQuantumAO(const ImportMapRequest *request,
+  QuantumType *quantum_map)
+{
+  Image
+    *image = request->image;
+
+  const char
+    *map = request->map;
+
+  const ssize_t
+    i = request->i;
+
+  ExceptionInfo
+    *exception = request->exception;
+
+  switch (map[i])
+  {
+    case 'a':
+    case 'A':
+    {
+      quantum_map[i]=AlphaQuantum;
+      image->alpha_trait=BlendPixelTrait;
+      break;
+    }
+    case 'O':
+    case 'o':
+    {
+      quantum_map[i]=OpacityQuantum;
+      image->alpha_trait=BlendPixelTrait;
+      break;
+    }
+    default:
+    {
+      if (ImportMapQuantumGPR(map,i,quantum_map,exception) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   const ssize_t y,const size_t width,const size_t height,const char *map,
   const StorageType type,const void *pixels,ExceptionInfo *exception)
@@ -3292,13 +3348,6 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
   {
     switch (map[i])
     {
-      case 'a':
-      case 'A':
-      {
-        quantum_map[i]=AlphaQuantum;
-        image->alpha_trait=BlendPixelTrait;
-        break;
-      }
       case 'B':
       case 'b':
       {
@@ -3333,13 +3382,6 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
         (void) SetImageColorspace(image,CMYKColorspace,exception);
         break;
       }
-      case 'O':
-      case 'o':
-      {
-        quantum_map[i]=OpacityQuantum;
-        image->alpha_trait=BlendPixelTrait;
-        break;
-      }
       case 'Y':
       case 'y':
       {
@@ -3349,7 +3391,14 @@ MagickExport MagickBooleanType ImportImagePixels(Image *image,const ssize_t x,
       }
       default:
       {
-        if (ImportMapQuantumGPR(map,i,quantum_map,exception) == MagickFalse)
+        ImportMapRequest
+          request;
+
+        request.image=image;
+        request.map=map;
+        request.i=i;
+        request.exception=exception;
+        if (ImportMapQuantumAO(&request,quantum_map) == MagickFalse)
           return(MagickFalse);
         break;
       }
