@@ -3057,6 +3057,13 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    caller no longer reads after the cut leaves the caller's declaration. The moved groups
    need not be adjacent in the `switch`, and the step may be repeated on the same
    `switch`, whose `default` group is then the earlier call.
+7. A `switch` without `default`. When the `switch` has no `default:` label, step 1
+   holds without it, and the groups that move are any whose bodies meet step 2. The new
+   function's `switch` ends with the group `default: break;`, and step 4's `default:`
+   group, holding the call, stands in the caller's `switch` where the first moved group
+   stood. A later step on the same `switch` (step 6's chain) moves the caller's
+   `default` group as step 2 says; the `default: break;` stays in the innermost
+   function. Nothing else is added.
 
 **Before:**
 
@@ -3175,6 +3182,17 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   ending its own `switch`, as the first point argues for one step. Choose the groups
   so that the new functions do not repeat each other's shape: two functions of the
   same groups' kind are reported as *Code Duplication*.
+- Under step 7, a value of a kept label selects its group as before; one of a moved
+  label reaches the caller's new `default`, then its own group in the new function, as
+  the first point argues. A value that matches no label of the original `switch` ran no
+  statement of it; now it reaches the caller's `default`, then the new function's
+  `default: break;`, which runs none either, and the function returns. The added group
+  is there for the compiler: a `switch` on an enumeration that names only some of its
+  constants and has no `default` draws `-Wswitch` (in `-Wall`, an error in ImageMagick's
+  CI), and the new function's `switch` names only the moved groups' constants. The cost
+  is a diagnostic, not behaviour: neither `switch` now warns about an enumeration
+  constant added later that no label names, where the original, if it named every
+  constant, would have. Say so in the commit message.
 
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), a case for each moved label where one exists, and steps 1 and 5
@@ -3191,6 +3209,11 @@ mandate of 2026-10-24. Step 6 (2026-10-30, task W10): `magnify.c`'s
 from its `Hq2XNeighbours` parameter. Recipe Z's struct for the nine inputs took the file
 to 1,031 lines (*Lines of Code in a Single File*, 6.39 in a probe); step 6's form, twice,
 takes `Hq2XHelper` out of *Complex Method* and *Large Method*: 7.48 to 7.66 to 8.13.
+Step 7 (2026-10-31, task W10): `resample.c`'s `ResamplePixelColor`, whose
+virtual-pixel `hit` switch names all seventeen `VirtualPixelMethod` constants and has no
+`default` (cc 22 of the function's 34). Its six-label image group alone with a `default`
+is a function of cc 9, so it stays; the vertical-tile and dither groups, then the corner
+and horizontal-tile groups, as two chained functions: 7.30 to 7.34 to 7.37 in probes.
 
 ---
 
@@ -4530,3 +4553,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | Y | Step 4: a variable the block reads on entry and then writes, and that the caller does not read after the block before writing it again, goes by value right after the struct, its text unchanged (Recipe E step 4's by-value input, as Recipe TW step 2 has it); it is neither a member nor `v` | `layer.c`'s `CompareImagesLayers` (W10): its first frame loop, `i=0; next=GetNextImageInList(next); for ( ; next != ...; ...) { ... }`, advances `next`, which the caller sets again (`next=GetFirstImageInList(image);`) before any later read, and leaves through V step 7's `image_a=DestroyImage(image_a); bounds=... RelinquishMagickMemory(bounds); return((Image *) NULL);`. A probe with `next` by value: 6.62 to 6.70, `CompareImagesLayers` leaving Bumpy Road Ahead | mandate (2026-10-24) |
 | 2026-10-31 | NEW | RF | Reuse a Struct Fill Across Calls: a fill of a struct local that repeats an earlier fill of the same members from the same side-effect-free expressions, with nothing in between that writes the local or what the expressions read, is deleted; the later calls read the earlier fill | `paint.c`'s `FloodfillPaintImage` (W10): three LB steps left `FloodfillRow row` filled with the same eight assignments before each of `FillFloodplaneLeft`, `FillFloodplaneRun` and `SkipFloodplaneRun` in one iteration; a probe deleting the second and third fills, 6.19 to 6.24 (172 to 156 lines), object code `IDENTICAL` | mandate (2026-10-24) |
 | 2026-10-31 | NEW | LT | Extract Loop Whose Early Exit Is Tested After It: a `for` loop leaving itself through `break;`, followed directly by `if (<cond>) X;` testing its own condition, moves to a `static MagickBooleanType` function whose `break;`s become `return(MagickFalse);` and which drops the test; the caller writes `if (Helper(...) == MagickFalse) X;`. A run equal to an existing I/LB/W/Y function calls it | `histogram.c`'s `CheckImageColors` (W10): its tree descent (`if (level < MaxTreeDepth) break;`) is `ClassifyImageColors`' `DescendHCube` with a `break` for the `return`, and its column loop is tested `x < (ssize_t) image->columns` after it; probes 8.58 to 8.64 (descent), 9.68 with the column loop, the function leaving every finding | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | SD | Step 7: a `switch` without `default` may be split too; the new function's `switch` ends with `default: break;` and the caller's gains the `default:` group holding the call. *Careful* argues the values that match no label and names the cost (`-Wswitch` no longer sees a constant added later) | `resample.c`'s `ResamplePixelColor` (W10): its `hit` switch over every `VirtualPixelMethod` constant has no `default`, so step 1 refuses it; without the added group the new function's partial `switch` draws `-Wswitch`. Probes: the vertical-tile and dither groups, 7.30 to 7.34; then the corner and horizontal-tile groups, 7.37 (cc 34 to 26) | mandate (2026-10-24) |
