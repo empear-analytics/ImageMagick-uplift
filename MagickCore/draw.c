@@ -5221,6 +5221,17 @@ static double GetStrokeBeta(const EdgeInfo *p,const double distance,
   return(beta);
 }
 
+static double GetSubpathBeta(double beta,const double distance)
+{
+  if (fabs(beta) < MagickEpsilon)
+    {
+      beta=1.0;
+      if (fabs(distance-1.0) >= MagickEpsilon)
+        beta=sqrt(distance);
+    }
+  return(beta);
+}
+
 static double GetFillAlpha(PolygonInfo *polygon_info,
   const FillAlphaSample *sample,const FillRule fill_rule,double *stroke_alpha)
 {
@@ -5293,12 +5304,7 @@ static double GetFillAlpha(PolygonInfo *polygon_info,
         }
       if (distance > 1.0)
         continue;
-      if (fabs(beta) < MagickEpsilon)
-        {
-          beta=1.0;
-          if (fabs(distance-1.0) >= MagickEpsilon)
-            beta=sqrt(distance);
-        }
+      beta=GetSubpathBeta(beta,distance);
       alpha=beta-1.0;
       if (subpath_alpha < (alpha*alpha))
         subpath_alpha=alpha*alpha;
