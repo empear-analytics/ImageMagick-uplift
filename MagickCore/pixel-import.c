@@ -516,6 +516,71 @@ static const unsigned char *ImportCharMapRow(const ImportCharRowInfo *row,
   return(p);
 }
 
+typedef struct _ImportCharMapLoop
+{
+  Image
+    *image;
+
+  const RectangleInfo
+    *roi;
+
+  const char
+    *map;
+
+  const QuantumType
+    *quantum_map;
+
+  ExceptionInfo
+    *exception;
+} ImportCharMapLoop;
+
+static MagickBooleanType ImportCharMapPixels(const ImportCharMapLoop *loop,
+  const unsigned char *magick_restrict p)
+{
+  Image
+    *image = loop->image;
+
+  const RectangleInfo
+    *roi = loop->roi;
+
+  const char
+    *map = loop->map;
+
+  const QuantumType
+    *quantum_map = loop->quantum_map;
+
+  ExceptionInfo
+    *exception = loop->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  size_t
+    length;
+
+  ssize_t
+    y;
+
+  length=strlen(map);
+  for (y=0; y < (ssize_t) roi->height; y++)
+  {
+    ImportCharRowInfo
+      row;
+
+    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
+    if (q == (Quantum *) NULL)
+      break;
+    row.image=image;
+    row.roi=roi;
+    row.quantum_map=quantum_map;
+    row.length=length;
+    p=ImportCharMapRow(&row,p,q);
+    if (SyncAuthenticPixels(image,exception) == MagickFalse)
+      break;
+  }
+  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+}
+
 static MagickBooleanType ImportCharPixel(Image *image,
   const RectangleInfo *roi,const ImportPixelBuffer *buffer,
   ExceptionInfo *exception)
@@ -532,14 +597,8 @@ static MagickBooleanType ImportCharPixel(Image *image,
   const unsigned char
     *magick_restrict p;
 
-  Quantum
-    *magick_restrict q;
-
-  size_t
-    length;
-
-  ssize_t
-    y;
+  ImportCharMapLoop
+    loop;
 
   p=(const unsigned char *) pixels;
   if (LocaleCompare(map,"BGR") == 0)
@@ -560,24 +619,12 @@ static MagickBooleanType ImportCharPixel(Image *image,
     return(ImportCharRGBOPixels(image,roi,p,exception));
   if (LocaleCompare(map,"RGBP") == 0)
     return(ImportCharRGBPPixels(image,roi,p,exception));
-  length=strlen(map);
-  for (y=0; y < (ssize_t) roi->height; y++)
-  {
-    ImportCharRowInfo
-      row;
-
-    q=GetAuthenticPixels(image,roi->x,roi->y+y,roi->width,1,exception);
-    if (q == (Quantum *) NULL)
-      break;
-    row.image=image;
-    row.roi=roi;
-    row.quantum_map=quantum_map;
-    row.length=length;
-    p=ImportCharMapRow(&row,p,q);
-    if (SyncAuthenticPixels(image,exception) == MagickFalse)
-      break;
-  }
-  return(y < (ssize_t) roi->height ? MagickFalse : MagickTrue);
+  loop.image=image;
+  loop.roi=roi;
+  loop.map=map;
+  loop.quantum_map=quantum_map;
+  loop.exception=exception;
+  return(ImportCharMapPixels(&loop,p));
 }
 
 static MagickBooleanType ImportDoubleBGRPixels(Image *image,const RectangleInfo *roi,
