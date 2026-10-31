@@ -317,6 +317,40 @@ typedef struct _RangeInfo
     max;
 } RangeInfo;
 
+typedef struct _CLAHERedistribution
+{
+  size_t
+    *histogram,
+    *q;
+
+  double
+    clip_limit;
+
+  ssize_t
+    step;
+} CLAHERedistribution;
+
+static void RedistributeCLAHEBins(const CLAHERedistribution *redistribution,
+  size_t **p,ssize_t *cumulative_excess)
+{
+  size_t
+    *const histogram = redistribution->histogram,
+    *const q = redistribution->q;
+
+  const double
+    clip_limit = redistribution->clip_limit;
+
+  const ssize_t
+    step = redistribution->step;
+
+  for ((*p)=histogram; ((*p) < q) && ((*cumulative_excess) != 0); (*p)+=(ptrdiff_t) step)
+    if ((double) *(*p) < clip_limit)
+      {
+        (*(*p))++;
+        (*cumulative_excess)--;
+      }
+}
+
 static ssize_t RedistributeCLAHEExcess(const double clip_limit,
   const size_t number_bins,size_t *histogram,ssize_t cumulative_excess)
 {
@@ -333,15 +367,17 @@ static ssize_t RedistributeCLAHEExcess(const double clip_limit,
   q=histogram+number_bins;
   while ((cumulative_excess != 0) && (p < q))
   {
+    CLAHERedistribution
+      redistribution;
+
     step=(ssize_t) number_bins/cumulative_excess;
     if (step < 1)
       step=1;
-    for (p=histogram; (p < q) && (cumulative_excess != 0); p+=(ptrdiff_t) step)
-      if ((double) *p < clip_limit)
-        {
-          (*p)++;
-          cumulative_excess--;
-        }
+    redistribution.histogram=histogram;
+    redistribution.q=q;
+    redistribution.clip_limit=clip_limit;
+    redistribution.step=step;
+    RedistributeCLAHEBins(&redistribution,&p,&cumulative_excess);
     p++;
   }
   return(cumulative_excess);
