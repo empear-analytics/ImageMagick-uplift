@@ -805,6 +805,27 @@ MagickExport MagickBooleanType CloseBlob(Image *image)
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void RestoreCustomStreamFilenames(const ImageInfo *image_info,
+  const MagickInfo *magick_info,Image *image)
+{
+  Image
+    *images;
+
+  /*
+    Restore original filenames and image format.
+  */
+  for (images=GetFirstImageInList(image); images != (Image *) NULL; )
+  {
+    (void) CopyMagickString(images->filename,image_info->filename,
+      MagickPathExtent);
+    (void) CopyMagickString(images->magick_filename,
+      image_info->filename,MagickPathExtent);
+    (void) CopyMagickString(images->magick,magick_info->name,
+      MagickPathExtent);
+    images=GetNextImageInList(images);
+  }
+}
+
 MagickExport Image *CustomStreamToImage(const ImageInfo *image_info,
   ExceptionInfo *exception)
 {
@@ -909,24 +930,7 @@ MagickExport Image *CustomStreamToImage(const ImageInfo *image_info,
             "%s:%s",blob_info->magick,unique);
           image=ReadImage(clone_info,exception);
           if (image != (Image *) NULL)
-            {
-              Image
-                *images;
-
-              /*
-                Restore original filenames and image format.
-              */
-              for (images=GetFirstImageInList(image); images != (Image *) NULL; )
-              {
-                (void) CopyMagickString(images->filename,image_info->filename,
-                  MagickPathExtent);
-                (void) CopyMagickString(images->magick_filename,
-                  image_info->filename,MagickPathExtent);
-                (void) CopyMagickString(images->magick,magick_info->name,
-                  MagickPathExtent);
-                images=GetNextImageInList(images);
-              }
-            }
+            RestoreCustomStreamFilenames(image_info,magick_info,image);
         }
       clone_info=DestroyImageInfo(clone_info);
       blob=(unsigned char *) RelinquishMagickMemory(blob);
