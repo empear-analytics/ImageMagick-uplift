@@ -2263,6 +2263,76 @@ static inline void ShadePixelChannels(const ShadeImages *shading,
   ClampPixel(GetPixelIntensity((image),(pixel)))
 #define ShadeImageTag  "Shade/Image"
 
+typedef struct _ShadeRow
+{
+  const Image
+    *linear_image,
+    *shade_image;
+
+  PrimaryInfo
+    light;
+
+  ShadeImages
+    shading;
+} ShadeRow;
+
+static void ShadeRowPixels(const ShadeRow *row,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  const Image
+    *const linear_image = row->linear_image,
+    *const shade_image = row->shade_image;
+
+  const PrimaryInfo
+    light = row->light;
+
+  const ShadeImages
+    shading = row->shading;
+
+  const Quantum
+    *magick_restrict center,
+    *magick_restrict post,
+    *magick_restrict pre;
+
+  double
+    shade;
+
+  PrimaryInfo
+    normal;
+
+  ssize_t
+    x;
+
+  normal.z=2.0*(double) QuantumRange;  /* constant Z of surface normal */
+  for (x=0; x < (ssize_t) linear_image->columns; x++)
+  {
+    /*
+      Determine the surface normal and compute shading.
+    */
+    pre=p+GetPixelChannels(linear_image);
+    center=pre+(linear_image->columns+2)*GetPixelChannels(linear_image);
+    post=center+(linear_image->columns+2)*GetPixelChannels(linear_image);
+    normal.x=(double) (
+      GetShadeIntensity(linear_image,pre-GetPixelChannels(linear_image))+
+      GetShadeIntensity(linear_image,center-GetPixelChannels(linear_image))+
+      GetShadeIntensity(linear_image,post-GetPixelChannels(linear_image))-
+      GetShadeIntensity(linear_image,pre+GetPixelChannels(linear_image))-
+      GetShadeIntensity(linear_image,center+GetPixelChannels(linear_image))-
+      GetShadeIntensity(linear_image,post+GetPixelChannels(linear_image)));
+    normal.y=(double) (
+      GetShadeIntensity(linear_image,post-GetPixelChannels(linear_image))+
+      GetShadeIntensity(linear_image,post)+
+      GetShadeIntensity(linear_image,post+GetPixelChannels(linear_image))-
+      GetShadeIntensity(linear_image,pre-GetPixelChannels(linear_image))-
+      GetShadeIntensity(linear_image,pre)-
+      GetShadeIntensity(linear_image,pre+GetPixelChannels(linear_image)));
+    shade=GetSurfaceShade(&normal,&light);
+    ShadePixelChannels(&shading,center,q,shade);
+    p+=(ptrdiff_t) GetPixelChannels(linear_image);
+    q+=(ptrdiff_t) GetPixelChannels(shade_image);
+  }
+}
+
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   const double azimuth,const double elevation,ExceptionInfo *exception)
 {
@@ -2332,26 +2402,17 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
 #endif
   for (y=0; y < (ssize_t) linear_image->rows; y++)
   {
-    double
-      shade;
-
-    PrimaryInfo
-      normal;
-
     const ShadeImages
       shading = { linear_image, shade_image, gray };
 
     const Quantum
-      *magick_restrict center,
-      *magick_restrict p,
-      *magick_restrict post,
-      *magick_restrict pre;
+      *magick_restrict p;
 
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    ShadeRow
+      row;
 
     if (status == MagickFalse)
       continue;
@@ -2367,34 +2428,11 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
     /*
       Shade this row of pixels.
     */
-    normal.z=2.0*(double) QuantumRange;  /* constant Z of surface normal */
-    for (x=0; x < (ssize_t) linear_image->columns; x++)
-    {
-      /*
-        Determine the surface normal and compute shading.
-      */
-      pre=p+GetPixelChannels(linear_image);
-      center=pre+(linear_image->columns+2)*GetPixelChannels(linear_image);
-      post=center+(linear_image->columns+2)*GetPixelChannels(linear_image);
-      normal.x=(double) (
-        GetShadeIntensity(linear_image,pre-GetPixelChannels(linear_image))+
-        GetShadeIntensity(linear_image,center-GetPixelChannels(linear_image))+
-        GetShadeIntensity(linear_image,post-GetPixelChannels(linear_image))-
-        GetShadeIntensity(linear_image,pre+GetPixelChannels(linear_image))-
-        GetShadeIntensity(linear_image,center+GetPixelChannels(linear_image))-
-        GetShadeIntensity(linear_image,post+GetPixelChannels(linear_image)));
-      normal.y=(double) (
-        GetShadeIntensity(linear_image,post-GetPixelChannels(linear_image))+
-        GetShadeIntensity(linear_image,post)+
-        GetShadeIntensity(linear_image,post+GetPixelChannels(linear_image))-
-        GetShadeIntensity(linear_image,pre-GetPixelChannels(linear_image))-
-        GetShadeIntensity(linear_image,pre)-
-        GetShadeIntensity(linear_image,pre+GetPixelChannels(linear_image)));
-      shade=GetSurfaceShade(&normal,&light);
-      ShadePixelChannels(&shading,center,q,shade);
-      p+=(ptrdiff_t) GetPixelChannels(linear_image);
-      q+=(ptrdiff_t) GetPixelChannels(shade_image);
-    }
+    row.linear_image=linear_image;
+    row.shade_image=shade_image;
+    row.light=light;
+    row.shading=shading;
+    ShadeRowPixels(&row,p,q);
     if (SyncCacheViewAuthenticPixels(shade_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
