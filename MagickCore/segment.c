@@ -1490,11 +1490,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
       /*
         Initialize a new class.
       */
-      cluster->count=0;
-      cluster->red=red;
-      cluster->green=green;
-      cluster->blue=blue;
-      cluster->next=(Cluster *) NULL;
+      InitializeNewCluster(cluster,red,green,blue);
       head=cluster;
     }
   /*
