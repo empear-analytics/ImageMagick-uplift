@@ -2514,6 +2514,35 @@ static void InterpolateAreaPixelInfo(const PixelInfoInterpolation grid,
   }
 }
 
+static void InterpolateGridPixelInfo(const PixelInfoInterpolation grid,
+  const PixelInterpolateMethod interpolate,PixelInfo *pixel,
+  MagickBooleanType *status)
+{
+  PixelInfo
+    pixels[16];
+
+  switch (interpolate)
+  {
+    default:
+    {
+      InterpolateAreaPixelInfo(grid,interpolate,pixel,status);
+      break;
+    }
+    case CatromInterpolatePixel:
+    {
+      (*status)=InterpolateCubicPixelInfo(&grid,CatromWeights,pixels,pixel,
+        (*status));
+      break;
+    }
+    case SplineInterpolatePixel:
+    {
+      (*status)=InterpolateCubicPixelInfo(&grid,SplineWeights,pixels,pixel,
+        (*status));
+      break;
+    }
+  }
+}
+
 MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
   const CacheView_ *image_view,const PixelInterpolateMethod method,
   const double x,const double y,PixelInfo *pixel,ExceptionInfo *exception)
@@ -2564,13 +2593,7 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
     }
     default:
     {
-      InterpolateAreaPixelInfo(grid,interpolate,pixel,&status);
-      break;
-    }
-    case CatromInterpolatePixel:
-    {
-      status=InterpolateCubicPixelInfo(&grid,CatromWeights,pixels,pixel,
-        status);
+      InterpolateGridPixelInfo(grid,interpolate,pixel,&status);
       break;
     }
     case IntegerInterpolatePixel:
@@ -2595,12 +2618,6 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
           break;
         }
       GetPixelInfoPixel(image,p,pixel);
-      break;
-    }
-    case SplineInterpolatePixel:
-    {
-      status=InterpolateCubicPixelInfo(&grid,SplineWeights,pixels,pixel,
-        status);
       break;
     }
   }
