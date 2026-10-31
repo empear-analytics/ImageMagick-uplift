@@ -5985,6 +5985,29 @@ MagickExport MagickBooleanType UnmapBlob(void *map,const size_t length)
 %    o data:  The address of the data to write to the blob or file.
 %
 */
+#if defined(MAGICKCORE_ZLIB_DELEGATE)
+static ssize_t WriteBlobGzip(BlobInfo *magick_restrict blob_info,
+  const size_t length,unsigned char *q,ssize_t count)
+{
+  size_t
+    i;
+
+  for (i=0; i < length; i+=(size_t) count)
+  {
+    count=(ssize_t) gzwrite(blob_info->file_info.gzfile,q+i,
+      (unsigned int) MagickMin(length-i,MagickMaxBufferExtent));
+    if (count <= 0)
+      {
+        count=0;
+        if (errno != EINTR)
+          break;
+      }
+  }
+  count=(ssize_t) i;
+  return(count);
+}
+#endif
+
 MagickExport ssize_t WriteBlob(Image *image,const size_t length,
   const void *data)
 {
@@ -6080,21 +6103,7 @@ MagickExport ssize_t WriteBlob(Image *image,const size_t length,
       {
         default:
         {
-          size_t
-            i;
-
-          for (i=0; i < length; i+=(size_t) count)
-          {
-            count=(ssize_t) gzwrite(blob_info->file_info.gzfile,q+i,
-              (unsigned int) MagickMin(length-i,MagickMaxBufferExtent));
-            if (count <= 0)
-              {
-                count=0;
-                if (errno != EINTR)
-                  break;
-              }
-          }
-          count=(ssize_t) i;
+          count=WriteBlobGzip(blob_info,length,q,count);
           break;
         }
         case 4:
