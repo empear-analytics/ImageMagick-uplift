@@ -1676,6 +1676,60 @@ static void PrintAuxiliaryChannelStatistics(const Image *image,
     }
 }
 
+static void PrintImageChannelStatistics(FILE *file,const Image *image,
+  const ColorspaceType colorspace,ChannelStatistics *channel_statistics)
+{
+  double
+    scale;
+
+  ChannelStatisticsReport report;
+
+  /*
+    Detail channel depth and extrema.
+  */
+  PrintChannelDepths(file,image,colorspace,channel_statistics);
+  scale=1.0;
+  if (image->depth <= MAGICKCORE_QUANTUM_DEPTH)
+    scale=(double) (QuantumRange/((size_t) QuantumRange >> ((size_t)
+      MAGICKCORE_QUANTUM_DEPTH-image->depth)));
+  report.file=file;
+  report.scale=1.0/scale;
+  report.channel_statistics=channel_statistics;
+
+  (void) FormatLocaleFile(file,"  Channel statistics:\n");
+  (void) FormatLocaleFile(file,"    Pixels: %.17g\n",(double)
+    image->columns*image->rows);
+  switch (colorspace)
+  {
+    case RGBColorspace:
+    case sRGBColorspace:
+    {
+      if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelStatistics(&report,RedPixelChannel,"Red");
+      if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelStatistics(&report,GreenPixelChannel,"Green");
+      if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
+        (void) PrintChannelStatistics(&report,BluePixelChannel,"Blue");
+      break;
+    }
+    default:
+    {
+      PrintCMYKOrOtherStatistics(image,colorspace,report);
+      break;
+    }
+  }
+  PrintAuxiliaryChannelStatistics(image,report);
+  if ((colorspace != LinearGRAYColorspace) &&
+      (colorspace != GRAYColorspace))
+    {
+      (void) FormatLocaleFile(file,"  Image statistics:\n");
+      (void) PrintChannelStatistics(&report,CompositePixelChannel,
+        "Overall");
+    }
+  channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
+    channel_statistics);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1707,7 +1761,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
 
   double
     elapsed_time,
-    scale,
     user_time;
 
   MagickBooleanType
@@ -1841,52 +1894,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     image->number_channels,(double) image->number_meta_channels);
   if (channel_statistics != (ChannelStatistics *) NULL)
     {
-      ChannelStatisticsReport report;
-
-      /*
-        Detail channel depth and extrema.
-      */
-      PrintChannelDepths(file,image,colorspace,channel_statistics);
-      scale=1.0;
-      if (image->depth <= MAGICKCORE_QUANTUM_DEPTH)
-        scale=(double) (QuantumRange/((size_t) QuantumRange >> ((size_t)
-          MAGICKCORE_QUANTUM_DEPTH-image->depth)));
-      report.file=file;
-      report.scale=1.0/scale;
-      report.channel_statistics=channel_statistics;
-
-      (void) FormatLocaleFile(file,"  Channel statistics:\n");
-      (void) FormatLocaleFile(file,"    Pixels: %.17g\n",(double)
-        image->columns*image->rows);
-      switch (colorspace)
-      {
-        case RGBColorspace:
-        case sRGBColorspace:
-        {
-          if ((GetPixelRedTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(&report,RedPixelChannel,"Red");
-          if ((GetPixelGreenTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(&report,GreenPixelChannel,"Green");
-          if ((GetPixelBlueTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelStatistics(&report,BluePixelChannel,"Blue");
-          break;
-        }
-        default:
-        {
-          PrintCMYKOrOtherStatistics(image,colorspace,report);
-          break;
-        }
-      }
-      PrintAuxiliaryChannelStatistics(image,report);
-      if ((colorspace != LinearGRAYColorspace) &&
-          (colorspace != GRAYColorspace))
-        {
-          (void) FormatLocaleFile(file,"  Image statistics:\n");
-          (void) PrintChannelStatistics(&report,CompositePixelChannel,
-            "Overall");
-        }
-      channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
-        channel_statistics);
+      PrintImageChannelStatistics(file,image,colorspace,channel_statistics);
     }
   if (channel_moments != (ChannelMoments *) NULL)
     {
