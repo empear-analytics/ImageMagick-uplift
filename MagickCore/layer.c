@@ -1050,6 +1050,18 @@ static void DeconstructLayerFrames(RectangleInfo *bounds,
   }
 }
 
+static Image *FinishDeconstructedLayers(RectangleInfo *bounds,
+  const Image *next,Image *layers)
+{
+  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+  if (next != (Image *) NULL)
+    {
+      layers=DestroyImageList(layers);
+      return((Image *) NULL);
+    }
+  return(GetFirstImageInList(layers));
+}
+
 MagickExport Image *CompareImagesLayers(const Image *image,
   const LayerMethod method,ExceptionInfo *exception)
 {
@@ -1120,13 +1132,7 @@ MagickExport Image *CompareImagesLayers(const Image *image,
     Deconstruct the image sequence.
   */
   DeconstructLayerFrames(bounds,exception,&next,&layers);
-  bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-  if (next != (Image *) NULL)
-    {
-      layers=DestroyImageList(layers);
-      return((Image *) NULL);
-    }
-  return(GetFirstImageInList(layers));
+  return(FinishDeconstructedLayers(bounds,next,layers));
 }
 
 /*
