@@ -1942,18 +1942,103 @@ static void AnnotatePolaroidCaption(const Image *image,
   *text=DestroyString(*text);
 }
 
+typedef struct _PolaroidFinish
+{
+  const Image
+    *image;
+
+  PixelInterpolateMethod
+    method;
+
+  ssize_t
+    quantum;
+
+  double
+    angle;
+} PolaroidFinish;
+
+static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
+  Image *picture_image,ExceptionInfo *exception)
+{
+  const Image
+    *const image = polaroid_finish->image;
+
+  const PixelInterpolateMethod
+    method = polaroid_finish->method;
+
+  const ssize_t
+    quantum = polaroid_finish->quantum;
+
+  const double
+    angle = polaroid_finish->angle;
+
+  Image
+    *bend_image,
+    *flop_image,
+    *polaroid_image,
+    *rotate_image,
+    *trim_image;
+
+  rotate_image=RotateImage(picture_image,90.0,exception);
+  picture_image=DestroyImage(picture_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  picture_image=rotate_image;
+  bend_image=WaveImage(picture_image,0.01*picture_image->rows,2.0*
+    picture_image->columns,method,exception);
+  picture_image=DestroyImage(picture_image);
+  if (bend_image == (Image *) NULL)
+    return((Image *) NULL);
+  picture_image=bend_image;
+  rotate_image=RotateImage(picture_image,-90.0,exception);
+  picture_image=DestroyImage(picture_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  picture_image=rotate_image;
+  picture_image->background_color=image->background_color;
+  polaroid_image=ShadowImage(picture_image,80.0,2.0,quantum/3,quantum/3,
+    exception);
+  if (polaroid_image == (Image *) NULL)
+    {
+      picture_image=DestroyImage(picture_image);
+      return(picture_image);
+    }
+  flop_image=FlopImage(polaroid_image,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (flop_image == (Image *) NULL)
+    {
+      picture_image=DestroyImage(picture_image);
+      return(picture_image);
+    }
+  polaroid_image=flop_image;
+  (void) CompositeImage(polaroid_image,picture_image,OverCompositeOp,
+    MagickTrue,(ssize_t) (-0.01*picture_image->columns/2.0),0L,exception);
+  picture_image=DestroyImage(picture_image);
+  (void) QueryColorCompliance("none",AllCompliance,
+    &polaroid_image->background_color,exception);
+  rotate_image=RotateImage(polaroid_image,angle,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=rotate_image;
+  trim_image=TrimImage(polaroid_image,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (trim_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=trim_image;
+  return(polaroid_image);
+}
+
 MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   const char *caption,const double angle,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
 {
   Image
-    *bend_image,
     *caption_image,
-    *flop_image,
-    *picture_image,
-    *polaroid_image,
-    *rotate_image,
-    *trim_image;
+    *picture_image;
+
+  PolaroidFinish
+    polaroid_finish;
 
   size_t
     height;
@@ -2012,54 +2097,11 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   (void) QueryColorCompliance("none",AllCompliance,
     &picture_image->background_color,exception);
   (void) SetImageAlphaChannel(picture_image,OpaqueAlphaChannel,exception);
-  rotate_image=RotateImage(picture_image,90.0,exception);
-  picture_image=DestroyImage(picture_image);
-  if (rotate_image == (Image *) NULL)
-    return((Image *) NULL);
-  picture_image=rotate_image;
-  bend_image=WaveImage(picture_image,0.01*picture_image->rows,2.0*
-    picture_image->columns,method,exception);
-  picture_image=DestroyImage(picture_image);
-  if (bend_image == (Image *) NULL)
-    return((Image *) NULL);
-  picture_image=bend_image;
-  rotate_image=RotateImage(picture_image,-90.0,exception);
-  picture_image=DestroyImage(picture_image);
-  if (rotate_image == (Image *) NULL)
-    return((Image *) NULL);
-  picture_image=rotate_image;
-  picture_image->background_color=image->background_color;
-  polaroid_image=ShadowImage(picture_image,80.0,2.0,quantum/3,quantum/3,
-    exception);
-  if (polaroid_image == (Image *) NULL)
-    {
-      picture_image=DestroyImage(picture_image);
-      return(picture_image);
-    }
-  flop_image=FlopImage(polaroid_image,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (flop_image == (Image *) NULL)
-    {
-      picture_image=DestroyImage(picture_image);
-      return(picture_image);
-    }
-  polaroid_image=flop_image;
-  (void) CompositeImage(polaroid_image,picture_image,OverCompositeOp,
-    MagickTrue,(ssize_t) (-0.01*picture_image->columns/2.0),0L,exception);
-  picture_image=DestroyImage(picture_image);
-  (void) QueryColorCompliance("none",AllCompliance,
-    &polaroid_image->background_color,exception);
-  rotate_image=RotateImage(polaroid_image,angle,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (rotate_image == (Image *) NULL)
-    return((Image *) NULL);
-  polaroid_image=rotate_image;
-  trim_image=TrimImage(polaroid_image,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (trim_image == (Image *) NULL)
-    return((Image *) NULL);
-  polaroid_image=trim_image;
-  return(polaroid_image);
+  polaroid_finish.image=image;
+  polaroid_finish.method=method;
+  polaroid_finish.quantum=quantum;
+  polaroid_finish.angle=angle;
+  return(FinishPolaroidImage(&polaroid_finish,picture_image,exception));
 }
 
 /*
