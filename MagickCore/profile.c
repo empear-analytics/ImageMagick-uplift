@@ -2885,35 +2885,33 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
           break;
         }
       }
-      if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) !=
+      if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
           MagickFalse)
+        continue;
+      offset=(ssize_t) ReadProfileLong(endian,p);
+      if (((size_t) offset >= (length-1)) ||
+          (level >= (MaxDirectoryStack-2)))
+        continue;
+      if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
+        exif_directory=exif+offset;
+      directory_stack[level].directory=directory;
+      entry++;
+      directory_stack[level].entry=entry;
+      level++;
+      directory_stack[level].directory=exif+offset;
+      directory_stack[level].entry=0;
+      level++;
+      if ((directory+2+(12*number_entries)) > (exif+length))
+        break;
+      offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
+        number_entries));
+      if (IsNextDirectoryOffset(offset,length,level) != MagickFalse)
         {
-          offset=(ssize_t) ReadProfileLong(endian,p);
-          if (((size_t) offset < (length-1)) &&
-              (level < (MaxDirectoryStack-2)))
-            {
-              if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
-                exif_directory=exif+offset;
-              directory_stack[level].directory=directory;
-              entry++;
-              directory_stack[level].entry=entry;
-              level++;
-              directory_stack[level].directory=exif+offset;
-              directory_stack[level].entry=0;
-              level++;
-              if ((directory+2+(12*number_entries)) > (exif+length))
-                break;
-              offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
-                number_entries));
-              if (IsNextDirectoryOffset(offset,length,level) != MagickFalse)
-                {
-                  directory_stack[level].directory=exif+offset;
-                  directory_stack[level].entry=0;
-                  level++;
-                }
-              break;
-            }
+          directory_stack[level].directory=exif+offset;
+          directory_stack[level].entry=0;
+          level++;
         }
+      break;
     }
   } while (level > 0);
   exif_resources=DestroySplayTree(exif_resources);
