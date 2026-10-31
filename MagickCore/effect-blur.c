@@ -3320,6 +3320,40 @@ static void BuildSelectiveKernel(MagickRealType *kernel,const size_t width,
   }
 }
 
+static void LogSelectiveKernel(MagickRealType *kernel,const size_t width)
+{
+  char
+    format[MagickPathExtent],
+    *message;
+
+  const MagickRealType
+    *k;
+
+  ssize_t
+    u,
+    v;
+
+  (void) LogMagickEvent(TransformEvent,GetMagickModule(),
+    "  SelectiveBlurImage with %.17gx%.17g kernel:",(double) width,(double)
+    width);
+  message=AcquireString("");
+  k=kernel;
+  for (v=0; v < (ssize_t) width; v++)
+  {
+    *message='\0';
+    (void) FormatLocaleString(format,MagickPathExtent,"%.17g: ",(double) v);
+    (void) ConcatenateString(&message,format);
+    for (u=0; u < (ssize_t) width; u++)
+    {
+      (void) FormatLocaleString(format,MagickPathExtent,"%+f ",(double)
+        *k++);
+      (void) ConcatenateString(&message,format);
+    }
+    (void) LogMagickEvent(TransformEvent,GetMagickModule(),"%s",message);
+  }
+  message=DestroyString(message);
+}
+
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
   const double sigma,const double threshold,ExceptionInfo *exception)
 {
@@ -3366,38 +3400,7 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
   BuildSelectiveKernel(kernel,width,sigma);
   if (image->debug != MagickFalse)
-    {
-      char
-        format[MagickPathExtent],
-        *message;
-
-      const MagickRealType
-        *k;
-
-      ssize_t
-        u,
-        v;
-
-      (void) LogMagickEvent(TransformEvent,GetMagickModule(),
-        "  SelectiveBlurImage with %.17gx%.17g kernel:",(double) width,(double)
-        width);
-      message=AcquireString("");
-      k=kernel;
-      for (v=0; v < (ssize_t) width; v++)
-      {
-        *message='\0';
-        (void) FormatLocaleString(format,MagickPathExtent,"%.17g: ",(double) v);
-        (void) ConcatenateString(&message,format);
-        for (u=0; u < (ssize_t) width; u++)
-        {
-          (void) FormatLocaleString(format,MagickPathExtent,"%+f ",(double)
-            *k++);
-          (void) ConcatenateString(&message,format);
-        }
-        (void) LogMagickEvent(TransformEvent,GetMagickModule(),"%s",message);
-      }
-      message=DestroyString(message);
-    }
+    LogSelectiveKernel(kernel,width);
   blur_image=CloneImage(image,0,0,MagickTrue,exception);
   if (blur_image == (Image *) NULL)
     return((Image *) NULL);
