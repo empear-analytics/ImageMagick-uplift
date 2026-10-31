@@ -196,6 +196,39 @@ static inline MagickBooleanType IsEitherRowMissing(const Quantum *p,
     MagickTrue : MagickFalse);
 }
 
+typedef struct _ClearedPixelScan
+{
+  const Image
+    *image1,
+    *image2;
+
+  RectangleInfo
+    *bounds;
+} ClearedPixelScan;
+
+static ssize_t FindClearedPixel(const ClearedPixelScan *scan,const Quantum *p,
+  const Quantum *q)
+{
+  const Image
+    *const image1 = scan->image1,
+    *const image2 = scan->image2;
+
+  RectangleInfo
+    *const bounds = scan->bounds;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) bounds->width; x++)
+  {
+    if (IsPixelCleared(image1,p,image2,q) != MagickFalse)
+      break;
+    p+=(ptrdiff_t) GetPixelChannels(image1);
+    q+=(ptrdiff_t) GetPixelChannels(image2);
+  }
+  return(x);
+}
+
 static MagickBooleanType IsBoundsCleared(const Image *image1,
   const Image *image2,RectangleInfo *bounds,ExceptionInfo *exception)
 {
@@ -213,17 +246,17 @@ static MagickBooleanType IsBoundsCleared(const Image *image1,
     return(MagickFalse);
   for (y=0; y < (ssize_t) bounds->height; y++)
   {
+    ClearedPixelScan
+      scan;
+
     p=GetVirtualPixels(image1,bounds->x,bounds->y+y,bounds->width,1,exception);
     q=GetVirtualPixels(image2,bounds->x,bounds->y+y,bounds->width,1,exception);
     if (IsEitherRowMissing(p,q) != MagickFalse)
       break;
-    for (x=0; x < (ssize_t) bounds->width; x++)
-    {
-      if (IsPixelCleared(image1,p,image2,q) != MagickFalse)
-        break;
-      p+=(ptrdiff_t) GetPixelChannels(image1);
-      q+=(ptrdiff_t) GetPixelChannels(image2);
-    }
+    scan.image1=image1;
+    scan.image2=image2;
+    scan.bounds=bounds;
+    x=FindClearedPixel(&scan,p,q);
     if (x < (ssize_t) bounds->width)
       break;
   }
