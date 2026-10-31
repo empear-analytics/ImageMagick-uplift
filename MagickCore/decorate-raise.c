@@ -212,6 +212,18 @@ static inline MagickBooleanType IsBevelTooWide(const Image *image,
     (image->rows <= (raise_info->height << 1))) ? MagickTrue : MagickFalse);
 }
 
+static void SelectRaiseColors(const MagickBooleanType raise,
+  Quantum *foreground,Quantum *background)
+{
+  *foreground=QuantumRange;
+  *background=(Quantum) 0;
+  if (raise == MagickFalse)
+    {
+      *foreground=(Quantum) 0;
+      *background=QuantumRange;
+    }
+}
+
 MagickExport MagickBooleanType RaiseImage(Image *image,
   const RectangleInfo *raise_info,const MagickBooleanType raise,
   ExceptionInfo *exception)
@@ -240,13 +252,7 @@ MagickExport MagickBooleanType RaiseImage(Image *image,
   if (IsBevelTooWide(image,raise_info) != MagickFalse)
     ThrowBinaryException(OptionError,"ImageSizeMustExceedBevelWidth",
       image->filename);
-  foreground=QuantumRange;
-  background=(Quantum) 0;
-  if (raise == MagickFalse)
-    {
-      foreground=(Quantum) 0;
-      background=QuantumRange;
-    }
+  SelectRaiseColors(raise,&foreground,&background);
   if (SetImageStorageClass(image,DirectClass,exception) == MagickFalse)
     return(MagickFalse);
   /*
