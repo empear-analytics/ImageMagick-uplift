@@ -1671,6 +1671,17 @@ MagickExport MagickBooleanType GammaImage(Image *image,const double gamma,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void EncodeGrayscaleGamma(const Image *image,MagickRealType *red,
+  MagickRealType *green,MagickRealType *blue)
+{
+  if (image->colorspace == RGBColorspace)
+    {
+      (*red)=EncodePixelGamma((*red));
+      (*green)=EncodePixelGamma((*green));
+      (*blue)=EncodePixelGamma((*blue));
+    }
+}
+
 static MagickRealType GetGrayscaleIntensity(const Image *image,
   const PixelIntensityMethod method,const Quantum *q)
 {
@@ -1710,12 +1721,7 @@ static MagickRealType GetGrayscaleIntensity(const Image *image,
     }
     case Rec601LumaPixelIntensityMethod:
     {
-      if (image->colorspace == RGBColorspace)
-        {
-          red=EncodePixelGamma(red);
-          green=EncodePixelGamma(green);
-          blue=EncodePixelGamma(blue);
-        }
+      EncodeGrayscaleGamma(image,&red,&green,&blue);
       intensity=0.298839*red+0.586811*green+0.114350*blue;
       break;
     }
