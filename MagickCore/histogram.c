@@ -1120,6 +1120,39 @@ static MagickBooleanType CheckPixelColor(const HPixelCheck *check,
   return(MagickTrue);
 }
 
+static MagickBooleanType CheckRowColors(const HPixelCheck *row,
+  const Quantum *p)
+{
+  const Image
+    *const image = row->image;
+
+  HCubeInfo
+    *const cube_info = row->cube_info;
+
+  const size_t
+    max_colors = row->max_colors;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    HPixelCheck
+      check;
+
+    check.image=image;
+    check.cube_info=cube_info;
+    check.max_colors=max_colors;
+    check.exception=exception;
+    if (CheckPixelColor(&check,&p) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
 static MagickBooleanType CheckImageColors(const Image *image,
   const size_t max_colors,ExceptionInfo *exception)
 {
@@ -1156,25 +1189,17 @@ static MagickBooleanType CheckImageColors(const Image *image,
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
+    HPixelCheck
+      row;
 
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
     if (p == (const Quantum *) NULL)
       break;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      HPixelCheck
-        check;
-
-      check.image=image;
-      check.cube_info=cube_info;
-      check.max_colors=max_colors;
-      check.exception=exception;
-      if (CheckPixelColor(&check,&p) == MagickFalse)
-        break;
-    }
-    if (x < (ssize_t) image->columns)
+    row.image=image;
+    row.cube_info=cube_info;
+    row.max_colors=max_colors;
+    row.exception=exception;
+    if (CheckRowColors(&row,p) == MagickFalse)
       break;
   }
   image_view=DestroyCacheView(image_view);
