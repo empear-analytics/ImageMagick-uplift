@@ -425,10 +425,10 @@ static MagickBooleanType StoreDespeckleChannel(const DespeckleStore *store,
   return(status);
 }
 
-MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
-{
 #define DespeckleImageTag  "Despeckle/Image"
 
+MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
+{
   CacheView
     *despeckle_view,
     *image_view;
