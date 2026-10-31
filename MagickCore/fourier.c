@@ -365,6 +365,18 @@ static MagickBooleanType SyncComplexViews(CacheView *Ci_view,
   return(status);
 }
 
+static MagickBooleanType CheckComplexSequence(const Image *images,
+  ExceptionInfo *exception)
+{
+  if (images->next == (Image *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ImageSequenceRequired","`%s'",images->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -413,12 +425,8 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
-  if (images->next == (Image *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "ImageSequenceRequired","`%s'",images->filename);
-      return((Image *) NULL);
-    }
+  if (CheckComplexSequence(images,exception) == MagickFalse)
+    return((Image *) NULL);
   image=CloneImage(images,0,0,MagickTrue,exception);
   if (image == (Image *) NULL)
     return((Image *) NULL);
