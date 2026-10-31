@@ -2127,9 +2127,22 @@ static void LevelColormap(Image *image,const double black_point,
   }
 }
 
-static void LevelImageRow(const Image *image,const double black_point,
-  const double white_point,const double gamma,Quantum *q)
+typedef struct _LevelPoints
 {
+  double
+    black_point,
+    white_point,
+    gamma;
+} LevelPoints;
+
+static void LevelImageRow(const Image *image,const LevelPoints *level,
+  Quantum *q)
+{
+  const double
+    black_point = level->black_point,
+    white_point = level->white_point,
+    gamma = level->gamma;
+
   ssize_t
     x;
 
@@ -2155,6 +2168,9 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
   const double white_point,const double gamma,ExceptionInfo *exception)
 {
 #define LevelImageTag  "Level/Image"
+
+  const LevelPoints
+    level = { black_point, white_point, gamma };
 
   CacheView
     *image_view;
@@ -2200,7 +2216,7 @@ MagickExport MagickBooleanType LevelImage(Image *image,const double black_point,
         status=MagickFalse;
         continue;
       }
-    LevelImageRow(image,black_point,white_point,gamma,q);
+    LevelImageRow(image,&level,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
