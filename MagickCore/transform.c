@@ -1820,6 +1820,16 @@ static MagickBooleanType PrepareSpliceImage(Image *splice_image,
   return(MagickTrue);
 }
 
+static Image *FinishSpliceImage(Image *splice_image,CacheView *splice_view,
+  CacheView *image_view,const MagickBooleanType status)
+{
+  splice_view=DestroyCacheView(splice_view);
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    splice_image=DestroyImage(splice_image);
+  return(splice_image);
+}
+
 MagickExport Image *SpliceImage(const Image *image,
   const RectangleInfo *geometry,ExceptionInfo *exception)
 {
@@ -1970,11 +1980,7 @@ MagickExport Image *SpliceImage(const Image *image,
           status=MagickFalse;
       }
   }
-  splice_view=DestroyCacheView(splice_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    splice_image=DestroyImage(splice_image);
-  return(splice_image);
+  return(FinishSpliceImage(splice_image,splice_view,image_view,status));
 }
 
 /*
