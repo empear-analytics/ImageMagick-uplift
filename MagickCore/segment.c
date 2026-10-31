@@ -1993,18 +1993,78 @@ static void SetActiveNodeExtrema(const ActiveNodeInputs *inputs,
   }
 }
 
+typedef struct _ZeroCrossingInputs
+{
+  double
+    max_tau,
+    min_tau,
+    delta_tau,
+    smooth_threshold;
+} ZeroCrossingInputs;
+
+static size_t InitializeZeroCrossings(const ssize_t *histogram,
+  const ZeroCrossingInputs *crossing_inputs,ZeroCrossing *zero_crossing)
+{
+  const double
+    max_tau = crossing_inputs->max_tau,
+    min_tau = crossing_inputs->min_tau,
+    delta_tau = crossing_inputs->delta_tau,
+    smooth_threshold = crossing_inputs->smooth_threshold;
+
+  double
+    *derivative,
+    *second_derivative,
+    tau;
+
+  size_t
+    number_crossings;
+
+  ssize_t
+    i,
+    j;
+
+  derivative=(double *) AcquireCriticalMemory(256*sizeof(*derivative));
+  second_derivative=(double *) AcquireCriticalMemory(256*
+    sizeof(*second_derivative));
+  i=0;
+  for (tau=max_tau; tau >= min_tau; tau-=delta_tau)
+  {
+    zero_crossing[i].tau=tau;
+    ScaleSpace(histogram,tau,zero_crossing[i].histogram);
+    DerivativeHistogram(zero_crossing[i].histogram,derivative);
+    DerivativeHistogram(derivative,second_derivative);
+    ZeroCrossHistogram(second_derivative,smooth_threshold,
+      zero_crossing[i].crossings);
+    i++;
+  }
+  /*
+    Add an entry for the original histogram.
+  */
+  zero_crossing[i].tau=0.0;
+  for (j=0; j <= 255; j++)
+    zero_crossing[i].histogram[j]=(double) histogram[j];
+  DerivativeHistogram(zero_crossing[i].histogram,derivative);
+  DerivativeHistogram(derivative,second_derivative);
+  ZeroCrossHistogram(second_derivative,smooth_threshold,
+    zero_crossing[i].crossings);
+  number_crossings=(size_t) i;
+  derivative=(double *) RelinquishMagickMemory(derivative);
+  second_derivative=(double *) RelinquishMagickMemory(second_derivative);
+  return(number_crossings);
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
 {
   double
-    average_tau,
-    *derivative,
-    *second_derivative,
-    tau;
+    average_tau;
 
   ActiveNodeInputs
     inputs;
+
+  ZeroCrossingInputs
+    crossing_inputs;
 
   IntervalTree
     **list,
@@ -2018,7 +2078,6 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     number_crossings;
 
   ssize_t
-    j,
     number_nodes;
 
   ZeroCrossing
@@ -2047,33 +2106,12 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
   /*
     Initialize zero crossing list.
   */
-  derivative=(double *) AcquireCriticalMemory(256*sizeof(*derivative));
-  second_derivative=(double *) AcquireCriticalMemory(256*
-    sizeof(*second_derivative));
-  i=0;
-  for (tau=max_tau; tau >= min_tau; tau-=delta_tau)
-  {
-    zero_crossing[i].tau=tau;
-    ScaleSpace(histogram,tau,zero_crossing[i].histogram);
-    DerivativeHistogram(zero_crossing[i].histogram,derivative);
-    DerivativeHistogram(derivative,second_derivative);
-    ZeroCrossHistogram(second_derivative,smooth_threshold,
-      zero_crossing[i].crossings);
-    i++;
-  }
-  /*
-    Add an entry for the original histogram.
-  */
-  zero_crossing[i].tau=0.0;
-  for (j=0; j <= 255; j++)
-    zero_crossing[i].histogram[j]=(double) histogram[j];
-  DerivativeHistogram(zero_crossing[i].histogram,derivative);
-  DerivativeHistogram(derivative,second_derivative);
-  ZeroCrossHistogram(second_derivative,smooth_threshold,
-    zero_crossing[i].crossings);
-  number_crossings=(size_t) i;
-  derivative=(double *) RelinquishMagickMemory(derivative);
-  second_derivative=(double *) RelinquishMagickMemory(second_derivative);
+  crossing_inputs.max_tau=max_tau;
+  crossing_inputs.min_tau=min_tau;
+  crossing_inputs.delta_tau=delta_tau;
+  crossing_inputs.smooth_threshold=smooth_threshold;
+  number_crossings=InitializeZeroCrossings(histogram,&crossing_inputs,
+    zero_crossing);
   /*
     Ensure the scale-space fingerprints form lines in scale-space, not loops.
   */
