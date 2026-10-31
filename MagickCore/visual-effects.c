@@ -2530,6 +2530,43 @@ static Image *BlendSketchImage(const Image *image,Image *blur_image,
   return(sketch_image);
 }
 
+typedef struct _SketchBlur
+{
+  const Image
+    *image;
+
+  double
+    radius,
+    sigma,
+    angle;
+} SketchBlur;
+
+static Image *BlurSketchImage(const SketchBlur *sketch_blur,
+  Image *random_image,const MagickBooleanType status,ExceptionInfo *exception)
+{
+  const Image
+    *const image = sketch_blur->image;
+
+  const double
+    radius = sketch_blur->radius,
+    sigma = sketch_blur->sigma,
+    angle = sketch_blur->angle;
+
+  Image
+    *blur_image;
+
+  if (status == MagickFalse)
+    {
+      random_image=DestroyImage(random_image);
+      return(random_image);
+    }
+  blur_image=MotionBlurImage(random_image,radius,sigma,angle,exception);
+  random_image=DestroyImage(random_image);
+  if (blur_image == (Image *) NULL)
+    return((Image *) NULL);
+  return(BlendSketchImage(image,blur_image,radius,exception));
+}
+
 MagickExport Image *SketchImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2537,7 +2574,6 @@ MagickExport Image *SketchImage(const Image *image,const double radius,
     *random_view;
 
   Image
-    *blur_image,
     *random_image;
 
   MagickBooleanType
@@ -2545,6 +2581,9 @@ MagickExport Image *SketchImage(const Image *image,const double radius,
 
   RandomInfo
     **magick_restrict random_info;
+
+  SketchBlur
+    sketch_blur;
 
   ssize_t
     y;
@@ -2603,16 +2642,11 @@ MagickExport Image *SketchImage(const Image *image,const double radius,
   }
   random_view=DestroyCacheView(random_view);
   random_info=DestroyRandomInfoTLS(random_info);
-  if (status == MagickFalse)
-    {
-      random_image=DestroyImage(random_image);
-      return(random_image);
-    }
-  blur_image=MotionBlurImage(random_image,radius,sigma,angle,exception);
-  random_image=DestroyImage(random_image);
-  if (blur_image == (Image *) NULL)
-    return((Image *) NULL);
-  return(BlendSketchImage(image,blur_image,radius,exception));
+  sketch_blur.image=image;
+  sketch_blur.radius=radius;
+  sketch_blur.sigma=sigma;
+  sketch_blur.angle=angle;
+  return(BlurSketchImage(&sketch_blur,random_image,status,exception));
 }
 
 /*
