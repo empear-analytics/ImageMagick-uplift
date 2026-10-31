@@ -943,6 +943,59 @@ static inline MagickBooleanType IsUnchangedFrameBounds(
     MagickFalse);
 }
 
+typedef struct _LayerFrameComparison
+{
+  Image
+    *image_a;
+
+  RectangleInfo
+    *bounds;
+
+  LayerMethod
+    method;
+
+  ExceptionInfo
+    *exception;
+} LayerFrameComparison;
+
+static MagickBooleanType CompareLayerFrames(
+  const LayerFrameComparison *frames,const Image *next)
+{
+  Image
+    *const image_a = frames->image_a;
+
+  RectangleInfo
+    *const bounds = frames->bounds;
+
+  const LayerMethod
+    method = frames->method;
+
+  ExceptionInfo
+    *const exception = frames->exception;
+
+  Image
+    *image_b;
+
+  ssize_t
+    i;
+
+  i=0;
+  next=GetNextImageInList(next);
+  for ( ; next != (const Image *) NULL; next=GetNextImageInList(next))
+  {
+    image_b=CloneImage(image_a,0,0,MagickTrue,exception);
+    if (image_b == (Image *) NULL)
+      return(MagickFalse);
+    image_b->background_color.alpha_trait=BlendPixelTrait;
+    (void) CompositeImage(image_a,next,CopyCompositeOp,MagickTrue,next->page.x,
+      next->page.y,exception);
+    bounds[i]=CompareImagesBounds(image_b,image_a,method,exception);
+    image_b=DestroyImage(image_b);
+    i++;
+  }
+  return(MagickTrue);
+}
+
 MagickExport Image *CompareImagesLayers(const Image *image,
   const LayerMethod method,ExceptionInfo *exception)
 {
@@ -950,6 +1003,9 @@ MagickExport Image *CompareImagesLayers(const Image *image,
     *image_a,
     *image_b,
     *layers;
+
+  LayerFrameComparison
+    frames;
 
   RectangleInfo
     *bounds;
@@ -998,24 +1054,16 @@ MagickExport Image *CompareImagesLayers(const Image *image,
   /*
     Compute the bounding box of changes for the later images
   */
-  i=0;
-  next=GetNextImageInList(next);
-  for ( ; next != (const Image *) NULL; next=GetNextImageInList(next))
-  {
-    image_b=CloneImage(image_a,0,0,MagickTrue,exception);
-    if (image_b == (Image *) NULL)
-      {
-        image_a=DestroyImage(image_a);
-        bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
-        return((Image *) NULL);
-      }
-    image_b->background_color.alpha_trait=BlendPixelTrait;
-    (void) CompositeImage(image_a,next,CopyCompositeOp,MagickTrue,next->page.x,
-      next->page.y,exception);
-    bounds[i]=CompareImagesBounds(image_b,image_a,method,exception);
-    image_b=DestroyImage(image_b);
-    i++;
-  }
+  frames.image_a=image_a;
+  frames.bounds=bounds;
+  frames.method=method;
+  frames.exception=exception;
+  if (CompareLayerFrames(&frames,next) == MagickFalse)
+    {
+      image_a=DestroyImage(image_a);
+      bounds=(RectangleInfo *) RelinquishMagickMemory(bounds);
+      return((Image *) NULL);
+    }
   image_a=DestroyImage(image_a);
   /*
     Clone first image in sequence.
