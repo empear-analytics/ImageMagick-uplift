@@ -1643,6 +1643,48 @@ static void SharpenContrastRepeatedly(Image *preview_image,const ssize_t i,
     (void) ContrastImage(preview_image,MagickTrue,exception);
 }
 
+static void SelectNoiseFactor(const ssize_t i,Image *thumbnail,char *factor)
+{
+  switch ((int) i)
+  {
+    case 0:
+    {
+      (void) CopyMagickString(factor,"uniform",MagickPathExtent);
+      break;
+    }
+    case 1:
+    {
+      (void) CopyMagickString(factor,"gaussian",MagickPathExtent);
+      break;
+    }
+    case 2:
+    {
+      (void) CopyMagickString(factor,"multiplicative",MagickPathExtent);
+      break;
+    }
+    case 3:
+    {
+      (void) CopyMagickString(factor,"impulse",MagickPathExtent);
+      break;
+    }
+    case 5:
+    {
+      (void) CopyMagickString(factor,"laplacian",MagickPathExtent);
+      break;
+    }
+    case 6:
+    {
+      (void) CopyMagickString(factor,"Poisson",MagickPathExtent);
+      break;
+    }
+    default:
+    {
+      (void) CopyMagickString(thumbnail->magick,"NULL",MagickPathExtent);
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -1859,44 +1901,7 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
       }
       case AddNoisePreview:
       {
-        switch ((int) i)
-        {
-          case 0:
-          {
-            (void) CopyMagickString(factor,"uniform",MagickPathExtent);
-            break;
-          }
-          case 1:
-          {
-            (void) CopyMagickString(factor,"gaussian",MagickPathExtent);
-            break;
-          }
-          case 2:
-          {
-            (void) CopyMagickString(factor,"multiplicative",MagickPathExtent);
-            break;
-          }
-          case 3:
-          {
-            (void) CopyMagickString(factor,"impulse",MagickPathExtent);
-            break;
-          }
-          case 5:
-          {
-            (void) CopyMagickString(factor,"laplacian",MagickPathExtent);
-            break;
-          }
-          case 6:
-          {
-            (void) CopyMagickString(factor,"Poisson",MagickPathExtent);
-            break;
-          }
-          default:
-          {
-            (void) CopyMagickString(thumbnail->magick,"NULL",MagickPathExtent);
-            break;
-          }
-        }
+        SelectNoiseFactor(i,thumbnail,factor);
         preview_image=StatisticImage(thumbnail,NonpeakStatistic,(size_t) i,
           (size_t) i,exception);
         (void) FormatLocaleString(label,MagickPathExtent,"+noise %s",factor);
