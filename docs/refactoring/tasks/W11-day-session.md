@@ -23,12 +23,13 @@ flagged as a close reading before pushing.
 | `visual-effects.c` | 3.27 → 3.50 | 10 |
 | `effect.c` | 3.52 → 4.10 (split) → **4.36** | 1 + 12 |
 | `effect-blur.c` (new) | 4.91 → **5.29** | 11 |
+| `enhance.c` | 2.97 → 4.32 (split) → **4.85** | 1 + 10 |
+| `enhance-tone.c` (new) | 4.06 → **4.17** | 12 |
 | `distort.c` | 3.01 (no legal step) | 0 |
-| `enhance.c` | 2.97 (saturated) | 0 |
 | `morphology.c` | 2.71 (saturated) | 0 |
 
-93 refactor commits (E 31, N 21, W 9, SD 6, V 6, H 4, D 3, Q 3, U 3, T 2, I 1, LB 1, O 1, S 1, Y 1)
-and 7 docs and tool commits. No new recipe and no amendment. Every refactor commit ran the
+116 refactor commits (E 35, N 24, W 10, SD 7, V 7, H 5, Q 5, O 4, B 3, D 3, U 3, S 2, T 2, I 1, LB 1, P 1, SV 1, Y 1, Z 1)
+and 9 docs and tool commits. No new recipe and no amendment. Every refactor commit ran the
 oracle on its function's cases (0 diverged) and passed the pre-commit gate; the whole
 catalogue ran after each file: 15,900 cases, 0 diverged. None of the steps adds
 *Overall Code Complexity* or *Code Duplication* to a file, except as noted for
@@ -88,7 +89,37 @@ playbook.
   The same split, for the files whose stub probes found nothing else (`morphology.c`,
   `enhance.c`, `composite.c`, `fx.c`, `compare.c`), is the lever; `effect.c` is the proof.
 
+- **`enhance.c` was split too** (00fbdbd35, commit message as for `effect.c`: the owner
+  asked for splits of the saturated files and said "Keep going"; confirm or revert): the
+  tone and color family (11 public functions, 57 functions, 2,643 lines) is now
+  `enhance-tone.c`. `enhance.c` 2.97 to 4.32 to 4.85, `enhance-tone.c` 4.06 to 4.17; the
+  whole oracle 15,900 cases, 0 diverged each time, guards over the pair unchanged. The
+  tool needed one more change for it (macro blocks above a family, b75cd469e).
+- **`composite.c`, `fx.c`, `compare.c` and `morphology.c` cannot be split**: each is one
+  family under Recipe S's rule (a static stays static and travels with every caller).
+  `composite.c`: `CompositeImage` reaches 50 functions and 3,544 of 4,631 lines, only
+  `TextureImage` (276 lines) is separable, and moving it leaves the file at 3.01.
+  `fx.c`: one family of 155 functions. `compare.c`: the distortion and similarity
+  functions share the `Accumulate*` statics. `morphology.c`: one family of 77 functions.
+  A split there would widen linkage, which Recipe S refuses.
+
 ### For the owner
+
+- **Close readings of the `enhance.c` and `enhance-tone.c` passes:** `enhance.c`
+  5fc609224 reuses the `ModulateRow` struct for a second block (N step 8 names only
+  switch cases as siblings); 20a964911 is Recipe O on a block outside the parallel region
+  of a function with OpenMP elsewhere (O step 1 allows it, Q step 1 says "no OpenMP region
+  at all"); 6139cceb6 is Z with an address passed elsewhere (O step 2's exception);
+  `enhance-tone.c` 1328a3196, ec46a16b2, e3cee6238 and 71596e0ca are E on blocks that are
+  not bumps themselves (E's *Use when* names Bumpy Road, which each function has);
+  25e60dacd (P: a compound-boolean predicate in a function with other findings);
+  fbcd6a213 (SV: the value is `point.y` versus `point.z`, member accesses of an unwritten
+  local); f01916300 moves one of four identical gamma blocks (moving all four measured 4.20
+  but the three copies would be D without a *Code Duplication* finding).
+- **A candidate amendment, not added:** Recipe D for a block identical to an existing
+  static helper of the file even without a *Code Duplication* finding (`enhance.c`'s
+  `CLAHEImage` second row loop, `enhance-tone.c`'s gamma blocks, `vision.c` 2221d8d57,
+  `effect-blur.c` 42d350a1b): CodeScene reports none for copies inside one function.
 
 - **Close readings of the `effect.c` and `effect-blur.c` passes**, for you to accept or
   revert: `effect-blur.c` 42d350a1b calls an existing helper (`CloneDirectImage`) for a
@@ -138,6 +169,10 @@ playbook.
   *Large Method*; the later W step took the function to 79 lines, still a *Large Method*.
 
 ### Noticed, not changed (possible upstream bugs)
+
+- `enhance-tone.c` `ContrastStretchImage` discards the histogram pass's failure status
+  (`status` is reset before the second loop); `enhance.c` `EnhanceImage`'s final `status`
+  is destroyed on any row failure, as before.
 
 - `effect.c` `PreviewImage`: the threshold preview applies `BilevelImage` to `thumbnail`,
   not to the clone `preview_image`; AddNoise's case 4 never sets `factor`, so its label

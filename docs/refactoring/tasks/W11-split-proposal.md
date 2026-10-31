@@ -75,3 +75,9 @@ refuses when the kept part names a moved type or a macro is used on both sides.
 - `distort.c`: a recipe for `status=Helper(...)` in a parallel loop, and whether an `#if 0`
   debug block may move with its case (see `W11-day-session.md`): 3.01 to about 3.55.
 - The function-pointer merge: `enhance.c` 3.04 to 3.27 (W08).
+
+## Update: enhance.c done too
+
+`enhance.c` was split into `enhance.c` and `enhance-tone.c` (00fbdbd35, 2.97 to 4.32 and 4.06) after
+the tool learned to move macro blocks above a family (b75cd469e). `composite.c`, `fx.c`,
+`compare.c` and `morphology.c` are one family each and cannot be split under Recipe S.
