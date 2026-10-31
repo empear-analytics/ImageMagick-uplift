@@ -2136,14 +2136,47 @@ static void ExportLiquidRescalePixels(const Image *image,
   rescale_view=DestroyCacheView(rescale_view);
 }
 
+static void ImportLiquidRescalePixels(const Image *image,gfloat *pixels,
+  ExceptionInfo *exception)
+{
+  CacheView
+    *image_view;
+
+  gfloat
+    *q;
+
+  MagickBooleanType
+    status;
+
+  ssize_t
+    y;
+
+  status=MagickTrue;
+  q=pixels;
+  image_view=AcquireVirtualCacheView(image,exception);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    if (status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    q=ImportLiquidRescaleRow(image,p,q);
+  }
+  image_view=DestroyCacheView(image_view);
+}
+
 MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   const size_t rows,const double delta_x,const double rigidity,
   ExceptionInfo *exception)
 {
 #define LiquidRescaleImageTag  "Rescale/Image"
-
-  CacheView
-    *image_view;
 
   gfloat
     *pixels;
@@ -2157,17 +2190,8 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   LqrRetVal
     lqr_status;
 
-  MagickBooleanType
-    status;
-
   MemoryInfo
     *pixel_info;
-
-  gfloat
-    *q;
-
-  ssize_t
-    y;
 
   /*
     Liquid rescale image.
@@ -2189,25 +2213,7 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   if (pixel_info == (MemoryInfo *) NULL)
     return((Image *) NULL);
   pixels=(gfloat *) GetVirtualMemoryBlob(pixel_info);
-  status=MagickTrue;
-  q=pixels;
-  image_view=AcquireVirtualCacheView(image,exception);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    q=ImportLiquidRescaleRow(image,p,q);
-  }
-  image_view=DestroyCacheView(image_view);
+  ImportLiquidRescalePixels(image,pixels,exception);
   carver=lqr_carver_new_ext(pixels,(int) image->columns,(int) image->rows,
     (int) GetPixelChannels(image),LQR_COLDEPTH_32F);
   if (carver == (LqrCarver *) NULL)
