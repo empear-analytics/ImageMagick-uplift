@@ -1196,6 +1196,17 @@ static MagickBooleanType ForwardFourierTransformChannel(const Image *image,
   magnitude_info=RelinquishVirtualMemory(magnitude_info);
   return(status);
 }
+
+static size_t PadFourierWidth(const Image *image,size_t width)
+{
+  if (IsFourierPaddingNeeded(image) != MagickFalse)
+    {
+      size_t extent=image->columns < image->rows ? image->rows :
+        image->columns;
+      width=(extent & 0x01) == 1 ? extent+1UL : extent;
+    }
+  return(width);
+}
 #endif
 
 MagickExport Image *ForwardFourierTransformImage(const Image *image,
@@ -1221,12 +1232,7 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
 
     width=image->columns;
     height=image->rows;
-    if (IsFourierPaddingNeeded(image) != MagickFalse)
-      {
-        size_t extent=image->columns < image->rows ? image->rows :
-          image->columns;
-        width=(extent & 0x01) == 1 ? extent+1UL : extent;
-      }
+    width=PadFourierWidth(image,width);
     height=width;
     magnitude_image=CloneImage(image,width,height,MagickTrue,exception);
     if (magnitude_image != (Image *) NULL)
