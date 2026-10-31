@@ -2839,6 +2839,21 @@ static const MagickInfo *SetUserSpecifiedFormat(ImageInfo *image_info,
   return(magick_info);
 }
 
+static void ParseSubimageSpecification(ImageInfo *image_info,
+  const char *component)
+{
+  /*
+    Look for scene specification (e.g. img0001.pcd[4]).
+  */
+  if (IsSceneGeometry(component,MagickFalse) == MagickFalse)
+    {
+      if (IsGeometry(component) != MagickFalse)
+        (void) CloneString(&image_info->extract,component);
+    }
+  else
+    ParseSceneRange(image_info,component);
+}
+
 static void ParseSubimageComponent(ImageInfo *image_info)
 {
   char
@@ -2853,18 +2868,7 @@ static void ParseSubimageComponent(ImageInfo *image_info)
         (void) CopyMagickString(component,image_frames,MagickPathExtent);
     }     
   if (*component != '\0')
-    {
-      /*
-        Look for scene specification (e.g. img0001.pcd[4]).
-      */
-      if (IsSceneGeometry(component,MagickFalse) == MagickFalse)
-        {
-          if (IsGeometry(component) != MagickFalse)
-            (void) CloneString(&image_info->extract,component);
-        }
-      else
-        ParseSceneRange(image_info,component);
-    }
+    ParseSubimageSpecification(image_info,component);
 }
 
 static void TestMultipleImageSupport(ImageInfo *image_info,char *component,
