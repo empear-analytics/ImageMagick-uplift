@@ -1825,6 +1825,115 @@ static ssize_t GetNextDashIndex(const DrawInfo *draw_info,ssize_t n)
   return(n);
 }
 
+typedef struct _DashSegmentInfo
+{
+  size_t
+    number_vertices;
+
+  PrimitiveInfo
+    *dash_polygon;
+
+  const PrimitiveInfo
+    *primitive_info;
+
+  ssize_t
+    i,
+    n;
+
+  double
+    dx,
+    dy,
+    total_length,
+    maximum_length;
+
+  Image
+    *image;
+
+  DrawInfo
+    *clone_info;
+
+  ExceptionInfo
+    *exception;
+} DashSegmentInfo;
+
+typedef struct _DashSegmentTargets
+{
+  ssize_t
+    *j;
+
+  MagickStatusType
+    *status;
+} DashSegmentTargets;
+
+static MagickBooleanType DrawDashSegment(const DashSegmentInfo *segment,
+  const DashSegmentTargets *targets)
+{
+  const size_t
+    number_vertices = segment->number_vertices;
+
+  PrimitiveInfo
+    *const dash_polygon = segment->dash_polygon;
+
+  const PrimitiveInfo
+    *const primitive_info = segment->primitive_info;
+
+  const ssize_t
+    i = segment->i,
+    n = segment->n;
+
+  const double
+    dx = segment->dx,
+    dy = segment->dy,
+    total_length = segment->total_length,
+    maximum_length = segment->maximum_length;
+
+  Image
+    *const image = segment->image;
+
+  DrawInfo
+    *const clone_info = segment->clone_info;
+
+  ExceptionInfo
+    *const exception = segment->exception;
+
+  ssize_t
+    *const j = targets->j;
+
+  MagickStatusType
+    *const status = targets->status;
+
+  if ((n & 0x01) != 0)
+    {
+      dash_polygon[0]=primitive_info[0];
+      dash_polygon[0].closed_subpath=MagickFalse;
+      dash_polygon[0].point.x=(double) (primitive_info[i-1].point.x+dx*
+        total_length*MagickSafeReciprocal(maximum_length));
+      dash_polygon[0].point.y=(double) (primitive_info[i-1].point.y+dy*
+        total_length*MagickSafeReciprocal(maximum_length));
+      *j=1;
+    }
+  else
+    {
+      if ((*j+1) > (ssize_t) number_vertices)
+        return(MagickFalse);
+      dash_polygon[*j]=primitive_info[i-1];
+      dash_polygon[*j].closed_subpath=MagickFalse;
+      dash_polygon[*j].point.x=(double) (primitive_info[i-1].point.x+dx*
+        total_length*MagickSafeReciprocal(maximum_length));
+      dash_polygon[*j].point.y=(double) (primitive_info[i-1].point.y+dy*
+        total_length*MagickSafeReciprocal(maximum_length));
+      dash_polygon[*j].coordinates=1;
+      (*j)++;
+      dash_polygon[0].coordinates=(size_t) *j;
+      dash_polygon[*j].primitive=UndefinedPrimitive;
+      *status&=(MagickStatusType) DrawStrokePolygon(image,clone_info,
+        dash_polygon,exception);
+      if (*status == MagickFalse)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
   const PrimitiveInfo *primitive_info,Image *image,ExceptionInfo *exception)
 {
@@ -1918,36 +2027,29 @@ static MagickBooleanType DrawDashPolygon(const DrawInfo *draw_info,
       }
     for (total_length=0.0; (length >= 0.0) && (maximum_length >= (total_length+length)); )
     {
+      DashSegmentInfo
+        segment;
+
+      DashSegmentTargets
+        targets;
+
       total_length+=length;
-      if ((n & 0x01) != 0)
-        {
-          dash_polygon[0]=primitive_info[0];
-          dash_polygon[0].closed_subpath=MagickFalse;
-          dash_polygon[0].point.x=(double) (primitive_info[i-1].point.x+dx*
-            total_length*MagickSafeReciprocal(maximum_length));
-          dash_polygon[0].point.y=(double) (primitive_info[i-1].point.y+dy*
-            total_length*MagickSafeReciprocal(maximum_length));
-          j=1;
-        }
-      else
-        {
-          if ((j+1) > (ssize_t) number_vertices)
-            break;
-          dash_polygon[j]=primitive_info[i-1];
-          dash_polygon[j].closed_subpath=MagickFalse;
-          dash_polygon[j].point.x=(double) (primitive_info[i-1].point.x+dx*
-            total_length*MagickSafeReciprocal(maximum_length));
-          dash_polygon[j].point.y=(double) (primitive_info[i-1].point.y+dy*
-            total_length*MagickSafeReciprocal(maximum_length));
-          dash_polygon[j].coordinates=1;
-          j++;
-          dash_polygon[0].coordinates=(size_t) j;
-          dash_polygon[j].primitive=UndefinedPrimitive;
-          status&=(MagickStatusType) DrawStrokePolygon(image,clone_info,
-            dash_polygon,exception);
-          if (status == MagickFalse)
-            break;
-        }
+      segment.number_vertices=number_vertices;
+      segment.dash_polygon=dash_polygon;
+      segment.primitive_info=primitive_info;
+      segment.i=i;
+      segment.n=n;
+      segment.dx=dx;
+      segment.dy=dy;
+      segment.total_length=total_length;
+      segment.maximum_length=maximum_length;
+      segment.image=image;
+      segment.clone_info=clone_info;
+      segment.exception=exception;
+      targets.j=(&j);
+      targets.status=(&status);
+      if (DrawDashSegment(&segment,&targets) == MagickFalse)
+        break;
       n=GetNextDashIndex(draw_info,n);
       length=scale*draw_info->dash_pattern[n];
     }
