@@ -292,6 +292,52 @@ static double EvaluateLeftShift(const Quantum pixel,const double value)
   return(result);
 }
 
+static void ApplyBasicEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
+  switch (op)
+  {
+    case UndefinedEvaluateOperator:
+      break;
+    case AbsEvaluateOperator:
+    {
+      (*result)=(double) fabs((double) pixel+value);
+      break;
+    }
+    case AddEvaluateOperator:
+    {
+      (*result)=(double) pixel+value;
+      break;
+    }
+    case AddModulusEvaluateOperator:
+    {
+      /*
+        This returns a 'floored modulus' of the addition which is a positive
+        result.  It differs from % or fmod() that returns a 'truncated modulus'
+        result, where floor() is replaced by trunc() and could return a
+        negative result (which is clipped).
+      */
+      (*result)=(double) pixel+value;
+      (*result)-=((double) QuantumRange+1.0)*floor((*result)/((double)
+        QuantumRange+1.0));
+      break;
+    }
+    case AndEvaluateOperator:
+    {
+      (*result)=(double) ((ssize_t) pixel & (ssize_t) (value+0.5));
+      break;
+    }
+    case CosineEvaluateOperator:
+    {
+      (*result)=(double) QuantumRange*(0.5*cos((double) (2.0*MagickPI*
+        QuantumScale*(double) pixel*value))+0.5);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
@@ -304,40 +350,9 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   result=0.0;
   switch (op)
   {
-    case UndefinedEvaluateOperator:
-      break;
-    case AbsEvaluateOperator:
+    default:
     {
-      result=(double) fabs((double) pixel+value);
-      break;
-    }
-    case AddEvaluateOperator:
-    {
-      result=(double) pixel+value;
-      break;
-    }
-    case AddModulusEvaluateOperator:
-    {
-      /*
-        This returns a 'floored modulus' of the addition which is a positive
-        result.  It differs from % or fmod() that returns a 'truncated modulus'
-        result, where floor() is replaced by trunc() and could return a
-        negative result (which is clipped).
-      */
-      result=(double) pixel+value;
-      result-=((double) QuantumRange+1.0)*floor(result/((double)
-        QuantumRange+1.0));
-      break;
-    }
-    case AndEvaluateOperator:
-    {
-      result=(double) ((ssize_t) pixel & (ssize_t) (value+0.5));
-      break;
-    }
-    case CosineEvaluateOperator:
-    {
-      result=(double) QuantumRange*(0.5*cos((double) (2.0*MagickPI*
-        QuantumScale*(double) pixel*value))+0.5);
+      ApplyBasicEvaluateOperator(pixel,op,value,&result);
       break;
     }
     case DivideEvaluateOperator:
