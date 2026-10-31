@@ -2259,13 +2259,13 @@ static inline void ShadePixelChannels(const ShadeImages *shading,
   }
 }
 
-MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
-  const double azimuth,const double elevation,ExceptionInfo *exception)
-{
 #define GetShadeIntensity(image,pixel) \
   ClampPixel(GetPixelIntensity((image),(pixel)))
 #define ShadeImageTag  "Shade/Image"
 
+MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
+  const double azimuth,const double elevation,ExceptionInfo *exception)
+{
   CacheView
     *image_view,
     *shade_view;
