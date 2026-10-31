@@ -3068,7 +3068,14 @@ function).
    ends with `break;`, `return`, `continue` or `goto`.
 3. The moved groups meet Recipe W step 3 (written variables): they write through
    pointers they already use, and plain locals of the caller only on paths that end in
-   `return(R);`, which go by value. Their inputs are at most four parameters (W step 5).
+   `return(R);`, which go by value. Their inputs are at most four parameters (W step 5),
+   or, when they would number five or more, the variables they only read (none written
+   anywhere in the groups) go in an input struct built as Recipe N steps 2 and 3 build
+   one: the new function takes `const Name *name` first, then the variables that go by
+   value, and declares one `const` local per member at the top (N step 4); the call
+   group of step 5 declares the `Name` local at the top of its block and assigns every
+   member from its variable, in declaration order, directly before the call (N steps 5
+   and 6). Splits of one `switch` may share one `Name` (N step 8, *Sibling blocks*).
 4. Cut the moved groups, labels and bodies, in their order, into a new `static
    MagickBooleanType` function directly above the caller, whose body is `switch (e)
    { ... }` with the same text of `e`, followed by `return(MagickTrue);`. Each
@@ -4056,6 +4063,7 @@ Before pushing a branch: `python3 tools/oracle/oracle.py run`, the whole catalog
 | 2026-10-24 | WORDING | rule | *Two levels of evidence*: at the guard-verified level, E and P pass on the exact extract fingerprint (`+2` per new helper, nothing else moved), which `--calls` prints as a `WARN`; any other movement stops the commit | The literal reading would forbid every extraction at the guard level, contradicting the same paragraph's list of E and P; found before the first guard-verified step (M04) | mandate (2026-10-24) |
 | 2026-10-25 | AMEND | E | Step 7: a block of a value-returning function whose every path ends in `return(<expr>);` moves to a function of the caller's return type; the block becomes `return(<call>);` | `QueryColorCompliance`'s fallback to a colour name when `ParseCSSColor` finds no values (probe: 2.89 to 2.91, bumps 6 to 5), refused by step 7's `void`-only wording | mandate (2026-10-24) |
 | 2026-10-31 | NEW | SR | Split a Selection at its Default, Returning Success: Recipe SD for a `switch` whose moved groups may leave through `return(R);` (`R` as Recipe W step 2 allows) and whose kept groups may hold any exit, none falling through; the new function is `static MagickBooleanType`, each `return(R);` becomes `return(MagickFalse);`, it ends with `return(MagickTrue);`, and the caller's `default:` writes `if (Helper(...) == MagickFalse) return(R); break;` | `pixel-export.c`'s `ExportImagePixels` (campaign B, task M117): the map parser's `switch` (twelve letter groups, four returning after the colourspace test, a returning `default`) holds about half of the cc 39; SD refuses its `return`s, W the cc 25 of a single helper. A probe of three chained functions: 6.20 to 6.40, no finding on a new function | mandate (2026-10-24) |
+| 2026-10-31 | AMEND | SR | Step 3: moved groups whose inputs would number five or more take them in an input struct as Recipe N builds one (`const Name *name` first, then the variables that go by value; the call group declares, fills and passes the local), as SD step 3 allows Recipe Z's struct | `ExportImagePixels` (campaign B, task M117): its four colourspace-checked groups (C, K, M, Y) read `image`, `map`, `i` and `exception` and pass `quantum_map` by value, five inputs; a probe of four single-letter splits sharing one struct: 6.40 to 6.53, `ExportImagePixels` cc 26 to 14 | mandate (2026-10-24) |
 
 Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)` or
 `after the fact`.
