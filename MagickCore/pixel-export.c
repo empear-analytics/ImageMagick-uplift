@@ -3044,6 +3044,33 @@ static MagickBooleanType ExportMapQuantumOPR(const char *map,const ssize_t i,
   return(MagickTrue);
 }
 
+static MagickBooleanType ExportMapQuantumGI(const char *map,const ssize_t i,
+  QuantumType *quantum_map,ExceptionInfo *exception)
+{
+  switch (map[i])
+  {
+    case 'g':
+    case 'G':
+    {
+      quantum_map[i]=GreenQuantum;
+      break;
+    }
+    case 'I':
+    case 'i':
+    {
+      quantum_map[i]=IndexQuantum;
+      break;
+    }
+    default:
+    {
+      if (ExportMapQuantumOPR(map,i,quantum_map,exception) == MagickFalse)
+        return(MagickFalse);
+      break;
+    }
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ExportImagePixels(const Image *image,
   const ssize_t x,const ssize_t y,const size_t width,const size_t height,
   const char *map,const StorageType type,void *pixels,ExceptionInfo *exception)
@@ -3104,18 +3131,6 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
           "ColorSeparatedImageRequired","`%s'",map);
         return(MagickFalse);
       }
-      case 'g':
-      case 'G':
-      {
-        quantum_map[i]=GreenQuantum;
-        break;
-      }
-      case 'I':
-      case 'i':
-      {
-        quantum_map[i]=IndexQuantum;
-        break;
-      }
       case 'K':
       case 'k':
       {
@@ -3151,7 +3166,7 @@ MagickExport MagickBooleanType ExportImagePixels(const Image *image,
       }
       default:
       {
-        if (ExportMapQuantumOPR(map,i,quantum_map,exception) == MagickFalse)
+        if (ExportMapQuantumGI(map,i,quantum_map,exception) == MagickFalse)
           return(MagickFalse);
         break;
       }
