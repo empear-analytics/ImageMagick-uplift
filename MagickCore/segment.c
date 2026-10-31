@@ -653,6 +653,25 @@ static MagickBooleanType AcquireSquares(double **squares)
   return(MagickTrue);
 }
 
+static void RelinquishClassifyResources(Cluster *head,double *squares)
+{
+  Cluster
+    *cluster,
+    *next_cluster;
+
+  double
+    *free_squares;
+
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
+  {
+    next_cluster=cluster->next;
+    cluster=(Cluster *) RelinquishMagickMemory(cluster);
+  }
+  squares-=255;
+  free_squares=squares;
+  free_squares=(double *) RelinquishMagickMemory(free_squares);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -865,14 +884,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   /*
     Relinquish resources.
   */
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
-  {
-    next_cluster=cluster->next;
-    cluster=(Cluster *) RelinquishMagickMemory(cluster);
-  }
-  squares-=255;
-  free_squares=squares;
-  free_squares=(double *) RelinquishMagickMemory(free_squares);
+  RelinquishClassifyResources(head,squares);
   return(MagickTrue);
 }
 
