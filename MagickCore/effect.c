@@ -495,6 +495,15 @@ static MagickBooleanType ReportDespeckleProgress(const Image *image,
   return(status);
 }
 
+static void RelinquishDespeckleMemory(MemoryInfo *buffer_info,
+  MemoryInfo *pixel_info)
+{
+  if (buffer_info != (MemoryInfo *) NULL)
+    buffer_info=RelinquishVirtualMemory(buffer_info);
+  if (pixel_info != (MemoryInfo *) NULL)
+    pixel_info=RelinquishVirtualMemory(pixel_info);
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -563,10 +572,7 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
   if ((pixel_info == (MemoryInfo *) NULL) ||
       (buffer_info == (MemoryInfo *) NULL))
     {
-      if (buffer_info != (MemoryInfo *) NULL)
-        buffer_info=RelinquishVirtualMemory(buffer_info);
-      if (pixel_info != (MemoryInfo *) NULL)
-        pixel_info=RelinquishVirtualMemory(pixel_info);
+      RelinquishDespeckleMemory(buffer_info,pixel_info);
       despeckle_image=DestroyImage(despeckle_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
