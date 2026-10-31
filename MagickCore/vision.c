@@ -2317,6 +2317,109 @@ static MagickBooleanType KeepTopObjects(const Image *component_image,
   return(MagickTrue);
 }
 
+typedef struct _CCMergeObject
+{
+  CacheView
+    *component_view;
+
+  Image
+    *component_image;
+
+  CacheView
+    *object_view;
+
+  CCObjectInfo
+    *object;
+
+  size_t
+    *neighbors;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    i;
+
+  ExceptionInfo
+    *exception;
+} CCMergeObject;
+
+static MagickBooleanType MergeObject(const CCMergeObject *merge_object,
+  MagickBooleanType status)
+{
+  CacheView
+    *const component_view = merge_object->component_view;
+
+  Image
+    *const component_image = merge_object->component_image;
+
+  CacheView
+    *const object_view = merge_object->object_view;
+
+  CCObjectInfo
+    *const object = merge_object->object;
+
+  size_t
+    *const neighbors = merge_object->neighbors;
+
+  const size_t
+    connectivity = merge_object->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = merge_object->connect4,
+    (*const connect8)[2] = merge_object->connect8;
+
+  const ssize_t
+    i = merge_object->i;
+
+  ExceptionInfo
+    *const exception = merge_object->exception;
+
+  CCObjectCensus
+    object_census;
+
+  CCObjectMerge
+    object_merge;
+
+  RectangleInfo
+    bounding_box;
+
+  size_t
+    count,
+    id;
+
+  count=0;
+  bounding_box=object[i].bounding_box;
+  object_census.component_view=component_view;
+  object_census.component_image=component_image;
+  object_census.object_view=object_view;
+  object_census.object=object;
+  object_census.neighbors=neighbors;
+  object_census.bounding_box=bounding_box;
+  object_census.connectivity=connectivity;
+  object_census.connect4=connect4;
+  object_census.connect8=connect8;
+  object_census.i=i;
+  object_census.exception=exception;
+  CountMergedObjectNeighbors(&object_census,&status,&count);
+  /*
+    Merge with object of greatest adjacent area.
+  */
+  id=GetGreatestAdjacentObject(object,neighbors,count);
+  ResetAdjacentCensus(object,neighbors,count);
+  object[i].area=0.0;
+  object_merge.component_image=component_image;
+  object_merge.component_view=component_view;
+  object_merge.bounding_box=bounding_box;
+  object_merge.i=i;
+  object_merge.id=id;
+  object_merge.exception=exception;
+  status=RelabelMergedObject(&object_merge,status);
+  return(status);
+}
+
 #define ConnectedComponentsImageTag  "ConnectedComponents/Image"
 
 static void UpdateComponentsProgress(const Image *image,
@@ -2710,18 +2813,8 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   (void) SetCacheViewVirtualPixelMethod(object_view,TileVirtualPixelMethod);
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
-    CCObjectCensus
-      object_census;
-
-    CCObjectMerge
-      object_merge;
-
-    RectangleInfo
-      bounding_box;
-
-    size_t
-      count,
-      id;
+    CCMergeObject
+      merge_object;
 
     if (status == MagickFalse)
       continue;
@@ -2730,33 +2823,17 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     /*
       Merge this object.
     */
-    count=0;
-    bounding_box=object[i].bounding_box;
-    object_census.component_view=component_view;
-    object_census.component_image=component_image;
-    object_census.object_view=object_view;
-    object_census.object=object;
-    object_census.neighbors=neighbors;
-    object_census.bounding_box=bounding_box;
-    object_census.connectivity=connectivity;
-    object_census.connect4=connect4;
-    object_census.connect8=connect8;
-    object_census.i=i;
-    object_census.exception=exception;
-    CountMergedObjectNeighbors(&object_census,&status,&count);
-    /*
-      Merge with object of greatest adjacent area.
-    */
-    id=GetGreatestAdjacentObject(object,neighbors,count);
-    ResetAdjacentCensus(object,neighbors,count);
-    object[i].area=0.0;
-    object_merge.component_image=component_image;
-    object_merge.component_view=component_view;
-    object_merge.bounding_box=bounding_box;
-    object_merge.i=i;
-    object_merge.id=id;
-    object_merge.exception=exception;
-    status=RelabelMergedObject(&object_merge,status);
+    merge_object.component_view=component_view;
+    merge_object.component_image=component_image;
+    merge_object.object_view=object_view;
+    merge_object.object=object;
+    merge_object.neighbors=neighbors;
+    merge_object.connectivity=connectivity;
+    merge_object.connect4=connect4;
+    merge_object.connect8=connect8;
+    merge_object.i=i;
+    merge_object.exception=exception;
+    status=MergeObject(&merge_object,status);
   }
   object_view=DestroyCacheView(object_view);
   component_view=DestroyCacheView(component_view);
