@@ -1156,6 +1156,19 @@ static void ApplyLocalContrastPixel(const LocalContrastPixel *contrast,
       GetPixelBlue(image,p)*mult),q);
 }
 
+static void LoadLocalContrastLuma(const Image *image,const Quantum *p,
+  float *pix,const ssize_t width)
+{
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) image->rows+(2*width); y++)
+  {
+    *pix++=(float)GetPixelLuma(image,p);
+    p+=(ptrdiff_t) image->number_channels;
+  }
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1278,11 +1291,7 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
           status=MagickFalse;
           continue;
         }
-      for (y=0; y < (ssize_t) image->rows+(2*width); y++)
-      {
-        *pix++=(float)GetPixelLuma(image,p);
-        p+=(ptrdiff_t) image->number_channels;
-      }
+      LoadLocalContrastLuma(image,p,pix,width);
       out=interImage+x+width;
       for (y=0; y < (ssize_t) image->rows; y++)
       {
