@@ -1182,6 +1182,52 @@ static inline void ClampUpAxes(const double dux,
 }
 
 #endif
+
+typedef struct _ResampleEllipse
+{
+  ResampleFilter
+    *resample_filter;
+
+  double
+    A,
+    B,
+    C;
+} ResampleEllipse;
+
+static MagickBooleanType FitResampleEllipse(const ResampleEllipse *ellipse,
+  double *F)
+{
+  ResampleFilter
+    *const resample_filter = ellipse->resample_filter;
+
+  const double
+    A = ellipse->A,
+    B = ellipse->B,
+    C = ellipse->C;
+
+  if ( (4*A*C - B*B) > MagickMaximumValue ) {
+    resample_filter->limit_reached = MagickTrue;
+    return(MagickFalse);
+  }
+
+  /* Scale ellipse to match the filters support
+     (that is, multiply F by the square of the support)
+     Simpler to just multiply it by the support twice!
+  */
+  *F *= resample_filter->support;
+  *F *= resample_filter->support;
+
+  /* Orthogonal bounds of the ellipse */
+  resample_filter->Ulimit = sqrt(C*(*F)/(A*C-0.25*B*B));
+  resample_filter->Vlimit = sqrt(A*(*F)/(A*C-0.25*B*B));
+
+  /* Horizontally aligned parallelogram fitted to Ellipse */
+  resample_filter->Uwidth = sqrt(*F/A); /* Half of the parallelogram width */
+  resample_filter->slope = -B/(2.0*A); /* Reciprocal slope of the parallelogram */
+
+  return(MagickTrue);
+}
+
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %                                                                             %
@@ -1248,6 +1294,9 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
   const double dux,const double duy,const double dvx,const double dvy)
 {
   double A,B,C,F;
+
+  ResampleEllipse
+    ellipse;
 
   assert(resample_filter != (ResampleFilter *) NULL);
   assert(resample_filter->signature == MagickCoreSignature);
@@ -1369,25 +1418,12 @@ MagickExport void ScaleResampleFilter(ResampleFilter *resample_filter,
      the average of the whole image is needed to get a reasonable
      result. Calculate only as needed.
   */
-  if ( (4*A*C - B*B) > MagickMaximumValue ) {
-    resample_filter->limit_reached = MagickTrue;
+  ellipse.resample_filter=resample_filter;
+  ellipse.A=A;
+  ellipse.B=B;
+  ellipse.C=C;
+  if (FitResampleEllipse(&ellipse,&F) == MagickFalse)
     return;
-  }
-
-  /* Scale ellipse to match the filters support
-     (that is, multiply F by the square of the support)
-     Simpler to just multiply it by the support twice!
-  */
-  F *= resample_filter->support;
-  F *= resample_filter->support;
-
-  /* Orthogonal bounds of the ellipse */
-  resample_filter->Ulimit = sqrt(C*F/(A*C-0.25*B*B));
-  resample_filter->Vlimit = sqrt(A*F/(A*C-0.25*B*B));
-
-  /* Horizontally aligned parallelogram fitted to Ellipse */
-  resample_filter->Uwidth = sqrt(F/A); /* Half of the parallelogram width */
-  resample_filter->slope = -B/(2.0*A); /* Reciprocal slope of the parallelogram */
 
 #if DEBUG_ELLIPSE
   (void) FormatLocaleFile(stderr, "Ulimit=%lf; Vlimit=%lf; UWidth=%lf; Slope=%lf;\n",
