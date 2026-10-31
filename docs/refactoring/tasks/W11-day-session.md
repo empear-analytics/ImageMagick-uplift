@@ -21,12 +21,14 @@ flagged as a close reading before pushing.
 | `threshold.c` | 5.20 → 5.35 | 6 |
 | `feature.c` | 5.23 → 5.24 | 1 |
 | `visual-effects.c` | 3.27 → 3.50 | 10 |
+| `effect.c` | 3.52 → 4.10 (split) → **4.36** | 1 + 12 |
+| `effect-blur.c` (new) | 4.91 → **5.29** | 11 |
 | `distort.c` | 3.01 (no legal step) | 0 |
 | `enhance.c` | 2.97 (saturated) | 0 |
 | `morphology.c` | 2.71 (saturated) | 0 |
 
-68 refactor commits (E 24, N 12, W 9, SD 6, V 4, D 3, Q 3, H 2, T 2, I 1, LB 1, O 1, U 1)
-and two docs commits (plateau rows, this report). No new recipe and no amendment. Every refactor commit ran the
+93 refactor commits (E 31, N 21, W 9, SD 6, V 6, H 4, D 3, Q 3, U 3, T 2, I 1, LB 1, O 1, S 1, Y 1)
+and 7 docs and tool commits. No new recipe and no amendment. Every refactor commit ran the
 oracle on its function's cases (0 diverged) and passed the pre-commit gate; the whole
 catalogue ran after each file: 15,900 cases, 0 diverged. None of the steps adds
 *Overall Code Complexity* or *Code Duplication* to a file, except as noted for
@@ -80,7 +82,22 @@ playbook.
   revert the commit; the Windows build configuration outside this repository still needs
   the file.
 
+- **After the split `effect.c` and `effect-blur.c` are no longer saturated:** 3.52 to
+  4.36 and 4.91 to 5.29 (23 steps; the whole catalogue 15,900 cases, 0 diverged after each
+  pass). `PreviewImage` (cc 56) and the Adaptive pair's clone problem are what remain.
+  The same split, for the files whose stub probes found nothing else (`morphology.c`,
+  `enhance.c`, `composite.c`, `fx.c`, `compare.c`), is the lever; `effect.c` is the proof.
+
 ### For the owner
+
+- **Close readings of the `effect.c` and `effect-blur.c` passes**, for you to accept or
+  revert: `effect-blur.c` 42d350a1b calls an existing helper (`CloneDirectImage`) for a
+  second identical block under V step 6, which names copies of a V helper, not a second
+  copy; with no *Code Duplication* finding it is D in all but name (like `vision.c`
+  2221d8d57); 3ba0a7626 (Y with a single exit's cleanup left in the caller, V step 7);
+  d0dd89745 passes a local array as the pointer it decays to where N says "exact type";
+  `effect.c` 233020a42 relies on a failure branch that no case reaches being dead after the
+  block; 55c71a999 (H) moved 4.17 to 4.18 by itself and is kept to unblock 0fea5fbc0.
 
 - **`distort.c`, two rulings** (the pass made no commits for want of them):
   (1) `DistortImage`'s resample site, `status=ResamplePixelColor(...)` and its test in
@@ -121,6 +138,12 @@ playbook.
   *Large Method*; the later W step took the function to 79 lines, still a *Large Method*.
 
 ### Noticed, not changed (possible upstream bugs)
+
+- `effect.c` `PreviewImage`: the threshold preview applies `BilevelImage` to `thumbnail`,
+  not to the clone `preview_image`; AddNoise's case 4 never sets `factor`, so its label
+  repeats the previous tile's. `effect-blur.c`: `BlurMotionPixel` and `BlurRotationalPixel`
+  copy a struct field by field for every channel; `AdaptiveSharpenImage` and
+  `AdaptiveBlurImage` are near-clones.
 
 - `distort.c` `DistortImage`: `status=ResamplePixelColor` can overwrite an earlier
   failure with `MagickTrue` (W07); `enhance.c` `NegateImage`'s grayscale path returns
