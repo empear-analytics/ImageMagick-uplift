@@ -666,6 +666,20 @@ static inline MagickBooleanType IsColorspaceRestoreNeeded(
     MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType FinishAssignImageColors(Image *image,
+  QCubeInfo *cube_info,const ColorspaceType colorspace,
+  ExceptionInfo *exception)
+{
+  if (cube_info->quantize_info->measure_error != MagickFalse)
+    (void) GetImageQuantizeError(image,exception);
+  if (IsMonochromeQuantize(cube_info) != MagickFalse)
+    SetMonochromeColormap(image);
+  (void) SyncImage(image,exception);
+  if (IsColorspaceRestoreNeeded(cube_info,colorspace) != MagickFalse)
+    (void) TransformImageColorspace(image,colorspace,exception);
+  return(MagickTrue);
+}
+
 static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
   ExceptionInfo *exception)
 {
@@ -727,14 +741,7 @@ static MagickBooleanType AssignImageColors(Image *image,QCubeInfo *cube_info,
       }
       image_view=DestroyCacheView(image_view);
     }
-  if (cube_info->quantize_info->measure_error != MagickFalse)
-    (void) GetImageQuantizeError(image,exception);
-  if (IsMonochromeQuantize(cube_info) != MagickFalse)
-    SetMonochromeColormap(image);
-  (void) SyncImage(image,exception);
-  if (IsColorspaceRestoreNeeded(cube_info,colorspace) != MagickFalse)
-    (void) TransformImageColorspace(image,colorspace,exception);
-  return(MagickTrue);
+  return(FinishAssignImageColors(image,cube_info,colorspace,exception));
 }
 
 /*
