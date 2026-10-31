@@ -151,6 +151,21 @@ static void ExtendToLayerBounds(const Image *image,RectangleInfo *page,
   }
 }
 
+static void ExtendToMosaicBounds(const Image *image,size_t *width,
+  size_t *height)
+{
+  const Image
+    *next;
+
+  for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
+  {
+    if ((ssize_t) *width < (next->page.x+(ssize_t) next->columns))
+      *width=(size_t) next->page.x+next->columns;
+    if ((ssize_t) *height < (next->page.y+(ssize_t) next->rows))
+      *height=(size_t) next->page.y+next->rows;
+  }
+}
+
 MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -164,9 +179,6 @@ MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
 
   RectangleInfo
     page;
-
-  const Image
-    *next;
 
   size_t
     number_images,
@@ -213,13 +225,7 @@ MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
         width=page.width;
       if (page.height > 0)
         height=page.height;
-      for (next=image; next != (Image *) NULL; next=GetNextImageInList(next))
-      {
-        if ((ssize_t) width < (next->page.x+(ssize_t) next->columns))
-          width=(size_t) next->page.x+next->columns;
-        if ((ssize_t) height < (next->page.y+(ssize_t) next->rows))
-          height=(size_t) next->page.y+next->rows;
-      }
+      ExtendToMosaicBounds(image,&width,&height);
       page.width=width;
       page.height=height;
       page.x=0;
