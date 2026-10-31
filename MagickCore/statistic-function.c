@@ -189,6 +189,28 @@ static double ApplyArcsinFunction(Quantum pixel,
   return(result);
 }
 
+static double ApplyArctanFunction(Quantum pixel,
+  const size_t number_parameters,const double *parameters)
+{
+  double
+    center,
+    bias,
+    range,
+    result,
+    slope;
+
+  /*
+    Arctan: slope, center, range, and bias.
+  */
+  slope=(number_parameters >= 1) ? parameters[0] : 1.0;
+  center=(number_parameters >= 2) ? parameters[1] : 0.5;
+  range=(number_parameters >= 3) ? parameters[2] : 1.0;
+  bias=(number_parameters >= 4) ? parameters[3] : 0.5;
+  result=MagickPI*slope*(QuantumScale*(double) pixel-center);
+  result=(double) QuantumRange*(range/MagickPI*atan((double) result)+bias);
+  return(result);
+}
+
 static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
   const size_t number_parameters,const double *parameters,
   ExceptionInfo *exception)
@@ -227,21 +249,7 @@ static Quantum ApplyFunction(Quantum pixel,const MagickFunction function,
     }
     case ArctanFunction:
     {
-      double
-        center,
-        bias,
-        range,
-        slope;
-
-      /*
-        Arctan: slope, center, range, and bias.
-      */
-      slope=(number_parameters >= 1) ? parameters[0] : 1.0;
-      center=(number_parameters >= 2) ? parameters[1] : 0.5;
-      range=(number_parameters >= 3) ? parameters[2] : 1.0;
-      bias=(number_parameters >= 4) ? parameters[3] : 0.5;
-      result=MagickPI*slope*(QuantumScale*(double) pixel-center);
-      result=(double) QuantumRange*(range/MagickPI*atan((double) result)+bias);
+      result=ApplyArctanFunction(pixel,number_parameters,parameters);
       break;
     }
     case UndefinedFunction:
