@@ -107,6 +107,16 @@ struct _ResizeFilter
   size_t
     signature;
 };
+
+typedef struct _ResizeFilterReport
+{
+  const ResizeFilter
+    *resize_filter;
+
+  const double
+    B,
+    C;
+} ResizeFilterReport;
 
 /*
   Forward declarations.
@@ -904,9 +914,16 @@ static FilterType GetWeightingFilterType(
 }
 
 static void ReportResizeFilter(const Image *image,
-  const ResizeFilter *resize_filter,FilterType filter_type,
-  FilterType window_type,const double B,const double C)
+  const ResizeFilterReport *report,FilterType filter_type,
+  FilterType window_type)
 {
+  const ResizeFilter
+    *resize_filter = report->resize_filter;
+
+  const double
+    B = report->B,
+    C = report->C;
+
   double
     support,
     x;
@@ -1446,7 +1463,10 @@ MagickPrivate ResizeFilter *AcquireResizeFilter(const Image *image,
     #pragma omp single
 #endif
     {
-      ReportResizeFilter(image,resize_filter,filter_type,window_type,B,C);
+      const ResizeFilterReport
+        report = { resize_filter, B, C };
+
+      ReportResizeFilter(image,&report,filter_type,window_type);
     }
   return(resize_filter);
 }
