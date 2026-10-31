@@ -1900,6 +1900,12 @@ MagickPrivate double GetResizeFilterWeight(const ResizeFilter *resize_filter,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static inline MagickBooleanType IsResizeSizeZero(const size_t columns,
+  const size_t rows)
+{
+  return(((columns == 0) || (rows == 0)) ? MagickTrue : MagickFalse);
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -1934,7 +1940,7 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((columns == 0) || (rows == 0))
+  if (IsResizeSizeZero(columns,rows) != MagickFalse)
     ThrowImageException(ImageError,"NegativeOrZeroImageSize");
   if ((columns == image->columns) && (rows == image->rows))
     return(CloneImage(image,0,0,MagickTrue,exception));
@@ -2202,7 +2208,7 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  if ((columns == 0) || (rows == 0))
+  if (IsResizeSizeZero(columns,rows) != MagickFalse)
     ThrowImageException(ImageError,"NegativeOrZeroImageSize");
   if ((columns == image->columns) && (rows == image->rows))
     return(CloneImage(image,0,0,MagickTrue,exception));
