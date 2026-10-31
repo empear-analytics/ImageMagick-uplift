@@ -338,6 +338,34 @@ static void ApplyBasicEvaluateOperator(const Quantum pixel,
   }
 }
 
+static void ApplyThresholdEvaluateOperator(const Quantum pixel,
+  const MagickEvaluateOperator op,const double value,double *result)
+{
+  switch (op)
+  {
+    default:
+    {
+      ApplyBasicEvaluateOperator(pixel,op,value,result);
+      break;
+    }
+    case ThresholdEvaluateOperator:
+    {
+      (*result)=(double) (((double) pixel <= value) ? 0 : QuantumRange);
+      break;
+    }
+    case ThresholdBlackEvaluateOperator:
+    {
+      (*result)=(double) (((double) pixel <= value) ? 0 : pixel);
+      break;
+    }
+    case ThresholdWhiteEvaluateOperator:
+    {
+      (*result)=(double) (((double) pixel > value) ? QuantumRange : pixel);
+      break;
+    }
+  }
+}
+
 static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   const MagickEvaluateOperator op,const double value)
 {
@@ -352,7 +380,7 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
   {
     default:
     {
-      ApplyBasicEvaluateOperator(pixel,op,value,&result);
+      ApplyThresholdEvaluateOperator(pixel,op,value,&result);
       break;
     }
     case DivideEvaluateOperator:
@@ -477,21 +505,6 @@ static double ApplyEvaluateOperator(RandomInfo *random_info,const Quantum pixel,
     case SumEvaluateOperator:
     {
       result=(double) pixel+value;
-      break;
-    }
-    case ThresholdEvaluateOperator:
-    {
-      result=(double) (((double) pixel <= value) ? 0 : QuantumRange);
-      break;
-    }
-    case ThresholdBlackEvaluateOperator:
-    {
-      result=(double) (((double) pixel <= value) ? 0 : pixel);
-      break;
-    }
-    case ThresholdWhiteEvaluateOperator:
-    {
-      result=(double) (((double) pixel > value) ? QuantumRange : pixel);
       break;
     }
     case UniformNoiseEvaluateOperator:
