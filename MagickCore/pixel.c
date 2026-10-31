@@ -1596,6 +1596,25 @@ static void AverageInterpolateChannel(const ChannelAverage *average,
   SetPixelChannel(destination,channel,ClampToQuantum(sum),pixel);
 }
 
+static void AverageInterpolateChannels(const ChannelsInterpolation *grid,
+  const Quantum *magick_restrict p,const ssize_t count,Quantum *pixel)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) GetPixelChannels(grid->source); i++)
+  {
+    ChannelAverage
+      average;
+
+    average.source=grid->source;
+    average.destination=grid->destination;
+    average.p=p;
+    average.count=count;
+    AverageInterpolateChannel(&average,i,pixel);
+  }
+}
+
 static void InterpolateCubicChannel(const ChannelsInterpolation *grid,
   void (*weights)(const double,double (*)[4]),const Quantum *magick_restrict p,
   const ssize_t i,Quantum *pixel)
@@ -1938,17 +1957,7 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
           break;
         }
       count*=count;  /* Number of pixels to average */
-      for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
-      {
-        ChannelAverage
-          average;
-
-        average.source=source;
-        average.destination=destination;
-        average.p=p;
-        average.count=count;
-        AverageInterpolateChannel(&average,i,pixel);
-      }
+      AverageInterpolateChannels(&grid,p,count,pixel);
       break;
     }
     case BilinearInterpolatePixel:
