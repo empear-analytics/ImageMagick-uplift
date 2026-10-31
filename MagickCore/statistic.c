@@ -876,6 +876,71 @@ static void EvaluateMedianRow(const EvaluateMedian *median,const Quantum **p,
   }
 }
 
+typedef struct _EvaluateImagesRows
+{
+  Image
+    *image;
+
+  const Image
+    *images;
+
+  size_t
+    number_images;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  int
+    id;
+
+  MagickEvaluateOperator
+    op;
+} EvaluateImagesRows;
+
+static void AccumulateEvaluateRows(const EvaluateImagesRows *rows,
+  const Quantum **p,PixelChannels *evaluate_pixel)
+{
+  Image
+    *const image = rows->image;
+
+  const Image
+    *const images = rows->images;
+
+  const size_t
+    number_images = rows->number_images;
+
+  RandomInfo
+    **magick_restrict const random_info = rows->random_info;
+
+  const int
+    id = rows->id;
+
+  const MagickEvaluateOperator
+    op = rows->op;
+
+  const Image
+    *next;
+
+  EvaluateRow
+    row;
+
+  ssize_t
+    j;
+
+  next=images;
+  for (j=0; j < (ssize_t) number_images; j++)
+  {
+    row.image=image;
+    row.next=next;
+    row.random_info=random_info;
+    row.id=id;
+    row.op=op;
+    row.j=j;
+    AccumulateEvaluateRow(&row,p,evaluate_pixel);
+    next=GetNextImageInList(next);
+  }
+}
+
 typedef struct _EvaluateFetch
 {
   CacheView
@@ -1107,9 +1172,6 @@ MagickExport Image *EvaluateImages(const Image *images,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        const Image
-          *next;
-
         const int
           id = GetOpenMPThreadId();
 
@@ -1119,8 +1181,8 @@ MagickExport Image *EvaluateImages(const Image *images,
         EvaluateFetch
           fetch;
 
-        EvaluateRow
-          row;
+        EvaluateImagesRows
+          rows;
 
         PixelChannels
           *evaluate_pixel;
@@ -1156,18 +1218,13 @@ MagickExport Image *EvaluateImages(const Image *images,
           }
         evaluate_pixel=evaluate_pixels[id];
         ClearPolynomialPixels(image,evaluate_pixel);
-        next=images;
-        for (j=0; j < (ssize_t) number_images; j++)
-        {
-          row.image=image;
-          row.next=next;
-          row.random_info=random_info;
-          row.id=id;
-          row.op=op;
-          row.j=j;
-          AccumulateEvaluateRow(&row,p,evaluate_pixel);
-          next=GetNextImageInList(next);
-        }
+        rows.image=image;
+        rows.images=images;
+        rows.number_images=number_images;
+        rows.random_info=random_info;
+        rows.id=id;
+        rows.op=op;
+        AccumulateEvaluateRows(&rows,p,evaluate_pixel);
         NormalizeEvaluatePixels(image,op,number_images,evaluate_pixel);
         SetEvaluatePixels(image,evaluate_pixel,q);
         p=(const Quantum **) RelinquishMagickMemory((void *) p);
