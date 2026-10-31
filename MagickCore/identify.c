@@ -1745,6 +1745,23 @@ static void PrintImageChannelStatistics(FILE *file,const Image *image,
     channel_statistics);
 }
 
+static void PrintCMYKFeatures(FILE *file,const Image *image,
+  const ChannelFeatures *channel_features)
+{
+  if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelFeatures(file,CyanPixelChannel,"Cyan",
+      channel_features);
+  if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelFeatures(file,MagentaPixelChannel,"Magenta",
+      channel_features);
+  if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelFeatures(file,YellowPixelChannel,"Yellow",
+      channel_features);
+  if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
+    (void) PrintChannelFeatures(file,BlackPixelChannel,"Black",
+      channel_features);
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1945,18 +1962,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         }
         case CMYKColorspace:
         {
-          if ((GetPixelCyanTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelFeatures(file,CyanPixelChannel,"Cyan",
-              channel_features);
-          if ((GetPixelMagentaTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelFeatures(file,MagentaPixelChannel,"Magenta",
-              channel_features);
-          if ((GetPixelYellowTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelFeatures(file,YellowPixelChannel,"Yellow",
-              channel_features);
-          if ((GetPixelBlackTraits(image) & UpdatePixelTrait) != 0)
-            (void) PrintChannelFeatures(file,BlackPixelChannel,"Black",
-              channel_features);
+          PrintCMYKFeatures(file,image,channel_features);
           break;
         }
         default:
