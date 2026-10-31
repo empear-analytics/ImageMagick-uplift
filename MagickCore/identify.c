@@ -1985,6 +1985,21 @@ static void GetRequestedFeatures(const Image *image,
     }
 }
 
+static void GetRequestedMoments(const Image *image,
+  ChannelMoments **channel_moments,ChannelPerceptualHash **channel_phash,
+  ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"identify:moments");
+  if (artifact != (const char *) NULL)
+    {
+      *channel_moments=GetImageMoments(image,exception);
+      *channel_phash=GetImagePerceptualHash(image,exception);
+    }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -2004,7 +2019,6 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     colorspace;
 
   const char
-    *artifact,
     *locate;
 
   const Quantum
@@ -2097,12 +2111,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
     {
       depth=GetImageDepth(image,exception);
       channel_statistics=GetImageStatistics(image,exception);
-      artifact=GetImageArtifact(image,"identify:moments");
-      if (artifact != (const char *) NULL)
-        {
-          channel_moments=GetImageMoments(image,exception);
-          channel_phash=GetImagePerceptualHash(image,exception);
-        }
+      GetRequestedMoments(image,&channel_moments,&channel_phash,exception);
       GetRequestedFeatures(image,&channel_features,exception);
     }
   (void) FormatLocaleFile(file,"Image:\n  Filename: %s\n",image->filename);
