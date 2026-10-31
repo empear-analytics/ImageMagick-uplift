@@ -3458,6 +3458,24 @@ static void OpenGzipBlob(BlobInfo *magick_restrict blob_info,
 }
 #endif
 
+#if defined(MAGICKCORE_BZLIB_DELEGATE)
+static void OpenBZipBlob(BlobInfo *magick_restrict blob_info,
+  const char *filename)
+{
+  BZFILE
+    *bzfile = BZ2_bzopen(filename,"r");
+
+  if (bzfile != (BZFILE *) NULL)
+    {
+      if (blob_info->file_info.file != (FILE *) NULL)
+        (void) fclose(blob_info->file_info.file);
+      blob_info->file_info.file=(FILE *) NULL;
+      blob_info->file_info.bzfile=bzfile;
+      blob_info->type=BZipStream;
+    }
+}
+#endif
+
 static void FormSharedListFilename(const Image *image,const char *extension,
   char *filename)
 {
@@ -3680,19 +3698,7 @@ MagickExport MagickBooleanType OpenBlob(const ImageInfo *image_info,
 #endif
 #if defined(MAGICKCORE_BZLIB_DELEGATE)
             if (strncmp((char *) magick,"BZh",3) == 0)
-              {
-                BZFILE
-                  *bzfile = BZ2_bzopen(filename,"r");
-
-                if (bzfile != (BZFILE *) NULL)
-                  {
-                    if (blob_info->file_info.file != (FILE *) NULL)
-                      (void) fclose(blob_info->file_info.file);
-                    blob_info->file_info.file=(FILE *) NULL;
-                    blob_info->file_info.bzfile=bzfile;
-                    blob_info->type=BZipStream;
-                  }
-              }
+              OpenBZipBlob(blob_info,filename);
 #endif
             if (blob_info->type == FileStream)
               MapBlobFile(image_info,blob_info);
