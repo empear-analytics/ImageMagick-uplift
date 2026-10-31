@@ -125,6 +125,32 @@
 %    o exception: return any errors or warnings in this structure.
 %
 */
+static void ExtendToLayerBounds(const Image *image,RectangleInfo *page,
+  size_t *width,size_t *height)
+{
+  const Image
+    *next;
+
+  next=GetNextImageInList(image);
+  for ( ; next != (Image *) NULL;  next=GetNextImageInList(next))
+  {
+    if ((*page).x > next->page.x)
+      {
+        *width=(size_t) ((ssize_t) *width+(*page).x-next->page.x);
+        (*page).x=next->page.x;
+      }
+    if ((*page).y > next->page.y)
+      {
+        *height=(size_t) ((ssize_t) *height+(*page).y-next->page.y);
+        (*page).y=next->page.y;
+      }
+    if ((ssize_t) *width < (next->page.x+(ssize_t) next->columns-(*page).x))
+      *width=(size_t) (next->page.x+(ssize_t) next->columns-(*page).x);
+    if ((ssize_t) *height < (next->page.y+(ssize_t) next->rows-(*page).y))
+      *height=(size_t) (next->page.y+(ssize_t) next->rows-(*page).y);
+  }
+}
+
 MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
   ExceptionInfo *exception)
 {
@@ -168,24 +194,7 @@ MagickExport Image *MergeImageLayers(Image *image,const LayerMethod method,
     case MergeLayer:
     default:
     {
-      next=GetNextImageInList(image);
-      for ( ; next != (Image *) NULL;  next=GetNextImageInList(next))
-      {
-        if (page.x > next->page.x)
-          {
-            width=(size_t) ((ssize_t) width+page.x-next->page.x);
-            page.x=next->page.x;
-          }
-        if (page.y > next->page.y)
-          {
-            height=(size_t) ((ssize_t) height+page.y-next->page.y);
-            page.y=next->page.y;
-          }
-        if ((ssize_t) width < (next->page.x+(ssize_t) next->columns-page.x))
-          width=(size_t) (next->page.x+(ssize_t) next->columns-page.x);
-        if ((ssize_t) height < (next->page.y+(ssize_t) next->rows-page.y))
-          height=(size_t) (next->page.y+(ssize_t) next->rows-page.y);
-      }
+      ExtendToLayerBounds(image,&page,&width,&height);
       break;
     }
     case FlattenLayer:
