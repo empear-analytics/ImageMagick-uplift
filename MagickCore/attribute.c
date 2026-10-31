@@ -1201,6 +1201,14 @@ static ImageInfo *AcquireImageTypeInfo(const Image *image)
   return(image_info);
 }
 
+static MagickBooleanType TransformImageToGray(Image *image,
+  MagickBooleanType status,ExceptionInfo *exception)
+{
+  if (IsGrayImageType(image->type) == MagickFalse)
+    status=TransformImageColorspace(image,GRAYColorspace,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
   ExceptionInfo *exception)
 {
@@ -1228,8 +1236,7 @@ MagickExport MagickBooleanType SetImageType(Image *image,const ImageType type,
     }
     case GrayscaleType:
     {
-      if (IsGrayImageType(image->type) == MagickFalse)
-        status=TransformImageColorspace(image,GRAYColorspace,exception);
+      status=TransformImageToGray(image,status,exception);
       image->alpha_trait=UndefinedPixelTrait;
       break;
     }
