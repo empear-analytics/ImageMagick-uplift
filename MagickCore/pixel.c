@@ -2543,6 +2543,23 @@ static void InterpolateGridPixelInfo(const PixelInfoInterpolation grid,
   }
 }
 
+static MagickBooleanType InterpolateIntegerPixelInfo(
+  const PixelInfoInterpolation *grid,PixelInfo *pixel,MagickBooleanType status)
+{
+  const Quantum
+    *p;
+
+  p=GetCacheViewVirtualPixels(grid->image_view,grid->x_offset,grid->y_offset,
+    1,1,grid->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  GetPixelInfoPixel(grid->image,p,pixel);
+  return(status);
+}
+
 MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
   const CacheView_ *image_view,const PixelInterpolateMethod method,
   const double x,const double y,PixelInfo *pixel,ExceptionInfo *exception)
@@ -2598,13 +2615,7 @@ MagickExport MagickBooleanType InterpolatePixelInfo(const Image *image,
     }
     case IntegerInterpolatePixel:
     {
-      p=GetCacheViewVirtualPixels(image_view,x_offset,y_offset,1,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          break;
-        }
-      GetPixelInfoPixel(image,p,pixel);
+      status=InterpolateIntegerPixelInfo(&grid,pixel,status);
       break;
     }
     case NearestInterpolatePixel:
