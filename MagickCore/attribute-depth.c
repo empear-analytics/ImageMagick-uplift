@@ -816,6 +816,14 @@ static inline MagickBooleanType IsFloydSteinbergDither(const char *artifact)
     MagickFalse);
 }
 
+static MagickBooleanType FinishImageDepth(Image *image,const size_t depth,
+  const MagickBooleanType status)
+{
+  if (status != MagickFalse)
+    image->depth=depth;
+  return(status);
+}
+
 MagickExport MagickBooleanType SetImageDepth(Image *image,
   const size_t depth,ExceptionInfo *exception)
 {
@@ -961,7 +969,5 @@ MagickExport MagickBooleanType SetImageDepth(Image *image,
       status=MagickFalse;
   }
   image_view=DestroyCacheView(image_view);
-  if (status != MagickFalse)
-    image->depth=depth;
-  return(status);
+  return(FinishImageDepth(image,depth,status));
 }
