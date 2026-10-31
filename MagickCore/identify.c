@@ -1566,6 +1566,19 @@ static void PrintGrayOrChannelsFeatures(FILE *file,const Image *image,
   }
 }
 
+static void PrintImageBaseFilename(FILE *file,const Image *image)
+{
+  if (*image->magick_filename != '\0')
+    if (LocaleCompare(image->magick_filename,image->filename) != 0)
+      {
+        char
+          filename[MagickPathExtent];
+
+        GetPathComponent(image->magick_filename,TailPath,filename);
+        (void) FormatLocaleFile(file,"  Base filename: %s\n",filename);
+      }
+}
+
 MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
   const MagickBooleanType verbose,ExceptionInfo *exception)
 {
@@ -1708,15 +1721,7 @@ MagickExport MagickBooleanType IdentifyImage(Image *image,FILE *file,
         }
     }
   (void) FormatLocaleFile(file,"Image:\n  Filename: %s\n",image->filename);
-  if (*image->magick_filename != '\0')
-    if (LocaleCompare(image->magick_filename,image->filename) != 0)
-      {
-        char
-          filename[MagickPathExtent];
-
-        GetPathComponent(image->magick_filename,TailPath,filename);
-        (void) FormatLocaleFile(file,"  Base filename: %s\n",filename);
-      }
+  PrintImageBaseFilename(file,image);
   properties=(*GetBlobProperties(image));
   if (properties.st_mode != 0)
     {
