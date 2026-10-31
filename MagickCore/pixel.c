@@ -1382,6 +1382,71 @@ static MagickBooleanType InterpolateIntegerChannels(
   return(status);
 }
 
+typedef struct _ChannelAverage
+{
+  const Image
+    *source,
+    *destination;
+
+  const Quantum
+    *p;
+
+  ssize_t
+    count;
+} ChannelAverage;
+
+static void AverageInterpolateChannel(const ChannelAverage *average,
+  const ssize_t i,Quantum *pixel)
+{
+  const Image
+    *source = average->source,
+    *destination = average->destination;
+
+  const Quantum
+    *p = average->p;
+
+  const ssize_t
+    count = average->count;
+
+  double
+    alpha[16],
+    gamma,
+    pixels[16],
+    sum;
+
+  ssize_t
+    j;
+
+  PixelChannel channel = GetPixelChannelChannel(source,i);
+  PixelTrait traits = GetPixelChannelTraits(source,channel);
+  PixelTrait destination_traits=GetPixelChannelTraits(destination,
+    channel);
+  if ((traits == UndefinedPixelTrait) ||
+      (destination_traits == UndefinedPixelTrait))
+    return;
+  for (j=0; j < (ssize_t) count; j++)
+    pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(source)+i];
+  sum=0.0;
+  if ((traits & BlendPixelTrait) == 0)
+    {
+      for (j=0; j < (ssize_t) count; j++)
+        sum+=pixels[j];
+      sum/=count;
+      SetPixelChannel(destination,channel,ClampToQuantum(sum),pixel);
+      return;
+    }
+  for (j=0; j < (ssize_t) count; j++)
+  {
+    alpha[j]=QuantumScale*(double) GetPixelAlpha(source,p+j*
+      (ssize_t) GetPixelChannels(source));
+    pixels[j]*=alpha[j];
+    gamma=MagickSafeReciprocal(alpha[j]);
+    sum+=gamma*pixels[j];
+  }
+  sum/=count;
+  SetPixelChannel(destination,channel,ClampToQuantum(sum),pixel);
+}
+
 MagickExport MagickBooleanType InterpolatePixelChannels(
   const Image *magick_restrict source,const CacheView_ *source_view,
   const Image *magick_restrict destination,const PixelInterpolateMethod method,
@@ -1461,40 +1526,14 @@ MagickExport MagickBooleanType InterpolatePixelChannels(
       count*=count;  /* Number of pixels to average */
       for (i=0; i < (ssize_t) GetPixelChannels(source); i++)
       {
-        double
-          sum;
+        ChannelAverage
+          average;
 
-        ssize_t
-          j;
-
-        PixelChannel channel = GetPixelChannelChannel(source,i);
-        PixelTrait traits = GetPixelChannelTraits(source,channel);
-        PixelTrait destination_traits=GetPixelChannelTraits(destination,
-          channel);
-        if ((traits == UndefinedPixelTrait) ||
-            (destination_traits == UndefinedPixelTrait))
-          continue;
-        for (j=0; j < (ssize_t) count; j++)
-          pixels[j]=(double) p[j*(ssize_t) GetPixelChannels(source)+i];
-        sum=0.0;
-        if ((traits & BlendPixelTrait) == 0)
-          {
-            for (j=0; j < (ssize_t) count; j++)
-              sum+=pixels[j];
-            sum/=count;
-            SetPixelChannel(destination,channel,ClampToQuantum(sum),pixel);
-            continue;
-          }
-        for (j=0; j < (ssize_t) count; j++)
-        {
-          alpha[j]=QuantumScale*(double) GetPixelAlpha(source,p+j*
-            (ssize_t) GetPixelChannels(source));
-          pixels[j]*=alpha[j];
-          gamma=MagickSafeReciprocal(alpha[j]);
-          sum+=gamma*pixels[j];
-        }
-        sum/=count;
-        SetPixelChannel(destination,channel,ClampToQuantum(sum),pixel);
+        average.source=source;
+        average.destination=destination;
+        average.p=p;
+        average.count=count;
+        AverageInterpolateChannel(&average,i,pixel);
       }
       break;
     }
