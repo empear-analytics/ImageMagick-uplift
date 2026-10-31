@@ -1933,6 +1933,110 @@ static CCThresholdRange GetThresholdRange(const char *artifact,
   return(range);
 }
 
+typedef struct _CCObjectCensus
+{
+  CacheView
+    *component_view;
+
+  Image
+    *component_image;
+
+  CacheView
+    *object_view;
+
+  CCObjectInfo
+    *object;
+
+  size_t
+    *neighbors;
+
+  RectangleInfo
+    bounding_box;
+
+  size_t
+    connectivity;
+
+  ssize_t
+    (*connect4)[2],
+    (*connect8)[2],
+    i;
+
+  ExceptionInfo
+    *exception;
+} CCObjectCensus;
+
+static void CountMergedObjectNeighbors(const CCObjectCensus *object_census,
+  MagickBooleanType *status,size_t *count)
+{
+  CacheView
+    *const component_view = object_census->component_view;
+
+  Image
+    *const component_image = object_census->component_image;
+
+  CacheView
+    *const object_view = object_census->object_view;
+
+  CCObjectInfo
+    *const object = object_census->object;
+
+  size_t
+    *const neighbors = object_census->neighbors;
+
+  const RectangleInfo
+    bounding_box = object_census->bounding_box;
+
+  const size_t
+    connectivity = object_census->connectivity;
+
+  ssize_t
+    (*const connect4)[2] = object_census->connect4,
+    (*const connect8)[2] = object_census->connect8;
+
+  const ssize_t
+    i = object_census->i;
+
+  ExceptionInfo
+    *const exception = object_census->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) bounding_box.height; y++)
+  {
+    CCAdjacentRow
+      adjacent_row;
+
+    const Quantum
+      *magick_restrict p;
+
+    const CCAdjacentTargets
+      adjacent_targets = { status, count, &p };
+
+    if (*status == MagickFalse)
+      continue;
+    p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
+      bounding_box.y+y,bounding_box.width,1,exception);
+    if (p == (const Quantum *) NULL)
+      {
+        *status=MagickFalse;
+        continue;
+      }
+    adjacent_row.component_image=component_image;
+    adjacent_row.object_view=object_view;
+    adjacent_row.object=object;
+    adjacent_row.neighbors=neighbors;
+    adjacent_row.bounding_box=bounding_box;
+    adjacent_row.connectivity=connectivity;
+    adjacent_row.connect4=connect4;
+    adjacent_row.connect8=connect8;
+    adjacent_row.y=y;
+    adjacent_row.i=i;
+    adjacent_row.exception=exception;
+    CountAdjacentObjectsInRow(&adjacent_row,&adjacent_targets);
+  }
+}
+
 typedef struct _CCObjectMerge
 {
   Image
@@ -2435,6 +2539,9 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
   (void) SetCacheViewVirtualPixelMethod(object_view,TileVirtualPixelMethod);
   for (i=0; i < (ssize_t) component_image->colors; i++)
   {
+    CCObjectCensus
+      object_census;
+
     CCObjectMerge
       object_merge;
 
@@ -2454,39 +2561,18 @@ MagickExport Image *ConnectedComponentsImage(const Image *image,
     */
     count=0;
     bounding_box=object[i].bounding_box;
-    for (y=0; y < (ssize_t) bounding_box.height; y++)
-    {
-      CCAdjacentRow
-        adjacent_row;
-
-      const Quantum
-        *magick_restrict p;
-
-      const CCAdjacentTargets
-        adjacent_targets = { &status, &count, &p };
-
-      if (status == MagickFalse)
-        continue;
-      p=GetCacheViewVirtualPixels(component_view,bounding_box.x,
-        bounding_box.y+y,bounding_box.width,1,exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      adjacent_row.component_image=component_image;
-      adjacent_row.object_view=object_view;
-      adjacent_row.object=object;
-      adjacent_row.neighbors=neighbors;
-      adjacent_row.bounding_box=bounding_box;
-      adjacent_row.connectivity=connectivity;
-      adjacent_row.connect4=connect4;
-      adjacent_row.connect8=connect8;
-      adjacent_row.y=y;
-      adjacent_row.i=i;
-      adjacent_row.exception=exception;
-      CountAdjacentObjectsInRow(&adjacent_row,&adjacent_targets);
-    }
+    object_census.component_view=component_view;
+    object_census.component_image=component_image;
+    object_census.object_view=object_view;
+    object_census.object=object;
+    object_census.neighbors=neighbors;
+    object_census.bounding_box=bounding_box;
+    object_census.connectivity=connectivity;
+    object_census.connect4=connect4;
+    object_census.connect8=connect8;
+    object_census.i=i;
+    object_census.exception=exception;
+    CountMergedObjectNeighbors(&object_census,&status,&count);
     /*
       Merge with object of greatest adjacent area.
     */
