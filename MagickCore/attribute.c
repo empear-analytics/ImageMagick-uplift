@@ -407,6 +407,17 @@ static void RelinquishConvexHullMemory(MemoryInfo *monotone_info,
     vertices_info=RelinquishVirtualMemory(vertices_info);
 }
 
+static void CopyConvexHullVertices(PointInfo *convex_hull,
+  PointInfo **monotone_chain,size_t *number_vertices)
+{
+  size_t
+    n;
+
+  if (convex_hull != (PointInfo *) NULL)
+    for (n=0; n < *number_vertices; n++)
+      convex_hull[n]=(*monotone_chain[n]);
+}
+
 MagickExport PointInfo *GetImageConvexHull(const Image *image,
   size_t *number_vertices,ExceptionInfo *exception)
 {
@@ -487,9 +498,7 @@ MagickExport PointInfo *GetImageConvexHull(const Image *image,
   TraceConvexHull(vertices,n,&monotone_chain,number_vertices);
   convex_hull=(PointInfo *) AcquireQuantumMemory(*number_vertices,
     sizeof(*convex_hull));
-  if (convex_hull != (PointInfo *) NULL)
-    for (n=0; n < *number_vertices; n++)
-      convex_hull[n]=(*monotone_chain[n]);
+  CopyConvexHullVertices(convex_hull,monotone_chain,number_vertices);
   monotone_info=RelinquishVirtualMemory(monotone_info);
   vertices_info=RelinquishVirtualMemory(vertices_info);
   return(convex_hull);
