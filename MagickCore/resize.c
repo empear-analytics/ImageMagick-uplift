@@ -2087,6 +2087,24 @@ static void SetLiquidRescalePixelChannels(const Image *image,
   }
 }
 
+static gfloat *ImportLiquidRescaleRow(const Image *image,
+  const Quantum *magick_restrict p,gfloat *q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+      *q++=(gfloat) (QuantumScale*(double) p[i]);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(q);
+}
+
 MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
   const size_t rows,const double delta_x,const double rigidity,
   ExceptionInfo *exception)
@@ -2154,9 +2172,6 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
     const Quantum
       *magick_restrict p;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -2165,15 +2180,7 @@ MagickExport Image *LiquidRescaleImage(const Image *image,const size_t columns,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-        *q++=(gfloat) (QuantumScale*(double) p[i]);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    q=ImportLiquidRescaleRow(image,p,q);
   }
   image_view=DestroyCacheView(image_view);
   carver=lqr_carver_new_ext(pixels,(int) image->columns,(int) image->rows,
