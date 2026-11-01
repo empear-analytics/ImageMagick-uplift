@@ -1274,16 +1274,12 @@ MagickExport Image *EvaluateImages(const Image *images,
           status=MagickFalse;
         if (images->progress_monitor != (MagickProgressMonitor) NULL)
           {
-            MagickBooleanType
-              proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
             #pragma omp atomic
 #endif
             progress++;
-            proceed=SetImageProgress(images,EvaluateImageTag,progress,
-              image->rows);
-            if (proceed == MagickFalse)
+            if (SetProgress(images,image,EvaluateImageTag,progress) ==
+                MagickFalse)
               status=MagickFalse;
           }
       }
