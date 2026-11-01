@@ -293,6 +293,7 @@ MAGICKCORE_BASE_SRCS = \
   MagickCore/static.c \
   MagickCore/static.h \
   MagickCore/statistic.c \
+  MagickCore/statistic-measure.c \
   MagickCore/statistic-function.c \
   MagickCore/statistic-moments.c \
   MagickCore/statistic-image.c \
