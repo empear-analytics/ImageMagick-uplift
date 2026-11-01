@@ -545,6 +545,21 @@ value still present), and `--calls` may move only the functions the replaced cod
 down by the number of calls it made) and the helper it now calls (up by one); any
 other movement stops the step.
 
+**Copies without a *Code Duplication* finding.** CodeScene reports no *Code Duplication*
+for copies inside one function, nor for a block that repeats the body of an existing
+helper, though both make the function longer and add branches. D may be used for them
+when the finding the step removes is another one of the function that holds them
+(*Complex Method*, *Large Method*, *Bumpy Road Ahead* or *Deep, Nested Complexity*), in
+two forms: (a) two or more copies in one function, identical under the renaming above or
+differing in a single value, become calls of one new `static` helper; (b) a block
+identical to the body of an existing `static` helper of the file (checked by script, as
+above) becomes a call of it. The function must be reached by oracle cases (an
+unreached one takes *Unreached functions* instead), the OpenMP condition of the last
+*Careful* item holds, and the step is kept only when the file's score rises (rule 2)
+with no new helper finding and no new *Code Duplication*; the commit names the finding
+it removes and says that no *Code Duplication* was reported. A warning the block
+throws with `GetMagickModule()` now names the helper, which the oracle normalises.
+
 **Careful:**
 
 - Why identical object code is proof: `obj_identical.sh` compiles the file as
@@ -570,7 +585,13 @@ file of *Unreached functions*.
 
 **Provenance:** founding recipe (2026-09-29). *Casts to the variable's own type:* 2026-10-30, from
 `colorspace.c`'s `SetImageGray` and `SetImageMonochrome`, whose closing blocks differ in
-the image type set and in a `(Image *)` cast of the `Image *` parameter.
+the image type set and in a `(Image *)` cast of the `Image *` parameter. *Copies without a
+finding:* 2026-11-01, owner ("You can adjust the two recipes as you propose"), from
+campaign A's W11 session: `vision.c`'s `ConnectedComponentsImage` (eight identical
+threshold-range parses, 2221d8d57), `effect-blur.c`'s `RotationalBlurImage` (a second
+copy of `CloneDirectImage`'s body, 42d350a1b), `enhance-tone.c`'s `GammaImage` and
+`enhance.c`'s `CLAHEImage` (a second row loop equal to an existing helper). Added by Claude
+Code (Claude Sonnet 5.5).
 
 ---
 
@@ -5320,3 +5341,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | O | *Use when*: the block may be a loop as well as a selection (steps 1 to 6 never depended on it); step 2: a variable written before read passes as a pointer, not declared in the new function, when the caller's store before the block would otherwise be left with no use; no recipe deletes that store | `identify.c`'s `IdentifyImage` (campaign B, task M117, a574c1d63): the transparent-pixel scan writes `p`, `y`, `found` and `x`; declaring `x` in the helper leaves the caller's `x=0;` set but unused, which fails the macOS CI build. The owner left both questions to the session (2026-10-31) | owner |
 | 2026-10-31 | AMEND | SD | Step 1: a chain of groups linked by `magick_fallthrough;` counts as one group when all of it moves, in order; its groups may hold a `break;` inside a selection. *Careful* gives the argument | `quantum-import.c`'s depth dispatchers (campaign B, task M118), sixteen `switch (quantum_info->depth)` of cc 9 to 13 whose `case 24:` and `case 64:` test the floating-point format, `break;` inside the `if`, and fall through to `default:`; step 1 refused every one. SD with the chain moved (and `case 32:` beside it where cc 13 needs it) on fourteen of them in a probe: 3.83 to 5.54 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | N | Step 2: a variable the block reads on entry and then writes, and that nothing after the block reads, may be a member; the new function binds it to a non-`const` local initialised from the member, the block's text unchanged. *Careful* gives the argument | `pixel.c`'s interpolation average groups (campaign B, task M118): they shift `x_offset`/`y_offset` before the fetch; as by-value parameters (E step 4) the helper would take six. A probe of `InterpolatePixelChannel`'s: 3.73 to 3.78 | mandate (2026-10-24) |
+| 2026-11-01 | AMEND | D | *Copies without a Code Duplication finding*: when the finding a step removes is another one of the function (Complex Method, Large Method, Bumpy Road Ahead, Deep, Nested Complexity), two or more identical copies in one function (or differing in one value) become calls of one new `static` helper, or a block identical to an existing `static` helper's body becomes a call of it; the function is reached by cases, the OpenMP condition holds, the file's score rises and no new finding or duplication appears | `vision.c`'s `ConnectedComponentsImage` (eight identical threshold-range parses), `effect-blur.c`'s `RotationalBlurImage` (a second copy of `CloneDirectImage`), `enhance-tone.c`'s `GammaImage`, `enhance.c`'s `CLAHEImage` (campaign A, W11): CodeScene reports no *Code Duplication* for copies inside one function, so D's *Use when* was not met as written, while the blocks were identical by script and the oracle agreed | owner |
