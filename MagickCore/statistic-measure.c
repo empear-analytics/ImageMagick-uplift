@@ -336,16 +336,12 @@ MagickExport MagickBooleanType GetImageMean(const Image *image,double *mean,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport MagickBooleanType GetImageMedian(const Image *image,double *median,
+static MagickBooleanType CompositeImageMedian(const Image *image,double *median,
   ExceptionInfo *exception)
 {
   ChannelStatistics
     *channel_statistics;
 
-  assert(image != (Image *) NULL);
-  assert(image->signature == MagickCoreSignature);
-  if (IsEventLogging() != MagickFalse)
-    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   channel_statistics=GetImageStatistics(image,exception);
   if (channel_statistics == (ChannelStatistics *) NULL)
     {
@@ -356,6 +352,16 @@ MagickExport MagickBooleanType GetImageMedian(const Image *image,double *median,
   channel_statistics=(ChannelStatistics *) RelinquishMagickMemory(
     channel_statistics);
   return(MagickTrue);
+}
+
+MagickExport MagickBooleanType GetImageMedian(const Image *image,double *median,
+  ExceptionInfo *exception)
+{
+  assert(image != (Image *) NULL);
+  assert(image->signature == MagickCoreSignature);
+  if (IsEventLogging() != MagickFalse)
+    (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
+  return(CompositeImageMedian(image,median,exception));
 }
 
 
