@@ -2046,6 +2046,76 @@ static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
       output_scaling*(A), output_scaling*(B), \
       output_scaling*(C), output_scaling*(D) )
 
+typedef struct _DistortPixelInput
+{
+  Image
+    *distort_image;
+
+  ResampleFilter
+    **resample_filter;
+
+  int
+    id;
+
+  PointInfo
+    s;
+
+  double
+    validity;
+
+  PixelInfo
+    invalid;
+
+  ExceptionInfo
+    *exception;
+} DistortPixelInput;
+
+static MagickBooleanType ResampleDistortPixel(const DistortPixelInput *input,
+  PixelInfo *pixel,Quantum *magick_restrict q)
+{
+  Image
+    *const distort_image = input->distort_image;
+
+  ResampleFilter
+    **const resample_filter = input->resample_filter;
+
+  const int
+    id = input->id;
+
+  const PointInfo
+    s = input->s;
+
+  const double
+    validity = input->validity;
+
+  const PixelInfo
+    invalid = input->invalid;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  MagickBooleanType
+    status;
+
+  /* resample the source image to find its correct color */
+  status=ResamplePixelColor(resample_filter[id],s.x,s.y,pixel,
+    exception);
+  if (status == MagickFalse)
+    SetPixelViaPixelInfo(distort_image,&invalid,q);
+  else
+    {
+      /* if validity between 0.0 & 1.0 mix result with invalid pixel */
+      if ( validity < 1.0 ) {
+        /* Do a blend of sample color and invalid pixel */
+        /* should this be a 'Blend', or an 'Over' compose */
+        CompositePixelInfoBlend(pixel,validity,&invalid,(1.0-validity),
+          pixel);
+      }
+      SetPixelViaPixelInfo(distort_image,pixel,q);
+    }
+  return(status);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3075,22 +3145,17 @@ if ( d.x == 0.5 && d.y == 0.5 ) {
           SetPixelViaPixelInfo(distort_image,&invalid,q);
         }
         else {
-          /* resample the source image to find its correct color */
-          status=ResamplePixelColor(resample_filter[id],s.x,s.y,&pixel,
-            exception);
-          if (status == MagickFalse)
-            SetPixelViaPixelInfo(distort_image,&invalid,q);
-          else
-            {
-              /* if validity between 0.0 & 1.0 mix result with invalid pixel */
-              if ( validity < 1.0 ) {
-                /* Do a blend of sample color and invalid pixel */
-                /* should this be a 'Blend', or an 'Over' compose */
-                CompositePixelInfoBlend(&pixel,validity,&invalid,(1.0-validity),
-                  &pixel);
-              }
-              SetPixelViaPixelInfo(distort_image,&pixel,q);
-            }
+          DistortPixelInput
+            distort_input;
+
+          distort_input.distort_image=distort_image;
+          distort_input.resample_filter=resample_filter;
+          distort_input.id=id;
+          distort_input.s=s;
+          distort_input.validity=validity;
+          distort_input.invalid=invalid;
+          distort_input.exception=exception;
+          status=ResampleDistortPixel(&distort_input,&pixel,q);
         }
         q+=(ptrdiff_t) GetPixelChannels(distort_image);
       }
