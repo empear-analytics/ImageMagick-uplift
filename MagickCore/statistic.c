@@ -1625,23 +1625,17 @@ MagickExport Image *PolynomialImage(const Image *images,
   ssize_t
     y;
 
+  const EvaluateCanvasTargets
+    targets = { &image, &number_images, &polynomial_pixels };
+
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
-  if (AcquireDirectImageCanvas(images,&image,exception) == MagickFalse)
+  if (AcquireEvaluateCanvas(images,&targets,exception) == MagickFalse)
     return((Image *) NULL);
-  number_images=GetImageListLength(images);
-  polynomial_pixels=AcquirePixelTLS(images);
-  if (polynomial_pixels == (PixelChannels **) NULL)
-    {
-      image=DestroyImage(image);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",images->filename);
-      return((Image *) NULL);
-    }
   /*
     Polynomial image pixels.
   */
