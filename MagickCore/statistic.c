@@ -1013,6 +1013,44 @@ static MagickBooleanType AcquireDirectImageCanvas(const Image *images,
   return(MagickTrue);
 }
 
+typedef struct _EvaluateCanvasTargets
+{
+  Image
+    **image;
+
+  size_t
+    *number_images;
+
+  PixelChannels
+    **magick_restrict *evaluate_pixels;
+} EvaluateCanvasTargets;
+
+static MagickBooleanType AcquireEvaluateCanvas(const Image *images,
+  const EvaluateCanvasTargets *targets,ExceptionInfo *exception)
+{
+  Image
+    **const image = targets->image;
+
+  size_t
+    *const number_images = targets->number_images;
+
+  PixelChannels
+    **magick_restrict *const evaluate_pixels = targets->evaluate_pixels;
+
+  if (AcquireDirectImageCanvas(images,image,exception) == MagickFalse)
+    return(MagickFalse);
+  *number_images=GetImageListLength(images);
+  *evaluate_pixels=AcquirePixelTLS(images);
+  if (*evaluate_pixels == (PixelChannels **) NULL)
+    {
+      *image=DestroyImage(*image);
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",images->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *EvaluateImages(const Image *images,
   const MagickEvaluateOperator op,ExceptionInfo *exception)
 {
@@ -1048,23 +1086,17 @@ MagickExport Image *EvaluateImages(const Image *images,
     key;
 #endif
 
+  const EvaluateCanvasTargets
+    targets = { &image, &number_images, &evaluate_pixels };
+
   assert(images != (Image *) NULL);
   assert(images->signature == MagickCoreSignature);
   assert(exception != (ExceptionInfo *) NULL);
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
-  if (AcquireDirectImageCanvas(images,&image,exception) == MagickFalse)
+  if (AcquireEvaluateCanvas(images,&targets,exception) == MagickFalse)
     return((Image *) NULL);
-  number_images=GetImageListLength(images);
-  evaluate_pixels=AcquirePixelTLS(images);
-  if (evaluate_pixels == (PixelChannels **) NULL)
-    {
-      image=DestroyImage(image);
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",images->filename);
-      return((Image *) NULL);
-    }
   image_view=(CacheView **) AcquireQuantumMemory(number_images,
     sizeof(*image_view));
   if (image_view == (CacheView **) NULL)
