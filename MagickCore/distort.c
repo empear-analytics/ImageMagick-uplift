@@ -2392,6 +2392,48 @@ if ( i == 0 && j == 0 ) {
   return(s);
 }
 
+static PointInfo MapBarrelPoint(const DistortMapping *mapping,const PointInfo d,
+  const double r)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  const DistortMethod
+    method = mapping->method;
+
+  double
+    fx,fy,gx,gy;
+
+  PointInfo
+    s;
+
+  fx = ((coeff[0]*r + coeff[1])*r + coeff[2])*r + coeff[3];
+  fy = ((coeff[4]*r + coeff[5])*r + coeff[6])*r + coeff[7];
+  gx = ((3*coeff[0]*r + 2*coeff[1])*r + coeff[2])/r;
+  gy = ((3*coeff[4]*r + 2*coeff[5])*r + coeff[6])/r;
+  /* adjust functions and scaling for 'inverse' form */
+  if ( method == BarrelInverseDistortion ) {
+    fx = 1/fx;  fy = 1/fy;
+    gx *= -fx*fx;  gy *= -fy*fy;
+  }
+  /* Set the source pixel to lookup and EWA derivative vectors */
+  s.x = d.x*fx + coeff[8];
+  s.y = d.y*fy + coeff[9];
+  ScaleFilter( resample_filter[id],
+      gx*d.x*d.x + fx, gx*d.x*d.y,
+      gy*d.x*d.y,      gy*d.y*d.y + fy );
+  return(s);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3221,27 +3263,13 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           case BarrelDistortion:
           case BarrelInverseDistortion:
           { /* Lens Barrel Distortion Correction */
-            double r,fx,fy,gx,gy;
+            double r;
             /* Radial Polynomial Distortion (de-normalized) */
             d.x -= coeff[8];
             d.y -= coeff[9];
             r = sqrt(d.x*d.x+d.y*d.y);
             if ( r > MagickEpsilon ) {
-              fx = ((coeff[0]*r + coeff[1])*r + coeff[2])*r + coeff[3];
-              fy = ((coeff[4]*r + coeff[5])*r + coeff[6])*r + coeff[7];
-              gx = ((3*coeff[0]*r + 2*coeff[1])*r + coeff[2])/r;
-              gy = ((3*coeff[4]*r + 2*coeff[5])*r + coeff[6])/r;
-              /* adjust functions and scaling for 'inverse' form */
-              if ( method == BarrelInverseDistortion ) {
-                fx = 1/fx;  fy = 1/fy;
-                gx *= -fx*fx;  gy *= -fy*fy;
-              }
-              /* Set the source pixel to lookup and EWA derivative vectors */
-              s.x = d.x*fx + coeff[8];
-              s.y = d.y*fy + coeff[9];
-              ScaleFilter( resample_filter[id],
-                  gx*d.x*d.x + fx, gx*d.x*d.y,
-                  gy*d.x*d.y,      gy*d.y*d.y + fy );
+              s=MapBarrelPoint(&mapping,d,r);
             }
             else {
               /* Special handling to avoid divide by zero when r==0
