@@ -1027,6 +1027,14 @@ static MagickBooleanType SetProgress(const Image *images,
   return(status);
 }
 
+static Image *FinishEvaluateImage(Image *image,
+  const MagickBooleanType status)
+{
+  if (status == MagickFalse)
+    image=DestroyImage(image);
+  return(image);
+}
+
 typedef struct _EvaluateCanvasTargets
 {
   Image
@@ -1289,9 +1297,7 @@ MagickExport Image *EvaluateImages(const Image *images,
   evaluate_view=DestroyCacheView(evaluate_view);
   evaluate_pixels=DestroyPixelTLS(images,evaluate_pixels);
   random_info=DestroyRandomInfoTLS(random_info);
-  if (status == MagickFalse)
-    image=DestroyImage(image);
-  return(image);
+  return(FinishEvaluateImage(image,status));
 }
 
 static void EvaluatePixel(const Image *image,RandomInfo *random_info,
