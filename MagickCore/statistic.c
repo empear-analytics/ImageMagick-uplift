@@ -1419,15 +1419,11 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,EvaluateImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
+        if (SetProgress(image,image,EvaluateImageTag,progress) == MagickFalse)
           status=MagickFalse;
       }
   }
