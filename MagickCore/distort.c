@@ -2434,6 +2434,32 @@ static PointInfo MapBarrelPoint(const DistortMapping *mapping,const PointInfo d,
   return(s);
 }
 
+static void ScaleBarrelOrigin(const DistortMapping *mapping)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  const DistortMethod
+    method = mapping->method;
+
+  if ( method == BarrelDistortion )
+    ScaleFilter( resample_filter[id],
+         coeff[3], 0, 0, coeff[7] );
+  else /* method == BarrelInverseDistortion */
+    /* FUTURE, trap for D==0 causing division by zero */
+    ScaleFilter( resample_filter[id],
+         1.0/coeff[3], 0, 0, 1.0/coeff[7] );
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3278,13 +3304,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
               ** which was set at the top of the loop using  s = d;
               ** otherwise...   s.x=coeff[8]; s.y=coeff[9];
               */
-              if ( method == BarrelDistortion )
-                ScaleFilter( resample_filter[id],
-                     coeff[3], 0, 0, coeff[7] );
-              else /* method == BarrelInverseDistortion */
-                /* FUTURE, trap for D==0 causing division by zero */
-                ScaleFilter( resample_filter[id],
-                     1.0/coeff[3], 0, 0, 1.0/coeff[7] );
+              ScaleBarrelOrigin(&mapping);
             }
             break;
           }
