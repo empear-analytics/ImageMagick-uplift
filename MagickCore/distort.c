@@ -2348,6 +2348,50 @@ if ( d.x == 0.5 && d.y == 0.5 ) {
   (*s).x += coeff[2]; (*s).y += coeff[3];
 }
 
+static PointInfo MapCylinder2PlanePoint(const DistortMapping *mapping)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  PointInfo
+    d = mapping->d;
+
+  PointInfo
+    s;
+
+  double ax, cx;
+  /* relative to center of distortion */
+  d.x -= coeff[4]; d.y -= coeff[5];
+  d.x /= coeff[1];        /* x' = x/r */
+  ax=atan(d.x);           /* aa = atan(x/r) = u/r  */
+  cx=cos(ax);             /* cx = cos(atan(x/r)) = 1/sqrt(x^2+u^2) */
+  s.x = coeff[1]*ax;      /* u  = r*atan(x/r) */
+  s.y = d.y*cx;           /* v  = y*cos(u/r) */
+  /* derivatives... (see personal notes) */
+  ScaleFilter( resample_filter[id],
+        1.0/(1.0+d.x*d.x), 0.0, -d.x*s.y*cx*cx/coeff[1], s.y/d.y );
+#if 0
+if ( i == 0 && j == 0 ) {
+  fprintf(stderr, "x=%lf  y=%lf  u=%lf  v=%lf\n", d.x*coeff[1], d.y, s.x, s.y);
+  fprintf(stderr, "phi = %lf\n", (double)(ax * 180.0/MagickPI) );
+  fprintf(stderr, "du/dx=%lf  du/dx=%lf  dv/dx=%lf  dv/dy=%lf\n",
+                1.0/(1.0+d.x*d.x), 0.0, -d.x*s.y*cx*cx/coeff[1], s.y/d.y );
+  fflush(stderr); }
+#endif
+  /* add center of distortion in source */
+  s.x += coeff[2]; s.y += coeff[3];
+  return(s);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3166,27 +3210,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           }
           case Cylinder2PlaneDistortion:
           { /* 3D Cylinder to Tangential Plane */
-            double ax, cx;
-            /* relative to center of distortion */
-            d.x -= coeff[4]; d.y -= coeff[5];
-            d.x /= coeff[1];        /* x' = x/r */
-            ax=atan(d.x);           /* aa = atan(x/r) = u/r  */
-            cx=cos(ax);             /* cx = cos(atan(x/r)) = 1/sqrt(x^2+u^2) */
-            s.x = coeff[1]*ax;      /* u  = r*atan(x/r) */
-            s.y = d.y*cx;           /* v  = y*cos(u/r) */
-            /* derivatives... (see personal notes) */
-            ScaleFilter( resample_filter[id],
-                  1.0/(1.0+d.x*d.x), 0.0, -d.x*s.y*cx*cx/coeff[1], s.y/d.y );
-#if 0
-if ( i == 0 && j == 0 ) {
-  fprintf(stderr, "x=%lf  y=%lf  u=%lf  v=%lf\n", d.x*coeff[1], d.y, s.x, s.y);
-  fprintf(stderr, "phi = %lf\n", (double)(ax * 180.0/MagickPI) );
-  fprintf(stderr, "du/dx=%lf  du/dx=%lf  dv/dx=%lf  dv/dy=%lf\n",
-                1.0/(1.0+d.x*d.x), 0.0, -d.x*s.y*cx*cx/coeff[1], s.y/d.y );
-  fflush(stderr); }
-#endif
-            /* add center of distortion in source */
-            s.x += coeff[2]; s.y += coeff[3];
+            s=MapCylinder2PlanePoint(&mapping);
             break;
           }
           case Plane2CylinderDistortion:
