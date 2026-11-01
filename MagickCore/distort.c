@@ -2601,6 +2601,33 @@ static PointInfo MapPolarPoint(const DistortMapping *mapping)
   return(s);
 }
 
+static void MapBarrelDistortion(const DistortMapping *mapping,PointInfo *d,
+  PointInfo *s)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  double
+    r;
+
+  /* Radial Polynomial Distortion (de-normalized) */
+  (*d).x -= coeff[8];
+  (*d).y -= coeff[9];
+  r = sqrt((*d).x*(*d).x+(*d).y*(*d).y);
+  if ( r > MagickEpsilon ) {
+    (*s)=MapBarrelPoint(mapping,(*d),r);
+  }
+  else {
+    /* Special handling to avoid divide by zero when r==0
+    **
+    ** The source and destination pixels match in this case
+    ** which was set at the top of the loop using  s = d;
+    ** otherwise...   s.x=coeff[8]; s.y=coeff[9];
+    */
+    ScaleBarrelOrigin(mapping);
+  }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3368,23 +3395,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           case BarrelDistortion:
           case BarrelInverseDistortion:
           { /* Lens Barrel Distortion Correction */
-            double r;
-            /* Radial Polynomial Distortion (de-normalized) */
-            d.x -= coeff[8];
-            d.y -= coeff[9];
-            r = sqrt(d.x*d.x+d.y*d.y);
-            if ( r > MagickEpsilon ) {
-              s=MapBarrelPoint(&mapping,d,r);
-            }
-            else {
-              /* Special handling to avoid divide by zero when r==0
-              **
-              ** The source and destination pixels match in this case
-              ** which was set at the top of the loop using  s = d;
-              ** otherwise...   s.x=coeff[8]; s.y=coeff[9];
-              */
-              ScaleBarrelOrigin(&mapping);
-            }
+            MapBarrelDistortion(&mapping,&d,&s);
             break;
           }
           case ShepardsDistortion:
