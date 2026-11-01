@@ -2460,6 +2460,55 @@ static void ScaleBarrelOrigin(const DistortMapping *mapping)
          1.0/coeff[3], 0, 0, 1.0/coeff[7] );
 }
 
+static PointInfo MapArcPoint(const DistortMapping *mapping)
+{
+  const PointInfo
+    d = mapping->d;
+
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  const Image
+    *const image = mapping->image;
+
+  Image
+    *const distort_image = mapping->distort_image;
+
+  PointInfo
+    s;
+
+  /* what is the angle and radius in the destination image */
+  s.x  = (double) ((atan2(d.y,d.x) - coeff[0])/Magick2PI);
+  s.x -= MagickRound(s.x);     /* angle */
+  s.y  = hypot(d.x,d.y);       /* radius */
+
+  /* Arc Distortion Partial Scaling Vectors
+    Are derived by mapping the perpendicular unit vectors
+    dR  and  dA*R*2PI  rather than trying to map dx and dy
+    The results is a very simple orthogonal aligned ellipse.
+  */
+  if ( s.y > MagickEpsilon )
+    ScaleFilter( resample_filter[id],
+        (double) (coeff[1]/(Magick2PI*s.y)), 0, 0, coeff[3] );
+  else
+    ScaleFilter( resample_filter[id],
+        distort_image->columns*2, 0, 0, coeff[3] );
+
+  /* now scale the angle and radius for source image lookup point */
+  s.x = s.x*coeff[1] + coeff[4] + image->page.x +0.5;
+  s.y = (coeff[2] - s.y) * coeff[3] + image->page.y;
+  return(s);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3219,26 +3268,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           }
           case ArcDistortion:
           {
-            /* what is the angle and radius in the destination image */
-            s.x  = (double) ((atan2(d.y,d.x) - coeff[0])/Magick2PI);
-            s.x -= MagickRound(s.x);     /* angle */
-            s.y  = hypot(d.x,d.y);       /* radius */
-
-            /* Arc Distortion Partial Scaling Vectors
-              Are derived by mapping the perpendicular unit vectors
-              dR  and  dA*R*2PI  rather than trying to map dx and dy
-              The results is a very simple orthogonal aligned ellipse.
-            */
-            if ( s.y > MagickEpsilon )
-              ScaleFilter( resample_filter[id],
-                  (double) (coeff[1]/(Magick2PI*s.y)), 0, 0, coeff[3] );
-            else
-              ScaleFilter( resample_filter[id],
-                  distort_image->columns*2, 0, 0, coeff[3] );
-
-            /* now scale the angle and radius for source image lookup point */
-            s.x = s.x*coeff[1] + coeff[4] + image->page.x +0.5;
-            s.y = (coeff[2] - s.y) * coeff[3] + image->page.y;
+            s=MapArcPoint(&mapping);
             break;
           }
           case PolarDistortion:
