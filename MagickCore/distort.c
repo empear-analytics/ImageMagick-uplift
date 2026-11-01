@@ -2180,6 +2180,84 @@ static MagickBooleanType ResampleDistortPixel(const DistortPixelInput *input,
   return(status);
 }
 
+typedef struct _DistortMapping
+{
+  PointInfo
+    d;
+
+  double
+    *coeff,
+    output_scaling;
+
+  ResampleFilter
+    **resample_filter;
+
+  int
+    id;
+
+  const Image
+    *image;
+
+  Image
+    *distort_image;
+
+  DistortMethod
+    method;
+} DistortMapping;
+
+static void MapPerspectivePoint(const DistortMapping *mapping,double *validity,
+  PointInfo *s)
+{
+  const PointInfo
+    d = mapping->d;
+
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  double
+    p,n,r,abs_r,abs_c6,abs_c7,scale;
+
+  /* perspective is a ratio of affines */
+  p=coeff[0]*d.x+coeff[1]*d.y+coeff[2];
+  n=coeff[3]*d.x+coeff[4]*d.y+coeff[5];
+  r=coeff[6]*d.x+coeff[7]*d.y+1.0;
+  /* Pixel Validity -- is it a 'sky' or 'ground' pixel */
+  (*validity) = (r*coeff[8] < 0.0) ? 0.0 : 1.0;
+  /* Determine horizon anti-alias blending */
+  abs_r = fabs(r)*2;
+  abs_c6 = fabs(coeff[6]);
+  abs_c7 = fabs(coeff[7]);
+  if ( abs_c6 > abs_c7 ) {
+    if ( abs_r < abs_c6*output_scaling )
+      (*validity) = 0.5 - coeff[8]*r/(coeff[6]*output_scaling);
+  }
+  else if ( abs_r < abs_c7*output_scaling )
+    (*validity) = 0.5 - coeff[8]*r/(coeff[7]*output_scaling);
+  /* Perspective Sampling Point (if valid) */
+  if ( (*validity) > 0.0 ) {
+    /* divide by r affine, for perspective scaling */
+    scale = 1.0/r;
+    (*s).x = p*scale;
+    (*s).y = n*scale;
+    /* Perspective Partial Derivatives or Scaling Vectors */
+    scale *= scale;
+    ScaleFilter( resample_filter[id],
+      (r*coeff[0] - p*coeff[6])*scale,
+      (r*coeff[1] - p*coeff[7])*scale,
+      (r*coeff[3] - n*coeff[6])*scale,
+      (r*coeff[4] - n*coeff[7])*scale );
+  }
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -2874,10 +2952,21 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
 
       for (i=0; i < (ssize_t) distort_image->columns; i++)
       {
+        DistortMapping
+          mapping;
+
         /* map pixel coordinate to distortion space coordinate */
         d.x = (double) (geometry.x+i+0.5)*output_scaling;
         d.y = (double) (geometry.y+j+0.5)*output_scaling;
         s = d;  /* default is a no-op mapping */
+        mapping.d=d;
+        mapping.coeff=coeff;
+        mapping.output_scaling=output_scaling;
+        mapping.resample_filter=resample_filter;
+        mapping.id=id;
+        mapping.image=image;
+        mapping.distort_image=distort_image;
+        mapping.method=method;
         switch (method)
         {
           case AffineDistortion:
@@ -2890,38 +2979,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           }
           case PerspectiveDistortion:
           {
-            double
-              p,n,r,abs_r,abs_c6,abs_c7,scale;
-            /* perspective is a ratio of affines */
-            p=coeff[0]*d.x+coeff[1]*d.y+coeff[2];
-            n=coeff[3]*d.x+coeff[4]*d.y+coeff[5];
-            r=coeff[6]*d.x+coeff[7]*d.y+1.0;
-            /* Pixel Validity -- is it a 'sky' or 'ground' pixel */
-            validity = (r*coeff[8] < 0.0) ? 0.0 : 1.0;
-            /* Determine horizon anti-alias blending */
-            abs_r = fabs(r)*2;
-            abs_c6 = fabs(coeff[6]);
-            abs_c7 = fabs(coeff[7]);
-            if ( abs_c6 > abs_c7 ) {
-              if ( abs_r < abs_c6*output_scaling )
-                validity = 0.5 - coeff[8]*r/(coeff[6]*output_scaling);
-            }
-            else if ( abs_r < abs_c7*output_scaling )
-              validity = 0.5 - coeff[8]*r/(coeff[7]*output_scaling);
-            /* Perspective Sampling Point (if valid) */
-            if ( validity > 0.0 ) {
-              /* divide by r affine, for perspective scaling */
-              scale = 1.0/r;
-              s.x = p*scale;
-              s.y = n*scale;
-              /* Perspective Partial Derivatives or Scaling Vectors */
-              scale *= scale;
-              ScaleFilter( resample_filter[id],
-                (r*coeff[0] - p*coeff[6])*scale,
-                (r*coeff[1] - p*coeff[7])*scale,
-                (r*coeff[3] - n*coeff[6])*scale,
-                (r*coeff[4] - n*coeff[7])*scale );
-            }
+            MapPerspectivePoint(&mapping,&validity,&s);
             break;
           }
           case BilinearReverseDistortion:
