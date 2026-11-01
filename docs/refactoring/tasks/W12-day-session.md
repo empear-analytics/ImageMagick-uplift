@@ -46,6 +46,29 @@ each file: 15,900 cases, 0 diverged.
   a failed fetch, then `status=MagickFalse;`) fits no recipe: T, LB, OC and W each refuse
   it, and it is what holds `GetImageRange` at 9.68 and `EvaluateImages` at cc 27.
 
+### The skip-guard recipe, probed and not added
+
+The owner allowed a recipe for the parallel loop's head, `if (status == MagickFalse)
+continue;` followed by a fetch and `if (p == NULL) { status=MagickFalse; continue; }`,
+which no recipe covers (T, LB, OC and W refuse it). The idea was one helper that reads and
+writes the shared `status` through a pointer at the same points, in the same order, and
+returns whether to skip (`if (SkipRow(&status,...) != MagickFalse) continue;`); the
+ordering argument holds. It does not pay, measured with `tools/ch.py`:
+
+| Probe | Before | After | Finding |
+| --- | --- | --- | --- |
+| `GetImageRange` (`statistic-measure.c`), 8-argument helper | cc 10, file 9.68 | cc gone, file 9.68 | the helper has *Excess Number of Function Arguments* (8); a 5-argument form is still flagged |
+| `ClampImage` (`threshold.c`) | cc 11, file 5.35 | cc 9, file 5.37 | new Excess Arguments (8) |
+| all nine row loops of `threshold.c`, one helper | file 5.35 | file 5.41 | every cc drops by 2, bumps stay 2, *Code Duplication* grows from 6 to 8 functions |
+| `FlipImage` (`transform.c`), 9-argument helper | cc 12, file 5.60 | cc 9, file 5.52 | the file score drops |
+| `ContrastImage`, six sites (`enhance.c`) | file 4.85 | file 4.97 | two new helper findings (one per fetch kind) |
+
+Why: the helper needs the status pointer, the view, the row, the width, the output pointer
+and the exception (five arguments at the least, with `x=0` and one row baked in), and
+CodeScene flags a function over four; the bumps stay because the second bump of each loop
+is its progress tail, not its head. A bundle struct of view, exception and status would get
+under four arguments, at one new type per file. No recipe was added.
+
 ### Correction made before pushing
 
 - Commit f190a8c9b's message gave "72 -> 69 lines" for `EvaluateImage`, numbers inferred
