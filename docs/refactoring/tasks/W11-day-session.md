@@ -105,6 +105,15 @@ playbook.
 
 ### For the owner
 
+- **Recipe AS, first use (`distort.c`, 2026-11-01): applies, flat, not committed.** The resample
+  branch meets AS steps 1 to 3 and the oracle agrees (502 cases, 0 diverged), but the helper
+  takes eight inputs, so it needs an input struct, which AS has no form for (an `AN`-style
+  amendment would add it, as N and U have), and the step leaves the score at 3.01 because
+  the file's remaining depth-5 site is the `#if 0` debug block of `Plane2Cylinder`. The
+  step and the probes say the same as before: `distort.c` moves only with the ruling on
+  moving an `#if 0` block with its case (3.01 to about 3.55, eleven steps). The patch is
+  kept out of the repository.
+
 - **Close readings of the `enhance.c` and `enhance-tone.c` passes:** `enhance.c`
   5fc609224 reuses the `ModulateRow` struct for a second block (N step 8 names only
   switch cases as siblings); 20a964911 is Recipe O on a block outside the parallel region
