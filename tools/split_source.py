@@ -37,6 +37,34 @@ def harvest_glyphs():
             g[ch][tuple(r[a:b] for r in art)] += 1
     return {ch: list(c.most_common(1)[0][0]) for ch, c in g.items()}
 
+def conditional_start(L, end):
+    """The line of the #if that the #endif at L[end] closes."""
+    depth = 0
+    for u in range(end, -1, -1):
+        w = L[u].strip()
+        if w.startswith("#endif"): depth += 1
+        elif re.match(r"#\s*(if|ifdef|ifndef)\b", w): depth -= 1
+        if depth == 0: return u
+    return None
+
+def macro_block_start(L, c):
+    """First line of the #define, or the #if ... #endif holding one, that ends at L[c - 1]."""
+    if L[c - 1].strip().startswith("#endif"):
+        u = conditional_start(L, c - 1)
+        block = "\n".join(L[u:c]) if u is not None else ""
+        return u if "#define" in block and "#include" not in block else None
+    u = c - 1
+    while u > 0 and L[u - 1].rstrip().endswith("\\"): u -= 1
+    return u if L[u].lstrip().startswith("#define") else None
+
+def typedef_names(L, starts):
+    """The names closing each `typedef struct _X` that begins at one of the lines STARTS."""
+    names = []
+    for n in starts:
+        while not re.match(r"^} \w+;$", L[n]): n += 1
+        names.append(L[n][2:-1])
+    return names
+
 args = sys.argv[1:]; out = None
 if "--out" in args: k = args.index("--out"); out = args[k + 1]; del args[k:k + 2]
 path, new, title, roots = args[0], args[1], args[2], args[3:]
@@ -97,22 +125,9 @@ for run in runs:
             outside = "\n".join(L[:t] + L[last[2] + 1:])
             if not re.search(r"\b%s\b" % m.group(1), outside):
                 a = t; typedefs.append(m.group(1)); continue
-        t = L[c - 1].strip()
-        if t.startswith("#endif"):
-            d = 0; u = c - 1
-            while u >= 0:
-                w = L[u].strip()
-                if w.startswith("#endif"): d += 1
-                elif re.match(r"#\s*(if|ifdef|ifndef)\b", w): d -= 1
-                if d == 0: break
-                u -= 1
-            if u >= 0 and "#define" in "\n".join(L[u:c]) and not re.search(r"^\s*#\s*include", "\n".join(L[u:c]), re.M):
-                a = u; continue
-        u = c - 1
-        while u > 0 and L[u - 1].rstrip().endswith("\\"): u -= 1
-        if L[u].lstrip().startswith("#define"):
-            a = u; continue
-        break
+        u = macro_block_start(L, c)
+        if u is None: break
+        a = u
     b = last[2] + 1
     incomment = False; intype = False; bad = []; depth = 0; inner = []
     for n in range(a, b):
@@ -134,10 +149,7 @@ for run in runs:
         if re.match(r"#\s*endif\b", t) and depth > 0: depth -= 1; continue
         if t: bad.append((n + 1, t))
     if depth: bad.append(("unbalanced conditional", depth))
-    for n in inner:
-        e = n
-        while not re.match(r"^} \w+;$", L[e]): e += 1
-        typedefs.append(L[e][2:-1])
+    typedefs.extend(typedef_names(L, inner))
     if bad: sys.exit("refused: top-level code in the region: %s" % bad[:5])
     cuts.append((a, b))
 first = order[idx[0]]
