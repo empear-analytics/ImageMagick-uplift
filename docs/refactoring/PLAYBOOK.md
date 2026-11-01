@@ -4839,9 +4839,16 @@ functions between files. No other recipe changes where a preprocessor line sits.
    of its macros (`Xbr2X`'s `const MagnifyPixels magnify = { pixels, result, channels };`
    before `WeightVar`), may be taken the same way: the run, from its first `#define` to
    its last line, moves; the declarations stay. Step 4's proof covers them too.
+   A single `#define` (with its `\` continuations) that stands further down the body,
+   after statements, may be taken as a run of its own when its name occurs nowhere
+   between the function's signature and that `#define` (checked by script); the lines
+   that stay are then unchanged, and so is the macro's text, whose free identifiers
+   (`output_scaling` in `DistortImage`'s `ScaleFilter`) are resolved where it is used.
+   Use it only to unblock an extraction that follows, as step 5 says.
 2. Move the run, unchanged, to directly above the function's signature: below its
    comment banner and below any helper already placed there.
-3. Leave every `#undef` and any `#define` further down the body where it is.
+3. Leave every `#undef` and any `#define` further down the body where it is, except the
+   single `#define` of step 1's last form.
 4. Run `sh tools/pp_identical.sh <file>`. It must print `IDENTICAL`: the preprocessed
    translation unit, with the build's own flags, is the same before and after. If it
    differs, a token between the old and new position named one of the macros (usually a
@@ -4903,6 +4910,9 @@ needed for this step. The extractions it unblocks keep their own evidence level.
 `GenerateDifferentialNoise` (M74), `SyncExifProfile` (M69) and `GetEXIFProperty` (M41), and
 the local typedef in `GetImageFeatures` (M35), which is a separate shape (Recipe L).
 Added by Claude Code (Claude Opus 5.5) during task M84, under the mandate of 2026-10-24.
+Step 1's last form (2026-11-01, task W11): `distort.c`'s `ScaleFilter`, defined in the middle
+of `DistortImage`'s body and used by nine pixel cases that Recipes Z, N and O move to helpers
+above the function, where the macro is not yet defined.
 
 ---
 
@@ -5473,3 +5483,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-01 | NEW | AS | Extract Block Assigning the Loop Status: a block inside a parallel loop body that assigns the shared `status` from a call and tests it, on every path and without reading the shared value, moves to a `static MagickBooleanType` function ending `return(status);`; the caller writes `status=Helper(...);` | `distort.c`'s `DistortImage` (campaign A, W11): the resample branch `status=ResamplePixelColor(...)` and its test sit at depth 5 in the parallel row loop; T allows only `status=MagickFalse;` and refuses a read, E and O refuse OpenMP writes; the same site in `resize.c`'s `InterpolativeResizeImage` and `feature.c`'s `MeanShiftImage`. A probe of the whole chain: 3.01 to 3.55 | owner |
 | 2026-11-01 | AMEND | Preprocessor branches | Exception: a branch no configuration compiles (`#if 0`) may move verbatim, token for token, with the code that holds it when a recipe moves that code; the dead text is not edited or renamed, a script checks it stands once in the new place unchanged, and `pp_identical.sh` prints `IDENTICAL`; `#if defined(...)` branches that some configuration compiles stay refused | `distort.c`'s `DistortImage` (campaign A, W11): the `Cylinder2Plane` and `Plane2Cylinder` pixel cases each hold a never-compiled `#if 0` debug block that names `i` and `j`; the rule kept the cases (and with them *Deep, Nested Complexity* at depth 5) in place; a probe with the blocks out of the function gave 3.01 to 3.55 | owner |
 | 2026-11-01 | AMEND | AS | Step 7: a block that reads more than four variables takes them through an input struct as in Recipe N steps 2 and 3, filled directly before the call; a variable written through its address that the callee reads on entry goes by pointer as a parameter; the caller writes `status=Helper(&inputs,...);` | `distort.c`'s `DistortImage` (campaign A, W11): the resample branch reads eight variables (`distort_image`, `resample_filter`, `id`, `s`, `validity`, `invalid`, `exception`) and writes `pixel` through `&pixel`, which `ResamplePixelColor` reads on entry; AS's first use gave 8 arguments, flat 3.01 with the struct form (bumps 16 to 14), 502 cases, 0 diverged | owner |
+| 2026-11-01 | AMEND | H | Step 1: a single `#define` that stands further down the body, after statements, may be hoisted as a run of its own when its name occurs nowhere between the function's signature and that `#define` (checked by script); step 3 excepts it; use only to unblock an extraction that follows; `pp_identical.sh` proves the step | `distort.c`'s `DistortImage` (campaign A, W11): `ScaleFilter` is `#define`d in the middle of the body and used by nine pixel cases; a helper above the function cannot see it, and step 1 took only a run at the top of the body | mandate (2026-10-24) |
