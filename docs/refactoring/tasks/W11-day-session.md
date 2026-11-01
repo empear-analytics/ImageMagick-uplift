@@ -25,11 +25,11 @@ flagged as a close reading before pushing.
 | `effect-blur.c` (new) | 4.91 → **5.29** | 11 |
 | `enhance.c` | 2.97 → 4.32 (split) → **4.85** | 1 + 10 |
 | `enhance-tone.c` (new) | 4.06 → **4.17** | 12 |
-| `distort.c` | 3.01 (no legal step) | 0 |
+| `distort.c` | 3.01 → **3.55** | 16 |
 | `morphology.c` | 2.71 (saturated) | 0 |
 
-116 refactor commits (E 35, N 24, W 10, SD 7, V 7, H 5, Q 5, O 4, B 3, D 3, U 3, S 2, T 2, I 1, LB 1, P 1, SV 1, Y 1, Z 1)
-and 9 docs and tool commits. No new recipe and no amendment. Every refactor commit ran the
+131 refactor commits (E 38, N 30, W 10, SD 7, V 7, H 6, O 5, Q 5, Z 4, B 3, D 3, U 3, S 2, T 2, AS 1, I 1, LB 1, P 1, SV 1, Y 1)
+and 16 docs, tool and playbook commits. No new recipe and no amendment. Every refactor commit ran the
 oracle on its function's cases (0 diverged) and passed the pre-commit gate; the whole
 catalogue ran after each file: 15,900 cases, 0 diverged. None of the steps adds
 *Overall Code Complexity* or *Code Duplication* to a file, except as noted for
@@ -105,6 +105,22 @@ playbook.
 
 ### For the owner
 
+- **`distort.c` 3.01 to 3.55 after the rulings of 2026-11-01** (16 commits: AS on the
+  resample branch with the input-struct form, nine pixel and verbose cases as helpers by
+  E, O, Z and N, two of them moving a never-compiled `#if 0` block with their case). Whole
+  oracle 15,900 cases, 0 diverged; `DistortImage` lost Brain Method and Deep, Nested
+  Complexity. **Read first:** the pass also amended Recipe H (9d22796e6, under the standing
+  mandate of 2026-10-24): step 1 now takes a single `#define` further down the body when
+  its name does not occur above it, because `ScaleFilter` is defined mid-body and no helper
+  above `DistortImage` could use it; the hoist (5a86513e3) unblocks the extractions that
+  follow, as the brief required. Then: the two `#if 0` steps (22024ed98, 90f53dfee), whose
+  proof is a script (`pp_identical.sh` cannot print IDENTICAL against HEAD when live code
+  moved, so it ran against a synthetic tree with every `#if 0` block removed; the `#if 0`
+  blocks are 8 before and 8 after, unchanged text); one `DistortMapping` struct reused by
+  Z and N siblings (N step 8 names only N siblings); N's read-then-written member `d`
+  (Polar, Cylinder2Plane); the Barrel else branch (07e833336), where no oracle case is known
+  to reach `r <= MagickEpsilon`.
+
 - **Recipe AS, first use (`distort.c`, 2026-11-01): applies, flat, not committed.** The resample
   branch meets AS steps 1 to 3 and the oracle agrees (502 cases, 0 diverged), but the helper
   takes eight inputs, so it needs an input struct, which AS has no form for (an `AN`-style
@@ -139,7 +155,7 @@ playbook.
   `effect.c` 233020a42 relies on a failure branch that no case reaches being dead after the
   block; 55c71a999 (H) moved 4.17 to 4.18 by itself and is kept to unblock 0fea5fbc0.
 
-- **`distort.c`, two rulings** (the pass made no commits for want of them):
+- **`distort.c`, two rulings** (given 2026-11-01: the recipe, with an input-struct step 7, and the `#if 0` move; see the next item):
   (1) `DistortImage`'s resample site, `status=ResamplePixelColor(...)` and its test in
   the parallel loop, is refused by T, U and J, which allow only `status=MagickFalse;`.
   A new recipe would cover it: the helper returns the call's result and the caller
