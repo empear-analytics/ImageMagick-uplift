@@ -2024,6 +2024,20 @@ static void PrintBarrelFX(const Image *image,const double *coeff,
   (void) FormatLocaleFile(stderr,"       p{ii+xc,jj+yc}' \\\n");
 }
 
+static void PrintPolynomialXTerms(const double *coeff,const size_t nterms)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) nterms; i++)
+  {
+    if ((i != 0) && (i%4 == 0))
+      (void) FormatLocaleFile(stderr, "\n         ");
+    (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i],
+      poly_basis_str(i));
+  }
+}
+
 static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
   MagickBooleanType *viewport_given,ExceptionInfo *exception)
 {
@@ -3033,13 +3047,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
         (void) FormatLocaleFile(stderr,
           "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
         (void) FormatLocaleFile(stderr, "       xx =");
-        for (i=0; i < (ssize_t) nterms; i++)
-        {
-          if ((i != 0) && (i%4 == 0))
-            (void) FormatLocaleFile(stderr, "\n         ");
-          (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i],
-            poly_basis_str(i));
-        }
+        PrintPolynomialXTerms(coeff,nterms);
         (void) FormatLocaleFile(stderr,";\n       yy =");
         for (i=0; i < (ssize_t) nterms; i++)
         {
