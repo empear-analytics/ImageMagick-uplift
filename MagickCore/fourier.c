@@ -351,6 +351,32 @@ static double GetComplexSNR(const Image *images)
   return(snr);
 }
 
+static MagickBooleanType SyncComplexViews(CacheView *Ci_view,
+  CacheView *Cr_view,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=MagickTrue;
+  if (SyncCacheViewAuthenticPixels(Ci_view,exception) == MagickFalse)
+    status=MagickFalse;
+  if (SyncCacheViewAuthenticPixels(Cr_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
+static MagickBooleanType CheckComplexSequence(const Image *images,
+  ExceptionInfo *exception)
+{
+  if (images->next == (Image *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ImageSequenceRequired","`%s'",images->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   ExceptionInfo *exception)
 {
@@ -399,12 +425,8 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",images->filename);
-  if (images->next == (Image *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "ImageSequenceRequired","`%s'",images->filename);
-      return((Image *) NULL);
-    }
+  if (CheckComplexSequence(images,exception) == MagickFalse)
+    return((Image *) NULL);
   image=CloneImage(images,0,0,MagickTrue,exception);
   if (image == (Image *) NULL)
     return((Image *) NULL);
@@ -506,9 +528,7 @@ MagickExport Image *ComplexImages(const Image *images,const ComplexOperator op,
       Cr+=(ptrdiff_t) GetPixelChannels(Cr_image);
       Ci+=(ptrdiff_t) GetPixelChannels(Ci_image);
     }
-    if (SyncCacheViewAuthenticPixels(Ci_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (SyncCacheViewAuthenticPixels(Cr_view,exception) == MagickFalse)
+    if (SyncComplexViews(Ci_view,Cr_view,exception) == MagickFalse)
       status=MagickFalse;
     if (images->progress_monitor != (MagickProgressMonitor) NULL)
       {
@@ -1024,6 +1044,30 @@ static void GetFourierChannelPixels(const FourierInfo *fourier_info,
   image_view=DestroyCacheView(image_view);
 }
 
+static MagickBooleanType CheckFourierExtent(const FourierInfo *fourier_info,
+  const Image *image,ExceptionInfo *exception)
+{
+  if ((fourier_info->width >= INT_MAX) || (fourier_info->height >= INT_MAX))
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "WidthOrHeightExceedsLimit","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType CheckFourierMemory(const MemoryInfo *source_info,
+  const Image *image,ExceptionInfo *exception)
+{
+  if (source_info == (MemoryInfo *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),
+        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
   const Image *image,double *magnitude_pixels,double *phase_pixels,
   ExceptionInfo *exception)
@@ -1052,20 +1096,12 @@ static MagickBooleanType ForwardFourierTransform(FourierInfo *fourier_info,
   /*
     Generate the forward Fourier transform.
   */
-  if ((fourier_info->width >= INT_MAX) || (fourier_info->height >= INT_MAX))
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "WidthOrHeightExceedsLimit","`%s'",image->filename);
-      return(MagickFalse);
-    }
+  if (CheckFourierExtent(fourier_info,image,exception) == MagickFalse)
+    return(MagickFalse);
   source_info=AcquireVirtualMemory(fourier_info->width,fourier_info->height*
     sizeof(*source_pixels));
-  if (source_info == (MemoryInfo *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),
-        ResourceLimitError,"MemoryAllocationFailed","`%s'",image->filename);
-      return(MagickFalse);
-    }
+  if (CheckFourierMemory(source_info,image,exception) == MagickFalse)
+    return(MagickFalse);
   source_pixels=(double *) GetVirtualMemoryBlob(source_info);
   memset(source_pixels,0,fourier_info->width*fourier_info->height*
     sizeof(*source_pixels));
@@ -1196,6 +1232,17 @@ static MagickBooleanType ForwardFourierTransformChannel(const Image *image,
   magnitude_info=RelinquishVirtualMemory(magnitude_info);
   return(status);
 }
+
+static size_t PadFourierWidth(const Image *image,size_t width)
+{
+  if (IsFourierPaddingNeeded(image) != MagickFalse)
+    {
+      size_t extent=image->columns < image->rows ? image->rows :
+        image->columns;
+      width=(extent & 0x01) == 1 ? extent+1UL : extent;
+    }
+  return(width);
+}
 #endif
 
 MagickExport Image *ForwardFourierTransformImage(const Image *image,
@@ -1221,12 +1268,7 @@ MagickExport Image *ForwardFourierTransformImage(const Image *image,
 
     width=image->columns;
     height=image->rows;
-    if (IsFourierPaddingNeeded(image) != MagickFalse)
-      {
-        size_t extent=image->columns < image->rows ? image->rows :
-          image->columns;
-        width=(extent & 0x01) == 1 ? extent+1UL : extent;
-      }
+    width=PadFourierWidth(image,width);
     height=width;
     magnitude_image=CloneImage(image,width,height,MagickTrue,exception);
     if (magnitude_image != (Image *) NULL)
@@ -1429,6 +1471,17 @@ static inline MagickBooleanType IsFourierMemoryMissing(
     (inverse_info == (MemoryInfo *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+static void RelinquishInverseFourierMemory(MemoryInfo *magnitude_info,
+  MemoryInfo *phase_info,MemoryInfo *inverse_info)
+{
+  if (magnitude_info != (MemoryInfo *) NULL)
+    magnitude_info=RelinquishVirtualMemory(magnitude_info);
+  if (phase_info != (MemoryInfo *) NULL)
+    phase_info=RelinquishVirtualMemory(phase_info);
+  if (inverse_info != (MemoryInfo *) NULL)
+    inverse_info=RelinquishVirtualMemory(inverse_info);
+}
+
 static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   const Image *magnitude_image,const Image *phase_image,
   fftw_complex *fourier_pixels,ExceptionInfo *exception)
@@ -1469,12 +1522,7 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
   if (IsFourierMemoryMissing(magnitude_info,phase_info,inverse_info) !=
       MagickFalse)
     {
-      if (magnitude_info != (MemoryInfo *) NULL)
-        magnitude_info=RelinquishVirtualMemory(magnitude_info);
-      if (phase_info != (MemoryInfo *) NULL)
-        phase_info=RelinquishVirtualMemory(phase_info);
-      if (inverse_info != (MemoryInfo *) NULL)
-        inverse_info=RelinquishVirtualMemory(inverse_info);
+      RelinquishInverseFourierMemory(magnitude_info,phase_info,inverse_info);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",
         magnitude_image->filename);
@@ -1742,6 +1790,18 @@ static MagickBooleanType InverseFourierTransformChannel(
 }
 #endif
 
+static MagickBooleanType CheckFourierPhaseImage(const Image *magnitude_image,
+  const Image *phase_image,ExceptionInfo *exception)
+{
+  if (phase_image == (Image *) NULL)
+    {
+      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
+        "ImageSequenceRequired","`%s'",magnitude_image->filename);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
   const Image *phase_image,const MagickBooleanType modulus,
   ExceptionInfo *exception)
@@ -1754,12 +1814,9 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
       magnitude_image->filename);
-  if (phase_image == (Image *) NULL)
-    {
-      (void) ThrowMagickException(exception,GetMagickModule(),ImageError,
-        "ImageSequenceRequired","`%s'",magnitude_image->filename);
-      return((Image *) NULL);
-    }
+  if (CheckFourierPhaseImage(magnitude_image,phase_image,exception) ==
+      MagickFalse)
+    return((Image *) NULL);
 #if !defined(ENABLE_FFTW_DELEGATE)
   fourier_image=(Image *) NULL;
   (void) modulus;

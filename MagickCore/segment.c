@@ -601,6 +601,85 @@ static MagickBooleanType AcquireDefaultCluster(const ExtentPacket red,
   return(MagickTrue);
 }
 
+typedef struct _GreenClusterTargets
+{
+  Cluster
+    **cluster,
+    **head;
+
+  ExtentPacket
+    *green,
+    *blue;
+} GreenClusterTargets;
+
+static MagickBooleanType FormGreenClusters(short **extrema,
+  const ExtentPacket red,const GreenClusterTargets *green_targets)
+{
+  Cluster
+    **const cluster = green_targets->cluster,
+    **const head = green_targets->head;
+
+  ExtentPacket
+    *const green = green_targets->green,
+    *const blue = green_targets->blue;
+
+  (*green).index=0;
+  while (DefineRegion(extrema[Green],green) != 0)
+  {
+    ClusterTargets
+      targets;
+
+    (*blue).index=0;
+    targets.cluster=(cluster);
+    targets.head=(head);
+    targets.blue=(blue);
+    if (FormBlueClusters(extrema,red,*green,&targets) == MagickFalse)
+      return(MagickFalse);
+  }
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireSquares(double **squares)
+{
+  ssize_t
+    i;
+
+  *squares=(double *) AcquireQuantumMemory(513UL,sizeof(*(*squares)));
+  if ((*squares) == (double *) NULL)
+    return(MagickFalse);
+  (*squares)+=255;
+  for (i=(-255); i <= 255; i++)
+    (*squares)[i]=(double) i*(double) i;
+  return(MagickTrue);
+}
+
+static void RelinquishClassifyResources(Cluster *head,double *squares)
+{
+  Cluster
+    *cluster,
+    *next_cluster;
+
+  double
+    *free_squares;
+
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
+  {
+    next_cluster=cluster->next;
+    cluster=(Cluster *) RelinquishMagickMemory(cluster);
+  }
+  squares-=255;
+  free_squares=squares;
+  free_squares=(double *) RelinquishMagickMemory(free_squares);
+}
+
+static void InitializeCluster(Cluster *cluster,const ssize_t count)
+{
+  cluster->id=count;
+  cluster->red.center/=cluster->count;
+  cluster->green.center/=cluster->count;
+  cluster->blue.center/=cluster->count;
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -651,9 +730,6 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   MagickStatusType
     status;
 
-  ssize_t
-    i;
-
   double
     *squares;
 
@@ -675,20 +751,16 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   (void) memset(&blue,0,sizeof(blue));
   while (DefineRegion(extrema[Red],&red) != 0)
   {
-    green.index=0;
-    while (DefineRegion(extrema[Green],&green) != 0)
-    {
-      ClusterTargets
-        targets;
+    GreenClusterTargets
+      green_targets;
 
-      blue.index=0;
-      targets.cluster=(&cluster);
-      targets.head=(&head);
-      targets.blue=(&blue);
-      if (FormBlueClusters(extrema,red,green,&targets) == MagickFalse)
-        ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
-          image->filename);
-    }
+    green_targets.cluster=(&cluster);
+    green_targets.head=(&head);
+    green_targets.green=(&green);
+    green_targets.blue=(&blue);
+    if (FormGreenClusters(extrema,red,&green_targets) == MagickFalse)
+      ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
+        image->filename);
   }
   if (AcquireDefaultCluster(red,green,blue,&head) == MagickFalse)
     ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
@@ -738,10 +810,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
         /*
           Initialize cluster.
         */
-        cluster->id=count;
-        cluster->red.center/=cluster->count;
-        cluster->green.center/=cluster->count;
-        cluster->blue.center/=cluster->count;
+        InitializeCluster(cluster,count);
         count++;
         last_cluster=cluster;
         continue;
@@ -761,13 +830,9 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   /*
     Speed up distance calculations.
   */
-  squares=(double *) AcquireQuantumMemory(513UL,sizeof(*squares));
-  if (squares == (double *) NULL)
+  if (AcquireSquares(&squares) == MagickFalse)
     ThrowClassifyException(ResourceLimitError,"MemoryAllocationFailed",
       image->filename);
-  squares+=255;
-  for (i=(-255); i <= 255; i++)
-    squares[i]=(double) i*(double) i;
   /*
     Allocate image colormap.
   */
@@ -824,14 +889,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   /*
     Relinquish resources.
   */
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
-  {
-    next_cluster=cluster->next;
-    cluster=(Cluster *) RelinquishMagickMemory(cluster);
-  }
-  squares-=255;
-  free_squares=squares;
-  free_squares=(double *) RelinquishMagickMemory(free_squares);
+  RelinquishClassifyResources(head,squares);
   return(MagickTrue);
 }
 
@@ -1234,6 +1292,84 @@ static ssize_t CountRowPixelsByRGB(const Image *image,Cluster *head,
   return(count);
 }
 
+static ssize_t CountImagePixelsByRGB(const Image *image,Cluster *head,
+  ssize_t count,ExceptionInfo *exception)
+{
+  const Quantum
+    *p;
+
+  MagickBooleanType
+    proceed;
+
+  ssize_t
+    y;
+
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    p=GetVirtualPixels(image,0,y,image->columns,1,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    count=CountRowPixelsByRGB(image,head,p,count);
+    proceed=SetImageProgress(image,SegmentImageTag,(MagickOffsetType) y,
+      2*image->rows);
+    if (proceed == MagickFalse)
+      break;
+  }
+  return(count);
+}
+
+static void SetDynamicThresholdPixel(const Cluster *background,
+  const Cluster *object,PixelInfo *pixel)
+{
+  double
+    threshold;
+
+  if (background != (Cluster *) NULL)
+    {
+      threshold=(background->red.center+object->red.center)/2.0;
+      pixel->red=(double) ScaleCharToQuantum((unsigned char)
+        (threshold+0.5));
+      threshold=(background->green.center+object->green.center)/2.0;
+      pixel->green=(double) ScaleCharToQuantum((unsigned char)
+        (threshold+0.5));
+      threshold=(background->blue.center+object->blue.center)/2.0;
+      pixel->blue=(double) ScaleCharToQuantum((unsigned char)
+        (threshold+0.5));
+    }
+}
+
+static void RelinquishDynamicThresholdResources(Cluster *head,
+  ssize_t **histogram,short **extrema)
+{
+  Cluster
+    *cluster,
+    *next_cluster;
+
+  ssize_t
+    i;
+
+  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
+  {
+    next_cluster=cluster->next;
+    cluster=(Cluster *) RelinquishMagickMemory(cluster);
+  }
+  for (i=0; i < MaxDimension; i++)
+  {
+    extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
+    histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
+  }
+}
+
+static void InitializeNewCluster(Cluster *cluster,const ExtentPacket red,
+  const ExtentPacket green,const ExtentPacket blue)
+{
+  cluster->count=0;
+  cluster->red=red;
+  cluster->green=green;
+  cluster->blue=blue;
+  cluster->next=(Cluster *) NULL;
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1251,15 +1387,6 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     green,
     red;
 
-  MagickBooleanType
-    proceed;
-
-  double
-    threshold;
-
-  const Quantum
-    *p;
-
   ssize_t
     i;
 
@@ -1268,8 +1395,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
 
   ssize_t
     count,
-    *histogram[MaxDimension],
-    y;
+    *histogram[MaxDimension];
 
   /*
     Allocate histogram and extrema.
@@ -1345,11 +1471,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
         /*
           Initialize a new class.
         */
-        cluster->count=0;
-        cluster->red=red;
-        cluster->green=green;
-        cluster->blue=blue;
-        cluster->next=(Cluster *) NULL;
+        InitializeNewCluster(cluster,red,green,blue);
       }
     }
   }
@@ -1368,28 +1490,14 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
       /*
         Initialize a new class.
       */
-      cluster->count=0;
-      cluster->red=red;
-      cluster->green=green;
-      cluster->blue=blue;
-      cluster->next=(Cluster *) NULL;
+      InitializeNewCluster(cluster,red,green,blue);
       head=cluster;
     }
   /*
     Count the pixels for each cluster.
   */
   count=0;
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    p=GetVirtualPixels(image,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      break;
-    count=CountRowPixelsByRGB(image,head,p,count);
-    proceed=SetImageProgress(image,SegmentImageTag,(MagickOffsetType) y,
-      2*image->rows);
-    if (proceed == MagickFalse)
-      break;
-  }
+  count=CountImagePixelsByRGB(image,head,count,exception);
   /*
     Remove clusters that do not meet minimum cluster threshold.
   */
@@ -1404,10 +1512,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
         /*
           Initialize cluster.
         */
-        cluster->id=count;
-        cluster->red.center/=cluster->count;
-        cluster->green.center/=cluster->count;
-        cluster->blue.center/=cluster->count;
+        InitializeCluster(cluster,count);
         count++;
         last_cluster=cluster;
         continue;
@@ -1431,31 +1536,11 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
         cluster=cluster->next;
       }
     }
-  if (background != (Cluster *) NULL)
-    {
-      threshold=(background->red.center+object->red.center)/2.0;
-      pixel->red=(double) ScaleCharToQuantum((unsigned char)
-        (threshold+0.5));
-      threshold=(background->green.center+object->green.center)/2.0;
-      pixel->green=(double) ScaleCharToQuantum((unsigned char)
-        (threshold+0.5));
-      threshold=(background->blue.center+object->blue.center)/2.0;
-      pixel->blue=(double) ScaleCharToQuantum((unsigned char)
-        (threshold+0.5));
-    }
+  SetDynamicThresholdPixel(background,object,pixel);
   /*
     Relinquish resources.
   */
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
-  {
-    next_cluster=cluster->next;
-    cluster=(Cluster *) RelinquishMagickMemory(cluster);
-  }
-  for (i=0; i < MaxDimension; i++)
-  {
-    extrema[i]=(short *) RelinquishMagickMemory(extrema[i]);
-    histogram[i]=(ssize_t *) RelinquishMagickMemory(histogram[i]);
-  }
+  RelinquishDynamicThresholdResources(head,histogram,extrema);
   return(MagickTrue);
 }
 
@@ -1993,18 +2078,78 @@ static void SetActiveNodeExtrema(const ActiveNodeInputs *inputs,
   }
 }
 
+typedef struct _ZeroCrossingInputs
+{
+  double
+    max_tau,
+    min_tau,
+    delta_tau,
+    smooth_threshold;
+} ZeroCrossingInputs;
+
+static size_t InitializeZeroCrossings(const ssize_t *histogram,
+  const ZeroCrossingInputs *crossing_inputs,ZeroCrossing *zero_crossing)
+{
+  const double
+    max_tau = crossing_inputs->max_tau,
+    min_tau = crossing_inputs->min_tau,
+    delta_tau = crossing_inputs->delta_tau,
+    smooth_threshold = crossing_inputs->smooth_threshold;
+
+  double
+    *derivative,
+    *second_derivative,
+    tau;
+
+  size_t
+    number_crossings;
+
+  ssize_t
+    i,
+    j;
+
+  derivative=(double *) AcquireCriticalMemory(256*sizeof(*derivative));
+  second_derivative=(double *) AcquireCriticalMemory(256*
+    sizeof(*second_derivative));
+  i=0;
+  for (tau=max_tau; tau >= min_tau; tau-=delta_tau)
+  {
+    zero_crossing[i].tau=tau;
+    ScaleSpace(histogram,tau,zero_crossing[i].histogram);
+    DerivativeHistogram(zero_crossing[i].histogram,derivative);
+    DerivativeHistogram(derivative,second_derivative);
+    ZeroCrossHistogram(second_derivative,smooth_threshold,
+      zero_crossing[i].crossings);
+    i++;
+  }
+  /*
+    Add an entry for the original histogram.
+  */
+  zero_crossing[i].tau=0.0;
+  for (j=0; j <= 255; j++)
+    zero_crossing[i].histogram[j]=(double) histogram[j];
+  DerivativeHistogram(zero_crossing[i].histogram,derivative);
+  DerivativeHistogram(derivative,second_derivative);
+  ZeroCrossHistogram(second_derivative,smooth_threshold,
+    zero_crossing[i].crossings);
+  number_crossings=(size_t) i;
+  derivative=(double *) RelinquishMagickMemory(derivative);
+  second_derivative=(double *) RelinquishMagickMemory(second_derivative);
+  return(number_crossings);
+}
+
 static double OptimalTau(const ssize_t *histogram,const double max_tau,
   const double min_tau,const double delta_tau,const double smooth_threshold,
   short *extrema)
 {
   double
-    average_tau,
-    *derivative,
-    *second_derivative,
-    tau;
+    average_tau;
 
   ActiveNodeInputs
     inputs;
+
+  ZeroCrossingInputs
+    crossing_inputs;
 
   IntervalTree
     **list,
@@ -2018,7 +2163,6 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
     number_crossings;
 
   ssize_t
-    j,
     number_nodes;
 
   ZeroCrossing
@@ -2047,33 +2191,12 @@ static double OptimalTau(const ssize_t *histogram,const double max_tau,
   /*
     Initialize zero crossing list.
   */
-  derivative=(double *) AcquireCriticalMemory(256*sizeof(*derivative));
-  second_derivative=(double *) AcquireCriticalMemory(256*
-    sizeof(*second_derivative));
-  i=0;
-  for (tau=max_tau; tau >= min_tau; tau-=delta_tau)
-  {
-    zero_crossing[i].tau=tau;
-    ScaleSpace(histogram,tau,zero_crossing[i].histogram);
-    DerivativeHistogram(zero_crossing[i].histogram,derivative);
-    DerivativeHistogram(derivative,second_derivative);
-    ZeroCrossHistogram(second_derivative,smooth_threshold,
-      zero_crossing[i].crossings);
-    i++;
-  }
-  /*
-    Add an entry for the original histogram.
-  */
-  zero_crossing[i].tau=0.0;
-  for (j=0; j <= 255; j++)
-    zero_crossing[i].histogram[j]=(double) histogram[j];
-  DerivativeHistogram(zero_crossing[i].histogram,derivative);
-  DerivativeHistogram(derivative,second_derivative);
-  ZeroCrossHistogram(second_derivative,smooth_threshold,
-    zero_crossing[i].crossings);
-  number_crossings=(size_t) i;
-  derivative=(double *) RelinquishMagickMemory(derivative);
-  second_derivative=(double *) RelinquishMagickMemory(second_derivative);
+  crossing_inputs.max_tau=max_tau;
+  crossing_inputs.min_tau=min_tau;
+  crossing_inputs.delta_tau=delta_tau;
+  crossing_inputs.smooth_threshold=smooth_threshold;
+  number_crossings=InitializeZeroCrossings(histogram,&crossing_inputs,
+    zero_crossing);
   /*
     Ensure the scale-space fingerprints form lines in scale-space, not loops.
   */

@@ -2024,6 +2024,48 @@ static void PrintBarrelFX(const Image *image,const double *coeff,
   (void) FormatLocaleFile(stderr,"       p{ii+xc,jj+yc}' \\\n");
 }
 
+static void PrintPolynomialXTerms(const double *coeff,const size_t nterms)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) nterms; i++)
+  {
+    if ((i != 0) && (i%4 == 0))
+      (void) FormatLocaleFile(stderr, "\n         ");
+    (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i],
+      poly_basis_str(i));
+  }
+}
+
+static void PrintPolynomialFX(const double *coeff,const char *image_gen,
+  const char *lookup)
+{
+  size_t
+    nterms =  CastDoubleToSizeT(coeff[1]);
+
+  ssize_t
+    i;
+
+  (void) FormatLocaleFile(stderr,
+    "Polynomial (order %lg, terms %lu), FX Equivalent\n",coeff[0],
+    (unsigned long) nterms);
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
+  (void) FormatLocaleFile(stderr, "       xx =");
+  PrintPolynomialXTerms(coeff,nterms);
+  (void) FormatLocaleFile(stderr,";\n       yy =");
+  for (i=0; i < (ssize_t) nterms; i++)
+  {
+    if ((i != 0) && (i%4 == 0))
+      (void) FormatLocaleFile(stderr,"\n         ");
+    (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i+(int) nterms],
+      poly_basis_str(i));
+  }
+  (void) FormatLocaleFile(stderr,";\n       %s' \\\n", lookup);
+}
+
 static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
   MagickBooleanType *viewport_given,ExceptionInfo *exception)
 {
@@ -2038,6 +2080,551 @@ static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
       else
         *viewport_given = MagickTrue;
     }
+  }
+}
+
+static PointInfo ShepardsSourcePoint(const PointInfo d,
+  const size_t number_arguments,const double *arguments,const double *coeff)
+{
+  double
+    denominator;
+
+  PointInfo
+    s;
+
+  size_t
+    k;
+
+  denominator = s.x = s.y = 0;
+  for(k=0; k<number_arguments; k+=4) {
+    double weight =
+        ((double)d.x-arguments[k+2])*((double)d.x-arguments[k+2])
+      + ((double)d.y-arguments[k+3])*((double)d.y-arguments[k+3]);
+    weight = pow(weight,coeff[0]); /* shepards power factor */
+    weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
+
+    s.x += (arguments[ k ]-arguments[k+2])*weight;
+    s.y += (arguments[k+1]-arguments[k+3])*weight;
+    denominator += weight;
+  }
+  s.x /= denominator;
+  s.y /= denominator;
+  s.x += d.x;   /* make it as relative displacement */
+  s.y += d.y;
+  return(s);
+}
+
+static void MapBilinearForwardPoint(const double *coeff,PointInfo *d,
+  PointInfo *s,double *validity)
+{
+  double
+    b,
+    c;
+
+  (*d).x -= coeff[3];  (*d).y -= coeff[7];
+  b = coeff[6]*(*d).x - coeff[2]*(*d).y + coeff[8];
+  c = coeff[4]*(*d).x - coeff[0]*(*d).y;
+
+  (*validity) = 1.0;
+  /* Handle Special degenerate (non-quadratic) case
+   * Currently without horizon anti-aliasing */
+  if ( fabs(coeff[9]) < MagickEpsilon )
+    (*s).y =  -c/b;
+  else {
+    c = b*b - 2*coeff[9]*c;
+    if ( c < 0.0 )
+      (*validity) = 0.0;
+    else
+      (*s).y = ( -b + sqrt(c) )/coeff[9];
+  }
+  if ( (*validity) > 0.0 )
+    (*s).x = ( (*d).x - coeff[1]*(*s).y) / ( coeff[0] + coeff[2]*(*s).y );
+
+  /* NOTE: the sign of the square root should be -ve for parts
+           where the source image becomes 'flipped' or 'mirrored'.
+     FUTURE: Horizon handling
+     FUTURE: Scaling factors or Derivatives (how?)
+  */
+}
+
+#define ScaleFilter(F,A,B,C,D) \
+    ScaleResampleFilter( (F), \
+      output_scaling*(A), output_scaling*(B), \
+      output_scaling*(C), output_scaling*(D) )
+
+typedef struct _DistortPixelInput
+{
+  Image
+    *distort_image;
+
+  ResampleFilter
+    **resample_filter;
+
+  int
+    id;
+
+  PointInfo
+    s;
+
+  double
+    validity;
+
+  PixelInfo
+    invalid;
+
+  ExceptionInfo
+    *exception;
+} DistortPixelInput;
+
+static MagickBooleanType ResampleDistortPixel(const DistortPixelInput *input,
+  PixelInfo *pixel,Quantum *magick_restrict q)
+{
+  Image
+    *const distort_image = input->distort_image;
+
+  ResampleFilter
+    **const resample_filter = input->resample_filter;
+
+  const int
+    id = input->id;
+
+  const PointInfo
+    s = input->s;
+
+  const double
+    validity = input->validity;
+
+  const PixelInfo
+    invalid = input->invalid;
+
+  ExceptionInfo
+    *const exception = input->exception;
+
+  MagickBooleanType
+    status;
+
+  /* resample the source image to find its correct color */
+  status=ResamplePixelColor(resample_filter[id],s.x,s.y,pixel,
+    exception);
+  if (status == MagickFalse)
+    SetPixelViaPixelInfo(distort_image,&invalid,q);
+  else
+    {
+      /* if validity between 0.0 & 1.0 mix result with invalid pixel */
+      if ( validity < 1.0 ) {
+        /* Do a blend of sample color and invalid pixel */
+        /* should this be a 'Blend', or an 'Over' compose */
+        CompositePixelInfoBlend(pixel,validity,&invalid,(1.0-validity),
+          pixel);
+      }
+      SetPixelViaPixelInfo(distort_image,pixel,q);
+    }
+  return(status);
+}
+
+typedef struct _DistortMapping
+{
+  PointInfo
+    d;
+
+  double
+    *coeff,
+    output_scaling;
+
+  ResampleFilter
+    **resample_filter;
+
+  int
+    id;
+
+  const Image
+    *image;
+
+  Image
+    *distort_image;
+
+  DistortMethod
+    method;
+} DistortMapping;
+
+static void MapPerspectivePoint(const DistortMapping *mapping,double *validity,
+  PointInfo *s)
+{
+  const PointInfo
+    d = mapping->d;
+
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  double
+    p,n,r,abs_r,abs_c6,abs_c7,scale;
+
+  /* perspective is a ratio of affines */
+  p=coeff[0]*d.x+coeff[1]*d.y+coeff[2];
+  n=coeff[3]*d.x+coeff[4]*d.y+coeff[5];
+  r=coeff[6]*d.x+coeff[7]*d.y+1.0;
+  /* Pixel Validity -- is it a 'sky' or 'ground' pixel */
+  (*validity) = (r*coeff[8] < 0.0) ? 0.0 : 1.0;
+  /* Determine horizon anti-alias blending */
+  abs_r = fabs(r)*2;
+  abs_c6 = fabs(coeff[6]);
+  abs_c7 = fabs(coeff[7]);
+  if ( abs_c6 > abs_c7 ) {
+    if ( abs_r < abs_c6*output_scaling )
+      (*validity) = 0.5 - coeff[8]*r/(coeff[6]*output_scaling);
+  }
+  else if ( abs_r < abs_c7*output_scaling )
+    (*validity) = 0.5 - coeff[8]*r/(coeff[7]*output_scaling);
+  /* Perspective Sampling Point (if valid) */
+  if ( (*validity) > 0.0 ) {
+    /* divide by r affine, for perspective scaling */
+    scale = 1.0/r;
+    (*s).x = p*scale;
+    (*s).y = n*scale;
+    /* Perspective Partial Derivatives or Scaling Vectors */
+    scale *= scale;
+    ScaleFilter( resample_filter[id],
+      (r*coeff[0] - p*coeff[6])*scale,
+      (r*coeff[1] - p*coeff[7])*scale,
+      (r*coeff[3] - n*coeff[6])*scale,
+      (r*coeff[4] - n*coeff[7])*scale );
+  }
+}
+
+static PointInfo MapPolynomialPoint(const DistortMapping *mapping)
+{
+  const PointInfo
+    d = mapping->d;
+
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  PointInfo
+    s;
+
+  ssize_t
+    k;
+
+  ssize_t
+    nterms=(ssize_t)coeff[1];
+
+  PointInfo
+    du,dv; /* the du,dv vectors from unit dx,dy -- derivatives */
+
+  s.x=s.y=du.x=du.y=dv.x=dv.y=0.0;
+  for(k=0; k < nterms; k++) {
+    s.x  += poly_basis_fn(k,d.x,d.y)*coeff[2+k];
+    du.x += poly_basis_dx(k,d.x,d.y)*coeff[2+k];
+    du.y += poly_basis_dy(k,d.x,d.y)*coeff[2+k];
+    s.y  += poly_basis_fn(k,d.x,d.y)*coeff[2+k+nterms];
+    dv.x += poly_basis_dx(k,d.x,d.y)*coeff[2+k+nterms];
+    dv.y += poly_basis_dy(k,d.x,d.y)*coeff[2+k+nterms];
+  }
+  ScaleFilter( resample_filter[id], du.x,du.y,dv.x,dv.y );
+  return(s);
+}
+
+static void MapPlane2CylinderPoint(const DistortMapping *mapping,PointInfo *d,
+  double *validity,PointInfo *s)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  /* relative to center of distortion */
+  (*d).x -= coeff[4]; (*d).y -= coeff[5];
+
+  /* is pixel valid - horizon of a infinite Virtual-Pixel Plane
+   * (see Anthony Thyssen's personal note) */
+  (*validity) = (double) (coeff[1]*MagickPI2 - fabs((*d).x))/output_scaling +
+    0.5;
+
+  if ( (*validity) > 0.0 ) {
+    double cx,tx;
+    (*d).x /= coeff[1];           /* x'= x/r */
+    cx = 1/cos((*d).x);           /* cx = 1/cos(x/r) */
+    tx = tan((*d).x);             /* tx = tan(x/r) */
+    (*s).x = coeff[1]*tx;         /* u = r * tan(x/r) */
+    (*s).y = (*d).y*cx;              /* v = y / cos(x/r) */
+    /* derivatives...  (see Anthony Thyssen's personal notes) */
+    ScaleFilter( resample_filter[id],
+          cx*cx, 0.0, (*s).y*cx/coeff[1], cx );
+#if 0
+/*if ( i == 0 && j == 0 )*/
+if ( d.x == 0.5 && d.y == 0.5 ) {
+  fprintf(stderr, "x=%lf  y=%lf  u=%lf  v=%lf\n", d.x*coeff[1], d.y, s.x, s.y);
+  fprintf(stderr, "radius = %lf  phi = %lf  validity = %lf\n",
+      coeff[1],  (double)(d.x * 180.0/MagickPI), validity );
+  fprintf(stderr, "du/dx=%lf  du/dx=%lf  dv/dx=%lf  dv/dy=%lf\n",
+      cx*cx, 0.0, s.y*cx/coeff[1], cx);
+  fflush(stderr); }
+#endif
+  }
+  /* add center of distortion in source */
+  (*s).x += coeff[2]; (*s).y += coeff[3];
+}
+
+static PointInfo MapCylinder2PlanePoint(const DistortMapping *mapping)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  PointInfo
+    d = mapping->d;
+
+  PointInfo
+    s;
+
+  double ax, cx;
+  /* relative to center of distortion */
+  d.x -= coeff[4]; d.y -= coeff[5];
+  d.x /= coeff[1];        /* x' = x/r */
+  ax=atan(d.x);           /* aa = atan(x/r) = u/r  */
+  cx=cos(ax);             /* cx = cos(atan(x/r)) = 1/sqrt(x^2+u^2) */
+  s.x = coeff[1]*ax;      /* u  = r*atan(x/r) */
+  s.y = d.y*cx;           /* v  = y*cos(u/r) */
+  /* derivatives... (see personal notes) */
+  ScaleFilter( resample_filter[id],
+        1.0/(1.0+d.x*d.x), 0.0, -d.x*s.y*cx*cx/coeff[1], s.y/d.y );
+#if 0
+if ( i == 0 && j == 0 ) {
+  fprintf(stderr, "x=%lf  y=%lf  u=%lf  v=%lf\n", d.x*coeff[1], d.y, s.x, s.y);
+  fprintf(stderr, "phi = %lf\n", (double)(ax * 180.0/MagickPI) );
+  fprintf(stderr, "du/dx=%lf  du/dx=%lf  dv/dx=%lf  dv/dy=%lf\n",
+                1.0/(1.0+d.x*d.x), 0.0, -d.x*s.y*cx*cx/coeff[1], s.y/d.y );
+  fflush(stderr); }
+#endif
+  /* add center of distortion in source */
+  s.x += coeff[2]; s.y += coeff[3];
+  return(s);
+}
+
+static PointInfo MapBarrelPoint(const DistortMapping *mapping,const PointInfo d,
+  const double r)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  const DistortMethod
+    method = mapping->method;
+
+  double
+    fx,fy,gx,gy;
+
+  PointInfo
+    s;
+
+  fx = ((coeff[0]*r + coeff[1])*r + coeff[2])*r + coeff[3];
+  fy = ((coeff[4]*r + coeff[5])*r + coeff[6])*r + coeff[7];
+  gx = ((3*coeff[0]*r + 2*coeff[1])*r + coeff[2])/r;
+  gy = ((3*coeff[4]*r + 2*coeff[5])*r + coeff[6])/r;
+  /* adjust functions and scaling for 'inverse' form */
+  if ( method == BarrelInverseDistortion ) {
+    fx = 1/fx;  fy = 1/fy;
+    gx *= -fx*fx;  gy *= -fy*fy;
+  }
+  /* Set the source pixel to lookup and EWA derivative vectors */
+  s.x = d.x*fx + coeff[8];
+  s.y = d.y*fy + coeff[9];
+  ScaleFilter( resample_filter[id],
+      gx*d.x*d.x + fx, gx*d.x*d.y,
+      gy*d.x*d.y,      gy*d.y*d.y + fy );
+  return(s);
+}
+
+static void ScaleBarrelOrigin(const DistortMapping *mapping)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  const DistortMethod
+    method = mapping->method;
+
+  if ( method == BarrelDistortion )
+    ScaleFilter( resample_filter[id],
+         coeff[3], 0, 0, coeff[7] );
+  else /* method == BarrelInverseDistortion */
+    /* FUTURE, trap for D==0 causing division by zero */
+    ScaleFilter( resample_filter[id],
+         1.0/coeff[3], 0, 0, 1.0/coeff[7] );
+}
+
+static PointInfo MapArcPoint(const DistortMapping *mapping)
+{
+  const PointInfo
+    d = mapping->d;
+
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  const Image
+    *const image = mapping->image;
+
+  Image
+    *const distort_image = mapping->distort_image;
+
+  PointInfo
+    s;
+
+  /* what is the angle and radius in the destination image */
+  s.x  = (double) ((atan2(d.y,d.x) - coeff[0])/Magick2PI);
+  s.x -= MagickRound(s.x);     /* angle */
+  s.y  = hypot(d.x,d.y);       /* radius */
+
+  /* Arc Distortion Partial Scaling Vectors
+    Are derived by mapping the perpendicular unit vectors
+    dR  and  dA*R*2PI  rather than trying to map dx and dy
+    The results is a very simple orthogonal aligned ellipse.
+  */
+  if ( s.y > MagickEpsilon )
+    ScaleFilter( resample_filter[id],
+        (double) (coeff[1]/(Magick2PI*s.y)), 0, 0, coeff[3] );
+  else
+    ScaleFilter( resample_filter[id],
+        distort_image->columns*2, 0, 0, coeff[3] );
+
+  /* now scale the angle and radius for source image lookup point */
+  s.x = s.x*coeff[1] + coeff[4] + image->page.x +0.5;
+  s.y = (coeff[2] - s.y) * coeff[3] + image->page.y;
+  return(s);
+}
+
+static PointInfo MapPolarPoint(const DistortMapping *mapping)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  const Image
+    *const image = mapping->image;
+
+  Image
+    *const distort_image = mapping->distort_image;
+
+  PointInfo
+    d = mapping->d;
+
+  PointInfo
+    s;
+
+  d.x -= coeff[2];
+  d.y -= coeff[3];
+  s.x  = atan2(d.x,d.y) - (coeff[4]+coeff[5])/2;
+  s.x /= Magick2PI;
+  s.x -= MagickRound(s.x);
+  s.x *= Magick2PI;       /* angle - relative to centerline */
+  s.y  = hypot(d.x,d.y);  /* radius */
+
+  /* Polar Scaling vectors are based on mapping dR and dA vectors
+     This results in very simple orthogonal scaling vectors
+  */
+  if ( s.y > MagickEpsilon )
+    ScaleFilter( resample_filter[id],
+      (double) (coeff[6]/(Magick2PI*s.y)), 0, 0, coeff[7] );
+  else
+    ScaleFilter( resample_filter[id],
+        distort_image->columns*2, 0, 0, coeff[7] );
+
+  /* now finish mapping radius/angle to source x,y coords */
+  s.x = s.x*coeff[6] + (double)image->columns/2.0 + image->page.x;
+  s.y = (s.y-coeff[1])*coeff[7] + image->page.y;
+  return(s);
+}
+
+static void MapBarrelDistortion(const DistortMapping *mapping,PointInfo *d,
+  PointInfo *s)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  double
+    r;
+
+  /* Radial Polynomial Distortion (de-normalized) */
+  (*d).x -= coeff[8];
+  (*d).y -= coeff[9];
+  r = sqrt((*d).x*(*d).x+(*d).y*(*d).y);
+  if ( r > MagickEpsilon ) {
+    (*s)=MapBarrelPoint(mapping,(*d),r);
+  }
+  else {
+    /* Special handling to avoid divide by zero when r==0
+    **
+    ** The source and destination pixels match in this case
+    ** which was set at the top of the loop using  s = d;
+    ** otherwise...   s.x=coeff[8]; s.y=coeff[9];
+    */
+    ScaleBarrelOrigin(mapping);
   }
 }
 
@@ -2507,30 +3094,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       }
       case PolynomialDistortion:
       {
-        size_t nterms =  CastDoubleToSizeT(coeff[1]);
-        (void) FormatLocaleFile(stderr,
-          "Polynomial (order %lg, terms %lu), FX Equivalent\n",coeff[0],
-          (unsigned long) nterms);
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
-        (void) FormatLocaleFile(stderr, "       xx =");
-        for (i=0; i < (ssize_t) nterms; i++)
-        {
-          if ((i != 0) && (i%4 == 0))
-            (void) FormatLocaleFile(stderr, "\n         ");
-          (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i],
-            poly_basis_str(i));
-        }
-        (void) FormatLocaleFile(stderr,";\n       yy =");
-        for (i=0; i < (ssize_t) nterms; i++)
-        {
-          if ((i != 0) && (i%4 == 0))
-            (void) FormatLocaleFile(stderr,"\n         ");
-          (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i+(int) nterms],
-            poly_basis_str(i));
-        }
-        (void) FormatLocaleFile(stderr,";\n       %s' \\\n", lookup);
+        PrintPolynomialFX(coeff,image_gen,lookup);
         break;
       }
       case ArcDistortion:
@@ -2619,10 +3183,6 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       output_scaling = 1/output_scaling;
     }
   }
-#define ScaleFilter(F,A,B,C,D) \
-    ScaleResampleFilter( (F), \
-      output_scaling*(A), output_scaling*(B), \
-      output_scaling*(C), output_scaling*(D) )
 
   /*
     Initialize the distort image attributes.
@@ -2739,10 +3299,21 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
 
       for (i=0; i < (ssize_t) distort_image->columns; i++)
       {
+        DistortMapping
+          mapping;
+
         /* map pixel coordinate to distortion space coordinate */
         d.x = (double) (geometry.x+i+0.5)*output_scaling;
         d.y = (double) (geometry.y+j+0.5)*output_scaling;
         s = d;  /* default is a no-op mapping */
+        mapping.d=d;
+        mapping.coeff=coeff;
+        mapping.output_scaling=output_scaling;
+        mapping.resample_filter=resample_filter;
+        mapping.id=id;
+        mapping.image=image;
+        mapping.distort_image=distort_image;
+        mapping.method=method;
         switch (method)
         {
           case AffineDistortion:
@@ -2755,38 +3326,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           }
           case PerspectiveDistortion:
           {
-            double
-              p,n,r,abs_r,abs_c6,abs_c7,scale;
-            /* perspective is a ratio of affines */
-            p=coeff[0]*d.x+coeff[1]*d.y+coeff[2];
-            n=coeff[3]*d.x+coeff[4]*d.y+coeff[5];
-            r=coeff[6]*d.x+coeff[7]*d.y+1.0;
-            /* Pixel Validity -- is it a 'sky' or 'ground' pixel */
-            validity = (r*coeff[8] < 0.0) ? 0.0 : 1.0;
-            /* Determine horizon anti-alias blending */
-            abs_r = fabs(r)*2;
-            abs_c6 = fabs(coeff[6]);
-            abs_c7 = fabs(coeff[7]);
-            if ( abs_c6 > abs_c7 ) {
-              if ( abs_r < abs_c6*output_scaling )
-                validity = 0.5 - coeff[8]*r/(coeff[6]*output_scaling);
-            }
-            else if ( abs_r < abs_c7*output_scaling )
-              validity = 0.5 - coeff[8]*r/(coeff[7]*output_scaling);
-            /* Perspective Sampling Point (if valid) */
-            if ( validity > 0.0 ) {
-              /* divide by r affine, for perspective scaling */
-              scale = 1.0/r;
-              s.x = p*scale;
-              s.y = n*scale;
-              /* Perspective Partial Derivatives or Scaling Vectors */
-              scale *= scale;
-              ScaleFilter( resample_filter[id],
-                (r*coeff[0] - p*coeff[6])*scale,
-                (r*coeff[1] - p*coeff[7])*scale,
-                (r*coeff[3] - n*coeff[6])*scale,
-                (r*coeff[4] - n*coeff[7])*scale );
-            }
+            MapPerspectivePoint(&mapping,&validity,&s);
             break;
           }
           case BilinearReverseDistortion:
@@ -2807,31 +3347,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           {
             /* Forward mapped needs reversed polynomial equations
              * which unfortunately requires a square root!  */
-            double b,c;
-            d.x -= coeff[3];  d.y -= coeff[7];
-            b = coeff[6]*d.x - coeff[2]*d.y + coeff[8];
-            c = coeff[4]*d.x - coeff[0]*d.y;
-
-            validity = 1.0;
-            /* Handle Special degenerate (non-quadratic) case
-             * Currently without horizon anti-aliasing */
-            if ( fabs(coeff[9]) < MagickEpsilon )
-              s.y =  -c/b;
-            else {
-              c = b*b - 2*coeff[9]*c;
-              if ( c < 0.0 )
-                validity = 0.0;
-              else
-                s.y = ( -b + sqrt(c) )/coeff[9];
-            }
-            if ( validity > 0.0 )
-              s.x = ( d.x - coeff[1]*s.y) / ( coeff[0] + coeff[2]*s.y );
-
-            /* NOTE: the sign of the square root should be -ve for parts
-                     where the source image becomes 'flipped' or 'mirrored'.
-               FUTURE: Horizon handling
-               FUTURE: Scaling factors or Derivatives (how?)
-            */
+            MapBilinearForwardPoint(coeff,&d,&s,&validity);
             break;
           }
 #if 0
@@ -2843,74 +3359,17 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           case PolynomialDistortion:
           {
             /* multi-ordered polynomial */
-            ssize_t
-              k;
-
-            ssize_t
-              nterms=(ssize_t)coeff[1];
-
-            PointInfo
-              du,dv; /* the du,dv vectors from unit dx,dy -- derivatives */
-
-            s.x=s.y=du.x=du.y=dv.x=dv.y=0.0;
-            for(k=0; k < nterms; k++) {
-              s.x  += poly_basis_fn(k,d.x,d.y)*coeff[2+k];
-              du.x += poly_basis_dx(k,d.x,d.y)*coeff[2+k];
-              du.y += poly_basis_dy(k,d.x,d.y)*coeff[2+k];
-              s.y  += poly_basis_fn(k,d.x,d.y)*coeff[2+k+nterms];
-              dv.x += poly_basis_dx(k,d.x,d.y)*coeff[2+k+nterms];
-              dv.y += poly_basis_dy(k,d.x,d.y)*coeff[2+k+nterms];
-            }
-            ScaleFilter( resample_filter[id], du.x,du.y,dv.x,dv.y );
+            s=MapPolynomialPoint(&mapping);
             break;
           }
           case ArcDistortion:
           {
-            /* what is the angle and radius in the destination image */
-            s.x  = (double) ((atan2(d.y,d.x) - coeff[0])/Magick2PI);
-            s.x -= MagickRound(s.x);     /* angle */
-            s.y  = hypot(d.x,d.y);       /* radius */
-
-            /* Arc Distortion Partial Scaling Vectors
-              Are derived by mapping the perpendicular unit vectors
-              dR  and  dA*R*2PI  rather than trying to map dx and dy
-              The results is a very simple orthogonal aligned ellipse.
-            */
-            if ( s.y > MagickEpsilon )
-              ScaleFilter( resample_filter[id],
-                  (double) (coeff[1]/(Magick2PI*s.y)), 0, 0, coeff[3] );
-            else
-              ScaleFilter( resample_filter[id],
-                  distort_image->columns*2, 0, 0, coeff[3] );
-
-            /* now scale the angle and radius for source image lookup point */
-            s.x = s.x*coeff[1] + coeff[4] + image->page.x +0.5;
-            s.y = (coeff[2] - s.y) * coeff[3] + image->page.y;
+            s=MapArcPoint(&mapping);
             break;
           }
           case PolarDistortion:
           { /* 2D Cartesian to Polar View */
-            d.x -= coeff[2];
-            d.y -= coeff[3];
-            s.x  = atan2(d.x,d.y) - (coeff[4]+coeff[5])/2;
-            s.x /= Magick2PI;
-            s.x -= MagickRound(s.x);
-            s.x *= Magick2PI;       /* angle - relative to centerline */
-            s.y  = hypot(d.x,d.y);  /* radius */
-
-            /* Polar Scaling vectors are based on mapping dR and dA vectors
-               This results in very simple orthogonal scaling vectors
-            */
-            if ( s.y > MagickEpsilon )
-              ScaleFilter( resample_filter[id],
-                (double) (coeff[6]/(Magick2PI*s.y)), 0, 0, coeff[7] );
-            else
-              ScaleFilter( resample_filter[id],
-                  distort_image->columns*2, 0, 0, coeff[7] );
-
-            /* now finish mapping radius/angle to source x,y coords */
-            s.x = s.x*coeff[6] + (double)image->columns/2.0 + image->page.x;
-            s.y = (s.y-coeff[1])*coeff[7] + image->page.y;
+            s=MapPolarPoint(&mapping);
             break;
           }
           case DePolarDistortion:
@@ -2925,103 +3384,18 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           }
           case Cylinder2PlaneDistortion:
           { /* 3D Cylinder to Tangential Plane */
-            double ax, cx;
-            /* relative to center of distortion */
-            d.x -= coeff[4]; d.y -= coeff[5];
-            d.x /= coeff[1];        /* x' = x/r */
-            ax=atan(d.x);           /* aa = atan(x/r) = u/r  */
-            cx=cos(ax);             /* cx = cos(atan(x/r)) = 1/sqrt(x^2+u^2) */
-            s.x = coeff[1]*ax;      /* u  = r*atan(x/r) */
-            s.y = d.y*cx;           /* v  = y*cos(u/r) */
-            /* derivatives... (see personal notes) */
-            ScaleFilter( resample_filter[id],
-                  1.0/(1.0+d.x*d.x), 0.0, -d.x*s.y*cx*cx/coeff[1], s.y/d.y );
-#if 0
-if ( i == 0 && j == 0 ) {
-  fprintf(stderr, "x=%lf  y=%lf  u=%lf  v=%lf\n", d.x*coeff[1], d.y, s.x, s.y);
-  fprintf(stderr, "phi = %lf\n", (double)(ax * 180.0/MagickPI) );
-  fprintf(stderr, "du/dx=%lf  du/dx=%lf  dv/dx=%lf  dv/dy=%lf\n",
-                1.0/(1.0+d.x*d.x), 0.0, -d.x*s.y*cx*cx/coeff[1], s.y/d.y );
-  fflush(stderr); }
-#endif
-            /* add center of distortion in source */
-            s.x += coeff[2]; s.y += coeff[3];
+            s=MapCylinder2PlanePoint(&mapping);
             break;
           }
           case Plane2CylinderDistortion:
           { /* 3D Cylinder to Tangential Plane */
-            /* relative to center of distortion */
-            d.x -= coeff[4]; d.y -= coeff[5];
-
-            /* is pixel valid - horizon of a infinite Virtual-Pixel Plane
-             * (see Anthony Thyssen's personal note) */
-            validity = (double) (coeff[1]*MagickPI2 - fabs(d.x))/output_scaling + 0.5;
-
-            if ( validity > 0.0 ) {
-              double cx,tx;
-              d.x /= coeff[1];           /* x'= x/r */
-              cx = 1/cos(d.x);           /* cx = 1/cos(x/r) */
-              tx = tan(d.x);             /* tx = tan(x/r) */
-              s.x = coeff[1]*tx;         /* u = r * tan(x/r) */
-              s.y = d.y*cx;              /* v = y / cos(x/r) */
-              /* derivatives...  (see Anthony Thyssen's personal notes) */
-              ScaleFilter( resample_filter[id],
-                    cx*cx, 0.0, s.y*cx/coeff[1], cx );
-#if 0
-/*if ( i == 0 && j == 0 )*/
-if ( d.x == 0.5 && d.y == 0.5 ) {
-  fprintf(stderr, "x=%lf  y=%lf  u=%lf  v=%lf\n", d.x*coeff[1], d.y, s.x, s.y);
-  fprintf(stderr, "radius = %lf  phi = %lf  validity = %lf\n",
-      coeff[1],  (double)(d.x * 180.0/MagickPI), validity );
-  fprintf(stderr, "du/dx=%lf  du/dx=%lf  dv/dx=%lf  dv/dy=%lf\n",
-      cx*cx, 0.0, s.y*cx/coeff[1], cx);
-  fflush(stderr); }
-#endif
-            }
-            /* add center of distortion in source */
-            s.x += coeff[2]; s.y += coeff[3];
+            MapPlane2CylinderPoint(&mapping,&d,&validity,&s);
             break;
           }
           case BarrelDistortion:
           case BarrelInverseDistortion:
           { /* Lens Barrel Distortion Correction */
-            double r,fx,fy,gx,gy;
-            /* Radial Polynomial Distortion (de-normalized) */
-            d.x -= coeff[8];
-            d.y -= coeff[9];
-            r = sqrt(d.x*d.x+d.y*d.y);
-            if ( r > MagickEpsilon ) {
-              fx = ((coeff[0]*r + coeff[1])*r + coeff[2])*r + coeff[3];
-              fy = ((coeff[4]*r + coeff[5])*r + coeff[6])*r + coeff[7];
-              gx = ((3*coeff[0]*r + 2*coeff[1])*r + coeff[2])/r;
-              gy = ((3*coeff[4]*r + 2*coeff[5])*r + coeff[6])/r;
-              /* adjust functions and scaling for 'inverse' form */
-              if ( method == BarrelInverseDistortion ) {
-                fx = 1/fx;  fy = 1/fy;
-                gx *= -fx*fx;  gy *= -fy*fy;
-              }
-              /* Set the source pixel to lookup and EWA derivative vectors */
-              s.x = d.x*fx + coeff[8];
-              s.y = d.y*fy + coeff[9];
-              ScaleFilter( resample_filter[id],
-                  gx*d.x*d.x + fx, gx*d.x*d.y,
-                  gy*d.x*d.y,      gy*d.y*d.y + fy );
-            }
-            else {
-              /* Special handling to avoid divide by zero when r==0
-              **
-              ** The source and destination pixels match in this case
-              ** which was set at the top of the loop using  s = d;
-              ** otherwise...   s.x=coeff[8]; s.y=coeff[9];
-              */
-              if ( method == BarrelDistortion )
-                ScaleFilter( resample_filter[id],
-                     coeff[3], 0, 0, coeff[7] );
-              else /* method == BarrelInverseDistortion */
-                /* FUTURE, trap for D==0 causing division by zero */
-                ScaleFilter( resample_filter[id],
-                     1.0/coeff[3], 0, 0, 1.0/coeff[7] );
-            }
+            MapBarrelDistortion(&mapping,&d,&s);
             break;
           }
           case ShepardsDistortion:
@@ -3034,28 +3408,7 @@ if ( d.x == 0.5 && d.y == 0.5 ) {
                Note: We can not determine derivatives using shepards method
                so only a point sample interpolation can be used.
             */
-            double
-              denominator;
-
-            size_t
-              k;
-
-            denominator = s.x = s.y = 0;
-            for(k=0; k<number_arguments; k+=4) {
-              double weight =
-                  ((double)d.x-arguments[k+2])*((double)d.x-arguments[k+2])
-                + ((double)d.y-arguments[k+3])*((double)d.y-arguments[k+3]);
-              weight = pow(weight,coeff[0]); /* shepards power factor */
-              weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
-
-              s.x += (arguments[ k ]-arguments[k+2])*weight;
-              s.y += (arguments[k+1]-arguments[k+3])*weight;
-              denominator += weight;
-            }
-            s.x /= denominator;
-            s.y /= denominator;
-            s.x += d.x;   /* make it as relative displacement */
-            s.y += d.y;
+            s=ShepardsSourcePoint(d,number_arguments,arguments,coeff);
             break;
           }
           default:
@@ -3074,22 +3427,17 @@ if ( d.x == 0.5 && d.y == 0.5 ) {
           SetPixelViaPixelInfo(distort_image,&invalid,q);
         }
         else {
-          /* resample the source image to find its correct color */
-          status=ResamplePixelColor(resample_filter[id],s.x,s.y,&pixel,
-            exception);
-          if (status == MagickFalse)
-            SetPixelViaPixelInfo(distort_image,&invalid,q);
-          else
-            {
-              /* if validity between 0.0 & 1.0 mix result with invalid pixel */
-              if ( validity < 1.0 ) {
-                /* Do a blend of sample color and invalid pixel */
-                /* should this be a 'Blend', or an 'Over' compose */
-                CompositePixelInfoBlend(&pixel,validity,&invalid,(1.0-validity),
-                  &pixel);
-              }
-              SetPixelViaPixelInfo(distort_image,&pixel,q);
-            }
+          DistortPixelInput
+            distort_input;
+
+          distort_input.distort_image=distort_image;
+          distort_input.resample_filter=resample_filter;
+          distort_input.id=id;
+          distort_input.s=s;
+          distort_input.validity=validity;
+          distort_input.invalid=invalid;
+          distort_input.exception=exception;
+          status=ResampleDistortPixel(&distort_input,&pixel,q);
         }
         q+=(ptrdiff_t) GetPixelChannels(distort_image);
       }

@@ -1942,18 +1942,103 @@ static void AnnotatePolaroidCaption(const Image *image,
   *text=DestroyString(*text);
 }
 
+typedef struct _PolaroidFinish
+{
+  const Image
+    *image;
+
+  PixelInterpolateMethod
+    method;
+
+  ssize_t
+    quantum;
+
+  double
+    angle;
+} PolaroidFinish;
+
+static Image *FinishPolaroidImage(const PolaroidFinish *polaroid_finish,
+  Image *picture_image,ExceptionInfo *exception)
+{
+  const Image
+    *const image = polaroid_finish->image;
+
+  const PixelInterpolateMethod
+    method = polaroid_finish->method;
+
+  const ssize_t
+    quantum = polaroid_finish->quantum;
+
+  const double
+    angle = polaroid_finish->angle;
+
+  Image
+    *bend_image,
+    *flop_image,
+    *polaroid_image,
+    *rotate_image,
+    *trim_image;
+
+  rotate_image=RotateImage(picture_image,90.0,exception);
+  picture_image=DestroyImage(picture_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  picture_image=rotate_image;
+  bend_image=WaveImage(picture_image,0.01*picture_image->rows,2.0*
+    picture_image->columns,method,exception);
+  picture_image=DestroyImage(picture_image);
+  if (bend_image == (Image *) NULL)
+    return((Image *) NULL);
+  picture_image=bend_image;
+  rotate_image=RotateImage(picture_image,-90.0,exception);
+  picture_image=DestroyImage(picture_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  picture_image=rotate_image;
+  picture_image->background_color=image->background_color;
+  polaroid_image=ShadowImage(picture_image,80.0,2.0,quantum/3,quantum/3,
+    exception);
+  if (polaroid_image == (Image *) NULL)
+    {
+      picture_image=DestroyImage(picture_image);
+      return(picture_image);
+    }
+  flop_image=FlopImage(polaroid_image,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (flop_image == (Image *) NULL)
+    {
+      picture_image=DestroyImage(picture_image);
+      return(picture_image);
+    }
+  polaroid_image=flop_image;
+  (void) CompositeImage(polaroid_image,picture_image,OverCompositeOp,
+    MagickTrue,(ssize_t) (-0.01*picture_image->columns/2.0),0L,exception);
+  picture_image=DestroyImage(picture_image);
+  (void) QueryColorCompliance("none",AllCompliance,
+    &polaroid_image->background_color,exception);
+  rotate_image=RotateImage(polaroid_image,angle,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (rotate_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=rotate_image;
+  trim_image=TrimImage(polaroid_image,exception);
+  polaroid_image=DestroyImage(polaroid_image);
+  if (trim_image == (Image *) NULL)
+    return((Image *) NULL);
+  polaroid_image=trim_image;
+  return(polaroid_image);
+}
+
 MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   const char *caption,const double angle,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
 {
   Image
-    *bend_image,
     *caption_image,
-    *flop_image,
-    *picture_image,
-    *polaroid_image,
-    *rotate_image,
-    *trim_image;
+    *picture_image;
+
+  PolaroidFinish
+    polaroid_finish;
 
   size_t
     height;
@@ -2012,54 +2097,11 @@ MagickExport Image *PolaroidImage(const Image *image,const DrawInfo *draw_info,
   (void) QueryColorCompliance("none",AllCompliance,
     &picture_image->background_color,exception);
   (void) SetImageAlphaChannel(picture_image,OpaqueAlphaChannel,exception);
-  rotate_image=RotateImage(picture_image,90.0,exception);
-  picture_image=DestroyImage(picture_image);
-  if (rotate_image == (Image *) NULL)
-    return((Image *) NULL);
-  picture_image=rotate_image;
-  bend_image=WaveImage(picture_image,0.01*picture_image->rows,2.0*
-    picture_image->columns,method,exception);
-  picture_image=DestroyImage(picture_image);
-  if (bend_image == (Image *) NULL)
-    return((Image *) NULL);
-  picture_image=bend_image;
-  rotate_image=RotateImage(picture_image,-90.0,exception);
-  picture_image=DestroyImage(picture_image);
-  if (rotate_image == (Image *) NULL)
-    return((Image *) NULL);
-  picture_image=rotate_image;
-  picture_image->background_color=image->background_color;
-  polaroid_image=ShadowImage(picture_image,80.0,2.0,quantum/3,quantum/3,
-    exception);
-  if (polaroid_image == (Image *) NULL)
-    {
-      picture_image=DestroyImage(picture_image);
-      return(picture_image);
-    }
-  flop_image=FlopImage(polaroid_image,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (flop_image == (Image *) NULL)
-    {
-      picture_image=DestroyImage(picture_image);
-      return(picture_image);
-    }
-  polaroid_image=flop_image;
-  (void) CompositeImage(polaroid_image,picture_image,OverCompositeOp,
-    MagickTrue,(ssize_t) (-0.01*picture_image->columns/2.0),0L,exception);
-  picture_image=DestroyImage(picture_image);
-  (void) QueryColorCompliance("none",AllCompliance,
-    &polaroid_image->background_color,exception);
-  rotate_image=RotateImage(polaroid_image,angle,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (rotate_image == (Image *) NULL)
-    return((Image *) NULL);
-  polaroid_image=rotate_image;
-  trim_image=TrimImage(polaroid_image,exception);
-  polaroid_image=DestroyImage(polaroid_image);
-  if (trim_image == (Image *) NULL)
-    return((Image *) NULL);
-  polaroid_image=trim_image;
-  return(polaroid_image);
+  polaroid_finish.image=image;
+  polaroid_finish.method=method;
+  polaroid_finish.quantum=quantum;
+  polaroid_finish.angle=angle;
+  return(FinishPolaroidImage(&polaroid_finish,picture_image,exception));
 }
 
 /*
@@ -2442,91 +2484,17 @@ static void SetRandomPixelChannels(const Image *image,
   }
 }
 
-MagickExport Image *SketchImage(const Image *image,const double radius,
-  const double sigma,const double angle,ExceptionInfo *exception)
+static Image *BlendSketchImage(const Image *image,Image *blur_image,
+  const double radius,ExceptionInfo *exception)
 {
-  CacheView
-    *random_view;
-
   Image
     *blend_image,
-    *blur_image,
     *dodge_image,
-    *random_image,
     *sketch_image;
 
   MagickBooleanType
     status;
 
-  RandomInfo
-    **magick_restrict random_info;
-
-  ssize_t
-    y;
-
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  unsigned long
-    key;
-#endif
-
-  /*
-    Sketch image.
-  */
-  random_image=CloneImage(image,image->columns << 1,image->rows << 1,
-    MagickTrue,exception);
-  if (random_image == (Image *) NULL)
-    return((Image *) NULL);
-  status=MagickTrue;
-  random_info=AcquireRandomInfoTLS();
-  random_view=AcquireAuthenticCacheView(random_image,exception);
-#if defined(MAGICKCORE_OPENMP_SUPPORT)
-  key=GetRandomSecretKey(random_info[0]);
-  #pragma omp parallel for schedule(static) shared(status) \
-    magick_number_threads(random_image,random_image,random_image->rows,key == ~0UL ? 0 : 2)
-#endif
-  for (y=0; y < (ssize_t) random_image->rows; y++)
-  {
-    const int
-      id = GetOpenMPThreadId();
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(random_view,0,y,random_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) random_image->columns; x++)
-    {
-      double
-        value;
-
-      value=GetPseudoRandomValue(random_info[id]);
-      SetRandomPixelChannels(image,random_image,value,q);
-      q+=(ptrdiff_t) GetPixelChannels(random_image);
-    }
-    if (SyncCacheViewAuthenticPixels(random_view,exception) == MagickFalse)
-      status=MagickFalse;
-  }
-  random_view=DestroyCacheView(random_view);
-  random_info=DestroyRandomInfoTLS(random_info);
-  if (status == MagickFalse)
-    {
-      random_image=DestroyImage(random_image);
-      return(random_image);
-    }
-  blur_image=MotionBlurImage(random_image,radius,sigma,angle,exception);
-  random_image=DestroyImage(random_image);
-  if (blur_image == (Image *) NULL)
-    return((Image *) NULL);
   dodge_image=EdgeImage(blur_image,radius,exception);
   blur_image=DestroyImage(blur_image);
   if (dodge_image == (Image *) NULL)
@@ -2560,6 +2528,191 @@ MagickExport Image *SketchImage(const Image *image,const double radius,
     0,0,exception);
   blend_image=DestroyImage(blend_image);
   return(sketch_image);
+}
+
+typedef struct _SketchBlur
+{
+  const Image
+    *image;
+
+  double
+    radius,
+    sigma,
+    angle;
+} SketchBlur;
+
+static Image *BlurSketchImage(const SketchBlur *sketch_blur,
+  Image *random_image,const MagickBooleanType status,ExceptionInfo *exception)
+{
+  const Image
+    *const image = sketch_blur->image;
+
+  const double
+    radius = sketch_blur->radius,
+    sigma = sketch_blur->sigma,
+    angle = sketch_blur->angle;
+
+  Image
+    *blur_image;
+
+  if (status == MagickFalse)
+    {
+      random_image=DestroyImage(random_image);
+      return(random_image);
+    }
+  blur_image=MotionBlurImage(random_image,radius,sigma,angle,exception);
+  random_image=DestroyImage(random_image);
+  if (blur_image == (Image *) NULL)
+    return((Image *) NULL);
+  return(BlendSketchImage(image,blur_image,radius,exception));
+}
+
+typedef struct _SketchRandomRow
+{
+  const Image
+    *image;
+
+  Image
+    *random_image;
+
+  CacheView
+    *random_view;
+
+  RandomInfo
+    **random_info;
+
+  int
+    id;
+
+  ssize_t
+    y;
+
+  ExceptionInfo
+    *exception;
+} SketchRandomRow;
+
+static MagickBooleanType SetRandomSketchRow(const SketchRandomRow *sketch_row)
+{
+  const Image
+    *const image = sketch_row->image;
+
+  Image
+    *const random_image = sketch_row->random_image;
+
+  CacheView
+    *const random_view = sketch_row->random_view;
+
+  RandomInfo
+    **const random_info = sketch_row->random_info;
+
+  const int
+    id = sketch_row->id;
+
+  const ssize_t
+    y = sketch_row->y;
+
+  ExceptionInfo
+    *const exception = sketch_row->exception;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  status=MagickTrue;
+  q=QueueCacheViewAuthenticPixels(random_view,0,y,random_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      status=MagickFalse;
+      return(status);
+    }
+  for (x=0; x < (ssize_t) random_image->columns; x++)
+  {
+    double
+      value;
+
+    value=GetPseudoRandomValue(random_info[id]);
+    SetRandomPixelChannels(image,random_image,value,q);
+    q+=(ptrdiff_t) GetPixelChannels(random_image);
+  }
+  if (SyncCacheViewAuthenticPixels(random_view,exception) == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
+MagickExport Image *SketchImage(const Image *image,const double radius,
+  const double sigma,const double angle,ExceptionInfo *exception)
+{
+  CacheView
+    *random_view;
+
+  Image
+    *random_image;
+
+  MagickBooleanType
+    status;
+
+  RandomInfo
+    **magick_restrict random_info;
+
+  SketchBlur
+    sketch_blur;
+
+  ssize_t
+    y;
+
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  unsigned long
+    key;
+#endif
+
+  /*
+    Sketch image.
+  */
+  random_image=CloneImage(image,image->columns << 1,image->rows << 1,
+    MagickTrue,exception);
+  if (random_image == (Image *) NULL)
+    return((Image *) NULL);
+  status=MagickTrue;
+  random_info=AcquireRandomInfoTLS();
+  random_view=AcquireAuthenticCacheView(random_image,exception);
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+  key=GetRandomSecretKey(random_info[0]);
+  #pragma omp parallel for schedule(static) shared(status) \
+    magick_number_threads(random_image,random_image,random_image->rows,key == ~0UL ? 0 : 2)
+#endif
+  for (y=0; y < (ssize_t) random_image->rows; y++)
+  {
+    const int
+      id = GetOpenMPThreadId();
+
+    SketchRandomRow
+      sketch_row;
+
+    if (status == MagickFalse)
+      continue;
+    sketch_row.image=image;
+    sketch_row.random_image=random_image;
+    sketch_row.random_view=random_view;
+    sketch_row.random_info=random_info;
+    sketch_row.id=id;
+    sketch_row.y=y;
+    sketch_row.exception=exception;
+    if (SetRandomSketchRow(&sketch_row) == MagickFalse)
+      status=MagickFalse;
+  }
+  random_view=DestroyCacheView(random_view);
+  random_info=DestroyRandomInfoTLS(random_info);
+  sketch_blur.image=image;
+  sketch_blur.radius=radius;
+  sketch_blur.sigma=sigma;
+  sketch_blur.angle=angle;
+  return(BlurSketchImage(&sketch_blur,random_image,status,exception));
 }
 
 /*
@@ -2901,6 +3054,92 @@ static void HideSteganoRow(const SteganoRow *stegano_row,int *c,ssize_t *k,
   }
 }
 
+static MagickBooleanType CloneSteganoImage(const Image *image,
+  Image **stegano_image,ExceptionInfo *exception)
+{
+  *stegano_image=CloneImage(image,0,0,MagickTrue,exception);
+  if (*stegano_image == (Image *) NULL)
+    return(MagickFalse);
+  (*stegano_image)->depth=MAGICKCORE_QUANTUM_DEPTH;
+  if (SetImageStorageClass(*stegano_image,DirectClass,exception) == MagickFalse)
+    {
+      *stegano_image=DestroyImage(*stegano_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _SteganoPlane
+{
+  const Image
+    *watermark;
+
+  CacheView
+    *watermark_view;
+
+  Image
+    *stegano_image;
+
+  CacheView
+    *stegano_view;
+
+  size_t
+    depth,
+    one;
+
+  ssize_t
+    i;
+
+  ExceptionInfo
+    *exception;
+} SteganoPlane;
+
+static void HideSteganoPlane(const SteganoPlane *stegano_plane,int *c,
+  ssize_t *k,ssize_t *j)
+{
+  const Image
+    *const watermark = stegano_plane->watermark;
+
+  CacheView
+    *const watermark_view = stegano_plane->watermark_view;
+
+  Image
+    *const stegano_image = stegano_plane->stegano_image;
+
+  CacheView
+    *const stegano_view = stegano_plane->stegano_view;
+
+  const size_t
+    depth = stegano_plane->depth,
+    one = stegano_plane->one;
+
+  const ssize_t
+    i = stegano_plane->i;
+
+  ExceptionInfo
+    *const exception = stegano_plane->exception;
+
+  ssize_t
+    y;
+
+  for (y=0; (y < (ssize_t) watermark->rows) && ((*j) < (ssize_t) depth); y++)
+  {
+    SteganoRow
+      stegano_row;
+
+    stegano_row.watermark=watermark;
+    stegano_row.watermark_view=watermark_view;
+    stegano_row.stegano_image=stegano_image;
+    stegano_row.stegano_view=stegano_view;
+    stegano_row.depth=depth;
+    stegano_row.one=one;
+    stegano_row.i=i;
+    stegano_row.y=y;
+    stegano_row.exception=exception;
+    HideSteganoRow(&stegano_row,c,k,j);
+  }
+}
+
 MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   ExceptionInfo *exception)
 {
@@ -2924,8 +3163,7 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   ssize_t
     i,
     j,
-    k,
-    y;
+    k;
 
   /*
     Initialize steganographic image attributes.
@@ -2939,15 +3177,8 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   one=1UL;
-  stegano_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (stegano_image == (Image *) NULL)
+  if (CloneSteganoImage(image,&stegano_image,exception) == MagickFalse)
     return((Image *) NULL);
-  stegano_image->depth=MAGICKCORE_QUANTUM_DEPTH;
-  if (SetImageStorageClass(stegano_image,DirectClass,exception) == MagickFalse)
-    {
-      stegano_image=DestroyImage(stegano_image);
-      return((Image *) NULL);
-    }
   /*
     Hide watermark in low-order bits of image.
   */
@@ -2961,22 +3192,18 @@ MagickExport Image *SteganoImage(const Image *image,const Image *watermark,
   stegano_view=AcquireAuthenticCacheView(stegano_image,exception);
   for (i=(ssize_t) depth-1; (i >= 0) && (j < (ssize_t) depth); i--)
   {
-    for (y=0; (y < (ssize_t) watermark->rows) && (j < (ssize_t) depth); y++)
-    {
-      SteganoRow
-        stegano_row;
+    SteganoPlane
+      stegano_plane;
 
-      stegano_row.watermark=watermark;
-      stegano_row.watermark_view=watermark_view;
-      stegano_row.stegano_image=stegano_image;
-      stegano_row.stegano_view=stegano_view;
-      stegano_row.depth=depth;
-      stegano_row.one=one;
-      stegano_row.i=i;
-      stegano_row.y=y;
-      stegano_row.exception=exception;
-      HideSteganoRow(&stegano_row,&c,&k,&j);
-    }
+    stegano_plane.watermark=watermark;
+    stegano_plane.watermark_view=watermark_view;
+    stegano_plane.stegano_image=stegano_image;
+    stegano_plane.stegano_view=stegano_view;
+    stegano_plane.depth=depth;
+    stegano_plane.one=one;
+    stegano_plane.i=i;
+    stegano_plane.exception=exception;
+    HideSteganoPlane(&stegano_plane,&c,&k,&j);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -3047,12 +3274,136 @@ static inline MagickBooleanType IsStereoRowMissing(const Quantum *p,
     (r == (Quantum *) NULL)) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _StereoPixels
+{
+  const Image
+    *left_image,
+    *right_image;
+
+  Image
+    *stereo_image;
+} StereoPixels;
+
+static void SetStereoRowPixels(const StereoPixels *stereo_pixels,
+  const Quantum *magick_restrict p,const Quantum *magick_restrict q,
+  Quantum *magick_restrict r)
+{
+  const Image
+    *const left_image = stereo_pixels->left_image,
+    *const right_image = stereo_pixels->right_image;
+
+  Image
+    *const stereo_image = stereo_pixels->stereo_image;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) stereo_image->columns; x++)
+  {
+    SetPixelRed(stereo_image,GetPixelRed(left_image,p),r);
+    SetPixelGreen(stereo_image,GetPixelGreen(right_image,q),r);
+    SetPixelBlue(stereo_image,GetPixelBlue(right_image,q),r);
+    if ((GetPixelAlphaTraits(stereo_image) & CopyPixelTrait) != 0)
+      SetPixelAlpha(stereo_image,(GetPixelAlpha(left_image,p)+
+        GetPixelAlpha(right_image,q))/2,r);
+    p+=(ptrdiff_t) GetPixelChannels(left_image);
+    q+=(ptrdiff_t) GetPixelChannels(right_image);
+    r+=(ptrdiff_t) GetPixelChannels(stereo_image);
+  }
+}
+
+#define StereoImageTag  "Stereo/Image"
+
+typedef struct _StereoRow
+{
+  const Image
+    *left_image,
+    *right_image,
+    *image;
+
+  Image
+    *stereo_image;
+
+  ssize_t
+    x_offset,
+    y_offset;
+
+  ExceptionInfo
+    *exception;
+} StereoRow;
+
+static MagickBooleanType SetStereoRow(const StereoRow *stereo_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const left_image = stereo_row->left_image,
+    *const right_image = stereo_row->right_image,
+    *const image = stereo_row->image;
+
+  Image
+    *const stereo_image = stereo_row->stereo_image;
+
+  const ssize_t
+    x_offset = stereo_row->x_offset,
+    y_offset = stereo_row->y_offset;
+
+  ExceptionInfo
+    *const exception = stereo_row->exception;
+
+  const Quantum
+    *magick_restrict p,
+    *magick_restrict q;
+
+  Quantum
+    *magick_restrict r;
+
+  StereoPixels
+    stereo_pixels;
+
+  p=GetVirtualPixels(left_image,-x_offset,y-y_offset,image->columns,1,
+    exception);
+  q=GetVirtualPixels(right_image,0,y,right_image->columns,1,exception);
+  r=QueueAuthenticPixels(stereo_image,0,y,stereo_image->columns,1,exception);
+  if (IsStereoRowMissing(p,q,r) != MagickFalse)
+    return(MagickFalse);
+  stereo_pixels.left_image=left_image;
+  stereo_pixels.right_image=right_image;
+  stereo_pixels.stereo_image=stereo_image;
+  SetStereoRowPixels(&stereo_pixels,p,q,r);
+  if (SyncAuthenticPixels(stereo_image,exception) == MagickFalse)
+    return(MagickFalse);
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,StereoImageTag,(MagickOffsetType) y,
+        stereo_image->rows);
+      if (proceed == MagickFalse)
+        *status=MagickFalse;
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType CloneStereoImage(const Image *left_image,
+  Image **stereo_image,ExceptionInfo *exception)
+{
+  *stereo_image=CloneImage(left_image,left_image->columns,left_image->rows,
+    MagickTrue,exception);
+  if (*stereo_image == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass(*stereo_image,DirectClass,exception) == MagickFalse)
+    {
+      *stereo_image=DestroyImage(*stereo_image);
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   const Image *right_image,const ssize_t x_offset,const ssize_t y_offset,
   ExceptionInfo *exception)
 {
-#define StereoImageTag  "Stereo/Image"
-
   const Image
     *image;
 
@@ -3081,15 +3432,8 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   /*
     Initialize stereo image attributes.
   */
-  stereo_image=CloneImage(left_image,left_image->columns,left_image->rows,
-    MagickTrue,exception);
-  if (stereo_image == (Image *) NULL)
+  if (CloneStereoImage(left_image,&stereo_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(stereo_image,DirectClass,exception) == MagickFalse)
-    {
-      stereo_image=DestroyImage(stereo_image);
-      return((Image *) NULL);
-    }
   (void) SetImageColorspace(stereo_image,sRGBColorspace,exception);
   /*
     Copy left image to red channel and right image to blue channel.
@@ -3097,46 +3441,18 @@ MagickExport Image *StereoAnaglyphImage(const Image *left_image,
   status=MagickTrue;
   for (y=0; y < (ssize_t) stereo_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p,
-      *magick_restrict q;
+    StereoRow
+      stereo_row;
 
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict r;
-
-    p=GetVirtualPixels(left_image,-x_offset,y-y_offset,image->columns,1,
-      exception);
-    q=GetVirtualPixels(right_image,0,y,right_image->columns,1,exception);
-    r=QueueAuthenticPixels(stereo_image,0,y,stereo_image->columns,1,exception);
-    if (IsStereoRowMissing(p,q,r) != MagickFalse)
+    stereo_row.left_image=left_image;
+    stereo_row.right_image=right_image;
+    stereo_row.image=image;
+    stereo_row.stereo_image=stereo_image;
+    stereo_row.x_offset=x_offset;
+    stereo_row.y_offset=y_offset;
+    stereo_row.exception=exception;
+    if (SetStereoRow(&stereo_row,y,&status) == MagickFalse)
       break;
-    for (x=0; x < (ssize_t) stereo_image->columns; x++)
-    {
-      SetPixelRed(stereo_image,GetPixelRed(left_image,p),r);
-      SetPixelGreen(stereo_image,GetPixelGreen(right_image,q),r);
-      SetPixelBlue(stereo_image,GetPixelBlue(right_image,q),r);
-      if ((GetPixelAlphaTraits(stereo_image) & CopyPixelTrait) != 0)
-        SetPixelAlpha(stereo_image,(GetPixelAlpha(left_image,p)+
-          GetPixelAlpha(right_image,q))/2,r);
-      p+=(ptrdiff_t) GetPixelChannels(left_image);
-      q+=(ptrdiff_t) GetPixelChannels(right_image);
-      r+=(ptrdiff_t) GetPixelChannels(stereo_image);
-    }
-    if (SyncAuthenticPixels(stereo_image,exception) == MagickFalse)
-      break;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,StereoImageTag,(MagickOffsetType) y,
-          stereo_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
   }
   if (status == MagickFalse)
     stereo_image=DestroyImage(stereo_image);
