@@ -2041,6 +2041,11 @@ static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
   }
 }
 
+#define ScaleFilter(F,A,B,C,D) \
+    ScaleResampleFilter( (F), \
+      output_scaling*(A), output_scaling*(B), \
+      output_scaling*(C), output_scaling*(D) )
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -2619,10 +2624,6 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       output_scaling = 1/output_scaling;
     }
   }
-#define ScaleFilter(F,A,B,C,D) \
-    ScaleResampleFilter( (F), \
-      output_scaling*(A), output_scaling*(B), \
-      output_scaling*(C), output_scaling*(D) )
 
   /*
     Initialize the distort image attributes.
