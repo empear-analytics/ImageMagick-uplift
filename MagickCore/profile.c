@@ -178,6 +178,16 @@ typedef struct _CMSExceptionInfo
   ExceptionInfo
     *exception;
 } CMSExceptionInfo;
+
+typedef struct _ClipPathResizeInfo
+{
+  size_t
+    old_columns,
+    old_rows;
+
+  const RectangleInfo
+    *new_geometry;
+} ClipPathResizeInfo;
 
 /*
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -709,6 +719,66 @@ static inline void SetLCMSInfoScale(LCMSInfo *info,const double scale)
   info->scale[2]=scale;
   info->scale[3]=scale;
 }
+
+static void SetLCMSInfoIntent(const Image *image,LCMSInfo *target_info)
+{
+  switch (image->rendering_intent)
+  {
+    case AbsoluteIntent:
+    {
+      (*target_info).intent=INTENT_ABSOLUTE_COLORIMETRIC;
+      break;
+    }
+    case PerceptualIntent:
+    {
+      (*target_info).intent=INTENT_PERCEPTUAL;
+      break;
+    }
+    case RelativeIntent:
+    {
+      (*target_info).intent=INTENT_RELATIVE_COLORIMETRIC;
+      break;
+    }
+    case SaturationIntent:
+    {
+      (*target_info).intent=INTENT_SATURATION;
+      break;
+    }
+    default:
+    {
+      (*target_info).intent=INTENT_PERCEPTUAL;
+      break;
+    }
+  }
+}
+
+static void SetImageTypeFromSignature(Image *image,
+  const cmsColorSpaceSignature signature)
+{
+  switch (signature)
+  {
+    case cmsSigRgbData:
+    {
+      image->type=image->alpha_trait == UndefinedPixelTrait ?
+        TrueColorType : TrueColorAlphaType;
+      break;
+    }
+    case cmsSigCmykData:
+    {
+      image->type=image->alpha_trait == UndefinedPixelTrait ?
+        ColorSeparationType : ColorSeparationAlphaType;
+      break;
+    }
+    case cmsSigGrayData:
+    {
+      image->type=image->alpha_trait == UndefinedPixelTrait ?
+        GrayscaleType : GrayscaleAlphaType;
+      break;
+    }
+    default:
+      break;
+  }
+}
 #endif
 
 static unsigned char
@@ -998,6 +1068,28 @@ static void SetsRGBImageProfile(Image *image,ExceptionInfo *exception)
   (void) SetImageProfilePrivate(image,profile,exception);
 }
 
+static MagickBooleanType DeleteMatchingImageProfiles(Image *image,
+  const char *name)
+{
+  char
+    *next;
+
+  /*
+    Delete image profile(s).
+  */
+  ResetImageProfileIterator(image);
+  for (next=GetNextImageProfile(image); next != (const char *) NULL; )
+  {
+    if (IsOptionMember(next,name) != MagickFalse)
+      {
+        (void) DeleteImageProfile(image,next);
+        ResetImageProfileIterator(image);
+      }
+    next=GetNextImageProfile(image);
+  }
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
   const void *datum,const size_t length,ExceptionInfo *exception)
 {
@@ -1030,25 +1122,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   if ((datum == (const void *) NULL) || (length == 0))
-    {
-      char
-        *next;
-
-      /*
-        Delete image profile(s).
-      */
-      ResetImageProfileIterator(image);
-      for (next=GetNextImageProfile(image); next != (const char *) NULL; )
-      {
-        if (IsOptionMember(next,name) != MagickFalse)
-          {
-            (void) DeleteImageProfile(image,next);
-            ResetImageProfileIterator(image);
-          }
-        next=GetNextImageProfile(image);
-      }
-      return(MagickTrue);
-    }
+    return(DeleteMatchingImageProfiles(image,name));
   /*
     Add a ICC, IPTC, or generic profile to the image.
   */
@@ -1363,34 +1437,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
                 ThrowProfileException(ImageError,
                   "ColorspaceColorProfileMismatch",name);
             }
-            switch (image->rendering_intent)
-            {
-              case AbsoluteIntent:
-              {
-                target_info.intent=INTENT_ABSOLUTE_COLORIMETRIC;
-                break;
-              }
-              case PerceptualIntent:
-              {
-                target_info.intent=INTENT_PERCEPTUAL;
-                break;
-              }
-              case RelativeIntent:
-              {
-                target_info.intent=INTENT_RELATIVE_COLORIMETRIC;
-                break;
-              }
-              case SaturationIntent:
-              {
-                target_info.intent=INTENT_SATURATION;
-                break;
-              }
-              default:
-              {
-                target_info.intent=INTENT_PERCEPTUAL;
-                break;
-              }
-            }
+            SetLCMSInfoIntent(image,&target_info);
             flags=cmsFLAGS_HIGHRESPRECALC;
 #if defined(cmsFLAGS_BLACKPOINTCOMPENSATION)
             if (image->black_point_compensation != MagickFalse)
@@ -1482,29 +1529,7 @@ MagickExport MagickBooleanType ProfileImage(Image *image,const char *name,
             }
             image_view=DestroyCacheView(image_view);
             (void) SetImageColorspace(image,target_info.colorspace,exception);
-            switch (signature)
-            {
-              case cmsSigRgbData:
-              {
-                image->type=image->alpha_trait == UndefinedPixelTrait ?
-                  TrueColorType : TrueColorAlphaType;
-                break;
-              }
-              case cmsSigCmykData:
-              {
-                image->type=image->alpha_trait == UndefinedPixelTrait ?
-                  ColorSeparationType : ColorSeparationAlphaType;
-                break;
-              }
-              case cmsSigGrayData:
-              {
-                image->type=image->alpha_trait == UndefinedPixelTrait ?
-                  GrayscaleType : GrayscaleAlphaType;
-                break;
-              }
-              default:
-                break;
-            }
+            SetImageTypeFromSignature(image,signature);
             target_info.pixels=DestroyPixelTLS(target_info.pixels);
             source_info.pixels=DestroyPixelTLS(source_info.pixels);
             transform=DestroyTransformTLS(transform);
@@ -1846,6 +1871,110 @@ static const unsigned char *ReadResolutionResource(Image *image,
   return(p);
 }
 
+typedef struct _ResourceBlockEntry
+{
+  Image
+    *image;
+
+  ssize_t
+    count;
+
+  unsigned short
+    id;
+
+  ExceptionInfo
+    *exception;
+} ResourceBlockEntry;
+
+static void SetResourceBlockProfile(const ResourceBlockEntry *entry,
+  const unsigned char **p)
+{
+  Image
+    *const image = entry->image;
+
+  const ssize_t
+    count = entry->count;
+
+  const unsigned short
+    id = entry->id;
+
+  ExceptionInfo
+    *const exception = entry->exception;
+
+  switch (id)
+  {
+    case 0x0404:
+    {
+      /*
+        IPTC profile.
+      */
+      SetProfileFromResource(image,"iptc",(*p),count,exception);
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    case 0x040c:
+    {
+      /*
+        Thumbnail.
+      */
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    case 0x040f:
+    {
+      /*
+        ICC Profile.
+      */
+      SetProfileFromResource(image,"icc",(*p),count,exception);
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    case 0x0422:
+    {
+      /*
+        EXIF Profile.
+      */
+      SetProfileFromResource(image,"exif",(*p),count,exception);
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    case 0x0424:
+    {
+      /*
+        XMP Profile.
+      */
+      SetProfileFromResource(image,"xmp",(*p),count,exception);
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+    default:
+    {
+      (*p)+=(ptrdiff_t) count;
+      break;
+    }
+  }
+}
+
+static const unsigned char *ReadResolutionResourceBlock(Image *image,
+  const ssize_t count,const unsigned char *p)
+{
+  /*
+    Resolution.
+  */
+  if (count < 16)
+    return(p);
+  p=ReadResolutionResource(image,p);
+  return(p);
+}
+
+static const unsigned char *SkipResourcePadding(const ssize_t count,
+  const unsigned char *p)
+{
+  if ((count & 0x01) != 0)
+    p++;
+  return(p);
+}
+
 static void GetProfilesFromResourceBlock(Image *image,
   const StringInfo *resource_block,ExceptionInfo *exception)
 {
@@ -1892,66 +2021,23 @@ static void GetProfilesFromResourceBlock(Image *image,
     {
       case 0x03ed:
       {
-        /*
-          Resolution.
-        */
-        if (count < 16)
-          break;
-        p=ReadResolutionResource(image,p);
-        break;
-      }
-      case 0x0404:
-      {
-        /*
-          IPTC profile.
-        */
-        SetProfileFromResource(image,"iptc",p,count,exception);
-        p+=(ptrdiff_t) count;
-        break;
-      }
-      case 0x040c:
-      {
-        /*
-          Thumbnail.
-        */
-        p+=(ptrdiff_t) count;
-        break;
-      }
-      case 0x040f:
-      {
-        /*
-          ICC Profile.
-        */
-        SetProfileFromResource(image,"icc",p,count,exception);
-        p+=(ptrdiff_t) count;
-        break;
-      }
-      case 0x0422:
-      {
-        /*
-          EXIF Profile.
-        */
-        SetProfileFromResource(image,"exif",p,count,exception);
-        p+=(ptrdiff_t) count;
-        break;
-      }
-      case 0x0424:
-      {
-        /*
-          XMP Profile.
-        */
-        SetProfileFromResource(image,"xmp",p,count,exception);
-        p+=(ptrdiff_t) count;
+        p=ReadResolutionResourceBlock(image,count,p);
         break;
       }
       default:
       {
-        p+=(ptrdiff_t) count;
+        ResourceBlockEntry
+          entry;
+
+        entry.image=image;
+        entry.count=count;
+        entry.id=id;
+        entry.exception=exception;
+        SetResourceBlockProfile(&entry,&p);
         break;
       }
     }
-    if ((count & 0x01) != 0)
-      p++;
+    p=SkipResourcePadding(count,p);
   }
 }
 
@@ -2062,12 +2148,68 @@ static MagickBooleanType ValidateXMPProfile(Image *image,
 #endif
 }
 
+static inline MagickBooleanType IsInvalidXMPProfile(Image *image,
+  const char *name,const StringInfo *profile,ExceptionInfo *exception)
+{
+  return(((LocaleCompare(name,"xmp") == 0) &&
+    (ValidateXMPProfile(image,profile,exception) == MagickFalse)) ?
+    MagickTrue : MagickFalse);
+}
+
 static inline MagickBooleanType IsExifInApp1(const size_t length,
   const char *key,const StringInfo *profile)
 {
   return(((length > 4) && (LocaleCompare(key,"app1") == 0) &&
     (LocaleNCompare((const char *) GetStringInfoDatum(profile),"exif",4) ==
     0)) ? MagickTrue : MagickFalse);
+}
+
+static MagickBooleanType DiscardOversizedProfile(StringInfo *profile,
+  const size_t length,ExceptionInfo *exception)
+{
+  if (length != 0)
+    (void) ThrowMagickException(exception,GetMagickModule(),
+      ResourceLimitWarning,"ProfileSizeExceedsLimit","`%llu'",
+      (unsigned long long) length);
+  profile=DestroyStringInfo(profile);
+  return(MagickTrue);
+}
+
+typedef struct _StoredProfileInfo
+{
+  Image
+    *image;
+
+  StringInfo
+    *profile;
+
+  MagickBooleanType
+    recursive;
+
+  ExceptionInfo
+    *exception;
+} StoredProfileInfo;
+
+static void SyncStoredProfile(const StoredProfileInfo *stored,
+  const char *key)
+{
+  Image
+    *const image = stored->image;
+
+  StringInfo
+    *const profile = stored->profile;
+
+  const MagickBooleanType
+    recursive = stored->recursive;
+
+  ExceptionInfo
+    *const exception = stored->exception;
+
+  if (LocaleCompare(key,"8bim") == 0)
+    GetProfilesFromResourceBlock(image,profile,exception);
+  else
+    if (recursive == MagickFalse)
+      WriteTo8BimProfile(image,key,profile);
 }
 
 static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
@@ -2091,17 +2233,9 @@ static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
   length=GetStringInfoLength(profile);
   if ((length == 0) || (length > GetMaxProfileSize()))
-    {
-      if (length != 0)
-        (void) ThrowMagickException(exception,GetMagickModule(),
-          ResourceLimitWarning,"ProfileSizeExceedsLimit","`%llu'",
-          (unsigned long long) length);
-      profile=DestroyStringInfo(profile);
-      return(MagickTrue);
-    }
+    return(DiscardOversizedProfile(profile,length,exception));
   PatchCorruptProfile(name,profile);
-  if ((LocaleCompare(name,"xmp") == 0) &&
-      (ValidateXMPProfile(image,profile,exception) == MagickFalse))
+  if (IsInvalidXMPProfile(image,name,profile,exception) != MagickFalse)
     {
       profile=DestroyStringInfo(profile);
       return(MagickTrue);
@@ -2125,11 +2259,14 @@ static MagickBooleanType SetImageProfileInternal(Image *image,const char *name,
     profile=DestroyStringInfo(profile);
   else
     {
-      if (LocaleCompare(key,"8bim") == 0)
-        GetProfilesFromResourceBlock(image,profile,exception);
-      else
-        if (recursive == MagickFalse)
-          WriteTo8BimProfile(image,key,profile);
+      StoredProfileInfo
+        stored;
+
+      stored.image=image;
+      stored.profile=profile;
+      stored.recursive=recursive;
+      stored.exception=exception;
+      SyncStoredProfile(&stored,key);
     }
   return(status);
 }
@@ -2399,18 +2536,213 @@ static inline MagickBooleanType IsNextDirectoryOffset(const ssize_t offset,
     (level < (MaxDirectoryStack-2))) ? MagickTrue : MagickFalse);
 }
 
+typedef struct _ExifTagInfo
+{
+  const Image
+    *image;
+
+  EndianType
+    endian;
+
+  unsigned char
+    *directory,
+    *ifd0;
+
+  unsigned short
+    tag_value;
+
+  ssize_t
+    format;
+
+  int
+    components;
+
+  size_t
+    number_bytes;
+
+  unsigned char
+    *q,
+    *p;
+} ExifTagInfo;
+
+static void SyncExifResolution(const ExifTagInfo *exif_tag,
+  const double resolution)
+{
+  const EndianType
+    endian = exif_tag->endian;
+
+  unsigned char
+    *const directory = exif_tag->directory;
+
+  unsigned char
+    *const ifd0 = exif_tag->ifd0;
+
+  const size_t
+    number_bytes = exif_tag->number_bytes;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  if (directory != ifd0)
+    return;
+  (void) WriteProfileLong(endian,(size_t) (resolution+0.5),p);
+  if (number_bytes == 8)
+    (void) WriteProfileLong(endian,1UL,p+4);
+}
+
+static void SyncExifOrientation(const ExifTagInfo *exif_tag)
+{
+  const Image
+    *const image = exif_tag->image;
+
+  const EndianType
+    endian = exif_tag->endian;
+
+  unsigned char
+    *const directory = exif_tag->directory;
+
+  unsigned char
+    *const ifd0 = exif_tag->ifd0;
+
+  const size_t
+    number_bytes = exif_tag->number_bytes;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  if (directory != ifd0)
+    return;
+  if (number_bytes == 4)
+    {
+      (void) WriteProfileLong(endian,(size_t) image->orientation,p);
+      return;
+    }
+  (void) WriteProfileShort(endian,(unsigned short) image->orientation,
+    p);
+}
+
+static void SyncExifIfd0Tag(const unsigned short tag_value,
+  const ExifTagInfo exif_tag,const Image *image)
+{
+  switch (tag_value)
+  {
+    case 0x011a:
+    {
+      SyncExifResolution(&exif_tag,image->resolution.x);
+      break;
+    }
+    case 0x011b:
+    {
+      SyncExifResolution(&exif_tag,image->resolution.y);
+      break;
+    }
+    case 0x0112:
+    {
+      SyncExifOrientation(&exif_tag);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+typedef struct _ExifEntryInfo
+{
+  EndianType
+    endian;
+
+  unsigned char
+    *exif;
+
+  size_t
+    length,
+    number_bytes;
+
+  unsigned char
+    *q;
+} ExifEntryInfo;
+
+static MagickBooleanType LocateExifEntryValue(const ExifEntryInfo *exif_entry,
+  unsigned char **p)
+{
+  const EndianType
+    endian = exif_entry->endian;
+
+  unsigned char
+    *const exif = exif_entry->exif;
+
+  const size_t
+    length = exif_entry->length,
+    number_bytes = exif_entry->number_bytes;
+
+  unsigned char
+    *const q = exif_entry->q;
+
+  ssize_t
+    offset;
+
+  if (number_bytes <= 4)
+    *p=q+8;
+  else
+    {
+      /*
+        The directory entry contains an offset.
+      */
+      offset=(ssize_t) ReadProfileLong(endian,q+8);
+      if ((offset < 0) ||
+          ((size_t) (offset+(ssize_t) number_bytes) > length))
+        return(MagickFalse);
+      if (~length < number_bytes)
+        return(MagickFalse);  /* prevent overflow */
+      *p=(unsigned char *) (exif+offset);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _DirectoryInfo
+{
+  unsigned char
+    *directory;
+
+  size_t
+    entry;
+} DirectoryInfo;
+
+static void SyncExifDimension(const ExifTagInfo *exif_tag,unsigned char *ifd,
+  const int width_tag)
+{
+  const Image
+    *const image = exif_tag->image;
+
+  const EndianType
+    endian = exif_tag->endian;
+
+  unsigned char
+    *const directory = exif_tag->directory;
+
+  const unsigned short
+    tag_value = exif_tag->tag_value;
+
+  const ssize_t
+    format = exif_tag->format;
+
+  const int
+    components = exif_tag->components;
+
+  unsigned char
+    *const q = exif_tag->q;
+
+  unsigned char
+    *const p = exif_tag->p;
+
+  if (directory == ifd)
+    WriteProfileDimension(endian,tag_value == width_tag ?
+      image->columns : image->rows,format,components,q,p);
+}
+
 static void SyncExifProfile(const Image *image,unsigned char *exif,
   size_t length)
 {
-  typedef struct _DirectoryInfo
-  {
-    unsigned char
-      *directory;
-
-    size_t
-      entry;
-  } DirectoryInfo;
-
   DirectoryInfo
     directory_stack[MaxDirectoryStack] = { { 0, 0 } };
 
@@ -2508,6 +2840,12 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
       continue;
     for ( ; entry < number_entries; entry++)
     {
+      ExifEntryInfo
+        exif_entry;
+
+      ExifTagInfo
+        exif_tag;
+
       int
         components;
 
@@ -2540,68 +2878,35 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
       number_bytes=(size_t) components*(size_t) format_bytes[format];
       if ((ssize_t) number_bytes < components)
         break;  /* prevent overflow */
-      if (number_bytes <= 4)
-        p=q+8;
-      else
-        {
-          /*
-            The directory entry contains an offset.
-          */
-          offset=(ssize_t) ReadProfileLong(endian,q+8);
-          if ((offset < 0) ||
-              ((size_t) (offset+(ssize_t) number_bytes) > length))
-            continue;
-          if (~length < number_bytes)
-            continue;  /* prevent overflow */
-          p=(unsigned char *) (exif+offset);
-        }
+      exif_entry.endian=endian;
+      exif_entry.exif=exif;
+      exif_entry.length=length;
+      exif_entry.number_bytes=number_bytes;
+      exif_entry.q=q;
+      if (LocateExifEntryValue(&exif_entry,&p) == MagickFalse)
+        continue;
+      exif_tag.image=image;
+      exif_tag.endian=endian;
+      exif_tag.directory=directory;
+      exif_tag.ifd0=ifd0;
+      exif_tag.tag_value=tag_value;
+      exif_tag.format=format;
+      exif_tag.components=components;
+      exif_tag.number_bytes=number_bytes;
+      exif_tag.q=q;
+      exif_tag.p=p;
       switch (tag_value)
       {
         case TAG_IMAGE_WIDTH:
         case TAG_IMAGE_LENGTH:
         {
-          if (directory == ifd0)
-            WriteProfileDimension(endian,tag_value == TAG_IMAGE_WIDTH ?
-              image->columns : image->rows,format,components,q,p);
+          SyncExifDimension(&exif_tag,ifd0,TAG_IMAGE_WIDTH);
           break;
         }
         case TAG_PIXEL_X_DIMENSION:
         case TAG_PIXEL_Y_DIMENSION:
         {
-          if (directory == exif_directory)
-            WriteProfileDimension(endian,tag_value == TAG_PIXEL_X_DIMENSION ?
-              image->columns : image->rows,format,components,q,p);
-          break;
-        }
-        case 0x011a:
-        {
-          if (directory != ifd0)
-            break;
-          (void) WriteProfileLong(endian,(size_t) (image->resolution.x+0.5),p);
-          if (number_bytes == 8)
-            (void) WriteProfileLong(endian,1UL,p+4);
-          break;
-        }
-        case 0x011b:
-        {
-          if (directory != ifd0)
-            break;
-          (void) WriteProfileLong(endian,(size_t) (image->resolution.y+0.5),p);
-          if (number_bytes == 8)
-            (void) WriteProfileLong(endian,1UL,p+4);
-          break;
-        }
-        case 0x0112:
-        {
-          if (directory != ifd0)
-            break;
-          if (number_bytes == 4)
-            {
-              (void) WriteProfileLong(endian,(size_t) image->orientation,p);
-              break;
-            }
-          (void) WriteProfileShort(endian,(unsigned short) image->orientation,
-            p);
+          SyncExifDimension(&exif_tag,exif_directory,TAG_PIXEL_X_DIMENSION);
           break;
         }
         case 0x0128:
@@ -2617,37 +2922,38 @@ static void SyncExifProfile(const Image *image,unsigned char *exif,
           break;
         }
         default:
-          break;
-      }
-      if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) !=
-          MagickFalse)
         {
-          offset=(ssize_t) ReadProfileLong(endian,p);
-          if (((size_t) offset < (length-1)) &&
-              (level < (MaxDirectoryStack-2)))
-            {
-              if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
-                exif_directory=exif+offset;
-              directory_stack[level].directory=directory;
-              entry++;
-              directory_stack[level].entry=entry;
-              level++;
-              directory_stack[level].directory=exif+offset;
-              directory_stack[level].entry=0;
-              level++;
-              if ((directory+2+(12*number_entries)) > (exif+length))
-                break;
-              offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
-                number_entries));
-              if (IsNextDirectoryOffset(offset,length,level) != MagickFalse)
-                {
-                  directory_stack[level].directory=exif+offset;
-                  directory_stack[level].entry=0;
-                  level++;
-                }
-              break;
-            }
+          SyncExifIfd0Tag(tag_value,exif_tag,image);
+          break;
         }
+      }
+      if (IsExifDirectoryOffset(tag_value,format,components,number_bytes) ==
+          MagickFalse)
+        continue;
+      offset=(ssize_t) ReadProfileLong(endian,p);
+      if (((size_t) offset >= (length-1)) ||
+          (level >= (MaxDirectoryStack-2)))
+        continue;
+      if ((directory == ifd0) && (tag_value == TAG_EXIF_OFFSET))
+        exif_directory=exif+offset;
+      directory_stack[level].directory=directory;
+      entry++;
+      directory_stack[level].entry=entry;
+      level++;
+      directory_stack[level].directory=exif+offset;
+      directory_stack[level].entry=0;
+      level++;
+      if ((directory+2+(12*number_entries)) > (exif+length))
+        break;
+      offset=(ssize_t) ReadProfileLong(endian,directory+2+(12*
+        number_entries));
+      if (IsNextDirectoryOffset(offset,length,level) != MagickFalse)
+        {
+          directory_stack[level].directory=exif+offset;
+          directory_stack[level].entry=0;
+          level++;
+        }
+      break;
     }
   } while (level > 0);
   exif_resources=DestroySplayTree(exif_resources);
@@ -2672,6 +2978,58 @@ static void WriteResolutionResource(const Image *image,unsigned char *p)
   WriteProfileShort(MSBEndian,(unsigned short) image->units,p+12);
 }
 
+static inline MagickBooleanType IsInvalid8BimNameCount(const ssize_t count,
+  const size_t length)
+{
+  return(((count >= (ssize_t) length) || (count < 0)) ? MagickTrue :
+    MagickFalse);
+}
+
+static inline MagickBooleanType IsInvalid8BimResourceCount(const ssize_t count,
+  const size_t length)
+{
+  return(((count > (ssize_t) length) || (count < 0)) ? MagickTrue :
+    MagickFalse);
+}
+
+typedef struct _ProfileCursorTargets
+{
+  unsigned char
+    **p;
+
+  size_t
+    *length;
+} ProfileCursorTargets;
+
+static MagickBooleanType Read8BimSignature(
+  const ProfileCursorTargets *targets)
+{
+  unsigned char
+    **const p = targets->p;
+
+  size_t
+    *const length = targets->length;
+
+  if (ReadProfileByte(p,length) != 0x38)
+    return(MagickFalse);
+  if (ReadProfileByte(p,length) != 0x42)
+    return(MagickFalse);
+  if (ReadProfileByte(p,length) != 0x49)
+    return(MagickFalse);
+  if (ReadProfileByte(p,length) != 0x4D)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static void Sync8BimResource(const Image *image,const unsigned short id,
+  const ssize_t count,unsigned char *p)
+{
+  if ((id == 0x3ED) && (count == 16))
+    WriteResolutionResource(image,p);
+  if (id == 0x0422)
+    SyncExifProfile(image,p,(size_t) count);
+}
+
 static void Sync8BimProfile(const Image *image,const StringInfo *profile)
 {
   size_t
@@ -2690,31 +3048,27 @@ static void Sync8BimProfile(const Image *image,const StringInfo *profile)
   p=GetStringInfoDatum(profile);
   while (length != 0)
   {
-    if (ReadProfileByte(&p,&length) != 0x38)
-      continue;
-    if (ReadProfileByte(&p,&length) != 0x42)
-      continue;
-    if (ReadProfileByte(&p,&length) != 0x49)
-      continue;
-    if (ReadProfileByte(&p,&length) != 0x4D)
+    ProfileCursorTargets
+      targets;
+
+    targets.p=(&p);
+    targets.length=(&length);
+    if (Read8BimSignature(&targets) == MagickFalse)
       continue;
     if (length < 7)
       return;
     id=(unsigned short) ReadProfileMSBShort(&p,&length);
     count=(ssize_t) ReadProfileByte(&p,&length);
-    if ((count >= (ssize_t) length) || (count < 0))
+    if (IsInvalid8BimNameCount(count,length) != MagickFalse)
       return;
     p+=(ptrdiff_t) count;
     length-=(size_t) count;
     if ((*p & 0x01) == 0)
       (void) ReadProfileByte(&p,&length);
     count=(ssize_t) ReadProfileMSBLong(&p,&length);
-    if ((count > (ssize_t) length) || (count < 0))
+    if (IsInvalid8BimResourceCount(count,length) != MagickFalse)
       return;
-    if ((id == 0x3ED) && (count == 16))
-      WriteResolutionResource(image,p);
-    if (id == 0x0422)
-      SyncExifProfile(image,p,(size_t) count);
+    Sync8BimResource(image,id,count,p);
     p+=(ptrdiff_t) count;
     length-=(size_t) count;
   }
@@ -2929,12 +3283,56 @@ MagickPrivate void SyncImageProfiles(Image *image)
     SyncXMPProfile(image,profile);
 }
 
-static void UpdateClipPath(unsigned char *blob,size_t length,
-  const size_t old_columns,const size_t old_rows,
-  const RectangleInfo *new_geometry)
+static void UpdateClipPathKnot(const ClipPathResizeInfo *resize,
+  unsigned char **blob,size_t *length)
 {
   ssize_t
-    i,
+    i;
+
+  for (i=0; i < 3; i++)
+  {
+    double
+      x,
+      y;
+
+    signed int
+      xx,
+      yy;
+
+    y=(double) ReadProfileMSBLong(&(*blob),&(*length));
+    y=y*resize->old_rows/4096.0/4096.0;
+    y-=resize->new_geometry->y;
+    yy=(signed int) ((y*4096*4096)/resize->new_geometry->height);
+    WriteProfileLong(MSBEndian,(size_t) yy,(*blob)-4);
+    x=(double) ReadProfileMSBLong(&(*blob),&(*length));
+    x=x*resize->old_columns/4096.0/4096.0;
+    x-=resize->new_geometry->x;
+    xx=(signed int) ((x*4096*4096)/resize->new_geometry->width);
+    WriteProfileLong(MSBEndian,(size_t) xx,(*blob)-4);
+  }
+}
+
+static void SkipClipPathRecord(const ssize_t selector,unsigned char **blob,
+  size_t *length)
+{
+  switch (selector)
+  {
+    case 6:
+    case 7:
+    case 8:
+    default:
+    {
+      (*blob)+=24;
+      (*length)-=(size_t) MagickMin((*length),24);
+      break;
+    }
+  }
+}
+
+static void UpdateClipPath(unsigned char *blob,size_t length,
+  const ClipPathResizeInfo *resize)
+{
+  ssize_t
     knot_count,
     selector;
 
@@ -2978,37 +3376,13 @@ static void UpdateClipPath(unsigned char *blob,size_t length,
         /*
           Add sub-path knot
         */
-        for (i=0; i < 3; i++)
-        {
-          double
-            x,
-            y;
-
-          signed int
-            xx,
-            yy;
-
-          y=(double) ReadProfileMSBLong(&blob,&length);
-          y=y*old_rows/4096.0/4096.0;
-          y-=new_geometry->y;
-          yy=(signed int) ((y*4096*4096)/new_geometry->height);
-          WriteProfileLong(MSBEndian,(size_t) yy,blob-4);
-          x=(double) ReadProfileMSBLong(&blob,&length);
-          x=x*old_columns/4096.0/4096.0;
-          x-=new_geometry->x;
-          xx=(signed int) ((x*4096*4096)/new_geometry->width);
-          WriteProfileLong(MSBEndian,(size_t) xx,blob-4);
-        }
+        UpdateClipPathKnot(resize,&blob,&length);
         knot_count--;
         break;
       }
-      case 6:
-      case 7:
-      case 8:
       default:
       {
-        blob+=24;
-        length-=(size_t) MagickMin(length,24);
+        SkipClipPathRecord(selector,&blob,&length);
         break;
       }
     }
@@ -3019,6 +3393,9 @@ MagickPrivate void Update8BIMClipPath(const Image *image,
   const size_t old_columns,const size_t old_rows,
   const RectangleInfo *new_geometry)
 {
+  const ClipPathResizeInfo
+    resize = { old_columns, old_rows, new_geometry };
+
   const StringInfo
     *profile;
 
@@ -3065,7 +3442,7 @@ MagickPrivate void Update8BIMClipPath(const Image *image,
         continue;
       }
     if ((id > 1999) && (id < 2999))
-      UpdateClipPath(info,(size_t) count,old_columns,old_rows,new_geometry);
+      UpdateClipPath(info,(size_t) count,&resize);
     info+=count;
     length-=(size_t) MagickMin(length,(size_t) count);
   }
