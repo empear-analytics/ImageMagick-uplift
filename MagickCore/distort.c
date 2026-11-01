@@ -2300,6 +2300,54 @@ static PointInfo MapPolynomialPoint(const DistortMapping *mapping)
   return(s);
 }
 
+static void MapPlane2CylinderPoint(const DistortMapping *mapping,PointInfo *d,
+  double *validity,PointInfo *s)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  /* relative to center of distortion */
+  (*d).x -= coeff[4]; (*d).y -= coeff[5];
+
+  /* is pixel valid - horizon of a infinite Virtual-Pixel Plane
+   * (see Anthony Thyssen's personal note) */
+  (*validity) = (double) (coeff[1]*MagickPI2 - fabs((*d).x))/output_scaling +
+    0.5;
+
+  if ( (*validity) > 0.0 ) {
+    double cx,tx;
+    (*d).x /= coeff[1];           /* x'= x/r */
+    cx = 1/cos((*d).x);           /* cx = 1/cos(x/r) */
+    tx = tan((*d).x);             /* tx = tan(x/r) */
+    (*s).x = coeff[1]*tx;         /* u = r * tan(x/r) */
+    (*s).y = (*d).y*cx;              /* v = y / cos(x/r) */
+    /* derivatives...  (see Anthony Thyssen's personal notes) */
+    ScaleFilter( resample_filter[id],
+          cx*cx, 0.0, (*s).y*cx/coeff[1], cx );
+#if 0
+/*if ( i == 0 && j == 0 )*/
+if ( d.x == 0.5 && d.y == 0.5 ) {
+  fprintf(stderr, "x=%lf  y=%lf  u=%lf  v=%lf\n", d.x*coeff[1], d.y, s.x, s.y);
+  fprintf(stderr, "radius = %lf  phi = %lf  validity = %lf\n",
+      coeff[1],  (double)(d.x * 180.0/MagickPI), validity );
+  fprintf(stderr, "du/dx=%lf  du/dx=%lf  dv/dx=%lf  dv/dy=%lf\n",
+      cx*cx, 0.0, s.y*cx/coeff[1], cx);
+  fflush(stderr); }
+#endif
+  }
+  /* add center of distortion in source */
+  (*s).x += coeff[2]; (*s).y += coeff[3];
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3143,36 +3191,7 @@ if ( i == 0 && j == 0 ) {
           }
           case Plane2CylinderDistortion:
           { /* 3D Cylinder to Tangential Plane */
-            /* relative to center of distortion */
-            d.x -= coeff[4]; d.y -= coeff[5];
-
-            /* is pixel valid - horizon of a infinite Virtual-Pixel Plane
-             * (see Anthony Thyssen's personal note) */
-            validity = (double) (coeff[1]*MagickPI2 - fabs(d.x))/output_scaling + 0.5;
-
-            if ( validity > 0.0 ) {
-              double cx,tx;
-              d.x /= coeff[1];           /* x'= x/r */
-              cx = 1/cos(d.x);           /* cx = 1/cos(x/r) */
-              tx = tan(d.x);             /* tx = tan(x/r) */
-              s.x = coeff[1]*tx;         /* u = r * tan(x/r) */
-              s.y = d.y*cx;              /* v = y / cos(x/r) */
-              /* derivatives...  (see Anthony Thyssen's personal notes) */
-              ScaleFilter( resample_filter[id],
-                    cx*cx, 0.0, s.y*cx/coeff[1], cx );
-#if 0
-/*if ( i == 0 && j == 0 )*/
-if ( d.x == 0.5 && d.y == 0.5 ) {
-  fprintf(stderr, "x=%lf  y=%lf  u=%lf  v=%lf\n", d.x*coeff[1], d.y, s.x, s.y);
-  fprintf(stderr, "radius = %lf  phi = %lf  validity = %lf\n",
-      coeff[1],  (double)(d.x * 180.0/MagickPI), validity );
-  fprintf(stderr, "du/dx=%lf  du/dx=%lf  dv/dx=%lf  dv/dy=%lf\n",
-      cx*cx, 0.0, s.y*cx/coeff[1], cx);
-  fflush(stderr); }
-#endif
-            }
-            /* add center of distortion in source */
-            s.x += coeff[2]; s.y += coeff[3];
+            MapPlane2CylinderPoint(&mapping,&d,&validity,&s);
             break;
           }
           case BarrelDistortion:
