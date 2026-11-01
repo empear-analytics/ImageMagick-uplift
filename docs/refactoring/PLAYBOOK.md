@@ -4685,6 +4685,117 @@ body moved the same way, 4.21. Added by Claude Code (Claude Opus 5.5) during tas
 
 ---
 
+## Recipe AS - Extract Block Assigning the Loop Status
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Large
+Method* or *Complex Method*, and the block that would fix it sits inside the body of a
+`#pragma omp parallel for` loop and assigns the loop's shared `status` from a call
+(`status=ResamplePixelColor(...)`, `status=InterpolatePixelChannels(...)`), usually
+testing it straight after (`if (status == MagickFalse) ...`).
+
+**Not covered by:** Recipe T, whose block writes `status` only as `status=MagickFalse;`
+and never reads it (T's *Careful* refuses exactly this form); Recipe E, whose OpenMP rule
+refuses a block that writes a variable declared outside the loop body, and `status` is
+one; Recipe O, which refuses every block inside an OpenMP region; Recipe G, which removes
+one level of nesting, not the block.
+
+**How:**
+
+1. The block lies inside one iteration of the parallel loop body and contains no
+   `#pragma omp` line. It contains no `return` or `goto`, and no `break` or `continue`
+   that leaves it (one of a loop or `switch` inside it stays as it is); Recipe T step 4's
+   exception for a block that ends the loop body applies as written.
+2. The block assigns `status` on **every path** through it, and on each path its first
+   use of `status` is that assignment: it never reads the shared value. Reads of `status`
+   after the assignment (the test of the value just assigned) and further writes
+   (`status=MagickFalse;`) are fine. A block with a path that leaves `status` alone (an
+   `if` without an `else`, a loop that may run no iteration) is not this recipe: the caller's
+   write of step 5 would put a value where the original left the shared one.
+3. Every other variable of the loop body that the block writes is declared inside the
+   block, or is not read after it (Recipe T step 3); the block writes no other variable
+   declared outside the loop body.
+4. Cut the block into a new `static MagickBooleanType` function directly above the
+   caller, with a local `status` declared first and the block unchanged after it; the
+   function ends with `return(status);`. If a compiler could warn that `status` may be
+   uninitialised, set it to `MagickTrue` first: step 2 means that value is never read.
+5. Where the block stood, write `status=Helper(...);`, and check every argument
+   against its parameter by reading.
+6. Pass every variable the block reads by value, pointers included, as Recipe T step 6
+   does; a variable the block writes and nothing reads afterwards is declared in the new
+   function (Recipe E step 4).
+
+**Before:**
+
+```c
+        else {
+          /* resample the source image to find its correct color */
+          status=ResamplePixelColor(resample_filter[id],s.x,s.y,&pixel,
+            exception);
+          if (status == MagickFalse)
+            SetPixelViaPixelInfo(distort_image,&invalid,q);
+          else
+            {
+              ...
+              SetPixelViaPixelInfo(distort_image,&pixel,q);
+            }
+        }
+```
+
+**After:**
+
+```c
+static MagickBooleanType SetResampledPixel(...,Quantum *q,
+  ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  status=ResamplePixelColor(...,exception);
+  if (status == MagickFalse)
+    SetPixelViaPixelInfo(distort_image,&invalid,q);
+  else
+    {
+      ...
+      SetPixelViaPixelInfo(distort_image,&pixel,q);
+    }
+  return(status);
+}
+...
+        else
+          status=SetResampledPixel(...,q,exception);
+```
+
+**Careful:**
+
+- The write to the shared `status` moves from the middle of the block to its end, and
+  only the block's last assignment of each path survives (an earlier one the block
+  overwrote is never stored). Step 2 makes both invisible to this thread: it reads
+  `status` only after its own assignment, which the local copy supplies. Other threads
+  read the shared flag unsynchronised (the loop's leading `if (status == MagickFalse)
+  continue;`), and OpenMP gives that read no ordering with this write in the first
+  place; the same value is stored, by the same iteration, before the same later reads.
+- A block that reads `status` before assigning it, or that leaves it unassigned on some
+  path, is not this recipe: the local would decide where the shared value did, or the
+  call's write-back would overwrite another thread's `MagickFalse` with a stale copy.
+  Skip it. The recipe keeps the original's habit of overwriting an earlier failure with
+  the call's later success; that is the code's behaviour, not something it fixes.
+- The helper's `status` is a local, so a callee that receives `&status` instead of
+  assigning from a call (`CompositeImage(...,&status)`) is not this recipe.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 checked by
+reading: the oracle runs single-threaded and cannot see them.
+
+**Provenance:** 2026-11-01, owner ("You can adjust the two recipes as you propose"), from
+campaign A's W11 session: `distort.c`'s `DistortImage`, whose resample branch assigns and
+tests `status` at depth 5 in the parallel row loop (it and its cases hold *Brain Method*
+and *Deep, Nested Complexity*; a probe with this branch as a helper and the verbose case and
+eight pixel-switch cases out: 3.01 to 3.55 in about eleven steps). The same site is in
+`resize.c`'s `InterpolativeResizeImage` and `feature.c`'s `MeanShiftImage`, which T and J
+refused (W03, W10). Whether their blocks meet step 2 is checked at use. Added by Claude
+Code (Claude Sonnet 5.5).
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -5342,3 +5453,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | SD | Step 1: a chain of groups linked by `magick_fallthrough;` counts as one group when all of it moves, in order; its groups may hold a `break;` inside a selection. *Careful* gives the argument | `quantum-import.c`'s depth dispatchers (campaign B, task M118), sixteen `switch (quantum_info->depth)` of cc 9 to 13 whose `case 24:` and `case 64:` test the floating-point format, `break;` inside the `if`, and fall through to `default:`; step 1 refused every one. SD with the chain moved (and `case 32:` beside it where cc 13 needs it) on fourteen of them in a probe: 3.83 to 5.54 | mandate (2026-10-24) |
 | 2026-10-31 | AMEND | N | Step 2: a variable the block reads on entry and then writes, and that nothing after the block reads, may be a member; the new function binds it to a non-`const` local initialised from the member, the block's text unchanged. *Careful* gives the argument | `pixel.c`'s interpolation average groups (campaign B, task M118): they shift `x_offset`/`y_offset` before the fetch; as by-value parameters (E step 4) the helper would take six. A probe of `InterpolatePixelChannel`'s: 3.73 to 3.78 | mandate (2026-10-24) |
 | 2026-11-01 | AMEND | D | *Copies without a Code Duplication finding*: when the finding a step removes is another one of the function (Complex Method, Large Method, Bumpy Road Ahead, Deep, Nested Complexity), two or more identical copies in one function (or differing in one value) become calls of one new `static` helper, or a block identical to an existing `static` helper's body becomes a call of it; the function is reached by cases, the OpenMP condition holds, the file's score rises and no new finding or duplication appears | `vision.c`'s `ConnectedComponentsImage` (eight identical threshold-range parses), `effect-blur.c`'s `RotationalBlurImage` (a second copy of `CloneDirectImage`), `enhance-tone.c`'s `GammaImage`, `enhance.c`'s `CLAHEImage` (campaign A, W11): CodeScene reports no *Code Duplication* for copies inside one function, so D's *Use when* was not met as written, while the blocks were identical by script and the oracle agreed | owner |
+| 2026-11-01 | NEW | AS | Extract Block Assigning the Loop Status: a block inside a parallel loop body that assigns the shared `status` from a call and tests it, on every path and without reading the shared value, moves to a `static MagickBooleanType` function ending `return(status);`; the caller writes `status=Helper(...);` | `distort.c`'s `DistortImage` (campaign A, W11): the resample branch `status=ResamplePixelColor(...)` and its test sit at depth 5 in the parallel row loop; T allows only `status=MagickFalse;` and refuses a read, E and O refuse OpenMP writes; the same site in `resize.c`'s `InterpolativeResizeImage` and `feature.c`'s `MeanShiftImage`. A probe of the whole chain: 3.01 to 3.55 | owner |
