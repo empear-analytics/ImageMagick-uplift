@@ -2041,6 +2041,37 @@ static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
   }
 }
 
+static PointInfo ShepardsSourcePoint(const PointInfo d,
+  const size_t number_arguments,const double *arguments,const double *coeff)
+{
+  double
+    denominator;
+
+  PointInfo
+    s;
+
+  size_t
+    k;
+
+  denominator = s.x = s.y = 0;
+  for(k=0; k<number_arguments; k+=4) {
+    double weight =
+        ((double)d.x-arguments[k+2])*((double)d.x-arguments[k+2])
+      + ((double)d.y-arguments[k+3])*((double)d.y-arguments[k+3]);
+    weight = pow(weight,coeff[0]); /* shepards power factor */
+    weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
+
+    s.x += (arguments[ k ]-arguments[k+2])*weight;
+    s.y += (arguments[k+1]-arguments[k+3])*weight;
+    denominator += weight;
+  }
+  s.x /= denominator;
+  s.y /= denominator;
+  s.x += d.x;   /* make it as relative displacement */
+  s.y += d.y;
+  return(s);
+}
+
 #define ScaleFilter(F,A,B,C,D) \
     ScaleResampleFilter( (F), \
       output_scaling*(A), output_scaling*(B), \
@@ -3105,28 +3136,7 @@ if ( d.x == 0.5 && d.y == 0.5 ) {
                Note: We can not determine derivatives using shepards method
                so only a point sample interpolation can be used.
             */
-            double
-              denominator;
-
-            size_t
-              k;
-
-            denominator = s.x = s.y = 0;
-            for(k=0; k<number_arguments; k+=4) {
-              double weight =
-                  ((double)d.x-arguments[k+2])*((double)d.x-arguments[k+2])
-                + ((double)d.y-arguments[k+3])*((double)d.y-arguments[k+3]);
-              weight = pow(weight,coeff[0]); /* shepards power factor */
-              weight = ( weight < 1.0 ) ? 1.0 : 1.0/weight;
-
-              s.x += (arguments[ k ]-arguments[k+2])*weight;
-              s.y += (arguments[k+1]-arguments[k+3])*weight;
-              denominator += weight;
-            }
-            s.x /= denominator;
-            s.y /= denominator;
-            s.x += d.x;   /* make it as relative displacement */
-            s.y += d.y;
+            s=ShepardsSourcePoint(d,number_arguments,arguments,coeff);
             break;
           }
           default:
