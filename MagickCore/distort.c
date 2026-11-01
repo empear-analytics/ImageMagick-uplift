@@ -2258,6 +2258,48 @@ static void MapPerspectivePoint(const DistortMapping *mapping,double *validity,
   }
 }
 
+static PointInfo MapPolynomialPoint(const DistortMapping *mapping)
+{
+  const PointInfo
+    d = mapping->d;
+
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  PointInfo
+    s;
+
+  ssize_t
+    k;
+
+  ssize_t
+    nterms=(ssize_t)coeff[1];
+
+  PointInfo
+    du,dv; /* the du,dv vectors from unit dx,dy -- derivatives */
+
+  s.x=s.y=du.x=du.y=dv.x=dv.y=0.0;
+  for(k=0; k < nterms; k++) {
+    s.x  += poly_basis_fn(k,d.x,d.y)*coeff[2+k];
+    du.x += poly_basis_dx(k,d.x,d.y)*coeff[2+k];
+    du.y += poly_basis_dy(k,d.x,d.y)*coeff[2+k];
+    s.y  += poly_basis_fn(k,d.x,d.y)*coeff[2+k+nterms];
+    dv.x += poly_basis_dx(k,d.x,d.y)*coeff[2+k+nterms];
+    dv.y += poly_basis_dy(k,d.x,d.y)*coeff[2+k+nterms];
+  }
+  ScaleFilter( resample_filter[id], du.x,du.y,dv.x,dv.y );
+  return(s);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3012,25 +3054,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           case PolynomialDistortion:
           {
             /* multi-ordered polynomial */
-            ssize_t
-              k;
-
-            ssize_t
-              nterms=(ssize_t)coeff[1];
-
-            PointInfo
-              du,dv; /* the du,dv vectors from unit dx,dy -- derivatives */
-
-            s.x=s.y=du.x=du.y=dv.x=dv.y=0.0;
-            for(k=0; k < nterms; k++) {
-              s.x  += poly_basis_fn(k,d.x,d.y)*coeff[2+k];
-              du.x += poly_basis_dx(k,d.x,d.y)*coeff[2+k];
-              du.y += poly_basis_dy(k,d.x,d.y)*coeff[2+k];
-              s.y  += poly_basis_fn(k,d.x,d.y)*coeff[2+k+nterms];
-              dv.x += poly_basis_dx(k,d.x,d.y)*coeff[2+k+nterms];
-              dv.y += poly_basis_dy(k,d.x,d.y)*coeff[2+k+nterms];
-            }
-            ScaleFilter( resample_filter[id], du.x,du.y,dv.x,dv.y );
+            s=MapPolynomialPoint(&mapping);
             break;
           }
           case ArcDistortion:
