@@ -114,6 +114,16 @@ OpenCL, Windows, a delegate library that is not installed - cannot be compiled, 
 measured here. Do not change it, even when the change looks identical to one you made in
 a compiled branch. When a recipe would need to, skip the function and report it.
 
+**Exception: a branch no configuration compiles.** A conditional branch that no build
+ever compiles (`#if 0`) may move, token for token, together with the code that holds it,
+when a recipe moves that code (owner, 2026-11-01). Nothing in the branch is edited, and its
+names are not adjusted to the new function's scope: it is dead text, and whoever enables
+it later has to adjust them, which the commit says. The step is checked by script that the
+dead text stands once in its new place exactly as it stood, and `tools/pp_identical.sh`
+prints `IDENTICAL` (the preprocessor drops the branch, so that proves everything else).
+The exception does not reach an `#if defined(...)` branch that some configuration
+compiles.
+
 This stands until `tools/oracle/build.sh` can build the X11, OpenCL and Windows code in
 one command ([`VERIFICATION.md`](VERIFICATION.md), step 5). Then that code becomes
 guard-verified, below, in the build that compiles it.
@@ -5454,3 +5464,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-10-31 | AMEND | N | Step 2: a variable the block reads on entry and then writes, and that nothing after the block reads, may be a member; the new function binds it to a non-`const` local initialised from the member, the block's text unchanged. *Careful* gives the argument | `pixel.c`'s interpolation average groups (campaign B, task M118): they shift `x_offset`/`y_offset` before the fetch; as by-value parameters (E step 4) the helper would take six. A probe of `InterpolatePixelChannel`'s: 3.73 to 3.78 | mandate (2026-10-24) |
 | 2026-11-01 | AMEND | D | *Copies without a Code Duplication finding*: when the finding a step removes is another one of the function (Complex Method, Large Method, Bumpy Road Ahead, Deep, Nested Complexity), two or more identical copies in one function (or differing in one value) become calls of one new `static` helper, or a block identical to an existing `static` helper's body becomes a call of it; the function is reached by cases, the OpenMP condition holds, the file's score rises and no new finding or duplication appears | `vision.c`'s `ConnectedComponentsImage` (eight identical threshold-range parses), `effect-blur.c`'s `RotationalBlurImage` (a second copy of `CloneDirectImage`), `enhance-tone.c`'s `GammaImage`, `enhance.c`'s `CLAHEImage` (campaign A, W11): CodeScene reports no *Code Duplication* for copies inside one function, so D's *Use when* was not met as written, while the blocks were identical by script and the oracle agreed | owner |
 | 2026-11-01 | NEW | AS | Extract Block Assigning the Loop Status: a block inside a parallel loop body that assigns the shared `status` from a call and tests it, on every path and without reading the shared value, moves to a `static MagickBooleanType` function ending `return(status);`; the caller writes `status=Helper(...);` | `distort.c`'s `DistortImage` (campaign A, W11): the resample branch `status=ResamplePixelColor(...)` and its test sit at depth 5 in the parallel row loop; T allows only `status=MagickFalse;` and refuses a read, E and O refuse OpenMP writes; the same site in `resize.c`'s `InterpolativeResizeImage` and `feature.c`'s `MeanShiftImage`. A probe of the whole chain: 3.01 to 3.55 | owner |
+| 2026-11-01 | AMEND | Preprocessor branches | Exception: a branch no configuration compiles (`#if 0`) may move verbatim, token for token, with the code that holds it when a recipe moves that code; the dead text is not edited or renamed, a script checks it stands once in the new place unchanged, and `pp_identical.sh` prints `IDENTICAL`; `#if defined(...)` branches that some configuration compiles stay refused | `distort.c`'s `DistortImage` (campaign A, W11): the `Cylinder2Plane` and `Plane2Cylinder` pixel cases each hold a never-compiled `#if 0` debug block that names `i` and `j`; the rule kept the cases (and with them *Deep, Nested Complexity* at depth 5) in place; a probe with the blocks out of the function gave 3.01 to 3.55 | owner |
