@@ -2038,6 +2038,34 @@ static void PrintPolynomialXTerms(const double *coeff,const size_t nterms)
   }
 }
 
+static void PrintPolynomialFX(const double *coeff,const char *image_gen,
+  const char *lookup)
+{
+  size_t
+    nterms =  CastDoubleToSizeT(coeff[1]);
+
+  ssize_t
+    i;
+
+  (void) FormatLocaleFile(stderr,
+    "Polynomial (order %lg, terms %lu), FX Equivalent\n",coeff[0],
+    (unsigned long) nterms);
+  (void) FormatLocaleFile(stderr,"%s", image_gen);
+  (void) FormatLocaleFile(stderr,
+    "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
+  (void) FormatLocaleFile(stderr, "       xx =");
+  PrintPolynomialXTerms(coeff,nterms);
+  (void) FormatLocaleFile(stderr,";\n       yy =");
+  for (i=0; i < (ssize_t) nterms; i++)
+  {
+    if ((i != 0) && (i%4 == 0))
+      (void) FormatLocaleFile(stderr,"\n         ");
+    (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i+(int) nterms],
+      poly_basis_str(i));
+  }
+  (void) FormatLocaleFile(stderr,";\n       %s' \\\n", lookup);
+}
+
 static void GetDistortViewport(const Image *image,RectangleInfo *geometry,
   MagickBooleanType *viewport_given,ExceptionInfo *exception)
 {
@@ -3039,24 +3067,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
       }
       case PolynomialDistortion:
       {
-        size_t nterms =  CastDoubleToSizeT(coeff[1]);
-        (void) FormatLocaleFile(stderr,
-          "Polynomial (order %lg, terms %lu), FX Equivalent\n",coeff[0],
-          (unsigned long) nterms);
-        (void) FormatLocaleFile(stderr,"%s", image_gen);
-        (void) FormatLocaleFile(stderr,
-          "  -fx 'ii=i+page.x+0.5; jj=j+page.y+0.5;\n");
-        (void) FormatLocaleFile(stderr, "       xx =");
-        PrintPolynomialXTerms(coeff,nterms);
-        (void) FormatLocaleFile(stderr,";\n       yy =");
-        for (i=0; i < (ssize_t) nterms; i++)
-        {
-          if ((i != 0) && (i%4 == 0))
-            (void) FormatLocaleFile(stderr,"\n         ");
-          (void) FormatLocaleFile(stderr," %+lf%s",coeff[2+i+(int) nterms],
-            poly_basis_str(i));
-        }
-        (void) FormatLocaleFile(stderr,";\n       %s' \\\n", lookup);
+        PrintPolynomialFX(coeff,image_gen,lookup);
         break;
       }
       case ArcDistortion:
