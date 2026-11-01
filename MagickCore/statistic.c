@@ -1340,6 +1340,19 @@ static MagickBooleanType GetEvaluateClamp(const Image *image)
   return(clamp);
 }
 
+static void EvaluateRowPixels(const Image *image,RandomInfo *random_info,
+  const EvaluateOperation operation,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    EvaluatePixel(image,random_info,&operation,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType EvaluateImage(Image *image,
   const MagickEvaluateOperator op,const double value,ExceptionInfo *exception)
 {
@@ -1393,9 +1406,6 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -1404,11 +1414,7 @@ MagickExport MagickBooleanType EvaluateImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      EvaluatePixel(image,random_info[id],&operation,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    EvaluateRowPixels(image,random_info[id],operation,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
