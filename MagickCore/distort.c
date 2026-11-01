@@ -2072,6 +2072,39 @@ static PointInfo ShepardsSourcePoint(const PointInfo d,
   return(s);
 }
 
+static void MapBilinearForwardPoint(const double *coeff,PointInfo *d,
+  PointInfo *s,double *validity)
+{
+  double
+    b,
+    c;
+
+  (*d).x -= coeff[3];  (*d).y -= coeff[7];
+  b = coeff[6]*(*d).x - coeff[2]*(*d).y + coeff[8];
+  c = coeff[4]*(*d).x - coeff[0]*(*d).y;
+
+  (*validity) = 1.0;
+  /* Handle Special degenerate (non-quadratic) case
+   * Currently without horizon anti-aliasing */
+  if ( fabs(coeff[9]) < MagickEpsilon )
+    (*s).y =  -c/b;
+  else {
+    c = b*b - 2*coeff[9]*c;
+    if ( c < 0.0 )
+      (*validity) = 0.0;
+    else
+      (*s).y = ( -b + sqrt(c) )/coeff[9];
+  }
+  if ( (*validity) > 0.0 )
+    (*s).x = ( (*d).x - coeff[1]*(*s).y) / ( coeff[0] + coeff[2]*(*s).y );
+
+  /* NOTE: the sign of the square root should be -ve for parts
+           where the source image becomes 'flipped' or 'mirrored'.
+     FUTURE: Horizon handling
+     FUTURE: Scaling factors or Derivatives (how?)
+  */
+}
+
 #define ScaleFilter(F,A,B,C,D) \
     ScaleResampleFilter( (F), \
       output_scaling*(A), output_scaling*(B), \
@@ -2909,31 +2942,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           {
             /* Forward mapped needs reversed polynomial equations
              * which unfortunately requires a square root!  */
-            double b,c;
-            d.x -= coeff[3];  d.y -= coeff[7];
-            b = coeff[6]*d.x - coeff[2]*d.y + coeff[8];
-            c = coeff[4]*d.x - coeff[0]*d.y;
-
-            validity = 1.0;
-            /* Handle Special degenerate (non-quadratic) case
-             * Currently without horizon anti-aliasing */
-            if ( fabs(coeff[9]) < MagickEpsilon )
-              s.y =  -c/b;
-            else {
-              c = b*b - 2*coeff[9]*c;
-              if ( c < 0.0 )
-                validity = 0.0;
-              else
-                s.y = ( -b + sqrt(c) )/coeff[9];
-            }
-            if ( validity > 0.0 )
-              s.x = ( d.x - coeff[1]*s.y) / ( coeff[0] + coeff[2]*s.y );
-
-            /* NOTE: the sign of the square root should be -ve for parts
-                     where the source image becomes 'flipped' or 'mirrored'.
-               FUTURE: Horizon handling
-               FUTURE: Scaling factors or Derivatives (how?)
-            */
+            MapBilinearForwardPoint(coeff,&d,&s,&validity);
             break;
           }
 #if 0
