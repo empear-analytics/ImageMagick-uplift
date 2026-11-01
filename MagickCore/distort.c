@@ -2509,6 +2509,56 @@ static PointInfo MapArcPoint(const DistortMapping *mapping)
   return(s);
 }
 
+static PointInfo MapPolarPoint(const DistortMapping *mapping)
+{
+  double
+    *const coeff = mapping->coeff;
+
+  const double
+    output_scaling = mapping->output_scaling;
+
+  ResampleFilter
+    **const resample_filter = mapping->resample_filter;
+
+  const int
+    id = mapping->id;
+
+  const Image
+    *const image = mapping->image;
+
+  Image
+    *const distort_image = mapping->distort_image;
+
+  PointInfo
+    d = mapping->d;
+
+  PointInfo
+    s;
+
+  d.x -= coeff[2];
+  d.y -= coeff[3];
+  s.x  = atan2(d.x,d.y) - (coeff[4]+coeff[5])/2;
+  s.x /= Magick2PI;
+  s.x -= MagickRound(s.x);
+  s.x *= Magick2PI;       /* angle - relative to centerline */
+  s.y  = hypot(d.x,d.y);  /* radius */
+
+  /* Polar Scaling vectors are based on mapping dR and dA vectors
+     This results in very simple orthogonal scaling vectors
+  */
+  if ( s.y > MagickEpsilon )
+    ScaleFilter( resample_filter[id],
+      (double) (coeff[6]/(Magick2PI*s.y)), 0, 0, coeff[7] );
+  else
+    ScaleFilter( resample_filter[id],
+        distort_image->columns*2, 0, 0, coeff[7] );
+
+  /* now finish mapping radius/angle to source x,y coords */
+  s.x = s.x*coeff[6] + (double)image->columns/2.0 + image->page.x;
+  s.y = (s.y-coeff[1])*coeff[7] + image->page.y;
+  return(s);
+}
+
 MagickExport Image *DistortImage(const Image *image, DistortMethod method,
   const size_t number_arguments,const double *arguments,
   MagickBooleanType bestfit,ExceptionInfo *exception)
@@ -3273,27 +3323,7 @@ MagickExport Image *DistortImage(const Image *image, DistortMethod method,
           }
           case PolarDistortion:
           { /* 2D Cartesian to Polar View */
-            d.x -= coeff[2];
-            d.y -= coeff[3];
-            s.x  = atan2(d.x,d.y) - (coeff[4]+coeff[5])/2;
-            s.x /= Magick2PI;
-            s.x -= MagickRound(s.x);
-            s.x *= Magick2PI;       /* angle - relative to centerline */
-            s.y  = hypot(d.x,d.y);  /* radius */
-
-            /* Polar Scaling vectors are based on mapping dR and dA vectors
-               This results in very simple orthogonal scaling vectors
-            */
-            if ( s.y > MagickEpsilon )
-              ScaleFilter( resample_filter[id],
-                (double) (coeff[6]/(Magick2PI*s.y)), 0, 0, coeff[7] );
-            else
-              ScaleFilter( resample_filter[id],
-                  distort_image->columns*2, 0, 0, coeff[7] );
-
-            /* now finish mapping radius/angle to source x,y coords */
-            s.x = s.x*coeff[6] + (double)image->columns/2.0 + image->page.x;
-            s.y = (s.y-coeff[1])*coeff[7] + image->page.y;
+            s=MapPolarPoint(&mapping);
             break;
           }
           case DePolarDistortion:
