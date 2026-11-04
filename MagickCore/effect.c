@@ -572,6 +572,55 @@ static void RelinquishDespeckleMemory(MemoryInfo *buffer_info,
     pixel_info=RelinquishVirtualMemory(pixel_info);
 }
 
+typedef struct _DespeckleHull
+{
+  const Image
+    *image;
+
+  Quantum
+    *pixels,
+    *buffer;
+} DespeckleHull;
+
+static void HullAllPolarities(const DespeckleHull *despeckle_hull,
+  const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = despeckle_hull->image;
+
+  HullBuffers
+    hull;
+
+  Quantum
+    *magick_restrict const buffer = despeckle_hull->buffer,
+    *magick_restrict const pixels = despeckle_hull->pixels;
+
+  hull.image=image;
+  hull.columns=image->columns;
+  hull.rows=image->rows;
+  hull.f=pixels;
+  hull.g=buffer;
+  Hull(&hull,x,y,1);
+  hull.image=image;
+  hull.columns=image->columns;
+  hull.rows=image->rows;
+  hull.f=pixels;
+  hull.g=buffer;
+  Hull(&hull,-x,-y,1);
+  hull.image=image;
+  hull.columns=image->columns;
+  hull.rows=image->rows;
+  hull.f=pixels;
+  hull.g=buffer;
+  Hull(&hull,-x,-y,-1);
+  hull.image=image;
+  hull.columns=image->columns;
+  hull.rows=image->rows;
+  hull.f=pixels;
+  hull.g=buffer;
+  Hull(&hull,x,y,-1);
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -660,8 +709,8 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
     DespeckleStore
       store;
 
-    HullBuffers
-      hull;
+    DespeckleHull
+      despeckle_hull;
 
     PixelChannel
        channel;
@@ -692,30 +741,10 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
     (void) memset(buffer,0,length*sizeof(*buffer));
     for (k=0; k < 4; k++)
     {
-      hull.image=image;
-      hull.columns=image->columns;
-      hull.rows=image->rows;
-      hull.f=pixels;
-      hull.g=buffer;
-      Hull(&hull,X[k],Y[k],1);
-      hull.image=image;
-      hull.columns=image->columns;
-      hull.rows=image->rows;
-      hull.f=pixels;
-      hull.g=buffer;
-      Hull(&hull,-X[k],-Y[k],1);
-      hull.image=image;
-      hull.columns=image->columns;
-      hull.rows=image->rows;
-      hull.f=pixels;
-      hull.g=buffer;
-      Hull(&hull,-X[k],-Y[k],-1);
-      hull.image=image;
-      hull.columns=image->columns;
-      hull.rows=image->rows;
-      hull.f=pixels;
-      hull.g=buffer;
-      Hull(&hull,X[k],Y[k],-1);
+      despeckle_hull.image=image;
+      despeckle_hull.pixels=pixels;
+      despeckle_hull.buffer=buffer;
+      HullAllPolarities(&despeckle_hull,X[k],Y[k]);
     }
     store.image=image;
     store.despeckle_image=despeckle_image;
