@@ -104,6 +104,23 @@ typedef struct _FourierInfo
     height;
 } FourierInfo;
 
+typedef struct _InverseChannelSource
+{
+  const Image
+    *magnitude_image,
+    *phase_image;
+
+  MagickBooleanType
+    modulus;
+} InverseChannelSource;
+
+typedef struct _InverseImagePair
+{
+  const Image
+    *magnitude_image,
+    *phase_image;
+} InverseImagePair;
+
 typedef struct _ForwardFourierPlanes
 {
   double
@@ -1614,8 +1631,8 @@ static void RelinquishInverseFourierMemory(MemoryInfo *magnitude_info,
 }
 
 static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
-  const Image *magnitude_image,const Image *phase_image,
-  fftw_complex *fourier_pixels,ExceptionInfo *exception)
+  const InverseImagePair *images,fftw_complex *fourier_pixels,
+  ExceptionInfo *exception)
 {
   CacheView
     *phase_view;
@@ -1656,20 +1673,20 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
       RelinquishInverseFourierMemory(magnitude_info,phase_info,inverse_info);
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",
-        magnitude_image->filename);
+        images->magnitude_image->filename);
       return(MagickFalse);
     }
   magnitude_pixels=(double *) GetVirtualMemoryBlob(magnitude_info);
   phase_pixels=(double *) GetVirtualMemoryBlob(phase_info);
   inverse_pixels=(double *) GetVirtualMemoryBlob(inverse_info);
-  GetFourierChannelPixels(fourier_info,magnitude_image,magnitude_pixels,
+  GetFourierChannelPixels(fourier_info,images->magnitude_image,magnitude_pixels,
     exception);
   status=InverseQuadrantSwap(fourier_info->width,fourier_info->height,
     magnitude_pixels,inverse_pixels);
   (void) memcpy(magnitude_pixels,inverse_pixels,fourier_info->height*
     fourier_info->center*sizeof(*magnitude_pixels));
   i=0L;
-  phase_view=AcquireVirtualCacheView(phase_image,exception);
+  phase_view=AcquireVirtualCacheView(images->phase_image,exception);
   for (y=0L; y < (ssize_t) fourier_info->height; y++)
   {
     p=GetCacheViewVirtualPixels(phase_view,0,y,fourier_info->width,1,
@@ -1678,9 +1695,10 @@ static MagickBooleanType InverseFourier(FourierInfo *fourier_info,
       break;
     for (x=0L; x < (ssize_t) fourier_info->width; x++)
     {
-      phase_pixels[i]=GetFourierPixel(phase_image,fourier_info->channel,p);
+      phase_pixels[i]=GetFourierPixel(images->phase_image,
+        fourier_info->channel,p);
       i++;
-      p+=(ptrdiff_t) GetPixelChannels(phase_image);
+      p+=(ptrdiff_t) GetPixelChannels(images->phase_image);
     }
   }
   ScaleInverseFourierPhase(fourier_info,phase_pixels);
@@ -1873,10 +1891,12 @@ static MagickBooleanType InverseFourierTransform(FourierInfo *fourier_info,
 }
 
 static MagickBooleanType InverseFourierTransformChannel(
-  const Image *magnitude_image,const Image *phase_image,
-  const PixelChannel channel,const MagickBooleanType modulus,
+  const InverseChannelSource *source,const PixelChannel channel,
   Image *fourier_image,ExceptionInfo *exception)
 {
+  const InverseImagePair
+    images = { source->magnitude_image, source->phase_image };
+
   fftw_complex
     *inverse_pixels;
 
@@ -1889,30 +1909,30 @@ static MagickBooleanType InverseFourierTransformChannel(
   MemoryInfo
     *inverse_info;
 
-  fourier_info.width=magnitude_image->columns;
-  fourier_info.height=magnitude_image->rows;
-  if (IsFourierPaddingNeeded(magnitude_image) != MagickFalse)
+  fourier_info.width=source->magnitude_image->columns;
+  fourier_info.height=source->magnitude_image->rows;
+  if (IsFourierPaddingNeeded(source->magnitude_image) != MagickFalse)
     {
-      size_t extent=magnitude_image->columns < magnitude_image->rows ?
-        magnitude_image->rows : magnitude_image->columns;
+      size_t extent=source->magnitude_image->columns <
+        source->magnitude_image->rows ? source->magnitude_image->rows :
+        source->magnitude_image->columns;
       fourier_info.width=(extent & 0x01) == 1 ? extent+1UL : extent;
     }
   fourier_info.height=fourier_info.width;
   fourier_info.center=fourier_info.width/2+1;
   fourier_info.channel=channel;
-  fourier_info.modulus=modulus;
+  fourier_info.modulus=source->modulus;
   inverse_info=AcquireVirtualMemory(fourier_info.width,(fourier_info.height/2+
     1)*sizeof(*inverse_pixels));
   if (inverse_info == (MemoryInfo *) NULL)
     {
       (void) ThrowMagickException(exception,GetMagickModule(),
         ResourceLimitError,"MemoryAllocationFailed","`%s'",
-        magnitude_image->filename);
+        source->magnitude_image->filename);
       return(MagickFalse);
     }
   inverse_pixels=(fftw_complex *) GetVirtualMemoryBlob(inverse_info);
-  status=InverseFourier(&fourier_info,magnitude_image,phase_image,
-    inverse_pixels,exception);
+  status=InverseFourier(&fourier_info,&images,inverse_pixels,exception);
   if (status != MagickFalse)
     status=InverseFourierTransform(&fourier_info,inverse_pixels,fourier_image,
       exception);
@@ -1960,6 +1980,9 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
       magnitude_image->rows,MagickTrue,exception);
     if (fourier_image != (Image *) NULL)
       {
+        const InverseChannelSource
+          source = { magnitude_image, phase_image, modulus };
+
         MagickBooleanType
           is_gray,
           status;
@@ -1980,11 +2003,11 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
               thread_status;
 
             if (is_gray != MagickFalse)
-              thread_status=InverseFourierTransformChannel(magnitude_image,
-                phase_image,GrayPixelChannel,modulus,fourier_image,exception);
+              thread_status=InverseFourierTransformChannel(&source,
+                GrayPixelChannel,fourier_image,exception);
             else
-              thread_status=InverseFourierTransformChannel(magnitude_image,
-                phase_image,RedPixelChannel,modulus,fourier_image,exception);
+              thread_status=InverseFourierTransformChannel(&source,
+                RedPixelChannel,fourier_image,exception);
             if (thread_status == MagickFalse)
               status=thread_status;
           }
@@ -1997,8 +2020,8 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
 
             thread_status=MagickTrue;
             if (is_gray == MagickFalse)
-              thread_status=InverseFourierTransformChannel(magnitude_image,
-                phase_image,GreenPixelChannel,modulus,fourier_image,exception);
+              thread_status=InverseFourierTransformChannel(&source,
+                GreenPixelChannel,fourier_image,exception);
             if (thread_status == MagickFalse)
               status=thread_status;
           }
@@ -2011,8 +2034,8 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
 
             thread_status=MagickTrue;
             if (is_gray == MagickFalse)
-              thread_status=InverseFourierTransformChannel(magnitude_image,
-                phase_image,BluePixelChannel,modulus,fourier_image,exception);
+              thread_status=InverseFourierTransformChannel(&source,
+                BluePixelChannel,fourier_image,exception);
             if (thread_status == MagickFalse)
               status=thread_status;
           }
@@ -2025,8 +2048,8 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
 
             thread_status=MagickTrue;
             if (magnitude_image->colorspace == CMYKColorspace)
-              thread_status=InverseFourierTransformChannel(magnitude_image,
-                phase_image,BlackPixelChannel,modulus,fourier_image,exception);
+              thread_status=InverseFourierTransformChannel(&source,
+                BlackPixelChannel,fourier_image,exception);
             if (thread_status == MagickFalse)
               status=thread_status;
           }
@@ -2039,8 +2062,8 @@ MagickExport Image *InverseFourierTransformImage(const Image *magnitude_image,
 
             thread_status=MagickTrue;
             if (magnitude_image->alpha_trait != UndefinedPixelTrait)
-              thread_status=InverseFourierTransformChannel(magnitude_image,
-                phase_image,AlphaPixelChannel,modulus,fourier_image,exception);
+              thread_status=InverseFourierTransformChannel(&source,
+                AlphaPixelChannel,fourier_image,exception);
             if (thread_status == MagickFalse)
               status=thread_status;
           }
