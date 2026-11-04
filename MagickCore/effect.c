@@ -2874,6 +2874,24 @@ static inline void UnsharpPixelChannels(const UnsharpPixels *unsharp,
   }
 }
 
+static void UnsharpRow(const UnsharpPixels *unsharp,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = unsharp->image,
+    *const unsharp_image = unsharp->unsharp_image;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    UnsharpPixelChannels(unsharp,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(unsharp_image);
+  }
+}
+
 MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
   const double sigma,const double gain,const double threshold,
   ExceptionInfo *exception)
@@ -2939,9 +2957,6 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
-
     if (status == MagickFalse)
       continue;
     p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
@@ -2952,12 +2967,7 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      UnsharpPixelChannels(&unsharp,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(unsharp_image);
-    }
+    UnsharpRow(&unsharp,p,q);
     if (SyncCacheViewAuthenticPixels(unsharp_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
