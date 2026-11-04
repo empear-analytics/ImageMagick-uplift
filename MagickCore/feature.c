@@ -571,6 +571,19 @@ static void ComputeCannyGradientRow(MagickBooleanType *status,
   SetCannyGradientRow(edge_image,canny_cache,p,y);
 }
 
+static MagickBooleanType BlurCannyImage(const Image *image,
+  KernelInfo *kernel_info,Image **edge_image,ExceptionInfo *exception)
+{
+  (*edge_image)=MorphologyImage(image,ConvolveMorphology,1,kernel_info,
+    exception);
+  kernel_info=DestroyKernelInfo(kernel_info);
+  if ((*edge_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetCannyEdgeGray((*edge_image),exception) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   const double sigma,const double lower_percent,const double upper_percent,
   ExceptionInfo *exception)
@@ -626,11 +639,7 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   kernel_info=AcquireKernelInfo(geometry,exception);
   if (kernel_info == (KernelInfo *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  edge_image=MorphologyImage(image,ConvolveMorphology,1,kernel_info,exception);
-  kernel_info=DestroyKernelInfo(kernel_info);
-  if (edge_image == (Image *) NULL)
-    return((Image *) NULL);
-  if (SetCannyEdgeGray(edge_image,exception) == MagickFalse)
+  if (BlurCannyImage(image,kernel_info,&edge_image,exception) == MagickFalse)
     return((Image *) NULL);
   /*
     Find the intensity gradient of the image.
