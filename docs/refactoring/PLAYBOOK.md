@@ -4865,7 +4865,9 @@ Method* or *Complex Method*, and the block that would fix it sits inside the bod
 `#pragma omp parallel for` loop and uses the loop's shared `status` in a way the
 local-copy recipes refuse: it assigns it from a call and tests it (`status=
 InterpolatePixelChannels(...); if (status == MagickFalse) break;`), possibly inside a loop
-that may run no iteration, or it reads the value it did not itself assign.
+that may run no iteration, or it reads the value it did not itself assign, or the loop also reads or writes a second
+(or third) shared scalar by plain assignment or increment (a loop `type`, a non-atomic
+`progress++`).
 
 **Not covered by:** Recipe T (the block writes `status` only as `status=MagickFalse;` and
 never reads it) and Recipe AS (the block assigns `status` on every path and never reads the
@@ -4882,23 +4884,30 @@ functions only.
    `continue` that leaves it (those of a loop or `switch` inside it stay as they are; a
    block that is a whole loop takes its own `break`s with it), except in step 7's form.
    Recipe T step 4's exception for a block that ends the loop body does not apply here.
-2. `status` is the only variable declared outside the loop body that the block writes. It
-   is shared: named in the pragma's `shared(...)` clause, or in no data-sharing clause
-   (`default` shared). It is not named in `private`, `firstprivate`, `lastprivate` or
-   `reduction`. The block may read it, test it and assign it in any way.
+2. `status` and at most two further scalars `v` are the only variables declared outside the
+   loop body that the block writes. Each is shared: named in the pragma's `shared(...)`
+   clause, or in no data-sharing clause (`default` shared), and not named in `private`,
+   `firstprivate`, `lastprivate` or `reduction`. The block may read `status`, test it and
+   assign it in any way; it reads or writes each `v` only by plain assignment (`v=c;`,
+   `v=expr;`) or a plain increment (`v++;`, `v+=n;`, its value used or not) outside any
+   `atomic` or `critical` (step 1: none moves). A loop with no `status` whose only such
+   variable is a flag `v` (`type=UndefinedType;`) passes `v` alone.
 3. Every other variable of the loop body that the block writes is declared inside the
    block, or is not read after it (a row pointer `q` advanced along the row, say; Recipe T
    step 3).
 4. Cut the block into a new `static void` function directly above the caller. Its first
-   parameter is `MagickBooleanType *status`; in the body every use of `status` becomes
-   `(*status)`, reads included, and `&status` passed to a callee becomes `status`, the same
-   address. Nothing else in the text changes.
+   parameters are the pointers, `MagickBooleanType *status` and then `T *v` for each
+   further scalar; in the body every use of `status` becomes `(*status)` and every use of
+   `v` becomes `(*v)` (an increment `(*v)++`), reads included, and `&status` or `&v` passed
+   to a callee becomes `status` or `v`, the same address. Nothing else in the text changes.
 5. Pass every other variable the block reads by value, pointers included, as Recipe T
    step 6 does; a variable of the loop body that the block writes and the caller does not
    read after it is declared in the new function (Recipe E step 4).
 6. Where the block stood, write `Helper(...,&status);`, and check every argument against
    its parameter by reading. With more than four parameters, bundle the read-only inputs in
-   a `const` struct as Recipe N steps 2 and 3 do; `status` is passed apart, by pointer.
+   a `const` struct as Recipe N steps 2 and 3 do; `status` and each `v` are passed apart,
+   by pointer, and the struct, the counter of step 7 and the pointers together stay within
+   four.
 7. A loop's whole body. The block may be the whole body of the parallel loop, declarations
    included, with `continue;` statements of that loop (the usual `if (status ==
    MagickFalse) continue;` first, and `status=MagickFalse; continue;` after a failed pixel
@@ -4957,6 +4966,14 @@ static void InterpolateResizeRow(...,MagickBooleanType *status,...)
   the flag no ordering in the first place, as for the leading `if (status == MagickFalse)
   continue;`. That is why a block that reads the shared value, or leaves it alone on some
   path (a loop that may run no iteration), is fine here and not under T or AS.
+- A further scalar `v` is treated exactly as `status` is: `*v` is the very variable the
+  caller used, read and written at the same program points, in the same order, with the
+  same values, nothing deferred or copied, the helper called from inside the iteration.
+  A plain increment that is a race stays a race, as before: `progress++` outside any
+  `atomic` is an unsynchronised read-modify-write inline and `(*v)++` is the same one
+  through the pointer, no more and no less atomic, so the recipe neither adds nor removes a
+  synchronisation, and a race found this way is reported, not fixed, in the commit. A
+  `progress` kept in an `omp atomic` or `critical` block does not move (step 1).
 - Step 2 is what makes passing the address safe: a `private` or `reduction` `status` would
   be the thread's own copy, and a pointer to it, passed down, is that same copy, but the
   recipe does not rely on it: it stays with a shared flag. Check the pragma by reading.
@@ -4992,7 +5009,13 @@ opening with `if (status == MagickFalse) continue;` and holding a failed-fetch
 over one `const` input struct filled once: 5.02 to 5.19 in a probe; as built (a struct per
 loop body, filled in the body), 5.02 to 5.10 to 5.15, `LocalContrastImage` leaving
 Bumpy Road Ahead (cc 19 to 9, 155 to 104 lines), no finding on either helper. Added by
-Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. Step 2 (2026-11-04, W12, from
+`attribute.c` and `resize-sample.c`): `attribute.c`'s `IdentifyImageGray`, whose row loop also
+reads and writes the shared `type` (`type=GrayscaleType;`, `type=UndefinedType;`) and
+`IdentifyImageMonochrome`, whose only shared write is `type`, and `resize-sample.c`'s
+`SampleImage`, whose body also does a non-atomic `progress++`; the sweep found each blocked
+by the one second scalar (probes +0.31 and 9.47 to 10.00). Added by Claude Code
+(Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -5676,3 +5699,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | AMEND | SD | Step 8 (new): a chain whose steps need Z's input struct declares one `tile` local at the top of the block holding the `switch` and fills it once directly before the `switch` (Recipe N step 8's sibling form); the caller's `default:` calls the outermost helper with `&tile`, and each helper passes `tile` on unchanged to the next. *Careful* gives the argument | `effect.c`'s `PreviewImage` (campaign A, W12): the groups read eleven variables, so Z gives a struct; step 2 moves the `default:` group with its struct local and fill, which would give every later helper its own copy of the fill and a second struct. Seven helpers over one `tile`: 5.00 in a probe, no finding on any of them | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | PS | Step 7 (new): the block may be a parallel loop's whole body, declarations included, with `continue;` statements of that loop (Recipe E step 7's whole-body form): each becomes `return;`, the counter goes by value, the body becomes the call alone, `status` through the pointer at every use; step 1 excepts it. *Careful* gives the argument | `effect.c`'s `LocalContrastImage` (campaign A, W12): both loop bodies open with `if (status == MagickFalse) continue;` and hold a failed-fetch `status=MagickFalse; continue;`, which T, LB, OC, W and PS step 1 refuse (the W12 report names the gap). Both bodies as helpers over one input struct: 5.02 to 5.19 in a probe, no finding on either helper | mandate (2026-10-24) |
 | 2026-11-04 | WORDING | PS | Step 7: the body becomes the call preceded by the declaration and fill of its input struct in the body (Recipe N step 7), not the call alone; the probe behind the step shared one struct filled once | `effect.c`'s `LocalContrastImage` (campaign A, W12): the first uses declare each pass's struct inside the loop body, as `KuwaharaImage`'s `kuwahara` and Recipe N step 7 do: 5.02 to 5.10 to 5.15 | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | PS | Step 2: besides `status`, the block may read or write at most two further shared scalars `v` (declared outside the loop body, in `shared(...)` or no clause, never in `private`, `firstprivate`, `lastprivate` or `reduction`) by plain assignment or a plain increment outside any `atomic` or `critical`; each is passed by pointer like `status`, every use `(*v)`, with the same argument (same memory, points and order, nothing deferred, helper called inside the iteration). Steps 4 and 6 and *Careful* follow; *Careful* says a plain increment that is a race stays a race. Still eight steps | `attribute.c`'s `IdentifyImageGray` and `IdentifyImageMonochrome` (shared `type`) and `resize-sample.c`'s `SampleImage` (non-atomic `progress++`), campaign A, W12: each blocked by one second shared scalar; probes +0.31 and 9.47 to 10.00 | mandate (2026-10-24) |
