@@ -3305,16 +3305,11 @@ MagickExport Image *SpreadImage(const Image *image,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SpreadImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportRowProgress(image,SpreadImageTag,progress,&status);
       }
   }
   spread_view=DestroyCacheView(spread_view);
