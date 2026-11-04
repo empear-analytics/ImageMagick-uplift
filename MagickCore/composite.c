@@ -1448,6 +1448,17 @@ static void CompositeOverRow(const OverRowInputs *row,
   }
 }
 
+static void SetCompositeProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1564,16 +1575,11 @@ static MagickBooleanType CompositeOverImage(Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,CompositeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetCompositeProgress(image,CompositeImageTag,progress,&status);
       }
   }
   source_view=DestroyCacheView(source_view);
@@ -2500,13 +2506,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           status=MagickFalse;
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
-            MagickBooleanType
-              proceed;
-
-            proceed=SetImageProgress(image,CompositeImageTag,(MagickOffsetType)
-              y,image->rows);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
+            SetCompositeProgress(image,CompositeImageTag,(MagickOffsetType) y,
+              &status);
           }
       }
       source_view=DestroyCacheView(source_view);
@@ -2573,13 +2574,8 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
           status=MagickFalse;
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
-            MagickBooleanType
-              proceed;
-
-            proceed=SetImageProgress(image,CompositeImageTag,(MagickOffsetType)
-              y,image->rows);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
+            SetCompositeProgress(image,CompositeImageTag,(MagickOffsetType) y,
+              &status);
           }
       }
       source_view=DestroyCacheView(source_view);
@@ -4331,16 +4327,11 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,CompositeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetCompositeProgress(image,CompositeImageTag,progress,&status);
       }
   }
   source_view=DestroyCacheView(source_view);
