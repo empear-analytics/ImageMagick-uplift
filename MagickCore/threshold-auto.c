@@ -198,6 +198,48 @@ static double ThrowKapurFailure(const KapurBuffers *buffers)
   return(-1.0);
 }
 
+typedef struct _KapurSums
+{
+  const double
+    *histogram;
+
+  double
+    *black_entropy,
+    *cumulative_histogram,
+    epsilon;
+} KapurSums;
+
+static void ComputeKapurBlackEntropy(const KapurSums *kapur,const ssize_t j)
+{
+  const double
+    *const histogram = kapur->histogram;
+
+  double
+    *const black_entropy = kapur->black_entropy,
+    *const cumulative_histogram = kapur->cumulative_histogram,
+    epsilon = kapur->epsilon;
+
+  double
+    entropy;
+
+  ssize_t
+    i;
+
+  /*
+    Black entropy.
+  */
+  black_entropy[j]=0.0;
+  if (cumulative_histogram[j] > epsilon)
+    {
+      entropy=0.0;
+      for (i=0; i <= j; i++)
+        if (histogram[i] > epsilon)
+          entropy-=histogram[i]/cumulative_histogram[j]*
+            log(histogram[i]/cumulative_histogram[j]);
+      black_entropy[j]=entropy;
+    }
+}
+
 static double KapurThreshold(const Image *image,const double *histogram,
   ExceptionInfo *exception)
 {
@@ -246,19 +288,17 @@ static double KapurThreshold(const Image *image,const double *histogram,
    epsilon=MagickMinimumValue;
    for (j=0; j <= MaxIntensity; j++)
    {
+     KapurSums
+       kapur;
+
      /*
        Black entropy.
      */
-     black_entropy[j]=0.0;
-     if (cumulative_histogram[j] > epsilon)
-       {
-         entropy=0.0;
-         for (i=0; i <= j; i++)
-           if (histogram[i] > epsilon)
-             entropy-=histogram[i]/cumulative_histogram[j]*
-               log(histogram[i]/cumulative_histogram[j]);
-         black_entropy[j]=entropy;
-       }
+     kapur.histogram=histogram;
+     kapur.black_entropy=black_entropy;
+     kapur.cumulative_histogram=cumulative_histogram;
+     kapur.epsilon=epsilon;
+     ComputeKapurBlackEntropy(&kapur,j);
      /*
        White entropy.
      */
