@@ -2345,6 +2345,26 @@ static MagickBooleanType BlurMotionLine(const MotionRow *row,
   return(MagickTrue);
 }
 
+static void FillMotionOffsets(OffsetInfo *offset,const size_t width,
+  const double angle)
+{
+  PointInfo
+    point;
+
+  ssize_t
+    w;
+
+  point.x=(double) width*sin(DegreesToRadians(angle));
+  point.y=(double) width*cos(DegreesToRadians(angle));
+  for (w=0; w < (ssize_t) width; w++)
+  {
+    offset[w].x=CastDoubleToSsizeT(ceil((double) (w*point.y)/
+      hypot(point.x,point.y)-0.5));
+    offset[w].y=CastDoubleToSsizeT(ceil((double) (w*point.x)/
+      hypot(point.x,point.y)-0.5));
+  }
+}
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2370,14 +2390,10 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   OffsetInfo
     *offset;
 
-  PointInfo
-    point;
-
   size_t
     width;
 
   ssize_t
-    w,
     y;
 
   assert(image != (Image *) NULL);
@@ -2396,15 +2412,7 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
       kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  point.x=(double) width*sin(DegreesToRadians(angle));
-  point.y=(double) width*cos(DegreesToRadians(angle));
-  for (w=0; w < (ssize_t) width; w++)
-  {
-    offset[w].x=CastDoubleToSsizeT(ceil((double) (w*point.y)/
-      hypot(point.x,point.y)-0.5));
-    offset[w].y=CastDoubleToSsizeT(ceil((double) (w*point.x)/
-      hypot(point.x,point.y)-0.5));
-  }
+  FillMotionOffsets(offset,width,angle);
   /*
     Motion blur image.
   */
