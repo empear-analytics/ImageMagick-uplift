@@ -1951,6 +1951,137 @@ static MagickBooleanType SetDirectClassOrDestroy(Image *resize_image,
   return(MagickTrue);
 }
 
+static MagickBooleanType SetResizeProgress(const Image *image,
+  const char *tag,const MagickOffsetType progress)
+{
+  MagickBooleanType
+    proceed,
+    status;
+
+  status=MagickTrue;
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
+static Image *FinishInterpolativeResize(CacheView *image_view,
+  CacheView *resize_view,Image *resize_image,const MagickBooleanType status)
+{
+  resize_view=DestroyCacheView(resize_view);
+  image_view=DestroyCacheView(image_view);
+  if (status == MagickFalse)
+    resize_image=DestroyImage(resize_image);
+  return(resize_image);
+}
+
+static PointInfo GetInterpolativeScale(const Image *image,
+  const Image *resize_image)
+{
+  PointInfo
+    scale;
+
+  scale.x=(double) image->columns/resize_image->columns;
+  scale.y=(double) image->rows/resize_image->rows;
+  return(scale);
+}
+
+typedef struct _InterpolativeResizeInfo
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view,
+    *resize_view;
+
+  Image
+    *resize_image;
+
+  PixelInterpolateMethod
+    method;
+
+  PointInfo
+    scale;
+
+  ExceptionInfo
+    *exception;
+} InterpolativeResizeInfo;
+
+static void InterpolateResizeRow(MagickBooleanType *status,
+  const InterpolativeResizeInfo *resize,const double offset_y,Quantum *q)
+{
+  const Image
+    *const image = resize->image;
+
+  CacheView
+    *const image_view = resize->image_view;
+
+  Image
+    *const resize_image = resize->resize_image;
+
+  const PixelInterpolateMethod
+    method = resize->method;
+
+  const PointInfo
+    scale = resize->scale;
+
+  ExceptionInfo
+    *const exception = resize->exception;
+
+  PointInfo
+    offset;
+
+  ssize_t
+    x;
+
+  offset.y=offset_y;
+  for (x=0; x < (ssize_t) resize_image->columns; x++)
+  {
+    ssize_t
+      i;
+
+    for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
+    {
+      PixelChannel
+        channel;
+
+      PixelTrait
+        resize_traits,
+        traits;
+
+      channel=GetPixelChannelChannel(image,i);
+      traits=GetPixelChannelTraits(image,channel);
+      resize_traits=GetPixelChannelTraits(resize_image,channel);
+      if (IsChannelTraitUndefined(traits,resize_traits) != MagickFalse)
+        continue;
+      offset.x=((double) x+0.5)*scale.x-0.5;
+      (*status)=InterpolatePixelChannels(image,image_view,resize_image,method,
+        offset.x,offset.y,q,exception);
+      if ((*status) == MagickFalse)
+        break;
+    }
+    q+=(ptrdiff_t) GetPixelChannels(resize_image);
+  }
+}
+
+static void InterpolateResizeLine(MagickBooleanType *status,
+  const InterpolativeResizeInfo *resize,const ssize_t y,Quantum *q)
+{
+  CacheView
+    *const resize_view = resize->resize_view;
+
+  const PointInfo
+    scale = resize->scale;
+
+  ExceptionInfo
+    *const exception = resize->exception;
+
+  InterpolateResizeRow(status,resize,((double) y+0.5)*scale.y-0.5,q);
+  if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -1998,22 +2129,18 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
   resize_view=AcquireAuthenticCacheView(resize_image,exception);
-  scale.x=(double) image->columns/resize_image->columns;
-  scale.y=(double) image->rows/resize_image->rows;
+  scale=GetInterpolativeScale(image,resize_image);
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
   #pragma omp parallel for schedule(static) shared(progress,status) \
     magick_number_threads(image,resize_image,resize_image->rows,1)
 #endif
   for (y=0; y < (ssize_t) resize_image->rows; y++)
   {
-    PointInfo
-      offset;
+    InterpolativeResizeInfo
+      resize;
 
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -2021,56 +2148,26 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
       exception);
     if (q == (Quantum *) NULL)
       continue;
-    offset.y=((double) y+0.5)*scale.y-0.5;
-    for (x=0; x < (ssize_t) resize_image->columns; x++)
-    {
-      ssize_t
-        i;
-
-      for (i=0; i < (ssize_t) GetPixelChannels(image); i++)
-      {
-        PixelChannel
-          channel;
-
-        PixelTrait
-          resize_traits,
-          traits;
-
-        channel=GetPixelChannelChannel(image,i);
-        traits=GetPixelChannelTraits(image,channel);
-        resize_traits=GetPixelChannelTraits(resize_image,channel);
-        if (IsChannelTraitUndefined(traits,resize_traits) != MagickFalse)
-          continue;
-        offset.x=((double) x+0.5)*scale.x-0.5;
-        status=InterpolatePixelChannels(image,image_view,resize_image,method,
-          offset.x,offset.y,q,exception);
-        if (status == MagickFalse)
-          break;
-      }
-      q+=(ptrdiff_t) GetPixelChannels(resize_image);
-    }
-    if (SyncCacheViewAuthenticPixels(resize_view,exception) == MagickFalse)
-      status=MagickFalse;
+    resize.image=image;
+    resize.image_view=image_view;
+    resize.resize_view=resize_view;
+    resize.resize_image=resize_image;
+    resize.method=method;
+    resize.scale=scale;
+    resize.exception=exception;
+    InterpolateResizeLine(&status,&resize,y,q);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,InterpolativeResizeImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
+        if (SetResizeProgress(image,InterpolativeResizeImageTag,progress) ==
+            MagickFalse)
           status=MagickFalse;
       }
   }
-  resize_view=DestroyCacheView(resize_view);
-  image_view=DestroyCacheView(image_view);
-  if (status == MagickFalse)
-    resize_image=DestroyImage(resize_image);
-  return(resize_image);
+  return(FinishInterpolativeResize(image_view,resize_view,resize_image,status));
 }
 #if defined(MAGICKCORE_LQR_DELEGATE)
 

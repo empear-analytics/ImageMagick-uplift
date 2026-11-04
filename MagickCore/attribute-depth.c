@@ -288,6 +288,15 @@ static inline MagickBooleanType IsOpaqueColormapImage(const Image *image)
     MagickFalse);
 }
 
+static void RaiseImageRowDepthStatus(MagickBooleanType *status,
+  const DepthScan *scan)
+{
+  if ((*status) == MagickFalse)
+    return;
+  if (RaiseImageRowDepth(scan) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -422,16 +431,13 @@ MagickExport size_t GetImageDepth(const Image *image,ExceptionInfo *exception)
     DepthScan
       scan;
 
-    if (status == MagickFalse)
-      continue;
     scan.image=image;
     scan.image_view=image_view;
     scan.y=y;
     scan.exception=exception;
     scan.current_depth=current_depth;
     scan.id=id;
-    if (RaiseImageRowDepth(&scan) == MagickFalse)
-      status=MagickFalse;
+    RaiseImageRowDepthStatus(&status,&scan);
   }
   image_view=DestroyCacheView(image_view);
   depth=GetMaximumDepth(current_depth,number_threads);

@@ -719,6 +719,90 @@ static MagickBooleanType AcquireAdaptiveSharpenKernel(double **kernel,
   return(MagickTrue);
 }
 
+static MagickBooleanType SharpenAdaptiveLine(const AdaptiveBlurRow *row,
+  CacheView *edge_view,CacheView *sharp_view,MagickBooleanType *status)
+{
+  const Image
+    *const image = row->image;
+
+  Image
+    *const sharp_image = row->blur_image;
+
+  Image
+    *const edge_image = row->edge_image;
+
+  double
+    **const kernel = row->kernel;
+
+  const size_t
+    width = row->width;
+
+  const ssize_t
+    y = row->y;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  const Quantum
+    *magick_restrict r;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  r=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(sharp_view,0,y,sharp_image->columns,1,
+    exception);
+  if ((r == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) sharp_image->columns; x++)
+  {
+    const Quantum
+      *magick_restrict p;
+
+    ssize_t
+      i;
+
+    ssize_t
+      center,
+      j;
+
+    j=GetAdaptiveKernelIndex(edge_image,r,width);
+    p=GetCacheViewVirtualPixels(row->image_view,x-(((ssize_t) width-j)/2L),y-
+      (((ssize_t) width-j)/2L),width-(size_t) j,width-(size_t) j,exception);
+    if (p == (const Quantum *) NULL)
+      break;
+    center=(ssize_t) (GetPixelChannels(image)*(width-(size_t) j)*
+     ((width-(size_t) j)/2L)+GetPixelChannels(image)*((width-(size_t) j)/2));
+    for (i=0; i < (ssize_t) GetPixelChannels(sharp_image); i++)
+    {
+      AdaptiveChannel
+        adaptive;
+
+      adaptive.image=image;
+      adaptive.blur_image=sharp_image;
+      adaptive.kernel=kernel;
+      adaptive.p=p;
+      adaptive.width=width;
+      adaptive.j=j;
+      adaptive.center=center;
+      BlurAdaptiveChannel(&adaptive,i,q);
+    }
+    q+=(ptrdiff_t) GetPixelChannels(sharp_image);
+    r+=(ptrdiff_t) GetPixelChannels(edge_image);
+  }
+  if (SyncCacheViewAuthenticPixels(sharp_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -824,63 +908,19 @@ MagickExport Image *AdaptiveSharpenImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) sharp_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict r;
+    AdaptiveBlurRow
+      row;
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    row.image=image;
+    row.blur_image=sharp_image;
+    row.edge_image=edge_image;
+    row.image_view=image_view;
+    row.kernel=kernel;
+    row.width=width;
+    row.y=y;
+    row.exception=exception;
+    if (SharpenAdaptiveLine(&row,edge_view,sharp_view,&status) == MagickFalse)
       continue;
-    r=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(sharp_view,0,y,sharp_image->columns,1,
-      exception);
-    if ((r == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) sharp_image->columns; x++)
-    {
-      const Quantum
-        *magick_restrict p;
-
-      ssize_t
-        i;
-
-      ssize_t
-        center,
-        j;
-
-      j=GetAdaptiveKernelIndex(edge_image,r,width);
-      p=GetCacheViewVirtualPixels(image_view,x-(((ssize_t) width-j)/2L),y-
-        (((ssize_t) width-j)/2L),width-(size_t) j,width-(size_t) j,exception);
-      if (p == (const Quantum *) NULL)
-        break;
-      center=(ssize_t) (GetPixelChannels(image)*(width-(size_t) j)*
-       ((width-(size_t) j)/2L)+GetPixelChannels(image)*((width-(size_t) j)/2));
-      for (i=0; i < (ssize_t) GetPixelChannels(sharp_image); i++)
-      {
-        AdaptiveChannel
-          adaptive;
-
-        adaptive.image=image;
-        adaptive.blur_image=sharp_image;
-        adaptive.kernel=kernel;
-        adaptive.p=p;
-        adaptive.width=width;
-        adaptive.j=j;
-        adaptive.center=center;
-        BlurAdaptiveChannel(&adaptive,i,q);
-      }
-      q+=(ptrdiff_t) GetPixelChannels(sharp_image);
-      r+=(ptrdiff_t) GetPixelChannels(edge_image);
-    }
-    if (SyncCacheViewAuthenticPixels(sharp_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -1537,6 +1577,61 @@ static void SetBilateralSpatial(const BilateralSpatial *spatial,ssize_t n)
   }
 }
 
+static MagickBooleanType BlurBilateralLine(const BilateralRow *row,
+  CacheView *blur_view,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(blur_view,0,row->y,row->blur_image->columns,1,
+    row->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  BlurBilateralRow(row,q);
+  if (SyncCacheViewAuthenticPixels(blur_view,row->exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static void FillBilateralIntensity(double *intensity_gaussian,
+  const double intensity_sigma)
+{
+  ssize_t
+    w;
+
+  for (w=(-MaxIntensity); w <= MaxIntensity; w++)
+    intensity_gaussian[w+MaxIntensity]=BlurGaussian((double) w,intensity_sigma);
+}
+
+static OffsetInfo FillBilateralSpatial(const size_t width,
+  const size_t height,double *spatial_gaussian,const double spatial_sigma)
+{
+  BilateralSpatial
+    spatial;
+
+  OffsetInfo
+    mid;
+
+  ssize_t
+    n;
+
+  n=0;
+  mid.x=(ssize_t) (MagickMax(width,1)/2L);
+  mid.y=(ssize_t) (MagickMax(height,1)/2L);
+  spatial.width=width;
+  spatial.height=height;
+  spatial.mid=mid;
+  spatial.spatial_gaussian=spatial_gaussian;
+  spatial.spatial_sigma=spatial_sigma;
+  SetBilateralSpatial(&spatial,n);
+  return(mid);
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1566,7 +1661,6 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     number_threads;
 
   ssize_t
-    w,
     y;
 
   assert(image != (const Image *) NULL);
@@ -1585,26 +1679,9 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
       blur_image=DestroyImage(blur_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  for (w=(-MaxIntensity); w <= MaxIntensity; w++)
-    intensity_gaussian[w+MaxIntensity]=BlurGaussian((double) w,intensity_sigma);
+  FillBilateralIntensity(intensity_gaussian,intensity_sigma);
   spatial_gaussian=weights[number_threads];
-  {
-    BilateralSpatial
-      spatial;
-
-    ssize_t
-      n;
-
-    n=0;
-    mid.x=(ssize_t) (MagickMax(width,1)/2L);
-    mid.y=(ssize_t) (MagickMax(height,1)/2L);
-    spatial.width=width;
-    spatial.height=height;
-    spatial.mid=mid;
-    spatial.spatial_gaussian=spatial_gaussian;
-    spatial.spatial_sigma=spatial_sigma;
-    SetBilateralSpatial(&spatial,n);
-  }
+  mid=FillBilateralSpatial(width,height,spatial_gaussian,spatial_sigma);
   /*
     Bilateral blur image.
   */
@@ -1621,21 +1698,9 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     const int
       id = GetOpenMPThreadId();
 
-    Quantum
-      *magick_restrict q;
-
     BilateralRow
       row;
 
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.blur_image=blur_image;
     row.image_view=image_view;
@@ -1650,9 +1715,8 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     row.id=id;
     row.y=y;
     row.exception=exception;
-    BlurBilateralRow(&row,q);
-    if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (BlurBilateralLine(&row,blur_view,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -2310,6 +2374,53 @@ static MagickBooleanType BlurMotionRow(const MotionRow *row,
   return(status);
 }
 
+static MagickBooleanType BlurMotionLine(const MotionRow *row,
+  CacheView *image_view,CacheView *blur_view,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,row->y,row->image->columns,1,
+    row->exception);
+  q=QueueCacheViewAuthenticPixels(blur_view,0,row->y,row->blur_image->columns,
+    1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  if (BlurMotionRow(row,p,q) == MagickFalse)
+    (*status)=MagickFalse;
+  if (SyncCacheViewAuthenticPixels(blur_view,row->exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static void FillMotionOffsets(OffsetInfo *offset,const size_t width,
+  const double angle)
+{
+  PointInfo
+    point;
+
+  ssize_t
+    w;
+
+  point.x=(double) width*sin(DegreesToRadians(angle));
+  point.y=(double) width*cos(DegreesToRadians(angle));
+  for (w=0; w < (ssize_t) width; w++)
+  {
+    offset[w].x=CastDoubleToSsizeT(ceil((double) (w*point.y)/
+      hypot(point.x,point.y)-0.5));
+    offset[w].y=CastDoubleToSsizeT(ceil((double) (w*point.x)/
+      hypot(point.x,point.y)-0.5));
+  }
+}
+
 MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   const double sigma,const double angle,ExceptionInfo *exception)
 {
@@ -2335,14 +2446,10 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
   OffsetInfo
     *offset;
 
-  PointInfo
-    point;
-
   size_t
     width;
 
   ssize_t
-    w,
     y;
 
   assert(image != (Image *) NULL);
@@ -2361,15 +2468,7 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
       kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  point.x=(double) width*sin(DegreesToRadians(angle));
-  point.y=(double) width*cos(DegreesToRadians(angle));
-  for (w=0; w < (ssize_t) width; w++)
-  {
-    offset[w].x=CastDoubleToSsizeT(ceil((double) (w*point.y)/
-      hypot(point.x,point.y)-0.5));
-    offset[w].y=CastDoubleToSsizeT(ceil((double) (w*point.x)/
-      hypot(point.x,point.y)-0.5));
-  }
+  FillMotionOffsets(offset,width,angle);
   /*
     Motion blur image.
   */
@@ -2407,25 +2506,9 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
     MotionRow
       row;
 
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.blur_image=blur_image;
     row.kernel=kernel;
@@ -2434,10 +2517,8 @@ MagickExport Image *MotionBlurImage(const Image *image,const double radius,
     row.width=width;
     row.y=y;
     row.exception=exception;
-    if (BlurMotionRow(&row,p,q) == MagickFalse)
-      status=MagickFalse;
-    if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (BlurMotionLine(&row,image_view,blur_view,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -2898,6 +2979,50 @@ static void RelinquishRotationalTables(double *cos_theta,double *sin_theta)
     sin_theta=(double *) RelinquishMagickMemory(sin_theta);
 }
 
+static MagickBooleanType BlurRotationalLine(const RotationalRow *row,
+  CacheView *image_view,CacheView *blur_view,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,row->y,row->image->columns,1,
+    row->exception);
+  q=QueueCacheViewAuthenticPixels(blur_view,0,row->y,row->blur_image->columns,
+    1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  if (BlurRotationalRow(row,p,q) == MagickFalse)
+    (*status)=MagickFalse;
+  if (SyncCacheViewAuthenticPixels(blur_view,row->exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static void FillRotationalTables(double *cos_theta,double *sin_theta,
+  const size_t n,const double theta)
+{
+  double
+    offset;
+
+  ssize_t
+    w;
+
+  offset=theta*(double) (n-1)/2.0;
+  for (w=0; w < (ssize_t) n; w++)
+  {
+    cos_theta[w]=cos((double) (theta*w-offset));
+    sin_theta[w]=sin((double) (theta*w-offset));
+  }
+}
+
 MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   ExceptionInfo *exception)
 {
@@ -2909,7 +3034,6 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
   double
     blur_radius,
     *cos_theta,
-    offset,
     *sin_theta,
     theta;
 
@@ -2929,7 +3053,6 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
     n;
 
   ssize_t
-    w,
     y;
 
   /*
@@ -2961,12 +3084,7 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
       blur_image=DestroyImage(blur_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  offset=theta*(double) (n-1)/2.0;
-  for (w=0; w < (ssize_t) n; w++)
-  {
-    cos_theta[w]=cos((double) (theta*w-offset));
-    sin_theta[w]=sin((double) (theta*w-offset));
-  }
+  FillRotationalTables(cos_theta,sin_theta,n,theta);
   /*
     Radial blur image.
   */
@@ -2981,25 +3099,9 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
     RotationalRow
       row;
 
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.blur_image=blur_image;
     row.radial_view=radial_view;
@@ -3010,10 +3112,8 @@ MagickExport Image *RotationalBlurImage(const Image *image,const double angle,
     row.n=n;
     row.y=y;
     row.exception=exception;
-    if (BlurRotationalRow(&row,p,q) == MagickFalse)
-      status=MagickFalse;
-    if (SyncCacheViewAuthenticPixels(blur_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (BlurRotationalLine(&row,image_view,blur_view,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -3473,17 +3573,26 @@ typedef struct _SelectiveRow
   const Image
     *luminance_image;
 
+  CacheView
+    *blur_view,
+    *image_view,
+    *luminance_view;
+
   MagickRealType
     *kernel;
 
   ssize_t
-    center;
+    center,
+    y;
 
   double
     threshold;
 
   size_t
     width;
+
+  ExceptionInfo
+    *exception;
 } SelectiveRow;
 
 static void BlurSelectiveRow(const SelectiveRow *row,
@@ -3523,6 +3632,59 @@ static void BlurSelectiveRow(const SelectiveRow *row,
     l+=(ptrdiff_t) GetPixelChannels(row->luminance_image);
     q+=(ptrdiff_t) GetPixelChannels(row->blur_image);
   }
+}
+
+static MagickBooleanType BlurSelectiveLine(const SelectiveRow *row,
+  MagickBooleanType *status)
+{
+  MagickBooleanType
+    sync;
+
+  const Quantum
+    *magick_restrict l,
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,-((ssize_t) (row->width-1)/2L),
+    row->y-(ssize_t) ((row->width-1)/2L),row->image->columns+row->width,
+    row->width,row->exception);
+  l=GetCacheViewVirtualPixels(row->luminance_view,-((ssize_t) (row->width-1)/
+    2L),row->y-(ssize_t) ((row->width-1)/2L),row->luminance_image->columns+
+    row->width,row->width,row->exception);
+  q=QueueCacheViewAuthenticPixels(row->blur_view,0,row->y,
+    row->blur_image->columns,1,row->exception);
+  if (IsSelectiveRowMissing(p,l,q) != MagickFalse)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  BlurSelectiveRow(row,p,l,q);
+  sync=SyncCacheViewAuthenticPixels(row->blur_view,row->exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static MagickBooleanType AcquireSelectiveLuminance(const Image *image,
+  Image **luminance_image,ExceptionInfo *exception)
+{
+  MagickBooleanType
+    status;
+
+  (*luminance_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*luminance_image) == (Image *) NULL)
+    return(MagickFalse);
+  status=TransformImageColorspace((*luminance_image),GRAYColorspace,exception);
+  if (status == MagickFalse)
+    {
+      (*luminance_image)=DestroyImage((*luminance_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
 }
 
 MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
@@ -3581,17 +3743,9 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
       kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
       return((Image *) NULL);
     }
-  luminance_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (luminance_image == (Image *) NULL)
+  if (AcquireSelectiveLuminance(image,&luminance_image,exception) ==
+      MagickFalse)
     {
-      blur_image=DestroyImage(blur_image);
-      kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
-      return((Image *) NULL);
-    }
-  status=TransformImageColorspace(luminance_image,GRAYColorspace,exception);
-  if (status == MagickFalse)
-    {
-      luminance_image=DestroyImage(luminance_image);
       blur_image=DestroyImage(blur_image);
       kernel=(MagickRealType *) RelinquishAlignedMemory(kernel);
       return((Image *) NULL);
@@ -3612,43 +3766,23 @@ MagickExport Image *SelectiveBlurImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MagickBooleanType
-      sync;
-
-    const Quantum
-      *magick_restrict l,
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
     SelectiveRow
       row;
 
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,-((ssize_t) (width-1)/2L),y-(ssize_t)
-      ((width-1)/2L),image->columns+width,width,exception);
-    l=GetCacheViewVirtualPixels(luminance_view,-((ssize_t) (width-1)/2L),y-
-      (ssize_t) ((width-1)/2L),luminance_image->columns+width,width,exception);
-    q=QueueCacheViewAuthenticPixels(blur_view,0,y,blur_image->columns,1,
-      exception);
-    if (IsSelectiveRowMissing(p,l,q) != MagickFalse)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
     row.blur_image=blur_image;
     row.luminance_image=luminance_image;
+    row.blur_view=blur_view;
+    row.image_view=image_view;
+    row.luminance_view=luminance_view;
     row.kernel=kernel;
     row.center=center;
+    row.y=y;
     row.threshold=threshold;
     row.width=width;
-    BlurSelectiveRow(&row,p,l,q);
-    sync=SyncCacheViewAuthenticPixels(blur_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
+    row.exception=exception;
+    if (BlurSelectiveLine(&row,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType

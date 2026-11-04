@@ -188,6 +188,94 @@ static void AddNoisePixelChannels(const Image *image,
   }
 }
 
+typedef struct _AddNoiseRow
+{
+  const Image
+    *image;
+
+  Image
+    *noise_image;
+
+  CacheView
+    *image_view,
+    *noise_view;
+
+  RandomInfo
+    **random_info;
+
+  NoiseType
+    noise_type;
+
+  double
+    attenuate;
+
+  ExceptionInfo
+    *exception;
+} AddNoiseRow;
+
+static MagickBooleanType AddNoiseImageRow(const AddNoiseRow *noise_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = noise_row->image;
+
+  Image
+    *const noise_image = noise_row->noise_image;
+
+  CacheView
+    *const image_view = noise_row->image_view,
+    *const noise_view = noise_row->noise_view;
+
+  RandomInfo
+    **const random_info = noise_row->random_info;
+
+  const NoiseType
+    noise_type = noise_row->noise_type;
+
+  const double
+    attenuate = noise_row->attenuate;
+
+  ExceptionInfo
+    *const exception = noise_row->exception;
+
+  const int
+    id = GetOpenMPThreadId();
+
+  MagickBooleanType
+    sync;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(noise_view,0,y,noise_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    AddNoisePixelChannels(image,noise_image,p,q,random_info[id],noise_type,
+      attenuate);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(noise_image);
+  }
+  sync=SyncCacheViewAuthenticPixels(noise_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
   const double attenuate,ExceptionInfo *exception)
 {
@@ -249,41 +337,19 @@ MagickExport Image *AddNoiseImage(const Image *image,const NoiseType noise_type,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const int
-      id = GetOpenMPThreadId();
+    AddNoiseRow
+      noise_row;
 
-    MagickBooleanType
-      sync;
-
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    noise_row.image=image;
+    noise_row.noise_image=noise_image;
+    noise_row.image_view=image_view;
+    noise_row.noise_view=noise_view;
+    noise_row.random_info=random_info;
+    noise_row.noise_type=noise_type;
+    noise_row.attenuate=attenuate;
+    noise_row.exception=exception;
+    if (AddNoiseImageRow(&noise_row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(noise_view,0,y,noise_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      AddNoisePixelChannels(image,noise_image,p,q,random_info[id],noise_type,
-        attenuate);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(noise_image);
-    }
-    sync=SyncCacheViewAuthenticPixels(noise_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -362,6 +428,94 @@ static Quantum GetPixelMaximumRGB(const Image *image,
   return(quantum);
 }
 
+typedef struct _BlueShiftRow
+{
+  const Image
+    *image;
+
+  Image
+    *shift_image;
+
+  CacheView
+    *image_view,
+    *shift_view;
+
+  double
+    factor;
+
+  ExceptionInfo
+    *exception;
+} BlueShiftRow;
+
+static MagickBooleanType BlueShiftImageRow(const BlueShiftRow *shift_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Image
+    *const image = shift_row->image;
+
+  Image
+    *const shift_image = shift_row->shift_image;
+
+  CacheView
+    *const image_view = shift_row->image_view,
+    *const shift_view = shift_row->shift_view;
+
+  const double
+    factor = shift_row->factor;
+
+  ExceptionInfo
+    *const exception = shift_row->exception;
+
+  MagickBooleanType
+    sync;
+
+  PixelInfo
+    pixel;
+
+  Quantum
+    quantum;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=QueueCacheViewAuthenticPixels(shift_view,0,y,shift_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    quantum=GetPixelMinimumRGB(image,p);
+    pixel.red=0.5*((double) GetPixelRed(image,p)+factor*(double) quantum);
+    pixel.green=0.5*((double) GetPixelGreen(image,p)+factor*(double) quantum);
+    pixel.blue=0.5*((double) GetPixelBlue(image,p)+factor*(double) quantum);
+    quantum=GetPixelMaximumRGB(image,p);
+    pixel.red=0.5*(pixel.red+factor*(double) quantum);
+    pixel.green=0.5*(pixel.green+factor*(double) quantum);
+    pixel.blue=0.5*(pixel.blue+factor*(double) quantum);
+    SetPixelRed(shift_image,ClampToQuantum(pixel.red),q);
+    SetPixelGreen(shift_image,ClampToQuantum(pixel.green),q);
+    SetPixelBlue(shift_image,ClampToQuantum(pixel.blue),q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(shift_image);
+  }
+  sync=SyncCacheViewAuthenticPixels(shift_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *BlueShiftImage(const Image *image,const double factor,
   ExceptionInfo *exception)
 {
@@ -413,53 +567,17 @@ MagickExport Image *BlueShiftImage(const Image *image,const double factor,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    MagickBooleanType
-      sync;
+    BlueShiftRow
+      shift_row;
 
-    PixelInfo
-      pixel;
-
-    Quantum
-      quantum;
-
-    const Quantum
-      *magick_restrict p;
-
-    ssize_t
-      x;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    shift_row.image=image;
+    shift_row.shift_image=shift_image;
+    shift_row.image_view=image_view;
+    shift_row.shift_view=shift_view;
+    shift_row.factor=factor;
+    shift_row.exception=exception;
+    if (BlueShiftImageRow(&shift_row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=QueueCacheViewAuthenticPixels(shift_view,0,y,shift_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      quantum=GetPixelMinimumRGB(image,p);
-      pixel.red=0.5*((double) GetPixelRed(image,p)+factor*(double) quantum);
-      pixel.green=0.5*((double) GetPixelGreen(image,p)+factor*(double) quantum);
-      pixel.blue=0.5*((double) GetPixelBlue(image,p)+factor*(double) quantum);
-      quantum=GetPixelMaximumRGB(image,p);
-      pixel.red=0.5*(pixel.red+factor*(double) quantum);
-      pixel.green=0.5*(pixel.green+factor*(double) quantum);
-      pixel.blue=0.5*(pixel.blue+factor*(double) quantum);
-      SetPixelRed(shift_image,ClampToQuantum(pixel.red),q);
-      SetPixelGreen(shift_image,ClampToQuantum(pixel.green),q);
-      SetPixelBlue(shift_image,ClampToQuantum(pixel.blue),q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(shift_image);
-    }
-    sync=SyncCacheViewAuthenticPixels(shift_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -641,6 +759,82 @@ static PixelInfo ParseColorizeBlendPercentage(const Image *colorize_image,
   return(blend_percentage);
 }
 
+typedef struct _ColorizeRow
+{
+  CacheView
+    *image_view;
+
+  Image
+    *colorize_image;
+
+  PixelInfo
+    blend_percentage;
+
+  const PixelInfo
+    *colorize;
+
+  ExceptionInfo
+    *exception;
+} ColorizeRow;
+
+static MagickBooleanType ColorizeImageRow(const ColorizeRow *colorize_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  CacheView
+    *const image_view = colorize_row->image_view;
+
+  Image
+    *const colorize_image = colorize_row->colorize_image;
+
+  const PixelInfo
+    blend_percentage = colorize_row->blend_percentage;
+
+  const PixelInfo
+    *const colorize = colorize_row->colorize;
+
+  ExceptionInfo
+    *const exception = colorize_row->exception;
+
+  MagickBooleanType
+    sync;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,colorize_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) colorize_image->columns; x++)
+  {
+    ColorizePixelChannels(colorize_image,&blend_percentage,colorize,q);
+    q+=(ptrdiff_t) GetPixelChannels(colorize_image);
+  }
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static void ConformColorizeImage(Image *colorize_image,
+  const PixelInfo *colorize,ExceptionInfo *exception)
+{
+  if ((IsGrayColorspace(colorize_image->colorspace) != MagickFalse) ||
+      (IsPixelInfoGray(colorize) != MagickFalse))
+    (void) SetImageColorspace(colorize_image,sRGBColorspace,exception);
+  if ((colorize_image->alpha_trait == UndefinedPixelTrait) &&
+      (colorize->alpha_trait != UndefinedPixelTrait))
+    (void) SetImageAlpha(colorize_image,OpaqueAlpha,exception);
+}
+
 MagickExport Image *ColorizeImage(const Image *image,const char *blend,
   const PixelInfo *colorize,ExceptionInfo *exception)
 {
@@ -681,12 +875,7 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
       colorize_image=DestroyImage(colorize_image);
       return((Image *) NULL);
     }
-  if ((IsGrayColorspace(colorize_image->colorspace) != MagickFalse) ||
-      (IsPixelInfoGray(colorize) != MagickFalse))
-    (void) SetImageColorspace(colorize_image,sRGBColorspace,exception);
-  if ((colorize_image->alpha_trait == UndefinedPixelTrait) &&
-      (colorize->alpha_trait != UndefinedPixelTrait))
-    (void) SetImageAlpha(colorize_image,OpaqueAlpha,exception);
+  ConformColorizeImage(colorize_image,colorize,exception);
   if (blend == (const char *) NULL)
     return(colorize_image);
   blend_percentage=ParseColorizeBlendPercentage(colorize_image,blend);
@@ -702,32 +891,16 @@ MagickExport Image *ColorizeImage(const Image *image,const char *blend,
 #endif
   for (y=0; y < (ssize_t) colorize_image->rows; y++)
   {
-    MagickBooleanType
-      sync;
+    ColorizeRow
+      colorize_row;
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    colorize_row.image_view=image_view;
+    colorize_row.colorize_image=colorize_image;
+    colorize_row.blend_percentage=blend_percentage;
+    colorize_row.colorize=colorize;
+    colorize_row.exception=exception;
+    if (ColorizeImageRow(&colorize_row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,colorize_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) colorize_image->columns; x++)
-    {
-      ColorizePixelChannels(colorize_image,&blend_percentage,colorize,q);
-      q+=(ptrdiff_t) GetPixelChannels(colorize_image);
-    }
-    sync=SyncCacheViewAuthenticPixels(image_view,exception);
-    if (sync == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -872,6 +1045,13 @@ typedef struct _ColorMatrixRow
 
   const KernelInfo
     *color_matrix;
+
+  CacheView
+    *image_view,
+    *color_view;
+
+  ExceptionInfo
+    *exception;
 } ColorMatrixRow;
 
 static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
@@ -916,6 +1096,45 @@ static void ApplyColorMatrixRow(const ColorMatrixRow *color_row,
     p+=(ptrdiff_t) GetPixelChannels(image);
     q+=(ptrdiff_t) GetPixelChannels(color_image);
   }
+}
+
+static MagickBooleanType ColorMatrixImageRow(
+  const ColorMatrixRow *color_row,double ColorMatrix[][6],const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Image
+    *const image = color_row->image;
+
+  Image
+    *const color_image = color_row->color_image;
+
+  CacheView
+    *const image_view = color_row->image_view,
+    *const color_view = color_row->color_view;
+
+  ExceptionInfo
+    *const exception = color_row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(color_view,0,y,color_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ApplyColorMatrixRow(color_row,ColorMatrix,p,q);
+  if (SyncCacheViewAuthenticPixels(color_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
 }
 
 MagickExport Image *ColorMatrixImage(const Image *image,
@@ -989,28 +1208,14 @@ MagickExport Image *ColorMatrixImage(const Image *image,
     ColorMatrixRow
       color_row;
 
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(color_view,0,y,color_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
     color_row.image=image;
     color_row.color_image=color_image;
     color_row.color_matrix=color_matrix;
-    ApplyColorMatrixRow(&color_row,ColorMatrix,p,q);
-    if (SyncCacheViewAuthenticPixels(color_view,exception) == MagickFalse)
-      status=MagickFalse;
+    color_row.image_view=image_view;
+    color_row.color_view=color_view;
+    color_row.exception=exception;
+    if (ColorMatrixImageRow(&color_row,ColorMatrix,y,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -1338,6 +1543,150 @@ static MagickBooleanType ReportMorphProgress(const Image *image,
   return(status);
 }
 
+static void ReportMorphFrameProgress(const Image *image,const ssize_t n,
+  const size_t number_frames,MagickBooleanType *status)
+{
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,MorphImageTag,(MagickOffsetType) n,
+        number_frames);
+      if (proceed == MagickFalse)
+        (*status)=MagickFalse;
+    }
+}
+
+typedef struct _MorphFrameRowInfo
+{
+  CacheView
+    *image_view;
+
+  Image
+    *morph_image;
+
+  ExceptionInfo
+    *exception;
+
+  CacheView
+    *morph_view;
+
+  Image
+    *morph_images;
+
+  double
+    alpha;
+
+  double
+    beta;
+} MorphFrameRowInfo;
+
+static void MorphFrameRow(MagickBooleanType *status,
+  const MorphFrameRowInfo *info,const ssize_t y)
+{
+  CacheView
+    *const image_view = info->image_view;
+
+  Image
+    *const morph_image = info->morph_image;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  CacheView
+    *const morph_view = info->morph_view;
+
+  Image
+    *const morph_images = info->morph_images;
+
+  const double
+    alpha = info->alpha;
+
+  const double
+    beta = info->beta;
+
+  MagickBooleanType
+    sync;
+
+  const Quantum
+    *magick_restrict p;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,morph_image->columns,1,
+    exception);
+  q=GetCacheViewAuthenticPixels(morph_view,0,y,morph_images->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=0; x < (ssize_t) morph_images->columns; x++)
+  {
+    MorphPixelChannels(morph_image,morph_images,p,q,alpha,beta);
+    p+=(ptrdiff_t) GetPixelChannels(morph_image);
+    q+=(ptrdiff_t) GetPixelChannels(morph_images);
+  }
+  sync=SyncCacheViewAuthenticPixels(morph_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+typedef struct _MorphSingleInfo
+{
+  const Image
+    *image;
+
+  size_t
+    number_frames;
+
+  ExceptionInfo
+    *exception;
+} MorphSingleInfo;
+
+static Image *MorphSingleImage(const MorphSingleInfo *single,
+  Image *morph_images,MagickBooleanType *status)
+{
+  const Image
+    *const image = single->image;
+
+  const size_t
+    number_frames = single->number_frames;
+
+  ExceptionInfo
+    *const exception = single->exception;
+
+  Image
+    *morph_image;
+
+  ssize_t
+    n;
+
+  /*
+    Morph single image.
+  */
+  for (n=1; n < (ssize_t) number_frames; n++)
+  {
+    morph_image=CloneImage(image,0,0,MagickTrue,exception);
+    if (morph_image == (Image *) NULL)
+      {
+        morph_images=DestroyImageList(morph_images);
+        return((Image *) NULL);
+      }
+    AppendImageToList(&morph_images,morph_image);
+    ReportMorphFrameProgress(image,n,number_frames,status);
+  }
+  return(GetFirstImageInList(morph_images));
+}
+
 MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
   ExceptionInfo *exception)
 {
@@ -1378,30 +1727,13 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
     return((Image *) NULL);
   if (GetNextImageInList(image) == (Image *) NULL)
     {
-      /*
-        Morph single image.
-      */
-      for (n=1; n < (ssize_t) number_frames; n++)
-      {
-        morph_image=CloneImage(image,0,0,MagickTrue,exception);
-        if (morph_image == (Image *) NULL)
-          {
-            morph_images=DestroyImageList(morph_images);
-            return((Image *) NULL);
-          }
-        AppendImageToList(&morph_images,morph_image);
-        if (image->progress_monitor != (MagickProgressMonitor) NULL)
-          {
-            MagickBooleanType
-              proceed;
+      MorphSingleInfo
+        single;
 
-            proceed=SetImageProgress(image,MorphImageTag,(MagickOffsetType) n,
-              number_frames);
-            if (proceed == MagickFalse)
-              status=MagickFalse;
-          }
-      }
-      return(GetFirstImageInList(morph_images));
+      single.image=image;
+      single.number_frames=number_frames;
+      single.exception=exception;
+      return(MorphSingleImage(&single,morph_images,&status));
     }
   /*
     Morph image sequence.
@@ -1450,38 +1782,17 @@ MagickExport Image *MorphImages(const Image *image,const size_t number_frames,
 #endif
       for (y=0; y < (ssize_t) morph_images->rows; y++)
       {
-        MagickBooleanType
-          sync;
+        MorphFrameRowInfo
+          info;
 
-        const Quantum
-          *magick_restrict p;
-
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        p=GetCacheViewVirtualPixels(image_view,0,y,morph_image->columns,1,
-          exception);
-        q=GetCacheViewAuthenticPixels(morph_view,0,y,morph_images->columns,1,
-          exception);
-        if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=0; x < (ssize_t) morph_images->columns; x++)
-        {
-          MorphPixelChannels(morph_image,morph_images,p,q,alpha,beta);
-          p+=(ptrdiff_t) GetPixelChannels(morph_image);
-          q+=(ptrdiff_t) GetPixelChannels(morph_images);
-        }
-        sync=SyncCacheViewAuthenticPixels(morph_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        info.image_view=image_view;
+        info.morph_image=morph_image;
+        info.exception=exception;
+        info.morph_view=morph_view;
+        info.morph_images=morph_images;
+        info.alpha=alpha;
+        info.beta=beta;
+        MorphFrameRow(&status,&info,y);
       }
       morph_view=DestroyCacheView(morph_view);
       image_view=DestroyCacheView(image_view);
@@ -2779,6 +3090,60 @@ static void SolarizeColormap(Image *image,const double threshold)
   }
 }
 
+typedef struct _SolarizeRow
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  double
+    threshold;
+
+  ExceptionInfo
+    *exception;
+} SolarizeRow;
+
+static MagickBooleanType SolarizeImageRow(const SolarizeRow *solarize_row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *const image = solarize_row->image;
+
+  CacheView
+    *const image_view = solarize_row->image_view;
+
+  const double
+    threshold = solarize_row->threshold;
+
+  ExceptionInfo
+    *const exception = solarize_row->exception;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    SolarizePixelChannels(image,threshold,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType SolarizeImage(Image *image,
   const double threshold,ExceptionInfo *exception)
 {
@@ -2822,27 +3187,15 @@ MagickExport MagickBooleanType SolarizeImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ssize_t
-      x;
+    SolarizeRow
+      solarize_row;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    solarize_row.image=image;
+    solarize_row.image_view=image_view;
+    solarize_row.threshold=threshold;
+    solarize_row.exception=exception;
+    if (SolarizeImageRow(&solarize_row,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      SolarizePixelChannels(image,threshold,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -4005,6 +4358,91 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _WaveRow
+{
+  Image
+    *canvas_image,
+    *wave_image;
+
+  CacheView
+    *canvas_image_view,
+    *wave_view;
+
+  float
+    *sine_map;
+
+  PixelInterpolateMethod
+    method;
+
+  ExceptionInfo
+    *exception;
+} WaveRow;
+
+static MagickBooleanType WaveImageRow(const WaveRow *wave_row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *const canvas_image = wave_row->canvas_image,
+    *const wave_image = wave_row->wave_image;
+
+  CacheView
+    *const canvas_image_view = wave_row->canvas_image_view,
+    *const wave_view = wave_row->wave_view;
+
+  float
+    *const sine_map = wave_row->sine_map;
+
+  const PixelInterpolateMethod
+    method = wave_row->method;
+
+  ExceptionInfo
+    *const exception = wave_row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(canvas_image_view,0,y,canvas_image->columns,1,
+    exception);
+  q=QueueCacheViewAuthenticPixels(wave_view,0,y,wave_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) wave_image->columns; x++)
+  {
+    (*status)=InterpolatePixelChannels(canvas_image,canvas_image_view,
+      wave_image,method,(double) x,(double) (y-sine_map[x]),q,exception);
+    if ((*status) == MagickFalse)
+      break;
+    p+=(ptrdiff_t) GetPixelChannels(canvas_image);
+    q+=(ptrdiff_t) GetPixelChannels(wave_image);
+  }
+  if (SyncCacheViewAuthenticPixels(wave_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+static void FillSineMap(float *sine_map,const size_t columns,
+  const double amplitude,const double wave_length)
+{
+  ssize_t
+    i;
+
+  for (i=0; i < (ssize_t) columns; i++)
+    sine_map[i]=(float) (fabs(amplitude)+amplitude*sin((double)
+      ((2.0*MagickPI*i)*(double) MagickSafeReciprocal(wave_length))));
+}
+
 MagickExport Image *WaveImage(const Image *image,const double amplitude,
   const double wave_length,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -4027,9 +4465,6 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
 
   MagickOffsetType
     progress;
-
-  ssize_t
-    i;
 
   ssize_t
     y;
@@ -4073,9 +4508,7 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
       wave_image=DestroyImage(wave_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  for (i=0; i < (ssize_t) wave_image->columns; i++)
-    sine_map[i]=(float) (fabs(amplitude)+amplitude*sin((double)
-      ((2.0*MagickPI*i)*(double) MagickSafeReciprocal(wave_length))));
+  FillSineMap(sine_map,wave_image->columns,amplitude,wave_length);
   /*
     Wave image.
   */
@@ -4091,37 +4524,18 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
 #endif
   for (y=0; y < (ssize_t) wave_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    WaveRow
+      wave_row;
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    wave_row.canvas_image=canvas_image;
+    wave_row.wave_image=wave_image;
+    wave_row.canvas_image_view=canvas_image_view;
+    wave_row.wave_view=wave_view;
+    wave_row.sine_map=sine_map;
+    wave_row.method=method;
+    wave_row.exception=exception;
+    if (WaveImageRow(&wave_row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(canvas_image_view,0,y,canvas_image->columns,1,
-      exception);
-    q=QueueCacheViewAuthenticPixels(wave_view,0,y,wave_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) wave_image->columns; x++)
-    {
-      status=InterpolatePixelChannels(canvas_image,canvas_image_view,
-        wave_image,method,(double) x,(double) (y-sine_map[x]),q,exception);
-      if (status == MagickFalse)
-        break;
-      p+=(ptrdiff_t) GetPixelChannels(canvas_image);
-      q+=(ptrdiff_t) GetPixelChannels(wave_image);
-    }
-    if (SyncCacheViewAuthenticPixels(wave_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType

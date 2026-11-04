@@ -102,10 +102,14 @@ typedef struct _SampleRow
     *sample_image;
 
   CacheView
-    *image_view;
+    *image_view,
+    *sample_view;
 
   PointInfo
     sample_offset;
+
+  ExceptionInfo
+    *exception;
 } SampleRow;
 
 /*
@@ -253,11 +257,54 @@ static Image *FinishSampleImage(const Image *image,Image *sample_image,
   return(sample_image);
 }
 
-MagickExport Image *SampleImage(const Image *image,const size_t columns,
-  const size_t rows,ExceptionInfo *exception)
+static void SampleImageLine(const SampleRow *row,const ssize_t y,
+  MagickBooleanType *status,MagickOffsetType *progress)
 {
 #define SampleImageTag  "Sample/Image"
 
+  const Image
+    *image = row->image,
+    *sample_image = row->sample_image;
+
+  CacheView
+    *sample_view = row->sample_view;
+
+  ExceptionInfo
+    *exception = row->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=QueueCacheViewAuthenticPixels(sample_view,0,y,sample_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  /*
+    Sample each column.
+  */
+  if (SampleImageRow(row,y,q,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  if (SyncCacheViewAuthenticPixels(sample_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  if (image->progress_monitor != (MagickProgressMonitor) NULL)
+    {
+      MagickBooleanType
+        proceed;
+
+      proceed=SetImageProgress(image,SampleImageTag,(*progress)++,image->rows);
+      if (proceed == MagickFalse)
+        (*status)=MagickFalse;
+    }
+}
+
+MagickExport Image *SampleImage(const Image *image,const size_t columns,
+  const size_t rows,ExceptionInfo *exception)
+{
   CacheView
     *image_view,
     *sample_view;
@@ -310,36 +357,10 @@ MagickExport Image *SampleImage(const Image *image,const size_t columns,
 #endif
   for (y=0; y < (ssize_t) sample_image->rows; y++)
   {
-    const SampleRow row = { image, sample_image, image_view, sample_offset };
+    const SampleRow row = { image, sample_image, image_view, sample_view,
+      sample_offset, exception };
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    q=QueueCacheViewAuthenticPixels(sample_view,0,y,sample_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    /*
-      Sample each column.
-    */
-    if (SampleImageRow(&row,y,q,exception) == MagickFalse)
-      status=MagickFalse;
-    if (SyncCacheViewAuthenticPixels(sample_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        proceed=SetImageProgress(image,SampleImageTag,progress++,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+    SampleImageLine(&row,y,&status,&progress);
   }
   image_view=DestroyCacheView(image_view);
   sample_view=DestroyCacheView(sample_view);

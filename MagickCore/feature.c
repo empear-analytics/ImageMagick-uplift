@@ -179,6 +179,40 @@ static inline MagickBooleanType IsUntracedEdgePixel(const Image *edge_image,
     (pixel.intensity >= lower_threshold)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType SeedCannyTrace(const CannyTrace *trace,
+  const ssize_t x,const ssize_t y,ExceptionInfo *exception)
+{
+  CacheView
+    *edge_view = trace->edge_view;
+
+  MatrixInfo
+    *canny_cache = trace->canny_cache;
+
+  CannyInfo
+    edge;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *q;
+
+  q=GetCacheViewAuthenticPixels(edge_view,x,y,1,1,exception);
+  if (q == (Quantum *) NULL)
+    return(MagickFalse);
+  *q=QuantumRange;
+  status=SyncCacheViewAuthenticPixels(edge_view,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  if (GetMatrixElement(canny_cache,0,0,&edge) == MagickFalse)
+    return(MagickFalse);
+  edge.x=x;
+  edge.y=y;
+  if (SetMatrixElement(canny_cache,0,0,&edge) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   const ssize_t y,ExceptionInfo *exception)
 {
@@ -207,18 +241,7 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   ssize_t
     i;
 
-  q=GetCacheViewAuthenticPixels(edge_view,x,y,1,1,exception);
-  if (q == (Quantum *) NULL)
-    return(MagickFalse);
-  *q=QuantumRange;
-  status=SyncCacheViewAuthenticPixels(edge_view,exception);
-  if (status == MagickFalse)
-    return(MagickFalse);
-  if (GetMatrixElement(canny_cache,0,0,&edge) == MagickFalse)
-    return(MagickFalse);
-  edge.x=x;
-  edge.y=y;
-  if (SetMatrixElement(canny_cache,0,0,&edge) == MagickFalse)
+  if (SeedCannyTrace(trace,x,y,exception) == MagickFalse)
     return(MagickFalse);
   for (i=1; i != 0; )
   {
@@ -309,10 +332,26 @@ static CannyInfo SetCannyOrientation(CannyInfo pixel,const double dx,
   return(pixel);
 }
 
-static void GetCannyNeighbors(const MatrixInfo *canny_cache,const ssize_t x,
-  const ssize_t y,const int orientation,CannyInfo *alpha_pixel,
-  CannyInfo *beta_pixel)
+typedef struct _CannyPosition
 {
+  ssize_t
+    x,
+    y;
+
+  int
+    orientation;
+} CannyPosition;
+
+static void GetCannyNeighbors(const MatrixInfo *canny_cache,
+  const CannyPosition *position,CannyInfo *alpha_pixel,CannyInfo *beta_pixel)
+{
+  const ssize_t
+    x = position->x,
+    y = position->y;
+
+  const int
+    orientation = position->orientation;
+
   switch (orientation)
   {
     case 0:
@@ -480,9 +519,14 @@ static CannyInfo SuppressCannyNonMaxima(MatrixInfo *canny_cache,
     beta_pixel,
     pixel;
 
+  CannyPosition
+    position;
+
   (void) GetMatrixElement(canny_cache,x,y,&pixel);
-  GetCannyNeighbors(canny_cache,x,y,pixel.orientation,&alpha_pixel,
-    &beta_pixel);
+  position.x=x;
+  position.y=y;
+  position.orientation=pixel.orientation;
+  GetCannyNeighbors(canny_cache,&position,&alpha_pixel,&beta_pixel);
   pixel.intensity=pixel.magnitude;
   if ((pixel.magnitude < alpha_pixel.magnitude) ||
       (pixel.magnitude < beta_pixel.magnitude))
@@ -500,6 +544,64 @@ static MagickBooleanType SetCannyEdgeGray(Image *edge_image,
       return(MagickFalse);
     }
   (void) SetImageAlphaChannel(edge_image,OffAlphaChannel,exception);
+  return(MagickTrue);
+}
+
+typedef struct _ComputeCannyGradientRowInfo
+{
+  CacheView
+    *edge_view;
+
+  Image
+    *edge_image;
+
+  ExceptionInfo
+    *exception;
+
+  MatrixInfo
+    *canny_cache;
+} ComputeCannyGradientRowInfo;
+
+static void ComputeCannyGradientRow(MagickBooleanType *status,
+  const ComputeCannyGradientRowInfo *info,const ssize_t y)
+{
+  CacheView
+    *const edge_view = info->edge_view;
+
+  Image
+    *const edge_image = info->edge_image;
+
+  ExceptionInfo
+    *const exception = info->exception;
+
+  MatrixInfo
+    *const canny_cache = info->canny_cache;
+
+  const Quantum
+    *magick_restrict p;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns+1,2,
+    exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  SetCannyGradientRow(edge_image,canny_cache,p,y);
+}
+
+static MagickBooleanType BlurCannyImage(const Image *image,
+  KernelInfo *kernel_info,Image **edge_image,ExceptionInfo *exception)
+{
+  (*edge_image)=MorphologyImage(image,ConvolveMorphology,1,kernel_info,
+    exception);
+  kernel_info=DestroyKernelInfo(kernel_info);
+  if ((*edge_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetCannyEdgeGray((*edge_image),exception) == MagickFalse)
+    return(MagickFalse);
   return(MagickTrue);
 }
 
@@ -558,11 +660,7 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
   kernel_info=AcquireKernelInfo(geometry,exception);
   if (kernel_info == (KernelInfo *) NULL)
     ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
-  edge_image=MorphologyImage(image,ConvolveMorphology,1,kernel_info,exception);
-  kernel_info=DestroyKernelInfo(kernel_info);
-  if (edge_image == (Image *) NULL)
-    return((Image *) NULL);
-  if (SetCannyEdgeGray(edge_image,exception) == MagickFalse)
+  if (BlurCannyImage(image,kernel_info,&edge_image,exception) == MagickFalse)
     return((Image *) NULL);
   /*
     Find the intensity gradient of the image.
@@ -582,19 +680,14 @@ MagickExport Image *CannyEdgeImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) edge_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    ComputeCannyGradientRowInfo
+      info;
 
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(edge_view,0,y,edge_image->columns+1,2,
-      exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    SetCannyGradientRow(edge_image,canny_cache,p,y);
+    info.edge_view=edge_view;
+    info.edge_image=edge_image;
+    info.exception=exception;
+    info.canny_cache=canny_cache;
+    ComputeCannyGradientRow(&status,&info,y);
   }
   edge_view=DestroyCacheView(edge_view);
   /*
@@ -1096,6 +1189,96 @@ static Image *AppendHoughAccumulator(Image *lines_image,
   return(lines_image);
 }
 
+typedef struct _HoughOutput
+{
+  const Image
+    *image;
+
+  MatrixInfo
+    *accumulator;
+
+  size_t
+    accumulator_width,
+    accumulator_height,
+    threshold;
+} HoughOutput;
+
+static MagickBooleanType WriteHoughFile(const HoughOutput *output,
+  const HoughWindow window,char *path)
+{
+  const Image
+    *const image = output->image;
+
+  MatrixInfo
+    *const accumulator = output->accumulator;
+
+  const size_t
+    accumulator_width = output->accumulator_width,
+    accumulator_height = output->accumulator_height,
+    threshold = output->threshold;
+
+  HoughSegments
+    segments;
+
+  int
+    file;
+
+  MagickBooleanType
+    status;
+
+  size_t
+    line_count;
+
+  file=AcquireUniqueFileResource(path);
+  if (file == -1)
+    return(MagickFalse);
+  status=WriteHoughHeader(image,file,&window,threshold);
+  line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
+  if (threshold != 0)
+    line_count=threshold;
+  segments.accumulator=accumulator;
+  segments.image=image;
+  segments.accumulator_width=accumulator_width;
+  segments.accumulator_height=accumulator_height;
+  segments.line_count=line_count;
+  segments.file=file;
+  status=WriteHoughLines(&segments,window,status);
+  (void) close_utf8(file);
+  return(MagickTrue);
+}
+
+static Image *RenderHoughImage(const Image *image,const char *path,
+  MatrixInfo *accumulator,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  Image
+    *lines_image = NULL;
+
+  ImageInfo
+    *image_info;
+
+  /*
+    Render lines to image canvas.
+  */
+  image_info=AcquireImageInfo();
+  image_info->background_color=image->background_color;
+  (void) FormatLocaleString(image_info->filename,MagickPathExtent,"%s",path);
+  SetHoughDrawOptions(image,image_info);
+  lines_image=RenderHoughLines(image_info,image->columns,image->rows,exception);
+  artifact=GetImageArtifact(image,"hough-lines:accumulator");
+  lines_image=AppendHoughAccumulator(lines_image,accumulator,artifact,
+    exception);
+  /*
+    Free resources.
+  */
+  accumulator=DestroyMatrixInfo(accumulator);
+  image_info=DestroyImageInfo(image_info);
+  (void) RelinquishUniqueFileResource(path);
+  return(GetFirstImageInList(lines_image));
+}
+
 MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   const size_t height,const size_t threshold,ExceptionInfo *exception)
 {
@@ -1107,26 +1290,14 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   char
     path[MagickPathExtent];
 
-  const char
-    *artifact;
-
   double
     hough_height;
 
   const HoughWindow
     window = { width, height };
 
-  HoughSegments
-    segments;
-
-  Image
-    *lines_image = NULL;
-
-  ImageInfo
-    *image_info;
-
-  int
-    file;
+  HoughOutput
+    output;
 
   MagickBooleanType
     status;
@@ -1145,8 +1316,7 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
 
   size_t
     accumulator_height,
-    accumulator_width,
-    line_count;
+    accumulator_width;
 
   /*
     Create the accumulator.
@@ -1222,42 +1392,17 @@ MagickExport Image *HoughLineImage(const Image *image,const size_t width,
   /*
     Generate line segments from accumulator.
   */
-  file=AcquireUniqueFileResource(path);
-  if (file == -1)
+  output.image=image;
+  output.accumulator=accumulator;
+  output.accumulator_width=accumulator_width;
+  output.accumulator_height=accumulator_height;
+  output.threshold=threshold;
+  if (WriteHoughFile(&output,window,path) == MagickFalse)
     {
       accumulator=DestroyMatrixInfo(accumulator);
       return((Image *) NULL);
     }
-  status=WriteHoughHeader(image,file,&window,threshold);
-  line_count=image->columns > image->rows ? image->columns/4 : image->rows/4;
-  if (threshold != 0)
-    line_count=threshold;
-  segments.accumulator=accumulator;
-  segments.image=image;
-  segments.accumulator_width=accumulator_width;
-  segments.accumulator_height=accumulator_height;
-  segments.line_count=line_count;
-  segments.file=file;
-  status=WriteHoughLines(&segments,window,status);
-  (void) close_utf8(file);
-  /*
-    Render lines to image canvas.
-  */
-  image_info=AcquireImageInfo();
-  image_info->background_color=image->background_color;
-  (void) FormatLocaleString(image_info->filename,MagickPathExtent,"%s",path);
-  SetHoughDrawOptions(image,image_info);
-  lines_image=RenderHoughLines(image_info,image->columns,image->rows,exception);
-  artifact=GetImageArtifact(image,"hough-lines:accumulator");
-  lines_image=AppendHoughAccumulator(lines_image,accumulator,artifact,
-    exception);
-  /*
-    Free resources.
-  */
-  accumulator=DestroyMatrixInfo(accumulator);
-  image_info=DestroyImageInfo(image_info);
-  (void) RelinquishUniqueFileResource(path);
-  return(GetFirstImageInList(lines_image));
+  return(RenderHoughImage(image,path,accumulator,exception));
 }
 
 /*
@@ -1341,10 +1486,290 @@ static void SetMeanShiftPixel(const Image *mean_image,
   SetPixelAlpha(mean_image,ClampToQuantum(mean_pixel.alpha),q);
 }
 
+typedef struct _MeanShiftInfo
+{
+  const Image
+    *image;
+
+  Image
+    *mean_image;
+
+  CacheView
+    *image_view,
+    *mean_view,
+    *pixel_view;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    width,
+    height;
+
+  double
+    color_distance;
+
+  ssize_t
+    y;
+} MeanShiftInfo;
+
+typedef struct _MeanShiftTargets
+{
+  PointInfo
+    *mean_location;
+
+  PixelInfo
+    *mean_pixel;
+} MeanShiftTargets;
+
+typedef struct _MeanShiftSum
+{
+  PointInfo
+    sum_location,
+    previous_location;
+
+  PixelInfo
+    sum_pixel,
+    previous_pixel;
+
+  ssize_t
+    count;
+} MeanShiftSum;
+
+static MagickBooleanType MeanShiftUpdate(const MeanShiftSum *sum,
+  PointInfo *mean_location,PixelInfo *mean_pixel)
+{
+  const PointInfo
+    sum_location = sum->sum_location,
+    previous_location = sum->previous_location;
+
+  const PixelInfo
+    sum_pixel = sum->sum_pixel,
+    previous_pixel = sum->previous_pixel;
+
+  const ssize_t
+    count = sum->count;
+
+  double
+    distance,
+    gamma = 1.0;
+
+  if (count != 0)
+    gamma=MagickSafeReciprocal((double) count);
+  (*mean_location).x=gamma*sum_location.x;
+  (*mean_location).y=gamma*sum_location.y;
+  (*mean_pixel).red=gamma*sum_pixel.red;
+  (*mean_pixel).green=gamma*sum_pixel.green;
+  (*mean_pixel).blue=gamma*sum_pixel.blue;
+  (*mean_pixel).alpha=gamma*sum_pixel.alpha;
+  distance=GetMeanShiftDistance((*mean_location),previous_location,
+    (*mean_pixel),previous_pixel);
+  if (distance <= 3.0)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
+static MagickBooleanType MeanShiftStep(const MeanShiftInfo *shift,
+  MagickBooleanType *status,const MeanShiftTargets *targets)
+{
+  const Image
+    *const image = shift->image;
+
+  CacheView
+    *const pixel_view = shift->pixel_view;
+
+  ExceptionInfo
+    *const exception = shift->exception;
+
+  const size_t
+    width = shift->width,
+    height = shift->height;
+
+  const double
+    color_distance = shift->color_distance;
+
+  PointInfo
+    *const mean_location = targets->mean_location;
+
+  PixelInfo
+    *const mean_pixel = targets->mean_pixel;
+
+  double
+    distance;
+
+  PixelInfo
+    previous_pixel,
+    sum_pixel;
+
+  PointInfo
+    previous_location,
+    sum_location;
+
+  MeanShiftSum
+    sum;
+
+  ssize_t
+    count,
+    v;
+
+  sum_location.x=0.0;
+  sum_location.y=0.0;
+  GetPixelInfo(image,&sum_pixel);
+  previous_location=(*mean_location);
+  previous_pixel=(*mean_pixel);
+  count=0;
+  for (v=(-((ssize_t) height/2)); v <= (((ssize_t) height/2)); v++)
+  {
+    ssize_t
+      u;
+
+    for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
+    {
+      PixelInfo
+        pixel;
+
+      if ((v*v+u*u) > (ssize_t) ((width/2)*(height/2)))
+        continue;
+      (*status)=GetOneCacheViewVirtualPixelInfo(pixel_view,(ssize_t)
+        MagickRound((*mean_location).x+u),(ssize_t) MagickRound(
+        (*mean_location).y+v),&pixel,exception);
+      distance=GetMeanShiftColorDistance((*mean_pixel),pixel);
+      if (!(distance <= (color_distance*color_distance)))
+        continue;
+      sum_location.x+=(*mean_location).x+u;
+      sum_location.y+=(*mean_location).y+v;
+      sum_pixel.red+=pixel.red;
+      sum_pixel.green+=pixel.green;
+      sum_pixel.blue+=pixel.blue;
+      sum_pixel.alpha+=pixel.alpha;
+      count++;
+    }
+  }
+  sum.sum_location=sum_location;
+  sum.sum_pixel=sum_pixel;
+  sum.count=count;
+  sum.previous_location=previous_location;
+  sum.previous_pixel=previous_pixel;
+  return(MeanShiftUpdate(&sum,mean_location,mean_pixel));
+}
+
+static void MeanShiftRow(MagickBooleanType *status,const MeanShiftInfo *shift,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+#define MaxMeanShiftIterations  100
+
+  const Image
+    *const image = shift->image;
+
+  Image
+    *const mean_image = shift->mean_image;
+
+  const ssize_t
+    y = shift->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) mean_image->columns; x++)
+  {
+    PixelInfo
+      mean_pixel;
+
+    PointInfo
+      mean_location;
+
+    const MeanShiftTargets
+      targets = { &mean_location, &mean_pixel };
+
+    ssize_t
+      i;
+
+    GetPixelInfo(image,&mean_pixel);
+    GetPixelInfoPixel(image,p,&mean_pixel);
+    mean_location.x=(double) x;
+    mean_location.y=(double) y;
+    for (i=0; i < MaxMeanShiftIterations; i++)
+    {
+      if (MeanShiftStep(shift,status,&targets) == MagickFalse)
+        break;
+    }
+    SetMeanShiftPixel(mean_image,mean_pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(mean_image);
+  }
+}
+
+static void MeanShiftLine(MagickBooleanType *status,
+  const MeanShiftInfo *shift,const Quantum *magick_restrict p,
+  Quantum *magick_restrict q)
+{
+  CacheView
+    *const mean_view = shift->mean_view;
+
+  ExceptionInfo
+    *const exception = shift->exception;
+
+  MeanShiftRow(status,shift,p,q);
+  if (SyncCacheViewAuthenticPixels(mean_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static MagickBooleanType AcquireMeanShiftImage(const Image *image,
+  Image **mean_image,ExceptionInfo *exception)
+{
+  (*mean_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*mean_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass((*mean_image),DirectClass,exception) == MagickFalse)
+    {
+      (*mean_image)=DestroyImage((*mean_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType MeanShiftHead(const MeanShiftInfo *shift,
+  MagickBooleanType *status)
+{
+  const Image
+    *const image = shift->image;
+
+  Image
+    *const mean_image = shift->mean_image;
+
+  CacheView
+    *const image_view = shift->image_view,
+    *const mean_view = shift->mean_view;
+
+  ExceptionInfo
+    *const exception = shift->exception;
+
+  const ssize_t
+    y = shift->y;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(mean_view,0,y,mean_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  MeanShiftLine(status,shift,p,q);
+  return(MagickTrue);
+}
+
 MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
   const size_t height,const double color_distance,ExceptionInfo *exception)
 {
-#define MaxMeanShiftIterations  100
 #define MeanShiftImageTag  "MeanShift/Image"
 
   CacheView
@@ -1370,14 +1795,8 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  mean_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (mean_image == (Image *) NULL)
+  if (AcquireMeanShiftImage(image,&mean_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(mean_image,DirectClass,exception) == MagickFalse)
-    {
-      mean_image=DestroyImage(mean_image);
-      return((Image *) NULL);
-    }
   status=MagickTrue;
   progress=0;
   image_view=AcquireVirtualCacheView(image,exception);
@@ -1389,110 +1808,21 @@ MagickExport Image *MeanShiftImage(const Image *image,const size_t width,
 #endif
   for (y=0; y < (ssize_t) mean_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    MeanShiftInfo
+      shift;
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    shift.image=image;
+    shift.mean_image=mean_image;
+    shift.image_view=image_view;
+    shift.mean_view=mean_view;
+    shift.pixel_view=pixel_view;
+    shift.exception=exception;
+    shift.width=width;
+    shift.height=height;
+    shift.color_distance=color_distance;
+    shift.y=y;
+    if (MeanShiftHead(&shift,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(mean_view,0,y,mean_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) mean_image->columns; x++)
-    {
-      PixelInfo
-        mean_pixel,
-        previous_pixel;
-
-      PointInfo
-        mean_location,
-        previous_location;
-
-      ssize_t
-        i;
-
-      GetPixelInfo(image,&mean_pixel);
-      GetPixelInfoPixel(image,p,&mean_pixel);
-      mean_location.x=(double) x;
-      mean_location.y=(double) y;
-      for (i=0; i < MaxMeanShiftIterations; i++)
-      {
-        double
-          distance,
-          gamma = 1.0;
-
-        PixelInfo
-          sum_pixel;
-
-        PointInfo
-          sum_location;
-
-        ssize_t
-          count,
-          v;
-
-        sum_location.x=0.0;
-        sum_location.y=0.0;
-        GetPixelInfo(image,&sum_pixel);
-        previous_location=mean_location;
-        previous_pixel=mean_pixel;
-        count=0;
-        for (v=(-((ssize_t) height/2)); v <= (((ssize_t) height/2)); v++)
-        {
-          ssize_t
-            u;
-
-          for (u=(-((ssize_t) width/2)); u <= (((ssize_t) width/2)); u++)
-          {
-            PixelInfo
-              pixel;
-
-            if ((v*v+u*u) > (ssize_t) ((width/2)*(height/2)))
-              continue;
-            status=GetOneCacheViewVirtualPixelInfo(pixel_view,(ssize_t)
-              MagickRound(mean_location.x+u),(ssize_t) MagickRound(
-              mean_location.y+v),&pixel,exception);
-            distance=GetMeanShiftColorDistance(mean_pixel,pixel);
-            if (!(distance <= (color_distance*color_distance)))
-              continue;
-            sum_location.x+=mean_location.x+u;
-            sum_location.y+=mean_location.y+v;
-            sum_pixel.red+=pixel.red;
-            sum_pixel.green+=pixel.green;
-            sum_pixel.blue+=pixel.blue;
-            sum_pixel.alpha+=pixel.alpha;
-            count++;
-          }
-        }
-        if (count != 0)
-          gamma=MagickSafeReciprocal((double) count);
-        mean_location.x=gamma*sum_location.x;
-        mean_location.y=gamma*sum_location.y;
-        mean_pixel.red=gamma*sum_pixel.red;
-        mean_pixel.green=gamma*sum_pixel.green;
-        mean_pixel.blue=gamma*sum_pixel.blue;
-        mean_pixel.alpha=gamma*sum_pixel.alpha;
-        distance=GetMeanShiftDistance(mean_location,previous_location,
-          mean_pixel,previous_pixel);
-        if (distance <= 3.0)
-          break;
-      }
-      SetMeanShiftPixel(mean_image,mean_pixel,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(mean_image);
-    }
-    if (SyncCacheViewAuthenticPixels(mean_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType

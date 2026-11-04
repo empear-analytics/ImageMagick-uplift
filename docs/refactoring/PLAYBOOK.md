@@ -3162,8 +3162,11 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
 1. The `switch` has a `default:` label, and its controlling expression `e` is a
    variable, or an expression of variables with no call, assignment or increment, that
    no statement inside the `switch` writes. Every *group* (a run of labels and the body
-   after them) ends with a `break;` of this `switch` and contains no other `break` of
-   it, no `continue`, `return` or `goto`: no group falls through into another. The
+   after them) ends with a `break;` of this `switch` and contains no `continue`,
+   `return` or `goto`: no group falls through into another. It contains no other
+   `break` of this `switch` either, except inside a selection (`if (p == NULL) break;`),
+   as a chain's groups may: each such `break;` ends the group where its last `break;`
+   would (*Careful* gives the argument). The
    last group of the `switch` may instead end at its closing brace, without `break;`,
    when it moves and stays the last group of the new `switch` (`default: *q=0;`).
    A *chain*, a run of groups each of which but the last ends in `magick_fallthrough;`
@@ -3203,6 +3206,20 @@ time (E, O or Z on its body) leaves every label in the caller, and the cc with i
    stood. A later step on the same `switch` (step 6's chain) moves the caller's
    `default` group as step 2 says; the `default: break;` stays in the innermost
    function. Nothing else is added.
+
+8. A chain with Z's struct. When the groups of the steps need Z's input struct, the
+   struct is declared once, as a local `tile` at the top of the block that holds the
+   `switch` (the loop body, for a `switch` in a loop), and its members, the union of what
+   the steps' groups read, are assigned once, in declaration order, directly before the
+   `switch`, as Recipe N step 8's sibling blocks do; Z step 5's local and assignments
+   are not repeated per step. The caller's `default:` group is the call
+   `Helper(&tile,...);` and `break;`, with no struct of its own. Each helper takes
+   `const Name *tile` first and declares the `const` locals of the members its groups
+   read (Z step 3). A helper whose `default:` group is the call of an earlier step's
+   helper passes `tile` on unchanged, and each written variable `v` as `&(*v)` (Z step
+   4), where the group moved had `&tile` and `&v`. N step 8's condition holds: nothing on
+   any path from the fill to the call writes a variable a member copies; a kept group
+   that writes one and leaves the `switch` before any call does not count.
 
 **Before:**
 
@@ -3343,6 +3360,26 @@ static void ApplyUnaryComplexOperator(const ComplexUnaryOperands *unary,
   constant added later that no label names, where the original, if it named every
   constant, would have. Say so in the commit message.
 
+- Under step 1's `break;` in a selection, a value of `e` that selects such a group ran
+  its body up to the `break;` and then left the `switch`. Now it reaches the outer
+  `default`, whose call runs the new function, whose `switch` selects the same group;
+  the group runs up to the same `break;`, which ends the inner `switch`; nothing
+  follows that `switch` in the function, so it returns, and the outer `default`'s
+  `break;` ends the outer `switch`, where the original `break;` ended the original. It
+  is the argument already made for a chain. A `break;` of a loop or of a `switch`
+  nested in the group is that construct's own and does not count; a `continue`,
+  `return` or `goto` still refuses the group.
+- Under step 8, every helper reads `tile` and nothing else of the caller's: its members
+  were copied from the variables of their names once, directly before the `switch`, and
+  between that point and the call only the `switch` selects a group, so the call sees
+  the values the original group saw. A kept group that writes a member's variable
+  (`thumbnail=...`) is on a path that ends at its own `break;`, before any call. The
+  pointers inside the members keep pointing at the caller's objects, so a write through
+  one (`factor`, `label`, `thumbnail->magick`) lands where it did. The chain's calls
+  pass the same `tile` and the same addresses (`&(*v)` is `v`) down to the helper whose
+  `switch` holds the group, so each written variable is the caller's own, written at
+  the points it was.
+
 **Evidence level:** oracle, with `refactor_guard.py --calls` (`+2` for the new function,
 nothing else moved), a case for each moved label where one exists, and steps 1 and 5
 checked by reading.
@@ -3363,6 +3400,14 @@ virtual-pixel `hit` switch names all seventeen `VirtualPixelMethod` constants an
 `default` (cc 22 of the function's 34). Its six-label image group alone with a `default`
 is a function of cc 9, so it stays; the vertical-tile and dither groups, then the corner
 and horizontal-tile groups, as two chained functions: 7.30 to 7.34 to 7.37 in probes.
+Step 1's `break;` in a selection and step 8 (2026-11-04, task W12): `effect.c`'s
+`PreviewImage`, whose `switch (preview)` has 29 groups (cc 56 of the function, 397 lines),
+fourteen of them ending a failed `CloneImage` with `if (preview_image == NULL) break;`,
+which step 1 refused. Seven chained functions of three to six groups each, taking one
+`PreviewTile` and `preview_image`, `gamma` and, in the last, `degrees`: 4.51 to 4.56, 4.62, 4.69,
+4.79, 4.85, 4.90 and 5.00 in probes (each step raising the score, no finding on a new
+function). Added by Claude Code (Claude
+Sonnet 5.5) during task W12, under the mandate of 2026-10-24.
 
 ---
 
@@ -4452,6 +4497,18 @@ helper returns a status the caller tests, which here would always lead to the sa
    in the order the block first writes them.
 5. Where the block stood, write the call. The `continue;` that followed the block stays,
    directly after the call. Check every argument against its parameter by reading.
+6. A block that is the whole body of a sequential loop, declarations included, whose
+   inputs would give five or more parameters: bundle the variables it only reads in a
+   struct as Recipe N steps 2 and 3 do (a `typedef struct` above
+   the helper, one member per variable, the variable's exact type and name), declared
+   among the caller's declarations and filled once before the loop (the function has
+   no OpenMP region, so one thread fills and reads it). The helper takes `const Name *`
+   first, then the loop counter by value, then the written variables by pointer
+   (`status`, `progress`), at most four parameters in all, and binds each member once
+   at the top of its body (`const T *const v = name->v;`). The variables the body
+   declares and the caller does not read after it (`p`, `q`, `sync`) move into the
+   helper; the loop keeps its `for` statement and its body becomes the call, with no
+   `continue;` after it (step 1's tail).
 
 **Before:**
 
@@ -4524,6 +4581,10 @@ static void DecodeDelegateEscape(const char **p,char **q)
 - The rewriting of step 3 is mechanical but easy to get wrong in precedence: `*v++` with
   `v` a pointer parameter is `*(*v)++`, not `**v++`. Check each by reading, and let the
   oracle cover the reached paths.
+- Step 6: the struct holds values and pointers the loop never changes (the images, the view,
+  the exception), filled before the first iteration, so every call reads what the body read
+  inline; the counter and the two written variables travel as before. Nothing in a
+  sequential loop runs between the fill and the first call.
 - A block not followed by `continue;` (one after which the loop body goes on) is not this
   recipe. A block that ends the body is (step 1): in C, `continue;` in a loop body
   jumps to the end of that body (C11 6.8.6.2), so falling off the end and running
@@ -4542,7 +4603,12 @@ ends each case with `continue;` of the scan loop, followed by a `continue;` for 
 B, task M116): `image.c`'s `AppendImages`, whose scan loop ends in the extent update
 (stacked: widen and `continue;`; otherwise add the columns and take the taller height),
 writing `width` and `height`; part of the probe that takes the function from 4 bumps
-to 3.
+to 3. Step 6 (2026-11-04, W12, from `vision.c`): `IntegralImage`, whose sequential row
+loop (guard, a fetch that `continue;`s, `IntegrateRow`, a sync test and a progress block)
+needs six parameters as a plain OC helper; with its views, images and exception in a
+struct, the function leaves Bumpy Road and Complex Method, 6.49 to 6.77 in a probe, no
+finding on the helper. Added by Claude Code (Claude Sonnet 5.5) under the mandate of
+2026-10-24.
 
 ---
 
@@ -4810,6 +4876,303 @@ eight pixel-switch cases out: 3.01 to 3.55 in about eleven steps). The same site
 `resize.c`'s `InterpolativeResizeImage` and `feature.c`'s `MeanShiftImage`, which T and J
 refused (W03, W10). Whether their blocks meet step 2 is checked at use. Added by Claude
 Code (Claude Sonnet 5.5).
+
+---
+
+## Recipe PS - Extract Block Through a Pointer to the Loop Status
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Deep, Nested Complexity*, *Large
+Method* or *Complex Method*, and the block that would fix it sits inside the body of a
+`#pragma omp parallel for` loop and uses the loop's shared `status` in a way the
+local-copy recipes refuse: it assigns it from a call and tests it (`status=
+InterpolatePixelChannels(...); if (status == MagickFalse) break;`), possibly inside a loop
+that may run no iteration, or it reads the value it did not itself assign, or the loop also reads or writes a second
+(or third) shared scalar by plain assignment or increment (a loop `type`, a non-atomic
+`progress++`).
+
+**Not covered by:** Recipe T (the block writes `status` only as `status=MagickFalse;` and
+never reads it) and Recipe AS (the block assigns `status` on every path and never reads the
+shared value first): both give the helper a local `status` and write the result back at the
+end, which is wrong for a block that reads the shared value or may leave it alone. Recipe E
+and Recipe O: E's OpenMP rule refuses any write to a variable declared outside the loop
+body, and O refuses every block inside an OpenMP region. Recipe Q and Recipe K: sequential
+functions only.
+
+**How:**
+
+1. The block lies inside one iteration of the parallel loop body, contains no `#pragma omp`
+   line (so no `critical` or `atomic` block moves), no `return` or `goto`, and no `break` or
+   `continue` that leaves it (those of a loop or `switch` inside it stay as they are; a
+   block that is a whole loop takes its own `break`s with it), except in step 7's form.
+   Recipe T step 4's exception for a block that ends the loop body does not apply here.
+2. `status` and at most two further scalars `v` are the only variables declared outside the
+   loop body that the block writes. Each is shared: named in the pragma's `shared(...)`
+   clause, or in no data-sharing clause (`default` shared), and not named in `private`,
+   `firstprivate`, `lastprivate` or `reduction`. The block may read `status`, test it and
+   assign it in any way; it reads or writes each `v` only by plain assignment (`v=c;`,
+   `v=expr;`) or a plain increment (`v++;`, `v+=n;`, its value used or not) outside any
+   `atomic` or `critical` (step 1: none moves). A loop with no `status` whose only such
+   variable is a flag `v` (`type=UndefinedType;`) passes `v` alone.
+3. Every other variable of the loop body that the block writes is declared inside the
+   block, or is not read after it (a row pointer `q` advanced along the row, say; Recipe T
+   step 3).
+4. Cut the block into a new `static void` function directly above the caller. Its first
+   parameters are the pointers, `MagickBooleanType *status` and then `T *v` for each
+   further scalar; in the body every use of `status` becomes `(*status)` and every use of
+   `v` becomes `(*v)` (an increment `(*v)++`), reads included, and `&status` or `&v` passed
+   to a callee becomes `status` or `v`, the same address. Nothing else in the text changes.
+5. Pass every other variable the block reads by value, pointers included, as Recipe T
+   step 6 does; a variable of the loop body that the block writes and the caller does not
+   read after it is declared in the new function (Recipe E step 4).
+6. Where the block stood, write `Helper(...,&status);`, and check every argument against
+   its parameter by reading. With more than four parameters, bundle the read-only inputs in
+   a `const` struct as Recipe N steps 2 and 3 do; `status` and each `v` are passed apart,
+   by pointer, and the struct, the counter of step 7 and the pointers together stay within
+   four.
+7. A loop's whole body. The block may be the whole body of the parallel loop, declarations
+   included, with `continue;` statements of that loop (the usual `if (status ==
+   MagickFalse) continue;` first, and `status=MagickFalse; continue;` after a failed pixel
+   fetch), as Recipe E step 7's whole-body form allows: each such `continue;` becomes
+   `return;` of the new function, the loop's counter goes by value, and the body becomes
+   the call, `Helper(...,x,&status);`, preceded only by the declaration and fill of its
+   input struct when step 6 needs one (declared in the body and filled there, as Recipe
+   N step 7 says, so each thread fills its own), so both end the iteration at the same
+   point.
+   Step 4's `(*status)` holds at every use, the leading test included. The `#pragma omp`
+   lines and the `for` statement stay; the variables the body declares (`id`, the row
+   pointers, the thread's scratch pointer) move with it, and a call such as
+   `GetOpenMPThreadId()` is made in the helper, by the same thread. A `continue` of a
+   loop nested in the body is that loop's own and does not change.
+8. A block that also writes two to four variables declared in the loop body that the
+   body reads after the block (accumulators the block adds to, which step 3 refuses):
+   pass their addresses in one `const` struct, Recipe Q step 8's form. A `typedef
+   struct` directly above the helper holds one pointer member per such variable, named
+   as the variable, in the order the block first writes them; the loop body declares it
+   `const` with the addresses as its initialiser (`const Targets targets = { &a, &b };`),
+   so each thread points at its own variables; the helper takes it after the input
+   struct and before `status`, binds each member once (`T *const v = targets->v;`) and
+   writes `(*v)` at every use, or `v` for `&v` passed on. The input struct, this struct
+   and the pointers together stay within four parameters. Nothing else in the text
+   changes.
+
+**Before:**
+
+```c
+    for (x=0; x < (ssize_t) resize_image->columns; x++)
+    {
+      ...
+        status=InterpolatePixelChannels(image,image_view,resize_image,method,
+          offset.x,offset.y,q,exception);
+        if (status == MagickFalse)
+          break;
+      ...
+      q+=(ptrdiff_t) GetPixelChannels(resize_image);
+    }
+```
+
+**After:**
+
+```c
+static void InterpolateResizeRow(...,MagickBooleanType *status,...)
+{
+  for (x=0; x < (ssize_t) resize_image->columns; x++)
+  {
+    ...
+      (*status)=InterpolatePixelChannels(...);
+      if ((*status) == MagickFalse)
+        break;
+    ...
+  }
+}
+...
+    InterpolateResizeRow(...,&status,...);
+```
+
+**Careful:**
+
+- The helper reads and writes the very variable the caller did: `*status` is the shared
+  `status`, at the same program points, in the same order and with the same values as
+  inline. Nothing is deferred and nothing is copied (unlike Recipe T and AS, which write
+  back at the end), so what another thread sees of the flag, and what this thread reads
+  back from it, is what the original produced; OpenMP gives unsynchronised accesses to
+  the flag no ordering in the first place, as for the leading `if (status == MagickFalse)
+  continue;`. That is why a block that reads the shared value, or leaves it alone on some
+  path (a loop that may run no iteration), is fine here and not under T or AS.
+- A further scalar `v` is treated exactly as `status` is: `*v` is the very variable the
+  caller used, read and written at the same program points, in the same order, with the
+  same values, nothing deferred or copied, the helper called from inside the iteration.
+  A plain increment that is a race stays a race, as before: `progress++` outside any
+  `atomic` is an unsynchronised read-modify-write inline and `(*v)++` is the same one
+  through the pointer, no more and no less atomic, so the recipe neither adds nor removes a
+  synchronisation, and a race found this way is reported, not fixed, in the commit. A
+  `progress` kept in an `omp atomic` or `critical` block does not move (step 1).
+- Step 2 is what makes passing the address safe: a `private` or `reduction` `status` would
+  be the thread's own copy, and a pointer to it, passed down, is that same copy, but the
+  recipe does not rely on it: it stays with a shared flag. Check the pragma by reading.
+- No `critical` or `atomic` block and no pragma moves, and the helper is called from inside
+  the iteration, never across the region's boundary: the parallel region, its clauses and
+  its scheduling are as before. A callee that the block calls is called from the same
+  thread as before.
+- Under step 7, the helper is the loop body: it starts where the body started, runs on
+  the same thread, and each `return;` leaves it where the `continue;` left the body, so
+  the next iteration starts at the same point; nothing in the body ran after a
+  `continue;` and nothing in the helper runs after a `return;`. The counter is the
+  thread's own copy of the loop variable, passed by value, and the body never wrote it
+  (a body that does is not this form). `status` is reached through its address as in
+  step 4, so the flag the threads share is read and written at the same points. The
+  helper is called from inside the iteration, never across the region's boundary.
+- Step 8's variables are declared in the loop body, so each thread's struct points at that
+  thread's own copies: the helper adds to the same variables the caller used, in the same
+  order, and the caller reads them after the call as it read them after the block. No
+  address leaves the iteration and none is shared between threads.
+- The oracle runs single-threaded and cannot see a data race: steps 1 to 3 are checked by
+  reading, and the guard's `--calls` moves only the new helper's `+2` and the callees of
+  the moved block.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 to 3 checked by
+reading.
+
+**Provenance:** 2026-11-04, owner ("Yes, write it", on the report that `resize.c`'s
+`InterpolativeResizeImage` probed 7.11 to 8.6 with its column loop moved through a `status`
+pointer, which no recipe allowed), from campaign A's W12 session: `resize.c`'s
+`InterpolativeResizeImage` (Recipe AS refused it: every candidate block leaves `status`
+alone when a loop runs zero iterations, or its `break` leaves the block), `feature.c`'s
+`MeanShiftImage` and `effect.c`'s `SpreadImage` and `KuwaharaImage` (the same assign-and-test
+`status=Interpolate...` with a `break`). Added by Claude Code (Claude Sonnet 5.5). Step 7 (2026-11-04, task W12): `effect.c`'s
+`LocalContrastImage`, whose two parallel loop bodies (a column pass and a row pass, each
+opening with `if (status == MagickFalse) continue;` and holding a failed-fetch
+`status=MagickFalse; continue;`) T, LB, OC and W each refused; both bodies as helpers
+over one `const` input struct filled once: 5.02 to 5.19 in a probe; as built (a struct per
+loop body, filled in the body), 5.02 to 5.10 to 5.15, `LocalContrastImage` leaving
+Bumpy Road Ahead (cc 19 to 9, 155 to 104 lines), no finding on either helper. Added by
+Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24. Step 2 (2026-11-04, W12, from
+`attribute.c` and `resize-sample.c`): `attribute.c`'s `IdentifyImageGray`, whose row loop also
+reads and writes the shared `type` (`type=GrayscaleType;`, `type=UndefinedType;`) and
+`IdentifyImageMonochrome`, whose only shared write is `type`, and `resize-sample.c`'s
+`SampleImage`, whose body also does a non-atomic `progress++`; the sweep found each blocked
+by the one second scalar (probes +0.31 and 9.47 to 10.00). Added by Claude Code
+(Claude Sonnet 5.5) under the mandate of 2026-10-24. Step 8 (2026-11-04, W12, from
+`vision.c`): the second-moment pass of `MajorAxisThreshold`, `MinorAxisThreshold`,
+`EccentricityThreshold` and `ComputeObjectAngle` (a centroid pass and a row loop that add to
+the body's `M00`, `M11`, `M20`, `M02` and read and write `status`); a probe of the three
+loops 5.91 to 6.49, all three leaving Bumpy Road and Complex Method, no finding on the
+helper. Added by Claude Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
+## Recipe PC - Extract Parallel Loop Head Returning Success for a Continue
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method*,
+and the body of a `#pragma omp parallel for` loop has the usual shape: a head (the
+`if (status == MagickFalse) continue;` guard, a pixel fetch whose failure is
+`status=MagickFalse; continue;`, the work, the sync test) followed by a tail that must
+stay in the caller because it holds a `#pragma omp atomic` progress block. The head's
+`continue;` statements skip that tail, so no whole-body or block-ending form moves the
+head, and the loop keeps two bumps (the fetch guard and the progress block) and the
+cyclomatic complexity of both.
+
+**Not covered by:** Recipe PS (step 1 refuses a `continue;` that leaves the block; step
+7 moves the whole body, and the pragma in the tail cannot move). Recipes T and U (the
+block may not be followed by a progress block, T step 4's *Careful*). Recipe E step 7
+(the same limit). Recipe OC (outside OpenMP; its helper returns nothing, and here the
+caller must know whether the tail runs). Recipe LB (a `break;`, not a `continue;`).
+
+**How:**
+
+1. The block is the head of one iteration of the parallel loop body: the body's
+   statements from the first one after the declarations up to, not including, a tail
+   that stays. It contains no `#pragma omp` line, no `return`, `goto` or `break` that
+   leaves it, and every `continue;` in it continues the parallel loop (those of a loop
+   nested in it stay). The tail follows it directly and is unchanged.
+2. Written variables: Recipe PS step 2 (`status` and at most two shared scalars, each by
+   pointer). Every other variable of the body that the head writes is declared in the
+   head, or is not read by the tail (a row pointer `q`), and is declared in the new
+   function (Recipe E step 4). The tail reads nothing the head wrote except `status`.
+3. Cut the head into a new `static MagickBooleanType` function directly above the
+   caller. Each `continue;` becomes `return(MagickFalse);`, the function ends with
+   `return(MagickTrue);`, and every use of `status` becomes `(*status)` (Recipe PS step
+   4). Nothing else in the text changes.
+4. Pass what the head reads by value. When that would give more than four parameters,
+   bundle the read-only inputs in a `const` struct (Recipe N steps 2 and 3), declared in
+   the body and filled there directly before the call, so each thread fills its own; the
+   fills copy invariant values and now run before the guard, which changes nothing
+   observable. `status` and each shared scalar come last, by pointer.
+5. Where the head stood, write `if (Helper(...,&status) == MagickFalse) continue;`,
+   after the struct's declaration and fill when step 4 needs one. The tail stays as it
+   is. Check every argument against its parameter by reading.
+
+**Before:**
+
+```c
+    if (status == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    ...
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      status=MagickFalse;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+        ...
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ...
+      }
+```
+
+**After:**
+
+```c
+static MagickBooleanType OpaquePaintLine(const OpaquePaintRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  ...
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  ...
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ...
+  return(MagickTrue);
+}
+...
+    if (OpaquePaintLine(&row,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      ...
+```
+
+**Careful:**
+
+- Every path of the head either reached a `continue;` (which skipped the tail) or fell
+  off its end (which ran the tail). After, the first returns `MagickFalse` and the caller
+  runs `continue;`, the second returns `MagickTrue` and the caller runs the tail: the
+  same transfer at the same point, after the same statements in the same order.
+- `status` is the shared variable itself, read and written at the same program points
+  (Recipe PS *Careful*); the helper is called from inside the iteration, on the same
+  thread, and no pragma moves, so the region, its clauses and the `omp atomic`
+  `progress++` are as before.
+- The oracle runs single-threaded and cannot see a race: steps 1 and 2 are checked by
+  reading.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 and 2 checked by
+reading.
+
+**Provenance:** 2026-11-04, from `paint.c`'s `OpaquePaintImage`, `TransparentPaintImage`
+and `OilPaintImage` (campaign A, W13), whose parallel loop bodies are a guard, a failed
+fetch that `continue;`s, a row call and a sync test, followed by an atomic progress
+block; the plateau table recorded that no T, U or LB form moves the head. A probe on
+`OpaquePaintImage`: 6.24 to 6.49, the function leaving Complex Method. Added by Claude
+Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
 
 ---
 
@@ -5272,36 +5635,41 @@ and you do not add one, record it here: the file, its score, and the smells left
 
 | File | Score | Smells left, and why no recipe reaches them | Recorded |
 | --- | ---: | --- | --- |
-| `MagickCore/resize.c` | 7.08 | Brain Method, Deep Nesting (4), Bumpy Road (3) and Large Method (104 lines) in `InterpolativeResizeImage`, OpenMP-bound: its channel loop, the depth-4 site, assigns the shared `status` from `InterpolatePixelChannels` (`MagickTrue` too) and tests it inside `omp parallel for`, which Recipes T and J refuse; the other bumps are the loop's leading `continue`s and the atomic progress block; the parallel loop alone is over 70 lines. Excess Arguments: public signatures (`InterpolativeResizeImage` 5, `LiquidRescaleImage` 6 and its uncompiled non-LQR stub 5, `ResampleImage` 5). Lines of Code in a Single File (1,341): Recipe S awaits the session. `LiquidRescaleImage` (LQR compiled, no case reaches it) left Bumpy Road, Complex and Large Method with E and P at guard level; `ReportResizeFilter` left Excess Arguments with B (`resize_filter`, `B`, `C`; flat). 2.89 at M01, 6.50 at W08; from 6.50 with E, P, B and W. See W10 | 2026-10-31, WSL (W10) |
+| `MagickCore/resize.c` | 8.65 | Brain Method, Deep Nesting (4), Bumpy Road (3) and Large Method (104 lines) in `InterpolativeResizeImage`, OpenMP-bound: its channel loop, the depth-4 site, assigns the shared `status` from `InterpolatePixelChannels` (`MagickTrue` too) and tests it inside `omp parallel for`, which Recipes T and J refuse; the other bumps are the loop's leading `continue`s and the atomic progress block; the parallel loop alone is over 70 lines. Excess Arguments: public signatures (`InterpolativeResizeImage` 5, `LiquidRescaleImage` 6 and its uncompiled non-LQR stub 5, `ResampleImage` 5). Lines of Code in a Single File (1,341): Recipe S awaits the session. `LiquidRescaleImage` (LQR compiled, no case reaches it) left Bumpy Road, Complex and Large Method with E and P at guard level; `ReportResizeFilter` left Excess Arguments with B (`resize_filter`, `B`, `C`; flat). 2.89 at M01, 6.50 at W08; from 6.50 with E, P, B and W. See W10 Second pass (W12, 2026-11-01): Recipe AS does not apply (every candidate block leaves `status` alone when a loop runs zero iterations, or its `break` leaves the block); three small steps took it 7.08 to 7.11 (96 lines, nesting 4, 3 bumps, Brain Method). The whole channel loop as a helper through a `status` pointer probes 8.6 and needs a ruling on the OpenMP rule (W12 report). Third pass (W12, 2026-11-04, Recipe PS): the column loop and the line (offset, row, sync test) became `InterpolateResizeRow` and `InterpolateResizeLine`, 7.11 to 8.65: `InterpolativeResizeImage` left Brain Method and Deep, Nested Complexity; it keeps Bumpy Road (2), Complex Method (cc 13), Large Method (75 lines) and Excess Arguments (public); what is left is `continue` guards and the pragma-bearing progress block. | 2026-10-31, WSL (W10) |
 | `MagickCore/magnify.c` | 6.57 | Complex and Large Method: `Hq2XHelper` is a rule table written as a `switch` (splitting its cases yields clones with 7-8 arguments, 5.16 in a probe); `Fish2XBottomRightPixel`'s ladder shares six flags that only a struct declared after statements could carry; the 3x3 kernels and `IsEpbx2XBlendable` split into clones of each other (5.93 in a probe). Bumpy Road and Large Method in `MagnifyImage`: its last bumps are the parallel loop's `continue` and the atomic progress block. Overall Code Complexity: the mean of the above. From 6.21, with Recipes E, T, M and B. See [M01's report](tasks/M01-resize.md) | 2026-10-24, Mac |
-| `MagickCore/compare.c` | 2.43 | FFTW is compiled now (`--with-fftw`, W08), so the `SIM*` region is measured and reached. Deep Nesting stays in `SimilarityImage` (its `omp critical` best-match `switch` nests two `if`s at depth 4 and cannot move; extracting its channel loop, metric `switch` and best-match `switch` (L then Z) left it flat, and the frequency-domain dispatch returns a variable, which no recipe takes) and in `SIMFilterImageNaNs` (no case; its channel or row loop as a helper joins the `SIM*` shell duplication). Brain Method in `SimilarityImage` (seven public arguments, depth 4). Complex Method in the `SIM*` row shells (cc 10 from the parallel loop's `status`/`continue` paths: moving the row tail needs a `continue` Recipe T does not take, and was flat on `SIMSquareImage`) and in `MSESimilarityImage`/`NCCSimilarityImage` (cleanup-throw macros whose blocks write what the cleanup reads, refusing V step 7). Code Duplication: the row shells, the `Accumulate*Pixel` helpers and the `GetPSNR`/`GetRMSE`/`GetDSSIM` wrappers differ in more than one value. From 2.43 on, steps that took a function out of a category (`AccumulateCorrelationPixel`, Excess Arguments; `CompareImages`, Bumpy Road) and probes that did (`SIMSquareImage`, Complex Method; the trait test as `IsChannelSkipped` at 33 sites) left the score flat. See [W08's report](tasks/W08-night-session.md) and M02's | 2026-10-30, WSL (W09) |
-| `MagickCore/colorspace.c` | 3.15 | Bumpy Road (10 each) and Deep Nesting (4) in `sRGBTransformImage` and `TransformsRGBImage`: every row loop's `if (status == MagickFalse) continue;`, `if (q == NULL) { status=MagickFalse; continue; }` and `if (sync == MagickFalse)` stay in the parallel body (T and U refuse a block that reads `status` or `continue`s the parallel loop), the depth-4 site is the `omp atomic` progress block, and each `switch` case holds its own `#pragma omp parallel for`. Probes: removing those three `if`s in every row loop would take `sRGBTransformImage` from 10 bumps to 3 (3.12), but moving the column loops alone is flat (M06) and as helpers adds *Code Duplication* (2.80); the property parsing (`white-luminance`, `film-gamma`, `reference-black`, `reference-white`, 8 sites) as one helper is flat; removing 140 lines is flat. Complex and Large Method and Excess Arguments in the public `ConvertGenericToRGB`/`ConvertRGBToGeneric` (Recipe SD chains to bring each piece under cc 9 give five functions per side, reported as *Code Duplication*: 2.83); Excess Arguments in the public `ConvertHSLToRGB`/`ConvertRGBToHSL`. From 2.80 with D, V, E, O, N (W08), then D (W09, `SetImageGray`/`SetImageMonochrome`, leaving *Code Duplication*). See [W08's report](tasks/W08-night-session.md) and [M06's](tasks/M06-colorspace.md) | 2026-10-30, WSL (W09) |
-| `MagickCore/fourier.c` | 6.02 | With FFTW compiled (W08): `ForwardFourierTransformImage` and `InverseFourierTransformImage` keep most of their complexity inside `omp parallel sections`; the normalize blocks and `InverseFourier`'s merge hold `#else` branches for no `complex.h`, which this build does not compile; the remaining loop pairs become *Code Duplication* when moved (5.66, 5.67 in probes); `ComplexImages`' column loop advances six row pointers (seven or more parameters). See W11 | 2026-10-31, WSL (W11) |
+| `MagickCore/compare.c` | 2.54 | FFTW is compiled now (`--with-fftw`, W08), so the `SIM*` region is measured and reached. Deep Nesting stays in `SimilarityImage` (its `omp critical` best-match `switch` nests two `if`s at depth 4 and cannot move; extracting its channel loop, metric `switch` and best-match `switch` (L then Z) left it flat, and the frequency-domain dispatch returns a variable, which no recipe takes) and in `SIMFilterImageNaNs` (no case; its channel or row loop as a helper joins the `SIM*` shell duplication). Brain Method in `SimilarityImage` (seven public arguments, depth 4). Complex Method in the `SIM*` row shells (cc 10 from the parallel loop's `status`/`continue` paths: moving the row tail needs a `continue` Recipe T does not take, and was flat on `SIMSquareImage`) and in `MSESimilarityImage`/`NCCSimilarityImage` (cleanup-throw macros whose blocks write what the cleanup reads, refusing V step 7). Code Duplication: the row shells, the `Accumulate*Pixel` helpers and the `GetPSNR`/`GetRMSE`/`GetDSSIM` wrappers differ in more than one value. From 2.43 on, steps that took a function out of a category (`AccumulateCorrelationPixel`, Excess Arguments; `CompareImages`, Bumpy Road) and probes that did (`SIMSquareImage`, Complex Method; the trait test as `IsChannelSkipped` at 33 sites) left the score flat. See [W08's report](tasks/W08-night-session.md) and M02's W12 (2026-11-04): re-measured 2.54 on the checked-out branch (cs-mcp 1.5.16); no legal step raised it. The `Get*Similarity` loops end in an `omp critical` merge that PS refuses and the fetch-failure `continue` skips; PS step 7 on the `SIM*` row shells took them off the cc-10 list but stayed flat with new clones; a column-loop helper for `GetAESimilarity` was flat and joined the Code Duplication group. Held by about 160 functions, 25 Complex Methods, 4,244 lines. | 2026-10-30, WSL (W09) |
+| `MagickCore/colorspace.c` | 3.27 | Bumpy Road (10 each) and Deep Nesting (4) in `sRGBTransformImage` and `TransformsRGBImage`: every row loop's `if (status == MagickFalse) continue;`, `if (q == NULL) { status=MagickFalse; continue; }` and `if (sync == MagickFalse)` stay in the parallel body (T and U refuse a block that reads `status` or `continue`s the parallel loop), the depth-4 site is the `omp atomic` progress block, and each `switch` case holds its own `#pragma omp parallel for`. Probes: removing those three `if`s in every row loop would take `sRGBTransformImage` from 10 bumps to 3 (3.12), but moving the column loops alone is flat (M06) and as helpers adds *Code Duplication* (2.80); the property parsing (`white-luminance`, `film-gamma`, `reference-black`, `reference-white`, 8 sites) as one helper is flat; removing 140 lines is flat. Complex and Large Method and Excess Arguments in the public `ConvertGenericToRGB`/`ConvertRGBToGeneric` (Recipe SD chains to bring each piece under cc 9 give five functions per side, reported as *Code Duplication*: 2.83); Excess Arguments in the public `ConvertHSLToRGB`/`ConvertRGBToHSL`. From 2.80 with D, V, E, O, N (W08), then D (W09, `SetImageGray`/`SetImageMonochrome`, leaving *Code Duplication*). See [W08's report](tasks/W08-night-session.md) and [M06's](tasks/M06-colorspace.md) PS sweep (W12): the Log row loop of `TransformsRGBImage` and the LinearGray loop of `sRGBTransformImage` as PS step 7 helpers (3.15 to 3.27); a second row helper of the same shape switches *Code Duplication* on (3.27 to 3.12 for GRAY, 3.06 to 3.12 for linear RGB and Log in the other function), the CMYK, generic and other loops are flat. W12 (2026-11-04), PC probes: a head helper for `sRGBTransformImage`'s DirectClass loop stayed 3.27 (cc 117 to 113, bumps stay 9); a second one for `TransformsRGBImage` dropped it to 3.12 (clone). No commit. | 2026-10-30, WSL (W09) |
+| `MagickCore/fourier.c` | 6.27 | With FFTW compiled (W08): `ForwardFourierTransformImage` and `InverseFourierTransformImage` keep most of their complexity inside `omp parallel sections`; the normalize blocks and `InverseFourier`'s merge hold `#else` branches for no `complex.h`, which this build does not compile; the remaining loop pairs become *Code Duplication* when moved (5.66, 5.67 in probes); `ComplexImages`' column loop advances six row pointers (seven or more parameters). See W11 W12 (2026-11-04): `ComplexImages` PC (6.10), Recipe B steps (flat), and `InverseFourierTransformChannel` plus `InverseFourier` as one same-recipe set (6.27, Excess Arguments leaves). Held by the compiled `#if defined(MAGICKCORE_HAVE_COMPLEX_H)` loops, the `omp section` blocks (a shared helper gains 0.06 and clones) and file-level findings. | 2026-10-31, WSL (W11) |
 | `MagickCore/semaphore.c` | 9.38 | Code Duplication between `LockSemaphoreInfo`, `UnlockSemaphoreInfo` and `RelinquishSemaphoreInfo`: shared assertions and preprocessor structure, a different primitive in each, most of the text in branches not compiled here. See [M19's report](tasks/M19-semaphore.md) | 2026-10-25, Mac |
 | `MagickCore/shear-rotate.c` | 7.63 | Six functions; a seventh switches on *Overall Code Complexity* (mean cc over 4, `IntegralRotateImage` alone is cc 50), 7.63 to 7.20 in a probe (the page-offset `if`s as one helper), and nothing legal brings the mean under 4. `IntegralRotateImage` keeps Deep Nesting (5), Bumpy Road (10), Complex and Large Method: its three `switch` cases each hold their own `#pragma omp parallel for`, which no recipe moves; the tile loops' `y` loops read the shared `status` (`if (status == MagickFalse) continue;`, which T and U refuse), the 270-degree sync sits under `omp critical`, and the progress blocks write the shared `progress`. The 90- and 270-degree column loops as Recipe N helpers differ in one operator (`-=`/`+=`), 7.55 to 7.56 for two near-identical functions (rejected). From 7.05 with E, D, SV. See W10 | 2026-10-30, WSL (W10) |
 | `MagickCore/threshold-auto.c` | 8.36 | Deep Nesting (4), Bumpy Road (3) and Complex Method (cc 13) in `KapurThreshold`: the depth-4 sites are its black and white entropy sums, which differ in the loop's bounds and in the divisor (`cumulative_histogram[j]`, `1.0-cumulative_histogram[j]`), three values, so SV and TW refuse one helper; as two Recipe E helpers they are reported as *Code Duplication* and take scalar parameters that switch on *Primitive Obsession* (7.82 to 7.66 in a probe; the black sum alone 7.62). Its allocation-failure cleanup as a Recipe N helper (`KapurFailure`) also switches on *Primitive Obsession*, 8.36 to 8.15. Bumpy Road (2) in `TriangleThreshold`: the end-bin search is `FindTriangleStartBin` run backwards (both as helpers: *Code Duplication*), and the search above the peak as a second Recipe Q helper is reported as a duplicate of `ScanTriangleBelowPeak` (8.36 to 7.62). Overall Code Complexity: the mean of the above. From 7.42 with E, H and Q (as amended). See W10 | 2026-10-30, WSL (W10) |
 | `MagickCore/statistic-function.c` | 9.23 | Six functions; a seventh switches on *Overall Code Complexity* (mean cc over 4: `FunctionImage` alone is cc 13, and twelve parameter-default ternaries sit in the three case helpers), so every remaining step that needs a new function costs more than it gains: the column loop as a Recipe N helper takes `FunctionImage` out of *Large Method* (71 lines before) and still scores 8.45 in a probe. `FunctionImage` keeps Bumpy Road (2), Complex Method (cc 13) and Large Method without a new function: its bumps are the parallel loop's `if (q == NULL) { status=MagickFalse; continue; }` (which skips the progress block, so no T or LB form moves it) and the `omp atomic` progress block; the preamble's `assert`s and `LogMagickEvent(...GetMagickModule()...)` would report another function and line if moved. Excess Arguments: `FunctionImage` is public (5); `ApplyFunctionToPixel` (6) under Recipe B would put the struct local in `FunctionImage`, which then grows to 72 lines while keeping *Large Method* (9.22 in a probe). The `(number_parameters >= k) ? parameters[k-1] : d` defaults differ in three values and occur nowhere else in MagickCore, so no recipe was added for them. From 8.70 with E (the Sinusoid, Arcsin and Arctan cases) and B. See W10 | 2026-10-31, WSL (W10) |
-| `MagickCore/resize-sample.c` | 9.47 | Bumpy Road (2), Complex Method (cc 16) and Large Method (70 lines) in `SampleImage`, all OpenMP-bound or position-bound: its bumps are the parallel loop's `if (q == NULL) { status=MagickFalse; continue; }`, whose `continue` skips the progress block that stays (so no T, U or LB form moves it), and the progress block itself, which writes the shared `progress`; the preamble's `assert`s, `LogMagickEvent(...GetMagickModule()...)` and `ThrowImageException` would report another function and line if moved; `CloneImage` and the cache-view acquisition write locals read later. The row's `SampleImageRow` call and sync as one Recipe T block would take five arguments (the `SampleRow` struct, `sample_view`, `y`, `q`, `exception`), and a Recipe U struct filled in the loop body grows `SampleImage`; the two `DestroyCacheView` lines cannot join `FinishSampleImage` without a fifth argument. From 9.10 with E (the offset parsing, the tail), and B (`SampleImageRow`, 7 to 4 arguments, 9.18 to 9.47). See W10 | 2026-10-31, WSL (W10) |
+| `MagickCore/resize-sample.c` | 10.0 | Reached 10.0 (W12, 2026-11-04, PS step 2 amended): `SampleImage`'s loop body, with its `progress` counter written by a plain, non-atomic `progress++` (an upstream data race, W10 report), moves through pointers as `SampleImageLine` and `SampleRow` (9.47 to 10.0, 112 cases, 0 diverged); the helper keeps the race exactly as it was, `(*progress)++`, and does not fix it. Previous plateau: Bumpy Road (2), Complex Method (cc 16) and Large Method (70 lines) in `SampleImage`, all OpenMP-bound or position-bound: its bumps are the parallel loop's `if (q == NULL) { status=MagickFalse; continue; }`, whose `continue` skips the progress block that stays (so no T, U or LB form moves it), and the progress block itself, which writes the shared `progress`; the preamble's `assert`s, `LogMagickEvent(...GetMagickModule()...)` and `ThrowImageException` would report another function and line if moved; `CloneImage` and the cache-view acquisition write locals read later. The row's `SampleImageRow` call and sync as one Recipe T block would take five arguments (the `SampleRow` struct, `sample_view`, `y`, `q`, `exception`), and a Recipe U struct filled in the loop body grows `SampleImage`; the two `DestroyCacheView` lines cannot join `FinishSampleImage` without a fifth argument. From 9.10 with E (the offset parsing, the tail), and B (`SampleImageRow`, 7 to 4 arguments, 9.18 to 9.47). See W10 | 2026-10-31, WSL (W10) |
 | `MagickCore/prepress.c` | 9.61 | Bumpy Road (2) and Complex Method (cc 9) in `GetImageTotalInkDensity`, OpenMP-bound: its bumps are the parallel loop's `if (p == NULL) { status=MagickFalse; continue; }`, whose `continue` skips the column loop that follows (no T, U or LB form moves a head block), and the column loop, which holds the `#pragma omp critical` maximum and writes the shared `total_ink_density` (no recipe moves a pragma or a block writing a shared variable). The column loop as a helper taking `&total_ink_density` scores 10.0 in a probe, and is forbidden for those reasons. The colorspace guard as a helper is flat (9.61) in a probe, and its `ThrowMagickException(...GetMagickModule()...)` would report another function and line. From 9.49 with E (the tail after the loop). See W10 | 2026-10-31, WSL (W10) |
-| `MagickCore/effect.c` | 4.36 | Split (Recipe S, W11): the blur and convolution family went to `effect-blur.c` (3.52 to 4.10 and 4.91), and twelve steps then took it to 4.36: not saturated after the split. Before it no single legal step, nor removing a whole function, moved 3.52. `PreviewImage` keeps cc 56 and 397 lines (SD step 1 refuses groups with an early `break`, 14 of its 30 cases; a crude 8-chunk probe about +0.12 with intermediate drops); `LocalContrastImage`, `SpreadImage`, `KuwaharaImage`, `UnsharpMaskImage`, `ShadeImage` and `Hull` are held by the `status` `continue` and atomic progress blocks, and `SpreadImage` and `KuwaharaImage` by an assign-and-test `status=Interpolate...` that no recipe covers. 2,822 lines (*Lines of Code in a Single File* remains). See W11 | 2026-10-31, WSL (W11) |
-| `MagickCore/effect-blur.c` | 5.29 | New in W11 (split from `effect.c`), 4.91 to 5.29 in eleven steps. `AdaptiveSharpenImage` (cc 26, 164 lines, 4 bumps) is the worst: every block left in it is a twin of one already moved out of `AdaptiveBlurImage`, so any further helper is a clone (*Code Duplication*, 4.86 in a probe); in all six blur functions what is left is the progress and row-fetch skeleton, allocation and cleanup ladders whose exits differ, and public argument counts (cc 14 to 26, 120 to 164 lines). The two Adaptive functions are near-clones with different parenthesisation. See W11 | 2026-10-31, WSL (W11) |
+| `MagickCore/effect.c` | 5.94 | Split (Recipe S, W11): the blur and convolution family went to `effect-blur.c` (3.52 to 4.10 and 4.91), and twelve steps then took it to 4.36: not saturated after the split. Before it no single legal step, nor removing a whole function, moved 3.52. `PreviewImage` keeps cc 56 and 397 lines (SD step 1 refuses groups with an early `break`, 14 of its 30 cases; a crude 8-chunk probe about +0.12 with intermediate drops); `LocalContrastImage`, `SpreadImage`, `KuwaharaImage`, `UnsharpMaskImage`, `ShadeImage` and `Hull` are held by the `status` `continue` and atomic progress blocks, and `SpreadImage` and `KuwaharaImage` by an assign-and-test `status=Interpolate...` that no recipe covers. 2,822 lines (*Lines of Code in a Single File* remains). See W11 Fourth pass (W12, 2026-11-04, Recipe PS and others): `SpreadImage` and `KuwaharaImage` through `SpreadRow` and `KuwaharaRow`, then V/I/N/Hull steps, 4.36 to 4.51. `PreviewImage` (cc 56, 397 lines) and `LocalContrastImage`'s Large Method (155 lines) remain; `DespeckleImage`'s hull `k` loop as a helper probes 4.51 to 4.57 but needs the function-local `static const X[4], Y[4]` tables (Recipe F's *Use when* does not fit a three-line table). Fifth pass (W12, 2026-11-04): `PreviewImage` 397 lines / cc 56 to 182 / cc 20 through eight Recipe SD steps (after two SD amendments: a `break` inside a selection, and one `tile` struct filled once before the `switch`) and `LocalContrastImage` through its two loop bodies as helpers (PS step 7): 4.51 to 5.15. Five groups stay in `PreviewImage`, each blocked by the four-argument limit (Gray and Quantize write `colors` and `quantize_info`, Despeckle writes `thumbnail`, Segment writes `threshold`, Roll needs the function-local `NumberTiles` macro); a struct of out-pointers for SD would open them and is not in the playbook. Stub ceiling for the rest of the switch: 5.22. W12 (2026-11-04): ten commits, 5.15 to 5.94 (PC on UnsharpMask, Spread, Kuwahara; Hull E twice; `ReportRowProgress` by PS and reused by D(b) on Spread, Kuwahara, Shade; `DespeckleImage` N). Held by `PreviewImage` (five groups at the argument limit), `DespeckleImage`'s sequential channel loop, head clones on `ShadeImage`. | 2026-10-31, WSL (W11) |
+| `MagickCore/effect-blur.c` | 5.69 | New in W11 (split from `effect.c`), 4.91 to 5.29 in eleven steps. `AdaptiveSharpenImage` (cc 26, 164 lines, 4 bumps) is the worst: every block left in it is a twin of one already moved out of `AdaptiveBlurImage`, so any further helper is a clone (*Code Duplication*, 4.86 in a probe); in all six blur functions what is left is the progress and row-fetch skeleton, allocation and cleanup ladders whose exits differ, and public argument counts (cc 14 to 26, 120 to 164 lines). The two Adaptive functions are near-clones with different parenthesisation. See W11 W12 (2026-11-04): ten commits, 5.29 to 5.69 (PC on Bilateral, Motion, Rotational, Selective, AdaptiveSharpen; E; V). PC on `AdaptiveBlurImage` is the third look-alike and drops to 5.11. | 2026-10-31, WSL (W11) |
 | `MagickCore/resize-image.c` | 6.83 | Bumpy Road (2), Complex Method (cc 16) and Large Method (102 lines) in `HorizontalFilter` and `VerticalFilter`, OpenMP-bound: their bumps are the parallel loop's `if ((p == NULL) \|\| (q == NULL)) { status=MagickFalse; continue; }`, whose `continue` skips the progress block (no T, U or LB form moves it), and the `omp atomic` progress block; the per-column prelude (`bisect`, `start`, `stop`, the weights loop) writes five loop-body variables, and the pixel loop as a Recipe U helper needs an eight-member struct whose fill is longer than the loop it replaces, growing the filters while they keep *Large Method*. Complex Method (cc 9) in `ResizeImage`: the uncompiled `MAGICKCORE_OPENCL_SUPPORT` branch holds an `if` CodeScene counts (without that branch, 6.61 to 6.77 in a probe before the B step), and the logging, size and identity tests stay for their `GetMagickModule()` and throw. Complex Method (cc 10), Bumpy Road (2), Excess Arguments (10) and Code Duplication in `FilterHorizontalPixel`/`FilterVerticalPixel`: their index formulas differ in more than one value (TW and SV refuse one helper), and Recipe B adds a seven-member fill to each filter, which keeps *Large Method*. Code Duplication between the two filters (twins under renaming except the cache fetches). Excess Arguments: `ResizeImage` is public (5); Recipe B on `VerticalFilter` (7 to 4, as on `HorizontalFilter`) is flat at 6.83 and was not kept. From 6.29 with W, O, D, E, P (W09), then Y, P, E, D, B (W10). See W10 | 2026-10-31, WSL (W10) |
 | `MagickCore/layer.c` | 7.07 | Lines of Code in a Single File (1,479), past the threshold since before the campaign: only a split (Recipe S, not asked for) reaches it. `OptimizeLayerFrames` keeps Bumpy Road (3), Complex Method (cc 33) and Large Method (255 lines): its validation loop and allocations throw through `ThrowImageException`, whose `GetMagickModule()` would report another function if moved, and every branch of the frame loop that holds its bumps (the previous, background and expanded-background trials and their acceptance tests) contains `#if DEBUG_OPT_FRAME` blocks this build does not compile; the moveable pieces left (the background clone, Recipe V; the deleted-frame marking, Recipe LB step 7) are flat at 7.07 in probes. `CompareImagesBounds` keeps Bumpy Road (3) and Complex Method (cc 12): its four edge scans are one loop each, and any two of them as helpers are reported as Code Duplication (6.11 in probes, column or row, ascending or descending), while their headers and fetch geometry differ in more than one value, so SV, TW and D refuse one helper; one scan moved (Recipe E) was kept. Excess Arguments: `CompositeLayers` is public (6); `IsBetterFrameBounds` (5) can be bundled (Recipe B) only with a struct local that grows `OptimizeLayerFrames`; `CompositeCanvas` (6) bundled into the existing `LayerCompositeInfo` passed through from its three callers is flat at 6.52 in a probe and needs an amendment to Recipe B (reuse of a struct, pass-through, a parameter the body writes). Overall Code Complexity follows from the above. From 4.27 with P, E, D, I, V (W08, W09), then B, N, E, Y, V, K (W10). See W10 | 2026-10-31, WSL (W10) |
-| `MagickCore/paint.c` | 6.24 | Lines of Code in a Single File (1,145; suppressed by the owner). `FloodfillPaintImage` keeps Bumpy Road (5), Complex Method (cc 27) and Large Method (156 lines): its bumps sit around `PushSegmentStack`, a macro that names the caller's locals, pushes on success and on overflow destroys four resources and throws through `ThrowBinaryException`, whose `GetMagickModule()` would report another function if moved, so no block holding it can leave; the segment pop writes five locals; the offset tests as one Recipe P predicate are flat (6.24). `OilPaintImage` keeps Bumpy Road (2), Complex Method (cc 16) and Large Method (101 lines): its bumps are the parallel loop's `if ((p == NULL) || (q == NULL)) { status=MagickFalse; continue; }`, whose `continue` skips the progress block (no T, U or LB form moves it), and the `omp atomic` progress block; the histogram failure throws through `ThrowImageException`. `OpaquePaintImage` (cc 11, 74 lines) and `TransparentPaintImage` (cc 11) keep Bumpy Road (2) and Complex Method for the same two OpenMP-bound blocks, and Opaque *Large Method*: its preamble's `ConformPixelInfo` calls write the locals the row struct reads (W step 3 refuses them). Their column loops are N helpers of their own (`OpaquePaintRowPixels`, `TransparentPaintRowPixels`), which differ in two places (target expression and action), so TW and SV refuse one helper; neither is reported as duplication. `TransparentPaintImageChroma` (Bumpy Road 3, cc 14, 76 lines) has no case (only Magick++ calls it), so only E, G and P apply: its column loop takes seven inputs, and its preamble is `PrepareTransparentImage`'s body, which only Recipe W step 7 (oracle level) may reuse. Excess Arguments: public signatures (`FloodfillPaintImage`, `GradientImage`, the three Opaque/Transparent functions). Overall Code Complexity: the mean of the above. From 6.10 with N, W, N, W, RF (W10). See W10 | 2026-10-31, WSL (W10) |
+| `MagickCore/paint.c` | 6.55 | Lines of Code in a Single File (1,145; suppressed by the owner). `FloodfillPaintImage` keeps Bumpy Road (5), Complex Method (cc 27) and Large Method (156 lines): its bumps sit around `PushSegmentStack`, a macro that names the caller's locals, pushes on success and on overflow destroys four resources and throws through `ThrowBinaryException`, whose `GetMagickModule()` would report another function if moved, so no block holding it can leave; the segment pop writes five locals; the offset tests as one Recipe P predicate are flat (6.24). `OilPaintImage` keeps Bumpy Road (2), Complex Method (cc 16) and Large Method (101 lines): its bumps are the parallel loop's `if ((p == NULL) || (q == NULL)) { status=MagickFalse; continue; }`, whose `continue` skips the progress block (no T, U or LB form moves it), and the `omp atomic` progress block; the histogram failure throws through `ThrowImageException`. `OpaquePaintImage` (cc 11, 74 lines) and `TransparentPaintImage` (cc 11) keep Bumpy Road (2) and Complex Method for the same two OpenMP-bound blocks, and Opaque *Large Method*: its preamble's `ConformPixelInfo` calls write the locals the row struct reads (W step 3 refuses them). Their column loops are N helpers of their own (`OpaquePaintRowPixels`, `TransparentPaintRowPixels`), which differ in two places (target expression and action), so TW and SV refuse one helper; neither is reported as duplication. `TransparentPaintImageChroma` (Bumpy Road 3, cc 14, 76 lines) has no case (only Magick++ calls it), so only E, G and P apply: its column loop takes seven inputs, and its preamble is `PrepareTransparentImage`'s body, which only Recipe W step 7 (oracle level) may reuse. Excess Arguments: public signatures (`FloodfillPaintImage`, `GradientImage`, the three Opaque/Transparent functions). Overall Code Complexity: the mean of the above. From 6.10 with N, W, N, W, RF (W10). See W10 W12 (2026-11-04), new Recipe PC (head of a parallel loop before an atomic progress tail): `OpaquePaintImage` 6.24 to 6.49, `OilPaintImage` 6.49 to 6.55. Held now by `FloodfillPaintImage` (Bumpy Road 5, cc 27; the `PushSegmentStack` macro names the caller's locals), `OilPaintImage` (cc 12), `TransparentPaintImageChroma` (unreached), and a `TransparentPaintImage` probe that cloned `OpaquePaintLine` (6.49 to 6.30). | 2026-10-31, WSL (W10) |
 | `MagickCore/histogram.c` | 9.68 | Excess Number of Function Arguments only. `MinMaxStretchImage` (5) is public API. `UniqueColorsToImage` (5, `static`, recursive) takes Recipe B (its four invariant parameters in one struct; the recursive call fills a `const` copy from the bound locals), which removes its finding but leaves the file flat at 9.68, since `MinMaxStretchImage` keeps the category: not committed (rule 2, no later step). Other probes, flat: `IsPixelInfoColorMatch`'s `beta` line calling `GetColorMatchAlpha` (Recipe D, cc 8 to 7). Rejected: `CheckImageColors`' count-or-add as its own LB helper is reported as *Code Duplication* of `CountHNodeColor` (and its column loop then of `ClassifyRowColors`), 8.81; the two differ in the search, the append and the colour limit, so D, TW and SV refuse one helper; the column body as one LB helper avoids it. From 6.39 (W09) to 7.47, then 9.68 in W10 with E, Y, W, LT, LB, LT (Recipe LT added). See W10 | 2026-10-31, WSL (W10) |
 | `MagickCore/resample.c` | 7.42 | `ResamplePixelColor` keeps Complex Method (cc 26), Bumpy Road (3) and Large Method (145 lines): what is left of its virtual-pixel `hit` switch is the image group (six labels and an `if`), which as a function needs a `default` and is then cc 9 (7.23 in a probe), and the tile group (six labels, empty body), which alone would be a function that does nothing; its `if` alone as a Recipe E helper takes the bumps 3 to 2 and is flat (7.40). The scan loop's braces interleave with the uncompiled `FILTER_LUT` and `DEBUG_HIT_MISS` branches, and its head (fetch, then `return(MagickFalse);`) writes `u1`, `Q`, `DQ` and `pixels`, whose Recipe I or Y fill would grow the function. `ScaleResampleFilter` keeps Large Method (95 lines), most of them in uncompiled `#if EWA` and `DEBUG_ELLIPSE` branches; its compiled coefficient lines write `A`, `B`, `C` and `F`, and its preamble as a Recipe V helper is flat (7.42). Excess Arguments: `ResamplePixelColor` and `ScaleResampleFilter` are public (5); `ClampUpAxes` (10) under Recipe B or I is flat (7.30), since the category stays. Code Duplication: `IsAreaOutsideCorner`/`IsAreaOutsideDitherCorner` differ in the edge literal (`0.0`/`-32.0`) and in the far edges (`-1.0`/`+31.0`, operator and literal), so D, SV and TW refuse one helper; one function taking the three bounds in a struct leaves the two callers' fills reported as duplicates (flat in a probe). `SetResampleFilterInterpolateMethod`/`SetResampleFilterVirtualPixelMethod` share only the assert-and-log prologue, whose `GetMagickModule()` would report another function if moved. Overall Code Complexity: the mean of the above. From 5.13 (M51) to 7.30 (W09), then SD (step 7 added), Q, Y and V (step 6's `void` form added) in W10. See W10 | 2026-10-31, WSL (W10) |
-| `MagickCore/attribute-depth.c` | 7.33 | `GetImageDepth` and `SetImageDepth` keep Deep Nesting (4), Bumpy Road (5, 4), Complex Method (cc 27, 25) and Large Method (127 lines each), nearly all of it in their `#if !defined(MAGICKCORE_HDRI_SUPPORT)` depth-map branches, which this HDRI build does not compile. What the build compiles of them is bound: the HDRI row loops read and write the shared `status` and `continue` (T and U refuse what is left), the `assert`s, `LogMagickEvent(...GetMagickModule()...)` and `ThrowFatalException` would report another function and line if moved, and `SetImageDepth`'s colormap loop carries its own `#pragma omp parallel for`. `GetImageDepth`'s `current_depth[i]=1` loop as a Recipe E helper scores 7.32 from 7.30 but leaves `i` unused in this build (`-Wunused-variable`; its other use is in the uncompiled branch, whose declaration may not move). Reusing `FinishImageDepth` in `FloydSteinbergImageDepth` (Recipe D, no reported duplication) is flat. Overall Code Complexity: the mean of the above. Reaching 10.0 needs a build that compiles the non-HDRI branch (then guard- or oracle-verified there) and a ruling on the colormap loop's pragma. From 6.37 (W09, after the split) with N, Q, E, U, P, then SV (step 2 amended), P and E in W10. See W10 | 2026-10-31, WSL (W10) |
-| `MagickCore/feature.c` | 5.24 | Line budget: CodeScene counts 999 lines of code, and *Lines of Code in a Single File* appears at 1,002 (a probe: 5.24 to 4.95); every extraction adds 5 to 8 lines, two small ones together measured 4.96. Beyond that, `MeanShiftImage` keeps Brain Method and depth 6 (its window loop assigns the shared `status` from a call, which T and J refuse) and `TraceEdges` needs a two-level extraction whose helper would be a *Complex Method*. A split (Recipe S) is the lever. See W11 | 2026-10-31, WSL (W11) |
-| `MagickCore/statistic.c` | 5.84 | `EvaluateImages` (Deep Nesting 4, 4 bumps, cc 29), `EvaluateImage` and `PolynomialImage` are OpenMP-bound: their parallel loops sit inside `if (op == Median)`, and what is left of their bodies is the `status` `continue` blocks and the atomic progress blocks. The *Code Duplication* among `GetImageEntropy`, `Extrema`, `Kurtosis`, `Mean` and `Median` is their logging prologue; the rest differs in more than one value. *Lines of Code in a Single File* needs a split (Recipe S). See W11 | 2026-10-31, WSL (W11) |
-| `MagickCore/segment.c` | 5.70 | `GetImageDynamicThreshold` keeps Brain Method, Deep Nesting (4) and 5 bumps, but no case reaches it and no in-tree file calls it, so only E, G, P and D's unreached form apply; its blue loop (three written variables, Recipe I), its allocation and default-cluster exits (W, V) and its removal loop need the oracle. A case reaching it would open them. `Classify` (6 bumps, cc 25) is OpenMP-bound, and its removal loop writes `count` and `head` in a function with a parallel region, which K step 6 and Q step 1 refuse. See W11 | 2026-10-31, WSL (W11) |
-| `MagickCore/transform.c` | 5.60 | Every remaining bump is the `#pragma omp atomic` progress block of a parallel loop (a probe removing `FlipImage`'s took it to 0 bumps); shrinking `FlopImage`, `TransposeImage` or `ExcerptImage` exposes the near-identical row-loop skeletons of the flip, flop, transpose, transverse and excerpt functions as *Code Duplication* (probes 5.01 to 5.13); `FlipImage`'s closing block needs a fifth argument; `ChopImage` and `SpliceImage` are held by two parallel loops each and by `ThrowImageException`. *Lines of Code in a Single File* needs a split (Recipe S). See W11 | 2026-10-31, WSL (W11) |
-| `MagickCore/quantize.c` | 5.60 | 110 functions: a 111th switches on *Number of Functions in a Single Module* (about -0.12; `SetGrayscaleImage`'s colormap compaction as a helper, 5.48), which rules out every extraction recipe. `SetGrayscaleImage` keeps Deep Nesting (5) from the `omp critical` colormap insert inside its parallel loop; the duplicated pairs differ in more than one value or are assert/log prologues; `KmeansImage`'s seeding leaves through `return(status);` with `status` read later, which W and V refuse. A split (Recipe S) is the lever. See W11 | 2026-10-31, WSL (W11) |
-| `MagickCore/threshold.c` | 5.35 | The nine parallel row loops each keep 2 bumps and cc 11 to 14 from their `status` and progress skeleton; a row-loop helper in `PerceptibleImage`, `BilevelImage` or `WhiteThresholdImage` widens the *Code Duplication* group (5.18 in probes). `ColorThresholdImage` (80 lines) is held by its start/stop scaling, which writes two struct locals in place and is not a selection (neither E nor O); `OrderedDitherImage` (79) by its map lookup, which writes `threshold_map` and `map`. Excess Arguments rests on the public `RangeThresholdImage`. See W11 | 2026-10-31, WSL (W11) |
-| `MagickCore/distort.c` | 3.55 | After three rulings (Recipe AS, the Recipe H amendment for one mid-body `#define`, and a never-compiled `#if 0` branch moving verbatim with its case; W11, 2026-11-01) `DistortImage` lost Brain Method and Deep, Nested Complexity (bumps 16 to 8, 895 to 715 lines; 16 steps, flat but for the verbose-`Polynomial` step 3.01 to 3.06 and the last, 3.55). It stays a *Complex Method* (cc 90), with `GenerateCoefficients` (cc 126, 737 lines; stubbing its 13 big cases leaves 3.01: only leaving every category moves it, whole stub 3.29), `SparseColorImage`, the `poly_basis` functions and `DistortResizeImage` (two bumps, no exact recipe). Whole-function stubs: `DistortImage` and `GenerateCoefficients` together are the lever left. See W11 | 2026-11-01, WSL (W11) |
-| `MagickCore/enhance.c` | 4.85 | Split (Recipe S, W11): the tone and color family went to `enhance-tone.c` (2.97 to 4.32 and 4.06), and ten steps then took it to 4.85: not saturated after the split. Before it no single step moved 2.97. `ContrastImage`, `SigmoidalContrastImage`, `EnhanceImage`, `ModulateImage`, `WhiteBalanceImage` and `CLAHEImage` are bound by the parallel-row skeleton (atomic progress and `status` blocks, cc 9 and up) or, for `CLAHEImage`, by its second row loop, which as a helper is a *Complex Method* because its progress block cannot reuse `UpdateCLAHEProgress` (4.58 in a probe; D for a block identical to an existing helper needs a *Code Duplication* finding, which CodeScene does not report). `EnhanceImage`'s 31-line `EnhancePixel` macro counts against the function after it (a per-pixel split still about 75 lines). Excess Arguments rests on the public functions and `InterpolateCLAHE`. Stub ceilings: `EnhanceImage` 5.23, `ContrastImage` 5.15, `SigmoidalContrastImage` 5.14, `CLAHEImage` and `ModulateImage` 5.12, `WhiteBalanceImage` 5.07. 2,617 lines (*Lines of Code in a Single File* remains). See W11 | 2026-10-31, WSL (W11) |
-| `MagickCore/enhance-tone.c` | 4.17 | New in W11 (split from `enhance.c`), 4.06 to 4.17 in twelve steps. *Code Duplication* appears only while it names five or more functions: the two `FindStretch` levels and the Stretch, Equalize and Gamma row helpers; stubbing one of the pair or two of the row helpers gives 4.40, and no legal step drops one (Recipe B on the five-argument row helpers is flat; a four-block `LevelizeImage` colormap loop helper is a clone of `LevelColormap`, 3.90). A parallel row loop floors at cc 9 (each `#if` counts +1; all-skeleton ceiling 4.67). `NegateImage` (cc 21) and `EqualizeImage`'s channel loop write `status` and `progress` with five inputs (N refuses); `LevelImageColors` (cc 19) and `HaldClutImage`'s four `status=InterpolatePixelInfo(...); break` (T refuses) hold. The identical-block D or the function-pointer merge would reach the duplication cliff. See W11 | 2026-10-31, WSL (W11) |
+| `MagickCore/attribute-depth.c` | 7.54 | `GetImageDepth` and `SetImageDepth` keep Deep Nesting (4), Bumpy Road (5, 4), Complex Method (cc 27, 25) and Large Method (127 lines each), nearly all of it in their `#if !defined(MAGICKCORE_HDRI_SUPPORT)` depth-map branches, which this HDRI build does not compile. What the build compiles of them is bound: the HDRI row loops read and write the shared `status` and `continue` (T and U refuse what is left), the `assert`s, `LogMagickEvent(...GetMagickModule()...)` and `ThrowFatalException` would report another function and line if moved, and `SetImageDepth`'s colormap loop carries its own `#pragma omp parallel for`. `GetImageDepth`'s `current_depth[i]=1` loop as a Recipe E helper scores 7.32 from 7.30 but leaves `i` unused in this build (`-Wunused-variable`; its other use is in the uncompiled branch, whose declaration may not move). Reusing `FinishImageDepth` in `FloydSteinbergImageDepth` (Recipe D, no reported duplication) is flat. Overall Code Complexity: the mean of the above. Reaching 10.0 needs a build that compiles the non-HDRI branch (then guard- or oracle-verified there) and a ruling on the colormap loop's pragma. From 6.37 (W09, after the split) with N, Q, E, U, P, then SV (step 2 amended), P and E in W10. See W10 PS sweep (W12): `GetImageDepth`'s loop as a PS step 7 helper (small form), 7.33 to 7.54; its and `SetImageDepth`'s first loops sit in `#if !defined(MAGICKCORE_HDRI_SUPPORT)`, not compiled in this build. | 2026-10-31, WSL (W10) |
+| `MagickCore/feature.c` | 6.51 | Line budget: CodeScene counts 999 lines of code, and *Lines of Code in a Single File* appears at 1,002 (a probe: 5.24 to 4.95); every extraction adds 5 to 8 lines, two small ones together measured 4.96. Beyond that, `MeanShiftImage` keeps Brain Method and depth 6 (its window loop assigns the shared `status` from a call, which T and J refuse) and `TraceEdges` needs a two-level extraction whose helper would be a *Complex Method*. A split (Recipe S) is the lever. See W11 Third pass (W12, 2026-11-04, Recipe PS, LB, N, V): `MeanShiftImage` 5.24 to 5.94 (it left Brain Method and Deep Nesting; cc 11, 79 lines, 2 bumps remain), the file now 1,084 lines of code: the line limit was crossed by the first step and the score still rose, so it is no longer the constraint. `CannyEdgeImage`, `HoughLineImage` and `TraceEdges` remain. PS sweep (W12): `CannyEdgeImage`'s gradient loop as a PS step 7 helper, 5.94 to 6.08. W12 (2026-11-04): `MeanShiftImage` PC, `HoughLineImage` E and Y, `TraceEdges` Wa, `CannyEdgeImage` V, `GetCannyNeighbors` B; 6.08 to 6.51. Held by `CannyEdgeImage` (critical and atomic tails), `TraceEdges` (nested scan) and `HoughLineImage`. | 2026-10-31, WSL (W11) |
+| `MagickCore/statistic.c` | 6.73 | Split (Recipe S, W12): the measurement family went to `statistic-measure.c` (5.84 to 6.55 and 9.09), and eight steps then took it to 6.73. `EvaluateImages` (cc 27, 198 lines, 4 bumps, depth 4) and `PolynomialImage` (cc 12, 83 lines, 2 bumps) are held by the two `if (op == Median)` parallel loops, whose heads and sync/progress tails no recipe may move; the fetch, median, rows and middle blocks each read six to ten variables (an input struct needs as many caller assignments as the lines it saves, a five-argument E helper adds Excess Arguments); the image-view allocation block returns an expression that reads a variable the block writes (V step 7 refuses); the trace logging blocks would name another function. Stubs: all three functions 9.38, `EvaluateImages` alone 8.03. 1,204 lines of code (*Lines of Code in a Single File* remains). See W12 | 2026-11-01, WSL (W12) |
+| `MagickCore/statistic-measure.c` | 9.68 | New in W12 (split from `statistic.c`), 9.09 to 9.68 in one step (`GetImageMedian`'s tail, E step 7, which removed the Code Duplication of its logging prologue). The one finding left is `GetImageRange` (Complex Method, cc 10): its asserts and logging prologue count toward cc, the `omp critical` merge of two `if`s stays, and its `p == NULL` / `status` `continue` block fits no recipe (T, OC, W and LB each refuse it); its column loop as a Recipe K helper gives cc 9 and a flat 9.09. Reaching 10.0 needs a ruling that lets a `continue` block mid-body move, or a recipe for the `p == NULL` block. A helper merging the leading `status` guard and the fetch-failure `continue` (the parallel-loop skip guard) removes the Complex Method but takes eight arguments (five at the least), so it carries *Excess Number of Function Arguments* and the file stays 9.68; the same helper over the nine row loops of `threshold.c` is 5.35 to 5.41 with *Code Duplication* growing (W12 report). See W12 | 2026-11-01, WSL (W12) |
+| `MagickCore/segment.c` | 6.44 | `GetImageDynamicThreshold` keeps Brain Method, Deep Nesting (4) and 5 bumps, but no case reaches it and no in-tree file calls it, so only E, G, P and D's unreached form apply; its blue loop (three written variables, Recipe I), its allocation and default-cluster exits (W, V) and its removal loop need the oracle. A case reaching it would open them. `Classify` (6 bumps, cc 25) is OpenMP-bound, and its removal loop writes `count` and `head` in a function with a parallel region, which K step 6 and Q step 1 refuse. See W11 W12 (2026-11-04): seven commits, 5.70 to 6.44 (`Classify` PC, LB, PS, D, O; `ClassifyFuzzyPixel` B; `GetImageDynamicThreshold` E, unreached, guard). Held by the 1,534-line file, `Classify` (throw macro, two atomic progress blocks) and `GetImageDynamicThreshold` (Brain Method). | 2026-10-31, WSL (W11) |
+| `MagickCore/transform.c` | 5.90 | Every remaining bump is the `#pragma omp atomic` progress block of a parallel loop (a probe removing `FlipImage`'s took it to 0 bumps); shrinking `FlopImage`, `TransposeImage` or `ExcerptImage` exposes the near-identical row-loop skeletons of the flip, flop, transpose, transverse and excerpt functions as *Code Duplication* (probes 5.01 to 5.13); `FlipImage`'s closing block needs a fifth argument; `ChopImage` and `SpliceImage` are held by two parallel loops each and by `ThrowImageException`. *Lines of Code in a Single File* needs a split (Recipe S). See W11 W12 (2026-11-04), Recipe PC: `FlipImage` 5.82, `FlopImage` 5.87, `CropImage` 5.90. The next helpers (Transverse, Transpose, Excerpt, Chop, Splice) each clone the first three and score 5.42 to 5.50. Held by Bumpy Road on those loops and the 1,803-line file. | 2026-10-31, WSL (W11) |
+| `MagickCore/quantize.c` | 5.60 | 110 functions: a 111th switches on *Number of Functions in a Single Module* (about -0.12; `SetGrayscaleImage`'s colormap compaction as a helper, 5.48), which rules out every extraction recipe. `SetGrayscaleImage` keeps Deep Nesting (5) from the `omp critical` colormap insert inside its parallel loop; the duplicated pairs differ in more than one value or are assert/log prologues; `KmeansImage`'s seeding leaves through `return(status);` with `status` read later, which W and V refuse. A split (Recipe S) is the lever. See W11 W12 (2026-11-04): re-probed, no commits. PC needs an `omp atomic` tail and this file has none; the 110-function ceiling makes any helper the 111th (a PS-shaped `AssignImageColors` helper scored 5.58). | 2026-10-31, WSL (W11) |
+| `MagickCore/threshold.c` | 5.50 | The nine parallel row loops each keep 2 bumps and cc 11 to 14 from their `status` and progress skeleton; a row-loop helper in `PerceptibleImage`, `BilevelImage` or `WhiteThresholdImage` widens the *Code Duplication* group (5.18 in probes). `ColorThresholdImage` (80 lines) is held by its start/stop scaling, which writes two struct locals in place and is not a selection (neither E nor O); `OrderedDitherImage` (79) by its map lookup, which writes `threshold_map` and `map`. Excess Arguments rests on the public `RangeThresholdImage`. See W11 W12 (2026-11-04), Recipe PC: `ClampImage` 5.35 to 5.50. Every further PC helper clones `ClampImageLine` (BlackThreshold 5.39, OrderedDither 5.36, Perceptible 5.51 with a clone finding); a shared head helper would need a callback. | 2026-10-31, WSL (W11) |
+| `MagickCore/distort.c` | 3.55 | After three rulings (Recipe AS, the Recipe H amendment for one mid-body `#define`, and a never-compiled `#if 0` branch moving verbatim with its case; W11, 2026-11-01) `DistortImage` lost Brain Method and Deep, Nested Complexity (bumps 16 to 8, 895 to 715 lines; 16 steps, flat but for the verbose-`Polynomial` step 3.01 to 3.06 and the last, 3.55). It stays a *Complex Method* (cc 90), with `GenerateCoefficients` (cc 126, 737 lines; stubbing its 13 big cases leaves 3.01: only leaving every category moves it, whole stub 3.29), `SparseColorImage`, the `poly_basis` functions and `DistortResizeImage` (two bumps, no exact recipe). Whole-function stubs: `DistortImage` and `GenerateCoefficients` together are the lever left. See W11 W12 (2026-11-04), re-probed, no commit: W/E on the verbose cases, E on `DistortResizeImage`, and a three-step `SparseColorImage` chain (cc 31 to 16) were all flat; `Polar` and `Plane2Cylinder` helpers cloned (3.29, 3.21). Only a whole function leaving every category would move it (`DistortImage` alone 4.00). | 2026-11-01, WSL (W11) |
+| `MagickCore/enhance.c` | 5.43 | Split (Recipe S, W11): the tone and color family went to `enhance-tone.c` (2.97 to 4.32 and 4.06), and ten steps then took it to 4.85: not saturated after the split. Before it no single step moved 2.97. `ContrastImage`, `SigmoidalContrastImage`, `EnhanceImage`, `ModulateImage`, `WhiteBalanceImage` and `CLAHEImage` are bound by the parallel-row skeleton (atomic progress and `status` blocks, cc 9 and up) or, for `CLAHEImage`, by its second row loop, which as a helper is a *Complex Method* because its progress block cannot reuse `UpdateCLAHEProgress` (4.58 in a probe; D for a block identical to an existing helper needs a *Code Duplication* finding, which CodeScene does not report). `EnhanceImage`'s 31-line `EnhancePixel` macro counts against the function after it (a per-pixel split still about 75 lines). Excess Arguments rests on the public functions and `InterpolateCLAHE`. Stub ceilings: `EnhanceImage` 5.23, `ContrastImage` 5.15, `SigmoidalContrastImage` 5.14, `CLAHEImage` and `ModulateImage` 5.12, `WhiteBalanceImage` 5.07. 2,617 lines (*Lines of Code in a Single File* remains). W12: the Recipe D amendment took the progress block of `CLAHEImage`'s second row loop to `UpdateCLAHEProgress` (4.85 to 4.91). See W11 W12 (2026-11-04): eight commits, 4.91 to 5.43 (PC on ContrastImage and EnhanceImage; H; E; CLAHEImage E and Q reusing `CLAHEPixelLoad`; WhiteBalance E). Further PC heads clone `ContrastImageHead` (all four together 5.21 against 5.43). | 2026-10-31, WSL (W11) |
+| `MagickCore/enhance-tone.c` | 4.37 | New in W11 (split from `enhance.c`), 4.06 to 4.17 in twelve steps. *Code Duplication* appears only while it names five or more functions: the two `FindStretch` levels and the Stretch, Equalize and Gamma row helpers; stubbing one of the pair or two of the row helpers gives 4.40, and no legal step drops one (Recipe B on the five-argument row helpers is flat; a four-block `LevelizeImage` colormap loop helper is a clone of `LevelColormap`, 3.90). A parallel row loop floors at cc 9 (each `#if` counts +1; all-skeleton ceiling 4.67). `NegateImage` (cc 21) and `EqualizeImage`'s channel loop write `status` and `progress` with five inputs (N refuses); `LevelImageColors` (cc 19) and `HaldClutImage`'s four `status=InterpolatePixelInfo(...); break` (T refuses) hold. The identical-block D or the function-pointer merge would reach the duplication cliff. See W11 PS sweep (W12): `HaldClutImage`'s column loop with four assign-and-test `status` calls through a `status` pointer, 4.17 to 4.24. W12 (2026-11-04): four commits, 4.24 to 4.37 (`NegateImage` H, OC step 6, PC; `ContrastStretchImage` OC step 6). Every other row loop has the same skeleton; a second head clones `NegateImageLine` (about -0.09). | 2026-10-31, WSL (W11) |
 | `MagickCore/morphology.c` | 2.71 | The four big functions have to leave Large Method, Complex Method and the nesting findings together (stubbed: all four 4.76; `MorphologyApply` alone 3.06, `MorphologyPrimitive` 3.02, `MorphologyPrimitiveDirect` 2.84, `AcquireKernelBuiltIn` 2.77), and none can. `MorphologyApply`'s legal floor is 135 lines, Brain Method and nesting 4 (its init, stage, loop and post-process blocks each as a call: 2.73, the stage-switch helper itself a cc-25 *Complex Method*), with 7 arguments from its `MagickPrivate` signature; `MorphologyPrimitive` (512 lines, cc 108, 16 bumps, nesting 7) is two parallel loops whose skeleton stays; `MorphologyPrimitiveDirect` and `AcquireKernelBuiltIn` hold one long switch each, which only a dispatch table (function pointers) would take. 3,464 lines of code. Recipe S is the lever. See W11 | 2026-10-31, WSL (W11) |
-| `MagickCore/visual-effects.c` | 3.50 | Moves only in sets (single steps and Recipe B on all seven static helpers are flat; three functions leaving Complex and Large Method together gave 3.27 to 3.38). `PlasmaImageProxy` (cc 21, 103 lines, 4 bumps; 3.68 if stubbed) stays: Recipe Y step 6 takes its right, bottom and top blocks (a constant `return` each), but the first alone is flat (3.50), two give 3.25 and three 3.17, because the helpers are reported as one clone group (*Code Duplication*) and the bumps stay at 4 (each extraction keeps the `if` and the `if (Helper(...)) return`); the left block leaves through two constants (`MagickFalse` from its nested right block, `MagickTrue` otherwise) and step 6 refuses it. The other functions are held by the parallel-loop skeleton or by Deep Nesting under a shared `status` assigned from a call (`ImplodeImage`, `SwirlImage`, `MorphImages`). See W11 | 2026-10-31, WSL (W11) |
+| `MagickCore/visual-effects.c` | 3.90 | Moves only in sets (single steps and Recipe B on all seven static helpers are flat; three functions leaving Complex and Large Method together gave 3.27 to 3.38). `PlasmaImageProxy` (cc 21, 103 lines, 4 bumps; 3.68 if stubbed) stays: Recipe Y step 6 takes its right, bottom and top blocks (a constant `return` each), but the first alone is flat (3.50), two give 3.25 and three 3.17, because the helpers are reported as one clone group (*Code Duplication*) and the bumps stay at 4 (each extraction keeps the `if` and the `if (Helper(...)) return`); the left block leaves through two constants (`MagickFalse` from its nested right block, `MagickTrue` otherwise) and step 6 refuses it. The other functions are held by the parallel-loop skeleton or by Deep Nesting under a shared `status` assigned from a call (`ImplodeImage`, `SwirlImage`, `MorphImages`). See W11 PS sweep (W12): `MorphImages` as a PS step 7 helper, 3.50 to 3.53; `SwirlImage`'s loop probes 3.62 but its helper has Bumpy Road (2 bumps), `WaveImage` is flat, `ImplodeImage` (the same shape as Swirl) was not probed. W12 (2026-11-04): ten commits, 3.53 to 3.90 (PC on Colorize, AddNoise, BlueShift, ColorMatrix, Solarize, Wave; E; `MorphImages` O and N, whose single-image branch no oracle case reaches, checked by hand with `rose: -morph`). Sepia/Tint PC clones (3.44); an `ImplodeImage` PC+E chain (about 4.05) was not committed because its row helper keeps two bumps. | 2026-10-31, WSL (W11) |
+| `MagickCore/channel-alpha.c` | 8.14 | PS sweep (W12): `SetImageAlphaChannel`'s Remove, Shape and Disassociate cases as PS step 7 helpers, 7.65 to 8.07 (the last two are the small guard-plus-one-call form, close readings in the W12 report); the Associate loop is 7.39 (*Code Duplication*), `OffIfOpaque` also writes the shared `opaque`. See W12 Second-scalar pass (W12): `OffIfOpaque`'s loop, which also writes the shared `opaque`, as a PS helper through two pointers, 8.07 to 8.14 (bumps 4 to 3, cc 51 to 45). | 2026-11-04, WSL (W12) |
+| `MagickCore/vision.c` | 6.98 | PS sweep (W12): `AngleThreshold`'s loop as a PS step 7 helper, 5.64 to 5.91 (it left Bumpy Road, Complex Method and Large Method); the same helper for Circularity, Major, Minor and Eccentricity switches *Code Duplication* on (5.45 to 5.58). See W12 W12 (2026-11-04): PS step 8 (`ComputeObjectMoments` for Major/Minor/Eccentricity), OC step 6 (`IntegralImage`), B steps for Excess Arguments; 5.91 to 6.98. Fragile: another sibling-shaped helper switches Code Duplication on. Held by `ConnectedComponentsImage` (cc 55), `CircularityThreshold`, `GetObjectCentroidSums`. | 2026-11-04, WSL (W12) |
+| `MagickCore/shear-deskew.c` | 8.97 | PS sweep (W12, 2026-11-04): `RadonTransform`'s second loop as a whole-body helper (PS step 7), 8.74 to 8.97, bumps gone. See W12 | 2026-11-04, WSL (W12) |
+| `MagickCore/attribute.c` | 7.92 | Second-scalar pass (W12, 2026-11-04, PS step 2 amended): `IdentifyImageGray` (writes the shared `type`), `IdentifyImageMonochrome` and `IsImageOpaque` as PS step 7 helpers, 7.11 to 7.92. Held now by `GetEdgeBackgroundColor`, `SetImageType` (cc 17, 104 lines) and Overall Code Complexity. See W12 | 2026-11-04, WSL (W12) |
 
 ### Tool notes
 
@@ -5484,3 +5852,12 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-01 | AMEND | Preprocessor branches | Exception: a branch no configuration compiles (`#if 0`) may move verbatim, token for token, with the code that holds it when a recipe moves that code; the dead text is not edited or renamed, a script checks it stands once in the new place unchanged, and `pp_identical.sh` prints `IDENTICAL`; `#if defined(...)` branches that some configuration compiles stay refused | `distort.c`'s `DistortImage` (campaign A, W11): the `Cylinder2Plane` and `Plane2Cylinder` pixel cases each hold a never-compiled `#if 0` debug block that names `i` and `j`; the rule kept the cases (and with them *Deep, Nested Complexity* at depth 5) in place; a probe with the blocks out of the function gave 3.01 to 3.55 | owner |
 | 2026-11-01 | AMEND | AS | Step 7: a block that reads more than four variables takes them through an input struct as in Recipe N steps 2 and 3, filled directly before the call; a variable written through its address that the callee reads on entry goes by pointer as a parameter; the caller writes `status=Helper(&inputs,...);` | `distort.c`'s `DistortImage` (campaign A, W11): the resample branch reads eight variables (`distort_image`, `resample_filter`, `id`, `s`, `validity`, `invalid`, `exception`) and writes `pixel` through `&pixel`, which `ResamplePixelColor` reads on entry; AS's first use gave 8 arguments, flat 3.01 with the struct form (bumps 16 to 14), 502 cases, 0 diverged | owner |
 | 2026-11-01 | AMEND | H | Step 1: a single `#define` that stands further down the body, after statements, may be hoisted as a run of its own when its name occurs nowhere between the function's signature and that `#define` (checked by script); step 3 excepts it; use only to unblock an extraction that follows; `pp_identical.sh` proves the step | `distort.c`'s `DistortImage` (campaign A, W11): `ScaleFilter` is `#define`d in the middle of the body and used by nine pixel cases; a helper above the function cannot see it, and step 1 took only a run at the top of the body | mandate (2026-10-24) |
+| 2026-11-04 | NEW | PS | Extract Block Through a Pointer to the Loop Status: a block inside a parallel loop body that reads, tests or assigns the shared `status` in ways T and AS refuse moves to a `static void` function taking `MagickBooleanType *status`, every use written `(*status)`; the caller passes `&status`; `status` shared, no pragma inside the block | `resize.c`'s `InterpolativeResizeImage` (campaign A, W12): its column loop assigns and tests `status` from `InterpolatePixelChannels` and may run no iteration; T and J refused it, AS refuses it (a path leaves `status` alone, a `break` leaves the block); the loop as a helper through a `status` pointer probed `resize.c` 7.11 to 8.6; the same site in `feature.c`'s `MeanShiftImage`, `effect.c`'s `SpreadImage` and `KuwaharaImage` | owner |
+| 2026-11-04 | AMEND | SD | Step 1: a group may hold `break;` of the `switch` inside a selection (`if (p == NULL) break;`), as a chain's groups already may; each ends the group where its last `break;` would. *Careful* gives the argument | `effect.c`'s `PreviewImage` (campaign A, W12): fourteen of the 29 groups of `switch (preview)` end a failed `CloneImage` with `if (preview_image == NULL) break;`, so step 1 refused the `switch` the function's cc 56 rests on. Chained functions of the break-free and breaking groups together: 4.51 to 5.00 in a probe, every step raising the score | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | SD | Step 8 (new): a chain whose steps need Z's input struct declares one `tile` local at the top of the block holding the `switch` and fills it once directly before the `switch` (Recipe N step 8's sibling form); the caller's `default:` calls the outermost helper with `&tile`, and each helper passes `tile` on unchanged to the next. *Careful* gives the argument | `effect.c`'s `PreviewImage` (campaign A, W12): the groups read eleven variables, so Z gives a struct; step 2 moves the `default:` group with its struct local and fill, which would give every later helper its own copy of the fill and a second struct. Seven helpers over one `tile`: 5.00 in a probe, no finding on any of them | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | PS | Step 7 (new): the block may be a parallel loop's whole body, declarations included, with `continue;` statements of that loop (Recipe E step 7's whole-body form): each becomes `return;`, the counter goes by value, the body becomes the call alone, `status` through the pointer at every use; step 1 excepts it. *Careful* gives the argument | `effect.c`'s `LocalContrastImage` (campaign A, W12): both loop bodies open with `if (status == MagickFalse) continue;` and hold a failed-fetch `status=MagickFalse; continue;`, which T, LB, OC, W and PS step 1 refuse (the W12 report names the gap). Both bodies as helpers over one input struct: 5.02 to 5.19 in a probe, no finding on either helper | mandate (2026-10-24) |
+| 2026-11-04 | WORDING | PS | Step 7: the body becomes the call preceded by the declaration and fill of its input struct in the body (Recipe N step 7), not the call alone; the probe behind the step shared one struct filled once | `effect.c`'s `LocalContrastImage` (campaign A, W12): the first uses declare each pass's struct inside the loop body, as `KuwaharaImage`'s `kuwahara` and Recipe N step 7 do: 5.02 to 5.10 to 5.15 | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | PS | Step 2: besides `status`, the block may read or write at most two further shared scalars `v` (declared outside the loop body, in `shared(...)` or no clause, never in `private`, `firstprivate`, `lastprivate` or `reduction`) by plain assignment or a plain increment outside any `atomic` or `critical`; each is passed by pointer like `status`, every use `(*v)`, with the same argument (same memory, points and order, nothing deferred, helper called inside the iteration). Steps 4 and 6 and *Careful* follow; *Careful* says a plain increment that is a race stays a race. Still eight steps | `attribute.c`'s `IdentifyImageGray` and `IdentifyImageMonochrome` (shared `type`) and `resize-sample.c`'s `SampleImage` (non-atomic `progress++`), campaign A, W12: each blocked by one second shared scalar; probes +0.31 and 9.47 to 10.00 | mandate (2026-10-24) |
+| 2026-11-04 | NEW | PC | Extract Parallel Loop Head Returning Success for a Continue: the head of a parallel loop body (guard, fetch with `status=MagickFalse; continue;`, work, sync test) that precedes a pragma-bearing progress tail moves to a `static MagickBooleanType` function, each `continue;` becoming `return(MagickFalse);`, `status` by pointer; the caller writes `if (Helper(...,&status) == MagickFalse) continue;` and keeps the tail | `paint.c`'s `OpaquePaintImage`, `TransparentPaintImage`, `OilPaintImage` (campaign A, W13): T, U, PS and E step 7 refuse a head followed by an atomic progress block; a probe on `OpaquePaintImage`, 6.24 to 6.49 | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | PS | Step 8 (new): a block that also writes two to four variables declared in the loop body and read by the body after it passes their addresses in one `const` struct initialised in the body, Recipe Q step 8's form; step 3 had refused it | `vision.c`'s `MajorAxisThreshold`, `MinorAxisThreshold`, `EccentricityThreshold` (campaign A, W12): the centroid pass and second-moment row loop read and write `status` (PS) and add to four accumulators the body reads afterwards (step 3 refused it; Q and I refuse the shared `status`). A probe: 5.91 to 6.49, the three functions leaving Bumpy Road and Complex Method | mandate (2026-10-24) |
+| 2026-11-04 | AMEND | OC | Step 6 (new): a block that is the whole body of a sequential loop, whose inputs would give five or more parameters, takes its read-only inputs in a struct filled once before the loop (Recipe N steps 2 and 3), then the counter and the written variables by pointer, at most four parameters | `vision.c`'s `IntegralImage` (campaign A, W12): row loop with a guard, a failed fetch `continue;`, a sync test and a progress block; step 1 allowed the body, the six parameters did not. A probe: 6.49 to 6.77, the function leaving Bumpy Road and Complex Method | mandate (2026-10-24) |

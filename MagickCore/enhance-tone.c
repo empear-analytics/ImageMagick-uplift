@@ -952,6 +952,39 @@ static void SetStretchProperty(Image *image,const Quantum *black,
     exception);
 }
 
+typedef struct _StretchScan
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  double
+    *histogram;
+
+  ExceptionInfo
+    *exception;
+} StretchScan;
+
+static void ScanStretchHistogramRow(const StretchScan *scan,const ssize_t y,
+  MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(scan->image_view,0,y,scan->image->columns,1,
+    scan->exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  AccumulateStretchHistogram(scan->image,p,scan->histogram);
+}
+
 MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   const double black_point,const double white_point,ExceptionInfo *exception)
 {
@@ -973,6 +1006,9 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
     *black,
     *stretch_map,
     *white;
+
+  StretchScan
+    scan;
 
   ssize_t
     i;
@@ -1007,21 +1043,12 @@ MagickExport MagickBooleanType ContrastStretchImage(Image *image,
   (void) memset(histogram,0,(MaxMap+1)*GetPixelChannels(image)*
     sizeof(*histogram));
   image_view=AcquireVirtualCacheView(image,exception);
+  scan.image=image;
+  scan.image_view=image_view;
+  scan.histogram=histogram;
+  scan.exception=exception;
   for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    const Quantum
-      *magick_restrict p;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    AccumulateStretchHistogram(image,p,histogram);
-  }
+    ScanStretchHistogramRow(&scan,y,&status);
   image_view=DestroyCacheView(image_view);
   /*
     Find the histogram boundaries by locating the black/white levels.
@@ -1979,6 +2006,114 @@ static double GetHaldArea(const Image *hald_image,const double point)
   return(area);
 }
 
+typedef struct _HaldClutRowInfo
+{
+  Image
+    *image;
+
+  const Image
+    *hald_image;
+
+  CacheView
+    *hald_view;
+
+  ExceptionInfo
+    *exception;
+
+  PixelInfo
+    zero;
+
+  size_t
+    level;
+
+  size_t
+    cube_size;
+
+  double
+    width;
+} HaldClutRowInfo;
+
+static void HaldClutRow(MagickBooleanType *status,
+  const HaldClutRowInfo *clut,Quantum *magick_restrict q)
+{
+  Image
+    *const image = clut->image;
+
+  const Image
+    *const hald_image = clut->hald_image;
+
+  CacheView
+    *const hald_view = clut->hald_view;
+
+  ExceptionInfo
+    *const exception = clut->exception;
+
+  const PixelInfo
+    zero = clut->zero;
+
+  const size_t
+    level = clut->level;
+
+  const size_t
+    cube_size = clut->cube_size;
+
+  const double
+    width = clut->width;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    double
+      area = 0.0,
+      offset = 0.0;
+
+    HaldInfo
+      point = { 0, 0, 0 };
+
+    PixelInfo
+      pixel = zero,
+      pixel1 = zero,
+      pixel2 = zero,
+      pixel3 = zero,
+      pixel4 = zero;
+
+    point=GetHaldPoint(image,level,q);
+    offset=point.x+level*floor(point.y)+cube_size*floor(point.z);
+    point.x-=floor(point.x);
+    point.y-=floor(point.y);
+    point.z-=floor(point.z);
+    (*status)=InterpolatePixelInfo(hald_image,hald_view,hald_image->interpolate,
+      fmod(offset,width),floor(offset/width),&pixel1,exception);
+    if ((*status) == MagickFalse)
+      break;
+    (*status)=InterpolatePixelInfo(hald_image,hald_view,hald_image->interpolate,
+      fmod(offset+level,width),floor((offset+level)/width),&pixel2,exception);
+    if ((*status) == MagickFalse)
+      break;
+    area=GetHaldArea(hald_image,point.y);
+    CompositePixelInfoAreaBlend(&pixel1,pixel1.alpha,&pixel2,pixel2.alpha,
+      area,&pixel3);
+    offset+=cube_size;
+    (*status)=InterpolatePixelInfo(hald_image,hald_view,hald_image->interpolate,
+      fmod(offset,width),floor(offset/width),&pixel1,exception);
+    if ((*status) == MagickFalse)
+      break;
+    (*status)=InterpolatePixelInfo(hald_image,hald_view,hald_image->interpolate,
+      fmod(offset+level,width),floor((offset+level)/width),&pixel2,exception);
+    if ((*status) == MagickFalse)
+      break;
+    CompositePixelInfoAreaBlend(&pixel1,pixel1.alpha,&pixel2,pixel2.alpha,
+      area,&pixel4);
+    area=GetHaldArea(hald_image,point.z);
+    CompositePixelInfoAreaBlend(&pixel3,pixel3.alpha,&pixel4,pixel4.alpha,
+      area,&pixel);
+    SetHaldPixel(image,pixel,q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+}
+
 MagickExport MagickBooleanType HaldClutImage(Image *image,
   const Image *hald_image,ExceptionInfo *exception)
 {
@@ -2036,11 +2171,11 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
+    HaldClutRowInfo
+      clut;
+
     Quantum
       *magick_restrict q;
-
-    ssize_t
-      x;
 
     if (status == MagickFalse)
       continue;
@@ -2050,55 +2185,15 @@ MagickExport MagickBooleanType HaldClutImage(Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        area = 0.0,
-        offset = 0.0;
-
-      HaldInfo
-        point = { 0, 0, 0 };
-
-      PixelInfo
-        pixel = zero,
-        pixel1 = zero,
-        pixel2 = zero,
-        pixel3 = zero,
-        pixel4 = zero;
-
-      point=GetHaldPoint(image,level,q);
-      offset=point.x+level*floor(point.y)+cube_size*floor(point.z);
-      point.x-=floor(point.x);
-      point.y-=floor(point.y);
-      point.z-=floor(point.z);
-      status=InterpolatePixelInfo(hald_image,hald_view,hald_image->interpolate,
-        fmod(offset,width),floor(offset/width),&pixel1,exception);
-      if (status == MagickFalse)
-        break;
-      status=InterpolatePixelInfo(hald_image,hald_view,hald_image->interpolate,
-        fmod(offset+level,width),floor((offset+level)/width),&pixel2,exception);
-      if (status == MagickFalse)
-        break;
-      area=GetHaldArea(hald_image,point.y);
-      CompositePixelInfoAreaBlend(&pixel1,pixel1.alpha,&pixel2,pixel2.alpha,
-        area,&pixel3);
-      offset+=cube_size;
-      status=InterpolatePixelInfo(hald_image,hald_view,hald_image->interpolate,
-        fmod(offset,width),floor(offset/width),&pixel1,exception);
-      if (status == MagickFalse)
-        break;
-      status=InterpolatePixelInfo(hald_image,hald_view,hald_image->interpolate,
-        fmod(offset+level,width),floor((offset+level)/width),&pixel2,exception);
-      if (status == MagickFalse)
-        break;
-      CompositePixelInfoAreaBlend(&pixel1,pixel1.alpha,&pixel2,pixel2.alpha,
-        area,&pixel4);
-      area=GetHaldArea(hald_image,point.z);
-      CompositePixelInfoAreaBlend(&pixel3,pixel3.alpha,&pixel4,pixel4.alpha,
-        area,&pixel);
-      SetHaldPixel(image,pixel,q);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
+    clut.image=image;
+    clut.hald_image=hald_image;
+    clut.hald_view=hald_view;
+    clut.exception=exception;
+    clut.zero=zero;
+    clut.level=level;
+    clut.cube_size=cube_size;
+    clut.width=width;
+    HaldClutRow(&status,&clut,q);
     if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
@@ -2734,11 +2829,82 @@ static void NegateColormap(Image *image,const MagickBooleanType grayscale)
   }
 }
 
+#define NegateImageTag  "Negate/Image"
+
+typedef struct _NegateInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} NegateInfo;
+
+static void NegateGrayscaleRow(const NegateInfo *negate,const ssize_t y,
+  MagickBooleanType *status,MagickOffsetType *progress)
+{
+  Image
+    *image = negate->image;
+
+  MagickBooleanType
+    proceed,
+    sync;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(negate->image_view,0,y,image->columns,1,
+    negate->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  NegateGrayImageRow(image,q);
+  sync=SyncCacheViewAuthenticPixels(negate->image_view,negate->exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+  if (image->progress_monitor == (MagickProgressMonitor) NULL)
+    return;
+  (*progress)++;
+  proceed=SetImageProgress(image,NegateImageTag,(*progress),image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static MagickBooleanType NegateImageLine(const NegateInfo *negate,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Image
+    *image = negate->image;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(negate->image_view,0,y,image->columns,1,
+    negate->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  NegateImageRow(image,q);
+  if (SyncCacheViewAuthenticPixels(negate->image_view,negate->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType NegateImage(Image *image,
   const MagickBooleanType grayscale,ExceptionInfo *exception)
 {
-#define NegateImageTag  "Negate/Image"
-
   CacheView
     *image_view;
 
@@ -2747,6 +2913,9 @@ MagickExport MagickBooleanType NegateImage(Image *image,
 
   MagickOffsetType
     progress;
+
+  NegateInfo
+    negate;
 
   ssize_t
     y;
@@ -2763,37 +2932,13 @@ MagickExport MagickBooleanType NegateImage(Image *image,
   status=MagickTrue;
   progress=0;
   image_view=AcquireAuthenticCacheView(image,exception);
+  negate.image=image;
+  negate.image_view=image_view;
+  negate.exception=exception;
   if( grayscale != MagickFalse )
     {
       for (y=0; y < (ssize_t) image->rows; y++)
-      {
-        MagickBooleanType
-          proceed,
-          sync;
-
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        NegateGrayImageRow(image,q);
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
-        if (image->progress_monitor == (MagickProgressMonitor) NULL)
-          continue;
-        progress++;
-        proceed=SetImageProgress(image,NegateImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
+        NegateGrayscaleRow(&negate,y,&status,&progress);
       image_view=DestroyCacheView(image_view);
       return(MagickTrue);
     }
@@ -2806,20 +2951,8 @@ MagickExport MagickBooleanType NegateImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    if (NegateImageLine(&negate,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    NegateImageRow(image,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType

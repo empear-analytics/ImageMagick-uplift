@@ -256,6 +256,88 @@ static void LowerHullRow(const HullFirstPass *pass,ssize_t i)
   }
 }
 
+typedef struct _HullSecondPass
+{
+  size_t
+    columns;
+
+  Quantum
+    *p,
+    *q,
+    *r,
+    *s;
+} HullSecondPass;
+
+static void RaiseHullEdgeRow(const HullSecondPass *pass,ssize_t i)
+{
+  const size_t
+    columns = pass->columns;
+
+  Quantum
+    *const p = pass->p,
+    *const q = pass->q,
+    *const r = pass->r,
+    *const s = pass->s;
+
+  MagickRealType
+    v;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    v=(MagickRealType) q[i];
+    v=RaiseHullEdgeValue(r,s,i,v);
+    p[i]=(Quantum) v;
+    i++;
+  }
+}
+
+static void LowerHullEdgeRow(const HullSecondPass *pass,ssize_t i)
+{
+  const size_t
+    columns = pass->columns;
+
+  Quantum
+    *const p = pass->p,
+    *const q = pass->q,
+    *const r = pass->r,
+    *const s = pass->s;
+
+  MagickRealType
+    v;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) columns; x++)
+  {
+    v=(MagickRealType) q[i];
+    v=LowerHullEdgeValue(r,s,i,v);
+    p[i]=(Quantum) v;
+    i++;
+  }
+}
+
+static void HullFirstPassRow(const HullFirstPass *pass,const ssize_t i,
+  const int polarity)
+{
+  if (polarity > 0)
+    RaiseHullRow(pass,i);
+  else
+    LowerHullRow(pass,i);
+}
+
+static void HullSecondPassRow(const HullSecondPass *pass,const ssize_t i,
+  const int polarity)
+{
+  if (polarity > 0)
+    RaiseHullEdgeRow(pass,i);
+  else
+    LowerHullEdgeRow(pass,i);
+}
+
 static void Hull(const HullBuffers *hull,const ssize_t x_offset,
   const ssize_t y_offset,const int polarity)
 {
@@ -306,10 +388,7 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
     pass.q=q;
     pass.r=r;
     i=(2*y+1)+y*(ssize_t) columns;
-    if (polarity > 0)
-      RaiseHullRow(&pass,i);
-    else
-      LowerHullRow(&pass,i);
+    HullFirstPassRow(&pass,i,polarity);
   }
   p=f+(ptrdiff_t) (columns+2);
   q=g+(ptrdiff_t) (columns+2);
@@ -321,30 +400,19 @@ static void Hull(const HullBuffers *hull,const ssize_t x_offset,
 #endif
   for (y=0; y < (ssize_t) rows; y++)
   {
+    HullSecondPass
+      pass;
+
     ssize_t
-      i,
-      x;
+      i;
 
-    MagickRealType
-      v;
-
+    pass.columns=columns;
+    pass.p=p;
+    pass.q=q;
+    pass.r=r;
+    pass.s=s;
     i=(2*y+1)+y*(ssize_t) columns;
-    if (polarity > 0)
-      for (x=0; x < (ssize_t) columns; x++)
-      {
-        v=(MagickRealType) q[i];
-        v=RaiseHullEdgeValue(r,s,i,v);
-        p[i]=(Quantum) v;
-        i++;
-      }
-    else
-      for (x=0; x < (ssize_t) columns; x++)
-      {
-        v=(MagickRealType) q[i];
-        v=LowerHullEdgeValue(r,s,i,v);
-        p[i]=(Quantum) v;
-        i++;
-      }
+    HullSecondPassRow(&pass,i,polarity);
   }
 }
 
@@ -504,6 +572,55 @@ static void RelinquishDespeckleMemory(MemoryInfo *buffer_info,
     pixel_info=RelinquishVirtualMemory(pixel_info);
 }
 
+typedef struct _DespeckleHull
+{
+  const Image
+    *image;
+
+  Quantum
+    *pixels,
+    *buffer;
+} DespeckleHull;
+
+static void HullAllPolarities(const DespeckleHull *despeckle_hull,
+  const ssize_t x,const ssize_t y)
+{
+  const Image
+    *const image = despeckle_hull->image;
+
+  HullBuffers
+    hull;
+
+  Quantum
+    *magick_restrict const buffer = despeckle_hull->buffer,
+    *magick_restrict const pixels = despeckle_hull->pixels;
+
+  hull.image=image;
+  hull.columns=image->columns;
+  hull.rows=image->rows;
+  hull.f=pixels;
+  hull.g=buffer;
+  Hull(&hull,x,y,1);
+  hull.image=image;
+  hull.columns=image->columns;
+  hull.rows=image->rows;
+  hull.f=pixels;
+  hull.g=buffer;
+  Hull(&hull,-x,-y,1);
+  hull.image=image;
+  hull.columns=image->columns;
+  hull.rows=image->rows;
+  hull.f=pixels;
+  hull.g=buffer;
+  Hull(&hull,-x,-y,-1);
+  hull.image=image;
+  hull.columns=image->columns;
+  hull.rows=image->rows;
+  hull.f=pixels;
+  hull.g=buffer;
+  Hull(&hull,x,y,-1);
+}
+
 MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
 {
   CacheView
@@ -592,8 +709,8 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
     DespeckleStore
       store;
 
-    HullBuffers
-      hull;
+    DespeckleHull
+      despeckle_hull;
 
     PixelChannel
        channel;
@@ -624,30 +741,10 @@ MagickExport Image *DespeckleImage(const Image *image,ExceptionInfo *exception)
     (void) memset(buffer,0,length*sizeof(*buffer));
     for (k=0; k < 4; k++)
     {
-      hull.image=image;
-      hull.columns=image->columns;
-      hull.rows=image->rows;
-      hull.f=pixels;
-      hull.g=buffer;
-      Hull(&hull,X[k],Y[k],1);
-      hull.image=image;
-      hull.columns=image->columns;
-      hull.rows=image->rows;
-      hull.f=pixels;
-      hull.g=buffer;
-      Hull(&hull,-X[k],-Y[k],1);
-      hull.image=image;
-      hull.columns=image->columns;
-      hull.rows=image->rows;
-      hull.f=pixels;
-      hull.g=buffer;
-      Hull(&hull,-X[k],-Y[k],-1);
-      hull.image=image;
-      hull.columns=image->columns;
-      hull.rows=image->rows;
-      hull.f=pixels;
-      hull.g=buffer;
-      Hull(&hull,X[k],Y[k],-1);
+      despeckle_hull.image=image;
+      despeckle_hull.pixels=pixels;
+      despeckle_hull.buffer=buffer;
+      HullAllPolarities(&despeckle_hull,X[k],Y[k]);
     }
     store.image=image;
     store.despeckle_image=despeckle_image;
@@ -959,6 +1056,151 @@ static void SelectKuwaharaQuadrant(const KuwaharaQuadrants *quadrants,
   }
 }
 
+static void ReportRowProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+typedef struct _KuwaharaInfo
+{
+  Image
+    *gaussian_image,
+    *kuwahara_image;
+
+  CacheView
+    *image_view,
+    *kuwahara_view;
+
+  ExceptionInfo
+    *exception;
+
+  size_t
+    width;
+
+  ssize_t
+    y;
+} KuwaharaInfo;
+
+static void KuwaharaRow(MagickBooleanType *status,const KuwaharaInfo *kuwahara,
+  Quantum *magick_restrict q)
+{
+  Image
+    *const gaussian_image = kuwahara->gaussian_image,
+    *const kuwahara_image = kuwahara->kuwahara_image;
+
+  CacheView
+    *const image_view = kuwahara->image_view;
+
+  ExceptionInfo
+    *const exception = kuwahara->exception;
+
+  const size_t
+    width = kuwahara->width;
+
+  const ssize_t
+    y = kuwahara->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) gaussian_image->columns; x++)
+  {
+    KuwaharaQuadrants
+      quadrants;
+
+    RectangleInfo
+      target;
+
+    size_t
+      i;
+
+    quadrants.gaussian_image=gaussian_image;
+    quadrants.image_view=image_view;
+    quadrants.width=width;
+    quadrants.x=x;
+    quadrants.y=y;
+    quadrants.exception=exception;
+    SelectKuwaharaQuadrant(&quadrants,&target,&i);
+    if (i < 4)
+      {
+        (*status)=MagickFalse;
+        break;
+      }
+    (*status)=InterpolatePixelChannels(gaussian_image,image_view,kuwahara_image,
+      UndefinedInterpolatePixel,(double) target.x+target.width/2.0,(double)
+      target.y+target.height/2.0,q,exception);
+    if ((*status) == MagickFalse)
+      break;
+    q+=(ptrdiff_t) GetPixelChannels(kuwahara_image);
+  }
+}
+
+typedef struct _KuwaharaImageTargets
+{
+  Image
+    **gaussian_image,
+    **kuwahara_image;
+} KuwaharaImageTargets;
+
+static MagickBooleanType AcquireKuwaharaImage(const Image *image,
+  ExceptionInfo *exception,const KuwaharaImageTargets *targets)
+{
+  Image
+    **const gaussian_image = targets->gaussian_image,
+    **const kuwahara_image = targets->kuwahara_image;
+
+  (*kuwahara_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*kuwahara_image) == (Image *) NULL)
+    {
+      (*gaussian_image)=DestroyImage((*gaussian_image));
+      return(MagickFalse);
+    }
+  if (SetImageStorageClass((*kuwahara_image),DirectClass,exception) == MagickFalse)
+    {
+      (*gaussian_image)=DestroyImage((*gaussian_image));
+      (*kuwahara_image)=DestroyImage((*kuwahara_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType KuwaharaHeadRow(MagickBooleanType *status,
+  const KuwaharaInfo *kuwahara)
+{
+  CacheView
+    *const kuwahara_view = kuwahara->kuwahara_view;
+
+  ExceptionInfo
+    *const exception = kuwahara->exception;
+
+  const Image
+    *const kuwahara_image = kuwahara->kuwahara_image;
+
+  const ssize_t
+    y = kuwahara->y;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(kuwahara_view,0,y,kuwahara_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  KuwaharaRow(status,kuwahara,q);
+  return(MagickTrue);
+}
+
 MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -974,6 +1216,9 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 
   MagickBooleanType
     status;
+
+  KuwaharaImageTargets
+    targets;
 
   MagickOffsetType
     progress;
@@ -997,18 +1242,10 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
   gaussian_image=BlurImage(image,radius,sigma,exception);
   if (gaussian_image == (Image *) NULL)
     return((Image *) NULL);
-  kuwahara_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (kuwahara_image == (Image *) NULL)
-    {
-      gaussian_image=DestroyImage(gaussian_image);
-      return((Image *) NULL);
-    }
-  if (SetImageStorageClass(kuwahara_image,DirectClass,exception) == MagickFalse)
-    {
-      gaussian_image=DestroyImage(gaussian_image);
-      kuwahara_image=DestroyImage(kuwahara_image);
-      return((Image *) NULL);
-    }
+  targets.gaussian_image=(&gaussian_image);
+  targets.kuwahara_image=(&kuwahara_image);
+  if (AcquireKuwaharaImage(image,exception,&targets) == MagickFalse)
+    return((Image *) NULL);
   /*
     Edge preserving noise reduction filter.
   */
@@ -1022,65 +1259,27 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) gaussian_image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    KuwaharaInfo
+      kuwahara;
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    kuwahara.gaussian_image=gaussian_image;
+    kuwahara.kuwahara_image=kuwahara_image;
+    kuwahara.image_view=image_view;
+    kuwahara.kuwahara_view=kuwahara_view;
+    kuwahara.exception=exception;
+    kuwahara.width=width;
+    kuwahara.y=y;
+    if (KuwaharaHeadRow(&status,&kuwahara) == MagickFalse)
       continue;
-    q=QueueCacheViewAuthenticPixels(kuwahara_view,0,y,kuwahara_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) gaussian_image->columns; x++)
-    {
-      KuwaharaQuadrants
-        quadrants;
-
-      RectangleInfo
-        target;
-
-      size_t
-        i;
-
-      quadrants.gaussian_image=gaussian_image;
-      quadrants.image_view=image_view;
-      quadrants.width=width;
-      quadrants.x=x;
-      quadrants.y=y;
-      quadrants.exception=exception;
-      SelectKuwaharaQuadrant(&quadrants,&target,&i);
-      if (i < 4)
-        {
-          status=MagickFalse;
-          break;
-        }
-      status=InterpolatePixelChannels(gaussian_image,image_view,kuwahara_image,
-        UndefinedInterpolatePixel,(double) target.x+target.width/2.0,(double)
-        target.y+target.height/2.0,q,exception);
-      if (status == MagickFalse)
-        break;
-      q+=(ptrdiff_t) GetPixelChannels(kuwahara_image);
-    }
     if (SyncCacheViewAuthenticPixels(kuwahara_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,KuwaharaImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportRowProgress(image,KuwaharaImageTag,progress,&status);
       }
   }
   kuwahara_view=DestroyCacheView(kuwahara_view);
@@ -1353,6 +1552,197 @@ static void StoreLocalContrastColumn(const LocalContrastColumn *column)
   }
 }
 
+static MagickBooleanType AcquireDirectClassClone(const Image *image,
+  Image **clone_image,ExceptionInfo *exception)
+{
+  (*clone_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if ((*clone_image) == (Image *) NULL)
+    return(MagickFalse);
+  if (SetImageStorageClass((*clone_image),DirectClass,exception) == MagickFalse)
+    {
+      (*clone_image)=DestroyImage((*clone_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+typedef struct _LocalContrastColumnPass
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  float
+    *interImage,
+    *scanline;
+
+  ssize_t
+    scanLineSize,
+    width;
+
+  double
+    totalWeight;
+
+  ExceptionInfo
+    *exception;
+} LocalContrastColumnPass;
+
+static void RunLocalContrastColumn(MagickBooleanType *status,
+  const LocalContrastColumnPass *pass,const ssize_t x)
+{
+  const Image
+    *const image = pass->image;
+
+  CacheView
+    *const image_view = pass->image_view;
+
+  float
+    *const interImage = pass->interImage,
+    *const scanline = pass->scanline;
+
+  const ssize_t
+    scanLineSize = pass->scanLineSize,
+    width = pass->width;
+
+  const double
+    totalWeight = pass->totalWeight;
+
+  ExceptionInfo
+    *const exception = pass->exception;
+
+  const int
+    id = GetOpenMPThreadId();
+
+  const Quantum
+    *magick_restrict p;
+
+  float
+    *pix,
+    *pixels;
+
+  LocalContrastColumn
+    column;
+
+  if ((*status) == MagickFalse)
+    return;
+  pixels=scanline;
+  pixels+=id*scanLineSize;
+  pix=pixels;
+  p=GetCacheViewVirtualPixels(image_view,x,-(ssize_t) width,1,
+    image->rows+(size_t) (2*width),exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  LoadLocalContrastLuma(image,p,pix,width);
+  column.image=image;
+  column.interImage=interImage;
+  column.pixels=pixels;
+  column.width=width;
+  column.x=x;
+  column.totalWeight=totalWeight;
+  StoreLocalContrastColumn(&column);
+}
+
+typedef struct _LocalContrastRowPass
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view,
+    *contrast_view;
+
+  float
+    *interImage,
+    *scanline;
+
+  ssize_t
+    scanLineSize,
+    width;
+
+  double
+    totalWeight,
+    strength;
+
+  Image
+    *contrast_image;
+
+  ExceptionInfo
+    *exception;
+} LocalContrastRowPass;
+
+static void RunLocalContrastRow(MagickBooleanType *status,
+  const LocalContrastRowPass *pass,const ssize_t y)
+{
+  const Image
+    *const image = pass->image;
+
+  CacheView
+    *const image_view = pass->image_view,
+    *const contrast_view = pass->contrast_view;
+
+  float
+    *const interImage = pass->interImage,
+    *const scanline = pass->scanline;
+
+  const ssize_t
+    scanLineSize = pass->scanLineSize,
+    width = pass->width;
+
+  const double
+    totalWeight = pass->totalWeight,
+    strength = pass->strength;
+
+  Image
+    *const contrast_image = pass->contrast_image;
+
+  ExceptionInfo
+    *const exception = pass->exception;
+
+  const int
+    id = GetOpenMPThreadId();
+
+  const Quantum
+    *magick_restrict p;
+
+  float
+    *pixels;
+
+  LocalContrastRow
+    row;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  pixels=scanline;
+  pixels+=id*scanLineSize;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(contrast_view,0,y,image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  memcpy(pixels,interImage+((size_t) y*(image->columns+(size_t) (2*width))),
+    (image->columns+(size_t) (2*width))*sizeof(float));
+  row.image=image;
+  row.pixels=pixels;
+  row.width=width;
+  row.totalWeight=totalWeight;
+  row.strength=strength;
+  row.contrast_image=contrast_image;
+  ApplyLocalContrastRow(&row,p,q);
+  if (SyncCacheViewAuthenticPixels(contrast_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1397,14 +1787,8 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   if (contrast_image != (Image *) NULL)
     return(contrast_image);
 #endif
-  contrast_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (contrast_image == (Image *) NULL)
+  if (AcquireDirectClassClone(image,&contrast_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(contrast_image,DirectClass,exception) == MagickFalse)
-    {
-      contrast_image=DestroyImage(contrast_image);
-      return((Image *) NULL);
-    }
   image_view=AcquireVirtualCacheView(image,exception);
   contrast_view=AcquireAuthenticCacheView(contrast_image,exception);
   scanLineSize=(ssize_t) MagickMax(image->columns,image->rows);
@@ -1449,39 +1833,18 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
 #endif
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      const int
-        id = GetOpenMPThreadId();
+      LocalContrastColumnPass
+        pass;
 
-      const Quantum
-        *magick_restrict p;
-
-      float
-        *pix,
-        *pixels;
-
-      LocalContrastColumn
-        column;
-
-      if (status == MagickFalse)
-        continue;
-      pixels=scanline;
-      pixels+=id*scanLineSize;
-      pix=pixels;
-      p=GetCacheViewVirtualPixels(image_view,x,-(ssize_t) width,1,
-        image->rows+(size_t) (2*width),exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      LoadLocalContrastLuma(image,p,pix,width);
-      column.image=image;
-      column.interImage=interImage;
-      column.pixels=pixels;
-      column.width=width;
-      column.x=x;
-      column.totalWeight=totalWeight;
-      StoreLocalContrastColumn(&column);
+      pass.image=image;
+      pass.image_view=image_view;
+      pass.interImage=interImage;
+      pass.scanline=scanline;
+      pass.scanLineSize=scanLineSize;
+      pass.width=width;
+      pass.totalWeight=totalWeight;
+      pass.exception=exception;
+      RunLocalContrastColumn(&status,&pass,x);
     }
   }
   /*
@@ -1497,44 +1860,21 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
 #endif
     for (y=0; y < (ssize_t) image->rows; y++)
     {
-      const int
-        id = GetOpenMPThreadId();
+      LocalContrastRowPass
+        pass;
 
-      const Quantum
-        *magick_restrict p;
-
-      float
-        *pixels;
-
-      LocalContrastRow
-        row;
-
-      Quantum
-        *magick_restrict q;
-
-      if (status == MagickFalse)
-        continue;
-      pixels=scanline;
-      pixels+=id*scanLineSize;
-      p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-      q=GetCacheViewAuthenticPixels(contrast_view,0,y,image->columns,1,
-        exception);
-      if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-        {
-          status=MagickFalse;
-          continue;
-        }
-      memcpy(pixels,interImage+((size_t) y*(image->columns+(size_t) (2*width))),
-        (image->columns+(size_t) (2*width))*sizeof(float));
-      row.image=image;
-      row.pixels=pixels;
-      row.width=width;
-      row.totalWeight=totalWeight;
-      row.strength=strength;
-      row.contrast_image=contrast_image;
-      ApplyLocalContrastRow(&row,p,q);
-      if (SyncCacheViewAuthenticPixels(contrast_view,exception) == MagickFalse)
-        status=MagickFalse;
+      pass.image=image;
+      pass.image_view=image_view;
+      pass.contrast_view=contrast_view;
+      pass.interImage=interImage;
+      pass.scanline=scanline;
+      pass.scanLineSize=scanLineSize;
+      pass.width=width;
+      pass.totalWeight=totalWeight;
+      pass.strength=strength;
+      pass.contrast_image=contrast_image;
+      pass.exception=exception;
+      RunLocalContrastRow(&status,&pass,y);
     }
   }
   scanline_info=RelinquishVirtualMemory(scanline_info);
@@ -1707,6 +2047,525 @@ static void RelinquishMontageDirectory(const Image *image,
     }
 }
 
+typedef struct _PreviewTile
+{
+  const Image
+    *image;
+
+  Image
+    *thumbnail;
+
+  ExceptionInfo
+    *exception;
+
+  char
+    *factor;
+
+  char
+    *label;
+
+  ImageInfo
+    *preview_info;
+
+  PreviewType
+    preview;
+
+  ssize_t
+    i;
+
+  double
+    percentage;
+
+  double
+    radius;
+
+  double
+    sigma;
+} PreviewTile;
+
+static void ApplyGammaHueSaturationPreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const factor = tile->factor,
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const double
+    percentage = tile->percentage;
+
+  switch (preview)
+  {
+    case GammaPreview:
+    default:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (*gamma)+=0.4;
+      (void) GammaImage((*preview_image),(*gamma),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"gamma %g",(*gamma));
+      break;
+    }
+    case HuePreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) FormatLocaleString(factor,MagickPathExtent,"100,100,%g",2.0*
+        percentage);
+      (void) ModulateImage((*preview_image),factor,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
+      break;
+    }
+    case SaturationPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) FormatLocaleString(factor,MagickPathExtent,"100,%g",2.0*
+        percentage);
+      (void) ModulateImage((*preview_image),factor,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
+      break;
+    }
+  }
+}
+
+static void ApplyBrightnessSpiffThresholdPreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const factor = tile->factor,
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  const double
+    percentage = tile->percentage;
+
+  switch (preview)
+  {
+    case BrightnessPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) FormatLocaleString(factor,MagickPathExtent,"%g",2.0*percentage);
+      (void) ModulateImage((*preview_image),factor,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
+      break;
+    }
+    case SpiffPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) != (Image *) NULL)
+        SharpenContrastRepeatedly((*preview_image),i,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"contrast (%.17g)",
+        (double) i+1);
+      break;
+    }
+    case ThresholdPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) BilevelImage(thumbnail,(double) (percentage*((double)
+        QuantumRange+1.0))/100.0,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"threshold %g",
+        (double) (percentage*((double) QuantumRange+1.0))/100.0);
+      break;
+    }
+    default:
+    {
+      ApplyGammaHueSaturationPreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
+static void ApplyDullSolarizeEdgePreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  const double
+    percentage = tile->percentage,
+    radius = tile->radius;
+
+  ssize_t
+    x;
+
+  switch (preview)
+  {
+    case DullPreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      for (x=0; x < i; x++)
+        (void) ContrastImage((*preview_image),MagickFalse,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"+contrast (%.17g)",
+        (double) i+1);
+      break;
+    }
+    case SolarizePreview:
+    {
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      (void) SolarizeImage((*preview_image),(double) QuantumRange*percentage/
+        100.0,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"solarize %g",
+        ((double) QuantumRange*percentage)/100.0);
+      break;
+    }
+    case EdgeDetectPreview:
+    {
+      (*preview_image)=EdgeImage(thumbnail,radius,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"edge %g",radius);
+      break;
+    }
+    default:
+    {
+      ApplyBrightnessSpiffThresholdPreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
+static void ApplyRaiseJpegPreview(const PreviewTile *tile,Image **preview_image,
+  double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const factor = tile->factor,
+    *const label = tile->label;
+
+  ImageInfo
+    *const preview_info = tile->preview_info;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  const double
+    percentage = tile->percentage;
+
+  switch (preview)
+  {
+    case RaisePreview:
+    {
+      RectangleInfo
+        raise;
+
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      raise.width=(size_t) (2*i+2);
+      raise.height=(size_t) (2*i+2);
+      raise.x=(i-1)/2;
+      raise.y=(i-1)/2;
+      (void) RaiseImage((*preview_image),&raise,MagickTrue,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,
+        "raise %.17gx%.17g%+.20g%+.20g",(double) raise.width,(double)
+        raise.height,(double) raise.x,(double) raise.y);
+      break;
+    }
+    case JPEGPreview:
+    {
+      char
+        filename[MagickPathExtent];
+
+      int
+        file;
+
+      (*preview_image)=CloneImage(thumbnail,0,0,MagickTrue,exception);
+      if ((*preview_image) == (Image *) NULL)
+        break;
+      preview_info->quality=(size_t) percentage;
+      (void) FormatLocaleString(factor,MagickPathExtent,"%.17g",(double)
+        preview_info->quality);
+      file=AcquireUniqueFileResource(filename);
+      if (file != -1)
+        file=close_utf8(file)-1;
+      (void) FormatLocaleString((*preview_image)->filename,MagickPathExtent,
+        "jpeg:%s",filename);
+      (*preview_image)=WriteAndReadQualityPreview(preview_info,(*preview_image),
+        exception);
+      (void) RelinquishUniqueFileResource((*preview_image)->filename);
+      FormatQualityLabel(label,factor,(*preview_image),thumbnail);
+      break;
+    }
+    default:
+    {
+      ApplyDullSolarizeEdgePreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
+static void ApplyOilPaintNoiseSharpenBlurPreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const factor = tile->factor,
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const ssize_t
+    i = tile->i;
+
+  const double
+    radius = tile->radius,
+    sigma = tile->sigma;
+
+  switch (preview)
+  {
+    case OilPaintPreview:
+    {
+      (*preview_image)=OilPaintImage(thumbnail,(double) radius,(double) sigma,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
+        radius,sigma);
+      break;
+    }
+    case ReduceNoisePreview:
+    {
+      (*preview_image)=StatisticImage(thumbnail,NonpeakStatistic,(size_t)
+        radius,(size_t) radius,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"noise %g",radius);
+      break;
+    }
+    case AddNoisePreview:
+    {
+      SelectNoiseFactor(i,thumbnail,factor);
+      (*preview_image)=StatisticImage(thumbnail,NonpeakStatistic,(size_t) i,
+        (size_t) i,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"+noise %s",factor);
+      break;
+    }
+    case SharpenPreview:
+    {
+      (*preview_image)=SharpenImage(thumbnail,radius,sigma,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"sharpen %gx%g",
+        radius,sigma);
+      break;
+    }
+    case BlurPreview:
+    {
+      (*preview_image)=BlurImage(thumbnail,radius,sigma,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"blur %gx%g",radius,
+        sigma);
+      break;
+    }
+    default:
+    {
+      ApplyRaiseJpegPreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
+static void ApplySpreadCharcoalPreview(const PreviewTile *tile,
+  Image **preview_image,double *gamma)
+{
+  const Image
+    *const image = tile->image;
+
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  const double
+    radius = tile->radius,
+    sigma = tile->sigma;
+
+  switch (preview)
+  {
+    case SpreadPreview:
+    {
+      (*preview_image)=SpreadImage(thumbnail,image->interpolate,radius,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"spread %g",
+        radius+0.5);
+      break;
+    }
+    case CharcoalDrawingPreview:
+    {
+      (*preview_image)=CharcoalImage(thumbnail,(double) radius,(double) sigma,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
+        radius,sigma);
+      break;
+    }
+    default:
+    {
+      ApplyOilPaintNoiseSharpenBlurPreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
+static void ApplyAnglePreview(const PreviewTile *tile,Image **preview_image,
+  double *degrees,double *gamma)
+{
+  const Image
+    *const image = tile->image;
+
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  switch (preview)
+  {
+    case RotatePreview:
+    {
+      (*degrees)+=45.0;
+      (*preview_image)=RotateImage(thumbnail,(*degrees),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"rotate %g",(*degrees));
+      break;
+    }
+    case ShearPreview:
+    {
+      (*degrees)+=5.0;
+      (*preview_image)=ShearImage(thumbnail,(*degrees),(*degrees),exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"shear %gx%g",(*degrees),
+        2.0*(*degrees));
+      break;
+    }
+    case ShadePreview:
+    {
+      (*degrees)+=10.0;
+      (*preview_image)=ShadeImage(thumbnail,MagickTrue,(*degrees),(*degrees),
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"shade %gx%g",(*degrees),
+        (*degrees));
+      break;
+    }
+    case SwirlPreview:
+    {
+      (*preview_image)=SwirlImage(thumbnail,(*degrees),image->interpolate,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"swirl %g",(*degrees));
+      (*degrees)+=45.0;
+      break;
+    }
+    case ImplodePreview:
+    {
+      (*degrees)+=0.1;
+      (*preview_image)=ImplodeImage(thumbnail,(*degrees),image->interpolate,
+        exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"implode %g",(*degrees));
+      break;
+    }
+    default:
+    {
+      ApplySpreadCharcoalPreview(tile,&(*preview_image),&(*gamma));
+      break;
+    }
+  }
+}
+
+static void ApplyWavePreview(const PreviewTile *tile,Image **preview_image,
+  double *degrees,double *gamma)
+{
+  const Image
+    *const image = tile->image;
+
+  Image
+    *const thumbnail = tile->thumbnail;
+
+  ExceptionInfo
+    *const exception = tile->exception;
+
+  char
+    *const label = tile->label;
+
+  const PreviewType
+    preview = tile->preview;
+
+  switch (preview)
+  {
+    case WavePreview:
+    {
+      (*degrees)+=5.0;
+      (*preview_image)=WaveImage(thumbnail,0.5*(*degrees),2.0*(*degrees),
+        image->interpolate,exception);
+      (void) FormatLocaleString(label,MagickPathExtent,"wave %gx%g",0.5*
+        (*degrees),2.0*(*degrees));
+      break;
+    }
+    default:
+    {
+      ApplyAnglePreview(tile,&(*preview_image),&(*degrees),&(*gamma));
+      break;
+    }
+  }
+}
+
 MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   ExceptionInfo *exception)
 {
@@ -1777,6 +2636,9 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
   threshold=0.0;
   for (i=0; i < NumberTiles; i++)
   {
+    PreviewTile
+      tile;
+
     thumbnail=ThumbnailImage(image,geometry.width,geometry.height,exception);
     if (thumbnail == (Image *) NULL)
       break;
@@ -1790,23 +2652,19 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
         AppendImageToList(&images,thumbnail);
         continue;
       }
+    tile.image=image;
+    tile.thumbnail=thumbnail;
+    tile.exception=exception;
+    tile.factor=factor;
+    tile.label=label;
+    tile.preview_info=preview_info;
+    tile.preview=preview;
+    tile.i=i;
+    tile.percentage=percentage;
+    tile.radius=radius;
+    tile.sigma=sigma;
     switch (preview)
     {
-      case RotatePreview:
-      {
-        degrees+=45.0;
-        preview_image=RotateImage(thumbnail,degrees,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"rotate %g",degrees);
-        break;
-      }
-      case ShearPreview:
-      {
-        degrees+=5.0;
-        preview_image=ShearImage(thumbnail,degrees,degrees,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"shear %gx%g",degrees,
-          2.0*degrees);
-        break;
-      }
       case RollPreview:
       {
         x=((i+1)*(ssize_t) thumbnail->columns)/NumberTiles;
@@ -1816,67 +2674,9 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           (double) x,(double) y);
         break;
       }
-      case HuePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) FormatLocaleString(factor,MagickPathExtent,"100,100,%g",2.0*
-          percentage);
-        (void) ModulateImage(preview_image,factor,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
-        break;
-      }
-      case SaturationPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) FormatLocaleString(factor,MagickPathExtent,"100,%g",2.0*
-          percentage);
-        (void) ModulateImage(preview_image,factor,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
-        break;
-      }
-      case BrightnessPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) FormatLocaleString(factor,MagickPathExtent,"%g",2.0*percentage);
-        (void) ModulateImage(preview_image,factor,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"modulate %s",factor);
-        break;
-      }
-      case GammaPreview:
       default:
       {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        gamma+=0.4;
-        (void) GammaImage(preview_image,gamma,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"gamma %g",gamma);
-        break;
-      }
-      case SpiffPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image != (Image *) NULL)
-          SharpenContrastRepeatedly(preview_image,i,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"contrast (%.17g)",
-          (double) i+1);
-        break;
-      }
-      case DullPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        for (x=0; x < i; x++)
-          (void) ContrastImage(preview_image,MagickFalse,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"+contrast (%.17g)",
-          (double) i+1);
+        ApplyWavePreview(&tile,&preview_image,&degrees,&gamma);
         break;
       }
       case GrayscalePreview:
@@ -1914,98 +2714,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           (double) i+1);
         break;
       }
-      case ReduceNoisePreview:
-      {
-        preview_image=StatisticImage(thumbnail,NonpeakStatistic,(size_t)
-          radius,(size_t) radius,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"noise %g",radius);
-        break;
-      }
-      case AddNoisePreview:
-      {
-        SelectNoiseFactor(i,thumbnail,factor);
-        preview_image=StatisticImage(thumbnail,NonpeakStatistic,(size_t) i,
-          (size_t) i,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"+noise %s",factor);
-        break;
-      }
-      case SharpenPreview:
-      {
-        preview_image=SharpenImage(thumbnail,radius,sigma,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"sharpen %gx%g",
-          radius,sigma);
-        break;
-      }
-      case BlurPreview:
-      {
-        preview_image=BlurImage(thumbnail,radius,sigma,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"blur %gx%g",radius,
-          sigma);
-        break;
-      }
-      case ThresholdPreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) BilevelImage(thumbnail,(double) (percentage*((double)
-          QuantumRange+1.0))/100.0,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"threshold %g",
-          (double) (percentage*((double) QuantumRange+1.0))/100.0);
-        break;
-      }
-      case EdgeDetectPreview:
-      {
-        preview_image=EdgeImage(thumbnail,radius,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"edge %g",radius);
-        break;
-      }
-      case SpreadPreview:
-      {
-        preview_image=SpreadImage(thumbnail,image->interpolate,radius,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"spread %g",
-          radius+0.5);
-        break;
-      }
-      case SolarizePreview:
-      {
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        (void) SolarizeImage(preview_image,(double) QuantumRange*percentage/
-          100.0,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"solarize %g",
-          ((double) QuantumRange*percentage)/100.0);
-        break;
-      }
-      case ShadePreview:
-      {
-        degrees+=10.0;
-        preview_image=ShadeImage(thumbnail,MagickTrue,degrees,degrees,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"shade %gx%g",degrees,
-          degrees);
-        break;
-      }
-      case RaisePreview:
-      {
-        RectangleInfo
-          raise;
-
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        raise.width=(size_t) (2*i+2);
-        raise.height=(size_t) (2*i+2);
-        raise.x=(i-1)/2;
-        raise.y=(i-1)/2;
-        (void) RaiseImage(preview_image,&raise,MagickTrue,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,
-          "raise %.17gx%.17g%+.20g%+.20g",(double) raise.width,(double)
-          raise.height,(double) raise.x,(double) raise.y);
-        break;
-      }
       case SegmentPreview:
       {
         preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
@@ -2016,72 +2724,6 @@ MagickExport Image *PreviewImage(const Image *image,const PreviewType preview,
           threshold,exception);
         (void) FormatLocaleString(label,MagickPathExtent,"segment %gx%g",
           threshold,threshold);
-        break;
-      }
-      case SwirlPreview:
-      {
-        preview_image=SwirlImage(thumbnail,degrees,image->interpolate,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"swirl %g",degrees);
-        degrees+=45.0;
-        break;
-      }
-      case ImplodePreview:
-      {
-        degrees+=0.1;
-        preview_image=ImplodeImage(thumbnail,degrees,image->interpolate,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"implode %g",degrees);
-        break;
-      }
-      case WavePreview:
-      {
-        degrees+=5.0;
-        preview_image=WaveImage(thumbnail,0.5*degrees,2.0*degrees,
-          image->interpolate,exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"wave %gx%g",0.5*
-          degrees,2.0*degrees);
-        break;
-      }
-      case OilPaintPreview:
-      {
-        preview_image=OilPaintImage(thumbnail,(double) radius,(double) sigma,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
-          radius,sigma);
-        break;
-      }
-      case CharcoalDrawingPreview:
-      {
-        preview_image=CharcoalImage(thumbnail,(double) radius,(double) sigma,
-          exception);
-        (void) FormatLocaleString(label,MagickPathExtent,"charcoal %gx%g",
-          radius,sigma);
-        break;
-      }
-      case JPEGPreview:
-      {
-        char
-          filename[MagickPathExtent];
-
-        int
-          file;
-
-        preview_image=CloneImage(thumbnail,0,0,MagickTrue,exception);
-        if (preview_image == (Image *) NULL)
-          break;
-        preview_info->quality=(size_t) percentage;
-        (void) FormatLocaleString(factor,MagickPathExtent,"%.17g",(double)
-          preview_info->quality);
-        file=AcquireUniqueFileResource(filename);
-        if (file != -1)
-          file=close_utf8(file)-1;
-        (void) FormatLocaleString(preview_image->filename,MagickPathExtent,
-          "jpeg:%s",filename);
-        preview_image=WriteAndReadQualityPreview(preview_info,preview_image,
-          exception);
-        (void) RelinquishUniqueFileResource(preview_image->filename);
-        FormatQualityLabel(label,factor,preview_image,thumbnail);
         break;
       }
     }
@@ -2350,6 +2992,39 @@ static void ShadeRowPixels(const ShadeRow *row,const Quantum *magick_restrict p,
   }
 }
 
+typedef struct _ShadeImageTargets
+{
+  Image
+    **linear_image,
+    **shade_image;
+} ShadeImageTargets;
+
+static MagickBooleanType AcquireShadeImages(const Image *image,
+  ExceptionInfo *exception,const ShadeImageTargets *targets)
+{
+  Image
+    **const linear_image = targets->linear_image,
+    **const shade_image = targets->shade_image;
+
+  (*linear_image)=CloneImage(image,0,0,MagickTrue,exception);
+  (*shade_image)=CloneImage(image,0,0,MagickTrue,exception);
+  if (((*linear_image) == (Image *) NULL) || ((*shade_image) == (Image *) NULL))
+    {
+      if ((*linear_image) != (Image *) NULL)
+        (*linear_image)=DestroyImage((*linear_image));
+      if ((*shade_image) != (Image *) NULL)
+        (*shade_image)=DestroyImage((*shade_image));
+      return(MagickFalse);
+    }
+  if (SetImageStorageClass((*shade_image),DirectClass,exception) == MagickFalse)
+    {
+      (*linear_image)=DestroyImage((*linear_image));
+      (*shade_image)=DestroyImage((*shade_image));
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   const double azimuth,const double elevation,ExceptionInfo *exception)
 {
@@ -2370,6 +3045,9 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   PrimaryInfo
     light;
 
+  ShadeImageTargets
+    targets;
+
   ssize_t
     y;
 
@@ -2382,22 +3060,10 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  linear_image=CloneImage(image,0,0,MagickTrue,exception);
-  shade_image=CloneImage(image,0,0,MagickTrue,exception);
-  if ((linear_image == (Image *) NULL) || (shade_image == (Image *) NULL))
-    {
-      if (linear_image != (Image *) NULL)
-        linear_image=DestroyImage(linear_image);
-      if (shade_image != (Image *) NULL)
-        shade_image=DestroyImage(shade_image);
-      return((Image *) NULL);
-    }
-  if (SetImageStorageClass(shade_image,DirectClass,exception) == MagickFalse)
-    {
-      linear_image=DestroyImage(linear_image);
-      shade_image=DestroyImage(shade_image);
-      return((Image *) NULL);
-    }
+  targets.linear_image=(&linear_image);
+  targets.shade_image=(&shade_image);
+  if (AcquireShadeImages(image,exception,&targets) == MagickFalse)
+    return((Image *) NULL);
   /*
     Compute the light vector.
   */
@@ -2454,16 +3120,11 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,ShadeImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportRowProgress(image,ShadeImageTag,progress,&status);
       }
   }
   shade_view=DestroyCacheView(shade_view);
@@ -2506,6 +3167,107 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _SpreadInfo
+{
+  const Image
+    *image;
+
+  Image
+    *spread_image;
+
+  CacheView
+    *image_view,
+    *spread_view;
+
+  ExceptionInfo
+    *exception;
+
+  PixelInterpolateMethod
+    method;
+
+  size_t
+    width;
+
+  ssize_t
+    y;
+} SpreadInfo;
+
+static void SpreadRow(MagickBooleanType *status,const SpreadInfo *spread,
+  RandomInfo *random_info,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = spread->image;
+
+  Image
+    *const spread_image = spread->spread_image;
+
+  CacheView
+    *const image_view = spread->image_view;
+
+  ExceptionInfo
+    *const exception = spread->exception;
+
+  const PixelInterpolateMethod
+    method = spread->method;
+
+  const size_t
+    width = spread->width;
+
+  const ssize_t
+    y = spread->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PointInfo
+      point;
+
+    point.x=GetPseudoRandomValue(random_info);
+    point.y=GetPseudoRandomValue(random_info);
+    (*status)=InterpolatePixelChannels(image,image_view,spread_image,method,
+      (double) x+width*(point.x-0.5),(double) y+width*(point.y-0.5),q,
+      exception);
+    if ((*status) == MagickFalse)
+      break;
+    q+=(ptrdiff_t) GetPixelChannels(spread_image);
+  }
+}
+
+static MagickBooleanType SpreadHeadRow(MagickBooleanType *status,
+  const SpreadInfo *spread,RandomInfo *random_info)
+{
+  CacheView
+    *const spread_view = spread->spread_view;
+
+  ExceptionInfo
+    *const exception = spread->exception;
+
+  const Image
+    *const spread_image = spread->spread_image;
+
+  const ssize_t
+    y = spread->y;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=QueueCacheViewAuthenticPixels(spread_view,0,y,spread_image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  SpreadRow(status,spread,random_info,q);
+  if (SyncCacheViewAuthenticPixels(spread_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *SpreadImage(const Image *image,
   const PixelInterpolateMethod method,const double radius,
   ExceptionInfo *exception)
@@ -2548,14 +3310,8 @@ MagickExport Image *SpreadImage(const Image *image,
   assert(exception->signature == MagickCoreSignature);
   if (IsEventLogging() != MagickFalse)
     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",image->filename);
-  spread_image=CloneImage(image,0,0,MagickTrue,exception);
-  if (spread_image == (Image *) NULL)
+  if (AcquireDirectClassClone(image,&spread_image,exception) == MagickFalse)
     return((Image *) NULL);
-  if (SetImageStorageClass(spread_image,DirectClass,exception) == MagickFalse)
-    {
-      spread_image=DestroyImage(spread_image);
-      return((Image *) NULL);
-    }
   /*
     Spread image.
   */
@@ -2575,49 +3331,26 @@ MagickExport Image *SpreadImage(const Image *image,
     const int
       id = GetOpenMPThreadId();
 
-    Quantum
-      *magick_restrict q;
+    SpreadInfo
+      spread;
 
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    spread.image=image;
+    spread.spread_image=spread_image;
+    spread.image_view=image_view;
+    spread.spread_view=spread_view;
+    spread.exception=exception;
+    spread.method=method;
+    spread.width=width;
+    spread.y=y;
+    if (SpreadHeadRow(&status,&spread,random_info[id]) == MagickFalse)
       continue;
-    q=QueueCacheViewAuthenticPixels(spread_view,0,y,spread_image->columns,1,
-      exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PointInfo
-        point;
-
-      point.x=GetPseudoRandomValue(random_info[id]);
-      point.y=GetPseudoRandomValue(random_info[id]);
-      status=InterpolatePixelChannels(image,image_view,spread_image,method,
-        (double) x+width*(point.x-0.5),(double) y+width*(point.y-0.5),q,
-        exception);
-      if (status == MagickFalse)
-        break;
-      q+=(ptrdiff_t) GetPixelChannels(spread_image);
-    }
-    if (SyncCacheViewAuthenticPixels(spread_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SpreadImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportRowProgress(image,SpreadImageTag,progress,&status);
       }
   }
   spread_view=DestroyCacheView(spread_view);
@@ -2713,6 +3446,76 @@ static inline void UnsharpPixelChannels(const UnsharpPixels *unsharp,
   }
 }
 
+static void UnsharpRow(const UnsharpPixels *unsharp,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = unsharp->image,
+    *const unsharp_image = unsharp->unsharp_image;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    UnsharpPixelChannels(unsharp,p,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(unsharp_image);
+  }
+}
+
+typedef struct _UnsharpHead
+{
+  UnsharpPixels
+    unsharp;
+
+  CacheView
+    *image_view,
+    *unsharp_view;
+
+  ExceptionInfo
+    *exception;
+} UnsharpHead;
+
+static MagickBooleanType UnsharpHeadRow(const UnsharpHead *head,const ssize_t y,
+  MagickBooleanType *status)
+{
+  CacheView
+    *const image_view = head->image_view,
+    *const unsharp_view = head->unsharp_view;
+
+  const Image
+    *const image = head->unsharp.image,
+    *const unsharp_image = head->unsharp.unsharp_image;
+
+  const Quantum
+    *magick_restrict p;
+
+  const UnsharpPixels
+    unsharp = head->unsharp;
+
+  ExceptionInfo
+    *const exception = head->exception;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  q=GetCacheViewAuthenticPixels(unsharp_view,0,y,unsharp_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  UnsharpRow(&unsharp,p,q);
+  if (SyncCacheViewAuthenticPixels(unsharp_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
   const double sigma,const double gain,const double threshold,
   ExceptionInfo *exception)
@@ -2769,48 +3572,19 @@ MagickExport Image *UnsharpMaskImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    const UnsharpHead
+      head = { { image, unsharp_image, quantum_threshold, gain }, image_view,
+        unsharp_view, exception };
 
-    const UnsharpPixels
-      unsharp = { image, unsharp_image, quantum_threshold, gain };
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    if (UnsharpHeadRow(&head,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    q=GetCacheViewAuthenticPixels(unsharp_view,0,y,unsharp_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      UnsharpPixelChannels(&unsharp,p,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(unsharp_image);
-    }
-    if (SyncCacheViewAuthenticPixels(unsharp_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SharpenImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportRowProgress(image,SharpenImageTag,progress,&status);
       }
   }
   unsharp_image->type=image->type;

@@ -882,6 +882,69 @@ static void LoadCLAHEPixels(const CLAHEPixelLoad *pixel_load,
   }
 }
 
+static size_t StoreCLAHERow(const Image *image,const unsigned short *pixels,
+  size_t n,Quantum *magick_restrict q)
+{
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    q[0]=ScaleShortToQuantum(pixels[n++]);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  return(n);
+}
+
+static void StoreCLAHEPixels(const CLAHEPixelLoad *pixel_load,
+  MagickBooleanType *status,MagickOffsetType *progress)
+{
+  Image
+    *const image = pixel_load->image;
+
+  CacheView
+    *const image_view = pixel_load->image_view;
+
+  const RectangleInfo
+    clahe_info = pixel_load->clahe_info,
+    tile_info = pixel_load->tile_info;
+
+  unsigned short
+    *const pixels = pixel_load->pixels;
+
+  ExceptionInfo
+    *const exception = pixel_load->exception;
+
+  size_t
+    n;
+
+  ssize_t
+    y;
+
+  n=clahe_info.width*(size_t) (tile_info.y/2);
+  for (y=0; y < (ssize_t) image->rows; y++)
+  {
+    Quantum
+      *magick_restrict q;
+
+    if ((*status) == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      {
+        (*status)=MagickFalse;
+        continue;
+      }
+    n+=(size_t) (tile_info.x/2);
+    n=StoreCLAHERow(image,pixels,n,q);
+    n+=(size_t) ((ssize_t) clahe_info.width-(ssize_t) image->columns-
+      (tile_info.x/2));
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      (*status)=MagickFalse;
+    UpdateCLAHEProgress(image,progress,status);
+  }
+}
+
 MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   const size_t height,const size_t number_bins,const double clip_limit,
   ExceptionInfo *exception)
@@ -910,12 +973,6 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
   RectangleInfo
     clahe_info,
     tile_info;
-
-  size_t
-    n;
-
-  ssize_t
-    y;
 
   unsigned short
     *pixels;
@@ -969,45 +1026,13 @@ MagickExport MagickBooleanType CLAHEImage(Image *image,const size_t width,
     Push CLAHE pixels to CLAHE image.
   */
   image_view=AcquireAuthenticCacheView(image,exception);
-  n=clahe_info.width*(size_t) (tile_info.y/2);
-  for (y=0; y < (ssize_t) image->rows; y++)
-  {
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    n+=(size_t) (tile_info.x/2);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      q[0]=ScaleShortToQuantum(pixels[n++]);
-      q+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    n+=(size_t) ((ssize_t) clahe_info.width-(ssize_t) image->columns-
-      (tile_info.x/2));
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
-    if (image->progress_monitor != (MagickProgressMonitor) NULL)
-      {
-        MagickBooleanType
-          proceed;
-
-        progress++;
-        proceed=SetImageProgress(image,CLAHEImageTag,progress,2*
-          GetPixelChannels(image));
-        if (proceed == MagickFalse)
-          status=MagickFalse;
-      }
-  }
+  pixel_load.image=image;
+  pixel_load.image_view=image_view;
+  pixel_load.clahe_info=clahe_info;
+  pixel_load.tile_info=tile_info;
+  pixel_load.pixels=pixels;
+  pixel_load.exception=exception;
+  StoreCLAHEPixels(&pixel_load,&status,&progress);
   image_view=DestroyCacheView(image_view);
   pixel_cache=RelinquishVirtualMemory(pixel_cache);
   if (TransformImageColorspace(image,colorspace,exception) == MagickFalse)
@@ -1113,6 +1138,43 @@ static void ContrastColormap(Image *image,const int sign)
   }
 }
 
+typedef struct _ContrastHead
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  int
+    sign;
+} ContrastHead;
+
+static MagickBooleanType ContrastImageHead(const ContrastHead *head,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(head->image_view,0,y,head->image->columns,1,
+    head->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ContrastImageRow(head->image,head->sign,q);
+  if (SyncCacheViewAuthenticPixels(head->image_view,head->exception) ==
+        MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport MagickBooleanType ContrastImage(Image *image,
   const MagickBooleanType sharpen,ExceptionInfo *exception)
 {
@@ -1159,20 +1221,15 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    Quantum
-      *magick_restrict q;
+    ContrastHead
+      head;
 
-    if (status == MagickFalse)
+    head.image=image;
+    head.image_view=image_view;
+    head.exception=exception;
+    head.sign=sign;
+    if (ContrastImageHead(&head,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    ContrastImageRow(image,sign,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -1217,8 +1274,6 @@ MagickExport MagickBooleanType ContrastImage(Image *image,
 %    o exception: return any errors or warnings in this structure.
 %
 */
-MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
-{
 #define EnhanceImageTag  "Enhance/Image"
 #define EnhancePixel(weight) \
   mean=QuantumScale*((double) GetPixelRed(image,r)+pixel.red)/2.0; \
@@ -1247,6 +1302,117 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
     } \
   r+=(ptrdiff_t) GetPixelChannels(image);
 
+static PixelInfo EnhancePixelInfo(const Image *image,
+  const Quantum *magick_restrict p,const ssize_t center)
+{
+  double
+    distance,
+    distance_squared,
+    mean,
+    total_weight;
+
+  PixelInfo
+    aggregate,
+    pixel;
+
+  const Quantum
+    *magick_restrict r;
+
+  GetPixelInfo(image,&aggregate);
+  total_weight=0.0;
+  GetPixelInfoPixel(image,p+center,&pixel);
+  r=p;
+  EnhancePixel(5.0); EnhancePixel(8.0); EnhancePixel(10.0);
+    EnhancePixel(8.0); EnhancePixel(5.0);
+  r=p+GetPixelChannels(image)*(image->columns+4);
+  EnhancePixel(8.0); EnhancePixel(20.0); EnhancePixel(40.0);
+    EnhancePixel(20.0); EnhancePixel(8.0);
+  r=p+2*GetPixelChannels(image)*(image->columns+4);
+  EnhancePixel(10.0); EnhancePixel(40.0); EnhancePixel(80.0);
+    EnhancePixel(40.0); EnhancePixel(10.0);
+  r=p+3*GetPixelChannels(image)*(image->columns+4);
+  EnhancePixel(8.0); EnhancePixel(20.0); EnhancePixel(40.0);
+    EnhancePixel(20.0); EnhancePixel(8.0);
+  r=p+4*GetPixelChannels(image)*(image->columns+4);
+  EnhancePixel(5.0); EnhancePixel(8.0); EnhancePixel(10.0);
+    EnhancePixel(8.0); EnhancePixel(5.0);
+  if (total_weight > MagickEpsilon)
+    {
+      pixel.red=((aggregate.red+total_weight/2.0)/total_weight);
+      pixel.green=((aggregate.green+total_weight/2.0)/total_weight);
+      pixel.blue=((aggregate.blue+total_weight/2.0)/total_weight);
+      pixel.black=((aggregate.black+total_weight/2.0)/total_weight);
+      pixel.alpha=((aggregate.alpha+total_weight/2.0)/total_weight);
+    }
+  return(pixel);
+}
+
+static void EnhanceImageRow(const Image *image,Image *enhance_image,
+  const Quantum *magick_restrict p,Quantum *magick_restrict q)
+{
+  PixelInfo
+    pixel;
+
+  ssize_t
+    center,
+    x;
+
+  center=(ssize_t) GetPixelChannels(image)*(2*((ssize_t) image->columns+4)+2);
+  GetPixelInfo(image,&pixel);
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    pixel=EnhancePixelInfo(image,p,center);
+    SetPixelViaPixelInfo(enhance_image,&pixel,q);
+    p+=(ptrdiff_t) GetPixelChannels(image);
+    q+=(ptrdiff_t) GetPixelChannels(enhance_image);
+  }
+}
+
+typedef struct _EnhanceHead
+{
+  const Image
+    *image;
+
+  Image
+    *enhance_image;
+
+  CacheView
+    *image_view,
+    *enhance_view;
+
+  ExceptionInfo
+    *exception;
+} EnhanceHead;
+
+static MagickBooleanType EnhanceImageHead(const EnhanceHead *head,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(head->image_view,-2,y-2,head->image->columns+4,
+    5,head->exception);
+  q=QueueCacheViewAuthenticPixels(head->enhance_view,0,y,
+    head->enhance_image->columns,1,head->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  EnhanceImageRow(head->image,head->enhance_image,p,q);
+  if (SyncCacheViewAuthenticPixels(head->enhance_view,head->exception) ==
+        MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
+MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
+{
   CacheView
     *enhance_view,
     *image_view;
@@ -1294,79 +1460,16 @@ MagickExport Image *EnhanceImage(const Image *image,ExceptionInfo *exception)
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    PixelInfo
-      pixel;
+    EnhanceHead
+      head;
 
-    const Quantum
-      *magick_restrict p;
-
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    ssize_t
-      center;
-
-    if (status == MagickFalse)
+    head.image=image;
+    head.enhance_image=enhance_image;
+    head.image_view=image_view;
+    head.enhance_view=enhance_view;
+    head.exception=exception;
+    if (EnhanceImageHead(&head,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(image_view,-2,y-2,image->columns+4,5,exception);
-    q=QueueCacheViewAuthenticPixels(enhance_view,0,y,enhance_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    center=(ssize_t) GetPixelChannels(image)*(2*((ssize_t) image->columns+4)+2);
-    GetPixelInfo(image,&pixel);
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      double
-        distance,
-        distance_squared,
-        mean,
-        total_weight;
-
-      PixelInfo
-        aggregate;
-
-      const Quantum
-        *magick_restrict r;
-
-      GetPixelInfo(image,&aggregate);
-      total_weight=0.0;
-      GetPixelInfoPixel(image,p+center,&pixel);
-      r=p;
-      EnhancePixel(5.0); EnhancePixel(8.0); EnhancePixel(10.0);
-        EnhancePixel(8.0); EnhancePixel(5.0);
-      r=p+GetPixelChannels(image)*(image->columns+4);
-      EnhancePixel(8.0); EnhancePixel(20.0); EnhancePixel(40.0);
-        EnhancePixel(20.0); EnhancePixel(8.0);
-      r=p+2*GetPixelChannels(image)*(image->columns+4);
-      EnhancePixel(10.0); EnhancePixel(40.0); EnhancePixel(80.0);
-        EnhancePixel(40.0); EnhancePixel(10.0);
-      r=p+3*GetPixelChannels(image)*(image->columns+4);
-      EnhancePixel(8.0); EnhancePixel(20.0); EnhancePixel(40.0);
-        EnhancePixel(20.0); EnhancePixel(8.0);
-      r=p+4*GetPixelChannels(image)*(image->columns+4);
-      EnhancePixel(5.0); EnhancePixel(8.0); EnhancePixel(10.0);
-        EnhancePixel(8.0); EnhancePixel(5.0);
-      if (total_weight > MagickEpsilon)
-        {
-          pixel.red=((aggregate.red+total_weight/2.0)/total_weight);
-          pixel.green=((aggregate.green+total_weight/2.0)/total_weight);
-          pixel.blue=((aggregate.blue+total_weight/2.0)/total_weight);
-          pixel.black=((aggregate.black+total_weight/2.0)/total_weight);
-          pixel.alpha=((aggregate.alpha+total_weight/2.0)/total_weight);
-        }
-      SetPixelViaPixelInfo(enhance_image,&pixel,q);
-      p+=(ptrdiff_t) GetPixelChannels(image);
-      q+=(ptrdiff_t) GetPixelChannels(enhance_image);
-    }
-    if (SyncCacheViewAuthenticPixels(enhance_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -2517,6 +2620,18 @@ static void AccumulateChromaMeans(const Image *image,
   }
 }
 
+static MagickStatusType LevelWhiteBalanceVibrance(Image *image,
+  MagickStatusType status,ExceptionInfo *exception)
+{
+  const char
+    *artifact;
+
+  artifact=GetImageArtifact(image,"white-balance:vibrance");
+  if (artifact != (const char *) NULL)
+    status=LevelVibrance(image,artifact,status,exception);
+  return(status);
+}
+
 MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2524,9 +2639,6 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
 
   CacheView
     *image_view;
-
-  const char
-    *artifact;
 
   double
     a_mean,
@@ -2608,9 +2720,7 @@ MagickExport MagickBooleanType WhiteBalanceImage(Image *image,
       }
   }
   image_view=DestroyCacheView(image_view);
-  artifact=GetImageArtifact(image,"white-balance:vibrance");
-  if (artifact != (const char *) NULL)
-    status=LevelVibrance(image,artifact,status,exception);
+  status=LevelWhiteBalanceVibrance(image,status,exception);
   status&=(MagickStatusType) TransformImageColorspace(image,sRGBColorspace,
     exception);
   return(status != 0 ? MagickTrue : MagickFalse);

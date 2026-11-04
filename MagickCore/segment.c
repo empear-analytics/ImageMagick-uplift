@@ -346,10 +346,22 @@ static void SetClusterColormap(Image *image,const Cluster *head)
   }
 }
 
-static void ClassifyFuzzyPixel(Image *image,const double *squares,
-  const PixelInfo *pixel,const double weighting_exponent,
-  Quantum *magick_restrict q)
+typedef struct _FuzzyWeights
 {
+  const double
+    *squares;
+
+  double
+    weighting_exponent;
+} FuzzyWeights;
+
+static void ClassifyFuzzyPixel(Image *image,const FuzzyWeights *weights,
+  const PixelInfo *pixel,Quantum *magick_restrict q)
+{
+  const double
+    *const squares = weights->squares,
+    weighting_exponent = weights->weighting_exponent;
+
   const PixelInfo
     *magick_restrict p;
 
@@ -493,6 +505,9 @@ static void ClassifyRowPixels(Image *image,const ClassifyRowInputs *inputs,
   const double
     weighting_exponent = inputs->weighting_exponent;
 
+  const FuzzyWeights
+    weights = { squares, weighting_exponent };
+
   Cluster
     *c;
 
@@ -510,7 +525,7 @@ static void ClassifyRowPixels(Image *image,const ClassifyRowInputs *inputs,
     pixel.blue=(double) ScaleQuantumToChar(GetPixelBlue(image,q));
     c=ClassifyPixelByCluster(image,head,pixel,q);
     if (c == (Cluster *) NULL)
-      ClassifyFuzzyPixel(image,squares,&pixel,weighting_exponent,q);
+      ClassifyFuzzyPixel(image,&weights,&pixel,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
 }
@@ -680,6 +695,112 @@ static void InitializeCluster(Cluster *cluster,const ssize_t count)
   cluster->blue.center/=cluster->count;
 }
 
+static void ReportClassifyProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickStatusType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,2*image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
+static void RemoveSmallClusters(const double cluster_threshold,
+  Cluster **head,ssize_t *count,Cluster **last_cluster)
+{
+  Cluster
+    *cluster,
+    *next_cluster;
+
+  for (cluster=(*head); cluster != (Cluster *) NULL; cluster=next_cluster)
+  {
+    next_cluster=cluster->next;
+    if (IsClusterAboveThreshold(cluster,(*count),cluster_threshold) !=
+        MagickFalse)
+      {
+        /*
+          Initialize cluster.
+        */
+        InitializeCluster(cluster,(*count));
+        (*count)++;
+        (*last_cluster)=cluster;
+        continue;
+      }
+    /*
+      Delete cluster.
+    */
+    (*head)=UnlinkCluster((*head),(*last_cluster),cluster,next_cluster);
+    cluster=(Cluster *) RelinquishMagickMemory(cluster);
+  }
+}
+
+typedef struct _ClassifyCountInputs
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  Cluster
+    *head;
+
+  ExceptionInfo
+    *exception;
+} ClassifyCountInputs;
+
+static MagickBooleanType CountClassifyRow(const ClassifyCountInputs *inputs,
+  const ssize_t y,ssize_t *count)
+{
+  const Quantum
+    *p;
+
+  p=GetCacheViewVirtualPixels(inputs->image_view,0,y,inputs->image->columns,1,
+    inputs->exception);
+  if (p == (const Quantum *) NULL)
+    return(MagickFalse);
+  (*count)=CountRowClusterPixels(inputs->image,inputs->head,p,(*count));
+  return(MagickTrue);
+}
+
+typedef struct _ClassifyLine
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  ClassifyRowInputs
+    inputs;
+} ClassifyLine;
+
+static MagickBooleanType ClassifyImageLine(const ClassifyLine *line,
+  const ssize_t y,MagickStatusType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(line->image_view,0,y,line->image->columns,1,
+    line->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ClassifyRowPixels(line->image,&line->inputs,q);
+  if (SyncCacheViewAuthenticPixels(line->image_view,line->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 static MagickBooleanType Classify(Image *image,short **extrema,
   const ClassifySettings *settings,ExceptionInfo *exception)
 {
@@ -774,25 +895,18 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   image_view=AcquireVirtualCacheView(image,exception);
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *p;
+    const ClassifyCountInputs
+      inputs = { image, image_view, head, exception };
 
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
+    if (CountClassifyRow(&inputs,y,&count) == MagickFalse)
       break;
-    count=CountRowClusterPixels(image,head,p,count);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SegmentImageTag,progress,2*image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportClassifyProgress(image,SegmentImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -802,25 +916,7 @@ static MagickBooleanType Classify(Image *image,short **extrema,
   count=0;
   last_cluster=head;
   next_cluster=head;
-  for (cluster=head; cluster != (Cluster *) NULL; cluster=next_cluster)
-  {
-    next_cluster=cluster->next;
-    if (IsClusterAboveThreshold(cluster,count,cluster_threshold) != MagickFalse)
-      {
-        /*
-          Initialize cluster.
-        */
-        InitializeCluster(cluster,count);
-        count++;
-        last_cluster=cluster;
-        continue;
-      }
-    /*
-      Delete cluster.
-    */
-    head=UnlinkCluster(head,last_cluster,cluster,next_cluster);
-    cluster=(Cluster *) RelinquishMagickMemory(cluster);
-  }
+  RemoveSmallClusters(cluster_threshold,&head,&count,&last_cluster);
   number_clusters=(size_t) count;
   if (verbose != MagickFalse)
     PrintClusterStatistics(head,cluster_threshold,weighting_exponent,
@@ -850,38 +946,24 @@ static MagickBooleanType Classify(Image *image,short **extrema,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    ClassifyRowInputs
-      inputs;
+    ClassifyLine
+      line;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
+    line.image=image;
+    line.image_view=image_view;
+    line.exception=exception;
+    line.inputs.head=head;
+    line.inputs.squares=squares;
+    line.inputs.weighting_exponent=weighting_exponent;
+    if (ClassifyImageLine(&line,y,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    inputs.head=head;
-    inputs.squares=squares;
-    inputs.weighting_exponent=weighting_exponent;
-    ClassifyRowPixels(image,&inputs,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,SegmentImageTag,progress,2*image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportClassifyProgress(image,SegmentImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1370,6 +1452,20 @@ static void InitializeNewCluster(Cluster *cluster,const ExtentPacket red,
   cluster->next=(Cluster *) NULL;
 }
 
+static Cluster *FindLargestBackground(Cluster *background)
+{
+  Cluster
+    *cluster;
+
+  for (cluster=background; cluster->next != (Cluster *) NULL; )
+  {
+    if (cluster->count > background->count)
+      background=cluster;
+    cluster=cluster->next;
+  }
+  return(background);
+}
+
 MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
   const double cluster_threshold,const double smooth_threshold,
   PixelInfo *pixel,ExceptionInfo *exception)
@@ -1529,12 +1625,7 @@ MagickExport MagickBooleanType GetImageDynamicThreshold(const Image *image,
     {
       object=FindObjectCluster(head);
       background=head->next;
-      for (cluster=background; cluster->next != (Cluster *) NULL; )
-      {
-        if (cluster->count > background->count)
-          background=cluster;
-        cluster=cluster->next;
-      }
+      background=FindLargestBackground(background);
     }
   SetDynamicThresholdPixel(background,object,pixel);
   /*

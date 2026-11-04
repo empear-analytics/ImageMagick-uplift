@@ -1046,6 +1046,13 @@ static Image *DestroyOilPaintClones(Image *linear_image,Image *paint_image)
 
 typedef struct _OilPaintRowInfo
 {
+  CacheView
+    *image_view,
+    *paint_view;
+
+  ExceptionInfo
+    *exception;
+
   Image
     *linear_image,
     *paint_image;
@@ -1094,6 +1101,34 @@ static MagickBooleanType PrepareOilPaintImage(Image *linear_image,
       paint_image=DestroyImage(paint_image);
       return(MagickFalse);
     }
+  return(MagickTrue);
+}
+
+static MagickBooleanType OilPaintLine(const OilPaintRowInfo *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(row->image_view,-((ssize_t) row->width/2L),y-
+    (ssize_t) (row->width/2L),row->linear_image->columns+row->width,row->width,
+    row->exception);
+  q=QueueCacheViewAuthenticPixels(row->paint_view,0,y,row->paint_image->columns,
+    1,row->exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  OilPaintRow(row,p,q);
+  if (SyncCacheViewAuthenticPixels(row->paint_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
   return(MagickTrue);
 }
 
@@ -1160,38 +1195,19 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
 #endif
   for (y=0; y < (ssize_t) linear_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
-
     OilPaintRowInfo
       row;
 
-    Quantum
-      *magick_restrict q;
-
-    size_t
-      *histogram;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,-((ssize_t) width/2L),y-(ssize_t)
-      (width/2L),linear_image->columns+width,width,exception);
-    q=QueueCacheViewAuthenticPixels(paint_view,0,y,paint_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    histogram=histograms[GetOpenMPThreadId()];
+    row.image_view=image_view;
+    row.paint_view=paint_view;
+    row.exception=exception;
     row.linear_image=linear_image;
     row.paint_image=paint_image;
-    row.histogram=histogram;
+    row.histogram=histograms[GetOpenMPThreadId()];
     row.width=width;
     row.center=center;
-    OilPaintRow(&row,p,q);
-    if (SyncCacheViewAuthenticPixels(paint_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (OilPaintLine(&row,y,&status) == MagickFalse)
+      continue;
     if (linear_image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
@@ -1283,6 +1299,12 @@ typedef struct _OpaquePaintRow
   Image
     *image;
 
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
   MagickBooleanType
     invert;
 
@@ -1320,6 +1342,28 @@ static void OpaquePaintRowPixels(const OpaquePaintRow *row,
       SetUpdatableFillChannels(image,&conform_fill,q);
     q+=(ptrdiff_t) GetPixelChannels(image);
   }
+}
+
+static MagickBooleanType OpaquePaintLine(const OpaquePaintRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  q=GetCacheViewAuthenticPixels(row->image_view,0,y,row->image->columns,1,
+    row->exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  OpaquePaintRowPixels(row,q);
+  if (SyncCacheViewAuthenticPixels(row->image_view,row->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
 }
 
 MagickExport MagickBooleanType OpaquePaintImage(Image *image,
@@ -1371,25 +1415,15 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
     OpaquePaintRow
       row;
 
-    Quantum
-      *magick_restrict q;
-
-    if (status == MagickFalse)
-      continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.image=image;
+    row.image_view=image_view;
+    row.exception=exception;
     row.invert=invert;
     row.conform_fill=conform_fill;
     row.conform_target=conform_target;
     row.zero=zero;
-    OpaquePaintRowPixels(&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    if (OpaquePaintLine(&row,y,&status) == MagickFalse)
+      continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType

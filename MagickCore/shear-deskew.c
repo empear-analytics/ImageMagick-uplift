@@ -503,6 +503,75 @@ static void DestroyRadonMatrices(MatrixInfo *source_matrices,
     source_matrices=DestroyMatrixInfo(source_matrices);
 }
 
+static void ReadRadonRow(MagickBooleanType *status,
+  const RadonRowSource *source,const unsigned short *bits)
+{
+  CacheView
+    *const image_view = source->image_view;
+
+  const Image
+    *const image = source->image;
+
+  const double
+    threshold = source->threshold;
+
+  const ssize_t
+    y = source->y;
+
+  ExceptionInfo
+    *const exception = source->exception;
+
+  MatrixInfo
+    *const source_matrices = source->source_matrices;
+
+  const Quantum
+    *magick_restrict p;
+
+  size_t
+    bit,
+    byte;
+
+  ssize_t
+    i,
+    x;
+
+  unsigned short
+    value;
+
+  if ((*status) == MagickFalse)
+    return;
+  p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  bit=0;
+  byte=0;
+  i=0;
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    byte<<=1;
+    if (IsPixelBelowThreshold(image,p,threshold) != MagickFalse)
+      byte|=0x01;
+    bit++;
+    if (bit == 8)
+      {
+        value=bits[byte];
+        (void) SetMatrixElement(source_matrices,i++,y,&value);
+        bit=0;
+        byte=0;
+      }
+    p+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  if (bit != 0)
+    {
+      byte<<=(8-bit);
+      value=bits[byte];
+      (void) SetMatrixElement(source_matrices,i++,y,&value);
+    }
+}
+
 static MagickBooleanType RadonTransform(const Image *image,
   const double threshold,size_t *projection,ExceptionInfo *exception)
 {
@@ -573,52 +642,16 @@ static MagickBooleanType RadonTransform(const Image *image,
 #endif
   for (y=0; y < (ssize_t) image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    RadonRowSource
+      source;
 
-    size_t
-      bit,
-      byte;
-
-    ssize_t
-      i,
-      x;
-
-    unsigned short
-     value;
-
-    if (status == MagickFalse)
-      continue;
-    p=GetCacheViewVirtualPixels(image_view,0,y,image->columns,1,exception);
-    if (p == (const Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
-    bit=0;
-    byte=0;
-    i=0;
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      byte<<=1;
-      if (IsPixelBelowThreshold(image,p,threshold) != MagickFalse)
-        byte|=0x01;
-      bit++;
-      if (bit == 8)
-        {
-          value=bits[byte];
-          (void) SetMatrixElement(source_matrices,i++,y,&value);
-          bit=0;
-          byte=0;
-        }
-      p+=(ptrdiff_t) GetPixelChannels(image);
-    }
-    if (bit != 0)
-      {
-        byte<<=(8-bit);
-        value=bits[byte];
-        (void) SetMatrixElement(source_matrices,i++,y,&value);
-      }
+    source.image_view=image_view;
+    source.image=image;
+    source.threshold=threshold;
+    source.y=y;
+    source.exception=exception;
+    source.source_matrices=source_matrices;
+    ReadRadonRow(&status,&source,bits);
   }
   RadonProjection(source_matrices,destination_matrices,1,projection);
   image_view=DestroyCacheView(image_view);
