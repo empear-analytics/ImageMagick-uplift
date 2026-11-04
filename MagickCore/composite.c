@@ -1461,6 +1461,69 @@ static void SetCompositeProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+typedef struct _OverSourceRow
+{
+  CacheView
+    *source_view;
+
+  const Image
+    *source_image;
+
+  MagickBooleanType
+    clip_to_self;
+
+  ssize_t
+    x_offset,
+    y_offset,
+    y;
+
+  ExceptionInfo
+    *exception;
+} OverSourceRow;
+
+static MagickBooleanType SkipOverRow(const OverSourceRow *source,
+  const MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  if (source->clip_to_self != MagickFalse)
+    {
+      if (source->y < source->y_offset)
+        return(MagickFalse);
+      if ((source->y-source->y_offset) >= (ssize_t) source->source_image->rows)
+        return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
+static MagickBooleanType FetchOverSourceRow(const OverSourceRow *source,
+  const Quantum **pixels,const Quantum *magick_restrict *p,
+  MagickBooleanType *status)
+{
+  /*
+    If pixels is NULL, y is outside overlay region.
+  */
+  (*pixels)=(Quantum *) NULL;
+  (*p)=(Quantum *) NULL;
+  if ((source->y >= source->y_offset) &&
+      ((source->y-source->y_offset) < (ssize_t) source->source_image->rows))
+    {
+      (*p)=GetCacheViewVirtualPixels(source->source_view,0,
+        CastDoubleToSsizeT((double) source->y-source->y_offset),
+        source->source_image->columns,1,source->exception);
+      if ((*p) == (const Quantum *) NULL)
+        {
+          (*status)=MagickFalse;
+          return(MagickFalse);
+        }
+      (*pixels)=(*p);
+      if (source->x_offset < 0)
+        (*p)-=(ptrdiff_t) CastDoubleToSsizeT((double) source->x_offset*
+          GetPixelChannels(source->source_image));
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType CompositeOverImage(Image *image,
   const Image *source_image,const CompositePlacement *placement,
   ExceptionInfo *exception)
@@ -1526,35 +1589,14 @@ static MagickBooleanType CompositeOverImage(Image *image,
     OverRowInputs
       row;
 
-    if (status == MagickFalse)
+    const OverSourceRow
+      source = { source_view, source_image, clip_to_self, x_offset, y_offset,
+        y, exception };
+
+    if (SkipOverRow(&source,&status) == MagickFalse)
       continue;
-    if (clip_to_self != MagickFalse)
-      {
-        if (y < y_offset)
-          continue;
-        if ((y-y_offset) >= (ssize_t) source_image->rows)
-          continue;
-      }
-    /*
-      If pixels is NULL, y is outside overlay region.
-    */
-    pixels=(Quantum *) NULL;
-    p=(Quantum *) NULL;
-    if ((y >= y_offset) &&
-        ((y-y_offset) < (ssize_t) source_image->rows))
-      {
-        p=GetCacheViewVirtualPixels(source_view,0,CastDoubleToSsizeT((double) y-
-          y_offset),source_image->columns,1,exception);
-        if (p == (const Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        pixels=p;
-        if (x_offset < 0)
-          p-=(ptrdiff_t) CastDoubleToSsizeT((double) x_offset*
-            GetPixelChannels(source_image));
-      }
+    if (FetchOverSourceRow(&source,&pixels,&p,&status) == MagickFalse)
+      continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
     if (q == (Quantum *) NULL)
       {
@@ -3091,36 +3133,14 @@ MagickExport MagickBooleanType CompositeImage(Image *image,
     ssize_t
       x;
 
-    if (status == MagickFalse)
+    const OverSourceRow
+      source = { source_view, source_image, clip_to_self, x_offset, y_offset,
+        y, exception };
+
+    if (SkipOverRow(&source,&status) == MagickFalse)
       continue;
-    if (clip_to_self != MagickFalse)
-      {
-        if (y < y_offset)
-          continue;
-        if ((y-y_offset) >= (ssize_t) source_image->rows)
-          continue;
-      }
-    /*
-      If pixels is NULL, y is outside overlay region.
-    */
-    pixels=(Quantum *) NULL;
-    p=(Quantum *) NULL;
-    if ((y >= y_offset) &&
-        ((y-y_offset) < (ssize_t) source_image->rows))
-      {
-        p=GetCacheViewVirtualPixels(source_view,0,
-          CastDoubleToSsizeT((double) y-y_offset),source_image->columns,1,
-          exception);
-        if (p == (const Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        pixels=p;
-        if (x_offset < 0)
-          p-=(ptrdiff_t) CastDoubleToSsizeT((double) x_offset*
-            GetPixelChannels(source_image));
-      }
+    if (FetchOverSourceRow(&source,&pixels,&p,&status) == MagickFalse)
+      continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
     if (q == (Quantum *) NULL)
       {
