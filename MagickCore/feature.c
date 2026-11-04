@@ -179,6 +179,40 @@ static inline MagickBooleanType IsUntracedEdgePixel(const Image *edge_image,
     (pixel.intensity >= lower_threshold)) ? MagickTrue : MagickFalse);
 }
 
+static MagickBooleanType SeedCannyTrace(const CannyTrace *trace,
+  const ssize_t x,const ssize_t y,ExceptionInfo *exception)
+{
+  CacheView
+    *edge_view = trace->edge_view;
+
+  MatrixInfo
+    *canny_cache = trace->canny_cache;
+
+  CannyInfo
+    edge;
+
+  MagickBooleanType
+    status;
+
+  Quantum
+    *q;
+
+  q=GetCacheViewAuthenticPixels(edge_view,x,y,1,1,exception);
+  if (q == (Quantum *) NULL)
+    return(MagickFalse);
+  *q=QuantumRange;
+  status=SyncCacheViewAuthenticPixels(edge_view,exception);
+  if (status == MagickFalse)
+    return(MagickFalse);
+  if (GetMatrixElement(canny_cache,0,0,&edge) == MagickFalse)
+    return(MagickFalse);
+  edge.x=x;
+  edge.y=y;
+  if (SetMatrixElement(canny_cache,0,0,&edge) == MagickFalse)
+    return(MagickFalse);
+  return(MagickTrue);
+}
+
 static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   const ssize_t y,ExceptionInfo *exception)
 {
@@ -207,18 +241,7 @@ static MagickBooleanType TraceEdges(const CannyTrace *trace,const ssize_t x,
   ssize_t
     i;
 
-  q=GetCacheViewAuthenticPixels(edge_view,x,y,1,1,exception);
-  if (q == (Quantum *) NULL)
-    return(MagickFalse);
-  *q=QuantumRange;
-  status=SyncCacheViewAuthenticPixels(edge_view,exception);
-  if (status == MagickFalse)
-    return(MagickFalse);
-  if (GetMatrixElement(canny_cache,0,0,&edge) == MagickFalse)
-    return(MagickFalse);
-  edge.x=x;
-  edge.y=y;
-  if (SetMatrixElement(canny_cache,0,0,&edge) == MagickFalse)
+  if (SeedCannyTrace(trace,x,y,exception) == MagickFalse)
     return(MagickFalse);
   for (i=1; i != 0; )
   {
