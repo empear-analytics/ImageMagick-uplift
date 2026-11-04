@@ -229,6 +229,21 @@ typedef struct _ThresholdLine
     *exception;
 } ThresholdLine;
 
+static MagickBooleanType GetThresholdRow(const ThresholdLine *line,
+  const ssize_t y,Quantum *magick_restrict *q,MagickBooleanType *status)
+{
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  (*q)=GetCacheViewAuthenticPixels(line->image_view,0,y,
+    line->image->columns,1,line->exception);
+  if ((*q) == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  return(MagickTrue);
+}
+
 static MagickBooleanType SetDirectNonGrayImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -280,14 +295,11 @@ MagickExport MagickBooleanType BilevelImage(Image *image,const double threshold,
     Quantum
       *magick_restrict q;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     for (x=0; x < (ssize_t) image->columns; x++)
     {
       double
