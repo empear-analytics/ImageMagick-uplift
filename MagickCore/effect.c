@@ -2506,6 +2506,73 @@ MagickExport Image *ShadeImage(const Image *image,const MagickBooleanType gray,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _SpreadInfo
+{
+  const Image
+    *image;
+
+  Image
+    *spread_image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  PixelInterpolateMethod
+    method;
+
+  size_t
+    width;
+
+  ssize_t
+    y;
+} SpreadInfo;
+
+static void SpreadRow(MagickBooleanType *status,const SpreadInfo *spread,
+  RandomInfo *random_info,Quantum *magick_restrict q)
+{
+  const Image
+    *const image = spread->image;
+
+  Image
+    *const spread_image = spread->spread_image;
+
+  CacheView
+    *const image_view = spread->image_view;
+
+  ExceptionInfo
+    *const exception = spread->exception;
+
+  const PixelInterpolateMethod
+    method = spread->method;
+
+  const size_t
+    width = spread->width;
+
+  const ssize_t
+    y = spread->y;
+
+  ssize_t
+    x;
+
+  for (x=0; x < (ssize_t) image->columns; x++)
+  {
+    PointInfo
+      point;
+
+    point.x=GetPseudoRandomValue(random_info);
+    point.y=GetPseudoRandomValue(random_info);
+    (*status)=InterpolatePixelChannels(image,image_view,spread_image,method,
+      (double) x+width*(point.x-0.5),(double) y+width*(point.y-0.5),q,
+      exception);
+    if ((*status) == MagickFalse)
+      break;
+    q+=(ptrdiff_t) GetPixelChannels(spread_image);
+  }
+}
+
 MagickExport Image *SpreadImage(const Image *image,
   const PixelInterpolateMethod method,const double radius,
   ExceptionInfo *exception)
@@ -2578,8 +2645,8 @@ MagickExport Image *SpreadImage(const Image *image,
     Quantum
       *magick_restrict q;
 
-    ssize_t
-      x;
+    SpreadInfo
+      spread;
 
     if (status == MagickFalse)
       continue;
@@ -2590,20 +2657,14 @@ MagickExport Image *SpreadImage(const Image *image,
         status=MagickFalse;
         continue;
       }
-    for (x=0; x < (ssize_t) image->columns; x++)
-    {
-      PointInfo
-        point;
-
-      point.x=GetPseudoRandomValue(random_info[id]);
-      point.y=GetPseudoRandomValue(random_info[id]);
-      status=InterpolatePixelChannels(image,image_view,spread_image,method,
-        (double) x+width*(point.x-0.5),(double) y+width*(point.y-0.5),q,
-        exception);
-      if (status == MagickFalse)
-        break;
-      q+=(ptrdiff_t) GetPixelChannels(spread_image);
-    }
+    spread.image=image;
+    spread.spread_image=spread_image;
+    spread.image_view=image_view;
+    spread.exception=exception;
+    spread.method=method;
+    spread.width=width;
+    spread.y=y;
+    SpreadRow(&status,&spread,random_info[id],q);
     if (SyncCacheViewAuthenticPixels(spread_view,exception) == MagickFalse)
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
