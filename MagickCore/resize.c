@@ -1951,6 +1951,20 @@ static MagickBooleanType SetDirectClassOrDestroy(Image *resize_image,
   return(MagickTrue);
 }
 
+static MagickBooleanType SetResizeProgress(const Image *image,
+  const char *tag,const MagickOffsetType progress)
+{
+  MagickBooleanType
+    proceed,
+    status;
+
+  status=MagickTrue;
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    status=MagickFalse;
+  return(status);
+}
+
 MagickExport Image *InterpolativeResizeImage(const Image *image,
   const size_t columns,const size_t rows,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -2053,16 +2067,12 @@ MagickExport Image *InterpolativeResizeImage(const Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,InterpolativeResizeImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
+        if (SetResizeProgress(image,InterpolativeResizeImageTag,progress) ==
+            MagickFalse)
           status=MagickFalse;
       }
   }
