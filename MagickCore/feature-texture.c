@@ -172,12 +172,11 @@ static unsigned int GetFeatureGrayLevels(const Image *image,
     number_grays=gray.green;
   if (gray.blue > number_grays)
     number_grays=gray.blue;
-  if (image->colorspace == CMYKColorspace)
-    if (gray.black > number_grays)
-      number_grays=gray.black;
-  if (image->alpha_trait != UndefinedPixelTrait)
-    if (gray.alpha > number_grays)
-      number_grays=gray.alpha;
+  if ((image->colorspace == CMYKColorspace) && (gray.black > number_grays))
+    number_grays=gray.black;
+  if ((image->alpha_trait != UndefinedPixelTrait) &&
+      (gray.alpha > number_grays))
+    number_grays=gray.alpha;
   return(number_grays);
 }
 
