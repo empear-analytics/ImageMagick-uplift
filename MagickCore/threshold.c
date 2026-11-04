@@ -2028,14 +2028,11 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
     RandomThresholdRow
       row;
 
-    if (status == MagickFalse)
+    const ThresholdLine
+      line = { image,image_view,exception };
+
+    if (GetThresholdRow(&line,y,&q,&status) == MagickFalse)
       continue;
-    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
-    if (q == (Quantum *) NULL)
-      {
-        status=MagickFalse;
-        continue;
-      }
     row.min_threshold=min_threshold;
     row.max_threshold=max_threshold;
     row.random_info=random_info;
