@@ -982,21 +982,10 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     bevel_width)+frame_info->inner_bevel);
   if (height != 0)
     {
-      FrameTopBorder
-        top_border;
+      const FrameTopBorder
+        top_border = { frame_view, frame_image, image, frame_info, accentuate,
+          highlight, matte, shadow, trough, bevel_width, height, exception };
 
-      top_border.frame_view=frame_view;
-      top_border.frame_image=frame_image;
-      top_border.image=image;
-      top_border.frame_info=frame_info;
-      top_border.accentuate=accentuate;
-      top_border.highlight=highlight;
-      top_border.matte=matte;
-      top_border.shadow=shadow;
-      top_border.trough=trough;
-      top_border.bevel_width=bevel_width;
-      top_border.height=height;
-      top_border.exception=exception;
       DrawFrameTopBorder(&top_border);
     }
   /*
@@ -1028,20 +1017,11 @@ MagickExport Image *FrameImage(const Image *image,const FrameInfo *frame_info,
     frame_info->outer_bevel);
   if (height != 0)
     {
-      FrameBottomBorder
-        bottom_border;
+      const FrameBottomBorder
+        bottom_border = { frame_view, frame_image, image, frame_info,
+          accentuate, highlight, matte, shadow, trough, bevel_width,
+          exception };
 
-      bottom_border.frame_view=frame_view;
-      bottom_border.frame_image=frame_image;
-      bottom_border.image=image;
-      bottom_border.frame_info=frame_info;
-      bottom_border.accentuate=accentuate;
-      bottom_border.highlight=highlight;
-      bottom_border.matte=matte;
-      bottom_border.shadow=shadow;
-      bottom_border.trough=trough;
-      bottom_border.bevel_width=bevel_width;
-      bottom_border.exception=exception;
       DrawFrameBottomBorder(&bottom_border,height);
     }
   frame_view=DestroyCacheView(frame_view);
