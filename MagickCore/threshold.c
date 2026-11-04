@@ -244,6 +244,14 @@ static MagickBooleanType GetThresholdRow(const ThresholdLine *line,
   return(MagickTrue);
 }
 
+static void SyncThresholdRow(const ThresholdLine *line,
+  MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(line->image_view,line->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType SetDirectNonGrayImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -309,8 +317,7 @@ MagickExport MagickBooleanType BilevelImage(Image *image,const double threshold,
       BilevelPixel(image,threshold,pixel,q);
       q+=(ptrdiff_t) GetPixelChannels(image);
     }
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
