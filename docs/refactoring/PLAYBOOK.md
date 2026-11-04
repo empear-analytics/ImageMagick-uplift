@@ -5019,6 +5019,122 @@ by the one second scalar (probes +0.31 and 9.47 to 10.00). Added by Claude Code
 
 ---
 
+## Recipe PC - Extract Parallel Loop Head Returning Success for a Continue
+
+**Use when:** CodeScene reports *Bumpy Road Ahead*, *Complex Method* or *Large Method*,
+and the body of a `#pragma omp parallel for` loop has the usual shape: a head (the
+`if (status == MagickFalse) continue;` guard, a pixel fetch whose failure is
+`status=MagickFalse; continue;`, the work, the sync test) followed by a tail that must
+stay in the caller because it holds a `#pragma omp atomic` progress block. The head's
+`continue;` statements skip that tail, so no whole-body or block-ending form moves the
+head, and the loop keeps two bumps (the fetch guard and the progress block) and the
+cyclomatic complexity of both.
+
+**Not covered by:** Recipe PS (step 1 refuses a `continue;` that leaves the block; step
+7 moves the whole body, and the pragma in the tail cannot move). Recipes T and U (the
+block may not be followed by a progress block, T step 4's *Careful*). Recipe E step 7
+(the same limit). Recipe OC (outside OpenMP; its helper returns nothing, and here the
+caller must know whether the tail runs). Recipe LB (a `break;`, not a `continue;`).
+
+**How:**
+
+1. The block is the head of one iteration of the parallel loop body: the body's
+   statements from the first one after the declarations up to, not including, a tail
+   that stays. It contains no `#pragma omp` line, no `return`, `goto` or `break` that
+   leaves it, and every `continue;` in it continues the parallel loop (those of a loop
+   nested in it stay). The tail follows it directly and is unchanged.
+2. Written variables: Recipe PS step 2 (`status` and at most two shared scalars, each by
+   pointer). Every other variable of the body that the head writes is declared in the
+   head, or is not read by the tail (a row pointer `q`), and is declared in the new
+   function (Recipe E step 4). The tail reads nothing the head wrote except `status`.
+3. Cut the head into a new `static MagickBooleanType` function directly above the
+   caller. Each `continue;` becomes `return(MagickFalse);`, the function ends with
+   `return(MagickTrue);`, and every use of `status` becomes `(*status)` (Recipe PS step
+   4). Nothing else in the text changes.
+4. Pass what the head reads by value. When that would give more than four parameters,
+   bundle the read-only inputs in a `const` struct (Recipe N steps 2 and 3), declared in
+   the body and filled there directly before the call, so each thread fills its own; the
+   fills copy invariant values and now run before the guard, which changes nothing
+   observable. `status` and each shared scalar come last, by pointer.
+5. Where the head stood, write `if (Helper(...,&status) == MagickFalse) continue;`,
+   after the struct's declaration and fill when step 4 needs one. The tail stays as it
+   is. Check every argument against its parameter by reading.
+
+**Before:**
+
+```c
+    if (status == MagickFalse)
+      continue;
+    q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
+    if (q == (Quantum *) NULL)
+      {
+        status=MagickFalse;
+        continue;
+      }
+    ...
+    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
+      status=MagickFalse;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      {
+        ...
+#if defined(MAGICKCORE_OPENMP_SUPPORT)
+        #pragma omp atomic
+#endif
+        progress++;
+        ...
+      }
+```
+
+**After:**
+
+```c
+static MagickBooleanType OpaquePaintLine(const OpaquePaintRow *row,
+  const ssize_t y,MagickBooleanType *status)
+{
+  ...
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  ...
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  ...
+  return(MagickTrue);
+}
+...
+    if (OpaquePaintLine(&row,y,&status) == MagickFalse)
+      continue;
+    if (image->progress_monitor != (MagickProgressMonitor) NULL)
+      ...
+```
+
+**Careful:**
+
+- Every path of the head either reached a `continue;` (which skipped the tail) or fell
+  off its end (which ran the tail). After, the first returns `MagickFalse` and the caller
+  runs `continue;`, the second returns `MagickTrue` and the caller runs the tail: the
+  same transfer at the same point, after the same statements in the same order.
+- `status` is the shared variable itself, read and written at the same program points
+  (Recipe PS *Careful*); the helper is called from inside the iteration, on the same
+  thread, and no pragma moves, so the region, its clauses and the `omp atomic`
+  `progress++` are as before.
+- The oracle runs single-threaded and cannot see a race: steps 1 and 2 are checked by
+  reading.
+
+**Evidence level:** oracle, with `refactor_guard.py --calls`, and steps 1 and 2 checked by
+reading.
+
+**Provenance:** 2026-11-04, from `paint.c`'s `OpaquePaintImage`, `TransparentPaintImage`
+and `OilPaintImage` (campaign A, W13), whose parallel loop bodies are a guard, a failed
+fetch that `continue;`s, a row call and a sync test, followed by an atomic progress
+block; the plateau table recorded that no T, U or LB form moves the head. A probe on
+`OpaquePaintImage`: 6.24 to 6.49, the function leaving Complex Method. Added by Claude
+Code (Claude Sonnet 5.5) under the mandate of 2026-10-24.
+
+---
+
 ## Recipe H - Hoist Function-Local Macros
 
 **Use when:** a function `#define`s constants or helper macros at the top of its body, and
@@ -5701,3 +5817,4 @@ Type is `NEW`, `AMEND` or `WORDING`. *Decided by* is `owner`, `mandate (<date>)`
 | 2026-11-04 | AMEND | PS | Step 7 (new): the block may be a parallel loop's whole body, declarations included, with `continue;` statements of that loop (Recipe E step 7's whole-body form): each becomes `return;`, the counter goes by value, the body becomes the call alone, `status` through the pointer at every use; step 1 excepts it. *Careful* gives the argument | `effect.c`'s `LocalContrastImage` (campaign A, W12): both loop bodies open with `if (status == MagickFalse) continue;` and hold a failed-fetch `status=MagickFalse; continue;`, which T, LB, OC, W and PS step 1 refuse (the W12 report names the gap). Both bodies as helpers over one input struct: 5.02 to 5.19 in a probe, no finding on either helper | mandate (2026-10-24) |
 | 2026-11-04 | WORDING | PS | Step 7: the body becomes the call preceded by the declaration and fill of its input struct in the body (Recipe N step 7), not the call alone; the probe behind the step shared one struct filled once | `effect.c`'s `LocalContrastImage` (campaign A, W12): the first uses declare each pass's struct inside the loop body, as `KuwaharaImage`'s `kuwahara` and Recipe N step 7 do: 5.02 to 5.10 to 5.15 | mandate (2026-10-24) |
 | 2026-11-04 | AMEND | PS | Step 2: besides `status`, the block may read or write at most two further shared scalars `v` (declared outside the loop body, in `shared(...)` or no clause, never in `private`, `firstprivate`, `lastprivate` or `reduction`) by plain assignment or a plain increment outside any `atomic` or `critical`; each is passed by pointer like `status`, every use `(*v)`, with the same argument (same memory, points and order, nothing deferred, helper called inside the iteration). Steps 4 and 6 and *Careful* follow; *Careful* says a plain increment that is a race stays a race. Still eight steps | `attribute.c`'s `IdentifyImageGray` and `IdentifyImageMonochrome` (shared `type`) and `resize-sample.c`'s `SampleImage` (non-atomic `progress++`), campaign A, W12: each blocked by one second shared scalar; probes +0.31 and 9.47 to 10.00 | mandate (2026-10-24) |
+| 2026-11-04 | NEW | PC | Extract Parallel Loop Head Returning Success for a Continue: the head of a parallel loop body (guard, fetch with `status=MagickFalse; continue;`, work, sync test) that precedes a pragma-bearing progress tail moves to a `static MagickBooleanType` function, each `continue;` becoming `return(MagickFalse);`, `status` by pointer; the caller writes `if (Helper(...,&status) == MagickFalse) continue;` and keeps the tail | `paint.c`'s `OpaquePaintImage`, `TransparentPaintImage`, `OilPaintImage` (campaign A, W13): T, U, PS and E step 7 refuse a head followed by an atomic progress block; a probe on `OpaquePaintImage`, 6.24 to 6.49 | mandate (2026-10-24) |
