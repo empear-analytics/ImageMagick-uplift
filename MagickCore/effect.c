@@ -1497,6 +1497,87 @@ static MagickBooleanType AcquireDirectClassClone(const Image *image,
   return(MagickTrue);
 }
 
+typedef struct _LocalContrastColumnPass
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  float
+    *interImage,
+    *scanline;
+
+  ssize_t
+    scanLineSize,
+    width;
+
+  double
+    totalWeight;
+
+  ExceptionInfo
+    *exception;
+} LocalContrastColumnPass;
+
+static void RunLocalContrastColumn(MagickBooleanType *status,
+  const LocalContrastColumnPass *pass,const ssize_t x)
+{
+  const Image
+    *const image = pass->image;
+
+  CacheView
+    *const image_view = pass->image_view;
+
+  float
+    *const interImage = pass->interImage,
+    *const scanline = pass->scanline;
+
+  const ssize_t
+    scanLineSize = pass->scanLineSize,
+    width = pass->width;
+
+  const double
+    totalWeight = pass->totalWeight;
+
+  ExceptionInfo
+    *const exception = pass->exception;
+
+  const int
+    id = GetOpenMPThreadId();
+
+  const Quantum
+    *magick_restrict p;
+
+  float
+    *pix,
+    *pixels;
+
+  LocalContrastColumn
+    column;
+
+  if ((*status) == MagickFalse)
+    return;
+  pixels=scanline;
+  pixels+=id*scanLineSize;
+  pix=pixels;
+  p=GetCacheViewVirtualPixels(image_view,x,-(ssize_t) width,1,
+    image->rows+(size_t) (2*width),exception);
+  if (p == (const Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  LoadLocalContrastLuma(image,p,pix,width);
+  column.image=image;
+  column.interImage=interImage;
+  column.pixels=pixels;
+  column.width=width;
+  column.x=x;
+  column.totalWeight=totalWeight;
+  StoreLocalContrastColumn(&column);
+}
+
 MagickExport Image *LocalContrastImage(const Image *image,const double radius,
   const double strength,ExceptionInfo *exception)
 {
@@ -1587,39 +1668,18 @@ MagickExport Image *LocalContrastImage(const Image *image,const double radius,
 #endif
     for (x=0; x < (ssize_t) image->columns; x++)
     {
-      const int
-        id = GetOpenMPThreadId();
+      LocalContrastColumnPass
+        pass;
 
-      const Quantum
-        *magick_restrict p;
-
-      float
-        *pix,
-        *pixels;
-
-      LocalContrastColumn
-        column;
-
-      if (status == MagickFalse)
-        continue;
-      pixels=scanline;
-      pixels+=id*scanLineSize;
-      pix=pixels;
-      p=GetCacheViewVirtualPixels(image_view,x,-(ssize_t) width,1,
-        image->rows+(size_t) (2*width),exception);
-      if (p == (const Quantum *) NULL)
-        {
-          status=MagickFalse;
-          continue;
-        }
-      LoadLocalContrastLuma(image,p,pix,width);
-      column.image=image;
-      column.interImage=interImage;
-      column.pixels=pixels;
-      column.width=width;
-      column.x=x;
-      column.totalWeight=totalWeight;
-      StoreLocalContrastColumn(&column);
+      pass.image=image;
+      pass.image_view=image_view;
+      pass.interImage=interImage;
+      pass.scanline=scanline;
+      pass.scanLineSize=scanLineSize;
+      pass.width=width;
+      pass.totalWeight=totalWeight;
+      pass.exception=exception;
+      RunLocalContrastColumn(&status,&pass,x);
     }
   }
   /*
