@@ -64,6 +64,35 @@ each file: 15,900 cases, 0 diverged.
   a failed fetch, then `status=MagickFalse;`) fits no recipe: T, LB, OC and W each refuse
   it, and it is what holds `GetImageRange` at 9.68 and `EvaluateImages` at cc 27.
 
+### Recipe PS, step 2 amended: a second shared scalar (6 commits)
+
+The sweep left two files blocked only because their loops also write a second shared scalar.
+PS step 2 was amended (43696cf4b, `mandate (2026-10-24)`): besides `status`, at most two
+further shared scalars `v` (in `shared(...)` or no data-sharing clause, never in `private`,
+`firstprivate`, `lastprivate` or `reduction`), read or written by plain assignment or a plain
+increment outside any `atomic` or `critical`, each passed by pointer and written `(*v)`; a
+loop with no `status` whose only such variable is a flag passes that flag alone. A plain
+increment that is a race stays a race (a new *Careful* bullet). Whole catalogue after the last
+commit: 15,900 cases, 0 diverged.
+
+| File and function | Score | Cases |
+| --- | --- | ---: |
+| `attribute.c` `IdentifyImageGray` (941250151, `type`) | 7.11 → 7.42 | 1,172 |
+| `attribute.c` `IdentifyImageMonochrome` (ef16eb71b) | 7.42 → 7.73 | 222 |
+| `resize-sample.c` `SampleImage` (10b2103f7, `progress`) | 9.47 → **10.00** | 112 |
+| `channel-alpha.c` `SetImageAlphaChannel` OffIfOpaque (acdc42902, `opaque`) | 8.07 → 8.14 | 1,350 |
+| `attribute.c` `IsImageOpaque` (5baaec2a8, lone flag `opaque`) | 7.73 → 7.92 | 51 |
+
+**`resize-sample.c` reaches 10.00.** Its loop body writes the shared `progress` with a plain
+`progress++`, an upstream data race (W10 report); the helper keeps it as `(*progress)++`
+and the commit says it is not fixed, so the file's behaviour, race included, is what it was.
+**Close readings:** the amendment also lets a loop with no `status` pass only a flag `v`
+(`IdentifyImageMonochrome`, `IsImageOpaque`; T's *other name* paragraph arguably covers
+those two, PS was used because the amendment names it); `IdentifyImageGray`'s block reads
+`type` in a test before writing it (the amendment allows reading); `acdc42902` reuses
+`RemoveAlphaRowInfo` for a different loop; `#define SampleImageTag` moved from
+`SampleImage` into the helper.
+
 ### The Recipe PS sweep over the other files (12 commits, 11 kept)
 
 PS and its step 7 applied to loops the earlier recipes refused; each commit records the PS
