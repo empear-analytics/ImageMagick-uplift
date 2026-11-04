@@ -4313,6 +4313,80 @@ MagickExport Image *VignetteImage(const Image *image,const double radius,
 %    o exception: return any errors or warnings in this structure.
 %
 */
+typedef struct _WaveRow
+{
+  Image
+    *canvas_image,
+    *wave_image;
+
+  CacheView
+    *canvas_image_view,
+    *wave_view;
+
+  float
+    *sine_map;
+
+  PixelInterpolateMethod
+    method;
+
+  ExceptionInfo
+    *exception;
+} WaveRow;
+
+static MagickBooleanType WaveImageRow(const WaveRow *wave_row,const ssize_t y,
+  MagickBooleanType *status)
+{
+  Image
+    *const canvas_image = wave_row->canvas_image,
+    *const wave_image = wave_row->wave_image;
+
+  CacheView
+    *const canvas_image_view = wave_row->canvas_image_view,
+    *const wave_view = wave_row->wave_view;
+
+  float
+    *const sine_map = wave_row->sine_map;
+
+  const PixelInterpolateMethod
+    method = wave_row->method;
+
+  ExceptionInfo
+    *const exception = wave_row->exception;
+
+  const Quantum
+    *magick_restrict p;
+
+  Quantum
+    *magick_restrict q;
+
+  ssize_t
+    x;
+
+  if ((*status) == MagickFalse)
+    return(MagickFalse);
+  p=GetCacheViewVirtualPixels(canvas_image_view,0,y,canvas_image->columns,1,
+    exception);
+  q=QueueCacheViewAuthenticPixels(wave_view,0,y,wave_image->columns,1,
+    exception);
+  if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
+    {
+      (*status)=MagickFalse;
+      return(MagickFalse);
+    }
+  for (x=0; x < (ssize_t) wave_image->columns; x++)
+  {
+    (*status)=InterpolatePixelChannels(canvas_image,canvas_image_view,
+      wave_image,method,(double) x,(double) (y-sine_map[x]),q,exception);
+    if ((*status) == MagickFalse)
+      break;
+    p+=(ptrdiff_t) GetPixelChannels(canvas_image);
+    q+=(ptrdiff_t) GetPixelChannels(wave_image);
+  }
+  if (SyncCacheViewAuthenticPixels(wave_view,exception) == MagickFalse)
+    (*status)=MagickFalse;
+  return(MagickTrue);
+}
+
 MagickExport Image *WaveImage(const Image *image,const double amplitude,
   const double wave_length,const PixelInterpolateMethod method,
   ExceptionInfo *exception)
@@ -4399,37 +4473,18 @@ MagickExport Image *WaveImage(const Image *image,const double amplitude,
 #endif
   for (y=0; y < (ssize_t) wave_image->rows; y++)
   {
-    const Quantum
-      *magick_restrict p;
+    WaveRow
+      wave_row;
 
-    Quantum
-      *magick_restrict q;
-
-    ssize_t
-      x;
-
-    if (status == MagickFalse)
+    wave_row.canvas_image=canvas_image;
+    wave_row.wave_image=wave_image;
+    wave_row.canvas_image_view=canvas_image_view;
+    wave_row.wave_view=wave_view;
+    wave_row.sine_map=sine_map;
+    wave_row.method=method;
+    wave_row.exception=exception;
+    if (WaveImageRow(&wave_row,y,&status) == MagickFalse)
       continue;
-    p=GetCacheViewVirtualPixels(canvas_image_view,0,y,canvas_image->columns,1,
-      exception);
-    q=QueueCacheViewAuthenticPixels(wave_view,0,y,wave_image->columns,1,
-      exception);
-    if ((p == (const Quantum *) NULL) || (q == (Quantum *) NULL))
-      {
-        status=MagickFalse;
-        continue;
-      }
-    for (x=0; x < (ssize_t) wave_image->columns; x++)
-    {
-      status=InterpolatePixelChannels(canvas_image,canvas_image_view,
-        wave_image,method,(double) x,(double) (y-sine_map[x]),q,exception);
-      if (status == MagickFalse)
-        break;
-      p+=(ptrdiff_t) GetPixelChannels(canvas_image);
-      q+=(ptrdiff_t) GetPixelChannels(wave_image);
-    }
-    if (SyncCacheViewAuthenticPixels(wave_view,exception) == MagickFalse)
-      status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
         MagickBooleanType
