@@ -1117,6 +1117,32 @@ static void ReleaseScaleBuffers(const ScaleBuffers *buffers)
   scale_image=DestroyImage(scale_image);
 }
 
+static Image *FinishScaleImage(const ScaleBuffers *buffers,
+  const MagickBooleanType status)
+{
+  const Image
+    *const image = buffers->image;
+
+  Image
+    *scale_image = buffers->scale_image;
+
+  double
+    *scale_scanline = buffers->scale_scanline,
+    *scanline = buffers->scanline,
+    *x_vector = buffers->x_vector,
+    *y_vector = buffers->y_vector;
+
+  y_vector=(double *) RelinquishMagickMemory(y_vector);
+  scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
+  if (scale_image->rows != image->rows)
+    scanline=(double *) RelinquishMagickMemory(scanline);
+  x_vector=(double *) RelinquishMagickMemory(x_vector);
+  scale_image->type=image->type;
+  if (status == MagickFalse)
+    scale_image=DestroyImage(scale_image);
+  return(scale_image);
+}
+
 MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   const size_t rows,ExceptionInfo *exception)
 {
@@ -1140,6 +1166,9 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   PointInfo
     scale,
     span;
+
+  ScaleBuffers
+    buffers;
 
   ScaleLoop
     loop;
@@ -1231,13 +1260,11 @@ MagickExport Image *ScaleImage(const Image *image,const size_t columns,
   /*
     Free allocated memory.
   */
-  y_vector=(double *) RelinquishMagickMemory(y_vector);
-  scale_scanline=(double *) RelinquishMagickMemory(scale_scanline);
-  if (scale_image->rows != image->rows)
-    scanline=(double *) RelinquishMagickMemory(scanline);
-  x_vector=(double *) RelinquishMagickMemory(x_vector);
-  scale_image->type=image->type;
-  if (status == MagickFalse)
-    scale_image=DestroyImage(scale_image);
-  return(scale_image);
+  buffers.image=image;
+  buffers.scale_image=scale_image;
+  buffers.scale_scanline=scale_scanline;
+  buffers.scanline=scanline;
+  buffers.x_vector=x_vector;
+  buffers.y_vector=y_vector;
+  return(FinishScaleImage(&buffers,status));
 }
