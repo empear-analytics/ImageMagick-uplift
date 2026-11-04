@@ -1558,6 +1558,16 @@ static MagickBooleanType BlurBilateralLine(const BilateralRow *row,
   return(MagickTrue);
 }
 
+static void FillBilateralIntensity(double *intensity_gaussian,
+  const double intensity_sigma)
+{
+  ssize_t
+    w;
+
+  for (w=(-MaxIntensity); w <= MaxIntensity; w++)
+    intensity_gaussian[w+MaxIntensity]=BlurGaussian((double) w,intensity_sigma);
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1587,7 +1597,6 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     number_threads;
 
   ssize_t
-    w,
     y;
 
   assert(image != (const Image *) NULL);
@@ -1606,8 +1615,7 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
       blur_image=DestroyImage(blur_image);
       ThrowImageException(ResourceLimitError,"MemoryAllocationFailed");
     }
-  for (w=(-MaxIntensity); w <= MaxIntensity; w++)
-    intensity_gaussian[w+MaxIntensity]=BlurGaussian((double) w,intensity_sigma);
+  FillBilateralIntensity(intensity_gaussian,intensity_sigma);
   spatial_gaussian=weights[number_threads];
   {
     BilateralSpatial
