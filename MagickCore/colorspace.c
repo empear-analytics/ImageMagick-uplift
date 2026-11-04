@@ -836,6 +836,17 @@ static void SetColorspaceProgress(const Image *image,const char *tag,
     (*status)=MagickFalse;
 }
 
+static void SyncColorspaceRow(CacheView *image_view,
+  ExceptionInfo *exception,MagickBooleanType *status)
+{
+  MagickBooleanType
+    sync;
+
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void TransformLinearGrayRowFromsRGB(MagickBooleanType *status,
   const ColorspaceRowInfo *row,const ssize_t y)
 {
@@ -946,9 +957,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         PixelInfo
           pixel;
 
@@ -975,9 +983,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
           SetPixelViaPixelInfo(image,&pixel,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       image->type=image->alpha_trait == UndefinedPixelTrait ?
@@ -1028,9 +1034,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         ssize_t
           x;
 
@@ -1056,9 +1059,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
           SetPixelGray(image,ClampToQuantum(gray),q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
@@ -1116,9 +1117,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         ssize_t
           x;
 
@@ -1149,9 +1147,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
           SetPixelBlue(image,ClampToQuantum((double) QuantumRange*Z),q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
@@ -1220,9 +1216,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         ssize_t
           x;
 
@@ -1257,9 +1250,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
           SetPixelBlue(image,logmap[ScaleQuantumToMap(ClampToQuantum(blue))],q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       logmap=(Quantum *) RelinquishMagickMemory(logmap);
@@ -1282,9 +1273,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         ssize_t
           x;
 
@@ -1315,9 +1303,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
           SetPixelBlue(image,ClampToQuantum(blue),q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       if (SetImageColorspace(image,colorspace,exception) == MagickFalse)
@@ -1499,9 +1485,6 @@ static MagickBooleanType sRGBTransformImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         PixelInfo
           pixel;
 
@@ -1544,9 +1527,7 @@ static MagickBooleanType sRGBTransformImage(Image *image,
           SetPixelBlue(image,ScaleMapToQuantum(pixel.blue),q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2331,9 +2312,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         PixelInfo
           pixel;
 
@@ -2360,9 +2338,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
           SetPixelViaPixelInfo(image,&pixel,q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
@@ -2385,9 +2361,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         ssize_t
           x;
 
@@ -2416,9 +2389,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
           SetPixelBlue(image,ClampToQuantum(gray),q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
@@ -2441,9 +2412,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         ssize_t
           x;
 
@@ -2471,9 +2439,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
           SetPixelBlue(image,ClampToQuantum(gray),q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
@@ -2531,9 +2497,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         ssize_t
           x;
 
@@ -2565,9 +2528,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
           SetPixelBlue(image,ClampToQuantum(blue),q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
@@ -2672,9 +2633,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         ssize_t
           x;
 
@@ -2705,9 +2663,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
           SetPixelBlue(image,ClampToQuantum(blue),q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
       }
       image_view=DestroyCacheView(image_view);
       if (SetImageColorspace(image,sRGBColorspace,exception) == MagickFalse)
@@ -2899,9 +2855,6 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
-
         PixelInfo
           pixel;
 
@@ -2939,9 +2892,7 @@ static MagickBooleanType TransformsRGBImage(Image *image,
           SetPixelBlue(image,ClampToQuantum(pixel.blue),q);
           q+=(ptrdiff_t) GetPixelChannels(image);
         }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        SyncColorspaceRow(image_view,exception,&status);
         if (image->progress_monitor != (MagickProgressMonitor) NULL)
           {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
