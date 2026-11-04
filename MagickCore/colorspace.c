@@ -1929,6 +1929,77 @@ static void FillLogTransformMap(const LogTransformMap *log_map,
     logmap[i]=QuantumRange;
 }
 
+typedef struct _ColorspaceLogRowInfo
+{
+  Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+
+  Quantum
+    *logmap;
+} ColorspaceLogRowInfo;
+
+static void TransformLogRowTosRGB(MagickBooleanType *status,
+  const ColorspaceLogRowInfo *row,const ssize_t y)
+{
+  Image
+    *const image = row->image;
+
+  CacheView
+    *const image_view = row->image_view;
+
+  ExceptionInfo
+    *const exception = row->exception;
+
+  Quantum
+    *const logmap = row->logmap;
+
+  MagickBooleanType
+    sync;
+
+  ssize_t
+    x;
+
+  Quantum
+    *magick_restrict q;
+
+  if ((*status) == MagickFalse)
+    return;
+  q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
+    exception);
+  if (q == (Quantum *) NULL)
+    {
+      (*status)=MagickFalse;
+      return;
+    }
+  for (x=(ssize_t) image->columns; x != 0; x--)
+  {
+    double
+      blue,
+      green,
+      red;
+
+    red=(double) logmap[ScaleQuantumToMap(GetPixelRed(image,q))];
+    green=(double) logmap[ScaleQuantumToMap(GetPixelGreen(image,q))];
+    blue=(double) logmap[ScaleQuantumToMap(GetPixelBlue(image,q))];
+    SetPixelRed(image,ClampToQuantum(EncodePixelGamma((MagickRealType)
+      red)),q);
+    SetPixelGreen(image,ClampToQuantum(EncodePixelGamma((MagickRealType)
+      green)),q);
+    SetPixelBlue(image,ClampToQuantum(EncodePixelGamma((MagickRealType)
+      blue)),q);
+    q+=(ptrdiff_t) GetPixelChannels(image);
+  }
+  sync=SyncCacheViewAuthenticPixels(image_view,exception);
+  if (sync == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static MagickBooleanType TransformsRGBImage(Image *image,
   ExceptionInfo *exception)
 {
@@ -2533,45 +2604,14 @@ static MagickBooleanType TransformsRGBImage(Image *image,
 #endif
       for (y=0; y < (ssize_t) image->rows; y++)
       {
-        MagickBooleanType
-          sync;
+        ColorspaceLogRowInfo
+          row;
 
-        ssize_t
-          x;
-
-        Quantum
-          *magick_restrict q;
-
-        if (status == MagickFalse)
-          continue;
-        q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,
-          exception);
-        if (q == (Quantum *) NULL)
-          {
-            status=MagickFalse;
-            continue;
-          }
-        for (x=(ssize_t) image->columns; x != 0; x--)
-        {
-          double
-            blue,
-            green,
-            red;
-
-          red=(double) logmap[ScaleQuantumToMap(GetPixelRed(image,q))];
-          green=(double) logmap[ScaleQuantumToMap(GetPixelGreen(image,q))];
-          blue=(double) logmap[ScaleQuantumToMap(GetPixelBlue(image,q))];
-          SetPixelRed(image,ClampToQuantum(EncodePixelGamma((MagickRealType)
-            red)),q);
-          SetPixelGreen(image,ClampToQuantum(EncodePixelGamma((MagickRealType)
-            green)),q);
-          SetPixelBlue(image,ClampToQuantum(EncodePixelGamma((MagickRealType)
-            blue)),q);
-          q+=(ptrdiff_t) GetPixelChannels(image);
-        }
-        sync=SyncCacheViewAuthenticPixels(image_view,exception);
-        if (sync == MagickFalse)
-          status=MagickFalse;
+        row.image=image;
+        row.image_view=image_view;
+        row.exception=exception;
+        row.logmap=logmap;
+        TransformLogRowTosRGB(&status,&row,y);
       }
       image_view=DestroyCacheView(image_view);
       logmap=(Quantum *) RelinquishMagickMemory(logmap);
