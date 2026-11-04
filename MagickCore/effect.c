@@ -1224,16 +1224,11 @@ MagickExport Image *KuwaharaImage(const Image *image,const double radius,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,KuwaharaImageTag,progress,image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        ReportRowProgress(image,KuwaharaImageTag,progress,&status);
       }
   }
   kuwahara_view=DestroyCacheView(kuwahara_view);
