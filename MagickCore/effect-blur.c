@@ -1568,6 +1568,30 @@ static void FillBilateralIntensity(double *intensity_gaussian,
     intensity_gaussian[w+MaxIntensity]=BlurGaussian((double) w,intensity_sigma);
 }
 
+static OffsetInfo FillBilateralSpatial(const size_t width,
+  const size_t height,double *spatial_gaussian,const double spatial_sigma)
+{
+  BilateralSpatial
+    spatial;
+
+  OffsetInfo
+    mid;
+
+  ssize_t
+    n;
+
+  n=0;
+  mid.x=(ssize_t) (MagickMax(width,1)/2L);
+  mid.y=(ssize_t) (MagickMax(height,1)/2L);
+  spatial.width=width;
+  spatial.height=height;
+  spatial.mid=mid;
+  spatial.spatial_gaussian=spatial_gaussian;
+  spatial.spatial_sigma=spatial_sigma;
+  SetBilateralSpatial(&spatial,n);
+  return(mid);
+}
+
 MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
   const size_t height,const double intensity_sigma,const double spatial_sigma,
   ExceptionInfo *exception)
@@ -1617,23 +1641,7 @@ MagickExport Image *BilateralBlurImage(const Image *image,const size_t width,
     }
   FillBilateralIntensity(intensity_gaussian,intensity_sigma);
   spatial_gaussian=weights[number_threads];
-  {
-    BilateralSpatial
-      spatial;
-
-    ssize_t
-      n;
-
-    n=0;
-    mid.x=(ssize_t) (MagickMax(width,1)/2L);
-    mid.y=(ssize_t) (MagickMax(height,1)/2L);
-    spatial.width=width;
-    spatial.height=height;
-    spatial.mid=mid;
-    spatial.spatial_gaussian=spatial_gaussian;
-    spatial.spatial_sigma=spatial_sigma;
-    SetBilateralSpatial(&spatial,n);
-  }
+  mid=FillBilateralSpatial(width,height,spatial_gaussian,spatial_sigma);
   /*
     Bilateral blur image.
   */
