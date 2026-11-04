@@ -1132,6 +1132,17 @@ static MagickBooleanType OilPaintLine(const OilPaintRowInfo *row,
   return(MagickTrue);
 }
 
+static void SetPaintProgress(const Image *image,const char *tag,
+  const MagickOffsetType progress,MagickBooleanType *status)
+{
+  MagickBooleanType
+    proceed;
+
+  proceed=SetImageProgress(image,tag,progress,image->rows);
+  if (proceed == MagickFalse)
+    (*status)=MagickFalse;
+}
+
 MagickExport Image *OilPaintImage(const Image *image,const double radius,
   const double sigma,ExceptionInfo *exception)
 {
@@ -1210,17 +1221,11 @@ MagickExport Image *OilPaintImage(const Image *image,const double radius,
       continue;
     if (linear_image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(linear_image,OilPaintImageTag,progress,
-          linear_image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPaintProgress(linear_image,OilPaintImageTag,progress,&status);
       }
   }
   paint_view=DestroyCacheView(paint_view);
@@ -1426,17 +1431,11 @@ MagickExport MagickBooleanType OpaquePaintImage(Image *image,
       continue;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,OpaquePaintImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPaintProgress(image,OpaquePaintImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1609,17 +1608,11 @@ MagickExport MagickBooleanType TransparentPaintImage(Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,TransparentPaintImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPaintProgress(image,TransparentPaintImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
@@ -1750,17 +1743,11 @@ MagickExport MagickBooleanType TransparentPaintImageChroma(Image *image,
       status=MagickFalse;
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
-        MagickBooleanType
-          proceed;
-
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
         #pragma omp atomic
 #endif
         progress++;
-        proceed=SetImageProgress(image,TransparentPaintImageTag,progress,
-          image->rows);
-        if (proceed == MagickFalse)
-          status=MagickFalse;
+        SetPaintProgress(image,TransparentPaintImageTag,progress,&status);
       }
   }
   image_view=DestroyCacheView(image_view);
