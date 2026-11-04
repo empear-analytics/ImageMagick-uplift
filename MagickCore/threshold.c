@@ -2037,8 +2037,7 @@ MagickExport MagickBooleanType RandomThresholdImage(Image *image,
     row.random_info=random_info;
     row.id=id;
     RandomThresholdPixels(image,&row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncThresholdRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
