@@ -1138,6 +1138,25 @@ static void ContrastColormap(Image *image,const int sign)
   }
 }
 
+typedef struct _EnhanceLine
+{
+  const Image
+    *image;
+
+  CacheView
+    *image_view;
+
+  ExceptionInfo
+    *exception;
+} EnhanceLine;
+
+static void SyncEnhanceRow(const EnhanceLine *line,MagickBooleanType *status)
+{
+  if (SyncCacheViewAuthenticPixels(line->image_view,line->exception) ==
+      MagickFalse)
+    (*status)=MagickFalse;
+}
+
 static void SetEnhanceProgress(const Image *image,const char *tag,
   const MagickOffsetType progress,MagickBooleanType *status)
 {
@@ -2174,6 +2193,9 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
     Quantum
       *magick_restrict q;
 
+    const EnhanceLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2189,8 +2211,7 @@ MagickExport MagickBooleanType ModulateImage(Image *image,const char *modulate,
     modulate_row.percent_brightness=percent_brightness;
     modulate_row.illuminant=illuminant;
     ModulateImageRow(&modulate_row,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncEnhanceRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
@@ -2492,6 +2513,9 @@ MagickExport MagickBooleanType SigmoidalContrastImage(Image *image,
     Quantum
       *magick_restrict q;
 
+    const EnhanceLine
+      line = { image,image_view,exception };
+
     if (status == MagickFalse)
       continue;
     q=GetCacheViewAuthenticPixels(image_view,0,y,image->columns,1,exception);
@@ -2501,8 +2525,7 @@ MagickExport MagickBooleanType SigmoidalContrastImage(Image *image,
         continue;
       }
     SigmoidalContrastImageRow(image,sharpen,contrast,midpoint,q);
-    if (SyncCacheViewAuthenticPixels(image_view,exception) == MagickFalse)
-      status=MagickFalse;
+    SyncEnhanceRow(&line,&status);
     if (image->progress_monitor != (MagickProgressMonitor) NULL)
       {
 #if defined(MAGICKCORE_OPENMP_SUPPORT)
